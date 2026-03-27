@@ -242,13 +242,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
           </form>
         </div>
 
-        {/* Footer */}
-        <p style={{
-          textAlign: 'center', marginTop: 20,
-          fontSize: 11, color: T.text3, fontWeight: 500,
-        }}>
-          Henkel Consumer Brands &middot; Strategy Intelligence Platform
-        </p>
+        {/* spacer */}
+        <div style={{ height: 20 }} />
       </motion.div>
     </div>
   );
