@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createUser, getUserByEmail } from '@/lib/users';
-import { createToken } from '@/lib/auth';
+import { findUserByEmail, createUser } from '@/lib/db';
+import { createToken, hashPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,15 +41,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    if (getUserByEmail(email)) {
+    const existing = await findUserByEmail(email);
+    if (existing) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }
       );
     }
 
-    // Create user
-    const user = await createUser(email, name, password);
+    // Hash password and create user in Neon DB
+    const hashedPw = await hashPassword(password);
+    const user = await createUser(email, hashedPw, name);
 
     // Create token
     const token = await createToken(user.id, user.email);

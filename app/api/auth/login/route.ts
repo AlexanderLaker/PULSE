@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail } from '@/lib/users';
+import { findUserByEmail } from '@/lib/db';
 import { createToken, verifyPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user
-    const user = getUserByEmail(email);
+    // Find user in Neon DB
+    const user = await findUserByEmail(email);
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
-    const isValid = await verifyPassword(password, user.passwordHash);
+    const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
