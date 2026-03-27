@@ -163,7 +163,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                     type="text"
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                    placeholder="PULSE-2026"
+                    placeholder="Enter invite code"
                     required
                     style={{ ...inputStyle, fontFamily: T.mono, letterSpacing: '0.04em' }}
                     onFocus={handleFocus}
