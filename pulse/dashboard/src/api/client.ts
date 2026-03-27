@@ -18,11 +18,42 @@ import type {
   CreateDelphiSessionPayload,
 } from '../types';
 
+// ── Auth Types ──────────────────────────────────────────────────
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+// ── Token Storage ──────────────────────────────────────────────
+
+const TOKEN_KEY = 'pulse_token';
+
+export function getStoredToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+export function setStoredToken(token: string): void {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* noop */ }
+}
+
+export function clearStoredToken(): void {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* noop */ }
+}
+
 // ── Base Request ─────────────────────────────────────────────────
 
 const BASE = '/api/v1';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
@@ -30,16 +61,35 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+  const token = getStoredToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: string };
     throw new ApiError(res.status, err.detail ?? `API ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
+
+// ── Auth ────────────────────────────────────────────────────────
+
+export const register = (data: { email: string; password: string; name: string; invite_code: string }): Promise<AuthResponse> =>
+  request('/auth/register', { method: 'POST', body: JSON.stringify(data) });
+
+export const login = (data: { email: string; password: string }): Promise<AuthResponse> =>
+  request('/auth/login', { method: 'POST', body: JSON.stringify(data) });
+
+export const getMe = (): Promise<AuthUser | null> =>
+  request('/auth/me');
+
+export const getUsers = (): Promise<AuthUser[]> =>
+  request('/auth/users');
 
 // ── Health & Config ──────────────────────────────────────────────
 

@@ -50,6 +50,7 @@ from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routes.delphi import router as delphi_router
+from pulse.api.routes.auth import router as auth_router
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,9 @@ def create_app(args=None) -> FastAPI:
     # Include Delphi expert elicitation routes
     app.include_router(delphi_router, prefix="/api/v1")
 
+    # Include auth routes
+    app.include_router(auth_router, prefix="/api/v1")
+
     # ── Lazy Initialization (Vercel serverless compatibility) ─────
     _initialized = {"done": False}
 
@@ -243,6 +247,10 @@ def create_app(args=None) -> FastAPI:
                 from pulse.elicitation.delphi import DelphiProtocol
                 _state["delphi"] = DelphiProtocol()
                 _state["delphi"]._ensure_tables_exist()
+
+                # Initialize auth tables
+                from pulse.api.auth import ensure_auth_tables
+                ensure_auth_tables()
 
                 # Seed with built-in data
                 if not _state["db"]:
