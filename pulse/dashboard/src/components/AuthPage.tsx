@@ -152,7 +152,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Alex Laker"
+                    placeholder="Enter name"
                     required
                     style={inputStyle}
                     onFocus={handleFocus}
@@ -178,7 +178,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="alex@henkel.com"
+              placeholder="Enter email"
               required
               autoComplete="email"
               style={inputStyle}
