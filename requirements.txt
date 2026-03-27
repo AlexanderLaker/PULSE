@@ -1,0 +1,45 @@
+# PULSE — Profit Pool Unified Landscape Simulation Engine
+# Requirements for Phase 1-3
+
+# Core
+pandas>=2.2
+numpy>=1.26
+scipy>=1.12
+openpyxl>=3.1
+networkx>=3.2
+python-dotenv>=1.0
+
+# Bayesian / Statistical
+arviz>=0.17
+statsmodels>=0.14
+SALib>=1.4  # Sobol sensitivity analysis
+
+# API Server (Phase 2)
+fastapi>=0.110
+uvicorn>=0.27
+pydantic>=2.6
+
+# AI Layer (Phase 3)
+anthropic>=0.40
+feedparser>=6.0
+newspaper3k>=0.2
+beautifulsoup4>=4.12
+
+# Export
+python-pptx>=0.6
+reportlab>=4.1
+jinja2>=3.1
+
+# API Integrations
+gdeltdoc>=1.4
+python-epo-ops-client>=4.1
+pytrends>=4.9
+praw>=7.7
+google-api-python-client>=2.100
+fredapi>=0.5
+openmeteo-requests>=1.2
+
+# Testing
+pytest>=8.0
+pytest-cov>=4.1
+hypothesis>=6.98

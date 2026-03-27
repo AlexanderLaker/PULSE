@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PULSE War Room — Profit Pool Simulation Engine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       DESIGN TOKENS — Apple-Grade Executive Dashboard
+       ═══════════════════════════════════════════════════════════════════ */
+
+    :root {
+      /* Base Colors */
+      --bg-primary: #0F172A;
+      --bg-secondary: #1E293B;
+      --bg-tertiary: #334155;
+      --bg-glass: rgba(30, 41, 59, 0.8);
+      --border: rgba(71, 85, 105, 0.5);
+      --border-hover: rgba(71, 85, 105, 0.8);
+
+      /* Accent */
+      --accent-blue: #3B82F6;
+      --accent-blue-hover: #60A5FA;
+      --accent-gold: #D4A847;
+
+      /* Semantic */
+      --expansion: #22C55E;
+      --contraction: #EF4444;
+      --neutral: #94A3B8;
+      --warning: #EAB308;
+      --causal: #8B5CF6;
+
+      /* Text */
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+
+      /* Typography */
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       LAYOUT: Main Grid Structure
+       ───────────────────────────────────────────────────────────────── */
+
+    .war-room {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      grid-template-columns: 1fr;
+      min-height: 100vh;
+      gap: 0;
+    }
+
+    .war-room-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+    }
+
+    .war-room-header-left {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    /* Tab Switcher */
+    .tab-switcher {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-tertiary);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+      white-space: nowrap;
+    }
+
+    .tab-button:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-button.active {
+      background: var(--bg-secondary);
+      color: var(--accent-blue);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .pulse-logo {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pulse-logo-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 500;
+    }
+
+    .war-room-header-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn-header {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-family);
+    }
+
+    .btn-header:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       SCENARIO SELECTOR
+       ───────────────────────────────────────────────────────────────── */
+
+    .scenario-bar {
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .scenario-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .scenario-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-scenario {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+    }
+
+    .btn-scenario:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .btn-scenario.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: white;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       MAIN CONTENT AREA
+       ───────────────────────────────────────────────────────────────── */
+
+    .war-room-content {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      padding: 24px 32px;
+      overflow-y: auto;
+    }
+
+    .war-room-main {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       HEADLINE KPI CARDS
+       ───────────────────────────────────────────────────────────────── */
+
+    .headline-kpi {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .kpi-card {
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: slideIn 0.4s ease-out forwards;
+      transition: all 0.3s;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .kpi-card:hover {
+      border-color: var(--border-hover);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(51, 65, 85, 0.5) 100%);
+    }
+
+    .kpi-label-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kpi-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(59, 130, 246, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    .kpi-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 300;
+      font-family: var(--font-mono);
+      letter-spacing: -0.5px;
+    }
+
+    .kpi-detail {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       SHIFT HEATMAP TABLE
+       ───────────────────────────────────────────────────────────────── */
+
+    .heatmap-panel {
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+      overflow-x: auto;
+    }
+
+    .heatmap-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .heatmap-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .heatmap-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-box {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .heatmap-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 2px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .heatmap-table thead {
+      background: transparent;
+    }
+
+    .heatmap-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .heatmap-table th.year {
+      text-align: center;
+      min-width: 70px;
+    }
+
+    .heatmap-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .heatmap-category {
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .category-marker {
+      width: 3px;
+      height: 20px;
+      border-radius: 1px;
+      background: var(--accent-blue);
+    }
+
+    .heatmap-cell {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+
+    .heatmap-cell:hover {
+      transform: scale(1.08);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .shift-positive {
+      color: var(--expansion);
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .shift-negative {
+      color: var(--contraction);
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .shift-neutral {
+      color: var(--text-secondary);
+      background: transparent;
+    }
+
+    .heatmap-row:hover {
+      background: var(--border);
+      border-radius: 8px;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       PATH TIMELINE CHART
+       ───────────────────────────────────────────────────────────────── */
+
+    .path-timeline-panel {
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+    }
+
+    .path-header {
+      margin-bottom: 20px;
+    }
+
+    .path-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 4px;
+    }
+
+    .path-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .chart-container {
+      height: 220px;
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .path-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .legend-category {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       CONTEXT PANEL (Right Sidebar)
+       ───────────────────────────────────────────────────────────────── */
+
+    .context-panel {
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+      height: fit-content;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+      position: sticky;
+      top: 120px;
+    }
+
+    .context-panel-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .context-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .context-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-close:hover {
+      color: var(--text-primary);
+    }
+
+    .context-section {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .context-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .context-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    .context-value {
+      font-size: 13px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .context-detail {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .posterior-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--bg-tertiary);
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .posterior-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-gold) 100%);
+      border-radius: 4px;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       AI INSIGHTS BAR (Bottom)
+       ───────────────────────────────────────────────────────────────── */
+
+    .ai-insights-bar {
+      padding: 12px 32px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--causal);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .ai-badge:hover {
+      background: rgba(139, 92, 246, 0.2);
+    }
+
+    .ai-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--causal);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       SCROLLBAR STYLING
+       ───────────────────────────────────────────────────────────────── */
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border-hover);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       RESPONSIVE
+       ───────────────────────────────────────────────────────────────── */
+
+    @media (max-width: 1024px) {
+      .war-room-content {
+        grid-template-columns: 1fr;
+      }
+
+      .context-panel {
+        position: static;
+        top: auto;
+        max-height: none;
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       TREND EXPLORER VIEW
+       ───────────────────────────────────────────────────────────────── */
+
+    .view-container {
+      display: none;
+    }
+
+    .view-container.active {
+      display: contents;
+    }
+
+    .trend-explorer-content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 24px 32px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .trend-explorer-toolbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .force-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .force-chip {
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+      white-space: nowrap;
+    }
+
+    .force-chip:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-tertiary);
+    }
+
+    .force-chip.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: white;
+    }
+
+    .force-chip.consumer.active { background: #3B82F6; border-color: #3B82F6; }
+    .force-chip.customer.active { background: #8B5CF6; border-color: #8B5CF6; }
+    .force-chip.technology.active { background: #06B6D4; border-color: #06B6D4; }
+    .force-chip.government.active { background: #F59E0B; border-color: #F59E0B; }
+    .force-chip.environmental.active { background: #22C55E; border-color: #22C55E; }
+    .force-chip.competitive.active { background: #EF4444; border-color: #EF4444; }
+
+    .search-container {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: var(--font-family);
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      background: var(--bg-tertiary);
+    }
+
+    .delphi-button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--accent-blue);
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--accent-blue);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+    }
+
+    .delphi-button:hover {
+      background: rgba(59, 130, 246, 0.2);
+    }
+
+    .trend-table-container {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(51, 65, 85, 0.3) 100%);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .trend-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .trend-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .trend-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .trend-table tbody tr {
+      transition: background 0.2s;
+    }
+
+    .trend-table tbody tr:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .force-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 80px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .force-badge.consumer { background: rgba(59, 130, 246, 0.8); }
+    .force-badge.customer { background: rgba(139, 92, 246, 0.8); }
+    .force-badge.technology { background: rgba(6, 182, 212, 0.8); }
+    .force-badge.government { background: rgba(245, 158, 11, 0.8); }
+    .force-badge.environmental { background: rgba(34, 197, 94, 0.8); }
+    .force-badge.competitive { background: rgba(239, 68, 68, 0.8); }
+
+    .trend-name {
+      color: var(--accent-blue);
+      cursor: pointer;
+      transition: color 0.2s;
+      font-weight: 500;
+    }
+
+    .trend-name:hover {
+      color: var(--accent-blue-hover);
+    }
+
+    .direction-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+    }
+
+    .direction-expansion {
+      color: var(--expansion);
+    }
+
+    .direction-contraction {
+      color: var(--contraction);
+    }
+
+    .dot-bar {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .dot:hover {
+      border-color: var(--accent-blue);
+      background: var(--bg-tertiary);
+      transform: scale(1.1);
+    }
+
+    .dot.filled {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: white;
+    }
+
+    .score-value {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      min-width: 50px;
+    }
+
+    .shift-value {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      min-width: 60px;
+    }
+
+    .shift-positive {
+      color: var(--expansion);
+    }
+
+    .shift-negative {
+      color: var(--contraction);
+    }
+
+    .expand-icon {
+      cursor: pointer;
+      color: var(--text-secondary);
+      user-select: none;
+      transition: transform 0.2s;
+    }
+
+    .trend-row.expanded .expand-icon {
+      transform: rotate(90deg);
+    }
+
+    .trend-detail-row {
+      display: none;
+    }
+
+    .trend-detail-row.show {
+      display: table-row;
+    }
+
+    .trend-detail-cell {
+      padding: 20px 16px !important;
+      background: var(--bg-secondary);
+    }
+
+    .trend-detail-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+
+    .trend-detail-left {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .trend-detail-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .trend-detail-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .trend-detail-text {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .exposure-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 12px;
+    }
+
+    .exposure-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px;
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+    }
+
+    .exposure-name {
+      font-size: 10px;
+      text-align: center;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .exposure-dots {
+      display: flex;
+      gap: 2px;
+    }
+
+    .exposure-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .exposure-dot.filled {
+      background: var(--accent-blue);
+    }
+
+    .detail-button-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .detail-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+    }
+
+    .detail-button:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    .detail-button.save {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: white;
+    }
+
+    .detail-button.save:hover {
+      background: var(--accent-blue-hover);
+      border-color: var(--accent-blue-hover);
+    }
+
+    /* Delphi Panel */
+    .delphi-panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 40;
+    }
+
+    .delphi-panel-overlay.active {
+      display: block;
+    }
+
+    .delphi-panel {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 420px;
+      background: var(--bg-primary);
+      border-left: 1px solid var(--border);
+      box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s ease-out;
+    }
+
+    .delphi-panel.open {
+      transform: translateX(0);
+    }
+
+    .delphi-panel-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .delphi-panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .delphi-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .delphi-close-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .delphi-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0;
+    }
+
+    .delphi-tab {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-family: var(--font-family);
+    }
+
+    .delphi-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .delphi-tab.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+
+    .delphi-tab-content {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .delphi-tab-content.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .delphi-session-card {
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .delphi-session-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .delphi-session-detail {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .delphi-scoring-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .delphi-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .delphi-form-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .delphi-slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .delphi-slider {
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--bg-tertiary);
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .delphi-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      border: 2px solid var(--bg-primary);
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .delphi-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      border: 2px solid var(--bg-primary);
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .delphi-slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .delphi-slider-value {
+      display: flex;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      font-family: var(--font-mono);
+    }
+
+    .delphi-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 11px;
+      font-family: var(--font-family);
+      resize: vertical;
+      transition: all 0.2s;
+    }
+
+    .delphi-textarea:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      background: var(--bg-tertiary);
+    }
+
+    .delphi-submit-btn {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent-blue);
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: var(--font-family);
+      margin-top: 8px;
+    }
+
+    .delphi-submit-btn:hover {
+      background: var(--accent-blue-hover);
+    }
+
+    @media (max-width: 768px) {
+      .war-room-header {
+        padding: 16px 20px;
+      }
+
+      .war-room-content {
+        padding: 16px 20px;
+        gap: 16px;
+      }
+
+      .headline-kpi {
+        grid-template-columns: 1fr;
+      }
+
+      .scenario-bar {
+        padding: 12px 20px;
+        overflow-x: auto;
+      }
+
+      .heatmap-table {
+        font-size: 10px;
+      }
+
+      .heatmap-table th,
+      .heatmap-table td {
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="war-room">
+    <!-- ═════════════════════════════════════════════════════════════════
+         HEADER
+         ═════════════════════════════════════════════════════════════════ -->
+    <div class="war-room-header">
+      <div class="war-room-header-left">
+        <div>
+          <div class="pulse-logo">PULSE</div>
+          <div class="pulse-logo-subtitle">War Room v3</div>
+        </div>
+        <div class="tab-switcher">
+          <button class="tab-button active" onclick="switchView('war-room')">War Room</button>
+          <button class="tab-button" onclick="switchView('trend-explorer')">Trend Explorer</button>
+        </div>
+      </div>
+      <div class="war-room-header-right">
+        <button class="btn-header">⚙️ Settings</button>
+        <button class="btn-header">↓ Export</button>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         WAR ROOM VIEW (War Room & Scenario Bar & Content)
+         ═════════════════════════════════════════════════════════════════ -->
+    <div id="war-room-view" class="view-container active">
+    <!-- SCENARIO SELECTOR -->
+    <div class="scenario-bar">
+      <span class="scenario-label">Scenario:</span>
+      <div class="scenario-buttons">
+        <button class="btn-scenario active" onclick="selectScenario('base')">Base Case</button>
+        <button class="btn-scenario" onclick="selectScenario('green')">Green Squeeze</button>
+        <button class="btn-scenario" onclick="selectScenario('tech')">Tech Disruption</button>
+        <button class="btn-scenario" onclick="selectScenario('price')">Price War</button>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         MAIN CONTENT
+         ═════════════════════════════════════════════════════════════════ -->
+    <div class="war-room-content">
+      <div class="war-room-main">
+        <!-- ─────────────────────────────────────────────────────────────
+             HEADLINE KPI CARDS
+             ───────────────────────────────────────────────────────────── -->
+        <div class="headline-kpi">
+          <div class="kpi-card" style="animation-delay: 0s">
+            <div class="kpi-label-container">
+              <div class="kpi-icon">📊</div>
+              <span class="kpi-label">Portfolio Shift 2030</span>
+            </div>
+            <div class="kpi-value" style="color: var(--contraction)">-3.1%</div>
+            <div class="kpi-detail">13 categories analyzed</div>
+          </div>
+
+          <div class="kpi-card" style="animation-delay: 0.08s">
+            <div class="kpi-label-container">
+              <div class="kpi-icon">📈</div>
+              <span class="kpi-label">Top Expansion</span>
+            </div>
+            <div class="kpi-value" style="color: var(--expansion)">+4.2%</div>
+            <div class="kpi-detail">Hair: Care</div>
+          </div>
+
+          <div class="kpi-card" style="animation-delay: 0.16s">
+            <div class="kpi-label-container">
+              <div class="kpi-icon">📉</div>
+              <span class="kpi-label">Top Contraction</span>
+            </div>
+            <div class="kpi-value" style="color: var(--contraction)">-7.8%</div>
+            <div class="kpi-detail">LHC: FCN</div>
+          </div>
+
+          <div class="kpi-card" style="animation-delay: 0.24s">
+            <div class="kpi-label-container">
+              <div class="kpi-icon">✓</div>
+              <span class="kpi-label">Model Quality</span>
+            </div>
+            <div class="kpi-value" style="color: var(--expansion)">73%</div>
+            <div class="kpi-detail">R̂ 1.03 · Backtest Accuracy</div>
+          </div>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             SHIFT HEATMAP
+             ───────────────────────────────────────────────────────────── -->
+        <div class="heatmap-panel">
+          <div class="heatmap-header">
+            <h3 class="heatmap-title">Shift Matrix — Category × Time Path</h3>
+            <div class="heatmap-legend">
+              <div class="legend-item">
+                <div class="legend-box" style="background: var(--expansion)"></div>
+                Expansion
+              </div>
+              <div class="legend-item">
+                <div class="legend-box" style="background: var(--contraction)"></div>
+                Contraction
+              </div>
+            </div>
+          </div>
+
+          <table class="heatmap-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="year">2026</th>
+                <th class="year">2027</th>
+                <th class="year">2028</th>
+                <th class="year">2029</th>
+                <th class="year">2030</th>
+                <th class="year">Δ 2030</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Hair Categories -->
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #F87171"></span>Hair: Color</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('hair_color')">-0.5%</td>
+                <td class="heatmap-cell shift-negative">-1.2%</td>
+                <td class="heatmap-cell shift-negative">-2.1%</td>
+                <td class="heatmap-cell shift-negative">-3.5%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-5.2%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-5.2%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #FB923C"></span>Hair: Care</span></td>
+                <td class="heatmap-cell shift-positive" onclick="selectCategory('hair_care')">+0.8%</td>
+                <td class="heatmap-cell shift-positive">+1.5%</td>
+                <td class="heatmap-cell shift-positive">+2.4%</td>
+                <td class="heatmap-cell shift-positive">+3.2%</td>
+                <td class="heatmap-cell shift-positive" style="font-weight: bold;">+4.2%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--expansion); background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4);">+4.2%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #FBBF24"></span>Hair: Styling</span></td>
+                <td class="heatmap-cell shift-neutral" onclick="selectCategory('hair_styling')">-0.2%</td>
+                <td class="heatmap-cell shift-neutral">-0.3%</td>
+                <td class="heatmap-cell shift-neutral">-0.5%</td>
+                <td class="heatmap-cell shift-neutral">-0.8%</td>
+                <td class="heatmap-cell shift-neutral" style="font-weight: bold;">-1.1%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.4);">-1.1%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #A3E635"></span>Hair: Body</span></td>
+                <td class="heatmap-cell shift-positive" onclick="selectCategory('hair_body')">+0.3%</td>
+                <td class="heatmap-cell shift-positive">+0.6%</td>
+                <td class="heatmap-cell shift-positive">+1.0%</td>
+                <td class="heatmap-cell shift-positive">+1.5%</td>
+                <td class="heatmap-cell shift-positive" style="font-weight: bold;">+2.1%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--expansion); background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4);">+2.1%</div></td>
+              </tr>
+
+              <!-- LHC Categories -->
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #34D399"></span>LHC: FCN</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_fcn')">-1.2%</td>
+                <td class="heatmap-cell shift-negative">-2.8%</td>
+                <td class="heatmap-cell shift-negative">-4.2%</td>
+                <td class="heatmap-cell shift-negative">-5.8%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-7.8%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-7.8%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #2DD4BF"></span>LHC: FCA</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_fca')">-0.4%</td>
+                <td class="heatmap-cell shift-negative">-0.9%</td>
+                <td class="heatmap-cell shift-negative">-1.5%</td>
+                <td class="heatmap-cell shift-negative">-2.2%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-3.1%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-3.1%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #22D3EE"></span>LHC: FFI</span></td>
+                <td class="heatmap-cell shift-positive" onclick="selectCategory('lhc_ffi')">+0.2%</td>
+                <td class="heatmap-cell shift-positive">+0.4%</td>
+                <td class="heatmap-cell shift-positive">+0.7%</td>
+                <td class="heatmap-cell shift-positive">+1.0%</td>
+                <td class="heatmap-cell shift-positive" style="font-weight: bold;">+1.4%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--expansion); background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4);">+1.4%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #60A5FA"></span>LHC: LAD</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_lad')">-0.3%</td>
+                <td class="heatmap-cell shift-negative">-0.7%</td>
+                <td class="heatmap-cell shift-negative">-1.2%</td>
+                <td class="heatmap-cell shift-negative">-1.8%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-2.5%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-2.5%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #818CF8"></span>LHC: HDW</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_hdw')">-0.6%</td>
+                <td class="heatmap-cell shift-negative">-1.3%</td>
+                <td class="heatmap-cell shift-negative">-2.1%</td>
+                <td class="heatmap-cell shift-negative">-3.0%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-4.2%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-4.2%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #A78BFA"></span>LHC: ADW</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_adw')">-0.1%</td>
+                <td class="heatmap-cell shift-negative">-0.3%</td>
+                <td class="heatmap-cell shift-negative">-0.5%</td>
+                <td class="heatmap-cell shift-negative">-0.8%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-1.2%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.4);">-1.2%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #C084FC"></span>LHC: HSC</span></td>
+                <td class="heatmap-cell shift-positive" onclick="selectCategory('lhc_hsc')">+0.5%</td>
+                <td class="heatmap-cell shift-positive">+1.0%</td>
+                <td class="heatmap-cell shift-positive">+1.6%</td>
+                <td class="heatmap-cell shift-positive">+2.2%</td>
+                <td class="heatmap-cell shift-positive" style="font-weight: bold;">+3.0%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--expansion); background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4);">+3.0%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #E879F9"></span>LHC: IC</span></td>
+                <td class="heatmap-cell shift-negative" onclick="selectCategory('lhc_ic')">-0.8%</td>
+                <td class="heatmap-cell shift-negative">-1.8%</td>
+                <td class="heatmap-cell shift-negative">-3.0%</td>
+                <td class="heatmap-cell shift-negative">-4.3%</td>
+                <td class="heatmap-cell shift-negative" style="font-weight: bold;">-5.8%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--contraction); background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4);">-5.8%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #06B6D4"></span>LHC: HS</span></td>
+                <td class="heatmap-cell shift-positive" onclick="selectCategory('lhc_hs')">+0.1%</td>
+                <td class="heatmap-cell shift-positive">+0.2%</td>
+                <td class="heatmap-cell shift-positive">+0.4%</td>
+                <td class="heatmap-cell shift-positive">+0.6%</td>
+                <td class="heatmap-cell shift-positive" style="font-weight: bold;">+0.8%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.4);">+0.8%</div></td>
+              </tr>
+
+              <tr class="heatmap-row">
+                <td><span class="heatmap-category"><span class="category-marker" style="background: #F59E0B"></span>LHC: OTC</span></td>
+                <td class="heatmap-cell shift-neutral" onclick="selectCategory('lhc_otc')">0.0%</td>
+                <td class="heatmap-cell shift-neutral">+0.1%</td>
+                <td class="heatmap-cell shift-neutral">+0.2%</td>
+                <td class="heatmap-cell shift-neutral">+0.3%</td>
+                <td class="heatmap-cell shift-neutral" style="font-weight: bold;">+0.4%</td>
+                <td class="heatmap-cell"><div style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.4);">+0.4%</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ─────────────────────────────────────────────────────────────
+             PATH TIMELINE CHART
+             ───────────────────────────────────────────────────────────── -->
+        <div class="path-timeline-panel">
+          <div class="path-header">
+            <div class="path-title">Path — Continuous Shift Trajectory</div>
+            <div class="path-subtitle">median ± 80% CI (p10 – p90) for selected category</div>
+          </div>
+
+          <div class="chart-container">
+            <svg viewBox="0 0 600 220" style="background: transparent;">
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.01"/>
+                </linearGradient>
+              </defs>
+
+              <!-- Grid -->
+              <line x1="50" y1="20" x2="50" y2="180" stroke="rgba(71, 85, 105, 0.5)" stroke-width="1"/>
+              <line x1="50" y1="180" x2="580" y2="180" stroke="rgba(71, 85, 105, 0.5)" stroke-width="1"/>
+              <line x1="50" y1="100" x2="580" y2="100" stroke="rgba(71, 85, 105, 0.3)" stroke-width="1" stroke-dasharray="2 2"/>
+
+              <!-- Y-axis labels (%) -->
+              <text x="40" y="185" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="end">0%</text>
+              <text x="40" y="105" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="end">-3%</text>
+              <text x="40" y="25" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="end">-6%</text>
+
+              <!-- Path area (confidence band) -->
+              <path d="M 80 120 L 150 130 L 220 145 L 290 158 L 360 168 L 430 170 L 500 165 L 500 155 L 430 160 L 360 158 L 290 148 L 220 135 L 150 120 L 80 110 Z" fill="url(#areaGrad)"/>
+
+              <!-- Median line -->
+              <path d="M 80 115 L 150 125 L 220 140 L 290 153 L 360 163 L 430 165 L 500 160"
+                    stroke="#3B82F6" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+              <!-- Data points -->
+              <circle cx="80" cy="115" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="150" cy="125" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="220" cy="140" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="290" cy="153" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="360" cy="163" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="430" cy="165" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+              <circle cx="500" cy="160" r="3" fill="#3B82F6" stroke="white" stroke-width="2"/>
+
+              <!-- X-axis labels (years) -->
+              <text x="80" y="200" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="middle">2026</text>
+              <text x="150" y="200" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="middle">2027</text>
+              <text x="220" y="200" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="middle">2028</text>
+              <text x="290" y="200" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="middle">2029</text>
+              <text x="360" y="200" font-family="var(--font-mono)" font-size="10" fill="var(--text-muted)" text-anchor="middle">2030</text>
+
+              <!-- Tooltip indicator -->
+              <circle cx="290" cy="153" r="5" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.3"/>
+            </svg>
+          </div>
+
+          <div class="path-legend">
+            <div class="legend-category">
+              <div class="legend-dot" style="background: #3B82F6;"></div>
+              <span>Hair: Care</span>
+            </div>
+            <div class="legend-category">
+              <div class="legend-dot" style="background: #A78BFA;"></div>
+              <span>Hair: Color</span>
+            </div>
+            <div class="legend-category">
+              <div class="legend-dot" style="background: #34D399;"></div>
+              <span>LHC: FCN</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════════════
+           CONTEXT PANEL (Right Sidebar)
+           ═════════════════════════════════════════════════════════════════ -->
+      <div class="context-panel" id="contextPanel">
+        <div class="context-panel-empty">
+          Click any category cell to view details here
+        </div>
+      </div>
+    </div>
+    </div><!-- End war-room-view -->
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         TREND EXPLORER VIEW
+         ═════════════════════════════════════════════════════════════════ -->
+    <div id="trend-explorer-view" class="view-container">
+      <div class="trend-explorer-content">
+        <!-- Toolbar -->
+        <div class="trend-explorer-toolbar">
+          <div class="force-filters">
+            <button class="force-chip active" onclick="filterByForce('all')">All Forces</button>
+            <button class="force-chip consumer" onclick="filterByForce('consumer')">Consumer</button>
+            <button class="force-chip customer" onclick="filterByForce('customer')">Customer</button>
+            <button class="force-chip technology" onclick="filterByForce('technology')">Technology</button>
+            <button class="force-chip government" onclick="filterByForce('government')">Government</button>
+            <button class="force-chip environmental" onclick="filterByForce('environmental')">Environmental</button>
+            <button class="force-chip competitive" onclick="filterByForce('competitive')">Competitive</button>
+          </div>
+          <div class="search-container">
+            <input type="text" class="search-input" id="trendSearch" placeholder="Search trends..." onkeyup="filterTrends()">
+          </div>
+          <button class="delphi-button" onclick="openDelphiPanel()">📋 Delphi Panel</button>
+        </div>
+
+        <!-- Trends Table -->
+        <div class="trend-table-container">
+          <table class="trend-table" id="trendTable">
+            <thead>
+              <tr>
+                <th style="width: 30px;"></th>
+                <th style="width: 100px;">Force</th>
+                <th style="flex: 1;">Trend Name</th>
+                <th style="width: 90px;">Direction</th>
+                <th style="width: 100px;">Impact</th>
+                <th style="width: 120px;">Probability</th>
+                <th style="width: 80px;">Score</th>
+                <th style="width: 100px;">GP1 Shift %</th>
+              </tr>
+            </thead>
+            <tbody id="trendTableBody">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════
+         AI INSIGHTS BAR (Footer)
+         ═════════════════════════════════════════════════════════════════ -->
+    <div class="ai-insights-bar">
+      <div class="ai-dot"></div>
+      <span class="ai-badge">🧠 3 new signals detected</span>
+      <span>·</span>
+      <span class="ai-badge">⚠️ FCN trigger breached</span>
+      <span>·</span>
+      <span>Model converged in 12.4s</span>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════
+       DELPHI PANEL (Slide-in)
+       ═════════════════════════════════════════════════════════════════ -->
+  <div id="delphiOverlay" class="delphi-panel-overlay" onclick="closeDelphiPanel()"></div>
+  <div id="delphiPanel" class="delphi-panel">
+    <div class="delphi-panel-header">
+      <div class="delphi-panel-title">Delphi Elicitation</div>
+      <button class="delphi-close-btn" onclick="closeDelphiPanel()">✕</button>
+    </div>
+    <div class="delphi-tabs">
+      <button class="delphi-tab active" onclick="switchDelphiTab('sessions')">Sessions</button>
+      <button class="delphi-tab" onclick="switchDelphiTab('scoring')">Scoring</button>
+      <button class="delphi-tab" onclick="switchDelphiTab('summary')">Summary</button>
+      <button class="delphi-tab" onclick="switchDelphiTab('consensus')">Consensus</button>
+    </div>
+    <div class="delphi-tab-content active" id="delphi-sessions">
+      <div class="delphi-session-card">
+        <div class="delphi-session-title">Q2 2026 Trend Calibration</div>
+        <div class="delphi-session-detail">
+          Status: In Progress<br>
+          Started: Mar 15, 2026<br>
+          Participants: 4 experts<br>
+          Round: 2 of 3
+        </div>
+      </div>
+      <div class="delphi-session-card">
+        <div class="delphi-session-title">Q1 2026 Baseline</div>
+        <div class="delphi-session-detail">
+          Status: Completed<br>
+          Rounds: 3 completed<br>
+          Consensus: Strong (α=0.82)<br>
+          Archive: View results
+        </div>
+      </div>
+    </div>
+    <div class="delphi-tab-content" id="delphi-scoring">
+      <form class="delphi-scoring-form" id="delphiScoringForm">
+        <div class="delphi-form-group">
+          <div class="delphi-form-label">Trend: Natural / Clean Beauty Movement</div>
+          <div class="trend-detail-text" style="margin-bottom: 8px;">Consumer preference shift toward natural, clean-label personal care products. Driven by ingredient transparency concerns and wellness positioning.</div>
+        </div>
+
+        <div class="delphi-form-group">
+          <div class="delphi-form-label">Impact: How transformative is this trend?</div>
+          <div class="delphi-slider-container">
+            <input type="range" min="1" max="5" value="4" class="delphi-slider" id="impactSlider" oninput="updateSliderValue('impact', this.value)">
+            <div class="delphi-slider-labels">
+              <span>Negligible</span>
+              <span>Transformative</span>
+            </div>
+            <div class="delphi-slider-value" id="impactValue">4</div>
+          </div>
+        </div>
+
+        <div class="delphi-form-group">
+          <div class="delphi-form-label">Probability: How likely is this to materialize?</div>
+          <div class="delphi-slider-container">
+            <input type="range" min="1" max="5" value="4" class="delphi-slider" id="probabilitySlider" oninput="updateSliderValue('probability', this.value)">
+            <div class="delphi-slider-labels">
+              <span>Very Unlikely</span>
+              <span>Almost Certain</span>
+            </div>
+            <div class="delphi-slider-value" id="probabilityValue">4</div>
+          </div>
+        </div>
+
+        <div class="delphi-form-group">
+          <div class="delphi-form-label">Rationale (min 20 chars)</div>
+          <textarea class="delphi-textarea" id="rationaleText" placeholder="Explain your scoring rationale..."></textarea>
+        </div>
+
+        <button type="button" class="delphi-submit-btn" onclick="submitDelphiScore()">Submit Score</button>
+      </form>
+    </div>
+    <div class="delphi-tab-content" id="delphi-summary">
+      <div class="delphi-session-card">
+        <div class="delphi-session-title">Round 2 Summary</div>
+        <div class="delphi-session-detail" style="margin-top: 12px;">
+          <strong>Scored Trends:</strong> 18 of 25<br>
+          <strong>Avg Time/Trend:</strong> 2.3 min<br>
+          <strong>Consistency:</strong> High (ICC=0.79)<br>
+          <strong>Deadline:</strong> Mar 31, 2026
+        </div>
+      </div>
+    </div>
+    <div class="delphi-tab-content" id="delphi-consensus">
+      <div class="delphi-session-card">
+        <div class="delphi-session-title">Consensus Scores (Q1 2026)</div>
+        <div class="delphi-session-detail" style="margin-top: 12px;">
+          <strong>Natural Beauty:</strong><br>
+          Impact: 4.2/5 (α=0.85)<br>
+          Probability: 4.0/5 (α=0.81)<br>
+          <br>
+          <strong>Premiumization:</strong><br>
+          Impact: 3.8/5 (α=0.79)<br>
+          Probability: 3.9/5 (α=0.77)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════
+       JAVASCRIPT
+       ═════════════════════════════════════════════════════════════════ -->
+  <script>
+    const categoryData = {
+      'hair_color': {
+        name: 'Hair: Color',
+        force: 'Consumer',
+        direction: 'Contraction',
+        impact: 4,
+        probability: 4,
+        description: 'Contraction driven by Gen Z DIY trend and private label acceptance in premium segments.',
+        trends: [
+          'Gen Z DIY & Salon-Skip Trend',
+          'Silver Economy & Aging Hair Care (defensive)',
+          'Premiumization pulls away volume'
+        ],
+        directEffects: { Consumer: -0.025, Government: -0.005, Technology: 0.002 },
+        posteriorMean: 0.65
+      },
+      'hair_care': {
+        name: 'Hair: Care',
+        force: 'Consumer',
+        direction: 'Expansion',
+        impact: 5,
+        probability: 4,
+        description: 'Expansion driven by clean beauty movement and premiumization in hair care segment.',
+        trends: [
+          'Natural / Clean Beauty Movement',
+          'Premiumization & Masstige Growth',
+          'Silver Economy & Aging Hair Care'
+        ],
+        directEffects: { Consumer: 0.035, Technology: 0.008, Government: 0.002 },
+        posteriorMean: 0.72
+      },
+      'hair_styling': {
+        name: 'Hair: Styling',
+        force: 'Consumer',
+        direction: 'Neutral',
+        impact: 2,
+        probability: 3,
+        description: 'Relatively stable with minimal directional pressure. DIY trend offsets premiumization.',
+        trends: [
+          'Sustainability-driven brand switching (slight)',
+          'Private label pressure (minimal)',
+          'Gen Z DIY benefit (offsetting)'
+        ],
+        directEffects: { Consumer: 0.001, Technology: -0.002, Competitive: -0.001 },
+        posteriorMean: 0.48
+      },
+      'hair_body': {
+        name: 'Hair: Body',
+        force: 'Consumer',
+        direction: 'Expansion',
+        impact: 3,
+        probability: 4,
+        description: 'Modest expansion from clean beauty adoption and body care premiumization.',
+        trends: [
+          'Natural / Clean Beauty Movement',
+          'Premiumization & Masstige Growth'
+        ],
+        directEffects: { Consumer: 0.015, Technology: 0.005, Competitive: 0.001 },
+        posteriorMean: 0.58
+      },
+      'lhc_fcn': {
+        name: 'LHC: FCN',
+        force: 'Customer',
+        direction: 'Contraction',
+        impact: 5,
+        probability: 4,
+        description: 'Major contraction from private label expansion and retailer shelf reallocation.',
+        trends: [
+          'Retailer Private Label Expansion (-5.0%)',
+          'Private Label Acceptance in Laundry (-4.2%)',
+          'Sustainability-driven brand switching (-1.8%)'
+        ],
+        directEffects: { Customer: -0.035, Technology: -0.008, Government: -0.005 },
+        posteriorMean: 0.82
+      },
+      'lhc_fca': {
+        name: 'LHC: FCA',
+        force: 'Customer',
+        direction: 'Contraction',
+        impact: 3,
+        probability: 4,
+        description: 'Contraction from private label pressure, partially offset by fabric care innovation.',
+        trends: [
+          'Retailer Private Label Expansion (-2.0%)',
+          'Private Label Acceptance in Laundry (-1.5%)',
+          'Sustainability-driven (minimal)'
+        ],
+        directEffects: { Customer: -0.015, Technology: 0.003, Competitive: -0.002 },
+        posteriorMean: 0.58
+      },
+      'lhc_ffi': {
+        name: 'LHC: FFI',
+        force: 'Technology',
+        direction: 'Expansion',
+        impact: 2,
+        probability: 3,
+        description: 'Modest expansion from fabric innovation and specialty care growth.',
+        trends: [
+          'Fabric care innovation driving premiumization',
+          'Niche specialty care growth'
+        ],
+        directEffects: { Technology: 0.008, Consumer: 0.002, Competitive: 0.001 },
+        posteriorMean: 0.52
+      },
+      'lhc_lad': {
+        name: 'LHC: LAD',
+        force: 'Customer',
+        direction: 'Contraction',
+        impact: 3,
+        probability: 3,
+        description: 'Contraction from private label and customer concentration effects.',
+        trends: [
+          'Retailer Private Label Expansion',
+          'D2C & Subscription Models (minimal)'
+        ],
+        directEffects: { Customer: -0.012, Technology: 0.001, Environmental: -0.002 },
+        posteriorMean: 0.55
+      },
+      'lhc_hdw': {
+        name: 'LHC: HDW',
+        force: 'Customer',
+        direction: 'Contraction',
+        impact: 4,
+        probability: 4,
+        description: 'Contraction from private label competition in hard surface cleaning.',
+        trends: [
+          'Retailer Private Label Expansion (-3.0%)',
+          'Private Label Acceptance (-1.8%)'
+        ],
+        directEffects: { Customer: -0.020, Competitive: -0.008, Technology: 0.001 },
+        posteriorMean: 0.62
+      },
+      'lhc_adw': {
+        name: 'LHC: ADW',
+        force: 'Environmental',
+        direction: 'Neutral',
+        impact: 2,
+        probability: 2,
+        description: 'Minimal directional pressure. Sustainability drivers offset by value competition.',
+        trends: [
+          'Sustainability-driven brand switching (slight)',
+          'Private label pressure (slight)'
+        ],
+        directEffects: { Environmental: 0.002, Consumer: -0.001, Customer: -0.002 },
+        posteriorMean: 0.48
+      },
+      'lhc_hsc': {
+        name: 'LHC: HSC',
+        force: 'Consumer',
+        direction: 'Expansion',
+        impact: 3,
+        probability: 4,
+        description: 'Expansion driven by sustainability and premium cleaning ingredients.',
+        trends: [
+          'Sustainability-driven brand switching (defensive)',
+          'Natural / Clean Beauty Movement'
+        ],
+        directEffects: { Consumer: 0.018, Environmental: 0.010, Technology: 0.002 },
+        posteriorMean: 0.64
+      },
+      'lhc_ic': {
+        name: 'LHC: IC',
+        force: 'Customer',
+        direction: 'Contraction',
+        impact: 4,
+        probability: 4,
+        description: 'Contraction from retailer shelf pressure and private label growth in insecticides.',
+        trends: [
+          'Retailer Private Label Expansion',
+          'Private Label Acceptance in Specialty Care'
+        ],
+        directEffects: { Customer: -0.028, Competitive: -0.015, Technology: 0.002 },
+        posteriorMean: 0.68
+      },
+      'lhc_hs': {
+        name: 'LHC: HS',
+        force: 'Technology',
+        direction: 'Expansion',
+        impact: 1,
+        probability: 3,
+        description: 'Very modest expansion from specialty care innovation.',
+        trends: [
+          'Technology-driven specialty care innovation'
+        ],
+        directEffects: { Technology: 0.004, Consumer: 0.001, Competitive: 0.001 },
+        posteriorMean: 0.51
+      },
+      'lhc_otc': {
+        name: 'LHC: OTC',
+        force: 'Government',
+        direction: 'Neutral',
+        impact: 1,
+        probability: 2,
+        description: 'Minimal movement. Regulatory environment relatively stable for OTC products.',
+        trends: [
+          'Regulatory changes (minimal)',
+          'Consumer health awareness (steady)'
+        ],
+        directEffects: { Government: 0.001, Consumer: 0.001, Technology: 0.001 },
+        posteriorMean: 0.50
+      }
+    };
+
+    function selectCategory(categoryId) {
+      const data = categoryData[categoryId];
+      if (!data) return;
+
+      const panel = document.getElementById('contextPanel');
+      const posteriorFill = Math.min(Math.max(data.posteriorMean * 100, 0), 100);
+
+      panel.innerHTML = `
+        <div class="context-header">
+          <div class="context-title">${data.name}</div>
+          <button class="btn-close" onclick="clearSelection()">×</button>
+        </div>
+
+        <div class="context-section">
+          <div class="context-label">Direction</div>
+          <div class="context-value">${data.direction}</div>
+          <div class="context-detail">Impact: ${data.impact}/5 · Probability: ${data.probability}/5</div>
+        </div>
+
+        <div class="context-section">
+          <div class="context-label">Summary</div>
+          <div class="context-detail">${data.description}</div>
+        </div>
+
+        <div class="context-section">
+          <div class="context-label">Driving Trends</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${data.trends.map(t => `<div class="context-detail">• ${t}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="context-section">
+          <div class="context-label">Bayesian Posterior</div>
+          <div class="context-detail">Confidence: ${posteriorFill.toFixed(0)}%</div>
+          <div class="posterior-bar">
+            <div class="posterior-fill" style="width: ${posteriorFill}%"></div>
+          </div>
+        </div>
+
+        <div class="context-section">
+          <div class="context-label">Direct Effects by Force</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${Object.entries(data.directEffects).map(([force, effect]) => `
+              <div style="display: flex; justify-content: space-between;">
+                <span class="context-detail">${force}</span>
+                <span class="context-value" style="color: ${effect > 0 ? 'var(--expansion)' : effect < 0 ? 'var(--contraction)' : 'var(--text-secondary)'}; font-family: var(--font-mono);">${effect > 0 ? '+' : ''}${(effect * 100).toFixed(2)}%</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      // Highlight the clicked row
+      document.querySelectorAll('.heatmap-row').forEach(row => {
+        row.style.background = 'transparent';
+      });
+    }
+
+    function clearSelection() {
+      const panel = document.getElementById('contextPanel');
+      panel.innerHTML = `
+        <div class="context-panel-empty">
+          Click any category cell to view details here
+        </div>
+      `;
+    }
+
+    function selectScenario(scenario) {
+      document.querySelectorAll('.btn-scenario').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // In production, this would trigger an API call to re-run the simulation
+      console.log('Scenario selected:', scenario);
+    }
+
+    // Add keyboard shortcut to close context panel
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        clearSelection();
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // TREND EXPLORER & DELPHI FUNCTIONALITY
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Demo Trends Data
+    const trendsData = [
+      // CONSUMER FORCE
+      { id: 'c1', force: 'Consumer', name: 'Natural / Clean Beauty Movement', direction: 'Expansion', impact: 4, probability: 4, description: 'Consumer preference for natural, clean-label products with transparent ingredients.', strategic: 'Expand natural portfolio; upgrade formulation communication.', sources: 'Google Trends, Reddit, BeautyChat', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 5, 'Hair: Styling': 2, 'Hair: Body': 4, 'LHC: FCN': 2, 'LHC: FCA': 1, 'LHC: FFI': 5, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 4, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 5, 'Manufacturing': 2, 'Packaging': 3, 'Distribution': 1, 'Retail': 2, 'Consumer Engagement': 4, 'Competitive Position': 3 } },
+      { id: 'c2', force: 'Consumer', name: 'Premiumization Wave', direction: 'Expansion', impact: 4, probability: 5, description: 'Affluent consumers trading up to premium, efficacy-driven product tiers.', strategic: 'Expand premium line positioning; support with efficacy claims.', sources: 'Euromonitor, PublicCompanyEarnings, LinkedIn', categoryExposure: { 'Hair: Color': 4, 'Hair: Care': 5, 'Hair: Styling': 3, 'Hair: Body': 3, 'LHC: FCN': 4, 'LHC: FCA': 5, 'LHC: FFI': 4, 'LHC: LAD': 2, 'LHC: HDW': 3, 'LHC: ADW': 1, 'LHC: HSC': 5, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 3, 'Formulation': 4, 'Manufacturing': 2, 'Packaging': 4, 'Distribution': 3, 'Retail': 4, 'Consumer Engagement': 5, 'Competitive Position': 4 } },
+      { id: 'c3', force: 'Consumer', name: 'Health & Hygiene Awareness Spike', direction: 'Expansion', impact: 3, probability: 3, description: 'Post-pandemic elevated focus on health, immunity, and hygiene in daily care.', strategic: 'Emphasize immune-support and hygiene benefits in messaging.', sources: 'GDELT, GNews, CDC Reports', categoryExposure: { 'Hair: Color': 1, 'Hair: Care': 2, 'Hair: Styling': 1, 'Hair: Body': 4, 'LHC: FCN': 5, 'LHC: FCA': 4, 'LHC: FFI': 3, 'LHC: LAD': 5, 'LHC: HDW': 5, 'LHC: ADW': 3, 'LHC: HSC': 2, 'LHC: IC': 4 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 5, 'Manufacturing': 3, 'Packaging': 2, 'Distribution': 2, 'Retail': 2, 'Consumer Engagement': 4, 'Competitive Position': 2 } },
+      { id: 'c4', force: 'Consumer', name: 'DIY & At-Home Treatments Trend', direction: 'Contraction', impact: 4, probability: 4, description: 'Gen Z DIY hair treatments and salon-skip behavior reducing professional care demand.', strategic: 'Develop DIY-friendly product lines; shift to at-home professional-grade.', sources: 'TikTok, YouTube, Reddit', categoryExposure: { 'Hair: Color': 5, 'Hair: Care': 4, 'Hair: Styling': 2, 'Hair: Body': 1, 'LHC: FCN': 1, 'LHC: FCA': 1, 'LHC: FFI': 1, 'LHC: LAD': 2, 'LHC: HDW': 2, 'LHC: ADW': 1, 'LHC: HSC': 1, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 3, 'Manufacturing': 1, 'Packaging': 3, 'Distribution': 2, 'Retail': 3, 'Consumer Engagement': 5, 'Competitive Position': 4 } },
+      { id: 'c5', force: 'Consumer', name: 'Aging Population & Silver Economy', direction: 'Expansion', impact: 3, probability: 5, description: 'Demographic shift toward aging consumers; silver hair care & anti-aging demand.', strategic: 'Launch targeted silver haircare line; emphasize age-positive messaging.', sources: 'WorldBank, Eurostat, MarketResearch', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 4, 'Hair: Styling': 2, 'Hair: Body': 3, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 2, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 4, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 3, 'Manufacturing': 1, 'Packaging': 2, 'Distribution': 2, 'Retail': 3, 'Consumer Engagement': 4, 'Competitive Position': 2 } },
+      { id: 'c6', force: 'Consumer', name: 'Personalization & Direct-to-Skin Tech', direction: 'Expansion', impact: 3, probability: 3, description: 'Rise of personalized beauty via DNA tests, skin analysis apps, and bespoke formulations.', strategic: 'Invest in personalization tech partnerships; develop customization platform.', sources: 'LinkedIn, Gartner, Tech News', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 3, 'Hair: Styling': 2, 'Hair: Body': 2, 'LHC: FCN': 3, 'LHC: FCA': 2, 'LHC: FFI': 4, 'LHC: LAD': 3, 'LHC: HDW': 2, 'LHC: ADW': 3, 'LHC: HSC': 4, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 4, 'Manufacturing': 2, 'Packaging': 3, 'Distribution': 4, 'Retail': 3, 'Consumer Engagement': 5, 'Competitive Position': 3 } },
+
+      // CUSTOMER FORCE
+      { id: 'cu1', force: 'Customer', name: 'Private Label Expansion & Quality Parity', direction: 'Contraction', impact: 5, probability: 5, description: 'Retailers aggressively expanding private label in hair & specialty care with parity quality.', strategic: 'Premiumize branded offerings; seek manufacturer partnerships with retailers.', sources: 'RetailDive, ECR, Retailer Reports', categoryExposure: { 'Hair: Color': 4, 'Hair: Care': 5, 'Hair: Styling': 4, 'Hair: Body': 3, 'LHC: FCN': 5, 'LHC: FCA': 5, 'LHC: FFI': 2, 'LHC: LAD': 4, 'LHC: HDW': 4, 'LHC: ADW': 3, 'LHC: HSC': 3, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 2, 'Manufacturing': 3, 'Packaging': 3, 'Distribution': 4, 'Retail': 5, 'Consumer Engagement': 2, 'Competitive Position': 5 } },
+      { id: 'cu2', force: 'Customer', name: 'E-Commerce Acceleration & DTC Growth', direction: 'Expansion', impact: 4, probability: 5, description: 'Continued shift to direct-to-consumer and online channels bypassing traditional retail.', strategic: 'Expand DTC e-commerce capabilities; invest in digital marketing and fulfillment.', sources: 'Amazon, Shopify, eMarketer', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 4, 'Hair: Styling': 3, 'Hair: Body': 4, 'LHC: FCN': 3, 'LHC: FCA': 3, 'LHC: FFI': 4, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 4, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 1, 'Manufacturing': 2, 'Packaging': 4, 'Distribution': 5, 'Retail': 5, 'Consumer Engagement': 5, 'Competitive Position': 3 } },
+      { id: 'cu3', force: 'Customer', name: 'Discounter Channel Growth in Europe', direction: 'Contraction', impact: 4, probability: 4, description: 'Aldi, Lidl, Penny accelerating beauty category expansion at deep discounts.', strategic: 'Develop discounter-specific sub-brands or enter partnerships.', sources: 'RetailDive, Eurostat, Aldi/Lidl Reports', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 4, 'Hair: Styling': 3, 'Hair: Body': 2, 'LHC: FCN': 3, 'LHC: FCA': 4, 'LHC: FFI': 2, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 2, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 2, 'Manufacturing': 4, 'Packaging': 3, 'Distribution': 4, 'Retail': 5, 'Consumer Engagement': 1, 'Competitive Position': 4 } },
+      { id: 'cu4', force: 'Customer', name: 'Retail Media Networks & Data Leverage', direction: 'Expansion', impact: 3, probability: 4, description: 'Retailers using media networks to monetize shelf placement and demand shopper data insights.', strategic: 'Increase RMN advertising spend; negotiate preferred placement with first-party data.', sources: 'RetailDive, Think with Google', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 3, 'LHC: FCN': 3, 'LHC: FCA': 3, 'LHC: FFI': 3, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 3, 'LHC: HSC': 3, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 1, 'Manufacturing': 1, 'Packaging': 1, 'Distribution': 2, 'Retail': 5, 'Consumer Engagement': 4, 'Competitive Position': 3 } },
+
+      // TECHNOLOGY FORCE
+      { id: 't1', force: 'Technology', name: 'AI-Powered Personalization & Beauty Tech', direction: 'Expansion', impact: 3, probability: 4, description: 'AI-powered recommendation engines, virtual try-on, and skin analysis driving purchase decisions.', strategic: 'Partner with beauty tech startups; integrate AR/AI into e-commerce platform.', sources: 'LinkedIn, TechCrunch, Patent Filings', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 2, 'LHC: FCN': 3, 'LHC: FCA': 2, 'LHC: FFI': 4, 'LHC: LAD': 3, 'LHC: HDW': 2, 'LHC: ADW': 3, 'LHC: HSC': 4, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 2, 'Manufacturing': 1, 'Packaging': 2, 'Distribution': 3, 'Retail': 4, 'Consumer Engagement': 5, 'Competitive Position': 3 } },
+      { id: 't2', force: 'Technology', name: 'Waterless & Low-Water Formulations', direction: 'Expansion', impact: 4, probability: 3, description: 'Waterless shampoos, dry formulations, and concentrated products gaining adoption.', strategic: 'Accelerate R&D in waterless tech; market as sustainability + convenience play.', sources: 'SemanticScholar, Patent Databases, StartupNews', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 4, 'Hair: Styling': 4, 'Hair: Body': 3, 'LHC: FCN': 3, 'LHC: FCA': 2, 'LHC: FFI': 3, 'LHC: LAD': 4, 'LHC: HDW': 4, 'LHC: ADW': 5, 'LHC: HSC': 3, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 5, 'Manufacturing': 4, 'Packaging': 5, 'Distribution': 2, 'Retail': 2, 'Consumer Engagement': 3, 'Competitive Position': 2 } },
+      { id: 't3', force: 'Technology', name: 'Biotech Ingredients & Fermentation', direction: 'Expansion', impact: 3, probability: 3, description: 'Biotech-derived active ingredients via fermentation and synthetic biology commanding premiums.', strategic: 'Invest in biotech partnerships; develop ingredient IP for competitive moat.', sources: 'Synthetic Biology Journals, Biotech News', categoryExposure: { 'Hair: Color': 1, 'Hair: Care': 4, 'Hair: Styling': 1, 'Hair: Body': 3, 'LHC: FCN': 4, 'LHC: FCA': 3, 'LHC: FFI': 5, 'LHC: LAD': 3, 'LHC: HDW': 2, 'LHC: ADW': 3, 'LHC: HSC': 5, 'LHC: IC': 4 }, vcExposure: { 'Raw Materials': 5, 'Formulation': 5, 'Manufacturing': 3, 'Packaging': 1, 'Distribution': 1, 'Retail': 1, 'Consumer Engagement': 2, 'Competitive Position': 3 } },
+      { id: 't4', force: 'Technology', name: 'Smart Packaging & IoT Integration', direction: 'Expansion', impact: 2, probability: 2, description: 'Packaging with embedded sensors, NFC chips, and app integration for consumer engagement.', strategic: 'Pilot smart packaging with premium lines; focus on loyalty/data capture.', sources: 'PackagingTechnology, IoT News', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 2, 'Hair: Styling': 2, 'Hair: Body': 2, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 2, 'LHC: LAD': 2, 'LHC: HDW': 2, 'LHC: ADW': 2, 'LHC: HSC': 3, 'LHC: IC': 4 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 1, 'Manufacturing': 2, 'Packaging': 5, 'Distribution': 2, 'Retail': 2, 'Consumer Engagement': 4, 'Competitive Position': 2 } },
+
+      // GOVERNMENT FORCE
+      { id: 'g1', force: 'Government', name: 'EU Green Deal & Carbon Neutrality Mandate', direction: 'Contraction', impact: 4, probability: 5, description: 'EU targets carbon neutrality by 2050; regulations mandating emissions cuts across supply chain.', strategic: 'Accelerate carbon accounting; invest in renewable energy and green logistics.', sources: 'EUR-Lex, EC Green Deal, CSDDD', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 3, 'LHC: FCN': 4, 'LHC: FCA': 4, 'LHC: FFI': 3, 'LHC: LAD': 4, 'LHC: HDW': 4, 'LHC: ADW': 4, 'LHC: HSC': 3, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 3, 'Manufacturing': 5, 'Packaging': 5, 'Distribution': 5, 'Retail': 2, 'Consumer Engagement': 2, 'Competitive Position': 2 } },
+      { id: 'g2', force: 'Government', name: 'PFAS (Forever Chemicals) Restrictions', direction: 'Contraction', impact: 3, probability: 4, description: 'EU ECHA restricting PFAS in cosmetics and personal care; many formulations affected.', strategic: 'Audit formulations for PFAS; transition to non-PFAS alternatives in care products.', sources: 'ECHA, ChemicalWatch, EUR-Lex', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 3, 'Hair: Styling': 2, 'Hair: Body': 4, 'LHC: FCN': 4, 'LHC: FCA': 3, 'LHC: FFI': 2, 'LHC: LAD': 5, 'LHC: HDW': 4, 'LHC: ADW': 4, 'LHC: HSC': 2, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 5, 'Manufacturing': 3, 'Packaging': 2, 'Distribution': 1, 'Retail': 1, 'Consumer Engagement': 1, 'Competitive Position': 1 } },
+      { id: 'g3', force: 'Government', name: 'Microplastics Ban in Cosmetics', direction: 'Contraction', impact: 3, probability: 5, description: 'EU & several countries banning microbeads and microplastics in rinse-off products.', strategic: 'Reformulate with biodegradable alternatives; audit supply chain.', sources: 'EUR-Lex, FTC Microplastics, UNEP', categoryExposure: { 'Hair: Color': 1, 'Hair: Care': 3, 'Hair: Styling': 4, 'Hair: Body': 5, 'LHC: FCN': 4, 'LHC: FCA': 3, 'LHC: FFI': 2, 'LHC: LAD': 5, 'LHC: HDW': 5, 'LHC: ADW': 4, 'LHC: HSC': 3, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 4, 'Formulation': 5, 'Manufacturing': 2, 'Packaging': 1, 'Distribution': 1, 'Retail': 1, 'Consumer Engagement': 2, 'Competitive Position': 1 } },
+      { id: 'g4', force: 'Government', name: 'Extended Producer Responsibility (EPR) Expansion', direction: 'Contraction', impact: 3, probability: 4, description: 'EU expanding EPR to cosmetics; producers responsible for end-of-life packaging and waste.', strategic: 'Design for circular economy; invest in take-back programs and recyclable packaging.', sources: 'EUR-Lex, Eunomia, CSDDD', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 2, 'Hair: Styling': 2, 'Hair: Body': 2, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 2, 'LHC: LAD': 2, 'LHC: HDW': 2, 'LHC: ADW': 3, 'LHC: HSC': 2, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 1, 'Manufacturing': 3, 'Packaging': 5, 'Distribution': 4, 'Retail': 2, 'Consumer Engagement': 2, 'Competitive Position': 2 } },
+
+      // ENVIRONMENTAL FORCE
+      { id: 'e1', force: 'Environmental', name: 'Water Scarcity & Supply Chain Pressure', direction: 'Contraction', impact: 4, probability: 4, description: 'Droughts in key regions (Spain, Italy) constrain water for production and agriculture.', strategic: 'Invest in water recycling tech; source raw materials from water-secure regions.', sources: 'WorldBank Water, Drought Monitor, FAO', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 4, 'Hair: Styling': 3, 'Hair: Body': 3, 'LHC: FCN': 3, 'LHC: FCA': 3, 'LHC: FFI': 4, 'LHC: LAD': 4, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 3, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 5, 'Formulation': 5, 'Manufacturing': 5, 'Packaging': 2, 'Distribution': 2, 'Retail': 1, 'Consumer Engagement': 1, 'Competitive Position': 2 } },
+      { id: 'e2', force: 'Environmental', name: 'Carbon Neutrality & Scope 3 Emissions Accountability', direction: 'Contraction', impact: 4, probability: 5, description: 'Climate targets forcing accounting and reduction of Scope 3 emissions across supply chain.', strategic: 'Measure and reduce upstream emissions; supplier engagement and alternative sourcing.', sources: 'Science-Based Targets, TCFD, Carbon Disclosure', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 3, 'LHC: FCN': 4, 'LHC: FCA': 4, 'LHC: FFI': 3, 'LHC: LAD': 4, 'LHC: HDW': 4, 'LHC: ADW': 4, 'LHC: HSC': 3, 'LHC: IC': 3 }, vcExposure: { 'Raw Materials': 5, 'Formulation': 2, 'Manufacturing': 5, 'Packaging': 4, 'Distribution': 5, 'Retail': 1, 'Consumer Engagement': 1, 'Competitive Position': 2 } },
+      { id: 'e3', force: 'Environmental', name: 'Biodiversity & Palm Oil Sourcing Under Scrutiny', direction: 'Contraction', impact: 3, probability: 4, description: 'NGOs and regulations targeting palm oil and unsustainable sourcing in personal care.', strategic: 'Transition to sustainable palm alternatives; RSPO certification for sourced palm.', sources: 'UNEP, EarthRights, Sourcing Alerts', categoryExposure: { 'Hair: Color': 2, 'Hair: Care': 4, 'Hair: Styling': 3, 'Hair: Body': 4, 'LHC: FCN': 3, 'LHC: FCA': 2, 'LHC: FFI': 2, 'LHC: LAD': 2, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 2, 'LHC: IC': 2 }, vcExposure: { 'Raw Materials': 5, 'Formulation': 2, 'Manufacturing': 2, 'Packaging': 1, 'Distribution': 2, 'Retail': 1, 'Consumer Engagement': 2, 'Competitive Position': 1 } ),
+      { id: 'e4', force: 'Environmental', name: 'Circular Packaging & Plastic-Free Movement', direction: 'Expansion', impact: 3, probability: 4, description: 'Consumer and regulatory push for reusable, refillable, and plastic-free packaging formats.', strategic: 'Launch refillable formats; partner with loop/returnables platforms; reduce virgin plastic.', sources: 'EllenMacarthur, PlasticWatch, RetailNews', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 4, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 2, 'LHC: LAD': 3, 'LHC: HDW': 3, 'LHC: ADW': 4, 'LHC: HSC': 4, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 1, 'Manufacturing': 2, 'Packaging': 5, 'Distribution': 3, 'Retail': 2, 'Consumer Engagement': 4, 'Competitive Position': 2 } ),
+
+      // COMPETITIVE FORCE
+      { id: 'co1', force: 'Competitive', name: 'P&G Innovation Acceleration & Premium Focus', direction: 'Contraction', impact: 4, probability: 4, description: 'P&G aggressively investing in R&D, launching premium brands, capturing market share in hair.', strategic: 'Differentiate via sustainability and efficacy; invest in clinical evidence.', sources: 'CompanyEarnings, BusinessWire, Patent Data', categoryExposure: { 'Hair: Color': 5, 'Hair: Care': 5, 'Hair: Styling': 4, 'Hair: Body': 3, 'LHC: FCN': 2, 'LHC: FCA': 1, 'LHC: FFI': 2, 'LHC: LAD': 1, 'LHC: HDW': 1, 'LHC: ADW': 1, 'LHC: HSC': 1, 'LHC: IC': 1 }, vcExposure: { 'Raw Materials': 3, 'Formulation': 4, 'Manufacturing': 3, 'Packaging': 3, 'Distribution': 4, 'Retail': 5, 'Consumer Engagement': 5, 'Competitive Position': 5 } },
+      { id: 'co2', force: 'Competitive', name: 'L\'Oréal DTC & Digital Expansion', direction: 'Expansion', impact: 3, probability: 4, description: 'L\'Oréal pivoting to DTC/digital channels, reducing retail dependence, increasing direct consumer access.', strategic: 'Accelerate own DTC channels; compete on digital experience and data.', sources: 'CompanyEarnings, LinkedIn, DigitalNews', categoryExposure: { 'Hair: Color': 3, 'Hair: Care': 3, 'Hair: Styling': 3, 'Hair: Body': 2, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 3, 'LHC: LAD': 2, 'LHC: HDW': 2, 'LHC: ADW': 2, 'LHC: HSC': 3, 'LHC: IC': 4 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 1, 'Manufacturing': 1, 'Packaging': 2, 'Distribution': 4, 'Retail': 3, 'Consumer Engagement': 5, 'Competitive Position': 4 } ),
+      { id: 'co3', force: 'Competitive', name: 'Private Label Quality Parity Threat', direction: 'Contraction', impact: 5, probability: 5, description: 'Retailers\' private labels achieving feature/efficacy parity with branded products at lower cost.', strategic: 'Premiumize; strengthen brand equity; seek co-manufacturing partnerships.', sources: 'RetailDive, Retailer Reports, Category Trends', categoryExposure: { 'Hair: Color': 4, 'Hair: Care': 5, 'Hair: Styling': 4, 'Hair: Body': 3, 'LHC: FCN': 5, 'LHC: FCA': 5, 'LHC: FFI': 2, 'LHC: LAD': 4, 'LHC: HDW': 4, 'LHC: ADW': 3, 'LHC: HSC': 3, 'LHC: IC': 5 }, vcExposure: { 'Raw Materials': 1, 'Formulation': 2, 'Manufacturing': 3, 'Packaging': 2, 'Distribution': 4, 'Retail': 5, 'Consumer Engagement': 2, 'Competitive Position': 5 } ),
+      { id: 'co4', force: 'Competitive', name: 'Asian Players Entering European Markets', direction: 'Contraction', impact: 2, probability: 3, description: 'Chinese (P&amp;G-like innovation labs), Korean (K-beauty skincare), Indian (Ayurveda) entrants gaining traction.', strategic: 'Monitor M&amp;A targets; form defensive partnerships; innovate in underserved niches.', sources: 'BusinessWire, TechAsia, MarketResearch', categoryExposure: { 'Hair: Color': 1, 'Hair: Care': 2, 'Hair: Styling': 1, 'Hair: Body': 2, 'LHC: FCN': 2, 'LHC: FCA': 2, 'LHC: FFI': 3, 'LHC: LAD': 2, 'LHC: HDW': 2, 'LHC: ADW': 2, 'LHC: HSC': 3, 'LHC: IC': 4 }, vcExposure: { 'Raw Materials': 2, 'Formulation': 3, 'Manufacturing': 3, 'Packaging': 2, 'Distribution': 3, 'Retail': 2, 'Consumer Engagement': 2, 'Competitive Position': 3 } )
+    ];
+
+    let currentFilter = 'all';
+    let currentSearch = '';
+
+    function switchView(view) {
+      document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+      document.getElementById(view + '-view').classList.add('active');
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      if (view === 'trend-explorer') {
+        setTimeout(() => renderTrendTable(), 100);
+      }
+    }
+
+    function filterByForce(force) {
+      currentFilter = force;
+      document.querySelectorAll('.force-chip').forEach(chip => chip.classList.remove('active'));
+      event.target.classList.add('active');
+      renderTrendTable();
+    }
+
+    function filterTrends() {
+      currentSearch = document.getElementById('trendSearch').value.toLowerCase();
+      renderTrendTable();
+    }
+
+    function renderTrendTable() {
+      const filtered = trendsData.filter(trend => {
+        const forceMatch = currentFilter === 'all' || trend.force.toLowerCase() === currentFilter;
+        const searchMatch = trend.name.toLowerCase().includes(currentSearch);
+        return forceMatch && searchMatch;
+      });
+
+      const tbody = document.getElementById('trendTableBody');
+      tbody.innerHTML = filtered.map(trend => {
+        const score = trend.impact * trend.probability;
+        const shift = (score / 25) * (trend.direction === 'Expansion' ? 1 : -1);
+        return `
+          <tr class="trend-row" id="trend-${trend.id}">
+            <td style="text-align: center;"><span class="expand-icon" onclick="toggleTrendDetail('${trend.id}')">▶</span></td>
+            <td><span class="force-badge ${trend.force.toLowerCase()}">${trend.force}</span></td>
+            <td><span class="trend-name" onclick="toggleTrendDetail('${trend.id}')">${trend.name}</span></td>
+            <td><span class="direction-badge ${trend.direction === 'Expansion' ? 'direction-expansion' : 'direction-contraction'}">${trend.direction === 'Expansion' ? '▲' : '▼'} ${trend.direction}</span></td>
+            <td>
+              <div class="dot-bar">
+                ${Array.from({length: 5}, (_, i) => `<div class="dot ${i < trend.impact ? 'filled' : ''}" onclick="setScore('impact', ${i+1}, '${trend.id}')"></div>`).join('')}
+              </div>
+            </td>
+            <td>
+              <div class="dot-bar">
+                ${Array.from({length: 5}, (_, i) => `<div class="dot ${i < trend.probability ? 'filled' : ''}" onclick="setScore('probability', ${i+1}, '${trend.id}')"></div>`).join('')}
+              </div>
+            </td>
+            <td class="score-value">${score}</td>
+            <td class="shift-value ${shift > 0 ? 'shift-positive' : 'shift-negative'}">${shift > 0 ? '+' : ''}${(shift * 100).toFixed(2)}%</td>
+          </tr>
+          <tr class="trend-detail-row" id="detail-${trend.id}">
+            <td colspan="8" class="trend-detail-cell">
+              <div class="trend-detail-content">
+                <div class="trend-detail-left">
+                  <div class="trend-detail-section">
+                    <div class="trend-detail-label">Description</div>
+                    <div class="trend-detail-text">${trend.description}</div>
+                  </div>
+                  <div class="trend-detail-section">
+                    <div class="trend-detail-label">Strategic Implication</div>
+                    <div class="trend-detail-text">${trend.strategic}</div>
+                  </div>
+                  <div class="trend-detail-section">
+                    <div class="trend-detail-label">Data Sources</div>
+                    <div class="trend-detail-text">${trend.sources}</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="trend-detail-section">
+                    <div class="trend-detail-label">Category Exposure (0-5)</div>
+                    <div class="exposure-grid">
+                      ${Object.entries(trend.categoryExposure).map(([cat, exp]) => `
+                        <div class="exposure-item">
+                          <div class="exposure-name">${cat}</div>
+                          <div class="exposure-dots">${Array.from({length: 5}, (_, i) => `<div class="exposure-dot ${i < exp ? 'filled' : ''}"></div>`).join('')}</div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                  <div class="trend-detail-section" style="margin-top: 16px;">
+                    <div class="trend-detail-label">Value Chain Exposure (0-5)</div>
+                    <div class="exposure-grid">
+                      ${Object.entries(trend.vcExposure).map(([vc, exp]) => `
+                        <div class="exposure-item">
+                          <div class="exposure-name">${vc}</div>
+                          <div class="exposure-dots">${Array.from({length: 5}, (_, i) => `<div class="exposure-dot ${i < exp ? 'filled' : ''}"></div>`).join('')}</div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-button-group">
+                <button class="detail-button save" onclick="saveTrendEdit('${trend.id}')">✓ Save Changes</button>
+                <button class="detail-button" onclick="toggleTrendDetail('${trend.id}')">Cancel</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleTrendDetail(trendId) {
+      const row = document.getElementById('trend-' + trendId);
+      const detail = document.getElementById('detail-' + trendId);
+      row.classList.toggle('expanded');
+      detail.classList.toggle('show');
+    }
+
+    function setScore(type, value, trendId) {
+      const trend = trendsData.find(t => t.id === trendId);
+      if (trend) {
+        trend[type] = value;
+        renderTrendTable();
+      }
+    }
+
+    function saveTrendEdit(trendId) {
+      console.log('Saving trend:', trendId);
+      toggleTrendDetail(trendId);
+    }
+
+    // Delphi Panel Functions
+    function openDelphiPanel() {
+      document.getElementById('delphiOverlay').classList.add('active');
+      document.getElementById('delphiPanel').classList.add('open');
+    }
+
+    function closeDelphiPanel() {
+      document.getElementById('delphiOverlay').classList.remove('active');
+      document.getElementById('delphiPanel').classList.remove('open');
+    }
+
+    function switchDelphiTab(tab) {
+      document.querySelectorAll('.delphi-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.delphi-tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('delphi-' + tab).classList.add('active');
+    }
+
+    function updateSliderValue(type, value) {
+      document.getElementById(type + 'Value').textContent = value;
+    }
+
+    function submitDelphiScore() {
+      const impact = document.getElementById('impactSlider').value;
+      const probability = document.getElementById('probabilitySlider').value;
+      const rationale = document.getElementById('rationaleText').value;
+      if (rationale.length >= 20) {
+        console.log('Submitted Delphi score:', { impact, probability, rationale });
+        alert('Score submitted successfully!');
+      } else {
+        alert('Please provide a rationale (at least 20 characters)');
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('load', () => {
+      renderTrendTable();
+    });
+  </script>
+</body>
+</html>

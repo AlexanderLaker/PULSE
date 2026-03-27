@@ -1,0 +1,6 @@
+# PULSE API — Vercel serverless runtime dependencies (slim)
+fastapi>=0.110
+pydantic>=2.6
+numpy>=1.26
+scipy>=1.12
+networkx>=3.2

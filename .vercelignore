@@ -1,0 +1,11 @@
+node_modules
+.venv
+__pycache__
+*.pyc
+tests/
+data/
+.git
+pulse/dashboard/node_modules
+pulse/dashboard/src
+*.xlsx
+*.db
