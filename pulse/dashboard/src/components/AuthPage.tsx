@@ -165,7 +165,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     placeholder="Enter invite code"
                     required
-                    style={{ ...inputStyle, fontFamily: T.mono, letterSpacing: '0.04em' }}
+                    style={inputStyle}
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                   />
