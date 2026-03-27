@@ -315,7 +315,10 @@ def create_app(args=None) -> FastAPI:
             "direction": t.direction, "impact": t.impact,
             "probability": t.probability, "normalized_score": t.normalized_score,
             "category_exposure": t.category_exposure,
+            "vc_exposure": t.vc_exposure,
             "regional_exposure": t.regional_exposure,
+            "description": t.description,
+            "strategic_implication": t.strategic_implication,
             "confidence": t.confidence, "ai_suggested": t.ai_suggested,
         } for t in trends]
 
