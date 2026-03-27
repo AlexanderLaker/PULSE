@@ -4,7 +4,7 @@
  * Apple × Bain × Goldman Sachs aesthetic
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
@@ -54,6 +54,7 @@ interface TrendWithSources extends Trend {
   }>;
   category_exposure: Record<string, number>;
   vc_exposure: Record<string, number>;
+  regional_exposure?: Record<string, number>;
 }
 
 interface AllocationWithRationale extends AllocationRecommendation {
@@ -581,10 +582,40 @@ export default function WarRoom(): React.ReactNode {
   const [showDelphi, setShowDelphi] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Mock data fallback — stable across renders via useState
-  const [mockData] = useState(() => generateMockData());
+  // Mock data fallback for simulation/scenarios — stable across renders
+  const [mockData, setMockData] = useState(() => generateMockData());
   const data = mockData;
   const scenarioOptions = mockData.scenarios;
+
+  // Fetch REAL trends from API (replaces mock trends)
+  useEffect(() => {
+    fetch('/api/v1/trends')
+      .then(r => r.json())
+      .then((apiTrends: any[]) => {
+        if (Array.isArray(apiTrends) && apiTrends.length > 0) {
+          const mapped = apiTrends.map(t => ({
+            id: t.id,
+            force: t.force,
+            name: t.name,
+            direction: t.direction || 'Expansion',
+            impact: t.impact || 3,
+            probability: t.probability || 3,
+            score: (t.impact || 3) * (t.probability || 3),
+            gp1_shift: t.normalized_score || 0,
+            description: t.description || '',
+            strategic_implication: t.strategic_implication || '',
+            category_exposure: t.category_exposure || {},
+            vc_exposure: t.vc_exposure || {},
+            regional_exposure: t.regional_exposure || {},
+            ai_suggested: t.ai_suggested || false,
+            confidence: t.confidence || 'Medium',
+            sources: t.sources || [],
+          }));
+          setMockData(prev => ({ ...prev, trends: mapped as any }));
+        }
+      })
+      .catch(() => { /* keep mock data on failure */ });
+  }, []);
   const forceNames = Object.keys(FORCES) as ForceName[];
 
   // AI insights mock
@@ -1054,7 +1085,21 @@ export default function WarRoom(): React.ReactNode {
               data={{ trends: data.trends }}
               forceFilter={forceFilter || ''}
               onForceFilter={setForceFilter}
-              onUpdateTrend={() => {}}
+              onUpdateTrend={(id: string, updates: any) => {
+                // Persist to API
+                fetch(`/api/v1/trends/${id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updates),
+                }).catch(() => {});
+                // Update local state immediately
+                setMockData(prev => ({
+                  ...prev,
+                  trends: prev.trends.map((t: any) =>
+                    t.id === id ? { ...t, ...updates } : t
+                  ) as any,
+                }));
+              }}
             />
 
             {/* Emerging Trends — AI-curated candidates below */}
