@@ -593,6 +593,16 @@ export default function WarRoom(): React.ReactNode {
       .then(r => r.json())
       .then((apiTrends: any[]) => {
         if (Array.isArray(apiTrends) && apiTrends.length > 0) {
+          // Normalize API keys to UI format:
+          // "Hair: Color" → "hair_color", "Raw Materials" → "raw_materials"
+          const normCatKey = (k: string): string => k.toLowerCase().replace(/^(hair|lhc):\s*/, (_, g) => g + '_').replace(/\s+/g, '_');
+          const normVcKey = (k: string): string => k.toLowerCase().replace(/[\s-]+/g, '_');
+          const normDict = (d: Record<string, number> | undefined, fn: (k: string) => string): Record<string, number> => {
+            if (!d) return {};
+            const out: Record<string, number> = {};
+            for (const [k, v] of Object.entries(d)) out[fn(k)] = v;
+            return out;
+          };
           const mapped = apiTrends.map(t => ({
             id: t.id,
             force: t.force,
@@ -604,8 +614,8 @@ export default function WarRoom(): React.ReactNode {
             gp1_shift: t.normalized_score || 0,
             description: t.description || '',
             strategic_implication: t.strategic_implication || '',
-            category_exposure: t.category_exposure || {},
-            vc_exposure: t.vc_exposure || {},
+            category_exposure: normDict(t.category_exposure, normCatKey),
+            vc_exposure: normDict(t.vc_exposure, normVcKey),
             regional_exposure: t.regional_exposure || {},
             ai_suggested: t.ai_suggested || false,
             confidence: t.confidence || 'Medium',
