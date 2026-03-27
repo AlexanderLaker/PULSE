@@ -74,12 +74,14 @@ const DotBar: FC<DotBarProps> = ({
   direction,
   labelType,
 }) => {
+  const [hoveredDot, setHoveredDot] = useState<number | null>(null);
   const dots = [1, 2, 3, 4, 5];
-  const sizeMap = {
-    xs: 'w-2 h-2',
-    sm: 'w-2.5 h-2.5',
-    md: 'w-2.5 h-2.5',
-  };
+
+  // Pixel sizes for each variant
+  const sizePixels = { xs: 10, sm: 12, md: 14 };
+  const dotSize = sizePixels[size];
+  const gapSize = size === 'xs' ? 4 : 5;
+
   const colorMap = {
     blue: { filled: '#3B82F6', hover: '#60A5FA' },
     amber: { filled: '#FBBF24', hover: '#FCD34D' },
@@ -87,19 +89,39 @@ const DotBar: FC<DotBarProps> = ({
     purple: { filled: '#A78BFA', hover: '#C4B5FD' },
   };
 
-  // Determine whether to use direction-aware gradient or fixed color
-  const getBackgroundColor = (dot: number, isSelected: boolean): string => {
-    if (!isSelected) {
-      return 'rgba(255,255,255,0.12)'; // Subtle but visible on dark background
-    }
+  // Unfilled dot color — clearly visible on dark bg
+  const UNFILLED_COLOR = 'rgba(148, 163, 184, 0.2)';     // slate-400 at 20%
+  const UNFILLED_BORDER = 'rgba(148, 163, 184, 0.35)';    // slate-400 at 35%
+  const HOVER_PREVIEW = 'rgba(148, 163, 184, 0.45)';      // preview on hover
 
-    // If direction is provided, use gradient colors
+  const getFilledColor = (dot: number): string => {
     if (direction && DIRECTION_GRADIENTS[direction]) {
       return DIRECTION_GRADIENTS[direction]![dot - 1] || colorMap[color].filled;
     }
-
-    // Otherwise use the color map
     return colorMap[color].filled;
+  };
+
+  const getDotStyle = (dot: number): React.CSSProperties => {
+    const isFilled = dot <= value;
+    const isHovered = hoveredDot !== null && dot <= hoveredDot;
+    const isPreview = editable && !isFilled && isHovered;
+
+    return {
+      width: dotSize,
+      height: dotSize,
+      borderRadius: '50%',
+      border: isFilled ? 'none' : `1.5px solid ${isPreview ? 'rgba(148,163,184,0.5)' : UNFILLED_BORDER}`,
+      backgroundColor: isFilled
+        ? getFilledColor(dot)
+        : isPreview
+          ? HOVER_PREVIEW
+          : UNFILLED_COLOR,
+      cursor: editable ? 'pointer' : 'default',
+      transition: 'all 150ms ease',
+      transform: (editable && isHovered) ? 'scale(1.25)' : 'scale(1)',
+      boxShadow: isFilled ? `0 0 4px ${getFilledColor(dot)}40` : 'none',
+      flexShrink: 0,
+    };
   };
 
   const labels = labelType ? LABEL_MAPS[labelType] : null;
@@ -107,23 +129,31 @@ const DotBar: FC<DotBarProps> = ({
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}
-      title={editable ? 'Click dots to change score (1-5)' : undefined}
+      style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}
+      title={editable ? 'Click dots to change score (1-5)' : `${value}/5`}
     >
-      <div className="flex gap-1">
+      <div
+        style={{ display: 'flex', gap: `${gapSize}px`, alignItems: 'center' }}
+        onMouseLeave={() => editable && setHoveredDot(null)}
+      >
         {dots.map((dot) => (
-          <button
+          <div
             key={dot}
-            onClick={() => editable && onChange?.(dot)}
-            disabled={!editable}
-            className={`rounded-full transition-all ${sizeMap[size]} ${
-              editable ? 'cursor-pointer hover:scale-125' : 'cursor-default'
-            }`}
-            style={{
-              backgroundColor: getBackgroundColor(dot, dot <= value),
-              opacity: 1,
+            role={editable ? 'button' : undefined}
+            tabIndex={editable ? 0 : undefined}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (editable) onChange?.(dot);
             }}
-            title={`${dot}/5${editable ? ' - click to set' : ''}`}
+            onMouseEnter={() => editable && setHoveredDot(dot)}
+            onKeyDown={(e) => {
+              if (editable && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                onChange?.(dot);
+              }
+            }}
+            style={getDotStyle(dot)}
+            title={`${dot}/5${labels ? ` — ${labels[dot - 1]}` : ''}${editable ? ' (click to set)' : ''}`}
           />
         ))}
       </div>
@@ -161,33 +191,72 @@ const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChan
   };
 
   return (
-    <div className="space-y-4">
-      <div style={{ fontSize: '11px', fontWeight: 600, color: T.text2 }}>Category Exposure (0-5)</div>
-      {Object.entries(grouped).map(([group, cats]) => (
-        <div key={group}>
-          <div style={{ fontSize: '9px', fontWeight: 500, marginBottom: '8px', color: T.text3 }}>
-            {group.toUpperCase()}
-          </div>
-          <div className={group === 'Hair' ? 'grid grid-cols-3 gap-3' : 'grid grid-cols-4 gap-3'}>
-            {cats.map((cat) => (
-              <div key={cat.id} className="flex flex-col items-center gap-2">
+    <div>
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: T.text2,
+        marginBottom: '12px',
+        letterSpacing: '0.5px',
+      }}>
+        CATEGORY EXPOSURE
+      </div>
+      <div style={{
+        borderRadius: '8px',
+        border: `1px solid ${T.border1}`,
+        overflow: 'hidden',
+        backgroundColor: T.bg1,
+      }}>
+        {Object.entries(grouped).map(([group, cats], groupIdx) => (
+          <React.Fragment key={group}>
+            {/* Group header row */}
+            <div style={{
+              padding: '6px 12px',
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '1px',
+              color: T.text3,
+              backgroundColor: T.bg3,
+              borderTop: groupIdx > 0 ? `1px solid ${T.border1}` : 'none',
+            }}>
+              {group.toUpperCase()}
+            </div>
+            {/* Category rows */}
+            {cats.map((cat, idx) => (
+              <div
+                key={cat.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 12px',
+                  borderTop: idx > 0 ? `1px solid ${T.border1}22` : 'none',
+                  transition: 'background-color 100ms',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${T.bg2}`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  color: T.text,
+                  minWidth: '90px',
+                }}>
+                  {shortCat(cat.name)}
+                </div>
                 <DotBar
                   value={exposures?.[cat.id as CategoryId] || 0}
                   onChange={(val) => handleChange(cat.id as CategoryId, val)}
                   editable={true}
                   color="emerald"
-                  size="xs"
+                  size="sm"
                   direction={direction}
-                  labelType="exposure"
                 />
-                <div style={{ fontSize: '9px', textAlign: 'center', color: T.text2, fontWeight: 500 }}>
-                  {shortCat(cat.name)}
-                </div>
               </div>
             ))}
-          </div>
-        </div>
-      ))}
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
 };
@@ -222,25 +291,52 @@ const ValueChainExposureGrid: FC<ValueChainExposureGridProps> = ({ exposures, on
   };
 
   return (
-    <div className="space-y-4">
-      <div style={{ fontSize: '11px', fontWeight: 600, color: T.text2 }}>Value Chain Exposure (0-5)</div>
-      <div className="grid grid-cols-2 gap-4">
-        {vcSteps.map((step) => (
-          <div key={step.id} className="flex items-center gap-2">
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 500, color: T.text2 }}>
-                {step.label}
-              </div>
-              <DotBar
-                value={exposures?.[step.id] || 0}
-                onChange={(val) => handleChange(step.id, val)}
-                editable={true}
-                color="purple"
-                size="xs"
-                direction={direction}
-                labelType="exposure"
-              />
+    <div>
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: T.text2,
+        marginBottom: '12px',
+        letterSpacing: '0.5px',
+      }}>
+        VALUE CHAIN EXPOSURE
+      </div>
+      <div style={{
+        borderRadius: '8px',
+        border: `1px solid ${T.border1}`,
+        overflow: 'hidden',
+        backgroundColor: T.bg1,
+      }}>
+        {vcSteps.map((step, idx) => (
+          <div
+            key={step.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 12px',
+              borderTop: idx > 0 ? `1px solid ${T.border1}22` : 'none',
+              transition: 'background-color 100ms',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${T.bg2}`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            <div style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: T.text,
+              minWidth: '100px',
+            }}>
+              {step.label}
             </div>
+            <DotBar
+              value={exposures?.[step.id] || 0}
+              onChange={(val) => handleChange(step.id, val)}
+              editable={true}
+              color="purple"
+              size="sm"
+              direction={direction}
+            />
           </div>
         ))}
       </div>

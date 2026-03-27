@@ -211,8 +211,8 @@ def create_app(args=None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -222,6 +222,57 @@ def create_app(args=None) -> FastAPI:
 
     # Include Delphi expert elicitation routes
     app.include_router(delphi_router, prefix="/api/v1")
+
+    # ── Lazy Initialization (Vercel serverless compatibility) ─────
+    _initialized = {"done": False}
+
+    async def _lazy_init():
+        """Initialize state on first request if lifespan didn't run (Vercel serverless)."""
+        if _initialized["done"]:
+            return
+        _initialized["done"] = True
+        logger.info("Lazy init: Vercel serverless cold start...")
+        async with _state_lock:
+            if _state["config"] is None:
+                _state["audit"] = AuditLogger()
+                _state["config"] = ModelConfig()
+                _state["dag"] = CausalDAG()
+                _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
+
+                # Initialize Delphi
+                from pulse.elicitation.delphi import DelphiProtocol
+                _state["delphi"] = DelphiProtocol()
+                _state["delphi"]._ensure_tables_exist()
+
+                # Seed with built-in data
+                if not _state["db"]:
+                    try:
+                        from pulse.api.seed_data import create_seed_database
+                        _state["db"] = create_seed_database()
+                        logger.info(f"Seeded with {_state['db'].trend_count} built-in trends")
+                    except Exception as e:
+                        logger.error(f"Failed to seed data: {e}")
+
+        # Run initial simulation
+        if _state["db"] and not _state.get("mc_result"):
+            try:
+                logger.info("Running initial simulation (1000 iterations)...")
+                await _run_simulation("base", 1000)
+                logger.info("Initial simulation complete — backend ready")
+            except Exception as e:
+                logger.error(f"Initial simulation failed: {e}")
+
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+    from starlette.responses import Response
+
+    class LazyInitMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            await _lazy_init()
+            response = await call_next(request)
+            return response
+
+    app.add_middleware(LazyInitMiddleware)
 
     # ── Health ──────────────────────────────────────────────────────
     @app.get("/api/v1/health")

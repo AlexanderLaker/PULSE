@@ -252,124 +252,113 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss
   const [expanded, setExpanded] = useState(false);
   const trendColor = trend.direction === 'Expansion' ? T.green : T.red;
   const isActioned = trend.status === 'added' || trend.status === 'dismissed';
+  const relevanceColor = trend.relevance_score >= 85 ? T.green :
+    trend.relevance_score >= 70 ? '#EAB308' : T.text3;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: isActioned ? 0.5 : 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: isActioned ? 0.45 : 1, y: 0 }}
+      transition={{ duration: 0.15 }}
       style={{
-        backgroundColor: T.bg1,
-        borderRadius: '10px',
-        border: `1px solid ${trend.status === 'added' ? T.green + '40' : T.border1}`,
+        backgroundColor: expanded ? T.bg1 : 'transparent',
+        borderRadius: '8px',
+        border: expanded
+          ? `1px solid ${trend.status === 'added' ? T.green + '40' : T.border1}`
+          : `1px solid transparent`,
         overflow: 'hidden',
         transition: 'all 0.2s',
       }}
     >
-      {/* Card Header */}
+      {/* Compact row — always visible */}
       <div
         style={{
-          padding: '14px 16px',
+          padding: expanded ? '12px 16px' : '8px 12px',
           display: 'flex',
-          gap: '12px',
+          alignItems: 'center',
+          gap: '10px',
           cursor: 'pointer',
+          borderRadius: expanded ? 0 : '8px',
+          transition: 'background-color 100ms',
         }}
         onClick={() => setExpanded(!expanded)}
+        onMouseEnter={(e) => { if (!expanded) e.currentTarget.style.backgroundColor = T.bg1; }}
+        onMouseLeave={(e) => { if (!expanded) e.currentTarget.style.backgroundColor = 'transparent'; }}
       >
-        {/* Left: Relevance indicator */}
+        {/* Relevance bar */}
         <div style={{
-          width: '4px',
+          width: '3px',
+          height: '28px',
           borderRadius: '2px',
-          backgroundColor: trend.relevance_score >= 85 ? T.green :
-            trend.relevance_score >= 70 ? '#EAB308' : T.text3,
+          backgroundColor: relevanceColor,
           flexShrink: 0,
         }} />
 
-        {/* Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-            <span style={{
-              padding: '2px 8px',
-              borderRadius: '10px',
-              fontSize: '9px',
-              fontWeight: 600,
-              backgroundColor: FORCE_COLORS[trend.force] + '20',
-              color: FORCE_COLORS[trend.force],
-            }}>
-              {FORCE_ICONS[trend.force]} {trend.force}
-            </span>
-            <span style={{
-              padding: '2px 8px',
-              borderRadius: '10px',
-              fontSize: '9px',
-              fontWeight: 600,
-              backgroundColor: trendColor + '15',
-              color: trendColor,
-            }}>
-              {trend.direction === 'Expansion' ? '▲' : '▼'} {trend.direction}
-            </span>
-            <RelevanceBadge score={trend.relevance_score} />
-            {trend.status === 'added' && (
-              <span style={{ fontSize: '9px', color: T.green, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <Check size={10} /> Added
-              </span>
-            )}
-          </div>
+        {/* Force badge */}
+        <span style={{
+          padding: '2px 7px',
+          borderRadius: '10px',
+          fontSize: '9px',
+          fontWeight: 600,
+          backgroundColor: FORCE_COLORS[trend.force] + '20',
+          color: FORCE_COLORS[trend.force],
+          flexShrink: 0,
+          minWidth: '68px',
+          textAlign: 'center',
+        }}>
+          {FORCE_ICONS[trend.force]} {trend.force}
+        </span>
 
-          <h4 style={{
-            fontSize: '13px',
-            fontWeight: 600,
-            color: T.text,
-            margin: '0 0 4px 0',
-          }}>
-            {trend.name}
-          </h4>
-
-          <p style={{
-            fontSize: '11px',
-            color: T.text2,
-            margin: 0,
-            lineHeight: 1.5,
-            display: '-webkit-box',
-            WebkitLineClamp: expanded ? undefined : 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: expanded ? 'visible' : 'hidden',
-          }}>
-            {trend.description}
-          </p>
-
-          {/* Source tags */}
-          <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-            {trend.sources.slice(0, 3).map((src, i) => (
-              <span key={i} style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '8px',
-                fontWeight: 500,
-                backgroundColor: T.bg3,
-                color: T.text3,
-              }}>
-                {SOURCE_ICONS[src.api] || <Globe size={8} />}
-                {src.api}
-              </span>
-            ))}
-            <span style={{ fontSize: '8px', color: T.text3, alignSelf: 'center' }}>
-              {new Date(trend.discovered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-          </div>
+        {/* Trend name — takes remaining space */}
+        <div style={{
+          flex: 1,
+          fontSize: '12px',
+          fontWeight: 500,
+          color: T.text,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {trend.name}
         </div>
 
-        {/* Right: Chevron + Score */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          <div style={{ fontSize: '10px', fontWeight: 600, fontFamily: T.mono, color: T.text2 }}>
-            {trend.suggested_impact}×{trend.suggested_probability}
-          </div>
-          <div style={{ color: T.text3 }}>
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </div>
+        {/* Direction pill */}
+        <span style={{
+          padding: '2px 7px',
+          borderRadius: '10px',
+          fontSize: '9px',
+          fontWeight: 600,
+          backgroundColor: trendColor + '15',
+          color: trendColor,
+          flexShrink: 0,
+        }}>
+          {trend.direction === 'Expansion' ? '▲' : '▼'}
+        </span>
+
+        {/* Score */}
+        <div style={{
+          fontSize: '10px',
+          fontWeight: 600,
+          fontFamily: T.mono,
+          color: T.text2,
+          flexShrink: 0,
+          minWidth: '30px',
+          textAlign: 'center',
+        }}>
+          {trend.suggested_impact}×{trend.suggested_probability}
+        </div>
+
+        {/* Relevance badge */}
+        <RelevanceBadge score={trend.relevance_score} />
+
+        {/* Status / Chevron */}
+        <div style={{ flexShrink: 0, color: T.text3, display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {trend.status === 'added' && (
+            <span style={{ fontSize: '9px', color: T.green, fontWeight: 600 }}>
+              <Check size={10} />
+            </span>
+          )}
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </div>
 
@@ -385,145 +374,169 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss
           >
             <div style={{
               padding: '0 16px 16px',
-              paddingLeft: '32px',
-              borderTop: `1px solid ${T.border}`,
-              paddingTop: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
+              borderTop: `1px solid ${T.border1}`,
+              paddingTop: '14px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
             }}>
-              {/* AI Reasoning */}
-              <div>
-                <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={10} /> PULSE Analysis
+              {/* Left column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Description */}
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px', letterSpacing: '0.5px' }}>
+                    DESCRIPTION
+                  </div>
+                  <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
+                    {trend.description}
+                  </p>
                 </div>
-                <p style={{ fontSize: '10px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
-                  {trend.reasoning}
-                </p>
+
+                {/* AI Reasoning */}
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Sparkles size={10} /> PULSE ANALYSIS
+                  </div>
+                  <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
+                    {trend.reasoning}
+                  </p>
+                </div>
+
+                {/* Sources */}
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                    SOURCES ({trend.sources.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {trend.sources.map((src, i) => (
+                      <a
+                        key={i}
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '5px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: T.bg3 + '40',
+                          textDecoration: 'none',
+                          fontSize: '10px',
+                          color: T.accent,
+                          transition: 'background-color 0.15s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = T.bg3; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = T.bg3 + '40'; }}
+                      >
+                        {SOURCE_ICONS[src.api] || <Globe size={9} />}
+                        <span style={{ color: T.text3, fontWeight: 500, flexShrink: 0 }}>{src.api}</span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.title}</span>
+                        <ExternalLink size={9} style={{ flexShrink: 0, opacity: 0.5 }} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Suggested Scores */}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1, padding: '8px', backgroundColor: T.bg3 + '60', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '8px', color: T.text3, marginBottom: '2px' }}>Suggested Impact</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_impact}/5</div>
+              {/* Right column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Suggested Scores */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Impact</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_impact}<span style={{ fontSize: '11px', color: T.text3 }}>/5</span></div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Probability</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_probability}<span style={{ fontSize: '11px', color: T.text3 }}>/5</span></div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Relevance</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: relevanceColor, fontFamily: T.mono }}>{trend.relevance_score}<span style={{ fontSize: '11px', color: T.text3 }}>%</span></div>
+                  </div>
                 </div>
-                <div style={{ flex: 1, padding: '8px', backgroundColor: T.bg3 + '60', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '8px', color: T.text3, marginBottom: '2px' }}>Suggested Probability</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_probability}/5</div>
-                </div>
-                <div style={{ flex: 1, padding: '8px', backgroundColor: T.bg3 + '60', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '8px', color: T.text3, marginBottom: '2px' }}>Relevance</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.relevance_score}%</div>
-                </div>
-              </div>
 
-              {/* Category Mapping */}
-              <div>
-                <div style={{ fontSize: '9px', fontWeight: 600, color: T.text2, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Suggested Category Exposure
+                {/* Category Mapping */}
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                    SUGGESTED CATEGORY EXPOSURE
+                  </div>
+                  <div style={{
+                    borderRadius: '6px',
+                    border: `1px solid ${T.border1}`,
+                    overflow: 'hidden',
+                    backgroundColor: T.bg1,
+                  }}>
+                    {Object.entries(trend.category_mapping).map(([catId, exposure], idx) => {
+                      const cat = CATEGORIES.find(c => c.id === catId);
+                      return (
+                        <div key={catId} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 10px',
+                          borderTop: idx > 0 ? `1px solid ${T.border1}22` : 'none',
+                        }}>
+                          <span style={{ fontSize: '10px', color: T.text2 }}>{cat?.name || catId}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: T.mono, color: T.text }}>{exposure}/5</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {Object.entries(trend.category_mapping).map(([catId, exposure]) => {
-                    const cat = CATEGORIES.find(c => c.id === catId);
-                    return (
-                      <span key={catId} style={{
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontSize: '9px',
-                        fontWeight: 500,
-                        backgroundColor: T.bg3,
-                        color: T.text2,
-                        fontFamily: T.mono,
-                      }}>
-                        {cat?.name || catId}: {exposure}/5
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* Sources */}
-              <div>
-                <div style={{ fontSize: '9px', fontWeight: 600, color: T.text2, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Sources ({trend.sources.length})
+                {/* Date */}
+                <div style={{ fontSize: '10px', color: T.text3 }}>
+                  Discovered: {new Date(trend.discovered_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {trend.sources.map((src, i) => (
-                    <a
-                      key={i}
-                      href={src.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+
+                {/* Actions */}
+                {!isActioned && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={(e) => { e.stopPropagation(); onAdd(); }}
                       style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: T.accent,
+                        border: 'none',
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '6px',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: T.bg3 + '40',
-                        textDecoration: 'none',
-                        fontSize: '9px',
-                        color: T.accent,
-                        transition: 'background-color 0.15s',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = T.bg3; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = T.bg3 + '40'; }}
                     >
-                      {SOURCE_ICONS[src.api] || <Globe size={9} />}
-                      <span style={{ color: T.text3, fontWeight: 500 }}>{src.api}</span>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.title}</span>
-                      <ExternalLink size={9} style={{ flexShrink: 0 }} />
-                    </a>
-                  ))}
-                </div>
+                      <Plus size={14} />
+                      Add to Relevant Trends
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: T.text2,
+                        backgroundColor: T.bg3,
+                        border: `1px solid ${T.border1}`,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Dismiss
+                    </motion.button>
+                  </div>
+                )}
               </div>
-
-              {/* Actions */}
-              {!isActioned && (
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                    style={{
-                      flex: 1,
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: '#fff',
-                      backgroundColor: T.accent,
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add to Relevant Trends
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-                    style={{
-                      padding: '10px 16px',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      color: T.text2,
-                      backgroundColor: T.bg3,
-                      border: `1px solid ${T.border1}`,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Dismiss
-                  </motion.button>
-                </div>
-              )}
             </div>
           </motion.div>
         )}
@@ -767,11 +780,11 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend }) => {
 
       {/* Trend Cards */}
       <div style={{
-        padding: '16px 24px',
+        padding: '12px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
-        maxHeight: '600px',
+        gap: '2px',
+        maxHeight: '700px',
         overflowY: 'auto',
       }}>
         {filteredTrends.length === 0 ? (

@@ -1,6 +1,8 @@
-# PULSE API — Vercel serverless runtime dependencies (slim)
+# PULSE API — Vercel serverless runtime dependencies
 fastapi>=0.110
 pydantic>=2.6
 numpy>=1.26
 scipy>=1.12
 networkx>=3.2
+uvicorn>=0.27
+python-dotenv>=1.0

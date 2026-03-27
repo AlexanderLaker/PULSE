@@ -895,7 +895,16 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
   const [sessions, setSessions] = useState<DelphiSessionSummaryData[]>([]);
   const [selectedSession, setSelectedSession] = useState<DelphiSessionSummaryData | null>(null);
   const [trends, setTrends] = useState<TrendData[]>([]);
-  const [scorerName, setScorerName] = useState('');
+  const [scorerName, setScorerName] = useState(() => {
+    try { return localStorage.getItem('pulse_scorer_name') || ''; } catch { return ''; }
+  });
+
+  // Persist scorer name
+  useEffect(() => {
+    if (scorerName) {
+      try { localStorage.setItem('pulse_scorer_name', scorerName); } catch { /* noop */ }
+    }
+  }, [scorerName]);
   const [scores, setScores] = useState<any[]>([]);
   const [consensus, setConsensus] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1057,132 +1066,183 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
   ] as const;
 
   return (
-    <motion.div
-      initial={{ x: 400, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 400, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      style={{
-        position: 'fixed',
-        right: 0,
-        top: 0,
-        width: '420px',
-        height: '100vh',
-        backgroundColor: T.bg,
-        borderLeft: `1px solid ${T.border1}`,
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 1000,
-        boxShadow: '0 20px 25px rgba(0,0,0,0.1)',
-      }}
-    >
-      {/* Header */}
-      <div
+    <>
+      {/* Backdrop overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
         style={{
-          padding: '16px',
-          borderBottom: `1px solid ${T.border1}`,
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 999,
+        }}
+      />
+      {/* Full-screen Delphi panel */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+        style={{
+          position: 'fixed',
+          top: '24px',
+          left: '24px',
+          right: '24px',
+          bottom: '24px',
+          backgroundColor: T.bg,
+          borderRadius: '16px',
+          border: `1px solid ${T.border1}`,
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          zIndex: 1000,
+          boxShadow: '0 25px 50px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)',
+          overflow: 'hidden',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: T.text }}>
-          Delphi Expert Elicitation
-        </h2>
-        <button
-          onClick={onClose}
+        {/* Header */}
+        <div
           style={{
-            padding: '6px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            color: T.text3,
+            padding: '20px 28px',
+            borderBottom: `1px solid ${T.border1}`,
             display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
+            backgroundColor: T.bg1,
           }}
         >
-          <X size={18} />
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: `linear-gradient(135deg, ${T.accent}, #8B5CF6)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Users size={18} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: T.text }}>
+                Delphi Expert Elicitation
+              </h2>
+              <div style={{ fontSize: '11px', color: T.text3, marginTop: '2px' }}>
+                Structured scoring with calibration and debiasing
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px',
+              backgroundColor: T.bg3,
+              border: `1px solid ${T.border1}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: T.text2,
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 120ms',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = T.bg4 || T.bg3;
+              e.currentTarget.style.color = T.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = T.bg3;
+              e.currentTarget.style.color = T.text2;
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          borderBottom: `1px solid ${T.border1}`,
-          backgroundColor: T.bg1,
-        }}
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flex: 1,
-                padding: '12px 8px',
-                backgroundColor: isActive ? T.bg : 'transparent',
-                border: 'none',
-                borderBottom: isActive ? `2px solid ${T.accent}` : 'none',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: isActive ? T.accent : T.text3,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                transition: 'all 0.2s',
-              }}
-              title={tab.label}
-            >
-              <Icon size={14} />
-              <span style={{ display: 'none' }}>
+        {/* Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            borderBottom: `1px solid ${T.border1}`,
+            backgroundColor: T.bg1,
+            padding: '0 28px',
+          }}
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderBottom: isActive ? `2px solid ${T.accent}` : '2px solid transparent',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: isActive ? T.accent : T.text3,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.color = T.text2;
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.color = T.text3;
+                }}
+              >
+                <Icon size={15} />
                 {tab.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', backgroundColor: T.bg }}>
-        <AnimatePresence mode="wait">
-          {activeTab === 'sessions' && (
-            <SessionsOverviewTab
-              key="sessions"
-              sessions={sessions}
-              onSelectSession={handleSelectSession}
-              loading={loading}
-            />
-          )}
-          {activeTab === 'scoring' && (
-            <ScoringInterfaceTab
-              key="scoring"
-              session={selectedSession}
-              trends={trends}
-              scorerName={scorerName}
-              onScorerNameChange={setScorerName}
-              onSubmitScore={handleSubmitScore}
-              loading={loading}
-              submitting={submitting}
-            />
-          )}
-          {activeTab === 'summary' && (
-            <RoundSummaryTab key="summary" session={selectedSession} scores={scores} loading={loading} />
-          )}
-          {activeTab === 'consensus' && (
-            <ConsensusResultsTab
-              key="consensus"
-              session={selectedSession}
-              consensus={consensus}
-              loading={loading}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: T.bg, padding: '0 4px' }}>
+          <AnimatePresence mode="wait">
+            {activeTab === 'sessions' && (
+              <SessionsOverviewTab
+                key="sessions"
+                sessions={sessions}
+                onSelectSession={handleSelectSession}
+                loading={loading}
+              />
+            )}
+            {activeTab === 'scoring' && (
+              <ScoringInterfaceTab
+                key="scoring"
+                session={selectedSession}
+                trends={trends}
+                scorerName={scorerName}
+                onScorerNameChange={setScorerName}
+                onSubmitScore={handleSubmitScore}
+                loading={loading}
+                submitting={submitting}
+              />
+            )}
+            {activeTab === 'summary' && (
+              <RoundSummaryTab key="summary" session={selectedSession} scores={scores} loading={loading} />
+            )}
+            {activeTab === 'consensus' && (
+              <ConsensusResultsTab
+                key="consensus"
+                session={selectedSession}
+                consensus={consensus}
+                loading={loading}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </>
   );
 }
