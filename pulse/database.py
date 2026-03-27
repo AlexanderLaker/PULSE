@@ -1,49 +1,73 @@
-"""SQLite database persistence for PULSE trends, simulations, and metadata.
+"""Database persistence for PULSE — dual-mode Postgres (Vercel) / SQLite (local).
 
-Implements all tables from the schema in CLAUDE.md:
-- trends: Strategic trends with scoring and Bayesian posteriors
-- trend_category_exposure: Exposure matrix for trends
-- trend_vc_exposure: Value chain exposure
-- causal_edges: Causal DAG edges between forces
-- competitors: Competitive profiles (public intelligence only)
-- config_snapshots: Configuration parameter snapshots
-- simulation_runs: Results from Bayesian MC and sensitivity runs
-- backtest_results: Historical prediction accuracy
-- delphi_rounds: Expert elicitation scoring
-- triggers: Early-warning trigger definitions and status
-- ai_suggestions: AI scanning results pending human review
-- audit_log: Change tracking with user/timestamp/reason
+When POSTGRES_URL is set (Vercel Postgres / Neon), uses psycopg2.
+Otherwise falls back to SQLite for local development.
+
+Implements all tables from the CLAUDE.md specification:
+- trends, trend_category_exposure, trend_vc_exposure
+- causal_edges, competitors, config_snapshots
+- simulation_runs, backtest_results, delphi_rounds
+- triggers, ai_suggestions, audit_log
+- users (auth), delphi_sessions, delphi_calibration
 
 CRITICAL: No financial data (€M values) stored anywhere.
 All monetary values are relative (percentages, weights, shifts).
 """
 
-import sqlite3
 import json
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Any
 from contextlib import contextmanager
 
 from pulse.ingestion.models import Trend, CausalEdge
-from pulse.env_loader import get_config
 
 logger = logging.getLogger(__name__)
 
-# Get database path from environment or use default
-config = get_config()
-DB_PATH = Path(config.db_path)
+# ── Detect database mode ─────────────────────────────────────────────
+POSTGRES_URL = os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL")
+USE_POSTGRES = bool(POSTGRES_URL)
+
+if USE_POSTGRES:
+    try:
+        import psycopg2
+        import psycopg2.extras
+        logger.info("Database mode: PostgreSQL (Vercel Postgres / Neon)")
+    except ImportError:
+        logger.warning("psycopg2 not installed — falling back to SQLite")
+        USE_POSTGRES = False
+
+if not USE_POSTGRES:
+    import sqlite3
+    logger.info("Database mode: SQLite (local development)")
 
 
-def get_db_path() -> Path:
-    """Get the database path."""
-    return DB_PATH
+# ── Connection helpers ────────────────────────────────────────────────
+
+def _get_sqlite_path() -> Path:
+    """Get SQLite database file path."""
+    _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+    default = "/tmp/pulse.db" if _is_vercel else "data/pulse.db"
+    db_path = os.environ.get("PULSE_DB_PATH", default)
+    return Path(db_path)
 
 
-def ensure_db_directory() -> None:
-    """Ensure the database directory exists."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _pg_connect():
+    """Create a new PostgreSQL connection."""
+    conn = psycopg2.connect(POSTGRES_URL, sslmode="require")
+    conn.autocommit = False
+    return conn
+
+
+def _sqlite_connect():
+    """Create a new SQLite connection."""
+    db_path = _get_sqlite_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @contextmanager
@@ -51,15 +75,22 @@ def get_db_connection():
     """
     Context manager for database connections with auto-commit.
 
+    Returns a connection + a dict-like row factory regardless of backend.
+    Uses %s placeholders for Postgres, ? for SQLite — callers should use
+    the sql() helper or write backend-aware queries.
+
     Usage:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(...)
             conn.commit()
     """
-    ensure_db_directory()
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row  # Return rows as dict-like objects
+    if USE_POSTGRES:
+        conn = _pg_connect()
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
+    else:
+        conn = _sqlite_connect()
+
     try:
         yield conn
         conn.commit()
@@ -71,30 +102,48 @@ def get_db_connection():
         conn.close()
 
 
+def placeholder() -> str:
+    """Return the correct SQL placeholder for the current backend."""
+    return "%s" if USE_POSTGRES else "?"
+
+
+def ph(count: int = 1) -> str:
+    """Return comma-separated placeholders. ph(3) → '%s, %s, %s' or '?, ?, ?'"""
+    p = placeholder()
+    return ", ".join([p] * count)
+
+
+# ── Schema initialization ─────────────────────────────────────────────
+
+def _serial_pk() -> str:
+    """Return the correct auto-increment primary key syntax."""
+    return "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+
 def init_db() -> None:
     """
-    Initialize database schema from CLAUDE.md specification.
+    Initialize database schema.
 
-    Creates all tables if they don't exist. Safe to call multiple times
-    (existing tables are not dropped).
+    Creates all tables if they don't exist. Safe to call multiple times.
+    Works for both Postgres and SQLite.
     """
-    ensure_db_directory()
+    serial = _serial_pk()
+    p = placeholder()
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # ── Core trends table ────────────────────────────────────────────
-
-        cursor.execute("""
+        # ── Core trends table ────────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS trends (
                 id TEXT PRIMARY KEY,
                 force TEXT NOT NULL,
                 sub_category TEXT,
                 name TEXT NOT NULL,
                 description TEXT,
-                direction TEXT CHECK(direction IN ('Expansion', 'Contraction')),
-                impact INTEGER CHECK(impact BETWEEN 1 AND 5),
-                probability INTEGER CHECK(probability BETWEEN 1 AND 5),
+                direction TEXT,
+                impact INTEGER,
+                probability INTEGER,
                 start_year INTEGER,
                 normalized_score REAL,
                 strategic_implication TEXT,
@@ -103,11 +152,9 @@ def init_db() -> None:
                 confidence TEXT DEFAULT 'Medium',
                 ai_suggested BOOLEAN DEFAULT FALSE,
                 user_override BOOLEAN DEFAULT FALSE,
-                -- Delphi metadata
                 scorer_count INTEGER DEFAULT 1,
                 score_variance REAL DEFAULT 0.0,
                 debiasing_applied BOOLEAN DEFAULT FALSE,
-                -- Bayesian posteriors (JSON: {alpha, beta})
                 impact_posterior TEXT,
                 probability_posterior TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -115,36 +162,43 @@ def init_db() -> None:
             )
         """)
 
-        # ── Category exposure ────────────────────────────────────────────
-
+        # ── Category exposure ────────────────────────────────────────
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trend_category_exposure (
                 trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
                 category TEXT NOT NULL,
-                exposure_score INTEGER CHECK(exposure_score BETWEEN 0 AND 5),
+                exposure_score INTEGER,
                 PRIMARY KEY (trend_id, category)
             )
         """)
 
-        # ── Value chain exposure ─────────────────────────────────────────
-
+        # ── Value chain exposure ─────────────────────────────────────
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trend_vc_exposure (
                 trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
                 vc_step TEXT NOT NULL,
-                exposure_score INTEGER CHECK(exposure_score BETWEEN 0 AND 5),
+                exposure_score INTEGER,
                 PRIMARY KEY (trend_id, vc_step)
             )
         """)
 
-        # ── Causal DAG edges ─────────────────────────────────────────────
-
+        # ── Regional exposure ──────────────────────────────────────────
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trend_regional_exposure (
+                trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
+                region TEXT NOT NULL,
+                exposure_score INTEGER,
+                PRIMARY KEY (trend_id, region)
+            )
+        """)
+
+        # ── Causal DAG edges ─────────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS causal_edges (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 source_force TEXT NOT NULL,
                 target_force TEXT NOT NULL,
-                propagation_weight REAL CHECK(propagation_weight BETWEEN 0 AND 1),
+                propagation_weight REAL,
                 lag_years INTEGER DEFAULT 0,
                 mechanism TEXT,
                 evidence_strength TEXT DEFAULT 'Moderate',
@@ -153,107 +207,130 @@ def init_db() -> None:
             )
         """)
 
-        # ── Competitor profiles ──────────────────────────────────────────
-
+        # ── Competitor profiles ──────────────────────────────────────
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS competitors (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 archetype TEXT,
-                response_patterns TEXT,     -- JSON
-                category_exposure TEXT,     -- JSON: {category: exposure_level}
+                response_patterns TEXT,
+                category_exposure TEXT,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # ── Model configuration snapshots ────────────────────────────────
-
-        cursor.execute("""
+        # ── Model configuration snapshots ────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS config_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 region TEXT,
                 attenuation REAL,
-                attenuation_source TEXT,   -- "assumed" | "backtested"
-                force_weights TEXT,         -- JSON
-                vc_weights TEXT,            -- JSON
-                category_names TEXT,        -- JSON
-                path_years TEXT,            -- JSON
-                materialization_schedule TEXT,  -- JSON
+                attenuation_source TEXT,
+                force_weights TEXT,
+                vc_weights TEXT,
+                category_names TEXT,
+                path_years TEXT,
+                materialization_schedule TEXT,
                 backtesting_accuracy REAL
             )
         """)
 
-        # ── Simulation runs ──────────────────────────────────────────────
-
-        cursor.execute("""
+        # ── Simulation runs ──────────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS simulation_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 scenario TEXT,
                 iterations INTEGER,
-                model_type TEXT,            -- "deterministic" | "bayesian_mc" | "copula_mc"
-                config_snapshot_id INTEGER REFERENCES config_snapshots(id),
-                results TEXT,               -- JSON: {category: {year: {percentile: shift%}}}
-                causal_decomposition TEXT,  -- JSON: {category: {force: direct_%, propagated_%}}
-                allocation_recommendation TEXT,  -- JSON: {category: weight}
-                convergence_diagnostics TEXT    -- JSON: {r_hat, ess, etc.}
+                model_type TEXT,
+                config_snapshot_id INTEGER,
+                results TEXT,
+                causal_decomposition TEXT,
+                allocation_recommendation TEXT,
+                convergence_diagnostics TEXT
             )
         """)
 
-        # ── Backtesting results ──────────────────────────────────────────
-
-        cursor.execute("""
+        # ── Backtesting results ──────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS backtest_results (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 backtest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                historical_version TEXT,    -- "V5", "V8", etc.
+                historical_version TEXT,
                 prediction_year INTEGER,
-                actual_shifts TEXT,         -- JSON: public market-level shifts
-                predicted_shifts TEXT,      -- JSON: what PULSE would have predicted
+                actual_shifts TEXT,
+                predicted_shifts TEXT,
                 accuracy_score REAL,
-                calibration_params TEXT     -- JSON: derived attenuation, distributions, etc.
+                calibration_params TEXT
             )
         """)
 
-        # ── Delphi elicitation rounds ────────────────────────────────────
-
-        cursor.execute("""
+        # ── Delphi elicitation rounds ────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS delphi_rounds (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
+                session_id TEXT,
                 round_number INTEGER,
                 round_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                trend_id TEXT REFERENCES trends(id),
+                trend_id TEXT,
                 scorer_id TEXT,
                 impact_score INTEGER,
                 probability_score INTEGER,
                 rationale TEXT,
                 calibration_factor REAL DEFAULT 1.0,
-                bias_flags TEXT             -- JSON: ["anchoring", "optimism", etc.]
+                bias_flags TEXT
             )
         """)
 
-        # ── Early-warning triggers ───────────────────────────────────────
-
+        # ── Delphi sessions ─────────────────────────────────────────
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS delphi_sessions (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                current_round INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                trend_ids TEXT,
+                scorer_ids TEXT
+            )
+        """)
+
+        # ── Delphi calibration ───────────────────────────────────────
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS delphi_calibration (
+                id {serial},
+                session_id TEXT,
+                scorer_id TEXT NOT NULL,
+                calibration_factor REAL DEFAULT 1.0,
+                bias_flags TEXT,
+                mean_impact_error REAL DEFAULT 0,
+                mean_prob_error REAL DEFAULT 0,
+                calibrated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # ── Early-warning triggers ───────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS triggers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 category TEXT NOT NULL,
-                condition_type TEXT,        -- "shift_exceeds" | "velocity_exceeds" | etc.
+                condition_type TEXT,
                 threshold REAL,
                 target_year INTEGER,
                 action_text TEXT,
-                status TEXT DEFAULT 'active',  -- "active" | "fired" | "dismissed"
+                status TEXT DEFAULT 'active',
                 fired_date TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # ── AI suggestions queue ─────────────────────────────────────────
-
-        cursor.execute("""
+        # ── AI suggestions queue ─────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS ai_suggestions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 suggestion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 suggestion_type TEXT,
                 content TEXT,
@@ -264,11 +341,10 @@ def init_db() -> None:
             )
         """)
 
-        # ── Audit log ────────────────────────────────────────────────────
-
-        cursor.execute("""
+        # ── Audit log ────────────────────────────────────────────────
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS audit_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {serial},
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 action TEXT NOT NULL,
                 entity_type TEXT,
@@ -280,186 +356,164 @@ def init_db() -> None:
             )
         """)
 
-        # ── Create indexes for common queries ────────────────────────────
-
+        # ── Users (auth) ────────────────────────────────────────────
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                password_salt TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'analyst',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            )
         """)
 
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_causal_edges_source ON causal_edges(source_force)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_causal_edges_target ON causal_edges(target_force)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)
-        """)
+        # ── Indexes ──────────────────────────────────────────────────
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_source ON causal_edges(source_force)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_target ON causal_edges(target_force)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_delphi_rounds_session ON delphi_rounds(session_id)")
 
         conn.commit()
-        logger.info(f"Database initialized at {DB_PATH}")
+        logger.info(f"Database initialized (mode: {'postgres' if USE_POSTGRES else 'sqlite'})")
 
 
 # ── TRENDS ──────────────────────────────────────────────────────────────
 
 def save_trends(trends: List[Trend]) -> None:
-    """
-    Save trends to database, replacing any existing trends with same IDs.
-
-    Args:
-        trends: List of Trend objects
-
-    Example:
-        trends = [Trend(id="c1", name="Green Beauty", ...), ...]
-        save_trends(trends)
-    """
+    """Save trends to database, replacing any existing trends with same IDs."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
         for trend in trends:
-            # Delete existing if present
-            cursor.execute("DELETE FROM trend_category_exposure WHERE trend_id = ?", (trend.id,))
-            cursor.execute("DELETE FROM trend_vc_exposure WHERE trend_id = ?", (trend.id,))
-            cursor.execute("DELETE FROM trends WHERE id = ?", (trend.id,))
+            cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend.id,))
+            cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend.id,))
+            cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (trend.id,))
+            cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend.id,))
 
-            # Insert trend
             cursor.execute(
-                """
+                f"""
                 INSERT INTO trends (
                     id, force, sub_category, name, description, direction,
                     impact, probability, start_year, normalized_score,
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, scorer_count, score_variance,
                     debiasing_applied, impact_posterior, probability_posterior
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ({ph(21)})
                 """,
                 (
-                    trend.id,
-                    trend.force,
-                    trend.sub_category,
-                    trend.name,
-                    trend.description,
-                    trend.direction,
-                    trend.impact,
-                    trend.probability,
-                    trend.start_year,
-                    trend.normalized_score,
-                    trend.strategic_implication,
-                    trend.data_source,
-                    trend.source_type,
-                    trend.confidence,
-                    trend.ai_suggested,
-                    trend.user_override,
-                    trend.scorer_count,
-                    trend.score_variance,
-                    trend.debiasing_applied,
+                    trend.id, trend.force, trend.sub_category, trend.name,
+                    trend.description, trend.direction, trend.impact,
+                    trend.probability, trend.start_year, trend.normalized_score,
+                    trend.strategic_implication, trend.data_source, trend.source_type,
+                    trend.confidence, trend.ai_suggested, trend.user_override,
+                    trend.scorer_count, trend.score_variance, trend.debiasing_applied,
                     json.dumps(trend.impact_posterior) if trend.impact_posterior else None,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
                 ),
             )
 
-            # Insert category exposures
             for category, score in trend.category_exposure.items():
                 cursor.execute(
-                    """
-                    INSERT INTO trend_category_exposure (trend_id, category, exposure_score)
-                    VALUES (?, ?, ?)
-                    """,
+                    f"INSERT INTO trend_category_exposure (trend_id, category, exposure_score) VALUES ({ph(3)})",
                     (trend.id, category, score),
                 )
 
-            # Insert VC exposures
             for vc_step, score in trend.vc_exposure.items():
                 cursor.execute(
-                    """
-                    INSERT INTO trend_vc_exposure (trend_id, vc_step, exposure_score)
-                    VALUES (?, ?, ?)
-                    """,
+                    f"INSERT INTO trend_vc_exposure (trend_id, vc_step, exposure_score) VALUES ({ph(3)})",
                     (trend.id, vc_step, score),
                 )
 
-            logger.debug(f"Saved trend: {trend.id}")
+            for region, score in trend.regional_exposure.items():
+                cursor.execute(
+                    f"INSERT INTO trend_regional_exposure (trend_id, region, exposure_score) VALUES ({ph(3)})",
+                    (trend.id, region, score),
+                )
 
         conn.commit()
         logger.info(f"Saved {len(trends)} trends to database")
 
 
+def _row_to_dict(row) -> dict:
+    """Convert a database row to a plain dict (works for both backends)."""
+    if isinstance(row, dict):
+        return row
+    # sqlite3.Row
+    return dict(row)
+
+
 def load_trends() -> List[Trend]:
-    """
-    Load all trends from database.
-
-    Returns:
-        List of Trend objects with all exposures populated
-
-    Example:
-        trends = load_trends()
-        for t in trends:
-            print(f"{t.name}: {t.impact}x{t.probability}")
-    """
+    """Load all trends from database."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        # Load all trends
         cursor.execute("SELECT * FROM trends")
         trend_rows = cursor.fetchall()
 
         trends = []
-        for row in trend_rows:
-            # Load category exposures
+        for raw_row in trend_rows:
+            row = _row_to_dict(raw_row)
+
             cursor.execute(
-                "SELECT category, exposure_score FROM trend_category_exposure WHERE trend_id = ?",
+                f"SELECT category, exposure_score FROM trend_category_exposure WHERE trend_id = {p}",
                 (row["id"],),
             )
-            cat_exposures = {r["category"]: r["exposure_score"] for r in cursor.fetchall()}
+            cat_exposures = {_row_to_dict(r)["category"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-            # Load VC exposures
             cursor.execute(
-                "SELECT vc_step, exposure_score FROM trend_vc_exposure WHERE trend_id = ?",
+                f"SELECT vc_step, exposure_score FROM trend_vc_exposure WHERE trend_id = {p}",
                 (row["id"],),
             )
-            vc_exposures = {r["vc_step"]: r["exposure_score"] for r in cursor.fetchall()}
+            vc_exposures = {_row_to_dict(r)["vc_step"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-            # Parse posteriors
+            cursor.execute(
+                f"SELECT region, exposure_score FROM trend_regional_exposure WHERE trend_id = {p}",
+                (row["id"],),
+            )
+            regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+
             impact_posterior = (
                 tuple(json.loads(row["impact_posterior"]))
-                if row["impact_posterior"]
+                if row.get("impact_posterior")
                 else None
             )
             prob_posterior = (
                 tuple(json.loads(row["probability_posterior"]))
-                if row["probability_posterior"]
+                if row.get("probability_posterior")
                 else None
             )
 
             trend = Trend(
                 id=row["id"],
                 force=row["force"],
-                sub_category=row["sub_category"],
+                sub_category=row.get("sub_category"),
                 name=row["name"],
-                description=row["description"],
-                direction=row["direction"],
-                impact=row["impact"],
-                probability=row["probability"],
-                start_year=row["start_year"],
-                normalized_score=row["normalized_score"],
-                strategic_implication=row["strategic_implication"],
+                description=row.get("description"),
+                direction=row.get("direction"),
+                impact=row.get("impact"),
+                probability=row.get("probability"),
+                start_year=row.get("start_year"),
+                normalized_score=row.get("normalized_score"),
+                strategic_implication=row.get("strategic_implication"),
                 category_exposure=cat_exposures,
                 vc_exposure=vc_exposures,
-                data_source=row["data_source"],
-                source_type=row["source_type"],
-                confidence=row["confidence"],
-                last_updated=datetime.fromisoformat(row["updated_at"]),
-                ai_suggested=row["ai_suggested"],
-                user_override=row["user_override"],
-                scorer_count=row["scorer_count"],
-                score_variance=row["score_variance"],
-                debiasing_applied=row["debiasing_applied"],
+                regional_exposure=regional_exposures,
+                data_source=row.get("data_source"),
+                source_type=row.get("source_type"),
+                confidence=row.get("confidence", "Medium"),
+                last_updated=datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow(),
+                ai_suggested=row.get("ai_suggested", False),
+                user_override=row.get("user_override", False),
+                scorer_count=row.get("scorer_count", 1),
+                score_variance=row.get("score_variance", 0.0),
+                debiasing_applied=row.get("debiasing_applied", False),
                 impact_posterior=impact_posterior,
                 probability_posterior=prob_posterior,
             )
@@ -470,71 +524,71 @@ def load_trends() -> List[Trend]:
 
 
 def get_trend_by_id(trend_id: str) -> Optional[Trend]:
-    """
-    Load a single trend by ID.
-
-    Args:
-        trend_id: Trend identifier
-
-    Returns:
-        Trend object or None if not found
-    """
+    """Load a single trend by ID."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM trends WHERE id = {p}", (trend_id,))
+        raw_row = cursor.fetchone()
 
-        cursor.execute("SELECT * FROM trends WHERE id = ?", (trend_id,))
-        row = cursor.fetchone()
-
-        if not row:
+        if not raw_row:
             return None
 
-        # Load exposures
-        cursor.execute(
-            "SELECT category, exposure_score FROM trend_category_exposure WHERE trend_id = ?",
-            (trend_id,),
-        )
-        cat_exposures = {r["category"]: r["exposure_score"] for r in cursor.fetchall()}
+        row = _row_to_dict(raw_row)
 
         cursor.execute(
-            "SELECT vc_step, exposure_score FROM trend_vc_exposure WHERE trend_id = ?",
+            f"SELECT category, exposure_score FROM trend_category_exposure WHERE trend_id = {p}",
             (trend_id,),
         )
-        vc_exposures = {r["vc_step"]: r["exposure_score"] for r in cursor.fetchall()}
+        cat_exposures = {_row_to_dict(r)["category"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+
+        cursor.execute(
+            f"SELECT vc_step, exposure_score FROM trend_vc_exposure WHERE trend_id = {p}",
+            (trend_id,),
+        )
+        vc_exposures = {_row_to_dict(r)["vc_step"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+
+        cursor.execute(
+            f"SELECT region, exposure_score FROM trend_regional_exposure WHERE trend_id = {p}",
+            (trend_id,),
+        )
+        regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
         impact_posterior = (
             tuple(json.loads(row["impact_posterior"]))
-            if row["impact_posterior"]
+            if row.get("impact_posterior")
             else None
         )
         prob_posterior = (
             tuple(json.loads(row["probability_posterior"]))
-            if row["probability_posterior"]
+            if row.get("probability_posterior")
             else None
         )
 
         return Trend(
             id=row["id"],
             force=row["force"],
-            sub_category=row["sub_category"],
+            sub_category=row.get("sub_category"),
             name=row["name"],
-            description=row["description"],
-            direction=row["direction"],
-            impact=row["impact"],
-            probability=row["probability"],
-            start_year=row["start_year"],
-            normalized_score=row["normalized_score"],
-            strategic_implication=row["strategic_implication"],
+            description=row.get("description"),
+            direction=row.get("direction"),
+            impact=row.get("impact"),
+            probability=row.get("probability"),
+            start_year=row.get("start_year"),
+            normalized_score=row.get("normalized_score"),
+            strategic_implication=row.get("strategic_implication"),
             category_exposure=cat_exposures,
             vc_exposure=vc_exposures,
-            data_source=row["data_source"],
-            source_type=row["source_type"],
-            confidence=row["confidence"],
-            last_updated=datetime.fromisoformat(row["updated_at"]),
-            ai_suggested=row["ai_suggested"],
-            user_override=row["user_override"],
-            scorer_count=row["scorer_count"],
-            score_variance=row["score_variance"],
-            debiasing_applied=row["debiasing_applied"],
+            regional_exposure=regional_exposures,
+            data_source=row.get("data_source"),
+            source_type=row.get("source_type"),
+            confidence=row.get("confidence", "Medium"),
+            last_updated=datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow(),
+            ai_suggested=row.get("ai_suggested", False),
+            user_override=row.get("user_override", False),
+            scorer_count=row.get("scorer_count", 1),
+            score_variance=row.get("score_variance", 0.0),
+            debiasing_applied=row.get("debiasing_applied", False),
             impact_posterior=impact_posterior,
             probability_posterior=prob_posterior,
         )
@@ -543,41 +597,23 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
 # ── CAUSAL EDGES ────────────────────────────────────────────────────────
 
 def save_causal_edges(edges: List[CausalEdge]) -> None:
-    """
-    Save causal DAG edges to database.
-
-    Args:
-        edges: List of CausalEdge objects
-
-    Example:
-        edges = [
-            CausalEdge(source_force="Government", target_force="Technology",
-                       propagation_weight=0.6, mechanism="..."),
-            ...
-        ]
-        save_causal_edges(edges)
-    """
+    """Save causal DAG edges to database."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        # Clear existing edges
         cursor.execute("DELETE FROM causal_edges")
 
         for edge in edges:
             cursor.execute(
-                """
+                f"""
                 INSERT INTO causal_edges (
                     source_force, target_force, propagation_weight,
                     lag_years, mechanism, evidence_strength, calibrated_from_backtest
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ({ph(7)})
                 """,
                 (
-                    edge.source_force,
-                    edge.target_force,
-                    edge.propagation_weight,
-                    edge.lag_years,
-                    edge.mechanism,
-                    edge.evidence_strength,
+                    edge.source_force, edge.target_force, edge.propagation_weight,
+                    edge.lag_years, edge.mechanism, edge.evidence_strength,
                     edge.calibrated_from_backtest,
                 ),
             )
@@ -587,19 +623,9 @@ def save_causal_edges(edges: List[CausalEdge]) -> None:
 
 
 def load_causal_edges() -> List[CausalEdge]:
-    """
-    Load all causal DAG edges from database.
-
-    Returns:
-        List of CausalEdge objects
-
-    Example:
-        edges = load_causal_edges()
-        dag = CausalDAG(edges)
-    """
+    """Load all causal DAG edges from database."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
         cursor.execute("""
             SELECT source_force, target_force, propagation_weight,
                    lag_years, mechanism, evidence_strength, calibrated_from_backtest
@@ -608,13 +634,13 @@ def load_causal_edges() -> List[CausalEdge]:
 
         edges = [
             CausalEdge(
-                source_force=row["source_force"],
-                target_force=row["target_force"],
-                propagation_weight=row["propagation_weight"],
-                lag_years=row["lag_years"],
-                mechanism=row["mechanism"],
-                evidence_strength=row["evidence_strength"],
-                calibrated_from_backtest=row["calibrated_from_backtest"],
+                source_force=_row_to_dict(row)["source_force"],
+                target_force=_row_to_dict(row)["target_force"],
+                propagation_weight=_row_to_dict(row)["propagation_weight"],
+                lag_years=_row_to_dict(row)["lag_years"],
+                mechanism=_row_to_dict(row)["mechanism"],
+                evidence_strength=_row_to_dict(row)["evidence_strength"],
+                calibrated_from_backtest=_row_to_dict(row)["calibrated_from_backtest"],
             )
             for row in cursor.fetchall()
         ]
@@ -635,131 +661,104 @@ def save_simulation_run(
     convergence_diagnostics: Optional[dict] = None,
     config_snapshot_id: Optional[int] = None,
 ) -> int:
-    """
-    Save a simulation run result to database.
-
-    Args:
-        scenario: Scenario name (e.g., "Base Case", "Green Squeeze")
-        iterations: Number of MC iterations
-        model_type: "deterministic", "bayesian_mc", or "copula_mc"
-        results: Dict of {category: {year: {percentile: shift%}}}
-        causal_decomposition: Optional causal breakdown
-        allocation_recommendation: Optional optimal weights
-        convergence_diagnostics: Optional R̂, ESS, etc.
-        config_snapshot_id: Reference to config snapshot
-
-    Returns:
-        ID of the saved simulation run
-
-    Example:
-        run_id = save_simulation_run(
-            scenario="Base Case",
-            iterations=10000,
-            model_type="bayesian_mc",
-            results={...},
-            convergence_diagnostics={"r_hat": 1.02}
-        )
-    """
+    """Save a simulation run result to database."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            INSERT INTO simulation_runs (
-                scenario, iterations, model_type, results,
-                causal_decomposition, allocation_recommendation,
-                convergence_diagnostics, config_snapshot_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                scenario,
-                iterations,
-                model_type,
-                json.dumps(results),
-                json.dumps(causal_decomposition) if causal_decomposition else None,
-                json.dumps(allocation_recommendation) if allocation_recommendation else None,
-                json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
-                config_snapshot_id,
-            ),
-        )
+        if USE_POSTGRES:
+            cursor.execute(
+                f"""
+                INSERT INTO simulation_runs (
+                    scenario, iterations, model_type, results,
+                    causal_decomposition, allocation_recommendation,
+                    convergence_diagnostics, config_snapshot_id
+                ) VALUES ({ph(8)}) RETURNING id
+                """,
+                (
+                    scenario, iterations, model_type, json.dumps(results),
+                    json.dumps(causal_decomposition) if causal_decomposition else None,
+                    json.dumps(allocation_recommendation) if allocation_recommendation else None,
+                    json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
+                    config_snapshot_id,
+                ),
+            )
+            run_id = cursor.fetchone()["id"]
+        else:
+            cursor.execute(
+                f"""
+                INSERT INTO simulation_runs (
+                    scenario, iterations, model_type, results,
+                    causal_decomposition, allocation_recommendation,
+                    convergence_diagnostics, config_snapshot_id
+                ) VALUES ({ph(8)})
+                """,
+                (
+                    scenario, iterations, model_type, json.dumps(results),
+                    json.dumps(causal_decomposition) if causal_decomposition else None,
+                    json.dumps(allocation_recommendation) if allocation_recommendation else None,
+                    json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
+                    config_snapshot_id,
+                ),
+            )
+            run_id = cursor.lastrowid
 
-        run_id = cursor.lastrowid
         conn.commit()
         logger.info(f"Saved simulation run {run_id}: {scenario} ({iterations} iterations)")
-
         return run_id
 
 
 def load_simulation_runs(
     limit: int = 100, scenario: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Load simulation runs from database.
-
-    Args:
-        limit: Maximum number of runs to return
-        scenario: Filter by scenario name (optional)
-
-    Returns:
-        List of simulation run records
-
-    Example:
-        runs = load_simulation_runs(limit=50)
-        latest = load_simulation_runs(scenario="Base Case", limit=1)
-    """
+    """Load simulation runs from database."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
         if scenario:
             cursor.execute(
-                """
+                f"""
                 SELECT id, run_date, scenario, iterations, model_type,
                        results, causal_decomposition, allocation_recommendation,
                        convergence_diagnostics
                 FROM simulation_runs
-                WHERE scenario = ?
+                WHERE scenario = {p}
                 ORDER BY run_date DESC
-                LIMIT ?
+                LIMIT {p}
                 """,
                 (scenario, limit),
             )
         else:
             cursor.execute(
-                """
+                f"""
                 SELECT id, run_date, scenario, iterations, model_type,
                        results, causal_decomposition, allocation_recommendation,
                        convergence_diagnostics
                 FROM simulation_runs
                 ORDER BY run_date DESC
-                LIMIT ?
+                LIMIT {p}
                 """,
                 (limit,),
             )
 
         runs = []
-        for row in cursor.fetchall():
+        for raw_row in cursor.fetchall():
+            row = _row_to_dict(raw_row)
+            run_date = row["run_date"]
+            if isinstance(run_date, str):
+                run_date = datetime.fromisoformat(run_date)
+
             run = {
                 "id": row["id"],
-                "run_date": datetime.fromisoformat(row["run_date"]),
+                "run_date": run_date,
                 "scenario": row["scenario"],
                 "iterations": row["iterations"],
                 "model_type": row["model_type"],
                 "results": json.loads(row["results"]) if row["results"] else {},
-                "causal_decomposition": (
-                    json.loads(row["causal_decomposition"])
-                    if row["causal_decomposition"]
-                    else None
-                ),
-                "allocation_recommendation": (
-                    json.loads(row["allocation_recommendation"])
-                    if row["allocation_recommendation"]
-                    else None
-                ),
-                "convergence_diagnostics": (
-                    json.loads(row["convergence_diagnostics"])
-                    if row["convergence_diagnostics"]
-                    else None
-                ),
+                "causal_decomposition": json.loads(row["causal_decomposition"]) if row.get("causal_decomposition") else None,
+                "allocation_recommendation": json.loads(row["allocation_recommendation"]) if row.get("allocation_recommendation") else None,
+                "convergence_diagnostics": json.loads(row["convergence_diagnostics"]) if row.get("convergence_diagnostics") else None,
             }
             runs.append(run)
 
@@ -778,85 +777,62 @@ def log_audit(
     reason: Optional[str] = None,
     user_id: str = "system",
 ) -> None:
-    """
-    Log an action to the audit trail.
-
-    Args:
-        action: Action name (e.g., "CREATE", "UPDATE", "DELETE")
-        entity_type: Entity being modified (e.g., "trend", "config")
-        entity_id: ID of entity
-        old_value: Previous value (optional)
-        new_value: New value (optional)
-        reason: Why this change was made (optional)
-        user_id: User who made the change (default: "system")
-
-    Example:
-        log_audit("UPDATE", "trend", "c1", old_value="5", new_value="4",
-                  reason="Delphi consensus", user_id="john_doe")
-    """
+    """Log an action to the audit trail."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
         cursor.execute(
-            """
+            f"""
             INSERT INTO audit_log (
                 action, entity_type, entity_id, old_value, new_value, reason, user_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ) VALUES ({ph(7)})
             """,
             (action, entity_type, entity_id, old_value, new_value, reason, user_id),
         )
-
         conn.commit()
 
 
 def get_audit_log(
     limit: int = 100, entity_type: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Get audit log entries.
-
-    Args:
-        limit: Maximum entries to return
-        entity_type: Filter by entity type (optional)
-
-    Returns:
-        List of audit log records
-
-    Example:
-        logs = get_audit_log(limit=50)
-        trend_logs = get_audit_log(entity_type="trend")
-    """
+    """Get audit log entries."""
+    p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
         if entity_type:
             cursor.execute(
-                """
+                f"""
                 SELECT id, timestamp, action, entity_type, entity_id,
                        old_value, new_value, reason, user_id
                 FROM audit_log
-                WHERE entity_type = ?
+                WHERE entity_type = {p}
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT {p}
                 """,
                 (entity_type, limit),
             )
         else:
             cursor.execute(
-                """
+                f"""
                 SELECT id, timestamp, action, entity_type, entity_id,
                        old_value, new_value, reason, user_id
                 FROM audit_log
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT {p}
                 """,
                 (limit,),
             )
 
-        logs = [
-            {
+        logs = []
+        for raw_row in cursor.fetchall():
+            row = _row_to_dict(raw_row)
+            ts = row["timestamp"]
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts)
+            logs.append({
                 "id": row["id"],
-                "timestamp": datetime.fromisoformat(row["timestamp"]),
+                "timestamp": ts,
                 "action": row["action"],
                 "entity_type": row["entity_type"],
                 "entity_id": row["entity_id"],
@@ -864,9 +840,7 @@ def get_audit_log(
                 "new_value": row["new_value"],
                 "reason": row["reason"],
                 "user_id": row["user_id"],
-            }
-            for row in cursor.fetchall()
-        ]
+            })
 
         return logs
 
@@ -874,43 +848,32 @@ def get_audit_log(
 # ── Database Health & Stats ────────────────────────────────────────────
 
 def get_db_stats() -> Dict[str, int]:
-    """
-    Get database statistics (record counts per table).
-
-    Returns:
-        Dict of {table_name: record_count}
-
-    Example:
-        stats = get_db_stats()
-        print(f"Database has {stats['trends']} trends")
-    """
+    """Get database statistics (record counts per table)."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
         tables = [
-            "trends",
-            "causal_edges",
-            "competitors",
-            "simulation_runs",
-            "backtest_results",
-            "delphi_rounds",
-            "triggers",
-            "ai_suggestions",
-            "audit_log",
+            "trends", "causal_edges", "competitors", "simulation_runs",
+            "backtest_results", "delphi_rounds", "triggers", "ai_suggestions",
+            "audit_log", "users", "delphi_sessions",
         ]
 
         stats = {}
         for table in tables:
-            cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-            stats[table] = cursor.fetchone()["count"]
+            try:
+                cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
+                row = _row_to_dict(cursor.fetchone())
+                stats[table] = row["count"]
+            except Exception:
+                stats[table] = 0
 
         return stats
 
 
 if __name__ == "__main__":
-    # Quick test
     init_db()
     stats = get_db_stats()
+    print(f"Database mode: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
     print("Database statistics:")
     for table, count in stats.items():
         print(f"  {table}: {count}")

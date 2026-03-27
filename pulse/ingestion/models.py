@@ -21,7 +21,8 @@ class Trend:
     normalized_score: float = 0.0
     strategic_implication: str = ""
     category_exposure: dict = field(default_factory=dict)  # {cat: 0-5}
-    vc_exposure: dict = field(default_factory=dict)
+    vc_exposure: dict = field(default_factory=dict)        # {vc_step: 0-5}
+    regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}
     data_source: str = ""
     source_type: str = ""
     confidence: str = "Medium"

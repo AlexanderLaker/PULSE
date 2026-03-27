@@ -26,6 +26,12 @@ export type CategoryExposure = Partial<Record<CategoryId, number>>;
 /** Value chain exposure mapping (step → 0-5 score). */
 export type VCExposure = Partial<Record<ValueChainStep, number>>;
 
+/** Regional exposure regions. */
+export type Region = 'Europe' | 'North America' | 'Asia' | 'High Growth';
+
+/** Regional exposure mapping (region → 0-5 score). */
+export type RegionalExposure = Partial<Record<Region, number>>;
+
 /** Full trend object as returned by the API. */
 export interface Trend {
   id: string;
@@ -44,6 +50,7 @@ export interface Trend {
   strategic_implication?: string;
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
+  regional_exposure?: RegionalExposure;
   data_source?: string;
   source_type?: string;
   confidence?: Confidence;
@@ -72,6 +79,7 @@ export interface TrendUpdate {
   confidence?: Confidence;
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
+  regional_exposure?: RegionalExposure;
 }
 
 /** Force contribution to a category shift. */

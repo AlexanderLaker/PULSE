@@ -20,6 +20,9 @@ VC_STEPS = [
     "Supply Chain", "Marketing", "Commercial", "Consumer"
 ]
 
+# ── Regional taxonomy ──────────────────────────────────────────────
+REGIONS = ["Europe", "North America", "Asia", "High Growth"]
+
 # ── Sheet names to read / skip ──────────────────────────────────────
 FORCE_SHEETS = {
     "Consumer": "1_Consumer",

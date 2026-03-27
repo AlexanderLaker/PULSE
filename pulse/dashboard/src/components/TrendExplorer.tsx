@@ -27,6 +27,7 @@ interface TrendData {
   strategic_implication?: string;
   category_exposure?: Record<CategoryId, number>;
   vc_exposure?: Record<string, number>;
+  regional_exposure?: Record<string, number>;
   sources?: Array<{ url?: string; title?: string; data?: string }>;
   ai_suggested?: boolean;
 }
@@ -48,7 +49,7 @@ interface DotBarProps {
   value: number;
   onChange?: (val: number) => void;
   editable?: boolean;
-  color?: 'blue' | 'amber' | 'emerald' | 'purple';
+  color?: 'blue' | 'amber' | 'emerald' | 'purple' | 'cyan';
   size?: 'xs' | 'sm' | 'md';
   direction?: 'Expansion' | 'Contraction';
   labelType?: 'impact' | 'probability' | 'exposure';
@@ -87,6 +88,7 @@ const DotBar: FC<DotBarProps> = ({
     amber: { filled: '#FBBF24', hover: '#FCD34D' },
     emerald: { filled: '#34D399', hover: '#6EE7B7' },
     purple: { filled: '#A78BFA', hover: '#C4B5FD' },
+    cyan: { filled: '#06B6D4', hover: '#22D3EE' },
   };
 
   // Unfilled dot color — clearly visible on dark bg
@@ -344,6 +346,80 @@ const ValueChainExposureGrid: FC<ValueChainExposureGridProps> = ({ exposures, on
   );
 };
 
+// ─── RegionalExposureGrid ─────────────────────────────────────────────────
+
+interface RegionalExposureGridProps {
+  exposures: Record<string, number>;
+  onChange: (exp: Record<string, number>) => void;
+  direction?: 'Expansion' | 'Contraction';
+}
+
+const RegionalExposureGrid: FC<RegionalExposureGridProps> = ({ exposures, onChange, direction }) => {
+  const regions = [
+    { id: 'Europe', label: 'Europe' },
+    { id: 'North America', label: 'North America' },
+    { id: 'Asia', label: 'Asia' },
+    { id: 'High Growth', label: 'High Growth' },
+  ];
+
+  const handleChange = (regionId: string, newVal: number): void => {
+    onChange({ ...exposures, [regionId]: newVal });
+  };
+
+  return (
+    <div>
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: T.text2,
+        marginBottom: '12px',
+        letterSpacing: '0.5px',
+      }}>
+        REGIONAL EXPOSURE
+      </div>
+      <div style={{
+        borderRadius: '8px',
+        border: `1px solid ${T.border1}`,
+        overflow: 'hidden',
+        backgroundColor: T.bg1,
+      }}>
+        {regions.map((region, idx) => (
+          <div
+            key={region.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 12px',
+              borderTop: idx > 0 ? `1px solid ${T.border1}22` : 'none',
+              transition: 'background-color 100ms',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${T.bg2}`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            <div style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: T.text,
+              minWidth: '110px',
+            }}>
+              {region.label}
+            </div>
+            <DotBar
+              value={exposures?.[region.id] || 0}
+              onChange={(val) => handleChange(region.id, val)}
+              editable={true}
+              color="cyan"
+              size="sm"
+              direction={direction}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ─── ExpandedTrendRow ─────────────────────────────────────────────────────
 
 interface ExpandedTrendRowProps {
@@ -355,11 +431,13 @@ interface ExpandedTrendRowProps {
 const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onClose }) => {
   const [catExposure, setCatExposure] = useState<Record<CategoryId, number>>(trend.category_exposure || {});
   const [vcExposure, setVcExposure] = useState<Record<string, number>>(trend.vc_exposure || {});
+  const [regionalExposure, setRegionalExposure] = useState<Record<string, number>>(trend.regional_exposure || {});
 
   const handleSave = (): void => {
     onUpdateTrend(trend.id, {
       category_exposure: catExposure,
       vc_exposure: vcExposure,
+      regional_exposure: regionalExposure,
     });
     onClose();
   };
@@ -483,6 +561,11 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
               <ValueChainExposureGrid
                 exposures={vcExposure}
                 onChange={setVcExposure}
+                direction={trend.direction}
+              />
+              <RegionalExposureGrid
+                exposures={regionalExposure}
+                onChange={setRegionalExposure}
                 direction={trend.direction}
               />
             </div>

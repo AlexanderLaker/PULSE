@@ -1,4 +1,6 @@
-"""Authentication module for PULSE — JWT-based auth with SQLite user store.
+"""Authentication module for PULSE — JWT-based auth with shared database.
+
+Uses pulse.database for Postgres (Vercel) / SQLite (local) dual-mode persistence.
 
 Provides:
 - User registration with name/email/password
@@ -13,17 +15,17 @@ import json
 import logging
 import os
 import secrets
-import sqlite3
 import time
 import uuid
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
+
+from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, init_db
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +33,6 @@ logger = logging.getLogger(__name__)
 JWT_SECRET = os.environ.get("PULSE_JWT_SECRET", "pulse-dev-secret-change-in-production-2026")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
-
-# On Vercel serverless, filesystem is read-only except /tmp.
-# Use /tmp for the database path to avoid write errors.
-_IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-DB_PATH = os.environ.get(
-    "PULSE_AUTH_DB",
-    "/tmp/auth.db" if _IS_VERCEL else str(Path(__file__).resolve().parent.parent.parent / "data" / "auth.db")
-)
 
 # Invite codes — required to register. Admin can create new ones.
 INVITE_CODES = set(os.environ.get("PULSE_INVITE_CODES", "PULSE-2026,HENKEL-STRATEGY,WARROOM-ACCESS").split(","))
@@ -137,7 +131,6 @@ def _verify_jwt(token: str, secret: str = JWT_SECRET) -> Optional[dict]:
         if not hmac.compare_digest(expected_sig, actual_sig):
             return None
         payload = json.loads(_b64decode(payload_b64))
-        # Check expiry
         if payload.get("exp", 0) < time.time():
             return None
         return payload
@@ -146,46 +139,29 @@ def _verify_jwt(token: str, secret: str = JWT_SECRET) -> Optional[dict]:
 
 
 # ── Database ─────────────────────────────────────────────────────
-def _get_db() -> sqlite3.Connection:
-    """Get SQLite connection for auth database."""
-    db_dir = Path(DB_PATH).parent
-    db_dir.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
 
 def ensure_auth_tables():
     """Create auth tables if they don't exist. On Vercel, seed a default admin user."""
-    conn = _get_db()
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                password_salt TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'analyst',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-        conn.commit()
+    init_db()  # Creates all tables including users
 
-        # On Vercel serverless, /tmp is wiped on cold starts.
-        # Seed a default admin user so login always works.
-        if _IS_VERCEL:
-            existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            if existing == 0:
-                _seed_default_users(conn)
-    finally:
-        conn.close()
+    _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # On Vercel or fresh Postgres, seed default users if none exist
+        cursor.execute("SELECT COUNT(*) as count FROM users")
+        row = _row_to_dict(cursor.fetchone())
+        existing = row["count"]
+
+        if existing == 0:
+            _seed_default_users(conn)
 
 
-def _seed_default_users(conn: sqlite3.Connection):
-    """Seed default users for Vercel serverless (data doesn't persist between cold starts)."""
+def _seed_default_users(conn):
+    """Seed default users (for fresh database or Vercel cold starts)."""
+    p = placeholder()
     now = datetime.utcnow().isoformat()
     default_users = [
         {
@@ -203,33 +179,50 @@ def _seed_default_users(conn: sqlite3.Connection):
             "role": "admin",
         },
     ]
+
+    cursor = conn.cursor()
     for u in default_users:
         pw_hash, pw_salt = _hash_password(u["password"])
         try:
-            conn.execute(
-                "INSERT OR IGNORE INTO users (id, name, email, password_hash, password_salt, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
-            )
-        except sqlite3.IntegrityError:
-            pass
+            # Use ON CONFLICT for Postgres, OR IGNORE for SQLite
+            from pulse.database import USE_POSTGRES
+            if USE_POSTGRES:
+                cursor.execute(
+                    f"""INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at)
+                        VALUES ({ph(7)}) ON CONFLICT (id) DO NOTHING""",
+                    (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
+                )
+            else:
+                cursor.execute(
+                    f"""INSERT OR IGNORE INTO users (id, name, email, password_hash, password_salt, role, created_at)
+                        VALUES ({ph(7)})""",
+                    (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
+                )
+        except Exception as e:
+            logger.debug(f"Seed user {u['email']}: {e}")
+
     conn.commit()
-    logger.info("Seeded %d default users for Vercel serverless", len(default_users))
+    logger.info("Seeded %d default users", len(default_users))
 
 
 # ── Auth Functions ───────────────────────────────────────────────
 def register_user(req: RegisterRequest) -> AuthResponse:
     """Register a new user and return JWT token."""
-    # Validate invite code
     if req.invite_code.strip().upper() not in {c.strip().upper() for c in INVITE_CODES}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid invite code"
         )
+
     ensure_auth_tables()
-    conn = _get_db()
-    try:
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
         # Check if email already exists
-        existing = conn.execute("SELECT id FROM users WHERE email = ?", (req.email.lower(),)).fetchone()
+        cursor.execute(f"SELECT id FROM users WHERE email = {p}", (req.email.lower(),))
+        existing = cursor.fetchone()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -239,17 +232,15 @@ def register_user(req: RegisterRequest) -> AuthResponse:
         user_id = str(uuid.uuid4())
         pw_hash, pw_salt = _hash_password(req.password)
         now = datetime.utcnow().isoformat()
-
-        # Auto-promote admin emails
         role = "admin" if req.email.lower() in ADMIN_EMAILS else req.role
 
-        conn.execute(
-            "INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        cursor.execute(
+            f"""INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at)
+                VALUES ({ph(7)})""",
             (user_id, req.name, req.email.lower(), pw_hash, pw_salt, role, now)
         )
         conn.commit()
 
-        # Issue JWT
         token = _create_jwt({
             "sub": user_id,
             "email": req.email.lower(),
@@ -262,25 +253,29 @@ def register_user(req: RegisterRequest) -> AuthResponse:
             token=token,
             user=UserResponse(id=user_id, name=req.name, email=req.email.lower(), role=role, created_at=now)
         )
-    finally:
-        conn.close()
 
 
 def login_user(req: LoginRequest) -> AuthResponse:
     """Authenticate user and return JWT token."""
     ensure_auth_tables()
-    conn = _get_db()
-    try:
-        row = conn.execute(
-            "SELECT id, name, email, password_hash, password_salt, role, created_at FROM users WHERE email = ?",
-            (req.email.lower(),)
-        ).fetchone()
+    p = placeholder()
 
-        if not row:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            f"SELECT id, name, email, password_hash, password_salt, role, created_at FROM users WHERE email = {p}",
+            (req.email.lower(),)
+        )
+        raw_row = cursor.fetchone()
+
+        if not raw_row:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
+
+        row = _row_to_dict(raw_row)
 
         if not _verify_password(req.password, row["password_hash"], row["password_salt"]):
             raise HTTPException(
@@ -289,10 +284,12 @@ def login_user(req: LoginRequest) -> AuthResponse:
             )
 
         # Update last login
-        conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.utcnow().isoformat(), row["id"]))
+        cursor.execute(
+            f"UPDATE users SET last_login = {p} WHERE id = {p}",
+            (datetime.utcnow().isoformat(), row["id"])
+        )
         conn.commit()
 
-        # Issue JWT
         token = _create_jwt({
             "sub": row["id"],
             "email": row["email"],
@@ -308,55 +305,72 @@ def login_user(req: LoginRequest) -> AuthResponse:
                 role=row["role"], created_at=row["created_at"]
             )
         )
-    finally:
-        conn.close()
 
 
 def get_all_users() -> list[UserResponse]:
     """Get all registered users (admin only)."""
     ensure_auth_tables()
-    conn = _get_db()
-    try:
-        rows = conn.execute("SELECT id, name, email, role, created_at, last_login FROM users ORDER BY created_at DESC").fetchall()
-        return [UserResponse(id=r["id"], name=r["name"], email=r["email"], role=r["role"], created_at=r["created_at"], last_login=r["last_login"]) for r in rows]
-    finally:
-        conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email, role, created_at, last_login FROM users ORDER BY created_at DESC")
+        return [
+            UserResponse(
+                id=_row_to_dict(r)["id"], name=_row_to_dict(r)["name"],
+                email=_row_to_dict(r)["email"], role=_row_to_dict(r)["role"],
+                created_at=_row_to_dict(r)["created_at"],
+                last_login=_row_to_dict(r).get("last_login")
+            )
+            for r in cursor.fetchall()
+        ]
 
 
 def update_user(user_id: str, req: UpdateProfileRequest) -> UserResponse:
     """Update a user's profile (admin only)."""
     ensure_auth_tables()
-    conn = _get_db()
-    try:
-        row = conn.execute("SELECT id, name, email, role, created_at, last_login FROM users WHERE id = ?", (user_id,)).fetchone()
-        if not row:
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT id, name, email, role, created_at, last_login FROM users WHERE id = {p}",
+            (user_id,)
+        )
+        raw_row = cursor.fetchone()
+        if not raw_row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+        row = _row_to_dict(raw_row)
         new_name = req.name if req.name else row["name"]
         new_role = req.role if req.role else row["role"]
 
-        conn.execute("UPDATE users SET name = ?, role = ? WHERE id = ?", (new_name, new_role, user_id))
+        cursor.execute(
+            f"UPDATE users SET name = {p}, role = {p} WHERE id = {p}",
+            (new_name, new_role, user_id)
+        )
         conn.commit()
 
-        return UserResponse(id=row["id"], name=new_name, email=row["email"], role=new_role, created_at=row["created_at"], last_login=row["last_login"])
-    finally:
-        conn.close()
+        return UserResponse(
+            id=row["id"], name=new_name, email=row["email"],
+            role=new_role, created_at=row["created_at"],
+            last_login=row.get("last_login")
+        )
 
 
 def delete_user(user_id: str) -> dict:
     """Delete a user (admin only). Cannot delete self."""
     ensure_auth_tables()
-    conn = _get_db()
-    try:
-        row = conn.execute("SELECT id, email FROM users WHERE id = ?", (user_id,)).fetchone()
-        if not row:
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT id, email FROM users WHERE id = {p}", (user_id,))
+        raw_row = cursor.fetchone()
+        if not raw_row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        cursor.execute(f"DELETE FROM users WHERE id = {p}", (user_id,))
         conn.commit()
         return {"deleted": True, "id": user_id}
-    finally:
-        conn.close()
 
 
 # ── FastAPI Dependencies ─────────────────────────────────────────

@@ -98,6 +98,9 @@ class TrendUpdate(BaseModel):
     impact: Optional[int] = Field(None, ge=1, le=5)
     probability: Optional[int] = Field(None, ge=1, le=5)
     direction: Optional[str] = None
+    category_exposure: Optional[dict] = None
+    vc_exposure: Optional[dict] = None
+    regional_exposure: Optional[dict] = None
 
 class ScenarioCreate(BaseModel):
     id: str
@@ -238,7 +241,7 @@ def create_app(args=None) -> FastAPI:
         logger.info("Lazy init: Vercel serverless cold start...")
         async with _state_lock:
             if _state["config"] is None:
-                # Initialize main database tables
+                # Initialize all database tables (Postgres on Vercel, SQLite locally)
                 from pulse.database import init_db
                 init_db()
 
@@ -247,12 +250,11 @@ def create_app(args=None) -> FastAPI:
                 _state["dag"] = CausalDAG()
                 _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
 
-                # Initialize Delphi
+                # Initialize Delphi (uses shared database)
                 from pulse.elicitation.delphi import DelphiProtocol
                 _state["delphi"] = DelphiProtocol()
-                _state["delphi"]._ensure_tables_exist()
 
-                # Initialize auth tables
+                # Seed default auth users if needed
                 from pulse.api.auth import ensure_auth_tables
                 ensure_auth_tables()
 
@@ -313,6 +315,7 @@ def create_app(args=None) -> FastAPI:
             "direction": t.direction, "impact": t.impact,
             "probability": t.probability, "normalized_score": t.normalized_score,
             "category_exposure": t.category_exposure,
+            "regional_exposure": t.regional_exposure,
             "confidence": t.confidence, "ai_suggested": t.ai_suggested,
         } for t in trends]
 
@@ -355,6 +358,7 @@ def create_app(args=None) -> FastAPI:
             "strategic_implication": trend.strategic_implication,
             "category_exposure": trend.category_exposure,
             "vc_exposure": trend.vc_exposure,
+            "regional_exposure": trend.regional_exposure,
             "confidence": trend.confidence, "ai_suggested": trend.ai_suggested,
             "impact_posterior": trend.impact_posterior,
             "probability_posterior": trend.probability_posterior,
@@ -380,7 +384,17 @@ def create_app(args=None) -> FastAPI:
             trend.probability = max(1, min(5, update.probability))
         if update.direction is not None:
             trend.direction = update.direction
+        if update.category_exposure is not None:
+            trend.category_exposure = update.category_exposure
+        if update.vc_exposure is not None:
+            trend.vc_exposure = update.vc_exposure
+        if update.regional_exposure is not None:
+            trend.regional_exposure = update.regional_exposure
         trend.__post_init__()
+
+        # Persist updated exposures
+        from pulse.database import save_trends
+        save_trends([trend])
 
         return {"status": "updated", "trend_id": trend_id}
 

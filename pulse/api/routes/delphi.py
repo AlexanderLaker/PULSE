@@ -489,25 +489,26 @@ async def get_session_audit(session_id: str) -> Dict[str, Any]:
         Complete audit log with all changes
     """
     try:
-        from pulse.database import get_db_connection
+        from pulse.database import get_db_connection, placeholder, _row_to_dict
+        p = placeholder()
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
+                f"""
                 SELECT * FROM audit_log
-                WHERE entity_type = 'delphi' AND entity_id = ?
+                WHERE entity_type = 'delphi' AND entity_id = {p}
                 ORDER BY timestamp DESC
                 """,
                 (session_id,),
             )
             audit_entries = [
                 {
-                    "timestamp": row["timestamp"],
-                    "action": row["action"],
-                    "old_value": row["old_value"],
-                    "new_value": row["new_value"],
-                    "reason": row["reason"],
-                    "user_id": row["user_id"],
+                    "timestamp": _row_to_dict(row)["timestamp"],
+                    "action": _row_to_dict(row)["action"],
+                    "old_value": _row_to_dict(row)["old_value"],
+                    "new_value": _row_to_dict(row)["new_value"],
+                    "reason": _row_to_dict(row)["reason"],
+                    "user_id": _row_to_dict(row)["user_id"],
                 }
                 for row in cursor.fetchall()
             ]

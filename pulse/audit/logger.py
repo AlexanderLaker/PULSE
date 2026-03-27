@@ -1,11 +1,14 @@
-"""Audit logger — tracks all changes for governance and reproducibility."""
+"""Audit logger — tracks all changes for governance and reproducibility.
+
+Uses the shared pulse.database module for Postgres/SQLite dual-mode persistence.
+"""
 
 import json
 import logging
-import sqlite3
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
+
+from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, init_db
 
 logger = logging.getLogger(__name__)
 
@@ -13,59 +16,27 @@ logger = logging.getLogger(__name__)
 class AuditLogger:
     """Logs all model changes, AI decisions, and configuration updates."""
 
-    def __init__(self, db_path: str = None):
-        if db_path is None:
-            # Use temp dir that supports SQLite (mounted FS may not)
-            import tempfile, os
-            base = os.environ.get("PULSE_DATA_DIR", tempfile.gettempdir())
-            db_dir = os.path.join(base, "pulse_data")
-            os.makedirs(db_dir, exist_ok=True)
-            self.db_path = os.path.join(db_dir, "pulse.db")
-        else:
-            self.db_path = db_path
-        self._ensure_db()
-
-    def _ensure_db(self):
-        """Create audit tables if they don't exist."""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT DEFAULT (datetime('now')),
-                action TEXT NOT NULL,
-                entity_type TEXT,
-                entity_id TEXT,
-                old_value TEXT,
-                new_value TEXT,
-                reason TEXT,
-                user_id TEXT DEFAULT 'system'
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS config_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                snapshot_date TEXT DEFAULT (datetime('now')),
-                config_json TEXT,
-                label TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+    def __init__(self):
+        """Initialize audit logger. Tables are created by init_db()."""
+        try:
+            init_db()
+        except Exception as e:
+            logger.debug(f"AuditLogger init_db: {e}")
 
     def log(self, action: str, entity_type: str = "", entity_id: str = "",
             old_value: str = "", new_value: str = "", reason: str = "",
             user_id: str = "system"):
         """Log an audit event."""
+        p = placeholder()
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.execute(
-                "INSERT INTO audit_log (action, entity_type, entity_id, "
-                "old_value, new_value, reason, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (action, entity_type, entity_id, old_value, new_value, reason, user_id)
-            )
-            conn.commit()
-            conn.close()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""INSERT INTO audit_log (action, entity_type, entity_id,
+                        old_value, new_value, reason, user_id) VALUES ({ph(7)})""",
+                    (action, entity_type, entity_id, old_value, new_value, reason, user_id)
+                )
+                conn.commit()
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
 
@@ -97,38 +68,52 @@ class AuditLogger:
 
     def save_snapshot(self, config_json: str, label: str = ""):
         """Save a configuration snapshot for reproducibility."""
+        p = placeholder()
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.execute(
-                "INSERT INTO config_snapshots (config_json, label) VALUES (?, ?)",
-                (config_json, label)
-            )
-            conn.commit()
-            conn.close()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"INSERT INTO config_snapshots (config_json, label) VALUES ({ph(2)})",
+                    (config_json, label)
+                )
+                conn.commit()
             self.log("snapshot_created", "config", reason=label)
         except Exception as e:
             logger.error(f"Failed to save snapshot: {e}")
 
     def get_log(self, limit: int = 100, entity_type: str = None) -> list:
         """Retrieve audit log entries."""
-        conn = sqlite3.connect(self.db_path)
-        if entity_type:
-            rows = conn.execute(
-                "SELECT * FROM audit_log WHERE entity_type = ? ORDER BY id DESC LIMIT ?",
-                (entity_type, limit)
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
-            ).fetchall()
-        conn.close()
+        p = placeholder()
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                if entity_type:
+                    cursor.execute(
+                        f"SELECT * FROM audit_log WHERE entity_type = {p} ORDER BY id DESC LIMIT {p}",
+                        (entity_type, limit)
+                    )
+                else:
+                    cursor.execute(
+                        f"SELECT * FROM audit_log ORDER BY id DESC LIMIT {p}", (limit,)
+                    )
 
-        return [
-            {"id": r[0], "timestamp": r[1], "action": r[2], "entity_type": r[3],
-             "entity_id": r[4], "old_value": r[5], "new_value": r[6],
-             "reason": r[7], "user_id": r[8]}
-            for r in rows
-        ]
+                return [
+                    {
+                        "id": _row_to_dict(r).get("id"),
+                        "timestamp": _row_to_dict(r).get("timestamp"),
+                        "action": _row_to_dict(r).get("action"),
+                        "entity_type": _row_to_dict(r).get("entity_type"),
+                        "entity_id": _row_to_dict(r).get("entity_id"),
+                        "old_value": _row_to_dict(r).get("old_value"),
+                        "new_value": _row_to_dict(r).get("new_value"),
+                        "reason": _row_to_dict(r).get("reason"),
+                        "user_id": _row_to_dict(r).get("user_id"),
+                    }
+                    for r in cursor.fetchall()
+                ]
+        except Exception as e:
+            logger.error(f"Failed to get audit log: {e}")
+            return []
 
     def get_report(self) -> str:
         """Generate human-readable audit report."""
@@ -136,8 +121,8 @@ class AuditLogger:
         if not entries:
             return "No audit entries recorded yet."
 
-        lines = ["═══ PULSE AUDIT LOG ═══", ""]
+        lines = ["=== PULSE AUDIT LOG ===", ""]
         for e in entries:
-            lines.append(f"[{e['timestamp']}] {e['action']} — {e['entity_type']}: "
-                         f"{e['entity_id']} — {e['reason'] or e['new_value'][:60]}")
+            lines.append(f"[{e['timestamp']}] {e['action']} -- {e['entity_type']}: "
+                         f"{e['entity_id']} -- {e.get('reason') or str(e.get('new_value', ''))[:60]}")
         return "\n".join(lines)
