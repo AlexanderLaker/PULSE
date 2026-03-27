@@ -935,7 +935,35 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
       setLoading(true);
       try {
         const sessionData = await api.getDelphiSession(selectedSession.id);
-        setTrends((sessionData as any)?.trend_ids || []);
+        const trendIds = (sessionData as any)?.trend_ids || [];
+
+        // Convert trend IDs to full trend objects if needed
+        let trendsToSet: TrendData[] = [];
+        if (trendIds.length > 0) {
+          if (typeof trendIds[0] === 'string') {
+            // IDs only - fetch full trend data or fallback to mock
+            try {
+              const trendDetails = await api.getTrends();
+              const trendsMap = (Array.isArray(trendDetails) ? trendDetails : (trendDetails as any)?.trends || [])
+                .reduce((map: Record<string, TrendData>, t: TrendData) => {
+                  map[t.id] = t;
+                  return map;
+                }, {});
+              trendsToSet = trendIds.map((id: string) => trendsMap[id] || mockTrends.find(mt => mt.id === id))
+                .filter(Boolean);
+            } catch {
+              // Fallback to mock trends
+              trendsToSet = mockTrends;
+            }
+          } else {
+            // Already full trend objects
+            trendsToSet = trendIds;
+          }
+        } else {
+          // No trends in session, use mock
+          trendsToSet = mockTrends;
+        }
+        setTrends(trendsToSet);
 
         if (activeTab === 'summary') {
           const scoresData = await api.getDelphiScores(selectedSession.id);
@@ -971,9 +999,36 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
     setSubmitting(true);
     try {
       await api.submitDelphiScore(selectedSession.id, data);
-      // Refresh trends
+      // Refresh trends with same logic as loadSessionDetails
       const sessionData = await api.getDelphiSession(selectedSession.id);
-      setTrends((sessionData as any)?.trend_ids || []);
+      const trendIds = (sessionData as any)?.trend_ids || [];
+
+      let trendsToSet: TrendData[] = [];
+      if (trendIds.length > 0) {
+        if (typeof trendIds[0] === 'string') {
+          // IDs only - fetch full trend data or fallback to mock
+          try {
+            const trendDetails = await api.getTrends();
+            const trendsMap = (Array.isArray(trendDetails) ? trendDetails : (trendDetails as any)?.trends || [])
+              .reduce((map: Record<string, TrendData>, t: TrendData) => {
+                map[t.id] = t;
+                return map;
+              }, {});
+            trendsToSet = trendIds.map((id: string) => trendsMap[id] || mockTrends.find(mt => mt.id === id))
+              .filter(Boolean);
+          } catch {
+            // Fallback to mock trends
+            trendsToSet = mockTrends;
+          }
+        } else {
+          // Already full trend objects
+          trendsToSet = trendIds;
+        }
+      } else {
+        // No trends in session, use mock
+        trendsToSet = mockTrends;
+      }
+      setTrends(trendsToSet);
     } catch (err) {
       // Backend unavailable - mark as scored locally
       console.warn('Backend unavailable, marking score locally:', err);

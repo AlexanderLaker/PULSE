@@ -76,8 +76,8 @@ const DotBar: FC<DotBarProps> = ({
 }) => {
   const dots = [1, 2, 3, 4, 5];
   const sizeMap = {
-    xs: 'w-1.5 h-1.5',
-    sm: 'w-2 h-2',
+    xs: 'w-2 h-2',
+    sm: 'w-2.5 h-2.5',
     md: 'w-2.5 h-2.5',
   };
   const colorMap = {
@@ -90,7 +90,7 @@ const DotBar: FC<DotBarProps> = ({
   // Determine whether to use direction-aware gradient or fixed color
   const getBackgroundColor = (dot: number, isSelected: boolean): string => {
     if (!isSelected) {
-      return '#E5E7EB'; // Light grey for unselected
+      return 'rgba(255,255,255,0.12)'; // Subtle but visible on dark background
     }
 
     // If direction is provided, use gradient colors
@@ -106,7 +106,10 @@ const DotBar: FC<DotBarProps> = ({
   const currentLabel = labels && value > 0 ? labels[value - 1] : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}
+      title={editable ? 'Click dots to change score (1-5)' : undefined}
+    >
       <div className="flex gap-1">
         {dots.map((dot) => (
           <button
@@ -127,9 +130,10 @@ const DotBar: FC<DotBarProps> = ({
       {currentLabel && (
         <div style={{
           fontSize: '9px',
-          color: T.text3,
+          color: T.text2,
           fontWeight: 500,
           whiteSpace: 'nowrap',
+          letterSpacing: '0.3px',
         }}>
           {currentLabel}
         </div>
@@ -164,7 +168,7 @@ const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChan
           <div style={{ fontSize: '9px', fontWeight: 500, marginBottom: '8px', color: T.text3 }}>
             {group.toUpperCase()}
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className={group === 'Hair' ? 'grid grid-cols-3 gap-3' : 'grid grid-cols-4 gap-3'}>
             {cats.map((cat) => (
               <div key={cat.id} className="flex flex-col items-center gap-2">
                 <DotBar
