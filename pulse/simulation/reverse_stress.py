@@ -1,6 +1,9 @@
 """Reverse stress testing — find conditions that cause target outcomes."""
 import numpy as np
-from scipy.optimize import differential_evolution
+try:
+    from scipy.optimize import differential_evolution
+except ImportError:
+    differential_evolution = None
 from typing import Dict, Any, Optional, List, Callable
 import logging
 

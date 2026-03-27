@@ -10,8 +10,7 @@ import logging
 from typing import Optional
 
 import numpy as np
-from scipy import stats
-from scipy.linalg import cholesky
+from pulse.simulation._scipy_compat import cholesky, beta_ppf, t_cdf
 
 from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,
@@ -190,7 +189,7 @@ class BayesianMonteCarloEngine:
         T = Z_correlated * np.sqrt(df / chi2_samples)
 
         # Transform to uniform via t-CDF
-        U = stats.t.cdf(T, df=df)
+        U = t_cdf(T, df=df)
         U = np.clip(U, 0.001, 0.999)  # Avoid boundary issues
 
         # Transform uniforms to Beta-distributed impact/probability samples
@@ -198,12 +197,12 @@ class BayesianMonteCarloEngine:
         for j, trend in enumerate(trends):
             # Impact: Beta(α, β) → scale to [1, 5]
             a_i, b_i = trend.impact_posterior
-            impact_01 = stats.beta.ppf(U[:, j], a_i, b_i)
+            impact_01 = beta_ppf(U[:, j], a_i, b_i)
             impact_scaled = 1 + impact_01 * 4  # [1, 5]
 
             # Probability: use correlated copula dimension (second half of U)
             a_p, b_p = trend.probability_posterior
-            prob_01 = stats.beta.ppf(U[:, n_trends + j], a_p, b_p)
+            prob_01 = beta_ppf(U[:, n_trends + j], a_p, b_p)
             prob_scaled = 1 + prob_01 * 4  # [1, 5]
 
             # Direction flip: small probability that trend reverses

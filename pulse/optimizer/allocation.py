@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 import numpy as np
-from scipy.optimize import minimize
+from pulse.simulation._scipy_compat import minimize
 
 from pulse.config import ModelConfig, CATEGORIES
 

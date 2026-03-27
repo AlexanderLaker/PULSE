@@ -10,8 +10,14 @@ import re
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
-import openpyxl
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 
 from pulse.config import (FORCES, CATEGORIES, VC_STEPS, FORCE_SHEETS,
                            SKIP_SHEETS, ModelConfig)

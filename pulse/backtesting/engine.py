@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 import numpy as np
-from scipy.optimize import minimize_scalar
+from pulse.simulation._scipy_compat import minimize_scalar
 
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import TrendDatabase
