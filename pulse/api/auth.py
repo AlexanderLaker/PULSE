@@ -28,10 +28,17 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────
-JWT_SECRET = os.environ.get("PULSE_JWT_SECRET", "pulse-dev-secret-change-in-production-" + secrets.token_hex(8))
+JWT_SECRET = os.environ.get("PULSE_JWT_SECRET", "pulse-dev-secret-change-in-production-2026")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
-DB_PATH = os.environ.get("PULSE_AUTH_DB", str(Path(__file__).resolve().parent.parent.parent / "data" / "auth.db"))
+
+# On Vercel serverless, filesystem is read-only except /tmp.
+# Use /tmp for the database path to avoid write errors.
+_IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+DB_PATH = os.environ.get(
+    "PULSE_AUTH_DB",
+    "/tmp/auth.db" if _IS_VERCEL else str(Path(__file__).resolve().parent.parent.parent / "data" / "auth.db")
+)
 
 # Invite codes — required to register. Admin can create new ones.
 INVITE_CODES = set(os.environ.get("PULSE_INVITE_CODES", "PULSE-2026,HENKEL-STRATEGY,WARROOM-ACCESS").split(","))
@@ -149,7 +156,7 @@ def _get_db() -> sqlite3.Connection:
 
 
 def ensure_auth_tables():
-    """Create auth tables if they don't exist."""
+    """Create auth tables if they don't exist. On Vercel, seed a default admin user."""
     conn = _get_db()
     try:
         conn.execute("""
@@ -166,8 +173,47 @@ def ensure_auth_tables():
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         conn.commit()
+
+        # On Vercel serverless, /tmp is wiped on cold starts.
+        # Seed a default admin user so login always works.
+        if _IS_VERCEL:
+            existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            if existing == 0:
+                _seed_default_users(conn)
     finally:
         conn.close()
+
+
+def _seed_default_users(conn: sqlite3.Connection):
+    """Seed default users for Vercel serverless (data doesn't persist between cold starts)."""
+    now = datetime.utcnow().isoformat()
+    default_users = [
+        {
+            "id": "seed-admin-001",
+            "name": "Admin",
+            "email": "laker.alexander@gmail.com",
+            "password": "pulse2026",
+            "role": "admin",
+        },
+        {
+            "id": "seed-admin-002",
+            "name": "Admin",
+            "email": "admin@pulse.app",
+            "password": "pulse2026",
+            "role": "admin",
+        },
+    ]
+    for u in default_users:
+        pw_hash, pw_salt = _hash_password(u["password"])
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO users (id, name, email, password_hash, password_salt, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
+            )
+        except sqlite3.IntegrityError:
+            pass
+    conn.commit()
+    logger.info("Seeded %d default users for Vercel serverless", len(default_users))
 
 
 # ── Auth Functions ───────────────────────────────────────────────
