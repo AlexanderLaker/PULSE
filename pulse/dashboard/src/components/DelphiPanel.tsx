@@ -103,8 +103,8 @@ function ScoreSlider({ label, value, onChange, previousScores, previousAlpha, sh
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.text2 }}>{label}</span>
-        <span style={{ fontSize: 16, fontWeight: 700, color: T.accent, fontFamily: T.mono }}>
-          {value}/5 — {labels[value - 1]}
+        <span style={{ fontSize: 16, fontWeight: 700, color: value > 0 ? T.accent : T.text4, fontFamily: T.mono }}>
+          {value > 0 ? `${value}/5 — ${labels[value - 1]}` : 'Not scored yet'}
         </span>
       </div>
 
@@ -117,8 +117,8 @@ function ScoreSlider({ label, value, onChange, previousScores, previousAlpha, sh
             style={{
               width: 48, height: 48,
               borderRadius: 12,
-              border: dot === value ? `2px solid ${T.accent}` : `1px solid ${T.border2}`,
-              backgroundColor: dot === value ? T.accentDim : T.bg1,
+              border: dot === value ? `2px solid ${T.accent}` : `1px solid ${T.border1}`,
+              backgroundColor: dot === value ? T.accentDim : T.bg,
               color: dot === value ? T.accent : T.text3,
               fontSize: 16, fontWeight: 700,
               cursor: 'pointer',
@@ -180,11 +180,11 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const roundInfo = ROUND_INFO[currentRound] || ROUND_INFO[1];
   const showPreviousDistributions = currentRound >= 2;
 
-  // Get current score or defaults
+  // Get current score or defaults (0 = not yet scored)
   const currentScore = scores[current?.id] || {
     trend_id: current?.id || '',
-    impact: current?.impact || 3,
-    probability: current?.probability || 3,
+    impact: 0,
+    probability: 0,
     rationale: '',
   };
 
@@ -195,15 +195,15 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
     }));
   };
 
-  // Initialize score when navigating to a new trend
+  // Initialize score when navigating to a new trend (0 = unscored)
   useEffect(() => {
     if (current && !scores[current.id]) {
       setScores(prev => ({
         ...prev,
         [current.id]: {
           trend_id: current.id,
-          impact: current.impact || 3,
-          probability: current.probability || 3,
+          impact: 0,
+          probability: 0,
           rationale: '',
         },
       }));
@@ -224,12 +224,18 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
     }
   };
 
+  // Check if all trends have been scored (impact + probability > 0)
+  const allScored = sortedTrends.every(t => {
+    const s = scores[t.id];
+    return s && s.impact > 0 && s.probability > 0;
+  });
+
   const handleSubmit = async () => {
-    // Collect all scores (fill in defaults for any unscored trends)
+    if (!allScored) return;
     const allScores: TrendScore[] = sortedTrends.map(t => ({
       trend_id: t.id,
-      impact: scores[t.id]?.impact ?? (t.impact || 3),
-      probability: scores[t.id]?.probability ?? (t.probability || 3),
+      impact: scores[t.id]?.impact || 3,
+      probability: scores[t.id]?.probability || 3,
       rationale: scores[t.id]?.rationale ?? '',
     }));
     await onSubmitAll(allScores);
@@ -414,21 +420,6 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
               </p>
             </div>
 
-            {/* Strategic implication */}
-            {current.strategic_implication && (
-              <div style={{
-                padding: 16, borderRadius: 12,
-                backgroundColor: T.amberDim, border: `1px solid rgba(255,159,10,0.15)`,
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: T.amber, textTransform: 'uppercase', marginBottom: 6 }}>
-                  Strategic Implication
-                </div>
-                <p style={{ margin: 0, fontSize: 13, color: T.text, lineHeight: 1.5 }}>
-                  {current.strategic_implication}
-                </p>
-              </div>
-            )}
-
             {/* Scoring */}
             <div style={{
               padding: 20, borderRadius: 12,
@@ -545,22 +536,22 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
         {isLast ? (
           <button
             onClick={handleSubmit}
-            disabled={submitting || !scorerName}
+            disabled={submitting || !scorerName || !allScored}
             style={{
               padding: '10px 24px', borderRadius: 10,
               border: 'none',
-              backgroundColor: T.green,
-              color: '#fff',
+              backgroundColor: (allScored && scorerName) ? T.green : T.bg4,
+              color: (allScored && scorerName) ? '#fff' : T.text3,
               fontSize: 13, fontWeight: 700,
-              cursor: (submitting || !scorerName) ? 'not-allowed' : 'pointer',
-              opacity: (submitting || !scorerName) ? 0.5 : 1,
+              cursor: (submitting || !scorerName || !allScored) ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.5 : 1,
               display: 'flex', alignItems: 'center', gap: 6,
               transition: 'all 0.15s',
-              boxShadow: '0 2px 8px rgba(48,209,88,0.3)',
+              boxShadow: (allScored && scorerName) ? '0 2px 8px rgba(48,209,88,0.3)' : 'none',
             }}
           >
             <Send size={16} />
-            {submitting ? 'Submitting...' : 'Submit All Scores'}
+            {submitting ? 'Submitting...' : !allScored ? `Score all trends first` : 'Submit All Scores'}
           </button>
         ) : (
           <button
@@ -1165,10 +1156,10 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
   const handleSubmitAllScores = async (allScores: TrendScore[]) => {
     if (!selectedSession || !scorerName) return;
     setSubmitting(true);
-    try {
-      // Submit all scores to the backend (cloud)
+
+    const submitToSession = async (sessionId: string) => {
       for (const score of allScores) {
-        await api.submitDelphiScore(selectedSession.id, {
+        await api.submitDelphiScore(sessionId, {
           scorer_id: scorerName,
           trend_id: score.trend_id,
           impact_score: score.impact,
@@ -1176,13 +1167,40 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
           rationale: score.rationale,
         });
       }
-      setToast({ msg: `${allScores.length} scores submitted to cloud successfully!`, type: 'success' });
-      // Go to summary view
+    };
+
+    try {
+      await submitToSession(selectedSession.id);
+      setToast({ msg: `${allScores.length} scores submitted successfully!`, type: 'success' });
       setView('summary');
       loadSessionDetails(selectedSession, 'summary');
-    } catch (err) {
+    } catch (err: any) {
+      // If session not found (Vercel cold start), create a new one and retry
+      const isNotFound = err?.message?.includes('not found') || err?.status === 404;
+      if (isNotFound) {
+        console.warn('Session lost (cold start), creating new session and retrying...');
+        try {
+          const result = await api.createDelphiSession({
+            name: selectedSession.name || 'Recovered Session',
+            trend_ids: [],
+            scorer_ids: [],
+          });
+          const newId = (result as any).session_id || (result as any).id;
+          if (newId) {
+            const updated = { ...selectedSession, id: newId };
+            setSelectedSession(updated);
+            await submitToSession(newId);
+            setToast({ msg: `${allScores.length} scores submitted successfully!`, type: 'success' });
+            setView('summary');
+            loadSessionDetails(updated, 'summary');
+            return;
+          }
+        } catch (retryErr) {
+          console.error('Retry also failed:', retryErr);
+        }
+      }
       console.error('Failed to submit scores:', err);
-      setToast({ msg: 'Failed to submit scores. Check connection.', type: 'error' });
+      setToast({ msg: 'Failed to submit scores. Please try again.', type: 'error' });
     } finally {
       setSubmitting(false);
     }

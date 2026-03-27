@@ -149,8 +149,11 @@ class EnvConfig:
         self.statista_api_key = get_env("STATISTA_API_KEY")
 
         # ── Database & Storage ───────────────────────────────────────────
-
-        self.db_path = get_env("PULSE_DB_PATH", default="data/pulse.db")
+        # On Vercel serverless, the deployment directory is read-only.
+        # Use /tmp for writable SQLite storage.
+        _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+        _default_db = "/tmp/pulse.db" if _is_vercel else "data/pulse.db"
+        self.db_path = get_env("PULSE_DB_PATH", default=_default_db)
 
         # ── Application Settings ────────────────────────────────────────
 

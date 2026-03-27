@@ -190,6 +190,7 @@ async def complete_session(session_id: str) -> Dict[str, Any]:
 async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, Any]:
     """
     Submit a score for a trend in a session.
+    Auto-creates session if it was lost due to Vercel cold start.
 
     Args:
         session_id: Session ID
@@ -211,7 +212,17 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
         delphi = get_delphi()
         session = delphi.get_session(session_id)
         if not session:
-            raise HTTPException(404, f"Session {session_id} not found")
+            # Auto-create session on Vercel cold start recovery
+            logger.warning(f"Session {session_id} not found, auto-creating for cold-start resilience")
+            new_id = delphi.create_session(
+                name="Auto-recovered Session",
+                trend_ids=[],
+                scorer_ids=[],
+            )
+            session = delphi.get_session(new_id)
+            session_id = new_id
+            if not session:
+                raise HTTPException(500, "Failed to auto-create session")
 
         from pulse.elicitation.delphi import ScoringRound
         round_data = ScoringRound(

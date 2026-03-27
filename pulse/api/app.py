@@ -238,6 +238,10 @@ def create_app(args=None) -> FastAPI:
         logger.info("Lazy init: Vercel serverless cold start...")
         async with _state_lock:
             if _state["config"] is None:
+                # Initialize main database tables
+                from pulse.database import init_db
+                init_db()
+
                 _state["audit"] = AuditLogger()
                 _state["config"] = ModelConfig()
                 _state["dag"] = CausalDAG()
