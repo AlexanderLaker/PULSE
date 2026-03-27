@@ -323,6 +323,42 @@ def get_all_users() -> list[UserResponse]:
         conn.close()
 
 
+def update_user(user_id: str, req: UpdateProfileRequest) -> UserResponse:
+    """Update a user's profile (admin only)."""
+    ensure_auth_tables()
+    conn = _get_db()
+    try:
+        row = conn.execute("SELECT id, name, email, role, created_at, last_login FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        new_name = req.name if req.name else row["name"]
+        new_role = req.role if req.role else row["role"]
+
+        conn.execute("UPDATE users SET name = ?, role = ? WHERE id = ?", (new_name, new_role, user_id))
+        conn.commit()
+
+        return UserResponse(id=row["id"], name=new_name, email=row["email"], role=new_role, created_at=row["created_at"], last_login=row["last_login"])
+    finally:
+        conn.close()
+
+
+def delete_user(user_id: str) -> dict:
+    """Delete a user (admin only). Cannot delete self."""
+    ensure_auth_tables()
+    conn = _get_db()
+    try:
+        row = conn.execute("SELECT id, email FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return {"deleted": True, "id": user_id}
+    finally:
+        conn.close()
+
+
 # ── FastAPI Dependencies ─────────────────────────────────────────
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
     """Extract current user from JWT token. Returns None if no token provided."""

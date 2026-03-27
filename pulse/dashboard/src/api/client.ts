@@ -91,6 +91,12 @@ export const getMe = (): Promise<AuthUser | null> =>
 export const getUsers = (): Promise<AuthUser[]> =>
   request('/auth/users');
 
+export const updateUser = (userId: string, data: { name?: string; role?: string }): Promise<AuthUser> =>
+  request(`/auth/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) });
+
+export const deleteUser = (userId: string): Promise<{ deleted: boolean; id: string }> =>
+  request(`/auth/users/${userId}`, { method: 'DELETE' });
+
 // ── Health & Config ──────────────────────────────────────────────
 
 export const getHealth = (): Promise<HealthStatus> =>

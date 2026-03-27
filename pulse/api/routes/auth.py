@@ -2,11 +2,11 @@
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pulse.api.auth import (
     RegisterRequest, LoginRequest, UpdateProfileRequest,
     AuthResponse, UserResponse,
-    register_user, login_user, get_all_users,
+    register_user, login_user, get_all_users, update_user, delete_user,
     get_current_user, require_auth, require_admin,
 )
 
@@ -44,3 +44,17 @@ async def get_profile(user: Optional[dict] = Depends(get_current_user)):
 async def list_users(user: dict = Depends(require_admin)):
     """List all users (admin only)."""
     return get_all_users()
+
+
+@router.put("/auth/users/{user_id}", response_model=UserResponse)
+async def update_user_route(user_id: str, req: UpdateProfileRequest, admin: dict = Depends(require_admin)):
+    """Update a user's profile (admin only)."""
+    return update_user(user_id, req)
+
+
+@router.delete("/auth/users/{user_id}")
+async def delete_user_route(user_id: str, admin: dict = Depends(require_admin)):
+    """Delete a user (admin only). Cannot delete yourself."""
+    if admin.get("sub") == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    return delete_user(user_id)

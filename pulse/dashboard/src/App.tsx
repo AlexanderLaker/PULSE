@@ -97,7 +97,7 @@ export default function App() {
       </div>
       {/* Admin users panel */}
       {isAdmin && (
-        <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} />
+        <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
       )}
     </ErrorBoundary>
   );
