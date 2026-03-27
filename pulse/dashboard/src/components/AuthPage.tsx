@@ -1,9 +1,27 @@
 /**
  * PULSE War Room — Authentication Page
- * Login / Register with dark-mode, glassmorphism design.
+ * White / slate design matching the main War Room aesthetic.
  */
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+/* ── Design tokens (mirrored from lib/format.ts) ─────────────── */
+const T = {
+  bg:       '#FFFFFF',
+  bg1:      '#F5F5F7',
+  bg2:      '#FBFBFD',
+  border:   'rgba(0,0,0,0.06)',
+  border2:  'rgba(0,0,0,0.12)',
+  accent:   '#0071E3',
+  purple:   '#7B61FF',
+  red:      '#FF453A',
+  redDim:   'rgba(255,69,58,0.06)',
+  text:     '#1D1D1F',
+  text2:    '#6E6E73',
+  text3:    '#999999',
+  sans:     "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+  mono:     "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
+};
 
 interface AuthPageProps {
   onLogin: (email: string, password: string) => Promise<unknown>;
@@ -41,54 +59,45 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
+      background: T.bg1,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: T.sans,
       padding: 24,
     }}>
-      {/* Subtle grid pattern overlay */}
-      <div style={{
-        position: 'fixed', inset: 0, opacity: 0.03,
-        backgroundImage: 'radial-gradient(circle, #3B82F6 1px, transparent 1px)',
-        backgroundSize: '32px 32px',
-        pointerEvents: 'none',
-      }} />
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         style={{
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 400,
           position: 'relative',
-          zIndex: 1,
         }}
       >
         {/* Logo & Title */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
-            width: 56, height: 56, borderRadius: 14,
-            background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+            width: 52, height: 52, borderRadius: 14,
+            background: `linear-gradient(135deg, ${T.accent}, ${T.purple})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
-            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3)',
+            boxShadow: '0 4px 20px rgba(0, 113, 227, 0.2)',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </div>
           <h1 style={{
-            fontSize: 28, fontWeight: 700, color: '#F8FAFC',
-            letterSpacing: '-0.02em', margin: '0 0 4px',
+            fontSize: 26, fontWeight: 700, color: T.text,
+            letterSpacing: '-0.025em', margin: '0 0 4px',
           }}>
             PULSE
           </h1>
           <p style={{
-            fontSize: 13, color: '#64748B', margin: 0, letterSpacing: '0.05em',
-            textTransform: 'uppercase',
+            fontSize: 12, color: T.text3, margin: 0, letterSpacing: '0.06em',
+            textTransform: 'uppercase', fontWeight: 500,
           }}>
             Profit Pool Simulation Engine
           </p>
@@ -96,30 +105,30 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
 
         {/* Auth Card */}
         <div style={{
-          background: 'rgba(30, 41, 59, 0.8)',
-          backdropFilter: 'blur(20px)',
+          background: T.bg,
           borderRadius: 16,
-          border: '1px solid rgba(71, 85, 105, 0.4)',
-          padding: 32,
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.4)',
+          border: `1px solid ${T.border2}`,
+          padding: '28px 28px 24px',
+          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02)',
         }}>
           {/* Mode Tabs */}
           <div style={{
-            display: 'flex', gap: 4, marginBottom: 28,
-            background: 'rgba(15, 23, 42, 0.6)',
-            borderRadius: 10, padding: 4,
+            display: 'flex', gap: 4, marginBottom: 24,
+            background: T.bg1,
+            borderRadius: 10, padding: 3,
           }}>
             {(['login', 'register'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => { if (m !== mode) switchMode(); }}
                 style={{
-                  flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer',
-                  borderRadius: 8, fontSize: 14, fontWeight: 500,
+                  flex: 1, padding: '9px 0', border: 'none', cursor: 'pointer',
+                  borderRadius: 8, fontSize: 13, fontWeight: 600,
                   transition: 'all 0.2s',
-                  background: mode === m ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                  color: mode === m ? '#3B82F6' : '#64748B',
-                  boxShadow: mode === m ? '0 1px 4px rgba(59, 130, 246, 0.1)' : 'none',
+                  background: mode === m ? T.bg : 'transparent',
+                  color: mode === m ? T.text : T.text3,
+                  boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  letterSpacing: '-0.01em',
                 }}
               >
                 {m === 'login' ? 'Sign In' : 'Register'}
@@ -131,7 +140,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
             <AnimatePresence mode="wait">
               {mode === 'register' && (
                 <motion.div
-                  key="name"
+                  key="register-fields"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -146,6 +155,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                     placeholder="Alex Laker"
                     required
                     style={inputStyle}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
                   />
                   <label style={labelStyle}>Invite Code</label>
                   <input
@@ -154,7 +165,9 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     placeholder="PULSE-2026"
                     required
-                    style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.05em' }}
+                    style={{ ...inputStyle, fontFamily: T.mono, letterSpacing: '0.04em' }}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
                   />
                 </motion.div>
               )}
@@ -169,6 +182,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               required
               autoComplete="email"
               style={inputStyle}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
             />
 
             <label style={labelStyle}>Password</label>
@@ -181,6 +196,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               minLength={6}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               style={inputStyle}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
             />
 
             {/* Error */}
@@ -191,10 +208,10 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   style={{
-                    padding: '10px 14px', borderRadius: 8, marginBottom: 16,
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#FCA5A5', fontSize: 13,
+                    padding: '10px 14px', borderRadius: 10, marginTop: 12, marginBottom: 4,
+                    background: T.redDim,
+                    border: `1px solid rgba(255, 69, 58, 0.15)`,
+                    color: '#CC3730', fontSize: 13, fontWeight: 500,
                   }}
                 >
                   {error}
@@ -208,13 +225,14 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               style={{
                 width: '100%', padding: '12px 0', border: 'none', borderRadius: 10,
                 background: loading
-                  ? 'rgba(59, 130, 246, 0.3)'
-                  : 'linear-gradient(135deg, #3B82F6, #2563EB)',
-                color: '#fff', fontSize: 15, fontWeight: 600,
+                  ? 'rgba(0, 113, 227, 0.4)'
+                  : T.accent,
+                color: '#fff', fontSize: 14, fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: loading ? 'none' : '0 4px 16px rgba(59, 130, 246, 0.3)',
-                marginTop: 4,
+                boxShadow: loading ? 'none' : '0 2px 8px rgba(0, 113, 227, 0.2)',
+                marginTop: 16,
+                letterSpacing: '-0.01em',
               }}
             >
               {loading
@@ -227,7 +245,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
         {/* Footer */}
         <p style={{
           textAlign: 'center', marginTop: 20,
-          fontSize: 12, color: '#475569',
+          fontSize: 11, color: T.text3, fontWeight: 500,
         }}>
           Henkel Consumer Brands &middot; Strategy Intelligence Platform
         </p>
@@ -240,23 +258,35 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 13,
-  fontWeight: 500,
-  color: '#94A3B8',
+  fontSize: 12,
+  fontWeight: 600,
+  color: T.text2,
   marginBottom: 6,
-  marginTop: 16,
+  marginTop: 14,
+  letterSpacing: '-0.01em',
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '11px 14px',
+  padding: '10px 14px',
   borderRadius: 10,
-  border: '1px solid rgba(71, 85, 105, 0.4)',
-  background: 'rgba(15, 23, 42, 0.6)',
-  color: '#F8FAFC',
+  border: `1px solid ${T.border2}`,
+  background: T.bg1,
+  color: T.text,
   fontSize: 14,
   outline: 'none',
-  transition: 'border-color 0.2s',
+  transition: 'border-color 0.2s, box-shadow 0.2s',
   boxSizing: 'border-box',
-  marginBottom: 4,
+  marginBottom: 2,
+  fontFamily: T.sans,
 };
+
+/* Focus handler: blue ring on focus */
+function handleFocus(e: React.FocusEvent<HTMLInputElement>) {
+  e.target.style.borderColor = T.accent;
+  e.target.style.boxShadow = `0 0 0 3px rgba(0, 113, 227, 0.1)`;
+}
+function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+  e.target.style.borderColor = 'rgba(0,0,0,0.12)';
+  e.target.style.boxShadow = 'none';
+}
