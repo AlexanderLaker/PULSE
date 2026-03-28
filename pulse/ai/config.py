@@ -22,7 +22,7 @@ class ProviderConfig:
     model: Optional[str] = None
     temperature: float = 0.7
     max_tokens: int = 2048
-    timeout_seconds: int = 30
+    timeout_seconds: int = 120
 
 
 @dataclass
@@ -47,9 +47,9 @@ class AI_CONFIG:
     providers: Dict[str, ProviderConfig] = field(default_factory=lambda: {
         LLMProvider.CLAUDE: ProviderConfig(
             provider=LLMProvider.CLAUDE,
-            model="claude-3-5-sonnet-20241022",
+            model="claude-opus-4-0-20250514",
             temperature=0.7,
-            max_tokens=2048,
+            max_tokens=8192,
         ),
         LLMProvider.AZURE_OPENAI: ProviderConfig(
             provider=LLMProvider.AZURE_OPENAI,

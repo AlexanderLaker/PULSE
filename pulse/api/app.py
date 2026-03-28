@@ -458,6 +458,74 @@ def create_app(args=None) -> FastAPI:
 
         return {"status": "updated", "trend_id": trend_id}
 
+    @app.delete("/api/v1/trends/{trend_id}")
+    async def delete_trend(trend_id: str):
+        """Delete a trend from the model."""
+        db = _state.get("db")
+        if not db:
+            raise HTTPException(404, "No model loaded")
+        trend = db.get_trend_by_id(trend_id)
+        if not trend:
+            raise HTTPException(404, f"Trend {trend_id} not found")
+
+        # Remove from in-memory database
+        db.trends = [t for t in db.trends if t.id != trend_id]
+
+        # Remove from persistent database
+        try:
+            from pulse.database import get_db_connection, placeholder, init_db
+            init_db()
+            p = placeholder()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend_id,))
+                cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend_id,))
+                cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend_id,))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Failed to delete trend from DB: {e}")
+
+        # Audit log
+        try:
+            from pulse.database import log_audit
+            log_audit("trend_deleted", "trend", trend_id, old_value=trend.name, reason="User deleted trend")
+        except Exception:
+            pass
+
+        return {"status": "deleted", "trend_id": trend_id, "trend_count": db.trend_count}
+
+    @app.delete("/api/v1/trends")
+    async def delete_all_trends():
+        """Delete ALL trends from the model. Use with caution."""
+        db = _state.get("db")
+        if not db:
+            raise HTTPException(404, "No model loaded")
+
+        count = len(db.trends)
+        db.trends = []
+
+        # Clear persistent database
+        try:
+            from pulse.database import get_db_connection, init_db
+            init_db()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM trends")
+                cursor.execute("DELETE FROM trend_category_exposure")
+                cursor.execute("DELETE FROM trend_vc_exposure")
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Failed to clear trends from DB: {e}")
+
+        # Audit log
+        try:
+            from pulse.database import log_audit
+            log_audit("all_trends_deleted", "trend", "all", reason=f"Cleared {count} trends")
+        except Exception:
+            pass
+
+        return {"status": "deleted_all", "trends_deleted": count}
+
     # ── Simulation ──────────────────────────────────────────────────
     @app.get("/api/v1/simulation")
     async def get_simulation():

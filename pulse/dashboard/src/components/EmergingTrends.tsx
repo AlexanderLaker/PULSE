@@ -13,7 +13,7 @@ import {
   Sparkles, Plus, ChevronDown, ChevronUp, ExternalLink,
   RefreshCw, Filter, TrendingUp, AlertTriangle, Check,
   Globe, Newspaper, FileText, BarChart3, Square, CheckSquare,
-  Loader, XCircle, Search,
+  Loader, XCircle, Search, Trash2,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS, FORCE_ICONS, CATEGORIES } from '../lib/format';
 import type { ForceName, CategoryId } from '../types';
@@ -110,6 +110,7 @@ interface EmergingTrendCardProps {
   trend: EmergingTrend;
   onAdd: () => void;
   onDismiss: () => void;
+  onDelete: () => void;
   isAdmin?: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -118,7 +119,7 @@ interface EmergingTrendCardProps {
 }
 
 const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
-  trend, onAdd, onDismiss, isAdmin = false, expanded, onToggle, selected, onSelect,
+  trend, onAdd, onDismiss, onDelete, isAdmin = false, expanded, onToggle, selected, onSelect,
 }) => {
   const trendColor = trend.direction === 'Expansion' ? T.green : T.red;
   const isActioned = trend.status === 'added' || trend.status === 'dismissed';
@@ -362,48 +363,76 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
                   Discovered: {new Date(trend.discovered_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </div>
 
-                {/* Individual add/dismiss (when not using bulk) */}
-                {!isActioned && isAdmin && (
+                {/* Individual add/dismiss/delete */}
+                {isAdmin && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    {!isActioned && (
+                      <>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                          style={{
+                            flex: 1,
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: '#fff',
+                            backgroundColor: T.accent,
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <Plus size={14} />
+                          Add to Trend Explorer
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                          style={{
+                            padding: '10px 16px',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: T.text2,
+                            backgroundColor: T.bg3,
+                            border: `1px solid ${T.border1}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Dismiss
+                        </motion.button>
+                      </>
+                    )}
                     <motion.button
-                      whileHover={{ scale: 1.02 }}
+                      whileHover={{ scale: 1.02, backgroundColor: T.red + '30' }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                      style={{
-                        flex: 1,
-                        padding: '10px 16px',
-                        borderRadius: '8px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: '#fff',
-                        backgroundColor: T.accent,
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Delete "${trend.name}" permanently?`)) onDelete();
                       }}
-                    >
-                      <Plus size={14} />
-                      Add to Trend Explorer
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={(e) => { e.stopPropagation(); onDismiss(); }}
                       style={{
-                        padding: '10px 16px',
+                        padding: '10px 12px',
                         borderRadius: '8px',
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: T.text2,
+                        color: T.red,
                         backgroundColor: T.bg3,
-                        border: `1px solid ${T.border1}`,
+                        border: `1px solid ${T.red}30`,
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
                       }}
                     >
-                      Dismiss
+                      <Trash2 size={13} />
+                      Delete
                     </motion.button>
                   </div>
                 )}
@@ -673,7 +702,19 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
     fetch('/api/v1/scanner/update-trend-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trend_id: trendId, status: 'dismissed' }),
+      body: JSON.stringify({ id: trendId, status: 'dismissed' }),
+    }).catch(() => {});
+  }, []);
+
+  const handleDeleteEmerging = useCallback((trendId: string) => {
+    // Remove from local state immediately
+    setEmergingTrends(prev => prev.filter(t => t.id !== trendId));
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(trendId); return n; });
+    // Remove from scanned_trends database
+    fetch('/api/v1/scanner/update-trend-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: trendId, status: 'dismissed' }),
     }).catch(() => {});
   }, []);
 
@@ -976,6 +1017,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
               trend={trend}
               onAdd={() => handleAddTrend(trend)}
               onDismiss={() => handleDismiss(trend.id)}
+              onDelete={() => handleDeleteEmerging(trend.id)}
               isAdmin={isAdmin}
               expanded={expandedTrendId === trend.id}
               onToggle={() => setExpandedTrendId(expandedTrendId === trend.id ? null : trend.id)}

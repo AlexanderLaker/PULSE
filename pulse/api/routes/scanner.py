@@ -53,49 +53,72 @@ class ScanResult(BaseModel):
     meta: Dict[str, Any]
 
 
-# ─── FMCG-focused search queries by force ──────────────────────────────────
+# ─── BROAD search queries by force ─────────────────────────────────────────
+# DESIGN: Phase 1 casts a WIDE NET with general industry terms.
+# The AI filter (Opus, Phase 3) handles relevance scoring for Henkel.
+# Overly specific queries miss emerging trends — let them surface organically.
+# KEY METRIC: anything that could impact consumer goods profitability.
 FORCE_QUERIES = {
     "Consumer": [
-        "natural beauty trends",
-        "sustainable personal care",
-        "premiumization wellness",
-        "clean beauty movement",
-        "direct-to-consumer beauty",
+        "consumer goods trends",
+        "beauty personal care market",
+        "household products consumer behavior",
+        "FMCG industry outlook",
+        "consumer spending habits",
+        "premiumization OR trading down consumer products",
+        "private label market share growth",
+        "emerging consumer trends",
+        "hair care market",
+        "laundry home care market",
     ],
     "Government": [
-        "EU cosmetics regulation",
-        "detergent labeling restrictions",
-        "microplastics ban",
-        "chemical ingredient restrictions",
-        "SVHC authorization",
+        "consumer products regulation",
+        "EU regulation cosmetics chemicals",
+        "packaging regulation Europe",
+        "ingredient ban restriction consumer goods",
+        "sustainability regulation FMCG",
+        "chemical regulation consumer safety",
+        "environmental compliance consumer products",
+        "labeling regulation household products",
     ],
     "Technology": [
-        "green chemistry innovation",
-        "biotechnology cosmetics",
-        "waterless formulations",
-        "AI personalization beauty",
-        "sustainable surfactants",
+        "consumer goods innovation",
+        "packaging innovation sustainability",
+        "beauty technology trends",
+        "formulation innovation consumer products",
+        "manufacturing technology FMCG",
+        "digital transformation consumer goods",
+        "biotechnology consumer products",
+        "e-commerce technology retail",
     ],
     "Environmental": [
-        "climate impact carbon footprint",
-        "water scarcity",
-        "biodiversity conservation",
+        "sustainability consumer goods",
+        "supply chain disruption FMCG",
+        "raw material cost consumer products",
+        "climate impact consumer goods industry",
         "circular economy packaging",
-        "PFAS contamination",
+        "carbon footprint consumer products",
+        "water scarcity impact industry",
     ],
     "Competitive": [
-        "P&G strategy acquisition",
-        "Unilever sustainability",
-        "Reckitt performance",
-        "market consolidation",
-        "competitive innovation",
+        "consumer goods company strategy",
+        "FMCG acquisition merger divestiture",
+        "beauty company earnings results",
+        "household products market share",
+        "consumer goods industry consolidation",
+        "private label retailer brand competitive",
+        "FMCG company performance",
+        "consumer goods CEO strategy",
     ],
     "Customer": [
-        "e-commerce growth beauty",
-        "retailer margins pressure",
-        "DTC direct-to-consumer",
-        "supply chain disruption",
-        "channel shift online",
+        "retail industry trends",
+        "e-commerce consumer goods growth",
+        "retail media network advertising",
+        "grocery retail market dynamics",
+        "discount retail market share Europe",
+        "social commerce consumer products",
+        "retail channel shift consumer goods",
+        "retailer margin pressure FMCG",
     ],
 }
 
@@ -107,7 +130,7 @@ async def _scan_source(
     limit: int,
 ) -> tuple[str, List[Dict[str, Any]], Optional[str]]:
     """
-    Attempt to scan a single source with timeout (10 seconds max per source).
+    Attempt to scan a single source with timeout (25 seconds max per source).
 
     Returns: (source_name, results, error_message)
     All failures return empty results + error message, never raise.
@@ -117,10 +140,10 @@ async def _scan_source(
         async def _source_logic():
             return await _scan_source_inner(source_name, query, limit)
 
-        result = await asyncio.wait_for(_source_logic(), timeout=10.0)
+        result = await asyncio.wait_for(_source_logic(), timeout=25.0)
         return result
     except asyncio.TimeoutError:
-        error_msg = f"Timeout: exceeded 10s limit"
+        error_msg = f"Timeout: exceeded 25s limit"
         logger.warning(f"Source {source_name} scan timed out: {error_msg}")
         return source_name, [], error_msg
     except Exception as e:
@@ -342,11 +365,25 @@ async def _run_full_scan(
 
     logger.info(f"Starting scan: {len(sources_to_scan)} sources, {len(queries)} queries")
 
-    # Create scan tasks: for each source × query pair
+    # Create scan tasks: distribute queries across sources intelligently
+    # Each source gets queries from ALL forces for comprehensive coverage
     tasks = []
+
+    # Limit queries per source based on source type to manage API rate limits
+    QUERIES_PER_SOURCE = {
+        "gdelt": 6, "gnews": 4, "currentsapi": 4, "rss_feeds": 3,
+        "reddit": 3, "youtube": 3, "google_trends": 2,
+        "sec_edgar": 3, "echa": 1, "eurlex": 1, "epo_patents": 1,
+        "beautyfeeds": 1, "newsapi": 3, "ncbi_pubmed": 2, "arxiv": 2,
+        "openalex": 3, "semantic_scholar": 3,
+        "fred": 1, "world_bank": 1, "open_meteo": 1,
+    }
+
     for source in sources_to_scan:
-        for query in queries[:1]:  # Limit to 1 query per source to fit within Vercel 300s timeout
-            _scan_state["progress"][f"{source}:{query[:20]}"] = "queued"
+        max_q = QUERIES_PER_SOURCE.get(source, 2)
+        source_queries = queries[:max_q]
+        for query in source_queries:
+            _scan_state["progress"][f"{source}:{query[:30]}"] = "queued"
             tasks.append(_scan_source(source, query, limit_per_source))
 
     # Execute all scans concurrently
@@ -415,7 +452,161 @@ async def _run_full_scan(
 
         deduplicated.append(trend)
 
-    results["trends"] = deduplicated[:200]  # Limit total results
+    # ── AI-POWERED RELEVANCE & QUALITY FILTER (Bain-grade) ──────────
+    # Use Claude Opus to analyze each raw trend for strategic relevance
+    # to Henkel Consumer Brands profitability
+    try:
+        from pulse.ai.provider import get_provider
+        from pulse.ai.config import get_ai_config, ProviderConfig, LLMProvider as LLMProviderEnum
+        import json as _json
+
+        ai_config = get_ai_config()
+        # Force Opus model for deep analysis
+        opus_config = ProviderConfig(
+            provider=LLMProviderEnum.CLAUDE,
+            api_key=ai_config.providers[LLMProviderEnum.CLAUDE].api_key,
+            model="claude-opus-4-0-20250514",
+            temperature=0.3,
+            max_tokens=8192,
+            timeout_seconds=120,
+        )
+        from pulse.ai.provider import ClaudeProvider
+        provider = ClaudeProvider(opus_config)
+
+        # Batch raw trends into chunks for efficient processing
+        raw_trends = deduplicated[:200]
+        BATCH_SIZE = 15
+        analyzed_trends = []
+
+        for batch_start in range(0, len(raw_trends), BATCH_SIZE):
+            batch = raw_trends[batch_start:batch_start + BATCH_SIZE]
+
+            # Build batch description
+            batch_descriptions = []
+            for i, t in enumerate(batch):
+                title = t.get("title", t.get("name", "Untitled"))
+                desc = t.get("description", t.get("snippet", t.get("abstract", "")))[:300]
+                source = t.get("source", t.get("api", "unknown"))
+                url = t.get("url", "")
+                batch_descriptions.append(
+                    f"[{i}] SOURCE: {source} | TITLE: {title}\nSNIPPET: {desc}\nURL: {url}"
+                )
+
+            system_prompt = """You are a Senior Partner at Bain & Company's Consumer Products practice, specializing in FMCG profit pool analysis for Henkel Consumer Brands.
+
+Your task: Evaluate each trend signal below for its STRATEGIC RELEVANCE to Henkel's category profitability. Henkel operates in:
+- HAIR: Color, Care, Styling, Body (brands: Schwarzkopf, Syoss, Gliss, Schauma, got2b)
+- LAUNDRY & HOME CARE: Fabric Care (Persil, all, Purex), Dish (Pril, Somat), Home Care (Bref), Insect Control
+
+QUALITY CRITERIA — Only accept trends that meet ALL of these:
+1. MATERIAL IMPACT: Could shift category profit pools by ≥1% within 3-5 years
+2. EVIDENCE-BASED: Has concrete data points, regulatory filings, market research, or executive statements — not speculation
+3. ACTIONABLE: Henkel can respond strategically (invest, defend, pivot, harvest)
+4. SPECIFIC: About a real, identifiable market force — not a generic buzzword
+5. SOURCE QUALITY: Prioritize consultancy reports, regulatory filings, financial filings (10-K/annual reports), peer-reviewed research, industry-specific trade press. Deprioritize social media noise, clickbait, and generic news.
+
+REJECT trends that are:
+- Generic industry news with no Henkel category relevance
+- Duplicate angles on the same underlying trend
+- Pure product launches without strategic market impact
+- Too narrow (single-SKU level) or too broad ("the economy")
+- From low-credibility or irrelevant sources
+
+For each ACCEPTED trend, provide:
+- name: Clear, specific trend name (e.g., "EU PFAS Restriction Impact on Fabric Care Formulations" not "Regulation Changes")
+- description: 2-3 sentences with specific evidence/data points
+- force: Consumer | Customer | Technology | Government | Environmental | Competitive
+- direction: Expansion (positive for category profit) or Contraction (negative)
+- suggested_impact: 1-5 (how much could this shift the profit pool?)
+- suggested_probability: 1-5 (how likely is this to materialize at scale?)
+- relevance_score: 0-100 (overall strategic relevance to Henkel)
+- reasoning: Why this matters for Henkel's profit pools specifically
+- category_mapping: Which Henkel categories are exposed and how much (0-5)?
+  Categories: hair_color, hair_care, hair_styling, body, fcn (fabric care near), fca (fabric care away), ffi (fabric freshness/ironing), lad (laundry additives), hdw (hand dish wash), adw (auto dish wash), hsc (home surface care), ic (insect control)
+- source_quality: "high" (consultancy/regulatory/financial filing), "medium" (trade press/academic), "low" (social media/blog/generic news)
+
+Return a JSON array of accepted trends only. Empty array if none pass the quality bar.
+IMPORTANT: Be HIGHLY selective. It's better to return 3 excellent trends than 15 mediocre ones."""
+
+            user_prompt = f"""Analyze these {len(batch)} trend signals for Henkel Consumer Brands strategic relevance:
+
+{chr(10).join(batch_descriptions)}
+
+Return ONLY the trends that pass all quality criteria as a JSON array."""
+
+            try:
+                ai_result = await provider.complete_structured(
+                    system_prompt,
+                    user_prompt,
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "description": {"type": "string"},
+                                "force": {"type": "string"},
+                                "direction": {"type": "string"},
+                                "suggested_impact": {"type": "number"},
+                                "suggested_probability": {"type": "number"},
+                                "relevance_score": {"type": "number"},
+                                "reasoning": {"type": "string"},
+                                "category_mapping": {"type": "object"},
+                                "source_quality": {"type": "string"},
+                            },
+                            "required": ["name", "force", "direction", "suggested_impact",
+                                         "suggested_probability", "relevance_score", "reasoning"]
+                        }
+                    }
+                )
+
+                # Enrich accepted trends with original source info
+                for trend_data in ai_result:
+                    # Find the best matching original source
+                    best_source = batch[0] if batch else {}
+                    for orig in batch:
+                        orig_title = (orig.get("title", "") + orig.get("name", "")).lower()
+                        if any(w in orig_title for w in trend_data.get("name", "").lower().split()[:3]):
+                            best_source = orig
+                            break
+
+                    trend_data["id"] = f"ai_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(analyzed_trends)}"
+                    trend_data["sources"] = [{
+                        "api": best_source.get("source", best_source.get("api", "AI Analysis")),
+                        "title": best_source.get("title", best_source.get("name", trend_data["name"])),
+                        "url": best_source.get("url", ""),
+                        "snippet": best_source.get("description", best_source.get("snippet", ""))[:200],
+                    }]
+                    trend_data["discovered_at"] = datetime.now().isoformat()
+                    trend_data["status"] = "new"
+
+                    # Default category mapping if not provided
+                    if "category_mapping" not in trend_data or not trend_data["category_mapping"]:
+                        trend_data["category_mapping"] = {}
+
+                    analyzed_trends.append(trend_data)
+
+            except Exception as ai_err:
+                logger.warning(f"AI analysis failed for batch: {ai_err}")
+                # Fall through — raw trends will be used as fallback
+
+        if analyzed_trends:
+            # Replace raw trends with AI-analyzed ones
+            results["trends"] = analyzed_trends
+            results["meta"]["ai_filtered"] = True
+            results["meta"]["ai_model"] = "claude-opus-4-0-20250514"
+            results["meta"]["trends_before_filter"] = len(deduplicated)
+            results["meta"]["trends_after_filter"] = len(analyzed_trends)
+            logger.info(f"AI filter: {len(deduplicated)} raw → {len(analyzed_trends)} quality trends")
+        else:
+            logger.warning("AI filter returned no results — using raw trends as fallback")
+            results["trends"] = deduplicated[:200]
+
+    except Exception as e:
+        logger.error(f"AI relevance filter failed entirely: {e}")
+        # Fallback: use raw deduplicated trends
+        results["trends"] = deduplicated[:200]
+
     results["meta"]["completed"] = datetime.now().isoformat()
     results["meta"]["total_trends"] = len(results["trends"])
     results["meta"]["sources_succeeded"] = len([p for p in _scan_state["progress"].values() if "ok" in p])

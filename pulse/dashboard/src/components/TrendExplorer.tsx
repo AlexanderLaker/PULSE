@@ -10,7 +10,7 @@ import React, { useState, useMemo, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronUp, Search, Sparkles, ExternalLink,
-  Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle,
+  Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle, Trash2,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS, FORCE_ICONS, CATEGORIES, fmtShift, fmtPct, shortCat, shiftColorHex } from '../lib/format';
 import type { ForceName, CategoryId } from '../types';
@@ -44,6 +44,7 @@ interface TrendExplorerProps {
   forceFilter: string;
   onForceFilter: (force: string) => void;
   onUpdateTrend: (id: string, updates: Partial<TrendData>) => void;
+  onDeleteTrend?: (id: string) => void;
 }
 
 // ─── Source Icons ─────────────────────────────────────────────────────────
@@ -462,7 +463,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
 
   return (
     <tr>
-      <td colSpan={8}>
+      <td colSpan={9}>
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -777,7 +778,7 @@ function BadgeStyled({ badge }: { badge: TrendBadge }): React.ReactNode {
   }
 }
 
-const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend }) => {
+const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -1040,6 +1041,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                 { key: 'probability', label: 'Probability' },
                 { key: 'score', label: 'Score' },
                 { key: 'gp1_shift', label: 'GP1 Shift %' },
+                { key: '_actions', label: '' },
               ].map(col => (
                 <th
                   key={col.key}
@@ -1192,6 +1194,41 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                       }}>
                         {fmtShift(trend.gp1_shift || 0, 2)}
                       </td>
+                      {onDeleteTrend && (
+                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete trend "${trend.name}"?`)) {
+                                onDeleteTrend(trend.id);
+                              }
+                            }}
+                            style={{
+                              padding: '6px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              color: T.text3,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 120ms',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = T.red + '15';
+                              e.currentTarget.style.color = T.red;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = T.text3;
+                            }}
+                            title="Delete trend"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      )}
                     </motion.tr>
 
                     {isExpanded && (

@@ -841,6 +841,19 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                   ) as any,
                 }));
               }}
+              onDeleteTrend={async (id: string) => {
+                try {
+                  const res = await fetch(`/api/v1/trends/${id}`, { method: 'DELETE' });
+                  if (res.ok) {
+                    setInitialData(prev => ({
+                      ...prev,
+                      trends: prev.trends.filter((t: any) => t.id !== id) as any,
+                    }));
+                  }
+                } catch (err) {
+                  console.error('Failed to delete trend:', err);
+                }
+              }}
             />
 
             {/* Emerging Trends — AI-curated candidates below */}
@@ -869,8 +882,17 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                     fetch('/api/v1/scanner/update-trend-status', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ trend_id: emergingTrend.id, status: 'added' }),
+                      body: JSON.stringify({ id: emergingTrend.id, status: 'added' }),
                     }).catch(() => {});
+
+                    // Refresh trend list to show newly added trend
+                    try {
+                      const refreshRes = await fetch('/api/v1/trends');
+                      if (refreshRes.ok) {
+                        const refreshData = await refreshRes.json();
+                        setInitialData((prev: any) => ({ ...prev, trends: refreshData }));
+                      }
+                    } catch {}
                   }
                 } catch (err) {
                   console.error('Failed to add trend:', err);
