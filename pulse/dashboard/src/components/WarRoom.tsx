@@ -468,7 +468,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               } as React.CSSProperties}
             />
             <span style={{ fontSize: 9, fontWeight: 600, color: T.text3, textTransform: 'uppercase', letterSpacing: 0.8 } as React.CSSProperties}>
-              v5.0
+              V6.0
             </span>
           </div>
 
