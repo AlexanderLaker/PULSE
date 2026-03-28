@@ -506,71 +506,41 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
     setScanErrors([]);
 
     try {
-      // Try background scan first, then poll status
-      const bgRes = await fetch('/api/v1/scanner/run-background', {
+      // Vercel serverless: use synchronous endpoint directly (no background tasks)
+      const res = await fetch('/api/v1/scanner/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit_per_source: 50 }),
+        body: JSON.stringify({ limit_per_source: 20 }),
       });
 
-      if (bgRes.ok) {
-        // Poll for progress
-        let attempts = 0;
-        const maxAttempts = 120; // 2 minutes max
-        while (attempts < maxAttempts) {
-          await new Promise(r => setTimeout(r, 1000));
-          attempts++;
-
-          try {
-            const statusRes = await fetch('/api/v1/scanner/status');
-            if (statusRes.ok) {
-              const status = await statusRes.json();
-              setScanProgress(status.progress || {});
-              setScanErrors(status.errors || []);
-
-              if (!status.running) {
-                // Scan complete — fetch results
-                const resultsRes = await fetch('/api/v1/scanner/results');
-                if (resultsRes.ok) {
-                  const data = await resultsRes.json();
-                  if (data.trends && data.trends.length > 0) {
-                    const mapped = mapApiResultsToTrends(data.trends);
-                    setEmergingTrends(prev => {
-                      const existingNames = new Set(prev.map(t => t.name));
-                      const newOnes = mapped.filter(t => !existingNames.has(t.name));
-                      return [...newOnes, ...prev].slice(0, MAX_VISIBLE_TRENDS);
-                    });
-                  }
-                }
-                break;
-              }
-            }
-          } catch { /* continue polling */ }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.trends && data.trends.length > 0) {
+          const mapped = mapApiResultsToTrends(data.trends);
+          setEmergingTrends(prev => {
+            const existingNames = new Set(prev.map(t => t.name));
+            const newOnes = mapped.filter(t => !existingNames.has(t.name));
+            return [...newOnes, ...prev].slice(0, MAX_VISIBLE_TRENDS);
+          });
         }
-      } else {
-        // Background scan not available — try synchronous
-        const syncRes = await fetch('/api/v1/scanner/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit_per_source: 50 }),
-        });
-
-        if (syncRes.ok) {
-          const data = await syncRes.json();
-          if (data.trends && data.trends.length > 0) {
-            const mapped = mapApiResultsToTrends(data.trends);
-            setEmergingTrends(prev => {
-              const existingNames = new Set(prev.map(t => t.name));
-              const newOnes = mapped.filter(t => !existingNames.has(t.name));
-              return [...newOnes, ...prev].slice(0, MAX_VISIBLE_TRENDS);
-            });
+        // Update progress from meta
+        if (data.meta) {
+          setScanProgress(
+            Object.fromEntries(
+              (data.meta.sources_queried || []).map((s: string) => [s, 'ok'])
+            )
+          );
+          if (data.meta.sources_failed > 0) {
+            setScanErrors([`${data.meta.sources_failed} source(s) had errors`]);
           }
         }
+      } else {
+        const errText = await res.text();
+        setScanErrors([`Scan failed: ${res.status} ${errText.slice(0, 100)}`]);
       }
     } catch (err) {
-      // Backend unavailable — show error state
-      console.warn('Scanner backend unavailable:', err);
-      setScanErrors(['Backend unreachable — ensure the PULSE API server is running on port 8000']);
+      console.warn('Scanner request failed:', err);
+      setScanErrors(['Backend unreachable — ensure the PULSE API server is running']);
     } finally {
       setIsScanning(false);
       setLastScanned(new Date());

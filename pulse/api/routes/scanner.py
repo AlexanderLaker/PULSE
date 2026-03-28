@@ -107,10 +107,35 @@ async def _scan_source(
     limit: int,
 ) -> tuple[str, List[Dict[str, Any]], Optional[str]]:
     """
-    Attempt to scan a single source.
+    Attempt to scan a single source with timeout (10 seconds max per source).
 
     Returns: (source_name, results, error_message)
     All failures return empty results + error message, never raise.
+    """
+    try:
+        # Wrap entire source scan with timeout to prevent Vercel 300s overrun
+        async def _source_logic():
+            return await _scan_source_inner(source_name, query, limit)
+
+        result = await asyncio.wait_for(_source_logic(), timeout=10.0)
+        return result
+    except asyncio.TimeoutError:
+        error_msg = f"Timeout: exceeded 10s limit"
+        logger.warning(f"Source {source_name} scan timed out: {error_msg}")
+        return source_name, [], error_msg
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)[:150]}"
+        logger.warning(f"Source {source_name} scan failed: {error_msg}")
+        return source_name, [], error_msg
+
+
+async def _scan_source_inner(
+    source_name: str,
+    query: str,
+    limit: int,
+) -> tuple[str, List[Dict[str, Any]], Optional[str]]:
+    """
+    Inner scan logic (now separated for timeout wrapping).
     """
     try:
         if source_name == "gdelt":
@@ -299,7 +324,7 @@ async def _run_full_scan(
     # Create scan tasks: for each source × query pair
     tasks = []
     for source in sources_to_scan:
-        for query in queries[:3]:  # Limit queries per source to avoid rate limiting
+        for query in queries[:1]:  # Limit to 1 query per source to fit within Vercel 300s timeout
             _scan_state["progress"][f"{source}:{query[:20]}"] = "queued"
             tasks.append(_scan_source(source, query, limit_per_source))
 

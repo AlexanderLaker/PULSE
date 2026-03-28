@@ -4,9 +4,9 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pulse.api.auth import (
-    RegisterRequest, LoginRequest, UpdateProfileRequest,
+    RegisterRequest, LoginRequest, UpdateProfileRequest, ResetPasswordRequest,
     AuthResponse, UserResponse,
-    register_user, login_user, get_all_users, update_user, delete_user,
+    register_user, login_user, get_all_users, update_user, delete_user, reset_password,
     get_current_user, require_auth, require_admin,
 )
 
@@ -24,6 +24,12 @@ async def register(req: RegisterRequest):
 async def login(req: LoginRequest):
     """Login and receive JWT token."""
     return login_user(req)
+
+
+@router.post("/auth/reset-password")
+async def reset_pw(req: ResetPasswordRequest):
+    """Reset password by email (no auth required)."""
+    return reset_password(req)
 
 
 @router.get("/auth/me", response_model=Optional[UserResponse])

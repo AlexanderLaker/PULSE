@@ -224,12 +224,31 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               <div style={{ textAlign: 'right', marginTop: 8 }}>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!email) {
                       alert('Please enter your email address first.');
                       return;
                     }
-                    alert(`A password reset link has been sent to ${email}.\nPlease check your inbox.`);
+                    const newPw = prompt('Enter your new password (min 6 characters):');
+                    if (!newPw || newPw.length < 6) {
+                      alert('Password must be at least 6 characters.');
+                      return;
+                    }
+                    try {
+                      const res = await fetch('/api/v1/auth/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, new_password: newPw }),
+                      });
+                      if (res.ok) {
+                        alert('Password reset successful! You can now sign in.');
+                      } else {
+                        const data = await res.json();
+                        alert(data.detail || 'Password reset failed.');
+                      }
+                    } catch {
+                      alert('Unable to reach server. Please try again.');
+                    }
                   }}
                   style={{
                     background: 'none',

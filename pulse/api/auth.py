@@ -61,6 +61,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ResetPasswordRequest(BaseModel):
+    email: str
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 class UserResponse(BaseModel):
     id: str
     name: str
@@ -168,7 +173,7 @@ def _seed_default_users(conn):
             "id": "seed-admin-001",
             "name": "Admin",
             "email": "laker.alexander@gmail.com",
-            "password": "pulse2026",
+            "password": "awseawse",
             "role": "admin",
         },
         {
@@ -305,6 +310,38 @@ def login_user(req: LoginRequest) -> AuthResponse:
                 role=row["role"], created_at=row["created_at"]
             )
         )
+
+
+def reset_password(req: ResetPasswordRequest) -> dict:
+    """Reset user password by email."""
+    ensure_auth_tables()
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            f"SELECT id FROM users WHERE email = {p}",
+            (req.email.lower(),)
+        )
+        raw_row = cursor.fetchone()
+
+        if not raw_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        row = _row_to_dict(raw_row)
+        pw_hash, pw_salt = _hash_password(req.new_password)
+
+        cursor.execute(
+            f"UPDATE users SET password_hash = {p}, password_salt = {p} WHERE id = {p}",
+            (pw_hash, pw_salt, row["id"])
+        )
+        conn.commit()
+
+        return {"success": True, "message": "Password reset successfully"}
 
 
 def get_all_users() -> list[UserResponse]:
