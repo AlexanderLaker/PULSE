@@ -51,6 +51,7 @@ from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routes.delphi import router as delphi_router
 from pulse.api.routes.auth import router as auth_router
+from pulse.api.routes.scanner import router as scanner_router
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,9 @@ def create_app(args=None) -> FastAPI:
 
     # Include auth routes
     app.include_router(auth_router, prefix="/api/v1")
+
+    # Include scanner routes
+    app.include_router(scanner_router, prefix="/api/v1")
 
     # ── Lazy Initialization (Vercel serverless compatibility) ─────
     _initialized = {"done": False}
