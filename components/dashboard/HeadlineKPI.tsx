@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import React from 'react';
 import type { ShiftMatrix, ConvergenceDiagnostics } from '@/types';
-import { T, fmtShift, fmtPct, shiftColorHex } from '@/lib/format';
+import { T, CATEGORIES, fmtShift, fmtPct, shiftColorHex } from '@/lib/format';
 
 interface KPICardProps {
   icon: React.ComponentType<any>;
@@ -170,7 +170,25 @@ export default function HeadlineKPI({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: 16,
+    gridAutoFlow: 'dense',
   };
+
+  // Build executive narrative
+  const direction = avgShift >= 0 ? 'expanding' : 'contracting';
+  const magnitude = Math.abs(avgShift * 100).toFixed(1);
+  const topExpName = CATEGORIES.find(c => c.id === maxExpansion.name)?.name || maxExpansion.name;
+  const topConName = CATEGORIES.find(c => c.id === maxContraction.name)?.name || maxContraction.name;
+
+  const narrativeText = avgShift === 0 && catCount === 0
+    ? 'Run a simulation to generate executive insights.'
+    : `The portfolio is ${direction} at ${magnitude}% net shift by 2030 across ${catCount} categories. ` +
+      `Top expansion: ${topExpName} at ${fmtShift(maxExpansion.val)}. ` +
+      `Highest risk: ${topConName} at ${fmtShift(maxContraction.val)}. ` +
+      (avgShift < -0.02
+        ? 'Recommended action: initiate defensive portfolio review and reallocate investment toward growth categories.'
+        : avgShift < 0
+        ? 'Recommended action: monitor contraction categories closely and accelerate innovation pipeline.'
+        : 'Recommended action: capitalize on expansion momentum while maintaining defensive positions in contracting segments.');
 
   return (
     <div style={gridStyle}>
@@ -217,6 +235,28 @@ export default function HeadlineKPI({
         bgIcon={hasConverged ? T.greenDim : T.amberDim}
         delay={0.24}
       />
+
+      {/* Executive Narrative */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.32 }}
+        style={{
+          gridColumn: '1 / -1',
+          padding: '16px 20px',
+          borderRadius: 12,
+          border: `1px solid ${T.border}`,
+          background: `linear-gradient(135deg, ${T.bg2}88 0%, ${T.bg3}44 100%)`,
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: T.text3, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12 }}>💡</span> Executive Insight
+        </div>
+        <div style={{ fontSize: 13, lineHeight: 1.6, color: T.text2 }}>
+          {narrativeText}
+        </div>
+      </motion.div>
     </div>
   );
 }

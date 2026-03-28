@@ -213,11 +213,19 @@ def create_app(args=None) -> FastAPI:
         lifespan=lifespan
     )
 
+    # ── CORS Configuration ──────────────────────────────────────
+    # Allow localhost:3000 for local development, and production domains
+    import os
+    cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+    if os.environ.get('ENV') == 'production':
+        # In production, restrict to specific domains
+        cors_origins = os.environ.get('CORS_ORIGINS', 'https://pulse.henkel.com').split(',')
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=False,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -773,6 +781,64 @@ def create_app(args=None) -> FastAPI:
         except Exception as e:
             raise HTTPException(500, f"Export failed: {e}")
 
+    @app.post("/api/v1/export/pptx")
+    async def export_pptx():
+        """Generate executive PowerPoint presentation."""
+        mc = _state.get("mc_result")
+        if not mc:
+            raise HTTPException(404, "No simulation results")
+        try:
+            import importlib
+            import pulse.api.export_pptx as _pptx_mod
+            importlib.reload(_pptx_mod)
+            PowerPointExporter = _pptx_mod.PowerPointExporter
+            from fastapi.responses import FileResponse
+            import tempfile, os
+
+            out_dir = os.path.join(tempfile.gettempdir(), "pulse_exports")
+            os.makedirs(out_dir, exist_ok=True)
+            out_file = os.path.join(out_dir, "PULSE_War_Room.pptx")
+
+            # Get current scenario (for slide titles)
+            db = _state.get("db")
+            trends_list = [
+                {
+                    "id": t.id,
+                    "name": t.name,
+                    "force": t.force,
+                    "direction": t.direction,
+                    "impact": t.impact,
+                    "probability": t.probability,
+                    "normalized_score": t.normalized_score,
+                    "description": t.description,
+                }
+                for t in (db.trends if db else [])
+            ]
+
+            config = _state.get("config")
+            exporter = PowerPointExporter()
+            exporter.export(
+                output_path=out_file,
+                scenario="Base Case",
+                shifts=mc.get("shift_matrix", {}),
+                trends=trends_list,
+                convergence=mc.get("convergence"),
+                allocation=_state.get("allocation"),
+                model_version=__version__,
+                model_accuracy=(config.backtesting_accuracy if config and config.backtesting_accuracy is not None else 0.73),
+            )
+
+            return FileResponse(
+                out_file,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                filename="PULSE_War_Room.pptx",
+            )
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            logger.error(f"PowerPoint export failed: {e}\n{tb}")
+            raise HTTPException(500, f"Export failed: {str(e)}\n{tb}")
+
     # ── AI Scanning & Intelligence ─────────────────────────────────
     @app.post("/api/v1/ai/scan")
     async def ai_scan():
@@ -863,6 +929,122 @@ def create_app(args=None) -> FastAPI:
             return {"answer": "AI features require additional setup. Set ANTHROPIC_API_KEY or configure an AI provider."}
         except Exception as e:
             return {"answer": f"AI query failed: {str(e)}"}
+
+    # ── Session Snapshots (Persistent History) ──────────────────────
+    class SnapshotCreate(BaseModel):
+        name: str
+        scenario: str = "Base Case"
+        shifts: dict
+        trends: list = []
+        trend_count: int = 0
+        net_shift: float = 0.0
+        notes: str = ""
+
+    @app.get("/api/v1/snapshots")
+    async def list_snapshots():
+        """List all session snapshots, newest first. Never deleted."""
+        try:
+            from pulse.database import get_db_connection, _row_to_dict
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, name, created_at, scenario, shifts, trends,
+                           trend_count, net_shift, notes, created_by, model_version, iterations
+                    FROM session_snapshots
+                    ORDER BY created_at DESC
+                """)
+                rows = cursor.fetchall()
+                snapshots = []
+                for raw_row in rows:
+                    row = _row_to_dict(raw_row)
+                    snap = dict(row)
+                    # Parse JSON fields
+                    try:
+                        snap["shifts"] = json.loads(snap["shifts"]) if snap["shifts"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        snap["shifts"] = {}
+                    try:
+                        snap["trends"] = json.loads(snap["trends"]) if snap["trends"] else []
+                    except (json.JSONDecodeError, TypeError):
+                        snap["trends"] = []
+                    snapshots.append(snap)
+                return snapshots
+        except Exception as e:
+            logger.error(f"Failed to list snapshots: {e}")
+            return []
+
+    @app.post("/api/v1/snapshots")
+    async def create_snapshot(req: SnapshotCreate):
+        """Create a new session snapshot. Snapshots are permanent — never auto-deleted."""
+        import uuid
+        from pulse.database import get_db_connection, placeholder, ph, _row_to_dict
+        snapshot_id = f"snap_{uuid.uuid4().hex[:12]}"
+        p = placeholder()
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"""
+                    INSERT INTO session_snapshots
+                        (id, name, scenario, shifts, trends, trend_count, net_shift, notes, model_version)
+                    VALUES ({ph(9)})
+                """, (
+                    snapshot_id,
+                    req.name,
+                    req.scenario,
+                    json.dumps(req.shifts),
+                    json.dumps(req.trends),
+                    req.trend_count,
+                    req.net_shift,
+                    req.notes,
+                    __version__,
+                ))
+                conn.commit()
+                # Fetch the created row to return full data
+                cursor.execute(f"""
+                    SELECT id, name, created_at, scenario, shifts, trends,
+                           trend_count, net_shift, notes, created_by, model_version, iterations
+                    FROM session_snapshots WHERE id = {p}
+                """, (snapshot_id,))
+                raw_row = cursor.fetchone()
+                if raw_row:
+                    row = _row_to_dict(raw_row)
+                    snap = dict(row)
+                    try:
+                        snap["shifts"] = json.loads(snap["shifts"]) if snap["shifts"] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        snap["shifts"] = {}
+                    try:
+                        snap["trends"] = json.loads(snap["trends"]) if snap["trends"] else []
+                    except (json.JSONDecodeError, TypeError):
+                        snap["trends"] = []
+                    return snap
+            return {"id": snapshot_id, "status": "created"}
+        except Exception as e:
+            logger.error(f"Failed to create snapshot: {e}")
+            raise HTTPException(500, f"Snapshot creation failed: {str(e)}")
+
+    @app.get("/api/v1/snapshots/{snapshot_id}")
+    async def get_snapshot(snapshot_id: str):
+        """Get a single snapshot by ID."""
+        from pulse.database import get_db_connection, placeholder, _row_to_dict
+        p = placeholder()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM session_snapshots WHERE id = {p}", (snapshot_id,))
+            raw_row = cursor.fetchone()
+            if not raw_row:
+                raise HTTPException(404, "Snapshot not found")
+            row = _row_to_dict(raw_row)
+            snap = dict(row)
+            try:
+                snap["shifts"] = json.loads(snap["shifts"]) if snap["shifts"] else {}
+            except (json.JSONDecodeError, TypeError):
+                snap["shifts"] = {}
+            try:
+                snap["trends"] = json.loads(snap["trends"]) if snap["trends"] else []
+            except (json.JSONDecodeError, TypeError):
+                snap["trends"] = []
+            return snap
 
     # Try to serve static files for the dashboard
     dashboard_dir = Path(__file__).parent.parent / "dashboard" / "dist"

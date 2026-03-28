@@ -35,8 +35,8 @@ interface TrendData {
   previous_round_scores?: {
     impact?: number[];
     probability?: number[];
-    impact_alpha?: number;
-    probability_alpha?: number;
+    impact_alpha?: number | null;
+    probability_alpha?: number | null;
   };
 }
 
@@ -90,7 +90,7 @@ interface ScoreSliderProps {
   value: number;
   onChange: (v: number) => void;
   previousScores?: number[];
-  previousAlpha?: number;
+  previousAlpha?: number | null;
   showPrevious?: boolean;
 }
 
@@ -181,8 +181,9 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const showPreviousDistributions = currentRound >= 2;
 
   // Get current score or defaults (0 = not yet scored)
-  const currentScore = scores[current?.id] || {
-    trend_id: current?.id || '',
+  const currentTrendId = current?.id || '';
+  const currentScore = (currentTrendId && scores[currentTrendId]) || {
+    trend_id: currentTrendId,
     impact: 0,
     probability: 0,
     rationale: '',
@@ -191,7 +192,7 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const updateScore = (field: keyof TrendScore, value: any) => {
     setScores(prev => ({
       ...prev,
-      [current.id]: { ...currentScore, trend_id: current.id, [field]: value },
+      [current?.id || '']: { ...currentScore, trend_id: current?.id || '', [field]: value },
     }));
   };
 
@@ -253,9 +254,10 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const forceCounts = useMemo(() => {
     const counts: Record<string, { total: number; scored: number }> = {};
     sortedTrends.forEach(t => {
-      if (!counts[t.force]) counts[t.force] = { total: 0, scored: 0 };
-      counts[t.force].total++;
-      if ((scores[t.id]?.rationale?.length || 0) >= 10) counts[t.force].scored++;
+      const force = t.force || 'Unknown';
+      if (!counts[force]) counts[force] = { total: 0, scored: 0 };
+      counts[force].total++;
+      if ((scores[t.id]?.rationale?.length || 0) >= 10) counts[force].scored++;
     });
     return counts;
   }, [sortedTrends, scores]);
@@ -279,11 +281,11 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
             width: 28, height: 28, borderRadius: 8,
             backgroundColor: T.accentDim, color: T.accent,
           }}>
-            {roundInfo.icon}
+            {roundInfo?.icon}
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{roundInfo.title}</div>
-            <div style={{ fontSize: 11, color: T.text3, marginTop: 1 }}>{roundInfo.subtitle}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{roundInfo?.title}</div>
+            <div style={{ fontSize: 11, color: T.text3, marginTop: 1 }}>{roundInfo?.subtitle}</div>
           </div>
         </div>
 
@@ -699,8 +701,8 @@ function SessionsOverview({
                 fontSize: 14, fontWeight: 700,
               }}>{round}</div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{info.title.split(' — ')[1]}</div>
-                <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>{info.subtitle}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{info?.title?.split(' — ')[1]}</div>
+                <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>{info?.subtitle}</div>
               </div>
             </div>
           );
@@ -796,8 +798,11 @@ function RoundSummaryView({
     scores.forEach((s: any) => {
       if (!s?.trend_id) return;
       if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { impact: [], probability: [], name: s.trend_name };
-      if (s.impact != null) byTrend[s.trend_id].impact.push(s.impact);
-      if (s.probability != null) byTrend[s.trend_id].probability.push(s.probability);
+      const trend = byTrend[s.trend_id];
+      if (trend) {
+        if (s.impact != null) trend.impact.push(s.impact);
+        if (s.probability != null) trend.probability.push(s.probability);
+      }
     });
   }
 
@@ -806,7 +811,7 @@ function RoundSummaryView({
     try { await onAdvanceRound(); } finally { setAdvancing(false); }
   };
 
-  const canAdvance = session.current_round < 3 && session.status !== 'Completed';
+  const canAdvance = (session?.current_round || 0) < 3 && session?.status !== 'Completed';
 
   return (
     <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1080,18 +1085,24 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
           const byTrend: Record<string, { impact: number[]; probability: number[] }> = {};
           scoreList.forEach((s: any) => {
             if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { impact: [], probability: [] };
-            if (s.impact != null) byTrend[s.trend_id].impact.push(s.impact);
-            if (s.probability != null) byTrend[s.trend_id].probability.push(s.probability);
+            const trend = byTrend[s.trend_id];
+            if (trend) {
+              if (s.impact != null) trend.impact.push(s.impact);
+              if (s.probability != null) trend.probability.push(s.probability);
+            }
           });
-          trendsToSet = trendsToSet.map(t => ({
-            ...t,
-            previous_round_scores: byTrend[t.id] ? {
-              impact: byTrend[t.id].impact,
-              probability: byTrend[t.id].probability,
-              impact_alpha: byTrend[t.id].impact.length > 1 ? 0.75 : null,
-              probability_alpha: byTrend[t.id].probability.length > 1 ? 0.75 : null,
-            } : undefined,
-          }));
+          trendsToSet = trendsToSet.map(t => {
+            const trendScores = byTrend[t.id];
+            return {
+              ...t,
+              previous_round_scores: trendScores ? {
+                impact: trendScores.impact,
+                probability: trendScores.probability,
+                impact_alpha: trendScores.impact.length > 1 ? 0.75 : null,
+                probability_alpha: trendScores.probability.length > 1 ? 0.75 : null,
+              } : undefined,
+            };
+          });
         } catch { /* no previous scores available */ }
       }
 
@@ -1162,8 +1173,8 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
         await api.submitDelphiScore(sessionId, {
           scorer_id: scorerName,
           trend_id: score.trend_id,
-          impact_score: score.impact,
-          probability_score: score.probability,
+          impact: score.impact,
+          probability: score.probability,
           rationale: score.rationale,
         });
       }

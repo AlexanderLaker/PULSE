@@ -13,6 +13,7 @@ interface HeatmapProps {
   shifts: ShiftMatrix | null;
   selectedCategory?: string | null;
   onSelectCategory?: (categoryId: string) => void;
+  onDoubleClickCategory?: (categoryId: string) => void;
 }
 
 interface HoveredCell {
@@ -77,7 +78,7 @@ function extractVal(path: unknown, year: number): number {
   return 0;
 }
 
-const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory }) => {
+const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory, onDoubleClickCategory }) => {
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
 
   // Build categories list from shifts data or use defaults
@@ -252,6 +253,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
               >
                 {/* Category Name Cell */}
                 <td
+                  onDoubleClick={() => onDoubleClickCategory?.(catId)}
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
@@ -259,7 +261,10 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                     padding: '10px 12px',
                     whiteSpace: 'nowrap',
                     textAlign: 'left',
-                  }}
+                    cursor: 'pointer',
+                    position: 'relative',
+                  } as React.CSSProperties}
+                  title="Double-click for deep dive"
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div

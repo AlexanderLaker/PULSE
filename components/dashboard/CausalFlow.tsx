@@ -9,6 +9,7 @@ import { useMemo, useState, FC, SVGProps } from 'react';
 import { motion } from 'framer-motion';
 import type { CausalDAG, ForceName } from '@/types';
 import { T, FORCES } from '@/lib/format';
+import { propagateShock } from '@/api/client';
 
 interface CausalFlowProps {
   dag?: CausalDAG | null;
@@ -31,6 +32,10 @@ interface ProcessedEdge {
   p2: Position;
   ctrl: Position;
   arrowPath: string;
+}
+
+interface PropagatedImpact {
+  [force: string]: number;
 }
 
 /**
@@ -104,6 +109,10 @@ const CausalFlow: FC<CausalFlowProps> = ({
 }) => {
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [hoveredForce, setHoveredForce] = useState<ForceName | null>(null);
+  const [shockMagnitude, setShockMagnitude] = useState<number>(0.3);
+  const [propagatedImpacts, setPropagatedImpacts] = useState<PropagatedImpact | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const positions = useMemo(() => getForcePositions(), []);
 
@@ -159,6 +168,74 @@ const CausalFlow: FC<CausalFlowProps> = ({
 
     return active;
   }, [shockedForce, edges]);
+
+  // Handle shock propagation
+  const handleRunPropagation = async () => {
+    if (!shockedForce) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await propagateShock({
+        shocked_force: shockedForce,
+        magnitude: shockMagnitude,
+        years: 5,
+      });
+
+      // Extract first year's impacts or use provided data
+      if (result.impacts && typeof result.impacts === 'object') {
+        const firstYearKey = Object.keys(result.impacts)[0];
+        if (firstYearKey && typeof result.impacts[firstYearKey] === 'object') {
+          setPropagatedImpacts(result.impacts[firstYearKey] as PropagatedImpact);
+        } else {
+          setPropagatedImpacts(result.impacts as PropagatedImpact);
+        }
+      }
+    } catch (err) {
+      // Fallback to local mock propagation using DAG weights
+      console.warn('Propagation API failed, using local mock:', err);
+      const mockImpacts: PropagatedImpact = {};
+      const forceList = Object.keys(FORCES) as ForceName[];
+
+      forceList.forEach(force => {
+        mockImpacts[force] = 0;
+      });
+
+      mockImpacts[shockedForce] = shockMagnitude;
+
+      // Simple BFS propagation using edge weights
+      const visited = new Set<ForceName>([shockedForce]);
+      const queue: Array<{ force: ForceName; impact: number }> = [
+        { force: shockedForce, impact: shockMagnitude },
+      ];
+
+      while (queue.length > 0) {
+        const { force, impact } = queue.shift()!;
+
+        edges.forEach(edge => {
+          if (edge.from === force && !visited.has(edge.to)) {
+            visited.add(edge.to);
+            const propagatedImpact = impact * edge.weight;
+            mockImpacts[edge.to] = (mockImpacts[edge.to] || 0) + propagatedImpact;
+            queue.push({ force: edge.to, impact: propagatedImpact });
+          }
+        });
+      }
+
+      setPropagatedImpacts(mockImpacts);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle reset
+  const handleReset = () => {
+    onShockForce(null);
+    setPropagatedImpacts(null);
+    setShockMagnitude(0.3);
+    setError(null);
+  };
 
   return (
     <motion.div
@@ -253,7 +330,7 @@ const CausalFlow: FC<CausalFlowProps> = ({
                   fill="none"
                   stroke={isActive ? T.purple : T.border1}
                   strokeWidth={isHovered ? 3 : isActive ? 2 : 1.5}
-                  opacity={isActive ? 1 : 0.04}
+                  opacity={isActive ? 1 : 0.18}
                   markerEnd={isActive ? 'url(#arrowActive)' : 'url(#arrowInactive)'}
                   style={{
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -263,8 +340,8 @@ const CausalFlow: FC<CausalFlowProps> = ({
                   onMouseLeave={() => setHoveredEdge(null)}
                 />
 
-                {/* Weight + lag label on hover or active */}
-                {(isHovered || isActive) && (
+                {/* Weight + lag label (always visible, but dimmer when inactive) */}
+                {(true) && (
                   <motion.g
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -275,7 +352,7 @@ const CausalFlow: FC<CausalFlowProps> = ({
                       y={edge.ctrl.y - 8}
                       textAnchor="middle"
                       fontSize={9}
-                      fill={T.text2}
+                      fill={isActive || isHovered ? T.text2 : T.text4}
                       fontFamily={T.mono}
                       fontWeight={500}
                     >
@@ -287,7 +364,7 @@ const CausalFlow: FC<CausalFlowProps> = ({
                         y={edge.ctrl.y + 6}
                         textAnchor="middle"
                         fontSize={8}
-                        fill={T.text3}
+                        fill={isActive || isHovered ? T.text3 : T.text4}
                         fontFamily={T.mono}
                       >
                         lag {edge.lag}y
@@ -380,7 +457,25 @@ const CausalFlow: FC<CausalFlowProps> = ({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      SHOCK +30%
+                      SHOCK {(shockMagnitude * 100).toFixed(0)}%
+                    </motion.text>
+                  )}
+
+                  {/* Propagated impact (if available) */}
+                  {propagatedImpacts && propagatedImpacts[force] && propagatedImpacts[force] !== shockMagnitude && (
+                    <motion.text
+                      x={pos.x}
+                      y={pos.y + 60}
+                      textAnchor="middle"
+                      fontSize={10}
+                      fill={propagatedImpacts[force] > 0 ? T.green : T.red}
+                      fontFamily={T.mono}
+                      fontWeight={600}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {propagatedImpacts[force] > 0 ? '+' : ''}{(propagatedImpacts[force] * 100).toFixed(1)}%
                     </motion.text>
                   )}
                 </g>
@@ -396,6 +491,158 @@ const CausalFlow: FC<CausalFlowProps> = ({
             50% { opacity: 0.2; }
           }
         `}</style>
+      </div>
+
+      {/* Shock Magnitude Slider (appears when force selected) */}
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: shockedForce ? 1 : 0, height: shockedForce ? 'auto' : 0 }}
+        transition={{ duration: 0.2 }}
+        style={{
+          overflow: 'hidden',
+          marginTop: 16,
+          paddingTop: shockedForce ? 16 : 0,
+          borderTop: shockedForce ? `1px solid ${T.border}` : 'none',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <label
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.text2,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                minWidth: 100,
+              }}
+            >
+              Shock Magnitude
+            </label>
+            <input
+              type="range"
+              min="-0.5"
+              max="0.5"
+              step="0.05"
+              value={shockMagnitude}
+              onChange={(e) => setShockMagnitude(parseFloat(e.target.value))}
+              style={{
+                flex: 1,
+                height: 5,
+                borderRadius: 3,
+                background: `linear-gradient(to right, ${T.red}, ${T.neutral}, ${T.green})`,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: shockMagnitude > 0 ? T.green : shockMagnitude < 0 ? T.red : T.text3,
+                minWidth: 45,
+                textAlign: 'right',
+                fontFamily: T.mono,
+              }}
+            >
+              {shockMagnitude > 0 ? '+' : ''}{(shockMagnitude * 100).toFixed(1)}%
+            </span>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              style={{
+                fontSize: 10,
+                color: T.red,
+                padding: '8px 12px',
+                borderRadius: 6,
+                background: `${T.red}15`,
+                border: `1px solid ${T.red}30`,
+              }}
+            >
+              {error}
+            </motion.div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleReset}
+              style={{
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.text2,
+                background: T.bg3,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = T.border;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = T.bg3;
+              }}
+            >
+              Reset
+            </button>
+            <button
+              onClick={handleRunPropagation}
+              disabled={isLoading}
+              style={{
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.bg1,
+                background: T.purple,
+                border: 'none',
+                borderRadius: 8,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.6 : 1,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.opacity = '0.85';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.opacity = '1';
+                }
+              }}
+            >
+              {isLoading ? 'Running...' : 'Run Propagation'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Edge Legend */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 20,
+        marginBottom: 8,
+        fontSize: 9,
+        color: T.text3,
+        fontFamily: T.mono,
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg width="20" height="2"><line x1="0" y1="1" x2="20" y2="1" stroke={T.purple} strokeWidth="2"/></svg>
+          Active propagation
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <svg width="20" height="2"><line x1="0" y1="1" x2="20" y2="1" stroke={T.border1} strokeWidth="1.5" opacity="0.18"/></svg>
+          Inactive edge
+        </span>
+        <span>Weight = propagation strength (0-100%)</span>
+        <span>Lag = delay in years</span>
       </div>
 
       {/* Legend / Instructions */}

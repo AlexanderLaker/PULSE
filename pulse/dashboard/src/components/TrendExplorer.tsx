@@ -635,14 +635,146 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
 
 // ─── TrendExplorer ────────────────────────────────────────────────────────
 
+// ─── Anomaly Detection & Badge Helpers ─────────────────────────────────────
+
+interface TrendBadge {
+  type: 'high_impact' | 'ai_suggested' | 'regulatory' | 'monitor';
+  label: string;
+}
+
+function detectTrendBadges(trend: TrendData): TrendBadge[] {
+  const badges: TrendBadge[] = [];
+
+  // High Impact badge: (impact * probability >= 16) AND Contraction
+  if ((trend.impact || 0) * (trend.probability || 0) >= 16 && trend.direction === 'Contraction') {
+    badges.push({ type: 'high_impact', label: 'High Impact' });
+  }
+
+  // AI Suggested badge
+  if (trend.ai_suggested) {
+    badges.push({ type: 'ai_suggested', label: 'AI Suggested' });
+  }
+
+  // Regulatory Watch badge (pulsing)
+  const regulatoryKeywords = ['Regulation', 'Ban', 'Tax', 'Restriction'];
+  if (regulatoryKeywords.some(kw => (trend.name || '').includes(kw))) {
+    badges.push({ type: 'regulatory', label: 'Regulatory Watch' });
+  }
+
+  // Monitor badge: impact === 5 OR probability === 5
+  if (trend.impact === 5 || trend.probability === 5) {
+    badges.push({ type: 'monitor', label: 'Monitor' });
+  }
+
+  return badges;
+}
+
+function BadgeStyled({ badge }: { badge: TrendBadge }): React.ReactNode {
+  const baseStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    fontSize: '8px',
+    padding: '2px 6px',
+    borderRadius: '10px',
+    fontWeight: 500,
+    marginRight: '4px',
+    whiteSpace: 'nowrap',
+  };
+
+  switch (badge.type) {
+    case 'high_impact':
+      return (
+        <span
+          style={{
+            ...baseStyle,
+            backgroundColor: 'rgba(255,159,10,0.12)',
+            color: '#FF9F0A',
+            border: '1px solid rgba(255,159,10,0.3)',
+          }}
+        >
+          {badge.label}
+        </span>
+      );
+    case 'ai_suggested':
+      return (
+        <span
+          style={{
+            ...baseStyle,
+            backgroundColor: 'rgba(0,113,227,0.08)',
+            color: '#0071E3',
+            border: '1px solid rgba(0,113,227,0.2)',
+          }}
+        >
+          {badge.label}
+        </span>
+      );
+    case 'regulatory':
+      return (
+        <motion.span
+          animate={{ opacity: [0.7, 1, 0.7] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          style={{
+            ...baseStyle,
+            backgroundColor: 'rgba(255,159,10,0.15)',
+            color: '#FF9F0A',
+            border: '1px solid rgba(255,159,10,0.4)',
+          }}
+        >
+          {badge.label}
+        </motion.span>
+      );
+    case 'monitor':
+      return (
+        <span
+          style={{
+            ...baseStyle,
+            backgroundColor: 'rgba(0,0,0,0.04)',
+            color: '#999999',
+            border: '1px solid rgba(0,0,0,0.08)',
+          }}
+        >
+          {badge.label}
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
 const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedTrendId, setExpandedTrendId] = useState<string | null>(null);
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'flagged' | 'ai' | 'regulatory'>('all');
 
   const trends = data?.trends || [];
   const forces = ['All', ...Object.keys(FORCES)];
+
+  // Compute badges for all trends
+  const trendBadges = useMemo(() => {
+    const map = new Map<string, TrendBadge[]>();
+    trends.forEach(t => {
+      map.set(t.id, detectTrendBadges(t));
+    });
+    return map;
+  }, [trends]);
+
+  // Count flagged trends
+  const flaggedCount = useMemo(() => {
+    return trends.filter(t => trendBadges.get(t.id)?.length ?? 0 > 0).length;
+  }, [trends, trendBadges]);
+
+  const aiSuggestedCount = useMemo(() => {
+    return trends.filter(t => t.ai_suggested).length;
+  }, [trends]);
+
+  const regulatoryCount = useMemo(() => {
+    return trends.filter(t => {
+      const regulatoryKeywords = ['Regulation', 'Ban', 'Tax', 'Restriction'];
+      return regulatoryKeywords.some(kw => (t.name || '').includes(kw));
+    }).length;
+  }, [trends]);
 
   // Filter & sort
   const filtered = useMemo(() => {
@@ -651,6 +783,16 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
     // Force filter
     if (forceFilter && forceFilter !== 'All') {
       result = result.filter(t => t.force === forceFilter);
+    }
+
+    // Badge filter
+    if (badgeFilter === 'flagged') {
+      result = result.filter(t => (trendBadges.get(t.id)?.length ?? 0) > 0);
+    } else if (badgeFilter === 'ai') {
+      result = result.filter(t => t.ai_suggested);
+    } else if (badgeFilter === 'regulatory') {
+      const regulatoryKeywords = ['Regulation', 'Ban', 'Tax', 'Restriction'];
+      result = result.filter(t => regulatoryKeywords.some(kw => (t.name || '').includes(kw)));
     }
 
     // Search
@@ -679,7 +821,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
     });
 
     return result;
-  }, [trends, forceFilter, searchQuery, sortBy, sortDir]);
+  }, [trends, forceFilter, searchQuery, sortBy, sortDir, badgeFilter, trendBadges]);
 
   const handleSort = (column: string): void => {
     if (sortBy === column) {
@@ -799,6 +941,56 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
         ))}
       </div>
 
+      {/* Badge Filter Chips */}
+      <div style={{
+        padding: '12px 24px',
+        borderBottom: `1px solid ${T.border1}`,
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+      }}>
+        <span style={{ fontSize: '10px', fontWeight: 600, color: T.text2, marginRight: '4px' }}>
+          FLAGS:
+        </span>
+        {[
+          { key: 'all', label: 'All', count: trends.length },
+          { key: 'flagged', label: 'Flagged', count: flaggedCount },
+          { key: 'ai', label: 'AI Suggested', count: aiSuggestedCount },
+          { key: 'regulatory', label: 'Regulatory Watch', count: regulatoryCount },
+        ].map((filter) => (
+          <button
+            key={filter.key}
+            onClick={() => setBadgeFilter(filter.key as any)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '16px',
+              fontSize: '11px',
+              fontWeight: 500,
+              transition: 'all 120ms ease',
+              backgroundColor: badgeFilter === filter.key ? T.accent : T.bg3,
+              color: badgeFilter === filter.key ? '#fff' : T.text2,
+              border: `1px solid ${badgeFilter === filter.key ? 'transparent' : T.border1}`,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (badgeFilter !== filter.key) {
+                e.currentTarget.style.backgroundColor = T.bg4;
+                e.currentTarget.style.borderColor = T.border2;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (badgeFilter !== filter.key) {
+                e.currentTarget.style.backgroundColor = T.bg3;
+                e.currentTarget.style.borderColor = T.border1;
+              }
+            }}
+          >
+            {filter.label} <span style={{ fontSize: '9px', marginLeft: '4px', opacity: 0.8 }}>({filter.count})</span>
+          </button>
+        ))}
+      </div>
+
       {/* Table */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
@@ -881,9 +1073,15 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
+                        flexWrap: 'wrap',
                       }}>
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        {trend.name}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {trend.name}
+                          {(trendBadges.get(trend.id) || []).map((badge, idx) => (
+                            <BadgeStyled key={idx} badge={badge} />
+                          ))}
+                        </span>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <button

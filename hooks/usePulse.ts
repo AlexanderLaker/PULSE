@@ -59,11 +59,13 @@ export interface UsePulseReturn {
   simulating: boolean;
   error: string | null;
   backendAvailable: boolean;
+  connectionState: 'connected' | 'reconnecting' | 'offline';
   activeScenario: string;
   setActiveScenario: (scenario: string) => void;
   simulate: (params?: SimulationParams) => Promise<void>;
   updateTrend: (trendId: string, updates: TrendUpdate) => Promise<void>;
   reload: () => Promise<void>;
+  reconnect: () => Promise<void>;
   loadAnalytics: () => Promise<void>;
 }
 
@@ -82,13 +84,64 @@ export default function usePulse(): UsePulseReturn {
   const [simulating, setSimulating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [backendAvailable, setBackendAvailable] = useState(true);
+  const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
   const [activeScenario, setActiveScenario] = useState('base');
   const mounted = useRef(true);
+  const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Health check with reconnect logic ───────────────────────
+  const performHealthCheck = useCallback(async () => {
+    try {
+      await api.getHealth();
+      if (mounted.current) {
+        setBackendAvailable(true);
+        setConnectionState('connected');
+        setError(null);
+      }
+    } catch (e) {
+      if (mounted.current) {
+        setBackendAvailable(false);
+        setConnectionState('offline');
+      }
+    }
+  }, []);
+
+  // ── Schedule periodic health checks ──────────────────────────
+  const scheduleHealthCheck = useCallback(() => {
+    // Clear any existing interval
+    if (healthCheckIntervalRef.current) {
+      clearInterval(healthCheckIntervalRef.current);
+    }
+
+    // Set new interval based on connection state
+    if (connectionState === 'connected') {
+      // Check every 60 seconds when connected
+      healthCheckIntervalRef.current = setInterval(() => {
+        void performHealthCheck();
+      }, 60000);
+    } else {
+      // Check every 30 seconds when offline/reconnecting
+      healthCheckIntervalRef.current = setInterval(() => {
+        void performHealthCheck();
+      }, 30000);
+    }
+  }, [connectionState, performHealthCheck]);
+
+  // ── Update schedule when connection state changes ────────────
+  useEffect(() => {
+    scheduleHealthCheck();
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, [scheduleHealthCheck]);
 
   // ── Initial load with graceful degradation ─────────────────
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setConnectionState('reconnecting');
     try {
       const [h, t, f, sc, d, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
@@ -102,6 +155,7 @@ export default function usePulse(): UsePulseReturn {
       if (!mounted.current) return;
 
       setBackendAvailable(true);
+      setConnectionState('connected');
       setHealth(h);
       setTrends(Array.isArray(t) ? t : []);
 
@@ -144,6 +198,7 @@ export default function usePulse(): UsePulseReturn {
     } catch (e) {
       if (mounted.current) {
         setBackendAvailable(false);
+        setConnectionState('offline');
         setHealth({ status: 'offline', version: 'mock' });
         setSimulation(generateMockSimulation());
         setError(`Backend unavailable. Using mock data. ${(e as Error).message}`);
@@ -217,11 +272,17 @@ export default function usePulse(): UsePulseReturn {
     }
   }, [backendAvailable]);
 
+  // ── Explicit reconnect function ──────────────────────────────
+  const reconnect = useCallback(async () => {
+    setConnectionState('reconnecting');
+    await loadAll();
+  }, [loadAll]);
+
   return {
     health, trends, forces, simulation, scenarios, dag, config,
     analytics, aiSuggestions, triggers,
-    loading, simulating, error, backendAvailable,
+    loading, simulating, error, backendAvailable, connectionState,
     activeScenario, setActiveScenario,
-    simulate, updateTrend, reload: loadAll, loadAnalytics,
+    simulate, updateTrend, reload: loadAll, reconnect, loadAnalytics,
   };
 }

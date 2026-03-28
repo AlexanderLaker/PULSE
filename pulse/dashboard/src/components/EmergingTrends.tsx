@@ -45,6 +45,7 @@ interface EmergingTrend {
 
 interface EmergingTrendsProps {
   onAddTrend: (trend: EmergingTrend) => void;
+  userRole?: string;
 }
 
 // ─── Source Icons ─────────────────────────────────────────────────────────
@@ -246,9 +247,10 @@ interface EmergingTrendCardProps {
   trend: EmergingTrend;
   onAdd: () => void;
   onDismiss: () => void;
+  isAdmin?: boolean;
 }
 
-const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss }) => {
+const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss, isAdmin = false }) => {
   const [expanded, setExpanded] = useState(false);
   const trendColor = trend.direction === 'Expansion' ? T.green : T.red;
   const isActioned = trend.status === 'added' || trend.status === 'dismissed';
@@ -492,7 +494,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss
                 </div>
 
                 {/* Actions */}
-                {!isActioned && (
+                {!isActioned && isAdmin && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -547,7 +549,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss
 
 // ─── EmergingTrends Component ─────────────────────────────────────────────
 
-const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend }) => {
+const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewer' }) => {
   const [emergingTrends, setEmergingTrends] = useState<EmergingTrend[]>(() => generateMockEmergingTrends());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [forceFilter, setForceFilter] = useState<string>('All');
@@ -803,6 +805,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend }) => {
               trend={trend}
               onAdd={() => handleAddTrend(trend)}
               onDismiss={() => handleDismiss(trend.id)}
+              isAdmin={userRole === 'admin'}
             />
           ))
         )}

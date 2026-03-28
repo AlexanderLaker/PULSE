@@ -370,6 +370,24 @@ def init_db() -> None:
             )
         """)
 
+        # ── Session snapshots (permanent history) ────────────────────
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS session_snapshots (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                scenario TEXT DEFAULT 'Base Case',
+                shifts TEXT NOT NULL,
+                trends TEXT,
+                trend_count INTEGER DEFAULT 0,
+                net_shift REAL DEFAULT 0,
+                notes TEXT,
+                created_by TEXT DEFAULT 'system',
+                model_version TEXT,
+                iterations INTEGER
+            )
+        """)
+
         # ── Indexes ──────────────────────────────────────────────────
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_source ON causal_edges(source_force)")
@@ -378,6 +396,7 @@ def init_db() -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_delphi_rounds_session ON delphi_rounds(session_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
 
         conn.commit()
         logger.info(f"Database initialized (mode: {'postgres' if USE_POSTGRES else 'sqlite'})")
@@ -855,7 +874,7 @@ def get_db_stats() -> Dict[str, int]:
         tables = [
             "trends", "causal_edges", "competitors", "simulation_runs",
             "backtest_results", "delphi_rounds", "triggers", "ai_suggestions",
-            "audit_log", "users", "delphi_sessions",
+            "audit_log", "users", "delphi_sessions", "session_snapshots",
         ]
 
         stats = {}

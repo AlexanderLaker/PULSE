@@ -347,17 +347,55 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
 
               return (
                 <g key={`group-${cat}`}>
-                  {/* Confidence band (p10 to p90) as filled area */}
+                  {/* Lower bound (invisible base for stacking) */}
                   <Area
                     type="monotone"
-                    dataKey={`${cat}_p90`}
-                    fill={`url(#gradArea-${cat})`}
+                    dataKey={`${cat}_p10`}
+                    stackId={`band-${cat}`}
+                    fill="transparent"
                     stroke="none"
                     isAnimationActive={true}
                     dot={false}
                   />
-
-                  {/* Median line */}
+                  {/* Upper bound minus lower = visible band between p10 and p90 */}
+                  <Area
+                    type="monotone"
+                    dataKey={(d: Record<string, number>) => {
+                      const p90 = d[`${cat}_p90`] || 0;
+                      const p10 = d[`${cat}_p10`] || 0;
+                      return p90 - p10;
+                    }}
+                    stackId={`band-${cat}`}
+                    fill={color}
+                    fillOpacity={0.12}
+                    stroke="none"
+                    isAnimationActive={true}
+                    dot={false}
+                    name={`${catLabel} CI`}
+                  />
+                  {/* p10 dashed line */}
+                  <Line
+                    type="monotone"
+                    dataKey={`${cat}_p10`}
+                    stroke={color}
+                    strokeWidth={1}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    isAnimationActive={true}
+                    legendType="none"
+                  />
+                  {/* p90 dashed line */}
+                  <Line
+                    type="monotone"
+                    dataKey={`${cat}_p90`}
+                    stroke={color}
+                    strokeWidth={1}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    isAnimationActive={true}
+                    legendType="none"
+                  />
+                  {/* Median line (solid) */}
                   <Line
                     type="monotone"
                     dataKey={`${cat}_median`}

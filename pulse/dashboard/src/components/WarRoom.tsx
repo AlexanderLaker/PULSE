@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
   Brain, AlertTriangle, FileDown, Settings, X, RefreshCw, Users,
+  Presentation,
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
@@ -35,6 +36,7 @@ import AllocationChart from './AllocationChart';
 import TrendExplorer from './TrendExplorer';
 import EmergingTrends from './EmergingTrends';
 import CategoryDetailPanel from './CategoryDetailPanel';
+import CategoryDeepDive from './CategoryDeepDive';
 
 // Extracted components
 import ScenarioSelectorPanel from './ScenarioSelectorPanel';
@@ -43,6 +45,8 @@ import SettingsPanel from './SettingsPanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import AIInsightsBar from './AIInsightsBar';
 import DelphiPanel from './DelphiPanel';
+import SessionSnapshots from './SessionSnapshots';
+import ExecutiveBriefing from './ExecutiveBriefing';
 
 // ─── Type Definitions ────────────────────────────────────────────
 
@@ -577,10 +581,13 @@ export default function WarRoom(): React.ReactNode {
   // Local state
   const [activeView, setActiveView] = useState<'overview' | 'trends'>('overview');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+  const [deepDiveCategory, setDeepDiveCategory] = useState<string | null>(null);
   const [shockedForce, setShockedForce] = useState<ForceName | null>(null);
   const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
   const [showDelphi, setShowDelphi] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSnapshots, setShowSnapshots] = useState<boolean>(false);
+  const [showBriefing, setShowBriefing] = useState<boolean>(false);
 
   // Mock data fallback for simulation/scenarios — stable across renders
   const [mockData, setMockData] = useState(() => generateMockData());
@@ -705,6 +712,40 @@ export default function WarRoom(): React.ReactNode {
   const handleExportPDF = async (): Promise<void> => {
     // Placeholder for PDF export (would require PDF library)
     console.log('PDF export not yet implemented');
+  };
+
+  const handleExportPowerPoint = async (): Promise<void> => {
+    // Generate PowerPoint presentation via API
+    try {
+      const response = await fetch('/api/v1/export/pptx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'PULSE_War_Room.pptx';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PowerPoint export failed:', err);
+      alert('PowerPoint export failed. Please check the backend.');
+    }
   };
 
   const handleRefresh = (): void => {
@@ -957,6 +998,50 @@ export default function WarRoom(): React.ReactNode {
               <Users size={16} />
             </motion.button>
 
+            {/* Session History Button */}
+            <motion.button
+              onClick={() => setShowSnapshots(!showSnapshots)}
+              whileHover={{ background: T.bg3 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                border: `1px solid ${showSnapshots ? T.accent : T.border}`,
+                background: showSnapshots ? T.accentDim : 'transparent',
+                color: showSnapshots ? T.accent : T.text2,
+                cursor: 'pointer',
+              } as React.CSSProperties}
+              title="Session History"
+            >
+              <Clock size={16} />
+            </motion.button>
+
+            {/* Executive Briefing Button */}
+            <motion.button
+              onClick={() => setShowBriefing(true)}
+              whileHover={{ background: T.bg3 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                border: `1px solid ${T.border}`,
+                background: 'transparent',
+                color: T.text2,
+                cursor: 'pointer',
+              } as React.CSSProperties}
+              title="Executive Briefing"
+            >
+              <Presentation size={16} />
+            </motion.button>
+
             {/* Settings Button */}
             <motion.button
               onClick={() => setShowSettings(!showSettings)}
@@ -1048,6 +1133,7 @@ export default function WarRoom(): React.ReactNode {
                 shifts={data.shifts}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
+                onDoubleClickCategory={setDeepDiveCategory}
               />
               </div>
               <div data-onboarding="timeline">
@@ -1383,11 +1469,50 @@ export default function WarRoom(): React.ReactNode {
                 onExcel={handleExportExcel}
                 onPowerBI={handleExportPowerBI}
                 onPDF={handleExportPDF}
+                onPowerPoint={handleExportPowerPoint}
                 onRefresh={handleRefresh}
-                modelAccuracy={data.convergence?.backtesting_accuracy || 0.73}
+                modelAccuracy={data.convergence?.backtestingAccuracy || 0.73}
               />
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Category Deep Dive Modal */}
+      <AnimatePresence>
+        {deepDiveCategory && (
+          <CategoryDeepDive
+            categoryId={deepDiveCategory}
+            shifts={data.shifts}
+            trends={data.trends}
+            forceContributions={data.forceContributions}
+            allocation={data.allocation}
+            onClose={() => setDeepDiveCategory(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Session Snapshots Panel */}
+      <AnimatePresence>
+        {showSnapshots && (
+          <SessionSnapshots
+            currentShifts={data.shifts}
+            currentTrends={data.trends}
+            onClose={() => setShowSnapshots(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Executive Briefing Modal */}
+      <AnimatePresence>
+        {showBriefing && (
+          <ExecutiveBriefing
+            shifts={data.shifts}
+            trends={data.trends}
+            convergence={data.convergence}
+            allocation={data.allocation}
+            onClose={() => setShowBriefing(false)}
+          />
         )}
       </AnimatePresence>
     </div>

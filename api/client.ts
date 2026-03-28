@@ -30,15 +30,25 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: string };
-    throw new ApiError(res.status, err.detail ?? `API ${res.status}`);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      ...options,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: string };
+      throw new ApiError(res.status, err.detail ?? `API ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new ApiError(0, 'Backend unavailable or network error');
+    }
+    throw error;
   }
-  return res.json() as Promise<T>;
 }
 
 // ── Health & Config ──────────────────────────────────────────────

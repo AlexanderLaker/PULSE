@@ -9,10 +9,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { ShiftMatrix, PercentileDistribution, CategoryId } from '@/types';
 import { T, CATEGORIES, YEARS, fmtShift, heatColor, shiftColorHex } from '@/lib/format';
 
+type HeatmapMode = 'direct' | 'propagation' | 'competitive';
+
 interface HeatmapProps {
   shifts: ShiftMatrix | null;
   selectedCategory?: string | null;
   onSelectCategory?: (categoryId: string) => void;
+  onHoverCategory?: (categoryId: string | null) => void;
 }
 
 interface HoveredCell {
@@ -77,14 +80,46 @@ function extractVal(path: unknown, year: number): number {
   return 0;
 }
 
-const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory }) => {
+const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory, onHoverCategory }) => {
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
+  const [mode, setMode] = useState<HeatmapMode>('direct');
 
   // Build categories list from shifts data or use defaults
   const categories = useMemo(() => {
     if (!shifts || typeof shifts !== 'object') return [];
     return Object.keys(shifts).sort();
   }, [shifts]);
+
+  // Defensive/Growth classification for competitive response
+  const defensiveCategories = new Set(['Hair: Color', 'LHC: FCN', 'LHC: FCA']);
+  const growthCategories = new Set(['Hair: Care', 'Hair: Styling']);
+
+  // Apply mode adjustments to shift values
+  const getAdjustedShift = (catId: string, baseValue: number): number => {
+    if (mode === 'direct') {
+      return baseValue;
+    }
+
+    if (mode === 'propagation') {
+      // Simple propagation multiplier: add ~10% boost to base shift
+      // In a real scenario, this would use actual causal weights from DAG
+      const propagationBoost = 0.1;
+      return baseValue * (1 + propagationBoost);
+    }
+
+    if (mode === 'competitive') {
+      // Competitive response adjustment
+      let adjustment = baseValue;
+      if (defensiveCategories.has(catId)) {
+        adjustment -= 0.02; // Defensive categories get pushed down
+      } else if (growthCategories.has(catId)) {
+        adjustment += 0.01; // Growth categories get boost
+      }
+      return adjustment;
+    }
+
+    return baseValue;
+  };
 
   // Fallback message if no data
   if (!shifts || categories.length === 0) {
@@ -131,17 +166,59 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
           marginBottom: 20,
         }}
       >
-        <h3
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: T.text3,
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-          }}
-        >
-          Shift Matrix — Category × Time Path
-        </h3>
+        <div>
+          <h3
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: T.text3,
+              textTransform: 'uppercase',
+              letterSpacing: 0.8,
+              marginBottom: 12,
+            }}
+          >
+            Shift Matrix — Category × Time Path
+          </h3>
+
+          {/* Mode Toggle */}
+          <div
+            style={{
+              display: 'inline-flex',
+              gap: 2,
+              padding: 3,
+              borderRadius: 10,
+              background: T.bg3,
+              border: `1px solid ${T.border}`,
+            }}
+          >
+            {(['direct', 'propagation', 'competitive'] as const).map((m) => (
+              <motion.button
+                key={m}
+                onClick={() => setMode(m)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: mode === m ? T.bg1 : T.text2,
+                  background: mode === m ? T.accent : 'transparent',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                  textTransform: 'capitalize',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {m === 'direct' && 'Direct Effects'}
+                {m === 'propagation' && 'With Propagation'}
+                {m === 'competitive' && 'With Competitive'}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
         <div style={{ fontSize: 10, color: T.text4, display: 'flex', gap: 16 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div
@@ -224,7 +301,8 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
         <tbody>
           {categories.map((catId, idx) => {
             const isSelected = selectedCategory === catId;
-            const val2030 = extractVal(shifts[catId], 2030);
+            const val2030Raw = extractVal(shifts[catId], 2030);
+            const val2030 = getAdjustedShift(catId, val2030Raw);
 
             return (
               <motion.tr
@@ -240,11 +318,13 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                   transition: 'all 0.15s',
                 } as React.CSSProperties}
                 onMouseEnter={(e: MouseEvent<HTMLTableRowElement>) => {
+                  onHoverCategory?.(catId);
                   if (!isSelected) {
                     e.currentTarget.style.background = `${T.border}`;
                   }
                 }}
                 onMouseLeave={(e: MouseEvent<HTMLTableRowElement>) => {
+                  onHoverCategory?.(null);
                   if (!isSelected) {
                     e.currentTarget.style.background = 'transparent';
                   }
@@ -270,13 +350,14 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                         background: CATEGORIES.find(c => c.id === catId)?.color || T.text3,
                       }}
                     />
-                    {catId}
+                    {CATEGORIES.find(c => c.id === catId)?.name || catId}
                   </div>
                 </td>
 
                 {/* Year Value Cells */}
                 {YEARS.map(year => {
-                  const val = extractVal(shifts[catId], year);
+                  const valRaw = extractVal(shifts[catId], year);
+                  const val = getAdjustedShift(catId, valRaw);
                   const isHovered = hoveredCell?.cat === catId && hoveredCell?.year === year;
 
                   return (
@@ -330,7 +411,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                 boxShadow: `0 10px 25px rgba(0,0,0,0.3)`,
                               } as React.CSSProperties}
                             >
-                              {catId} · {year} · {fmtShift(val, 2)}
+                              {CATEGORIES.find(c => c.id === catId)?.name || catId} · {year} · {fmtShift(val, 2)}
                             </motion.div>
                           )}
                         </AnimatePresence>

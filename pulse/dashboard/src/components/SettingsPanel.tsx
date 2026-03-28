@@ -14,6 +14,7 @@ interface SettingsPanelProps {
   onExcel?: () => Promise<void>;
   onPowerBI?: () => Promise<void>;
   onPDF?: () => Promise<void>;
+  onPowerPoint?: () => Promise<void>;
   onRefresh?: () => void;
   backendAvailable?: boolean;
   modelAccuracy?: number;
@@ -25,6 +26,7 @@ const SettingsPanel: FC<SettingsPanelProps> = ({
   onExcel = () => Promise.resolve(),
   onPowerBI = () => Promise.resolve(),
   onPDF = () => Promise.resolve(),
+  onPowerPoint = () => Promise.resolve(),
   onRefresh = () => {},
   backendAvailable = true,
   modelAccuracy = 0.73,
@@ -32,12 +34,13 @@ const SettingsPanel: FC<SettingsPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [exporting, setExporting] = useState<boolean>(false);
 
-  const handleExport = async (type: 'excel' | 'powerbi' | 'pdf'): Promise<void> => {
+  const handleExport = async (type: 'excel' | 'powerbi' | 'pdf' | 'pptx'): Promise<void> => {
     setExporting(true);
     try {
       if (type === 'excel') await onExcel();
       else if (type === 'powerbi') await onPowerBI();
       else if (type === 'pdf') await onPDF();
+      else if (type === 'pptx') await onPowerPoint();
     } finally {
       setExporting(false);
     }
@@ -299,6 +302,56 @@ const SettingsPanel: FC<SettingsPanelProps> = ({
                     }}
                   >
                     To semantic model (requires Azure)
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleExport('pptx')}
+                disabled={exporting}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 16px',
+                  backgroundColor: T.bg3,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 8,
+                  cursor: exporting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease',
+                  opacity: exporting ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!exporting) {
+                    e.currentTarget.style.backgroundColor = T.bg4;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!exporting) {
+                    e.currentTarget.style.backgroundColor = T.bg3;
+                  }
+                }}
+              >
+                <Download size={16} color={T.amber} />
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: T.text,
+                      margin: 0,
+                    }}
+                  >
+                    PowerPoint Deck
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: T.text3,
+                      margin: 0,
+                    }}
+                  >
+                    Executive slides with heatmaps &amp; trends
                   </p>
                 </div>
               </button>

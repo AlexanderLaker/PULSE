@@ -240,61 +240,94 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   {trend.strategic_implication || '(No strategic implication documented)'}
                 </div>
               </div>
+
+              {/* PULSE Analysis */}
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '6px', color: T.accent, display: 'flex', alignItems: 'center', gap: '4px', letterSpacing: '0.5px' }}>
+                  <span style={{ fontSize: '12px' }}>✨</span> PULSE ANALYSIS
+                </div>
+                <div style={{
+                  padding: '12px 14px',
+                  background: `${T.accent}06`,
+                  borderRadius: '8px',
+                  border: `1px solid ${T.accent}15`,
+                }}>
+                  <p style={{ fontSize: '11px', lineHeight: 1.6, color: T.text2, margin: 0 }}>
+                    {trend.strategic_implication
+                      ? `This trend has a weighted score of ${((trend.impact || 3) * (trend.probability || 3) * (trend.direction === 'Expansion' ? 1 : -1) / 25 * 100).toFixed(1)}% normalized impact. ${trend.direction === 'Expansion' ? 'Expansion' : 'Contraction'} force with ${trend.impact && trend.impact >= 4 ? 'high' : trend.impact && trend.impact >= 3 ? 'moderate' : 'low'} impact (${trend.impact || '—'}/5) and ${trend.probability && trend.probability >= 4 ? 'high' : trend.probability && trend.probability >= 3 ? 'moderate' : 'low'} probability (${trend.probability || '—'}/5). ${trend.strategic_implication}`
+                      : `${trend.direction} trend in ${trend.force} force. Impact: ${trend.impact || '—'}/5, Probability: ${trend.probability || '—'}/5. Weighted score: ${((trend.impact || 3) * (trend.probability || 3) * (trend.direction === 'Expansion' ? 1 : -1) / 25 * 100).toFixed(1)}%.`
+                    }
+                  </p>
+                </div>
+              </div>
+
               {/* Sources & Evidence */}
               {trend.sources && trend.sources.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '8px', color: T.text2 }}>
-                    SOURCES & EVIDENCE
+                  <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '8px', color: T.text2, letterSpacing: '0.5px' }}>
+                    SOURCES ({trend.sources.length})
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {trend.sources.map((src, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '10px 14px',
-                          background: T.bg3,
-                          borderRadius: '8px',
-                          border: `1px solid ${T.border1}`,
-                        }}
-                      >
-                        {src.url ? (
-                          <a
-                            href={src.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              color: T.accent,
-                              textDecoration: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-                            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
-                          >
-                            {src.title || 'Source'}
-                            <span style={{ fontSize: '9px', opacity: 0.6 }}>↗</span>
-                          </a>
-                        ) : (
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: T.text }}>
-                            {src.title || 'Source'}
-                          </span>
-                        )}
-                        {src.data && (
-                          <div style={{
-                            fontSize: '10px',
-                            color: T.text2,
-                            marginTop: '4px',
-                            fontFamily: T.mono,
-                            lineHeight: 1.4,
-                          }}>
-                            {src.data}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {trend.sources.map((src, idx) => {
+                      const isValidUrl = src.url && (src.url.startsWith('http://') || src.url.startsWith('https://'));
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: T.bg3 + '60',
+                            borderRadius: '6px',
+                            border: `1px solid ${T.border1}`,
+                          }}
+                        >
+                          <span style={{ fontSize: '12px', flexShrink: 0 }}>📄</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {isValidUrl ? (
+                              <a
+                                href={src.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  color: T.accent,
+                                  textDecoration: 'none',
+                                  display: 'block',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+                                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                              >
+                                {src.title || src.url} ↗
+                              </a>
+                            ) : (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: T.text }}>
+                                {src.title || 'Source'}
+                              </span>
+                            )}
+                            {src.data && (
+                              <div style={{
+                                fontSize: '10px',
+                                color: T.text3,
+                                marginTop: '2px',
+                                fontFamily: T.mono,
+                                lineHeight: 1.4,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {src.data}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
