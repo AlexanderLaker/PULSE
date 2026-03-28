@@ -179,7 +179,7 @@ function generateInitialData(): InitialDataResult {
 export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
-    simulate,
+    simulate, simulation,
   } = usePulse();
 
   // Local state
@@ -197,6 +197,45 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
   const [initialData, setInitialData] = useState(() => generateInitialData());
   const data = initialData;
   const scenarioOptions = initialData.scenarios;
+
+  // ─── Merge backend simulation results into data when available ──────
+  useEffect(() => {
+    if (!simulation || !simulation.shift_matrix) return;
+
+    // Map backend shift_matrix keys to frontend category IDs
+    const normCatId = (k: string): string =>
+      k.toLowerCase().replace(/^(hair|lhc):\s*/, (_, g: string) => g + '_').replace(/\s+/g, '_');
+
+    const newShifts: typeof data.shifts = {};
+    for (const [catKey, yearData] of Object.entries(simulation.shift_matrix)) {
+      const catId = normCatId(catKey);
+      newShifts[catId] = {} as any;
+      for (const [year, pcts] of Object.entries(yearData as Record<string, any>)) {
+        newShifts[catId][year] = {
+          median: pcts.median ?? 0,
+          p10: pcts.p10 ?? 0,
+          p25: pcts.p25 ?? 0,
+          p75: pcts.p75 ?? 0,
+          p90: pcts.p90 ?? 0,
+        };
+      }
+    }
+
+    setInitialData(prev => ({
+      ...prev,
+      shifts: { ...prev.shifts, ...newShifts },
+      convergence: {
+        r_hat: simulation.convergence?.r_hat ?? 0,
+        converged: simulation.convergence?.converged ?? true,
+        iterations: simulation.iterations ?? 5000,
+        backtestingAccuracy: simulation.convergence?.backtesting_accuracy ?? 0,
+      },
+      allocation: simulation.allocation ? {
+        ...prev.allocation,
+        ...simulation.allocation,
+      } : prev.allocation,
+    }));
+  }, [simulation]);
 
   // Fetch trends from API
   useEffect(() => {
@@ -798,11 +837,38 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
 
             {/* Emerging Trends — AI-curated candidates below */}
             <EmergingTrends
-              onAddTrend={(emergingTrend) => {
-                // When user adds an emerging trend, it becomes a relevant trend
-                // In production this calls POST /api/v1/trends
-                console.log('Added emerging trend to relevant trends:', emergingTrend.name);
+              onAddTrend={async (emergingTrend) => {
+                try {
+                  const res = await fetch('/api/v1/trends', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      force: emergingTrend.force,
+                      name: emergingTrend.name,
+                      description: emergingTrend.description,
+                      direction: emergingTrend.direction,
+                      impact: emergingTrend.suggested_impact,
+                      probability: emergingTrend.suggested_probability,
+                      category_exposure: emergingTrend.category_mapping,
+                      strategic_implication: emergingTrend.reasoning,
+                      data_source: (emergingTrend.sources || []).map((s: any) => s.api || s.title).join(', '),
+                      confidence: emergingTrend.relevance_score >= 85 ? 'High' : emergingTrend.relevance_score >= 70 ? 'Medium' : 'Low',
+                      ai_suggested: true,
+                    }),
+                  });
+                  if (res.ok) {
+                    // Also update scanned_trends status to 'added'
+                    fetch('/api/v1/scanner/update-trend-status', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ trend_id: emergingTrend.id, status: 'added' }),
+                    }).catch(() => {});
+                  }
+                } catch (err) {
+                  console.error('Failed to add trend:', err);
+                }
               }}
+              userRole={isAdmin ? 'admin' : 'viewer'}
             />
           </motion.div>
         )}

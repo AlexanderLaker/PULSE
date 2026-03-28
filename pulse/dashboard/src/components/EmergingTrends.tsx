@@ -672,6 +672,12 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
       t.id === trendId ? { ...t, status: 'dismissed' as const } : t
     ));
     setSelectedIds(prev => { const n = new Set(prev); n.delete(trendId); return n; });
+    // Persist dismiss status to database
+    fetch('/api/v1/scanner/update-trend-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trend_id: trendId, status: 'dismissed' }),
+    }).catch(() => {});
   }, []);
 
   // ─── Filter & sort ────────────────────────────────────────────────────

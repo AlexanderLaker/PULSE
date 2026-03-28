@@ -74,26 +74,18 @@ _state_lock = asyncio.Lock()  # Protect concurrent mutations
 def _load_trend_database() -> TrendDatabase:
     """Load trends from the Postgres/SQLite database into a TrendDatabase object.
 
-    This bridges the persistent database (where trends are added via the scanner
-    or the API) with the in-memory TrendDatabase that the simulation engine expects.
-    Falls back to seed data if no trends exist in the database yet.
+    No seed/built-in trends — all trends come from API sources via the scanner.
+    Users scan sources, review trends, add them to the model, then simulate.
     """
     from pulse.database import load_trends
     db_trends = load_trends()
-    if db_trends:
-        return TrendDatabase(
-            trends=db_trends,
-            categories=CATEGORIES,
-            forces=FORCES,
-            source_file="database",
-        )
-    # No trends in DB yet — seed with built-in data and persist
-    from pulse.api.seed_data import create_seed_database
-    from pulse.database import save_trends
-    seed_db = create_seed_database()
-    save_trends(seed_db.trends)
-    logger.info(f"Seeded database with {seed_db.trend_count} built-in trends")
-    return seed_db
+    logger.info(f"Loaded {len(db_trends)} trends from database")
+    return TrendDatabase(
+        trends=db_trends,
+        categories=CATEGORIES,
+        forces=FORCES,
+        source_file="database",
+    )
 
 
 # ── Pydantic models ────────────────────────────────────────────────
@@ -112,13 +104,20 @@ class SimulationRequest(BaseModel):
         return v
 
 class TrendCreate(BaseModel):
-    """Create a new trend."""
+    """Create a new trend (from scanner 'Add to Model' or manual entry)."""
     force: str
     name: str
     description: str = ""
     direction: str = "Expansion"
     impact: int = Field(3, ge=1, le=5)
     probability: int = Field(3, ge=1, le=5)
+    category_exposure: Optional[dict] = None   # {"Hair: Color": 3, ...}
+    vc_exposure: Optional[dict] = None
+    regional_exposure: Optional[dict] = None
+    strategic_implication: str = ""
+    data_source: str = ""
+    confidence: str = "Medium"
+    ai_suggested: bool = True
 
 class TrendUpdate(BaseModel):
     impact: Optional[int] = Field(None, ge=1, le=5)
@@ -217,15 +216,8 @@ def create_app(args=None) -> FastAPI:
                 except Exception as e:
                     logger.error(f"Failed to load trends: {e}")
 
-        # Run initial simulation outside the lock to avoid blocking startup
-        if _state["db"] and not _state.get("mc_result"):
-            try:
-                logger.info("Running initial simulation (1000 iterations)...")
-                await _run_simulation("base", 1000)
-                logger.info("Initial simulation complete — backend ready")
-            except Exception as e:
-                logger.error(f"Initial simulation failed: {e}")
-
+        # No auto-simulation on startup — admin triggers it manually
+        # after trends are added from the scanner
         yield
 
         # ─── Shutdown ───
@@ -296,11 +288,10 @@ def create_app(args=None) -> FastAPI:
                 from pulse.api.auth import ensure_auth_tables
                 ensure_auth_tables()
 
-                # Load trends from database (seeds if empty)
+                # Load trends from database (empty until user scans + adds)
                 if not _state["db"]:
                     try:
                         _state["db"] = _load_trend_database()
-                        logger.info(f"Loaded {_state['db'].trend_count} trends from database")
                     except Exception as e:
                         logger.error(f"Failed to load trends: {e}")
 
@@ -361,16 +352,54 @@ def create_app(args=None) -> FastAPI:
         if req.force not in FORCES:
             raise HTTPException(422, f"Invalid force: {req.force}. Must be one of {FORCES}")
 
-        # Create new trend (simplified; full implementation would generate ID, etc.)
-        trend_id = f"{req.force.lower().replace(' ', '_')}_{len(db.trends)}"
+        import uuid
+        trend_id = f"{req.force.lower().replace(' ', '_')}_{uuid.uuid4().hex[:8]}"
 
-        # In real implementation, would create and persist the trend
-        # For now, just validate and return success
+        # Build category exposure — if not provided, assign moderate exposure
+        # to all categories (will be refined by user later)
+        cat_exp = req.category_exposure or {c: 3 for c in CATEGORIES}
+        vc_exp = req.vc_exposure or {}
+        reg_exp = req.regional_exposure or {}
+
+        new_trend = Trend(
+            id=trend_id,
+            force=req.force,
+            name=req.name,
+            description=req.description,
+            direction=req.direction,
+            impact=req.impact,
+            probability=req.probability,
+            start_year=2026,
+            strategic_implication=req.strategic_implication,
+            category_exposure=cat_exp,
+            vc_exposure=vc_exp,
+            regional_exposure=reg_exp,
+            data_source=req.data_source,
+            source_type="scanner",
+            confidence=req.confidence,
+            ai_suggested=req.ai_suggested,
+        )
+
+        # Persist to database
+        from pulse.database import save_trends
+        save_trends([new_trend])
+
+        # Add to in-memory TrendDatabase
+        db.trends.append(new_trend)
+
+        # Log to audit trail
+        try:
+            from pulse.database import log_audit
+            log_audit("trend_added", "trend", trend_id, new_value=req.name, reason=f"Added from scanner: {req.force}")
+        except Exception:
+            pass
+
         return {
             "status": "created",
             "trend_id": trend_id,
             "force": req.force,
             "name": req.name,
+            "trend_count": db.trend_count,
         }
 
     @app.get("/api/v1/trends/{trend_id}")
