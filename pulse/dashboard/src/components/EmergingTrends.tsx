@@ -248,10 +248,11 @@ interface EmergingTrendCardProps {
   onAdd: () => void;
   onDismiss: () => void;
   isAdmin?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss, isAdmin = false }) => {
-  const [expanded, setExpanded] = useState(false);
+const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss, isAdmin = false, expanded, onToggle }) => {
   const trendColor = trend.direction === 'Expansion' ? T.green : T.red;
   const isActioned = trend.status === 'added' || trend.status === 'dismissed';
   const relevanceColor = trend.relevance_score >= 85 ? T.green :
@@ -283,7 +284,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({ trend, onAdd, onDismiss
           borderRadius: expanded ? 0 : '8px',
           transition: 'background-color 100ms',
         }}
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         onMouseEnter={(e) => { if (!expanded) e.currentTarget.style.backgroundColor = T.bg1; }}
         onMouseLeave={(e) => { if (!expanded) e.currentTarget.style.backgroundColor = 'transparent'; }}
       >
@@ -555,6 +556,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
   const [forceFilter, setForceFilter] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'impact'>('relevance');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [expandedTrendId, setExpandedTrendId] = useState<string | null>(null);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -806,6 +808,8 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
               onAdd={() => handleAddTrend(trend)}
               onDismiss={() => handleDismiss(trend.id)}
               isAdmin={userRole === 'admin'}
+              expanded={expandedTrendId === trend.id}
+              onToggle={() => setExpandedTrendId(expandedTrendId === trend.id ? null : trend.id)}
             />
           ))
         )}

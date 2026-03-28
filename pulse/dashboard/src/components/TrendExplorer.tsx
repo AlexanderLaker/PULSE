@@ -8,7 +8,10 @@
  */
 import React, { useState, useMemo, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import {
+  ChevronDown, ChevronUp, Search, Sparkles, ExternalLink,
+  Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle,
+} from 'lucide-react';
 import { T, FORCES, FORCE_COLORS, FORCE_ICONS, CATEGORIES, fmtShift, fmtPct, shortCat, shiftColorHex } from '../lib/format';
 import type { ForceName, CategoryId } from '../types';
 
@@ -42,6 +45,21 @@ interface TrendExplorerProps {
   onForceFilter: (force: string) => void;
   onUpdateTrend: (id: string, updates: Partial<TrendData>) => void;
 }
+
+// ─── Source Icons ─────────────────────────────────────────────────────────
+
+const SOURCE_ICONS: Record<string, React.ReactNode> = {
+  GDELT: <Globe size={10} />,
+  GNews: <Newspaper size={10} />,
+  RSS: <FileText size={10} />,
+  'Google Trends': <TrendingUp size={10} />,
+  ECHA: <AlertTriangle size={10} />,
+  'EUR-Lex': <FileText size={10} />,
+  'SEC EDGAR': <BarChart3 size={10} />,
+  Reddit: <Globe size={10} />,
+  YouTube: <Globe size={10} />,
+  'Semantic Scholar': <FileText size={10} />,
+};
 
 // ─── DotBar ───────────────────────────────────────────────────────────────
 
@@ -457,82 +475,100 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
           }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-            {/* Left: Description, implication, metadata */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Left: Description → PULSE Analysis → Sources (matches EmergingTrends structure) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* 1. Description */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '6px', color: T.text2 }}>
-                  EVIDENCE & DESCRIPTION
+                <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px', letterSpacing: '0.5px' }}>
+                  DESCRIPTION
                 </div>
-                <div style={{ fontSize: '12px', lineHeight: 1.5, color: T.text, whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
                   {trend.description || '(No description provided)'}
-                </div>
+                </p>
               </div>
+
+              {/* 2. PULSE Analysis */}
               <div>
-                <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '6px', color: T.text2 }}>
-                  STRATEGIC IMPLICATION
+                <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={10} /> PULSE ANALYSIS
                 </div>
-                <div style={{ fontSize: '12px', lineHeight: 1.5, color: T.text }}>
+                <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
                   {trend.strategic_implication || '(No strategic implication documented)'}
-                </div>
+                </p>
               </div>
-              {/* Sources & Evidence */}
+
+              {/* 3. Sources — clickable links with API icons (same style as EmergingTrends) */}
               {trend.sources && trend.sources.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '8px', color: T.text2 }}>
-                    SOURCES & EVIDENCE
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                    SOURCES ({trend.sources.length})
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {trend.sources.map((src, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '10px 14px',
-                          background: T.bg3,
-                          borderRadius: '8px',
-                          border: `1px solid ${T.border1}`,
-                        }}
-                      >
-                        {src.url ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {trend.sources.map((src, i) => {
+                      // Detect API/source type from URL domain
+                      const url = (src.url || '').toLowerCase();
+                      const apiName = url.includes('eur-lex') ? 'EUR-Lex'
+                        : url.includes('echa') ? 'ECHA'
+                        : url.includes('sec.gov') || url.includes('edgar') ? 'SEC EDGAR'
+                        : url.includes('trends.google') ? 'Google Trends'
+                        : url.includes('reddit') ? 'Reddit'
+                        : url.includes('youtube') ? 'YouTube'
+                        : url.includes('scholar') || url.includes('doi.org') || url.includes('nature.com') || url.includes('pubmed') ? 'Semantic Scholar'
+                        : url.includes('gdelt') ? 'GDELT'
+                        : url.includes('mckinsey') || url.includes('bain') || url.includes('bcg') ? 'GNews'
+                        : url.includes('grandview') || url.includes('statista') || url.includes('euromonitor') ? 'GNews'
+                        : url.includes('cosmetics') || url.includes('happi') || url.includes('retaildetail') || url.includes('grocery') || url.includes('packaging') ? 'RSS'
+                        : url.includes('environment.ec.europa') || url.includes('europa.eu') ? 'EUR-Lex'
+                        : 'GNews';
+
+                      return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                           <a
-                            href={src.url}
+                            href={src.url || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              color: T.accent,
-                              textDecoration: 'none',
-                              display: 'inline-flex',
+                              display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px',
+                              padding: '5px 8px',
+                              paddingBottom: src.data ? '2px' : '5px',
+                              borderRadius: src.data ? '4px 4px 0 0' : '4px',
+                              backgroundColor: T.bg3 + '40',
+                              textDecoration: 'none',
+                              fontSize: '10px',
+                              color: T.accent,
+                              transition: 'background-color 0.15s',
+                              pointerEvents: src.url ? 'auto' : 'none',
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-                            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = T.bg3; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = T.bg3 + '40'; }}
                           >
-                            {src.title || 'Source'}
-                            <span style={{ fontSize: '9px', opacity: 0.6 }}>↗</span>
+                            {SOURCE_ICONS[apiName] || <Globe size={9} />}
+                            <span style={{ color: T.text3, fontWeight: 500, flexShrink: 0 }}>{apiName}</span>
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.title || 'Source'}</span>
+                            {src.url && <ExternalLink size={9} style={{ flexShrink: 0, opacity: 0.5 }} />}
                           </a>
-                        ) : (
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: T.text }}>
-                            {src.title || 'Source'}
-                          </span>
-                        )}
-                        {src.data && (
-                          <div style={{
-                            fontSize: '10px',
-                            color: T.text2,
-                            marginTop: '4px',
-                            fontFamily: T.mono,
-                            lineHeight: 1.4,
-                          }}>
-                            {src.data}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          {src.data && (
+                            <div style={{
+                              padding: '3px 8px 5px 27px',
+                              borderRadius: '0 0 4px 4px',
+                              backgroundColor: T.bg3 + '40',
+                              fontSize: '9px',
+                              fontFamily: T.mono,
+                              color: T.text3,
+                              lineHeight: 1.4,
+                            }}>
+                              {src.data}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
+
               {trend.ai_suggested && (
                 <div style={{
                   display: 'inline-flex',
@@ -546,7 +582,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   color: T.purple,
                   width: 'fit-content',
                 }}>
-                  <span>✨</span> AI Suggested
+                  <Sparkles size={10} /> AI Suggested
                 </div>
               )}
             </div>
