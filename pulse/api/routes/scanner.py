@@ -137,7 +137,15 @@ async def _scan_source_inner(
     """
     Inner scan logic (now separated for timeout wrapping).
     """
+    import asyncio as _aio
+
+    def _run_sync(fn):
+        """Helper: run a synchronous function in thread executor."""
+        loop = _aio.get_event_loop()
+        return loop.run_in_executor(None, fn)
+
     try:
+        # ── Async sources (use aiohttp — can be awaited directly) ──────
         if source_name == "gdelt":
             from pulse.integrations.gdelt import GDELTClient
             client = GDELTClient()
@@ -165,14 +173,12 @@ async def _scan_source_inner(
         elif source_name == "fred":
             from pulse.integrations.fred_api import FREDClient
             client = FREDClient()
-            # FRED requires series_id, use query as ID
             results = await client.fetch_series(query, limit=limit)
             return source_name, results, None
 
         elif source_name == "google_trends":
             from pulse.integrations.google_trends import GoogleTrendsClient
             client = GoogleTrendsClient()
-            # Google Trends takes list of keywords
             keywords = query.split() if isinstance(query, str) else [query]
             results = await client.fetch_interest(keywords[:5])
             return source_name, [results] if results else [], None
@@ -180,22 +186,18 @@ async def _scan_source_inner(
         elif source_name == "world_bank":
             from pulse.integrations.world_bank import WorldBankClient
             client = WorldBankClient()
-            # World Bank works with specific indicator IDs, not free-text query
-            # Use a default indicator for FMCG-relevant data
             results = await client.fetch_indicator("NY.GDP.PCAP.CD", limit=limit)
             return source_name, results, None
 
         elif source_name == "sec_edgar":
             from pulse.integrations.sec_edgar import SECEdgarClient
             client = SECEdgarClient()
-            # SEC Edgar requires company CIK, search returns empty for free-text
             results = await client.search_filings(query, limit=limit)
             return source_name, results, None
 
         elif source_name == "open_meteo":
             from pulse.integrations.open_meteo import OpenMeteoClient
             client = OpenMeteoClient()
-            # Open-Meteo requires latitude/longitude, use default (Brussels for EU/Henkel)
             results = await client.fetch_weather(50.8503, 4.3517, days_back=30)
             return source_name, [results] if results else [], None
 
@@ -211,56 +213,68 @@ async def _scan_source_inner(
             results = await client.search_videos(query, limit=limit)
             return source_name, results, None
 
+        # ── Sync sources (use requests — must run in executor) ─────────
+
         elif source_name == "openalex":
             from pulse.integrations.openalex import OpenAlexClient
             client = OpenAlexClient()
-            # OpenAlex uses search_works() method
-            results = await client.search_works(query, limit=limit)
+            results = await _run_sync(lambda: client.search_works(query, limit=limit))
+            return source_name, results, None
+
+        elif source_name == "semantic_scholar":
+            from pulse.integrations.semantic_scholar import SemanticScholarClient
+            client = SemanticScholarClient()
+            # S2 search() already wraps sync calls in run_in_executor
+            results = await client.search(query, limit=min(limit, 10))
             return source_name, results, None
 
         elif source_name == "echa":
             from pulse.integrations.echa import ECHAClient
             client = ECHAClient()
-            # ECHA uses search_svhcs() or search_restrictions()
-            results = await client.search_svhcs(query, limit=limit)
+            # ECHA uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "eurlex":
             from pulse.integrations.eurlex import EurLexClient
             client = EurLexClient()
-            # EUR-Lex uses search() method
-            results = await client.search(query, limit=limit)
+            # EUR-Lex uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "epo_patents":
             from pulse.integrations.epo_patents import EPOPatentClient
             client = EPOPatentClient()
-            # EPO uses search_patents() method
-            results = await client.search_patents(query, limit=limit)
+            # EPO uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "beautyfeeds":
             from pulse.integrations.beautyfeeds import BeautyFeedsClient
             client = BeautyFeedsClient()
-            results = await client.fetch_all(query, limit=limit)
+            # BeautyFeeds uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "newsapi":
             from pulse.integrations.newsapi import NewsAPIClient
             client = NewsAPIClient()
-            results = await client.search(query, limit=limit)
+            # NewsAPI uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "ncbi_pubmed":
             from pulse.integrations.ncbi_pubmed import NCBIPubMedClient
             client = NCBIPubMedClient()
-            results = await client.search(query, limit=limit)
+            # PubMed uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         elif source_name == "arxiv":
             from pulse.integrations.arxiv_api import ArxivClient
             client = ArxivClient()
-            results = await client.search(query, limit=limit)
+            # arXiv uses scan_for_trends() — sync, returns PULSE-formatted trends
+            results = await _run_sync(lambda: client.scan_for_trends())
             return source_name, results, None
 
         else:
@@ -297,11 +311,18 @@ async def _run_full_scan(
         "fred", "google_trends", "world_bank", "open_meteo",
         "sec_edgar", "reddit", "youtube",
         "echa", "eurlex", "epo_patents",
-        "openalex", "newsapi", "ncbi_pubmed", "arxiv",
+        "openalex", "semantic_scholar",
+        "newsapi", "ncbi_pubmed", "arxiv",
         "beautyfeeds",
     ]
 
     sources_to_scan = sources or all_sources
+
+    # ALWAYS include academic sources (OpenAlex + Semantic Scholar) even if
+    # the user specified a subset — they provide the highest-quality trend signals
+    for required_source in ("openalex", "semantic_scholar"):
+        if required_source not in sources_to_scan:
+            sources_to_scan.append(required_source)
     results = {
         "trends": [],
         "raw": {},
@@ -352,14 +373,47 @@ async def _run_full_scan(
         results["raw"][source_name].extend(articles)
         results["trends"].extend(articles)
 
-    # Deduplicate trends by title
+    # ── Cross-source deduplication (S2 + OpenAlex + others) ──────────
+    # Deduplicate by: 1) DOI (exact), 2) normalized title (fuzzy)
+    seen_dois = set()
     seen_titles = set()
     deduplicated = []
-    for trend in results["trends"]:
+
+    def _normalize_title(t: str) -> str:
+        """Strip punctuation & lowercase for fuzzy title matching."""
+        return "".join(c for c in t.lower() if c.isalnum() or c == " ").strip()
+
+    # Prefer S2 results over OpenAlex when both have the same paper,
+    # because S2 provides TLDR summaries and citation velocity enrichment
+    academic_first = sorted(
+        results["trends"],
+        key=lambda t: (
+            1 if t.get("source") == "semantic_scholar" else
+            2 if t.get("source") == "openalex" else
+            0  # Non-academic sources always pass through
+        ),
+    )
+
+    for trend in academic_first:
+        # Check DOI dedup (exact match — most reliable)
+        doi = (
+            trend.get("doi") or
+            trend.get("url", "").replace("https://doi.org/", "") if "doi.org" in trend.get("url", "") else ""
+        )
+        if doi and doi in seen_dois:
+            continue
+        if doi:
+            seen_dois.add(doi)
+
+        # Check title dedup (normalized fuzzy match)
         title = trend.get("title", "")
-        if title and title not in seen_titles:
-            seen_titles.add(title)
-            deduplicated.append(trend)
+        norm = _normalize_title(title)
+        if norm and len(norm) > 20 and norm in seen_titles:
+            continue
+        if norm:
+            seen_titles.add(norm)
+
+        deduplicated.append(trend)
 
     results["trends"] = deduplicated[:200]  # Limit total results
     results["meta"]["completed"] = datetime.now().isoformat()
@@ -505,7 +559,8 @@ async def scanner_health() -> Dict[str, Any]:
             "fred", "google_trends", "world_bank", "open_meteo",
             "sec_edgar", "reddit", "youtube",
             "echa", "eurlex", "epo_patents",
-            "openalex", "newsapi", "ncbi_pubmed", "arxiv",
+            "openalex", "semantic_scholar",
+            "newsapi", "ncbi_pubmed", "arxiv",
             "beautyfeeds",
         ],
     }

@@ -40,7 +40,7 @@ INVITE_CODES = set(os.environ.get("PULSE_INVITE_CODES", "PULSE-2026,HENKEL-STRAT
 # Admin emails — these users are automatically assigned admin role on registration
 ADMIN_EMAILS = set(
     e.strip().lower()
-    for e in os.environ.get("PULSE_ADMIN_EMAILS", "laker.alexander@gmail.com").split(",")
+    for e in os.environ.get("PULSE_ADMIN_EMAILS", "laker.alexander@gmail.com,alexander.laker@gmx.com").split(",")
     if e.strip()
 )
 
@@ -193,6 +193,13 @@ def _seed_default_users(conn):
             "password": "pulse2026",
             "role": "admin",
         },
+        {
+            "id": "seed-admin-003",
+            "name": "Alexander Laker",
+            "email": "alexander.laker@gmx.com",
+            "password": "awseawse",
+            "role": "admin",
+        },
     ]
 
     cursor = conn.cursor()
@@ -215,6 +222,16 @@ def _seed_default_users(conn):
                 )
         except Exception as e:
             logger.debug(f"Seed user {u['email']}: {e}")
+
+    # Ensure all ADMIN_EMAILS are upgraded to admin role (even if they registered earlier as viewer)
+    for admin_email in ADMIN_EMAILS:
+        try:
+            cursor.execute(
+                f"UPDATE users SET role = 'admin' WHERE LOWER(email) = {p} AND role != 'admin'",
+                (admin_email.lower(),),
+            )
+        except Exception as e:
+            logger.debug(f"Admin upgrade for {admin_email}: {e}")
 
     conn.commit()
     logger.info("Seeded %d default users", len(default_users))
