@@ -188,16 +188,13 @@ Beyond Henkel's current 12 categories, the scan pipeline monitors adjacent marke
 | **Professional Salon Products** | Premium margin, brand halo for consumer lines | Schwarzkopf Professional already exists; consumer-professional bridge | $16B globally |
 | **Scalp Care / Trichology** | Fastest-growing hair sub-segment, medical-consumer hybrid | Natural extension of Hair Care; peptide/biotech innovation pipeline | $4B, growing 8% CAGR |
 | **Men's Grooming** | Underserved by Henkel relative to P&G (Old Spice) and Unilever (Dove Men) | Hair/body infrastructure; brand equity in Taft/Schauma | $78B globally |
-| **Oral Care** | High-margin, high-frequency, similar retail shelf dynamics | Retail distribution muscle; chemistry formulation expertise | $53B globally |
 | **Skin Care** | Largest beauty category; Henkel under-indexed | Consumer brand awareness (Dial, Fa); limited but could be adjacency play | $180B globally |
 
 ### Medium-Adjacency Monitoring Targets
 
 | Adjacent Category | Why It Matters | Monitoring Signal |
 |-------------------|---------------|------------------|
-| **Pet Care (Grooming)** | Fastest-growing adjacent; "humanization" of pets drives premium | PubMed papers on pet dermatology; Google Trends for "dog shampoo" |
 | **Industrial & Institutional Cleaning** | Henkel Adhesive Technologies already in B2B; LHC extension possible | SEC filings for Ecolab, Diversey; EUR-Lex for workplace hygiene regs |
-| **Fragrance & Air Care** | Natural extension of fabric care; S.C. Johnson vulnerable | Consumer trends for home fragrance; RSS feeds for air care innovation |
 | **Water Treatment (Consumer)** | Water scarcity drives home purification; links to sustainability narrative | World Bank water stress data; FRED commodity data; Open-Meteo drought index |
 | **Personal Hygiene (Wipes, Sanitizers)** | Post-COVID structural shift; packaging innovation aligns with LHC | GDELT sentiment analysis; patent filings in B65D class |
 
