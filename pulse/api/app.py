@@ -38,7 +38,7 @@ def _sanitize(obj):
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.excel_reader import ExcelReader
-from pulse.ingestion.models import TrendDatabase
+from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.simulation.deterministic import DeterministicEngine
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 from pulse.simulation.scenarios import ScenarioEngine, BUILTIN_SCENARIOS, Scenario
@@ -69,6 +69,31 @@ _state = {
     "delphi": None,
 }
 _state_lock = asyncio.Lock()  # Protect concurrent mutations
+
+
+def _load_trend_database() -> TrendDatabase:
+    """Load trends from the Postgres/SQLite database into a TrendDatabase object.
+
+    This bridges the persistent database (where trends are added via the scanner
+    or the API) with the in-memory TrendDatabase that the simulation engine expects.
+    Falls back to seed data if no trends exist in the database yet.
+    """
+    from pulse.database import load_trends
+    db_trends = load_trends()
+    if db_trends:
+        return TrendDatabase(
+            trends=db_trends,
+            categories=CATEGORIES,
+            forces=FORCES,
+            source_file="database",
+        )
+    # No trends in DB yet — seed with built-in data and persist
+    from pulse.api.seed_data import create_seed_database
+    from pulse.database import save_trends
+    seed_db = create_seed_database()
+    save_trends(seed_db.trends)
+    logger.info(f"Seeded database with {seed_db.trend_count} built-in trends")
+    return seed_db
 
 
 # ── Pydantic models ────────────────────────────────────────────────
@@ -182,14 +207,15 @@ def create_app(args=None) -> FastAPI:
                 except Exception as e:
                     logger.error(f"Failed to load Excel: {e}")
 
-            # If no Excel loaded, seed with built-in data
+            # If no Excel loaded, load from database (seeds if empty)
             if not _state["db"]:
                 try:
-                    from pulse.api.seed_data import create_seed_database
-                    _state["db"] = create_seed_database()
-                    logger.info(f"Seeded with {_state['db'].trend_count} built-in trends")
+                    from pulse.database import init_db
+                    init_db()
+                    _state["db"] = _load_trend_database()
+                    logger.info(f"Loaded {_state['db'].trend_count} trends from database")
                 except Exception as e:
-                    logger.error(f"Failed to seed data: {e}")
+                    logger.error(f"Failed to load trends: {e}")
 
         # Run initial simulation outside the lock to avoid blocking startup
         if _state["db"] and not _state.get("mc_result"):
@@ -270,23 +296,13 @@ def create_app(args=None) -> FastAPI:
                 from pulse.api.auth import ensure_auth_tables
                 ensure_auth_tables()
 
-                # Seed with built-in data
+                # Load trends from database (seeds if empty)
                 if not _state["db"]:
                     try:
-                        from pulse.api.seed_data import create_seed_database
-                        _state["db"] = create_seed_database()
-                        logger.info(f"Seeded with {_state['db'].trend_count} built-in trends")
+                        _state["db"] = _load_trend_database()
+                        logger.info(f"Loaded {_state['db'].trend_count} trends from database")
                     except Exception as e:
-                        logger.error(f"Failed to seed data: {e}")
-
-        # Run initial simulation
-        if _state["db"] and not _state.get("mc_result"):
-            try:
-                logger.info("Running initial simulation (1000 iterations)...")
-                await _run_simulation("base", 1000)
-                logger.info("Initial simulation complete — backend ready")
-            except Exception as e:
-                logger.error(f"Initial simulation failed: {e}")
+                        logger.error(f"Failed to load trends: {e}")
 
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
@@ -431,11 +447,17 @@ def create_app(args=None) -> FastAPI:
 
     @app.post("/api/v1/simulate")
     async def run_simulation(req: SimulationRequest):
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-
         async with _state_lock:
+            # Reload trends from database so we always simulate with latest data
+            try:
+                _state["db"] = _load_trend_database()
+            except Exception as e:
+                logger.error(f"Failed to reload trends: {e}")
+
+            db = _state.get("db")
+            if not db or db.trend_count == 0:
+                raise HTTPException(404, "No trends found. Add trends before simulating.")
+
             config = _state["config"]
             dag = _state["dag"]
 
@@ -444,7 +466,7 @@ def create_app(args=None) -> FastAPI:
             det_result = det.run(db)
             _state["det_result"] = det_result
 
-            # MC
+            # Bayesian Monte Carlo
             scenario = _state["scenario_engine"].get_scenario(req.scenario)
             overrides = None
             if scenario and scenario.primary_shocks:
@@ -454,12 +476,12 @@ def create_app(args=None) -> FastAPI:
             mc_result = mc.run(db, iterations=req.iterations, scenario_overrides=overrides)
             _state["mc_result"] = mc_result
 
-            # Competitive
+            # Competitive response
             comp = CompetitiveResponseModel()
             shocks = scenario.primary_shocks if scenario else {}
             _state["competitive"] = comp.compute_all_competitive_adjustments(shocks)
 
-            # Allocation
+            # Allocation optimizer
             if req.include_allocation:
                 opt = AllocationOptimizer(config)
                 _state["allocation"] = opt.optimize(
@@ -467,6 +489,21 @@ def create_app(args=None) -> FastAPI:
                 )
 
             _state["audit"].log_simulation_run(req.scenario, req.iterations, "bayesian_copula")
+
+            # Persist simulation run to database
+            try:
+                from pulse.database import save_simulation_run
+                save_simulation_run(
+                    scenario=req.scenario,
+                    iterations=req.iterations,
+                    model_type="bayesian_copula",
+                    results=mc_result["shift_matrix"],
+                    causal_decomposition=mc_result.get("causal_decomposition"),
+                    allocation_recommendation=_state.get("allocation"),
+                    convergence_diagnostics=mc_result.get("convergence"),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to persist simulation run: {e}")
 
             return _sanitize({
                 "shift_matrix": mc_result["shift_matrix"],

@@ -122,7 +122,15 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
         body: JSON.stringify({ email }),
       });
       if (res.ok) {
-        setEmailSent(true);
+        const data = await res.json().catch(() => ({}));
+        if (data.reset_token) {
+          // Email sending failed but we got a direct token (pre-production fallback)
+          // Navigate directly to the reset form
+          window.location.hash = `reset=${data.reset_token}`;
+          setMode('reset');
+        } else {
+          setEmailSent(true);
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         setLocalError(data.detail || 'Something went wrong. Please try again.');

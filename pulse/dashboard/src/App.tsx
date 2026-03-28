@@ -35,7 +35,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<FullPageSkeleton />}>
-        <WarRoom />
+        <WarRoom isAdmin={isAdmin} />
       </Suspense>
       {/* Top-right user bar */}
       <div style={{

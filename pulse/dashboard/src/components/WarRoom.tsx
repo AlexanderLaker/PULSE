@@ -176,7 +176,7 @@ function generateInitialData(): InitialDataResult {
 }
 
 // ─── WarRoom Component ──────────────────────────────────────────────
-export default function WarRoom(): React.ReactNode {
+export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate,
@@ -525,30 +525,32 @@ export default function WarRoom(): React.ReactNode {
               </span>
             </div>
 
-            {/* Simulate Button */}
-            <motion.button
-              onClick={handleSimulate}
-              disabled={simulating}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 14px',
-                borderRadius: 8,
-                border: `1px solid ${T.accent}40`,
-                background: T.accent,
-                color: '#000',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: simulating ? 'not-allowed' : 'pointer',
-                opacity: simulating ? 0.6 : 1,
-              } as React.CSSProperties}
-            >
-              <Zap size={14} />
-              {simulating ? 'Simulating…' : 'Simulate'}
-            </motion.button>
+            {/* Simulate Button — admin only */}
+            {isAdmin && (
+              <motion.button
+                onClick={handleSimulate}
+                disabled={simulating}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${T.accent}40`,
+                  background: T.accent,
+                  color: '#000',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: simulating ? 'not-allowed' : 'pointer',
+                  opacity: simulating ? 0.6 : 1,
+                } as React.CSSProperties}
+              >
+                <Zap size={14} />
+                {simulating ? 'Simulating…' : 'Simulate'}
+              </motion.button>
+            )}
 
             {/* Export Button */}
             <motion.button
