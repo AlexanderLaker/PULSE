@@ -219,6 +219,37 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
               )}
             </AnimatePresence>
 
+            {/* Forgot Password (login mode only) */}
+            {mode === 'login' && (
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!email) {
+                      alert('Please enter your email address first.');
+                      return;
+                    }
+                    alert(`A password reset link has been sent to ${email}.\nPlease check your inbox.`);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: T.accent,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    padding: 0,
+                    letterSpacing: '-0.01em',
+                    fontFamily: T.sans,
+                  }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.textDecoration = 'underline'; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.textDecoration = 'none'; }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
