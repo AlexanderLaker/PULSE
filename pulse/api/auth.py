@@ -84,6 +84,18 @@ class UserResponse(BaseModel):
     created_at: str
     last_login: Optional[str] = None
 
+    @classmethod
+    def from_row(cls, row: dict) -> "UserResponse":
+        """Create UserResponse from a database row, handling datetime→str conversion."""
+        return cls(
+            id=str(row["id"]),
+            name=str(row["name"]),
+            email=str(row["email"]),
+            role=str(row["role"]),
+            created_at=str(row["created_at"]) if row.get("created_at") else "",
+            last_login=str(row["last_login"]) if row.get("last_login") else None,
+        )
+
 
 class AuthResponse(BaseModel):
     token: str
@@ -332,10 +344,7 @@ def login_user(req: LoginRequest) -> AuthResponse:
 
         return AuthResponse(
             token=token,
-            user=UserResponse(
-                id=row["id"], name=row["name"], email=row["email"],
-                role=row["role"], created_at=row["created_at"]
-            )
+            user=UserResponse.from_row(row)
         )
 
 
@@ -532,12 +541,7 @@ def get_all_users() -> list[UserResponse]:
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, email, role, created_at, last_login FROM users ORDER BY created_at DESC")
         return [
-            UserResponse(
-                id=_row_to_dict(r)["id"], name=_row_to_dict(r)["name"],
-                email=_row_to_dict(r)["email"], role=_row_to_dict(r)["role"],
-                created_at=_row_to_dict(r)["created_at"],
-                last_login=_row_to_dict(r).get("last_login")
-            )
+            UserResponse.from_row(_row_to_dict(r))
             for r in cursor.fetchall()
         ]
 
@@ -567,11 +571,10 @@ def update_user(user_id: str, req: UpdateProfileRequest) -> UserResponse:
         )
         conn.commit()
 
-        return UserResponse(
-            id=row["id"], name=new_name, email=row["email"],
-            role=new_role, created_at=row["created_at"],
-            last_login=row.get("last_login")
-        )
+        updated_row = dict(row)
+        updated_row["name"] = new_name
+        updated_row["role"] = new_role
+        return UserResponse.from_row(updated_row)
 
 
 def delete_user(user_id: str) -> dict:
