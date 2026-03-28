@@ -92,7 +92,7 @@ const RelevanceBadge: FC<{ score: number }> = ({ score }) => {
       gap: '4px',
       padding: '3px 8px',
       borderRadius: '10px',
-      fontSize: '9px',
+      fontSize: '10px',
       fontWeight: 600,
       fontFamily: T.mono,
       backgroundColor: color + '15',
@@ -126,10 +126,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
     trend.relevance_score >= 70 ? '#EAB308' : T.text3;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: isActioned ? 0.45 : 1, y: 0 }}
-      transition={{ duration: 0.15 }}
+    <div
       style={{
         backgroundColor: expanded ? T.bg1 : selected ? T.accent + '08' : 'transparent',
         borderRadius: '8px',
@@ -138,14 +135,14 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
           : selected
             ? `1px solid ${T.accent}30`
             : `1px solid transparent`,
-        overflow: 'hidden',
+        opacity: isActioned ? 0.45 : 1,
         transition: 'all 0.2s',
       }}
     >
       {/* Compact row — always visible */}
       <div
         style={{
-          padding: expanded ? '12px 16px' : '8px 12px',
+          padding: expanded ? '14px 16px' : '10px 14px',
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
@@ -178,14 +175,14 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
 
         {/* Force badge */}
         <span style={{
-          padding: '2px 7px',
+          padding: '3px 8px',
           borderRadius: '10px',
-          fontSize: '9px',
+          fontSize: '10px',
           fontWeight: 600,
           backgroundColor: FORCE_COLORS[trend.force] + '20',
           color: FORCE_COLORS[trend.force],
           flexShrink: 0,
-          minWidth: '68px',
+          minWidth: '72px',
           textAlign: 'center',
         }}>
           {FORCE_ICONS[trend.force]} {trend.force}
@@ -194,7 +191,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
         {/* Trend name */}
         <div style={{
           flex: 1,
-          fontSize: '12px',
+          fontSize: '13px',
           fontWeight: 500,
           color: T.text,
           overflow: 'hidden',
@@ -219,12 +216,12 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
 
         {/* Score */}
         <div style={{
-          fontSize: '10px',
+          fontSize: '11px',
           fontWeight: 600,
           fontFamily: T.mono,
           color: T.text2,
           flexShrink: 0,
-          minWidth: '30px',
+          minWidth: '36px',
           textAlign: 'center',
         }}>
           {trend.suggested_impact}×{trend.suggested_probability}
@@ -415,7 +412,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
 
@@ -955,7 +952,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
         padding: '12px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '2px',
+        gap: '4px',
         maxHeight: '800px',
         overflowY: 'auto',
       }}>
