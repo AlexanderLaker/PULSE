@@ -365,16 +365,44 @@ def create_app(args=None) -> FastAPI:
         trends = db.trends
         if force:
             trends = [t for t in trends if t.force == force]
+        def _build_sources(t):
+            """Get structured sources array with URLs from trend."""
+            sources = getattr(t, 'sources', None) or []
+            if sources:
+                return sources
+            # Fallback: parse data_source text
+            if t.data_source:
+                result = []
+                for part in t.data_source.split(';'):
+                    part = part.strip()
+                    if part:
+                        result.append({"title": part, "url": "", "data": t.source_type or ""})
+                return result
+            return []
+
         return [{
-            "id": t.id, "force": t.force, "name": t.name,
-            "direction": t.direction, "impact": t.impact,
-            "probability": t.probability, "normalized_score": t.normalized_score,
+            "id": t.id, "force": t.force, "sub_category": t.sub_category,
+            "name": t.name, "direction": t.direction,
+            "impact": t.impact, "probability": t.probability,
+            "score": t.impact * t.probability,
+            "weighted_score": t.weighted_score,
+            "normalized_score": t.normalized_score,
+            "gp1_shift": t.normalized_score,
+            "start_year": t.start_year,
             "category_exposure": t.category_exposure,
             "vc_exposure": t.vc_exposure,
             "regional_exposure": t.regional_exposure,
             "description": t.description,
             "strategic_implication": t.strategic_implication,
+            "data_source": t.data_source,
+            "source_type": t.source_type,
+            "sources": _build_sources(t),
             "confidence": t.confidence, "ai_suggested": t.ai_suggested,
+            "user_override": t.user_override,
+            "scorer_count": t.scorer_count,
+            "score_variance": t.score_variance,
+            "impact_posterior": {"alpha": t.impact_posterior[0], "beta": t.impact_posterior[1]} if t.impact_posterior else None,
+            "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
         } for t in trends]
 
     @app.post("/api/v1/trends")

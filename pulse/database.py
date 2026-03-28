@@ -217,6 +217,17 @@ def init_db() -> None:
             )
         """)
 
+        # ── Trend sources (evidence URLs) ────────────────────────────
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS trend_sources (
+                id {serial},
+                trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                source_type TEXT DEFAULT ''
+            )
+        """)
+
         # ── Causal DAG edges ─────────────────────────────────────────
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS causal_edges (
@@ -459,6 +470,7 @@ def save_trends(trends: List[Trend]) -> None:
         cursor = conn.cursor()
 
         for trend in trends:
+            cursor.execute(f"DELETE FROM trend_sources WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (trend.id,))
@@ -502,6 +514,14 @@ def save_trends(trends: List[Trend]) -> None:
                 cursor.execute(
                     f"INSERT INTO trend_regional_exposure (trend_id, region, exposure_score) VALUES ({ph(3)})",
                     (trend.id, region, score),
+                )
+
+            # Save source URLs if available
+            sources = getattr(trend, 'sources', None) or []
+            for src in sources:
+                cursor.execute(
+                    f"INSERT INTO trend_sources (trend_id, title, url, source_type) VALUES ({ph(4)})",
+                    (trend.id, src.get("title", ""), src.get("url", ""), src.get("source_type", src.get("data", ""))),
                 )
 
         conn.commit()
@@ -557,6 +577,19 @@ def load_trends() -> List[Trend]:
                 else None
             )
 
+            # Load source URLs
+            try:
+                cursor.execute(
+                    f"SELECT title, url, source_type FROM trend_sources WHERE trend_id = {p}",
+                    (row["id"],),
+                )
+                sources = [
+                    {"title": _row_to_dict(r)["title"], "url": _row_to_dict(r)["url"], "data": _row_to_dict(r).get("source_type", "")}
+                    for r in cursor.fetchall()
+                ]
+            except Exception:
+                sources = []
+
             trend = Trend(
                 id=row["id"],
                 force=row["force"],
@@ -584,6 +617,8 @@ def load_trends() -> List[Trend]:
                 impact_posterior=impact_posterior,
                 probability_posterior=prob_posterior,
             )
+            # Attach sources as transient attribute (not in dataclass)
+            trend.sources = sources
             trends.append(trend)
 
         logger.info(f"Loaded {len(trends)} trends from database")
