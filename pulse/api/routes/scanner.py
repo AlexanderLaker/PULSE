@@ -934,6 +934,45 @@ async def update_trend_status(body: Dict[str, Any]) -> Dict[str, str]:
         raise HTTPException(500, str(e)[:200])
 
 
+@router.delete("/trends/{trend_id}")
+async def delete_scanned_trend(trend_id: str) -> Dict[str, str]:
+    """Permanently delete a single scanned trend from database."""
+    try:
+        from pulse.database import get_db_connection, placeholder, init_db
+        init_db()
+        p = placeholder()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"DELETE FROM scanned_trends WHERE id = {p}", (trend_id,))
+            conn.commit()
+        return {"status": "ok", "deleted": trend_id}
+    except Exception as e:
+        raise HTTPException(500, str(e)[:200])
+
+
+@router.delete("/trends")
+async def delete_scanned_trends(body: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Delete scanned trends. If body contains 'ids', delete those. Otherwise delete ALL."""
+    try:
+        from pulse.database import get_db_connection, placeholder, init_db
+        init_db()
+        p = placeholder()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            if body and body.get("ids"):
+                ids = body["ids"]
+                placeholders = ", ".join([p] * len(ids))
+                cursor.execute(f"DELETE FROM scanned_trends WHERE id IN ({placeholders})", tuple(ids))
+                deleted = cursor.rowcount
+            else:
+                cursor.execute("DELETE FROM scanned_trends")
+                deleted = cursor.rowcount
+            conn.commit()
+        return {"status": "ok", "deleted_count": deleted}
+    except Exception as e:
+        raise HTTPException(500, str(e)[:200])
+
+
 @router.get("/forces")
 async def get_force_queries() -> Dict[str, List[str]]:
     """Get available force query templates.

@@ -710,12 +710,29 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
     // Remove from local state immediately
     setEmergingTrends(prev => prev.filter(t => t.id !== trendId));
     setSelectedIds(prev => { const n = new Set(prev); n.delete(trendId); return n; });
-    // Remove from scanned_trends database
-    fetch('/api/v1/scanner/update-trend-status', {
-      method: 'POST',
+    // Permanently delete from scanned_trends database
+    fetch(`/api/v1/scanner/trends/${trendId}`, { method: 'DELETE' }).catch(() => {});
+  }, []);
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    // Remove from local state immediately
+    setEmergingTrends(prev => prev.filter(t => !selectedIds.has(t.id)));
+    setSelectedIds(new Set());
+    // Permanently delete from database
+    fetch('/api/v1/scanner/trends', {
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: trendId, status: 'dismissed' }),
+      body: JSON.stringify({ ids }),
     }).catch(() => {});
+  }, [selectedIds]);
+
+  const handleDeleteAll = useCallback(() => {
+    // Clear all from local state
+    setEmergingTrends([]);
+    setSelectedIds(new Set());
+    // Permanently delete all from database
+    fetch('/api/v1/scanner/trends', { method: 'DELETE' }).catch(() => {});
   }, []);
 
   // ─── Filter & sort ────────────────────────────────────────────────────
@@ -817,6 +834,33 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
             </motion.div>
             {isScanning ? 'Scanning 19 APIs...' : 'Scan All Sources'}
           </motion.button>
+          {emergingTrends.length > 0 && !isScanning && (
+            <motion.button
+              whileHover={{ scale: 1.05, backgroundColor: T.red + '30' }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (window.confirm(`Delete all ${emergingTrends.length} emerging trends?`)) {
+                  handleDeleteAll();
+                }
+              }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: T.red,
+                backgroundColor: T.red + '10',
+                border: `1px solid ${T.red}30`,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <Trash2 size={12} />
+              Delete All
+            </motion.button>
+          )}
         </div>
       </div>
 
@@ -966,7 +1010,32 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
                 }}
               >
                 <Plus size={12} />
-                Add {selectedCount} to Trend Explorer
+                Add {selectedCount} to Explorer
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02, backgroundColor: T.red + '30' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  if (window.confirm(`Permanently delete ${selectedCount} selected trend${selectedCount > 1 ? 's' : ''}?`)) {
+                    handleBulkDelete();
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: T.red,
+                  backgroundColor: T.red + '10',
+                  border: `1px solid ${T.red}30`,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Trash2 size={12} />
+                Delete {selectedCount}
               </motion.button>
               <button
                 onClick={deselectAll}
