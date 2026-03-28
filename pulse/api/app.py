@@ -307,18 +307,19 @@ def create_app(args=None) -> FastAPI:
         if _initialized["done"]:
             return
         _initialized["done"] = True
-        logger.info("Lazy init: Vercel serverless cold start...")
+        print("[PULSE] Lazy init: Vercel serverless cold start...", flush=True)
 
         try:
             async with _state_lock:
                 if _state["config"] is None:
                     # Initialize database tables with retry (handles Neon connection issues)
                     try:
-                        from pulse.database import init_db
+                        from pulse.database import init_db, USE_POSTGRES, POSTGRES_URL
+                        print(f"[PULSE] DB mode: postgres={USE_POSTGRES}, url_set={bool(POSTGRES_URL)}", flush=True)
                         init_db()
-                        logger.info("Database initialized successfully")
+                        print("[PULSE] Database initialized successfully", flush=True)
                     except Exception as e:
-                        logger.error(f"Database init failed (will retry on next request): {e}")
+                        print(f"[PULSE] Database init FAILED: {e}", flush=True)
                         _initialized["done"] = False  # Allow retry on next request
                         return
 
@@ -345,9 +346,13 @@ def create_app(args=None) -> FastAPI:
                     # Load trends from database (auto-seeds if empty)
                     if not _state["db"]:
                         try:
+                            print("[PULSE] Loading trends from database...", flush=True)
                             _state["db"] = _load_trend_database()
+                            tc = _state["db"].trend_count if _state["db"] else 0
+                            print(f"[PULSE] Loaded {tc} trends", flush=True)
                         except Exception as e:
-                            logger.error(f"Failed to load trends: {e}")
+                            print(f"[PULSE] Failed to load trends: {e}", flush=True)
+                            import traceback; traceback.print_exc()
 
                     # Try to load latest simulation from DB so War Room fills immediately
                     if _state["db"] and _state["db"].trend_count > 0 and not _state.get("mc_result"):
@@ -372,10 +377,10 @@ def create_app(args=None) -> FastAPI:
                                     "model_type": latest.get("model_type", "bayesian_copula"),
                                 }
                                 _state["allocation"] = alloc
-                                logger.info("Loaded latest simulation from database")
+                                print("[PULSE] Loaded latest simulation from database", flush=True)
                             else:
                                 # No simulation in DB — run one now
-                                logger.info("No simulation in DB — auto-running simulation...")
+                                print("[PULSE] No simulation in DB — auto-running simulation...", flush=True)
                                 try:
                                     config = _state["config"]
                                     dag = _state["dag"]
@@ -400,13 +405,15 @@ def create_app(args=None) -> FastAPI:
                                         allocation_recommendation=_state.get("allocation"),
                                         convergence_diagnostics=mc_result.get("convergence"),
                                     )
-                                    logger.info("Auto-simulation complete and persisted to DB")
+                                    print("[PULSE] Auto-simulation complete and persisted to DB", flush=True)
                                 except Exception as e:
-                                    logger.error(f"Auto-simulation failed: {e}")
+                                    print(f"[PULSE] Auto-simulation failed: {e}", flush=True)
+                                    import traceback; traceback.print_exc()
                         except Exception as e:
-                            logger.warning(f"Failed to load/run simulation: {e}")
+                            print(f"[PULSE] Failed to load/run simulation: {e}", flush=True)
         except Exception as e:
-            logger.error(f"Lazy init failed completely: {e}")
+            print(f"[PULSE] Lazy init failed completely: {e}", flush=True)
+            import traceback; traceback.print_exc()
             _initialized["done"] = False  # Allow retry
 
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -433,6 +440,82 @@ def create_app(args=None) -> FastAPI:
             "categories": len(db.categories) if db else 0,
             "has_simulation": _state.get("mc_result") is not None,
         }
+
+    # ── Manual Seed + Simulate (for Vercel debugging) ──────────────
+    @app.post("/api/v1/seed")
+    async def manual_seed():
+        """Manually trigger seeding + simulation. Use when auto-seed fails."""
+        import traceback
+        steps = []
+        try:
+            from pulse.database import init_db, load_trends, save_trends, USE_POSTGRES, POSTGRES_URL
+            steps.append(f"db_mode=postgres:{USE_POSTGRES}, url_set={bool(POSTGRES_URL)}")
+
+            init_db()
+            steps.append("init_db OK")
+
+            db_trends = load_trends()
+            steps.append(f"existing_trends={len(db_trends)}")
+
+            if not db_trends:
+                from pulse.seed_trends import get_report_trends
+                seed = get_report_trends()
+                steps.append(f"seed_trends_loaded={len(seed)}")
+                save_trends(seed)
+                steps.append("save_trends OK")
+                db_trends = load_trends()
+                steps.append(f"after_seed_count={len(db_trends)}")
+
+            # Rebuild TrendDatabase in memory
+            _state["db"] = TrendDatabase(
+                trends=db_trends, categories=CATEGORIES, forces=FORCES, source_file="database",
+            )
+            steps.append(f"trend_database_count={_state['db'].trend_count}")
+
+            # Run simulation
+            config = _state.get("config") or ModelConfig()
+            _state["config"] = config
+            dag = _state.get("dag") or CausalDAG()
+            _state["dag"] = dag
+            if not _state.get("scenario_engine"):
+                _state["scenario_engine"] = ScenarioEngine(config, dag)
+
+            det = DeterministicEngine(config)
+            _state["det_result"] = det.run(_state["db"])
+            steps.append("deterministic OK")
+
+            mc = BayesianMonteCarloEngine(config, dag)
+            mc_result = mc.run(_state["db"], iterations=1000)
+            _state["mc_result"] = mc_result
+            steps.append(f"mc OK, categories={len(mc_result.get('shift_matrix', {}))}")
+
+            comp = CompetitiveResponseModel()
+            _state["competitive"] = comp.compute_all_competitive_adjustments({})
+            steps.append("competitive OK")
+
+            opt = AllocationOptimizer(config)
+            _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
+            steps.append("allocation OK")
+
+            # Persist simulation
+            from pulse.database import save_simulation_run
+            save_simulation_run(
+                scenario="base", iterations=1000, model_type="bayesian_copula",
+                results=mc_result["shift_matrix"],
+                causal_decomposition=mc_result.get("causal_decomposition"),
+                allocation_recommendation=_state.get("allocation"),
+                convergence_diagnostics=mc_result.get("convergence"),
+            )
+            steps.append("simulation persisted OK")
+
+            return {"status": "ok", "steps": steps}
+
+        except Exception as e:
+            steps.append(f"ERROR: {type(e).__name__}: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "steps": steps, "traceback": traceback.format_exc()},
+            )
 
     # ── Trends ──────────────────────────────────────────────────────
     @app.get("/api/v1/trends")
