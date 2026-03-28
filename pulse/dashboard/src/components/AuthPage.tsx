@@ -125,9 +125,10 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
         const data = await res.json().catch(() => ({}));
         if (data.reset_token) {
           // Email sending failed but we got a direct token (pre-production fallback)
-          // Navigate directly to the reset form
-          window.location.hash = `reset=${data.reset_token}`;
-          setMode('reset');
+          // Set the token and navigate directly to the reset form
+          setResetToken(data.reset_token);
+          setLocalError(null);
+          setMode('reset-token');
         } else {
           setEmailSent(true);
         }

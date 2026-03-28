@@ -37,6 +37,7 @@ import TrendExplorer from './TrendExplorer';
 import EmergingTrends from './EmergingTrends';
 import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
+import ProductImpactRankings from './ProductImpactRankings';
 
 // Extracted components
 import ScenarioSelectorPanel from './ScenarioSelectorPanel';
@@ -780,6 +781,13 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               />
               </div>
             </div>
+
+            {/* Row 2.5: Product Type Impact Rankings */}
+            <ProductImpactRankings
+              shifts={data.shifts}
+              trends={data.trends}
+              onCategorySelect={setSelectedCategory}
+            />
 
             {/* Row 3: Causal + Forces + Allocation */}
             <div

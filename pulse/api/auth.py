@@ -324,6 +324,10 @@ def login_user(req: LoginRequest) -> AuthResponse:
 
 # ── Resend Email Integration ─────────────────────────────────────
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_EtpzJRr3_Pfqj4AdH3fogdekDeBuSBbdZ")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+# NOTE: onboarding@resend.dev is Resend's test sender — it can ONLY deliver
+# to the Resend account owner's email. To send to any user, set RESEND_FROM_EMAIL
+# to an address on a verified domain in your Resend dashboard (e.g. noreply@yourdomain.com).
 RESET_TOKEN_EXPIRY = 3600  # 1 hour
 
 
@@ -353,7 +357,7 @@ def _send_reset_email(to_email: str, reset_token: str) -> bool:
     reset_link = f"{app_url}#reset={reset_token}"
 
     payload = json.dumps({
-        "from": "PULSE <onboarding@resend.dev>",
+        "from": f"PULSE <{RESEND_FROM_EMAIL}>",
         "to": [to_email],
         "subject": "PULSE — Password Reset",
         "html": f"""
