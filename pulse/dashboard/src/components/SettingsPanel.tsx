@@ -187,7 +187,7 @@ const SettingsPanel: FC<SettingsPanelProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {backendAvailable ? '● Online' : '● Mock Data'}
+                {backendAvailable ? '● Online' : '● Offline'}
               </span>
             </div>
 

@@ -499,6 +499,50 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const isAdmin = userRole === 'admin';
 
+  // ─── Load saved trends from database on mount ───────────────────────
+  React.useEffect(() => {
+    fetch('/api/v1/scanner/saved-trends')
+      .then(r => r.json())
+      .then(data => {
+        if (data.trends && data.trends.length > 0) {
+          const loaded: EmergingTrend[] = data.trends.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || '',
+            force: t.force || 'Consumer',
+            direction: t.direction || 'Expansion',
+            suggested_impact: t.suggested_impact || 3,
+            suggested_probability: t.suggested_probability || 3,
+            relevance_score: t.relevance_score || 65,
+            category_mapping: typeof t.category_mapping === 'string'
+              ? JSON.parse(t.category_mapping || '{}')
+              : (t.category_mapping || {}),
+            sources: typeof t.sources === 'string'
+              ? JSON.parse(t.sources || '[]')
+              : (t.sources || []),
+            discovered_at: t.discovered_at || new Date().toISOString(),
+            reasoning: t.reasoning || '',
+            status: t.status || 'new',
+          }));
+          setEmergingTrends(loaded);
+        }
+      })
+      .catch(() => { /* no saved trends yet */ });
+  }, []);
+
+  // ─── Save trends to database ────────────────────────────────────────
+  const saveTrendsToDb = useCallback(async (trends: EmergingTrend[]) => {
+    try {
+      await fetch('/api/v1/scanner/save-trends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trends }),
+      });
+    } catch {
+      console.warn('Failed to persist scanned trends');
+    }
+  }, []);
+
   // ─── API Scan Handler ─────────────────────────────────────────────────
   const handleScan = useCallback(async () => {
     setIsScanning(true);
@@ -520,7 +564,12 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
           setEmergingTrends(prev => {
             const existingNames = new Set(prev.map(t => t.name));
             const newOnes = mapped.filter(t => !existingNames.has(t.name));
-            return [...newOnes, ...prev].slice(0, MAX_VISIBLE_TRENDS);
+            // Mark previously-seen trends as 'reviewed'
+            const updated = prev.map(t => t.status === 'new' ? { ...t, status: 'reviewed' as const } : t);
+            const merged = [...newOnes, ...updated].slice(0, MAX_VISIBLE_TRENDS);
+            // Persist merged trends to database
+            saveTrendsToDb(merged);
+            return merged;
           });
         }
         // Update progress from meta
@@ -545,7 +594,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
       setIsScanning(false);
       setLastScanned(new Date());
     }
-  }, []);
+  }, [saveTrendsToDb]);
 
   // ─── Map raw API results to EmergingTrend format ──────────────────────
   function mapApiResultsToTrends(raw: any[]): EmergingTrend[] {

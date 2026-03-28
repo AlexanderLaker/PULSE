@@ -65,7 +65,7 @@ interface AllocationWithRationale extends AllocationRecommendation {
   rationale: string;
 }
 
-interface MockDataResult {
+interface InitialDataResult {
   shifts: ShiftMatrix;
   forceContributions: Record<string, ForceContribution[]>;
   trends: TrendWithSources[];
@@ -85,141 +85,37 @@ interface AIInsight {
   severity?: 'warning' | 'critical';
 }
 
-// ─── Seeded PRNG (Mulberry32) — deterministic results on every load ──
-/**
- * Mulberry32: fast, deterministic 32-bit PRNG.
- * Returns a function that produces values in [0, 1) — same sequence for same seed.
- */
-function mulberry32(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// ─── Initial Data — no mock data, all zeros until backend provides real simulation ──
 
-// ─── Monte Carlo Simulation Engine (Frontend) ──────────────────────
-/**
- * ARCHITECTURE: Instead of generating random percentiles on each render,
- * we run a proper Monte Carlo simulation ONCE with N=10,000 iterations
- * using a seeded PRNG, then compute and STORE the statistical moments:
- *   Mean, StdDev, P5, P10, P25, P50 (median), P75, P90, P95
- *
- * The dashboard displays the deterministic Mean as the main value
- * and the stored confidence intervals (P10–P90) as the spread band.
- *
- * This ensures:
- * 1. Results are IDENTICAL on every page load (seeded PRNG)
- * 2. Results never change between renders (stored moments)
- * 3. Statistical moments are properly computed from the full distribution
- * 4. Confidence bands reflect actual simulation variance, not arbitrary formulas
- */
-
-/** Compute percentile from sorted array */
-function percentile(sorted: number[], p: number): number {
-  const idx = (p / 100) * (sorted.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo]!;
-  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (idx - lo);
-}
-
-/** Box-Muller transform for normal samples from uniform PRNG */
-function normalSample(rand: () => number, mean: number, std: number): number {
-  const u1 = rand();
-  const u2 = rand();
-  const z = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
-  return mean + z * std;
-}
-
-const MC_ITERATIONS = 10_000; // Run 10k simulations — stored, never re-run
-
-function generateMockData(): MockDataResult {
-  const rand = mulberry32(42); // Fixed seed — deterministic on every load
+function generateInitialData(): InitialDataResult {
   const categoryIds = CATEGORIES.map(c => c.id);
   const forceNames = Object.keys(FORCES) as ForceName[];
 
-  // ─── Step 1: Define trend parameters (deterministic base scores) ───
-  // Each category has a "true" base shift direction + magnitude
-  // derived from expert scores. The MC adds uncertainty around these.
-  const categoryBaseParams: Record<string, { baseShift: number; velocity: number; volatility: number }> = {};
-  categoryIds.forEach(catId => {
-    categoryBaseParams[catId] = {
-      baseShift: (rand() - 0.5) * 0.10, // True mean shift direction
-      velocity: (rand() - 0.5) * 0.020, // Trend acceleration per year
-      volatility: rand() * 0.02 + 0.005, // Uncertainty magnitude
-    };
-  });
-
-  // ─── Step 2: Run N=10,000 MC iterations, collect samples ──────────
-  // For each category × year: collect 10k shift samples
-  const samples: Record<string, Record<number, number[]>> = {};
-  categoryIds.forEach(catId => {
-    samples[catId] = {};
-    YEARS.forEach(year => { samples[catId]![year] = []; });
-  });
-
-  for (let iter = 0; iter < MC_ITERATIONS; iter++) {
-    categoryIds.forEach(catId => {
-      const params = categoryBaseParams[catId]!;
-      // Sample: each iteration draws from the posterior distribution
-      // (normal approx of Bayesian posterior around expert scores)
-      const shiftNoise = normalSample(rand, 0, params.volatility);
-      const velocityNoise = normalSample(rand, 0, params.volatility * 0.3);
-
-      YEARS.forEach((year, idx) => {
-        const iterShift = (params.baseShift + shiftNoise) + (params.velocity + velocityNoise) * idx;
-        samples[catId]![year]!.push(iterShift);
-      });
-    });
-  }
-
-  // ─── Step 3: Compute & store statistical moments from samples ─────
+  // All shifts start at 0.0 — no simulation has been run yet
   const shifts: ShiftMatrix = {};
   categoryIds.forEach(catId => {
     shifts[catId] = {};
     YEARS.forEach(year => {
-      const s = samples[catId]![year]!.sort((a, b) => a - b);
-      const mean = s.reduce((sum, v) => sum + v, 0) / s.length;
-
       const shiftPath = shifts[catId];
       if (shiftPath) {
-        shiftPath[year] = {
-          median: mean, // Use mean as the primary display value
-          p10: percentile(s, 10),
-          p25: percentile(s, 25),
-          p75: percentile(s, 75),
-          p90: percentile(s, 90),
-        };
+        shiftPath[year] = { median: 0, p10: 0, p25: 0, p75: 0, p90: 0 };
       }
     });
   });
 
-  // Force contributions by category
+  // Force contributions — equal weights (no analysis yet)
   const forceContributions: Record<string, ForceContribution[]> = {};
   categoryIds.forEach(catId => {
-    const total = forceNames.reduce((sum) => sum + rand(), 0);
+    const equalWeight = 1 / forceNames.length;
     forceContributions[catId] = forceNames.map((force: ForceName) => ({
-      force: force as ForceName,
-      value: rand() / total,
-      normalized: 0,
-    }));
-    const sum = forceContributions[catId].reduce((s, x) => s + (x?.value || 0), 0);
-    forceContributions[catId] = forceContributions[catId].map(fc => ({
-      ...fc,
-      normalized: (fc?.value || 0) / sum,
+      force,
+      value: equalWeight,
+      normalized: equalWeight,
     }));
   });
 
-  // Trends are loaded dynamically via API — no hardcoded data
+  // Trends are loaded dynamically via API
   const trends: TrendWithSources[] = [];
-  // Compute score and gp1_shift for trends that don't have them
-  trends.forEach(t => {
-    if (!t.score) t.score = t.impact * t.probability * (t.direction === 'Expansion' ? 1 : -1);
-    if (!t.gp1_shift) t.gp1_shift = (t.score / 25) * 0.05;
-  });
 
   // Scenarios
   const scenarios: Scenario[] = [
@@ -230,15 +126,14 @@ function generateMockData(): MockDataResult {
     { id: 'storm', name: 'Perfect Storm', description: 'Correlated tail events' },
   ];
 
-  // Allocation recommendations
+  // Allocation — equal weights until simulation provides recommendations
   const allocation: AllocationWithRationale[] = categoryIds.map((catId) => {
-    const baseWeight = 1 / categoryIds.length;
-    const recommendation = baseWeight + (rand() - 0.5) * 0.05;
+    const equalWeight = 1 / categoryIds.length;
     return {
       category: catId,
-      currentWeight: baseWeight,
-      recommendedWeight: Math.max(0.02, Math.min(0.20, recommendation)),
-      rationale: 'Based on shift magnitude and diversification.',
+      currentWeight: equalWeight,
+      recommendedWeight: equalWeight,
+      rationale: 'Run simulation to generate allocation recommendations.',
     };
   });
 
@@ -263,10 +158,10 @@ function generateMockData(): MockDataResult {
   ];
 
   const convergence: ConvergenceDiagnostics = {
-    r_hat: 1.03,
-    converged: true,
-    iterations: 5000,
-    backtestingAccuracy: 0.73,
+    r_hat: 0,
+    converged: false,
+    iterations: 0,
+    backtestingAccuracy: 0,
   };
 
   return {
@@ -298,12 +193,12 @@ export default function WarRoom(): React.ReactNode {
   const [showSnapshots, setShowSnapshots] = useState<boolean>(false);
   const [showBriefing, setShowBriefing] = useState<boolean>(false);
 
-  // Mock data fallback for simulation/scenarios — stable across renders
-  const [mockData, setMockData] = useState(() => generateMockData());
-  const data = mockData;
-  const scenarioOptions = mockData.scenarios;
+  // Initial data — zeroed until backend provides real simulation
+  const [initialData, setInitialData] = useState(() => generateInitialData());
+  const data = initialData;
+  const scenarioOptions = initialData.scenarios;
 
-  // Fetch REAL trends from API (replaces mock trends)
+  // Fetch trends from API
   useEffect(() => {
     fetch('/api/v1/trends')
       .then(r => r.json())
@@ -337,31 +232,23 @@ export default function WarRoom(): React.ReactNode {
             confidence: t.confidence || 'Medium',
             sources: t.sources || [],
           }));
-          setMockData(prev => ({ ...prev, trends: mapped as any }));
+          setInitialData(prev => ({ ...prev, trends: mapped as any }));
         }
       })
-      .catch(() => { /* keep mock data on failure */ });
+      .catch(() => { /* keep initial data on failure */ });
   }, []);
   const forceNames = Object.keys(FORCES) as ForceName[];
 
-  // AI insights mock
-  const aiInsights: AIInsight[] = [
-    { id: 1, type: 'signal', title: 'New Signals', description: '3 new signals detected', count: 3 },
-    { id: 2, type: 'trigger', title: 'Trigger Alert', description: 'FCN trigger breached', severity: 'warning' },
-  ];
+  // AI insights — empty until scanner provides real data
+  const aiInsights: AIInsight[] = [];
 
   const handleSimulate = async (): Promise<void> => {
-    // Show loading animation for 800ms to simulate computation time.
-    // Mock data is already stable (deterministic with seed 42), so no API call needed.
-    // This gives visual feedback that simulation is running.
-    // In production, this would call simulate() which hits the backend API.
-    return new Promise((resolve) => {
-      // Trigger loading state (usePulse handles simulating flag)
-      // For now, just show the animation
-      setTimeout(() => {
-        resolve();
-      }, 800);
-    });
+    // Call the real backend simulation via usePulse hook
+    try {
+      await simulate();
+    } catch (err) {
+      console.error('Simulation failed:', err);
+    }
   };
 
   const handleExportExcel = async (): Promise<void> => {
@@ -898,7 +785,7 @@ export default function WarRoom(): React.ReactNode {
                   body: JSON.stringify(updates),
                 }).catch(() => {});
                 // Update local state immediately
-                setMockData(prev => ({
+                setInitialData(prev => ({
                   ...prev,
                   trends: prev.trends.map((t: any) =>
                     t.id === id ? { ...t, ...updates } : t

@@ -529,6 +529,165 @@ async def cancel_scan() -> Dict[str, str]:
     return {"status": "cancel requested"}
 
 
+@router.get("/saved-trends")
+async def get_saved_trends() -> Dict[str, Any]:
+    """Load previously saved scanned trends from database.
+
+    Returns:
+        List of saved scanned trends with their status.
+    """
+    try:
+        from pulse.database import get_db_connection, _row_to_dict, placeholder, init_db
+        init_db()
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM scanned_trends ORDER BY discovered_at DESC LIMIT 200"
+            )
+            rows = cursor.fetchall()
+            trends = []
+            for r in rows:
+                row = _row_to_dict(r)
+                # Parse JSON fields
+                import json as _json
+                row["category_mapping"] = _json.loads(row.get("category_mapping") or "{}")
+                row["sources"] = _json.loads(row.get("sources") or "[]")
+                trends.append(row)
+            return {"trends": trends, "count": len(trends)}
+    except Exception as e:
+        logger.error(f"Failed to load saved trends: {e}")
+        return {"trends": [], "count": 0, "error": str(e)[:200]}
+
+
+@router.post("/save-trends")
+async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save scanned trends to database for persistence.
+
+    Args:
+        body: { "trends": [...] } — list of emerging trend objects
+
+    Returns:
+        Count of saved trends.
+    """
+    try:
+        from pulse.database import get_db_connection, placeholder, ph, init_db, USE_POSTGRES
+        import json as _json
+        init_db()
+
+        trends = body.get("trends", [])
+        if not trends:
+            return {"saved": 0}
+
+        p = placeholder()
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        saved = 0
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            for t in trends:
+                trend_id = t.get("id", f"scan_{session_id}_{saved}")
+                name = t.get("name", "Untitled")
+
+                # Upsert: update if exists, insert if new
+                if USE_POSTGRES:
+                    cursor.execute(
+                        f"""INSERT INTO scanned_trends
+                            (id, name, description, force, direction, suggested_impact,
+                             suggested_probability, relevance_score, category_mapping,
+                             sources, discovered_at, reasoning, status, scan_session, updated_at)
+                            VALUES ({ph(15)})
+                            ON CONFLICT (id) DO UPDATE SET
+                                description = EXCLUDED.description,
+                                relevance_score = EXCLUDED.relevance_score,
+                                sources = EXCLUDED.sources,
+                                status = CASE
+                                    WHEN scanned_trends.status IN ('added', 'dismissed') THEN scanned_trends.status
+                                    ELSE 'reviewed'
+                                END,
+                                updated_at = EXCLUDED.updated_at""",
+                        (
+                            trend_id, name,
+                            t.get("description", ""),
+                            t.get("force", "Consumer"),
+                            t.get("direction", "Expansion"),
+                            t.get("suggested_impact", 3),
+                            t.get("suggested_probability", 3),
+                            t.get("relevance_score", 65),
+                            _json.dumps(t.get("category_mapping", {})),
+                            _json.dumps(t.get("sources", [])),
+                            t.get("discovered_at", datetime.now().isoformat()),
+                            t.get("reasoning", ""),
+                            t.get("status", "new"),
+                            session_id,
+                            datetime.now().isoformat(),
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        f"""INSERT OR REPLACE INTO scanned_trends
+                            (id, name, description, force, direction, suggested_impact,
+                             suggested_probability, relevance_score, category_mapping,
+                             sources, discovered_at, reasoning, status, scan_session, updated_at)
+                            VALUES ({ph(15)})""",
+                        (
+                            trend_id, name,
+                            t.get("description", ""),
+                            t.get("force", "Consumer"),
+                            t.get("direction", "Expansion"),
+                            t.get("suggested_impact", 3),
+                            t.get("suggested_probability", 3),
+                            t.get("relevance_score", 65),
+                            _json.dumps(t.get("category_mapping", {})),
+                            _json.dumps(t.get("sources", [])),
+                            t.get("discovered_at", datetime.now().isoformat()),
+                            t.get("reasoning", ""),
+                            t.get("status", "new"),
+                            session_id,
+                            datetime.now().isoformat(),
+                        ),
+                    )
+                saved += 1
+
+            conn.commit()
+
+        return {"saved": saved, "session_id": session_id}
+    except Exception as e:
+        logger.error(f"Failed to save trends: {e}")
+        raise HTTPException(500, f"Failed to save: {str(e)[:200]}")
+
+
+@router.post("/update-trend-status")
+async def update_trend_status(body: Dict[str, Any]) -> Dict[str, str]:
+    """Update the status of a scanned trend (new/reviewed/added/dismissed).
+
+    Args:
+        body: { "id": "...", "status": "added"|"dismissed"|"reviewed" }
+    """
+    try:
+        from pulse.database import get_db_connection, placeholder, init_db
+        init_db()
+
+        trend_id = body.get("id")
+        new_status = body.get("status")
+        if not trend_id or new_status not in ("new", "reviewed", "added", "dismissed"):
+            raise HTTPException(400, "Invalid id or status")
+
+        p = placeholder()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE scanned_trends SET status = {p}, updated_at = {p} WHERE id = {p}",
+                (new_status, datetime.now().isoformat(), trend_id),
+            )
+            conn.commit()
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e)[:200])
+
+
 @router.get("/forces")
 async def get_force_queries() -> Dict[str, List[str]]:
     """Get available force query templates.

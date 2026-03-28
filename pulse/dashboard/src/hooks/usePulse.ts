@@ -1,7 +1,7 @@
 /**
  * Central state hook for PULSE War Room.
  * Single source of truth — all components read from here.
- * Connects to real FastAPI backend with graceful fallback to mock data.
+ * Connects to real FastAPI backend. No mock data — shows empty state when backend unavailable.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '../api/client';
@@ -11,49 +11,6 @@ import type {
   ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
   TrendUpdate,
 } from '../types';
-
-// ── Seeded PRNG (Mulberry32) — deterministic mock data ──────────
-function mulberry32(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// ── Mock data generator for graceful degradation ──────────────
-function generateMockSimulation(): SimulationResult {
-  const rand = mulberry32(42); // Fixed seed — same results every load
-  const mock: ShiftMatrix = {};
-  const categories = [
-    'hair_color', 'hair_care', 'hair_styling', 'hair_body',
-    'lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad', 'lhc_hdw', 'lhc_adw', 'lhc_hsc', 'lhc_ic'
-  ];
-  const years = [2026, 2027, 2028, 2029, 2030];
-
-  categories.forEach(cat => {
-    const baseShift = (rand() - 0.5) * 0.10;
-    const velocity = (rand() - 0.5) * 0.02;
-    mock[cat] = {};
-    years.forEach((year, idx) => {
-      const median = baseShift + velocity * idx;
-      const std = Math.abs(median) * 0.4 + 0.01;
-      mock[cat]![year] = {
-        median, p10: median - std * 1.28, p25: median - std * 0.67,
-        p75: median + std * 0.67, p90: median + std * 1.28,
-      };
-    });
-  });
-
-  return {
-    shifts: mock,
-    causal_decomposition: {},
-    allocation_recommendation: {},
-    convergence: { converged: true, r_hat: 1.03, backtestingAccuracy: 0.73 }
-  };
-}
 
 /** Return type for the usePulse hook. */
 export interface UsePulseReturn {
@@ -135,8 +92,6 @@ export default function usePulse(): UsePulseReturn {
       if (h?.has_simulation) {
         const sim = await api.getSimulation().catch((): null => null);
         if (sim && mounted.current) setSimulation(sim);
-      } else if (mounted.current) {
-        setSimulation(generateMockSimulation());
       }
 
       // Load analytics endpoints
@@ -156,9 +111,9 @@ export default function usePulse(): UsePulseReturn {
     } catch (e) {
       if (mounted.current) {
         setBackendAvailable(false);
-        setHealth({ status: 'offline', version: 'mock' });
-        setSimulation(generateMockSimulation());
-        setError(`Backend unavailable. Using mock data. ${(e as Error).message}`);
+        setHealth({ status: 'offline', version: 'unavailable' });
+        setSimulation(null);
+        setError(`Backend unavailable. ${(e as Error).message}`);
       }
     } finally {
       if (mounted.current) setLoading(false);
@@ -177,7 +132,7 @@ export default function usePulse(): UsePulseReturn {
     setError(null);
     try {
       if (!backendAvailable) {
-        if (mounted.current) setSimulation(generateMockSimulation());
+        if (mounted.current) setError('Backend unavailable. Cannot run simulation.');
         return;
       }
 
@@ -195,7 +150,6 @@ export default function usePulse(): UsePulseReturn {
     } catch (e) {
       if (mounted.current) {
         setError((e as Error).message);
-        setSimulation(generateMockSimulation());
       }
     } finally {
       if (mounted.current) setSimulating(false);

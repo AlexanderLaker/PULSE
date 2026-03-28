@@ -388,6 +388,27 @@ def init_db() -> None:
             )
         """)
 
+        # ── Scanned trends (emerging trends persistence) ──────────
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS scanned_trends (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                force TEXT,
+                direction TEXT DEFAULT 'Expansion',
+                suggested_impact INTEGER DEFAULT 3,
+                suggested_probability INTEGER DEFAULT 3,
+                relevance_score INTEGER DEFAULT 65,
+                category_mapping TEXT,
+                sources TEXT,
+                discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reasoning TEXT,
+                status TEXT DEFAULT 'new',
+                scan_session TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # ── Indexes ──────────────────────────────────────────────────
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_source ON causal_edges(source_force)")
@@ -397,6 +418,8 @@ def init_db() -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_delphi_rounds_session ON delphi_rounds(session_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_status ON scanned_trends(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_force ON scanned_trends(force)")
 
         conn.commit()
         logger.info(f"Database initialized (mode: {'postgres' if USE_POSTGRES else 'sqlite'})")

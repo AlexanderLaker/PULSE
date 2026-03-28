@@ -329,11 +329,19 @@ RESET_TOKEN_EXPIRY = 3600  # 1 hour
 
 def _get_app_url() -> str:
     """Get the app's base URL for reset links."""
-    # Vercel provides VERCEL_URL
+    # Use explicit override if set
+    explicit = os.environ.get("PULSE_APP_URL")
+    if explicit:
+        return explicit.rstrip("/")
+    # Vercel production URL (stable across deployments)
+    prod_url = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL")
+    if prod_url:
+        return f"https://{prod_url}"
+    # Vercel deployment URL (deployment-specific, fallback)
     vercel_url = os.environ.get("VERCEL_URL")
     if vercel_url:
         return f"https://{vercel_url}"
-    return os.environ.get("PULSE_APP_URL", "http://localhost:3000")
+    return "http://localhost:3000"
 
 
 def _send_reset_email(to_email: str, reset_token: str) -> bool:
