@@ -208,10 +208,13 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
       k.toLowerCase().replace(/^(hair|lhc):\s*/, (_, g: string) => g + '_').replace(/\s+/g, '_');
 
     const newShifts: typeof data.shifts = {};
-    for (const [catKey, yearData] of Object.entries(simulation.shift_matrix)) {
+    for (const [catKey, catData] of Object.entries(simulation.shift_matrix)) {
       const catId = normCatId(catKey);
       newShifts[catId] = {} as any;
+      // Handle both flat format {"2026": {...}} and nested {"path": {"2026": {...}}}
+      const yearData = (catData as any)?.path ?? catData;
       for (const [year, pcts] of Object.entries(yearData as Record<string, any>)) {
+        if (year === 'velocity' || year === 'path') continue; // skip non-year keys
         newShifts[catId][year] = {
           median: pcts.median ?? 0,
           p10: pcts.p10 ?? 0,
