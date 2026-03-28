@@ -400,10 +400,10 @@ def create_app(args=None) -> FastAPI:
                                         scenario="base",
                                         iterations=1000,
                                         model_type="bayesian_copula",
-                                        results=mc_result["shift_matrix"],
-                                        causal_decomposition=mc_result.get("causal_decomposition"),
-                                        allocation_recommendation=_state.get("allocation"),
-                                        convergence_diagnostics=mc_result.get("convergence"),
+                                        results=_sanitize(mc_result["shift_matrix"]),
+                                        causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                                        allocation_recommendation=_sanitize(_state.get("allocation")),
+                                        convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                                     )
                                     print("[PULSE] Auto-simulation complete and persisted to DB", flush=True)
                                 except Exception as e:
@@ -497,14 +497,14 @@ def create_app(args=None) -> FastAPI:
             _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
             steps.append("allocation OK")
 
-            # Persist simulation
+            # Persist simulation (sanitize numpy types for JSON)
             from pulse.database import save_simulation_run
             save_simulation_run(
                 scenario="base", iterations=1000, model_type="bayesian_copula",
-                results=mc_result["shift_matrix"],
-                causal_decomposition=mc_result.get("causal_decomposition"),
-                allocation_recommendation=_state.get("allocation"),
-                convergence_diagnostics=mc_result.get("convergence"),
+                results=_sanitize(mc_result["shift_matrix"]),
+                causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                allocation_recommendation=_sanitize(_state.get("allocation")),
+                convergence_diagnostics=_sanitize(mc_result.get("convergence")),
             )
             steps.append("simulation persisted OK")
 
@@ -819,10 +819,10 @@ def create_app(args=None) -> FastAPI:
                     scenario=req.scenario,
                     iterations=req.iterations,
                     model_type="bayesian_copula",
-                    results=mc_result["shift_matrix"],
-                    causal_decomposition=mc_result.get("causal_decomposition"),
-                    allocation_recommendation=_state.get("allocation"),
-                    convergence_diagnostics=mc_result.get("convergence"),
+                    results=_sanitize(mc_result["shift_matrix"]),
+                    causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                    allocation_recommendation=_sanitize(_state.get("allocation")),
+                    convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
             except Exception as e:
                 logger.warning(f"Failed to persist simulation run: {e}")
