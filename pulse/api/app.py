@@ -82,11 +82,7 @@ def _load_trend_database() -> TrendDatabase:
     if not db_trends:
         logger.info("Database empty — auto-seeding with Intelligence Report trends...")
         try:
-            import sys, os
-            scripts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scripts")
-            if scripts_dir not in sys.path:
-                sys.path.insert(0, scripts_dir)
-            from import_report_trends import get_report_trends
+            from pulse.seed_trends import get_report_trends
             seed_trends = get_report_trends()
             save_trends(seed_trends)
             db_trends = load_trends()
@@ -231,8 +227,33 @@ def create_app(args=None) -> FastAPI:
                 except Exception as e:
                     logger.error(f"Failed to load trends: {e}")
 
-        # No auto-simulation on startup — admin triggers it manually
-        # after trends are added from the scanner
+        # Auto-load latest simulation from DB if available
+        if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
+            try:
+                from pulse.database import load_simulation_runs
+                runs = load_simulation_runs(limit=1)
+                if runs:
+                    latest = runs[0]
+                    results = latest.get("results")
+                    if isinstance(results, str):
+                        results = json.loads(results)
+                    alloc = latest.get("allocation_recommendation")
+                    if isinstance(alloc, str):
+                        alloc = json.loads(alloc)
+                    conv = latest.get("convergence_diagnostics")
+                    if isinstance(conv, str):
+                        conv = json.loads(conv)
+                    _state["mc_result"] = {
+                        "shift_matrix": results,
+                        "convergence": conv or {},
+                        "iterations": latest.get("iterations", 1000),
+                        "model_type": latest.get("model_type", "bayesian_copula"),
+                    }
+                    _state["allocation"] = alloc
+                    logger.info("Loaded latest simulation from database on startup")
+            except Exception as e:
+                logger.warning(f"Failed to load simulation from DB: {e}")
+
         yield
 
         # ─── Shutdown ───
@@ -321,12 +342,69 @@ def create_app(args=None) -> FastAPI:
                     except Exception as e:
                         logger.warning(f"Auth tables init failed (non-critical): {e}")
 
-                    # Load trends from database (empty until user scans + adds)
+                    # Load trends from database (auto-seeds if empty)
                     if not _state["db"]:
                         try:
                             _state["db"] = _load_trend_database()
                         except Exception as e:
                             logger.error(f"Failed to load trends: {e}")
+
+                    # Try to load latest simulation from DB so War Room fills immediately
+                    if _state["db"] and _state["db"].trend_count > 0 and not _state.get("mc_result"):
+                        try:
+                            from pulse.database import load_simulation_runs
+                            runs = load_simulation_runs(limit=1)
+                            if runs:
+                                latest = runs[0]
+                                results = latest.get("results")
+                                if isinstance(results, str):
+                                    results = json.loads(results)
+                                alloc = latest.get("allocation_recommendation")
+                                if isinstance(alloc, str):
+                                    alloc = json.loads(alloc)
+                                conv = latest.get("convergence_diagnostics")
+                                if isinstance(conv, str):
+                                    conv = json.loads(conv)
+                                _state["mc_result"] = {
+                                    "shift_matrix": results,
+                                    "convergence": conv or {},
+                                    "iterations": latest.get("iterations", 1000),
+                                    "model_type": latest.get("model_type", "bayesian_copula"),
+                                }
+                                _state["allocation"] = alloc
+                                logger.info("Loaded latest simulation from database")
+                            else:
+                                # No simulation in DB — run one now
+                                logger.info("No simulation in DB — auto-running simulation...")
+                                try:
+                                    config = _state["config"]
+                                    dag = _state["dag"]
+                                    db = _state["db"]
+                                    det = DeterministicEngine(config)
+                                    _state["det_result"] = det.run(db)
+                                    mc = BayesianMonteCarloEngine(config, dag)
+                                    mc_result = mc.run(db, iterations=1000)
+                                    _state["mc_result"] = mc_result
+                                    comp = CompetitiveResponseModel()
+                                    _state["competitive"] = comp.compute_all_competitive_adjustments({})
+                                    opt = AllocationOptimizer(config)
+                                    _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
+                                    # Persist to DB for future cold starts
+                                    from pulse.database import save_simulation_run
+                                    save_simulation_run(
+                                        scenario="base",
+                                        iterations=1000,
+                                        model_type="bayesian_copula",
+                                        results=mc_result["shift_matrix"],
+                                        causal_decomposition=mc_result.get("causal_decomposition"),
+                                        allocation_recommendation=_state.get("allocation"),
+                                        convergence_diagnostics=mc_result.get("convergence"),
+                                    )
+                                    logger.info("Auto-simulation complete and persisted to DB")
+                                except Exception as e:
+                                    logger.error(f"Auto-simulation failed: {e}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load/run simulation: {e}")
         except Exception as e:
             logger.error(f"Lazy init failed completely: {e}")
             _initialized["done"] = False  # Allow retry
