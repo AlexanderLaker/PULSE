@@ -254,6 +254,78 @@ export function PanelSkeleton() {
 }
 
 /**
+ * Causal Flow Skeleton
+ */
+export function CausalFlowSkeleton() {
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: 20,
+    backgroundColor: '#FBFBFD',
+    borderRadius: 12,
+    border: '1px solid rgba(0,0,0,0.06)',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <SkeletonBase width={140} height={14} />
+      <SkeletonBase width="100%" height={280} borderRadius={50} />
+    </div>
+  );
+}
+
+/**
+ * Allocation Chart Skeleton
+ */
+export function AllocationSkeleton() {
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: 20,
+    backgroundColor: '#FBFBFD',
+    borderRadius: 12,
+    border: '1px solid rgba(0,0,0,0.06)',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <SkeletonBase width={140} height={14} />
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SkeletonBase width={60} height={10} borderRadius={4} />
+          <SkeletonBase width="100%" height={6} borderRadius={3} />
+          <SkeletonBase width={32} height={10} borderRadius={4} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Force Waterfall Skeleton
+ */
+export function ForceWaterfallSkeleton() {
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: 20,
+    backgroundColor: '#FBFBFD',
+    borderRadius: 12,
+    border: '1px solid rgba(0,0,0,0.06)',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <SkeletonBase width={140} height={14} />
+      <SkeletonBase width="100%" height={220} borderRadius={8} />
+    </div>
+  );
+}
+
+/**
  * Full Page Skeleton
  */
 export function FullPageSkeleton() {

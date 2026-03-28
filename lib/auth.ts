@@ -5,7 +5,9 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'pulse-dev-secret-key-min-32-chars-long-2026'
 );
 
-const TOKEN_EXPIRY = '7d';
+const ACCESS_TOKEN_EXPIRY = '1h';
+const REFRESH_TOKEN_EXPIRY = '7d';
+const SESSION_WARNING_MINUTES = 5;
 
 /**
  * Hash a plaintext password using bcrypt
@@ -26,7 +28,7 @@ export async function verifyPassword(
 }
 
 /**
- * Create a JWT token for the user
+ * Create a JWT access token (short-lived, 1 hour)
  */
 export async function createToken(
   userId: string,
@@ -35,26 +37,62 @@ export async function createToken(
   const token = await new SignJWT({
     userId,
     email,
+    type: 'access',
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(TOKEN_EXPIRY)
+    .setExpirationTime(ACCESS_TOKEN_EXPIRY)
     .sign(JWT_SECRET);
 
   return token;
 }
 
 /**
- * Verify and decode a JWT token
+ * Create a JWT refresh token (long-lived, 7 days)
+ */
+export async function createRefreshToken(
+  userId: string,
+  email: string
+): Promise<string> {
+  const token = await new SignJWT({
+    userId,
+    email,
+    type: 'refresh',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(REFRESH_TOKEN_EXPIRY)
+    .sign(JWT_SECRET);
+
+  return token;
+}
+
+/**
+ * Verify and decode a JWT token.
+ * Returns payload with remaining time info for session timeout warning.
  */
 export async function verifyToken(
   token: string
-): Promise<{ userId: string; email: string } | null> {
+): Promise<{
+  userId: string;
+  email: string;
+  type?: string;
+  expiresAt?: number;
+  warningActive?: boolean;
+} | null> {
   try {
     const verified = await jwtVerify(token, JWT_SECRET);
+    const exp = verified.payload.exp as number | undefined;
+    const now = Math.floor(Date.now() / 1000);
+    const remainingSeconds = exp ? exp - now : Infinity;
+    const warningThreshold = SESSION_WARNING_MINUTES * 60;
+
     return {
       userId: verified.payload.userId as string,
       email: verified.payload.email as string,
+      type: (verified.payload.type as string) || 'access',
+      expiresAt: exp,
+      warningActive: remainingSeconds <= warningThreshold && remainingSeconds > 0,
     };
   } catch {
     return null;

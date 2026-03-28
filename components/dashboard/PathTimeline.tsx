@@ -23,6 +23,8 @@ import { T, YEARS, CATEGORIES, fmtShift, shortCat, tooltipStyle } from '@/lib/fo
 interface PathTimelineProps {
   shifts?: ShiftMatrix | null;
   selectedCategory?: string | null;
+  triggers?: Array<{ category: string; target_year: number; threshold: number; action_text: string; status: string }>;
+  competitiveOverlay?: Record<string, Record<string, number>> | null;
 }
 
 interface ChartDataPoint {
@@ -157,7 +159,7 @@ function extractBand(
   return result;
 }
 
-const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory = null }) => {
+const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory = null, triggers = [], competitiveOverlay = null }) => {
   const { chartData, visibleCategories, categoryName } = useMemo(() => {
     if (!shifts || !shifts || typeof shifts !== 'object') {
       return { chartData: [], visibleCategories: [], categoryName: null };
@@ -445,6 +447,55 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
           );
         })}
       </div>
+
+      {/* Velocity Indicators */}
+      {visibleCategories.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 16, paddingTop: 12, marginTop: 8,
+          borderTop: `1px solid ${T.border}`,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: T.text3 }}>
+            Velocity (YoY Δ)
+          </div>
+          {visibleCategories.slice(0, 4).map((cat, i) => {
+            const path = extractPath((shifts as Record<string, unknown>)?.[cat]);
+            const v2029 = (path[2030] || 0) - (path[2029] || 0);
+            const accel = v2029 - ((path[2029] || 0) - (path[2028] || 0));
+            const color = catColors[i % catColors.length];
+            const catLabel = shortCat(CATEGORIES.find(c => c.id === cat)?.name || cat);
+            return (
+              <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                <span style={{ fontSize: 10, color: T.text2, fontFamily: T.mono }}>
+                  {catLabel}: {v2029 >= 0 ? '+' : ''}{(v2029 * 100).toFixed(1)}%
+                  <span style={{ color: accel > 0 ? T.red : T.green, marginLeft: 2 }}>
+                    {accel > 0.001 ? '↑' : accel < -0.001 ? '↓' : '→'}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Early-Warning Triggers */}
+      {triggers && triggers.length > 0 && (
+        <div style={{
+          marginTop: 12, padding: '8px 12px',
+          background: 'rgba(255, 159, 10, 0.06)',
+          border: '1px solid rgba(255, 159, 10, 0.15)',
+          borderRadius: 8,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#FF9F0A', marginBottom: 4 }}>
+            TRIGGER ALERTS
+          </div>
+          {triggers.filter(t => t.status === 'fired' || t.status === 'active').slice(0, 3).map((t, i) => (
+            <div key={i} style={{ fontSize: 10, color: T.text2, marginTop: 2 }}>
+              {t.status === 'fired' ? '🔴' : '🟡'} {t.category}: {t.action_text} (by {t.target_year})
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 };

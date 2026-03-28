@@ -186,10 +186,10 @@ const CausalFlow: FC<CausalFlowProps> = ({
       // Extract first year's impacts or use provided data
       if (result.impacts && typeof result.impacts === 'object') {
         const firstYearKey = Object.keys(result.impacts)[0];
-        if (firstYearKey && typeof result.impacts[firstYearKey] === 'object') {
-          setPropagatedImpacts(result.impacts[firstYearKey] as PropagatedImpact);
+        if (firstYearKey && typeof (result.impacts as any)[firstYearKey] === 'object') {
+          setPropagatedImpacts((result.impacts as any)[firstYearKey] as PropagatedImpact);
         } else {
-          setPropagatedImpacts(result.impacts as PropagatedImpact);
+          setPropagatedImpacts(result.impacts as unknown as PropagatedImpact);
         }
       }
     } catch (err) {
@@ -530,7 +530,7 @@ const CausalFlow: FC<CausalFlowProps> = ({
                 flex: 1,
                 height: 5,
                 borderRadius: 3,
-                background: `linear-gradient(to right, ${T.red}, ${T.neutral}, ${T.green})`,
+                background: `linear-gradient(to right, ${T.red}, ${T.text3}, ${T.green})`,
                 outline: 'none',
                 cursor: 'pointer',
               }}

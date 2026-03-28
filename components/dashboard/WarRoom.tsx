@@ -4,11 +4,12 @@
  * Apple × Bain × Goldman Sachs aesthetic
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BarChart3, Layers, Zap, CheckCircle2, Clock,
+  Zap, CheckCircle2, Clock,
   Brain, AlertTriangle, FileDown, Settings, X, RefreshCw, Users,
+  Download, Presentation, MessageCircle,
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '@/lib/format';
@@ -51,8 +52,8 @@ import ForceWeightSliders from './ForceWeightSliders';
 import SettingsPanel from './SettingsPanel';
 import OnboardingTooltips from './OnboardingTooltips';
 import AIInsightsBar from './AIInsightsBar';
-import DelphiPanel from './DelphiPanel';
 import ConnectionStatus from './ConnectionStatus';
+import AIChatPanel from './AIChatPanel';
 
 // ─── Type Definitions ────────────────────────────────────────────
 // All types moved to @/data/mockData.ts
@@ -169,21 +170,40 @@ function ProductImpactAnalysis({ shifts, trends }: ProductImpactProps) {
 // All mock data generation moved to @/data/mockData.ts
 
 // ─── WarRoom Component ──────────────────────────────────────────────
+type PanelType = 'category' | 'settings' | 'delphi' | 'scenario' | null;
+type ModalType = 'export' | 'briefing' | null;
+
 export default function WarRoom(): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate, connectionState, reconnect,
   } = usePulse();
 
+  // Responsive breakpoints
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1920);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isIPad = windowWidth <= 1024;
+  const isLaptop = windowWidth <= 1366;
+
   // Local state
-  const [activeView, setActiveView] = useState<'overview' | 'trends'>('overview');
+  const [showTrends, setShowTrends] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [shockedForce, setShockedForce] = useState<ForceName | null>(null);
   const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
-  const [showDelphi, setShowDelphi] = useState<boolean>(false);
   const [selectedRegion, setSelectedRegion] = useState<string>('Global');
   const [presentationMode, setPresentationMode] = useState(false);
+
+  // Panel stack manager
+  const [activePanel, setActivePanel] = useState<PanelType>(null);
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [aiChatOpen, setAIChatOpen] = useState<boolean>(false);
 
   // Mock data fallback
   const mockData = generateMockData();
@@ -296,30 +316,114 @@ export default function WarRoom(): React.ReactNode {
             </span>
           </div>
 
-          {/* Tab Buttons — Segmented Control */}
-          <div className="segmented-control">
-            {[
-              { id: 'overview' as const, label: 'War Room', icon: BarChart3 },
-              { id: 'trends' as const, label: 'Trends', icon: Layers },
-            ].map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeView === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveView(tab.id)}
-                  className={isActive ? 'active' : ''}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                  } as React.CSSProperties}
-                >
-                  <Icon size={13} />
-                  {tab.label}
-                </button>
-              );
-            })}
+          {/* Primary Action Buttons — Simulate, Scenario, Export, Briefing */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 } as React.CSSProperties}>
+            {/* Simulate Button — primary action pill */}
+            <motion.button
+              onClick={handleSimulate}
+              disabled={simulating}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 18px',
+                borderRadius: 999,
+                border: 'none',
+                background: T.text,
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: simulating ? 'not-allowed' : 'pointer',
+                opacity: simulating ? 0.6 : 1,
+                transition: 'all 0.3s cubic-bezier(0.25,0.1,0.25,1)',
+              } as React.CSSProperties}
+            >
+              <Zap size={13} />
+              {simulating ? 'Simulating…' : 'Simulate'}
+            </motion.button>
+
+            {/* Scenario Selector Button */}
+            <motion.button
+              onClick={() => setActiveModal('export')}
+              whileHover={{ background: T.bg1, borderColor: 'rgba(0,0,0,0.12)' }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.08)',
+                background: 'transparent',
+                color: T.text2,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
+              } as React.CSSProperties}
+              title="Scenario Analysis"
+            >
+              <AlertTriangle size={16} />
+            </motion.button>
+
+            {/* Export Button */}
+            <motion.button
+              data-onboarding="export"
+              onClick={() => setActiveModal('export')}
+              whileHover={{ background: T.bg1, borderColor: 'rgba(0,0,0,0.12)' }}
+              whileTap={{ scale: 0.95 }}
+              className="btn-icon"
+              title="Export Results"
+            >
+              <Download size={16} />
+            </motion.button>
+
+            {/* Briefing / Presentation Mode Button */}
+            <motion.button
+              onClick={() => setActiveModal('briefing')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 10,
+                border: `1px solid ${presentationMode ? T.accent : 'rgba(0,0,0,0.08)'}`,
+                background: presentationMode ? `${T.accent}15` : 'transparent',
+                color: presentationMode ? T.accent : T.text2,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
+              } as React.CSSProperties}
+              title="Briefing Mode"
+            >
+              <Presentation size={16} />
+            </motion.button>
+
+            {/* AI Chat Button */}
+            <motion.button
+              onClick={() => setAIChatOpen(!aiChatOpen)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              style={{
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 10,
+                border: `1px solid ${aiChatOpen ? T.accent : 'rgba(0,0,0,0.08)'}`,
+                background: aiChatOpen ? `${T.accent}15` : 'transparent',
+                color: aiChatOpen ? T.accent : T.text2,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
+              } as React.CSSProperties}
+              title="AI Chat"
+            >
+              <MessageCircle size={16} />
+            </motion.button>
           </div>
 
           {/* Region Selector */}
@@ -411,96 +515,6 @@ export default function WarRoom(): React.ReactNode {
                 {data.convergence?.iterations?.toLocaleString() || '5k'} iter
               </span>
             </div>
-
-            {/* Simulate Button — primary action pill */}
-            <motion.button
-              onClick={handleSimulate}
-              disabled={simulating}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '7px 18px',
-                borderRadius: 999,
-                border: 'none',
-                background: T.text,
-                color: '#fff',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: simulating ? 'not-allowed' : 'pointer',
-                opacity: simulating ? 0.6 : 1,
-                transition: 'all 0.3s cubic-bezier(0.25,0.1,0.25,1)',
-              } as React.CSSProperties}
-            >
-              <Zap size={13} />
-              {simulating ? 'Simulating…' : 'Simulate'}
-            </motion.button>
-
-            {/* Export Button */}
-            <motion.button
-              data-onboarding="export"
-              whileHover={{ background: T.bg1, borderColor: 'rgba(0,0,0,0.12)' }}
-              whileTap={{ scale: 0.95 }}
-              className="btn-icon"
-            >
-              <FileDown size={16} />
-            </motion.button>
-
-            {/* Delphi Button */}
-            <motion.button
-              onClick={() => setShowDelphi(!showDelphi)}
-              whileHover={{ background: showDelphi ? undefined : T.bg1 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 10,
-                border: showDelphi ? `1.5px solid ${T.accent}` : '1px solid rgba(0,0,0,0.08)',
-                background: showDelphi ? 'rgba(0,113,227,0.08)' : 'transparent',
-                color: showDelphi ? T.accent : T.text2,
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
-              } as React.CSSProperties}
-              title="Expert Elicitation"
-            >
-              <Users size={16} />
-            </motion.button>
-
-            {/* Settings Button */}
-            <motion.button
-              whileHover={{ background: T.bg1, borderColor: 'rgba(0,0,0,0.12)' }}
-              whileTap={{ scale: 0.95 }}
-              className="btn-icon"
-            >
-              <Settings size={16} />
-            </motion.button>
-
-            {/* Presentation Mode Toggle */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setPresentationMode(!presentationMode)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 8,
-                border: `1px solid ${presentationMode ? T.accent : T.border2}`,
-                background: presentationMode ? T.accentDim : T.bg1,
-                color: presentationMode ? T.accent : T.text2,
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {presentationMode ? '◉' : '○'} Present
-            </motion.button>
           </div>
         </div>
       </motion.header>
@@ -575,112 +589,141 @@ export default function WarRoom(): React.ReactNode {
           </motion.div>
         )}
 
-        {activeView === 'overview' && (
-          <motion.div
-            key="overview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}
-          >
-            {/* Row 1: Headline KPIs */}
-            <div data-onboarding="kpi" style={{ flex: '0 0 auto' }}>
-              <HeadlineKPI
-                shifts={data.shifts}
-                convergence={data.convergence}
-                selectedCategory={selectedCategory}
-              />
-            </div>
-
-            {/* Row 2: Heatmap (55%) + Path Timeline (45%) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gap: 24,
-                flex: 1,
-                minHeight: 0,
-              } as React.CSSProperties}
-            >
-              {/* Heatmap - 55% of remaining space */}
-              <div
-                data-onboarding="heatmap"
-                style={{
-                  flex: '0 0 55%',
-                  minHeight: 0,
-                  overflow: 'hidden',
-                }}
-              >
-                <ShiftHeatmap
-                  shifts={data.shifts}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={setSelectedCategory}
-                  onHoverCategory={setHoveredCategory}
-                />
-              </div>
-
-              {/* Path Timeline - 45% of remaining space */}
-              <div
-                data-onboarding="timeline"
-                style={{
-                  flex: '0 0 45%',
-                  minHeight: 0,
-                  overflow: 'hidden',
-                }}
-              >
-                <PathTimeline
-                  shifts={data.shifts}
-                  selectedCategory={selectedCategory}
-                />
-              </div>
-            </div>
-
-            {/* Row 3: Causal + Forces + Allocation */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.1fr 0.9fr 1fr',
-                gap: 24,
-                flex: '0 0 auto',
-              } as React.CSSProperties}
-            >
-              <CausalFlow
-                dag={{ edges: data.dagEdges, forces: forceNames as ForceName[] }}
-                shockedForce={shockedForce}
-                onShockForce={setShockedForce}
-              />
-              <ForceWaterfall
-                selectedCategory={selectedCategory}
-              />
-              <AllocationChart
-                allocation={data.allocation[0] || undefined}
-              />
-            </div>
-
-            {/* Row 4: Product Impact Analysis */}
-            <div style={{ flex: '0 0 auto' }}>
-              <ProductImpactAnalysis shifts={data.shifts} trends={data.trends} />
-            </div>
-          </motion.div>
-        )}
-
-        {activeView === 'trends' && (
-          <motion.div
-            key="trends"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <TrendExplorer
-              data={{ trends: data.trends }}
-              forceFilter={forceFilter || ''}
-              onForceFilter={setForceFilter}
-              onUpdateTrend={() => {}}
+        <motion.div
+          key="overview"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}
+        >
+          {/* Row 1: Headline KPIs */}
+          <div data-onboarding="kpi" style={{ flex: '0 0 auto' }}>
+            <HeadlineKPI
+              shifts={data.shifts}
+              convergence={data.convergence}
+              selectedCategory={selectedCategory}
             />
+          </div>
+
+          {/* Row 2: Heatmap + Path Timeline (Responsive Grid) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isIPad ? '1fr' : '1.2fr 1fr',
+              gap: 24,
+              flex: 1,
+              minHeight: 0,
+            } as React.CSSProperties}
+          >
+            {/* Heatmap */}
+            <div
+              data-onboarding="heatmap"
+              style={{
+                flex: '0 0 auto',
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <ShiftHeatmap
+                shifts={data.shifts}
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+                onHoverCategory={setHoveredCategory}
+              />
+            </div>
+
+            {/* Path Timeline */}
+            <div
+              data-onboarding="timeline"
+              style={{
+                flex: '0 0 auto',
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <PathTimeline
+                shifts={data.shifts}
+                selectedCategory={selectedCategory}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Causal + Forces + Allocation (Responsive Grid) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isIPad ? '1fr' : isLaptop ? '1fr 1fr' : '1.1fr 0.9fr 1fr',
+              gap: 24,
+              flex: '0 0 auto',
+            } as React.CSSProperties}
+          >
+            <CausalFlow
+              dag={{ edges: data.dagEdges, forces: forceNames as ForceName[] }}
+              shockedForce={shockedForce}
+              onShockForce={setShockedForce}
+            />
+            <ForceWaterfall
+              selectedCategory={selectedCategory}
+            />
+            <AllocationChart
+              allocation={data.allocation[0] || undefined}
+            />
+          </div>
+
+          {/* Row 4: Product Impact Analysis */}
+          <div style={{ flex: '0 0 auto' }}>
+            <ProductImpactAnalysis shifts={data.shifts} trends={data.trends} />
+          </div>
+
+          {/* Row 5: Collapsible Trends Section */}
+          <motion.div
+            style={{ marginTop: 24 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <button
+              onClick={() => setShowTrends(!showTrends)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '12px 16px', background: T.bg2, border: `1px solid ${T.border1}`,
+                borderRadius: 12, cursor: 'pointer', transition: 'all 0.15s ease',
+              } as React.CSSProperties}
+            >
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.text2, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Trend Explorer
+              </span>
+              <span style={{ fontSize: 11, color: T.text3, marginLeft: 'auto' }}>
+                {data.trends?.length || 0} trends · {showTrends ? 'Collapse' : 'Expand'}
+              </span>
+              <motion.span
+                animate={{ rotate: showTrends ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', alignItems: 'center' }}
+              >
+                ▾
+              </motion.span>
+            </button>
+            <AnimatePresence>
+              {showTrends && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  style={{ overflow: 'hidden', marginTop: 8 }}
+                >
+                  <TrendExplorer
+                    data={{ trends: data.trends }}
+                    forceFilter={forceFilter || ''}
+                    onForceFilter={setForceFilter}
+                    onUpdateTrend={() => {}}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
-        )}
+        </motion.div>
       </motion.main>
 
       {/* ─── DETAIL PANEL (Right Slide-In Grid Column) ─────────────────────────────── */}
@@ -834,10 +877,15 @@ export default function WarRoom(): React.ReactNode {
         </div>
       </motion.footer>
 
-      {/* Delphi Panel */}
-      <AnimatePresence>
-        {showDelphi && <DelphiPanel onClose={() => setShowDelphi(false)} />}
-      </AnimatePresence>
+      {/* AI Chat Panel (Bottom slide-up) */}
+      <AIChatPanel
+        isOpen={aiChatOpen}
+        onClose={() => setAIChatOpen(false)}
+        onSendMessage={async (message) => {
+          // Mock response - integrate with real API later
+          return `Analysis: ${message.includes('shift') ? 'The portfolio shows a net negative shift driven primarily by Government and Environmental forces.' : 'I can help with shift projections, force analysis, allocation recommendations, and scenario comparisons.'}`;
+        }}
+      />
     </div>
   );
 }

@@ -86,19 +86,29 @@ export async function createUser(
 }
 
 /**
- * Initialize with default admin user if no users exist
+ * Initialize with default admin user if no users exist.
+ * Credentials come from environment variables — never hardcoded.
  */
 export async function initializeDefaultUser(): Promise<void> {
   const users = getUsers();
 
   if (users.length === 0) {
-    const adminEmail = 'laker.alexander@gmail.com';
-    const adminName = 'Alex';
-    const adminPassword = 'pulse2026';
+    const adminEmail = process.env.PULSE_ADMIN_EMAIL;
+    const adminPassword = process.env.PULSE_ADMIN_PASSWORD;
+
+    if (!adminEmail || !adminPassword) {
+      console.warn(
+        'No users exist and PULSE_ADMIN_EMAIL / PULSE_ADMIN_PASSWORD not set. ' +
+        'Register via the UI or set environment variables.'
+      );
+      return;
+    }
+
+    const adminName = process.env.PULSE_ADMIN_NAME || 'Admin';
 
     const admin: User = {
       id: randomUUID(),
-      email: adminEmail,
+      email: adminEmail.toLowerCase(),
       name: adminName,
       passwordHash: await hashPassword(adminPassword),
       createdAt: new Date().toISOString(),

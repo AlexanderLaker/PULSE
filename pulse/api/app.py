@@ -74,11 +74,26 @@ _state_lock = asyncio.Lock()  # Protect concurrent mutations
 def _load_trend_database() -> TrendDatabase:
     """Load trends from the Postgres/SQLite database into a TrendDatabase object.
 
-    No seed/built-in trends — all trends come from API sources via the scanner.
-    Users scan sources, review trends, add them to the model, then simulate.
+    Auto-seeds with 47 Intelligence Report trends if the database is empty.
     """
-    from pulse.database import load_trends
+    from pulse.database import load_trends, save_trends
     db_trends = load_trends()
+
+    if not db_trends:
+        logger.info("Database empty — auto-seeding with Intelligence Report trends...")
+        try:
+            import sys, os
+            scripts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from import_report_trends import get_report_trends
+            seed_trends = get_report_trends()
+            save_trends(seed_trends)
+            db_trends = load_trends()
+            logger.info(f"Seeded {len(db_trends)} trends from Intelligence Report")
+        except Exception as e:
+            logger.error(f"Auto-seed failed: {e}")
+
     logger.info(f"Loaded {len(db_trends)} trends from database")
     return TrendDatabase(
         trends=db_trends,
@@ -264,36 +279,57 @@ def create_app(args=None) -> FastAPI:
     _initialized = {"done": False}
 
     async def _lazy_init():
-        """Initialize state on first request if lifespan didn't run (Vercel serverless)."""
+        """Initialize state on first request if lifespan didn't run (Vercel serverless).
+
+        Includes retry logic and graceful degradation for cold start failures.
+        """
         if _initialized["done"]:
             return
         _initialized["done"] = True
         logger.info("Lazy init: Vercel serverless cold start...")
-        async with _state_lock:
-            if _state["config"] is None:
-                # Initialize all database tables (Postgres on Vercel, SQLite locally)
-                from pulse.database import init_db
-                init_db()
 
-                _state["audit"] = AuditLogger()
-                _state["config"] = ModelConfig()
-                _state["dag"] = CausalDAG()
-                _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
-
-                # Initialize Delphi (uses shared database)
-                from pulse.elicitation.delphi import DelphiProtocol
-                _state["delphi"] = DelphiProtocol()
-
-                # Seed default auth users if needed
-                from pulse.api.auth import ensure_auth_tables
-                ensure_auth_tables()
-
-                # Load trends from database (empty until user scans + adds)
-                if not _state["db"]:
+        try:
+            async with _state_lock:
+                if _state["config"] is None:
+                    # Initialize database tables with retry (handles Neon connection issues)
                     try:
-                        _state["db"] = _load_trend_database()
+                        from pulse.database import init_db
+                        init_db()
+                        logger.info("Database initialized successfully")
                     except Exception as e:
-                        logger.error(f"Failed to load trends: {e}")
+                        logger.error(f"Database init failed (will retry on next request): {e}")
+                        _initialized["done"] = False  # Allow retry on next request
+                        return
+
+                    # Initialize core components
+                    _state["audit"] = AuditLogger()
+                    _state["config"] = ModelConfig()
+                    _state["dag"] = CausalDAG()
+                    _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
+
+                    # Initialize Delphi (uses shared database, non-critical)
+                    try:
+                        from pulse.elicitation.delphi import DelphiProtocol
+                        _state["delphi"] = DelphiProtocol()
+                    except Exception as e:
+                        logger.warning(f"Delphi init failed (non-critical): {e}")
+
+                    # Seed default auth users if needed (non-critical)
+                    try:
+                        from pulse.api.auth import ensure_auth_tables
+                        ensure_auth_tables()
+                    except Exception as e:
+                        logger.warning(f"Auth tables init failed (non-critical): {e}")
+
+                    # Load trends from database (empty until user scans + adds)
+                    if not _state["db"]:
+                        try:
+                            _state["db"] = _load_trend_database()
+                        except Exception as e:
+                            logger.error(f"Failed to load trends: {e}")
+        except Exception as e:
+            logger.error(f"Lazy init failed completely: {e}")
+            _initialized["done"] = False  # Allow retry
 
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request

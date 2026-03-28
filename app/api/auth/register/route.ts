@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByEmail, createUser } from '@/lib/db';
-import { createToken, hashPassword } from '@/lib/auth';
+import { createToken, createRefreshToken, hashPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,8 +53,9 @@ export async function POST(request: NextRequest) {
     const hashedPw = await hashPassword(password);
     const user = await createUser(email, hashedPw, name);
 
-    // Create token
+    // Create tokens
     const token = await createToken(user.id, user.email);
+    const refreshToken = await createRefreshToken(user.id, user.email);
 
     // Create response with cookie
     const response = NextResponse.json(
@@ -69,8 +70,17 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
-    // Set httpOnly cookie
+    // Set access token cookie (1 hour)
     response.cookies.set('pulse-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60, // 1 hour
+      path: '/',
+    });
+
+    // Set refresh token cookie (7 days)
+    response.cookies.set('pulse-refresh-token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

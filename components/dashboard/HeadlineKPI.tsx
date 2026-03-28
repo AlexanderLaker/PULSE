@@ -132,6 +132,8 @@ export default function HeadlineKPI({
 }: HeadlineKPIProps) {
   // Compute portfolio average shift at 2030
   let avgShift = 0;
+  let avgP10 = 0;
+  let avgP90 = 0;
   let maxExpansion = { name: '—', val: -Infinity };
   let maxContraction = { name: '—', val: Infinity };
   let catCount = 0;
@@ -159,6 +161,27 @@ export default function HeadlineKPI({
 
     if (catCount > 0) {
       avgShift = avgShift / catCount;
+    }
+
+    // Compute p10 and p90 bounds from PercentileDistribution at 2030
+    Object.entries(shifts).forEach(([catId, pathData]) => {
+      const pathObj = typeof pathData === 'object' && pathData !== null ? pathData : { 2030: pathData };
+      const val2030Entry = (pathObj as any)[2030];
+
+      if (typeof val2030Entry === 'object' && val2030Entry !== null) {
+        avgP10 += val2030Entry.p10 ?? val2030Entry.median ?? 0;
+        avgP90 += val2030Entry.p90 ?? val2030Entry.median ?? 0;
+      } else {
+        // Scalar value — no percentile info, use the value itself
+        const v = typeof val2030Entry === 'number' ? val2030Entry : 0;
+        avgP10 += v;
+        avgP90 += v;
+      }
+    });
+
+    if (catCount > 0) {
+      avgP10 = avgP10 / catCount;
+      avgP90 = avgP90 / catCount;
     }
   }
 
@@ -197,7 +220,7 @@ export default function HeadlineKPI({
         icon={TrendingUp}
         label="Portfolio Shift 2030"
         value={fmtShift(avgShift)}
-        detail={`${catCount} categories analyzed`}
+        detail={catCount > 0 && (avgP10 !== 0 || avgP90 !== 0) ? `80% CI: ${fmtShift(avgP10)} to ${fmtShift(avgP90)} · ${catCount} categories` : `${catCount} categories analyzed`}
         color={shiftColorHex(avgShift)}
         bgIcon={avgShift >= 0 ? T.greenDim : T.redDim}
         delay={0}

@@ -4,7 +4,7 @@
  * Apple × Bain: clean, purposeful, data-forward.
  */
 
-import { useMemo, FC } from 'react';
+import { useMemo, useState, FC } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart,
@@ -23,6 +23,7 @@ import { T, FORCES, CATEGORIES, fmtPct, shortCat, tooltipStyle } from '@/lib/for
 interface ForceWaterfallProps {
   trends?: Trend[] | null;
   selectedCategory?: string | null;
+  causalDecomposition?: Record<string, any> | null;
 }
 
 interface ChartDataPoint {
@@ -81,7 +82,9 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 const ForceWaterfall: FC<ForceWaterfallProps> = ({
   trends = null,
   selectedCategory = 'lhc_fcn',
+  causalDecomposition = null,
 }) => {
+  const [showPropagated, setShowPropagated] = useState(false);
   const { chartData, categoryName } = useMemo(() => {
     if (!trends || !Array.isArray(trends)) {
       return { chartData: [], categoryName: 'FCN' };
@@ -180,6 +183,29 @@ const ForceWaterfall: FC<ForceWaterfallProps> = ({
         >
           Contribution to {categoryName} shift by force
         </div>
+      </div>
+
+      {/* Direct / Propagated Toggle */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        {['Direct', 'With Propagation'].map((label, idx) => (
+          <button
+            key={label}
+            onClick={() => setShowPropagated(idx === 1)}
+            style={{
+              padding: '4px 12px',
+              fontSize: 10,
+              fontWeight: 500,
+              borderRadius: 6,
+              border: `1px solid ${(idx === 0 ? !showPropagated : showPropagated) ? T.accent : T.border1}`,
+              background: (idx === 0 ? !showPropagated : showPropagated) ? `${T.accent}15` : 'transparent',
+              color: (idx === 0 ? !showPropagated : showPropagated) ? T.accent : T.text3,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Chart */}

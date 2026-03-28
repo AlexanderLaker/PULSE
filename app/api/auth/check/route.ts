@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
           id: decoded.userId,
           email: decoded.email,
         },
+        session: {
+          expiresAt: decoded.expiresAt,
+          warningActive: decoded.warningActive,
+        },
       },
       { status: 200 }
     );

@@ -74,6 +74,7 @@ def _sqlite_connect():
 def get_db_connection():
     """
     Context manager for database connections with auto-commit.
+    Includes retry logic for cold-start connection failures (Neon/Postgres).
 
     Returns a connection + a dict-like row factory regardless of backend.
     Uses %s placeholders for Postgres, ? for SQLite — callers should use
@@ -85,11 +86,35 @@ def get_db_connection():
             cursor.execute(...)
             conn.commit()
     """
-    if USE_POSTGRES:
-        conn = _pg_connect()
-        conn.cursor_factory = psycopg2.extras.RealDictCursor
-    else:
-        conn = _sqlite_connect()
+    max_retries = 3
+    last_error = None
+    conn = None
+
+    for attempt in range(max_retries):
+        try:
+            if USE_POSTGRES:
+                conn = _pg_connect()
+                conn.cursor_factory = psycopg2.extras.RealDictCursor
+            else:
+                conn = _sqlite_connect()
+            break
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                import time
+                wait = 0.5 * (2 ** attempt)
+                logger.warning(
+                    f"DB connection attempt {attempt + 1}/{max_retries} failed: {e}. "
+                    f"Retrying in {wait:.1f}s..."
+                )
+                time.sleep(wait)
+            else:
+                logger.error(f"All {max_retries} DB connection attempts failed: {e}")
+
+    if conn is None:
+        raise RuntimeError(
+            f"Failed to connect to database after {max_retries} attempts: {last_error}"
+        )
 
     try:
         yield conn
