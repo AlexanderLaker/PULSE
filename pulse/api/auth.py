@@ -61,6 +61,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RequestResetRequest(BaseModel):
+    """Step 1: User provides email → receives reset link via email."""
+    email: str
+
+class ConfirmResetRequest(BaseModel):
+    """Step 2: User clicks link with token → sets new password."""
+    token: str
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+# Keep legacy model for backwards compat
 class ResetPasswordRequest(BaseModel):
     email: str
     new_password: str = Field(..., min_length=6, max_length=128)
@@ -312,36 +322,168 @@ def login_user(req: LoginRequest) -> AuthResponse:
         )
 
 
-def reset_password(req: ResetPasswordRequest) -> dict:
-    """Reset user password by email."""
+# ── Resend Email Integration ─────────────────────────────────────
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_EtpzJRr3_Pfqj4AdH3fogdekDeBuSBbdZ")
+RESET_TOKEN_EXPIRY = 3600  # 1 hour
+
+
+def _get_app_url() -> str:
+    """Get the app's base URL for reset links."""
+    # Vercel provides VERCEL_URL
+    vercel_url = os.environ.get("VERCEL_URL")
+    if vercel_url:
+        return f"https://{vercel_url}"
+    return os.environ.get("PULSE_APP_URL", "http://localhost:3000")
+
+
+def _send_reset_email(to_email: str, reset_token: str) -> bool:
+    """Send password reset email via Resend."""
+    import urllib.request
+    import urllib.error
+
+    app_url = _get_app_url()
+    reset_link = f"{app_url}#reset={reset_token}"
+
+    payload = json.dumps({
+        "from": "PULSE <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": "PULSE — Password Reset",
+        "html": f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #0071E3, #7B61FF); display: inline-flex; align-items: center; justify-content: center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 600; color: #1D1D1F; text-align: center; margin-bottom: 8px;">Reset Your Password</h2>
+            <p style="font-size: 14px; color: #6E6E73; text-align: center; line-height: 1.6; margin-bottom: 32px;">
+                Click the button below to set a new password for your PULSE account. This link expires in 1 hour.
+            </p>
+            <div style="text-align: center; margin-bottom: 32px;">
+                <a href="{reset_link}" style="display: inline-block; padding: 12px 32px; border-radius: 10px; background: #0071E3; color: white; font-size: 14px; font-weight: 600; text-decoration: none;">
+                    Reset Password
+                </a>
+            </div>
+            <p style="font-size: 12px; color: #999; text-align: center;">
+                If you didn't request this, you can safely ignore this email.
+            </p>
+        </div>
+        """,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            logger.info(f"Reset email sent to {to_email}: {result.get('id', 'ok')}")
+            return True
+    except urllib.error.HTTPError as e:
+        body = e.read().decode() if e.fp else ""
+        logger.error(f"Resend API error {e.code}: {body}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send reset email: {e}")
+        return False
+
+
+def request_password_reset(req: RequestResetRequest) -> dict:
+    """Step 1: Generate a reset token and email it to the user."""
     ensure_auth_tables()
     p = placeholder()
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
         cursor.execute(
-            f"SELECT id FROM users WHERE email = {p}",
+            f"SELECT id, email, name FROM users WHERE email = {p}",
             (req.email.lower(),)
         )
         raw_row = cursor.fetchone()
 
-        if not raw_row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
+    if not raw_row:
+        # Don't reveal whether the email exists — always return success
+        return {"success": True, "message": "If that email is registered, a reset link has been sent."}
 
-        row = _row_to_dict(raw_row)
+    row = _row_to_dict(raw_row)
+
+    # Create a short-lived JWT as the reset token
+    reset_token = _create_jwt({
+        "sub": row["id"],
+        "email": row["email"],
+        "purpose": "password_reset",
+        "exp": time.time() + RESET_TOKEN_EXPIRY,
+    })
+
+    # Send email
+    sent = _send_reset_email(row["email"], reset_token)
+    if not sent:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send reset email. Please try again.",
+        )
+
+    return {"success": True, "message": "If that email is registered, a reset link has been sent."}
+
+
+def confirm_password_reset(req: ConfirmResetRequest) -> dict:
+    """Step 2: Verify the token and set the new password."""
+    # Verify the reset token
+    payload = _verify_jwt(req.token)
+    if not payload or payload.get("purpose") != "password_reset":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link. Please request a new one.",
+        )
+
+    ensure_auth_tables()
+    p = placeholder()
+    user_id = payload["sub"]
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT id FROM users WHERE id = {p}", (user_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
         pw_hash, pw_salt = _hash_password(req.new_password)
-
         cursor.execute(
             f"UPDATE users SET password_hash = {p}, password_salt = {p} WHERE id = {p}",
-            (pw_hash, pw_salt, row["id"])
+            (pw_hash, pw_salt, user_id),
         )
         conn.commit()
 
-        return {"success": True, "message": "Password reset successfully"}
+    return {"success": True, "message": "Password updated successfully. You can now sign in."}
+
+
+def reset_password(req: ResetPasswordRequest) -> dict:
+    """Legacy direct reset (kept for backwards compatibility)."""
+    ensure_auth_tables()
+    p = placeholder()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT id FROM users WHERE email = {p}", (req.email.lower(),))
+        raw_row = cursor.fetchone()
+        if not raw_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        row = _row_to_dict(raw_row)
+        pw_hash, pw_salt = _hash_password(req.new_password)
+        cursor.execute(
+            f"UPDATE users SET password_hash = {p}, password_salt = {p} WHERE id = {p}",
+            (pw_hash, pw_salt, row["id"]),
+        )
+        conn.commit()
+
+    return {"success": True, "message": "Password reset successfully"}
 
 
 def get_all_users() -> list[UserResponse]:

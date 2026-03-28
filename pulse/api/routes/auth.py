@@ -1,12 +1,14 @@
-"""Auth API routes — registration, login, profile, user management."""
+"""Auth API routes — registration, login, profile, user management, password reset."""
 
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pulse.api.auth import (
-    RegisterRequest, LoginRequest, UpdateProfileRequest, ResetPasswordRequest,
+    RegisterRequest, LoginRequest, UpdateProfileRequest,
+    RequestResetRequest, ConfirmResetRequest, ResetPasswordRequest,
     AuthResponse, UserResponse,
-    register_user, login_user, get_all_users, update_user, delete_user, reset_password,
+    register_user, login_user, get_all_users, update_user, delete_user,
+    request_password_reset, confirm_password_reset, reset_password,
     get_current_user, require_auth, require_admin,
 )
 
@@ -26,9 +28,21 @@ async def login(req: LoginRequest):
     return login_user(req)
 
 
+@router.post("/auth/request-reset")
+async def request_reset(req: RequestResetRequest):
+    """Step 1: Send a password reset link to the user's email via Resend."""
+    return request_password_reset(req)
+
+
+@router.post("/auth/confirm-reset")
+async def confirm_reset(req: ConfirmResetRequest):
+    """Step 2: Verify reset token and set new password."""
+    return confirm_password_reset(req)
+
+
 @router.post("/auth/reset-password")
 async def reset_pw(req: ResetPasswordRequest):
-    """Reset password by email (no auth required)."""
+    """Legacy direct reset (backwards compat)."""
     return reset_password(req)
 
 
