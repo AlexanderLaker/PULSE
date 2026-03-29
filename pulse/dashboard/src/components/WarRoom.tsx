@@ -274,6 +274,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             ai_suggested: t.ai_suggested || false,
             confidence: t.confidence || 'Medium',
             sources: t.sources || [],
+            gp1_pct_affected: t.gp1_pct_affected ?? 0.10,
           }));
           setInitialData(prev => ({ ...prev, trends: mapped as any }));
         }
