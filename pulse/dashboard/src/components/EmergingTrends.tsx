@@ -1116,7 +1116,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
           {filteredTrends.length} trends · {newCount} new · {addedCount} added{selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
         </span>
         <span>
-          19 API sources · Max {MAX_VISIBLE_TRENDS} trends
+          6 forces · 10 research questions · Max {MAX_VISIBLE_TRENDS} trends
         </span>
       </div>
     </motion.div>
