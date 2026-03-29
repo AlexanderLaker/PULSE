@@ -189,10 +189,15 @@ def init_db() -> None:
         """)
 
         # Migration: add gp1_pct_affected column if missing (for existing DBs)
+        # Use SAVEPOINT so a failure doesn't poison the Postgres transaction
         try:
+            if POSTGRES_URL:
+                cursor.execute("SAVEPOINT sp_migrate_gp1")
             cursor.execute("ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10")
             conn.commit()
         except Exception:
+            if POSTGRES_URL:
+                cursor.execute("ROLLBACK TO SAVEPOINT sp_migrate_gp1")
             pass  # Column already exists
 
         # ── Category exposure ────────────────────────────────────────
