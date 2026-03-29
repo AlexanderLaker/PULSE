@@ -1005,6 +1005,72 @@ def create_app(args=None) -> FastAPI:
             "backtesting_accuracy": config.backtesting_accuracy,
         }
 
+    class ConfigUpdate(BaseModel):
+        attenuation: Optional[float] = Field(None, ge=0.05, le=1.0,
+            description="Attenuation factor (0.05-1.0). Controls how much raw "
+                        "force scores translate to GP1 shifts. Lower = more "
+                        "conservative output. Default 0.5.")
+        attenuation_source: Optional[str] = Field(None,
+            description="'assumed' | 'backtested' | 'admin_override'")
+        force_weights: Optional[dict] = None
+        iterations: Optional[int] = Field(None, ge=1000, le=100000)
+        within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
+        t_copula_df: Optional[int] = Field(None, ge=2, le=30)
+
+    @app.put("/api/v1/config")
+    async def update_config(req: ConfigUpdate):
+        """Admin endpoint to update model configuration (e.g. attenuation)."""
+        config = _state.get("config")
+        if not config:
+            raise HTTPException(404, "No config loaded")
+
+        audit = _state.get("audit")
+        changes = {}
+
+        if req.attenuation is not None:
+            old_val = config.attenuation
+            config.attenuation = req.attenuation
+            config.attenuation_source = req.attenuation_source or "admin_override"
+            changes["attenuation"] = {"old": old_val, "new": req.attenuation}
+
+        if req.force_weights is not None:
+            total = sum(req.force_weights.values())
+            if abs(total - 1.0) > 0.01:
+                raise HTTPException(400, f"Force weights must sum to 1.0, got {total}")
+            changes["force_weights"] = {"old": config.force_weights, "new": req.force_weights}
+            config.force_weights = req.force_weights
+
+        if req.iterations is not None:
+            changes["iterations"] = {"old": config.iterations, "new": req.iterations}
+            config.iterations = req.iterations
+
+        if req.within_force_rho is not None:
+            changes["within_force_rho"] = {"old": config.within_force_rho, "new": req.within_force_rho}
+            config.within_force_rho = req.within_force_rho
+
+        if req.t_copula_df is not None:
+            changes["t_copula_df"] = {"old": config.t_copula_df, "new": req.t_copula_df}
+            config.t_copula_df = req.t_copula_df
+
+        if audit and changes:
+            audit.log("config_update", "config", "global",
+                       old_value=json.dumps({k: v["old"] for k, v in changes.items()}),
+                       new_value=json.dumps({k: v["new"] for k, v in changes.items()}),
+                       reason="Admin config update")
+
+        # Invalidate cached simulation results so next request re-runs
+        _state.pop("simulation_results", None)
+        _state.pop("allocation", None)
+
+        return {"updated": list(changes.keys()), "config": {
+            "attenuation": config.attenuation,
+            "attenuation_source": config.attenuation_source,
+            "force_weights": config.force_weights,
+            "iterations": config.iterations,
+            "within_force_rho": config.within_force_rho,
+            "t_copula_df": config.t_copula_df,
+        }}
+
     # ── Audit ───────────────────────────────────────────────────────
     @app.get("/api/v1/audit/log")
     async def get_audit_log(limit: int = 50):

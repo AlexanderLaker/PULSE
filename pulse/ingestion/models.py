@@ -33,6 +33,14 @@ class Trend:
     scorer_count: int = 1
     score_variance: float = 0.0
     debiasing_applied: bool = False
+    # % of GP1 affected — what fraction of the category profit pool is
+    # realistically exposed to this trend at full materialization.
+    # AI-preset, expert-adjustable. Range 0.0 to 1.0 (e.g. 0.15 = 15%).
+    # This replaces the implicit assumption that every trend can affect
+    # 100% of the pool. A 5/5 impact trend with gp1_pct_affected=0.15
+    # means: "this is a maximum-severity trend, but even at full force
+    # it only touches 15% of the category's GP1."
+    gp1_pct_affected: float = 0.10  # default 10% — conservative baseline
     # Bayesian posteriors — (alpha, beta) for Beta distribution
     impact_posterior: Optional[tuple] = None
     probability_posterior: Optional[tuple] = None
@@ -40,7 +48,13 @@ class Trend:
     def __post_init__(self):
         direction_sign = 1 if self.direction == "Expansion" else -1
         self.weighted_score = self.impact * self.probability * direction_sign
-        self.normalized_score = self.weighted_score / 25.0
+        # normalized_score now incorporates gp1_pct_affected:
+        # The raw score (impact × prob × direction / 25) is scaled by
+        # the fraction of GP1 actually exposed to this trend.
+        # Old: normalized_score ∈ [-1.0, +1.0] — meaningless at extremes
+        # New: normalized_score ∈ [-gp1_pct, +gp1_pct] — economically anchored
+        raw_normalized = self.weighted_score / 25.0
+        self.normalized_score = raw_normalized * self.gp1_pct_affected
         # Default Bayesian priors centered on expert score
         if self.impact_posterior is None:
             self.impact_posterior = (max(self.impact, 1), max(6 - self.impact, 1))

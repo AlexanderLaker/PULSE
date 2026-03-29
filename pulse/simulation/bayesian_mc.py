@@ -211,8 +211,9 @@ class BayesianMonteCarloEngine:
             direction_signs = np.full(n_iter, trend.direction_sign)
             direction_signs[flip_mask] *= -1
 
-            # Normalized score = (impact * probability * direction) / 25
-            samples[:, j] = (impact_scaled * prob_scaled * direction_signs) / 25.0
+            # Normalized score = (impact * probability * direction) / 25 × gp1_pct_affected
+            # gp1_pct_affected caps the maximum economic impact of this trend
+            samples[:, j] = (impact_scaled * prob_scaled * direction_signs) / 25.0 * trend.gp1_pct_affected
 
         return samples
 

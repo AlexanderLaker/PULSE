@@ -1,6 +1,6 @@
 # PULSE — Profit Pool Unified Landscape Simulation Engine
 
-## Project Specification & Architecture — v2.1
+## Project Specification & Architecture — v2.2
 
 ---
 
@@ -25,6 +25,12 @@ This specification was elevated based on ten critical feedback dimensions that a
 8. **Continuous Path Modeling** replaces 2 discrete time horizons — velocity matters, early-warning triggers included
 9. **Formal Delphi Expert Elicitation Protocol** — structured scoring with calibration and debiasing
 10. **War Room UX** replaces 8 separate pages — one screen tells the story, drill-down on demand
+
+### What Changed in v2.2 (vs. v2.1)
+Two critical model integrity improvements:
+
+11. **Economic Anchoring via `gp1_pct_affected`** — Each trend now carries a "% of GP1 affected" parameter (0.0 to 1.0) that caps the maximum fraction of a category's profit pool that this trend can realistically touch at full materialization. This replaces the implicit assumption that every 5/5 trend affects 100% of the pool. AI-preset per trend (range: 2-25%), expert-adjustable via dashboard or Delphi. Implemented in both the Trend dataclass (`normalized_score = raw_score × gp1_pct_affected`) and the Bayesian MC copula sampler.
+12. **Admin-Configurable Model Parameters** — The attenuation factor, force weights, copula parameters, and iteration count are now configurable via `PUT /api/v1/config` with validation, audit logging, and simulation cache invalidation. Attenuation source is tracked as `"assumed"`, `"backtested"`, or `"admin_override"`.
 
 ### Design Philosophy
 1. **Enterprise-grade security** — deployed within Henkel's corporate cloud environment with standard enterprise security controls
@@ -184,7 +190,7 @@ class Trend:
     probability: int                 # 1-5 (expert-scored via Delphi)
     start_year: int                  # Year effect begins
     weighted_score: float            # impact × probability × direction_sign
-    normalized_score: float          # weighted_score / 25
+    normalized_score: float          # (weighted_score / 25) × gp1_pct_affected
     strategic_implication: str       # Action text
     category_exposure: dict[str, int]  # {"Color": 3, "Care": 3, ...}
     vc_exposure: dict[str, int]      # {"Raw Materials": 2, ...}
@@ -198,6 +204,10 @@ class Trend:
     scorer_count: int                # Number of experts who scored
     score_variance: float            # Inter-rater variance
     debiasing_applied: bool          # Whether anchoring correction was applied
+    # Economic anchoring (v2.2)
+    gp1_pct_affected: float          # 0.0-1.0: fraction of category GP1 exposed to this trend
+                                     # AI-preset, expert-adjustable. Default 0.10 (10%).
+                                     # Example: PL penetration = 0.25, DPP compliance = 0.02
     # Bayesian posterior
     impact_posterior: tuple           # (alpha, beta) for Beta distribution
     probability_posterior: tuple      # (alpha, beta) for Beta distribution
@@ -206,14 +216,18 @@ class Trend:
 class ModelConfig:
     region: str
     aggregation_method: str          # "Multiplicative"
-    attenuation: float               # Empirically derived from backtesting (default 0.5, calibrated)
+    attenuation: float               # Default 0.5, admin-configurable via PUT /api/v1/config
+    attenuation_source: str          # "assumed" | "backtested" | "admin_override"
     neutral_threshold: float         # 0.001
     base_year: int                   # 2025
     path_years: list[int]            # [2026, 2027, 2028, 2029, 2030]
     maturity_schedule: dict          # Year → materialization fraction
-    force_weights: dict[str, float]  # 6 forces → weights summing to 1.0
+    force_weights: dict[str, float]  # 6 forces → weights summing to 1.0 (admin-configurable)
     vc_weights: dict[str, float]     # 8 VC steps → weights summing to 1.0
-    category_names: list[str]        # 13 category names
+    category_names: list[str]        # 12 category names
+    iterations: int                  # Default 10,000 (admin-configurable, range 1K-100K)
+    within_force_rho: float          # Default 0.3 (admin-configurable)
+    t_copula_df: int                 # Default 4 (admin-configurable, range 2-30)
     backtesting_accuracy: float      # Derived from Phase 0 calibration
 
 @dataclass
@@ -1971,7 +1985,7 @@ PROFIT_POOL_ENGINE/
 
 ---
 
-*Document Version: 2.0 — March 2026*
+*Document Version: 2.2 — March 2026*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Bayesian hierarchical + copula dependencies + causal DAG + game theory + Delphi elicitation*
