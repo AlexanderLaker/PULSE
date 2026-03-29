@@ -51,7 +51,8 @@ from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routes.delphi import router as delphi_router
 from pulse.api.routes.auth import router as auth_router
-from pulse.api.routes.scanner import router as scanner_router
+# Scanner/Emerging Trends routes removed — external API scanning disabled
+# from pulse.api.routes.scanner import router as scanner_router
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +300,8 @@ def create_app(args=None) -> FastAPI:
     # Include auth routes
     app.include_router(auth_router, prefix="/api/v1")
 
-    # Include scanner routes
-    app.include_router(scanner_router, prefix="/api/v1")
+    # Scanner routes removed (Emerging Trends disabled)
+    # app.include_router(scanner_router, prefix="/api/v1")
 
     # ── Lazy Initialization (Vercel serverless compatibility) ─────
     _initialized = {"done": False}
@@ -1065,6 +1066,7 @@ def create_app(args=None) -> FastAPI:
         attenuation_source: Optional[str] = Field(None,
             description="'assumed' | 'backtested' | 'admin_override'")
         force_weights: Optional[dict] = None
+        vc_weights: Optional[dict] = None
         iterations: Optional[int] = Field(None, ge=1000, le=100000)
         within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
         t_copula_df: Optional[int] = Field(None, ge=2, le=30)
@@ -1092,6 +1094,13 @@ def create_app(args=None) -> FastAPI:
             changes["force_weights"] = {"old": config.force_weights, "new": req.force_weights}
             config.force_weights = req.force_weights
 
+        if req.vc_weights is not None:
+            total = sum(req.vc_weights.values())
+            if abs(total - 1.0) > 0.01:
+                raise HTTPException(400, f"VC weights must sum to 1.0, got {total}")
+            changes["vc_weights"] = {"old": config.vc_weights, "new": req.vc_weights}
+            config.vc_weights = req.vc_weights
+
         if req.iterations is not None:
             changes["iterations"] = {"old": config.iterations, "new": req.iterations}
             config.iterations = req.iterations
@@ -1118,6 +1127,7 @@ def create_app(args=None) -> FastAPI:
             "attenuation": config.attenuation,
             "attenuation_source": config.attenuation_source,
             "force_weights": config.force_weights,
+            "vc_weights": config.vc_weights,
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
             "t_copula_df": config.t_copula_df,
@@ -1320,69 +1330,16 @@ def create_app(args=None) -> FastAPI:
             logger.error(f"PowerPoint export failed: {e}\n{tb}")
             raise HTTPException(500, f"Export failed: {str(e)}\n{tb}")
 
-    # ── AI Scanning & Intelligence ─────────────────────────────────
+    # ── AI Scanning (disabled — external API integrations removed) ──
     @app.post("/api/v1/ai/scan")
     async def ai_scan():
-        """AI trend scanning — aggregates from live APIs with seed fallback."""
-        all_trends = []
-        sources_checked = []
-
-        # 1. BeautyFeeds.io — real-time beauty market data
-        try:
-            from pulse.integrations.beautyfeeds import BeautyFeedsClient
-            bf = BeautyFeedsClient()
-            if bf.api_key:
-                trends = bf.scan_for_trends()
-                all_trends.extend(trends)
-                sources_checked.append({"api": "beautyfeeds", "status": "ok", "trends_found": len(trends)})
-            else:
-                sources_checked.append({"api": "beautyfeeds", "status": "no_key"})
-        except Exception as e:
-            logger.warning(f"BeautyFeeds scan failed: {e}")
-            sources_checked.append({"api": "beautyfeeds", "status": "error", "message": str(e)})
-
-        # 2. OpenAlex — academic research trends
-        try:
-            from pulse.integrations.openalex import OpenAlexClient
-            oa = OpenAlexClient()
-            trends = oa.scan_for_trends()
-            all_trends.extend(trends)
-            sources_checked.append({"api": "openalex", "status": "ok", "trends_found": len(trends)})
-        except Exception as e:
-            logger.warning(f"OpenAlex scan failed: {e}")
-            sources_checked.append({"api": "openalex", "status": "error", "message": str(e)})
-
-        # 3. NewsAPI — real-time news intelligence
-        try:
-            from pulse.integrations.newsapi import NewsAPIClient
-            na = NewsAPIClient()
-            if na.api_key:
-                trends = na.scan_for_trends()
-                all_trends.extend(trends)
-                sources_checked.append({"api": "newsapi", "status": "ok", "trends_found": len(trends)})
-            else:
-                sources_checked.append({"api": "newsapi", "status": "no_key"})
-        except Exception as e:
-            logger.warning(f"NewsAPI scan failed: {e}")
-            sources_checked.append({"api": "newsapi", "status": "error", "message": str(e)})
-
-        # 4. Fallback to seed data if no live trends found
-        if not all_trends:
-            try:
-                from pulse.api.seed_data import get_emerging_trends
-                all_trends = get_emerging_trends()
-                sources_checked.append({"api": "seed_data", "status": "fallback", "trends_found": len(all_trends)})
-            except Exception as e:
-                logger.error(f"Seed data fallback failed: {e}")
-
-        # Sort by relevance score descending
-        all_trends.sort(key=lambda t: t.get("relevance_score", 0), reverse=True)
-
+        """AI trend scanning disabled — external API integrations removed."""
         return {
-            "status": "ok",
-            "trends": all_trends,
-            "sources_checked": sources_checked,
-            "total_trends": len(all_trends),
+            "status": "disabled",
+            "trends": [],
+            "sources_checked": [],
+            "total_trends": 0,
+            "message": "External API scanning has been disabled. Use manual trend entry.",
         }
 
     # ── AI Chat endpoint ─────────────────────────────────────────

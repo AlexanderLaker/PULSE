@@ -34,7 +34,7 @@ import CausalFlow from './CausalFlow';
 import ForceWaterfall from './ForceWaterfall';
 import AllocationChart from './AllocationChart';
 import TrendExplorer from './TrendExplorer';
-import EmergingTrends from './EmergingTrends';
+// EmergingTrends removed — external API scanning disabled
 import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
 import ProductImpactRankings from './ProductImpactRankings';
@@ -590,8 +590,8 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               </span>
             </div>
 
-            {/* Simulate Button — all authenticated users */}
-            {(
+            {/* Simulate Button — admin only */}
+            {isAdmin && (
               <motion.button
                 onClick={handleSimulate}
                 disabled={simulating}
@@ -901,50 +901,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               }}
             />
 
-            {/* Emerging Trends — AI-curated candidates below */}
-            <EmergingTrends
-              onAddTrend={async (emergingTrend) => {
-                try {
-                  const res = await fetch('/api/v1/trends', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      force: emergingTrend.force,
-                      name: emergingTrend.name,
-                      description: emergingTrend.description,
-                      direction: emergingTrend.direction,
-                      impact: emergingTrend.suggested_impact,
-                      probability: emergingTrend.suggested_probability,
-                      category_exposure: emergingTrend.category_mapping,
-                      strategic_implication: emergingTrend.reasoning,
-                      data_source: (emergingTrend.sources || []).map((s: any) => s.api || s.title).join(', '),
-                      confidence: emergingTrend.relevance_score >= 85 ? 'High' : emergingTrend.relevance_score >= 70 ? 'Medium' : 'Low',
-                      ai_suggested: true,
-                    }),
-                  });
-                  if (res.ok) {
-                    // Also update scanned_trends status to 'added'
-                    fetch('/api/v1/scanner/update-trend-status', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ id: emergingTrend.id, status: 'added' }),
-                    }).catch(() => {});
-
-                    // Refresh trend list to show newly added trend
-                    try {
-                      const refreshRes = await fetch('/api/v1/trends');
-                      if (refreshRes.ok) {
-                        const refreshData = await refreshRes.json();
-                        setInitialData((prev: any) => ({ ...prev, trends: refreshData }));
-                      }
-                    } catch {}
-                  }
-                } catch (err) {
-                  console.error('Failed to add trend:', err);
-                }
-              }}
-              userRole={isAdmin ? 'admin' : 'viewer'}
-            />
+            {/* Emerging Trends section removed */}
           </motion.div>
         )}
       </motion.main>
