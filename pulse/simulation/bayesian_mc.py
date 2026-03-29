@@ -252,13 +252,16 @@ class BayesianMonteCarloEngine:
                     total_score += trend_scores[j] * exposure_frac * region_factor
                     count += 1
 
-            avg_score = total_score / max(count, 1)
+            # Additive aggregation: total pressure from all trends in this force.
+            # More trends affecting a category = more total pressure on the pool,
+            # not less (which averaging would cause by diluting strong signals).
+            force_score = total_score
 
             # Apply scenario override if present
             if scenario_overrides and force in scenario_overrides:
-                avg_score += scenario_overrides[force]
+                force_score += scenario_overrides[force]
 
-            base_force_contributions[force] = avg_score * force_weight
+            base_force_contributions[force] = force_score * force_weight
 
         # Compute year-by-year shifts with lag-aware causal propagation
         # Store per-year force contributions for correct lagged referencing

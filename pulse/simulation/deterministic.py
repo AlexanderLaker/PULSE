@@ -67,8 +67,8 @@ class DeterministicEngine:
                         total_score += trend.normalized_score * exposure_frac * region_factor
                         count += 1
 
-                avg_score = total_score / max(count, 1)
-                force_contributions[force] = avg_score * force_weight
+                # Additive: total pressure from all trends (same as MC engine)
+                force_contributions[force] = total_score * force_weight
 
             # Compute per-year shifts with per-force materialization
             year_shifts = {}
@@ -96,10 +96,7 @@ class DeterministicEngine:
         scorecard = {}
         for force in FORCES:
             trends = db.get_trends_by_force(force)
-            if trends:
-                total = sum(t.normalized_score for t in trends) / len(trends)
-            else:
-                total = 0.0
+            total = sum(t.normalized_score for t in trends)
             weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
             scorecard[force] = total * weight
         return scorecard
@@ -120,7 +117,7 @@ class DeterministicEngine:
                     total += trend.normalized_score * (exposure / 5.0)
                     count += 1
             vc_weight = self.config.vc_weights.get(step, 1.0 / len(VC_STEPS))
-            scorecard[step] = (total / max(count, 1)) * vc_weight
+            scorecard[step] = total * vc_weight
         return scorecard
 
     def validate_against_v12(self, db: TrendDatabase, v12_values: dict,
