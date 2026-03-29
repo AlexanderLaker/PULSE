@@ -132,12 +132,12 @@ class BayesianMonteCarloEngine:
     def _generate_copula_samples(self, trends: list, R: np.ndarray,
                                   n_iter: int) -> np.ndarray:
         """
-        Generate correlated samples using t-copula for tail dependence.
+        Generate correlated probability samples using t-copula for tail dependence.
 
-        Each trend gets (impact_sample, probability_sample) from its Beta posterior,
-        both correlated via copula structure. Impact and probability are sampled
-        from a 2*N dimensional copula: first N dimensions for impact,
-        second N dimensions for probability.
+        Each trend's probability of materialization is sampled from its Beta
+        posterior, correlated across trends via copula structure. The copula
+        captures "crisis correlation" — when things go wrong, they go wrong
+        together (t-copula with low df = heavy tails).
 
         Returns: (n_iter, n_trends) array of normalized_score samples
         """
@@ -145,44 +145,25 @@ class BayesianMonteCarloEngine:
         if n_trends == 0:
             return np.zeros((n_iter, 0))
 
-        # Build extended correlation matrix: 2N x 2N for impact + probability
-        # Block diagonal structure with within-force correlation
-        R_extended = np.zeros((2 * n_trends, 2 * n_trends))
-
-        # Impact block (top-left)
-        R_extended[:n_trends, :n_trends] = R
-
-        # Probability block (bottom-right)
-        R_extended[n_trends:, n_trends:] = R
-
-        # Off-diagonal blocks: correlation between impact and probability within trend
-        # Same trend impact-probability correlation (~0.3-0.4)
-        within_trend_corr = 0.35
-        for j in range(n_trends):
-            R_extended[j, n_trends + j] = within_trend_corr
-            R_extended[n_trends + j, j] = within_trend_corr
-
-        # Ensure positive definiteness
-        eigvals = np.linalg.eigvalsh(R_extended)
+        # Ensure positive definiteness of R
+        eigvals = np.linalg.eigvalsh(R)
         if eigvals.min() < 0:
-            R_extended += (abs(eigvals.min()) + 0.01) * np.eye(2 * n_trends)
-            # Re-normalize
-            d = np.sqrt(np.diag(R_extended))
-            R_extended = R_extended / np.outer(d, d)
+            R = R + (abs(eigvals.min()) + 0.01) * np.eye(n_trends)
+            d = np.sqrt(np.diag(R))
+            R = R / np.outer(d, d)
 
         # Generate correlated uniform samples via t-copula
         df = self.config.t_copula_df
         try:
-            L = cholesky(R_extended, lower=True)
+            L = cholesky(R, lower=True)
         except np.linalg.LinAlgError:
-            # Fallback: make positive definite
-            eigvals, eigvecs = np.linalg.eigh(R_extended)
+            eigvals, eigvecs = np.linalg.eigh(R)
             eigvals = np.maximum(eigvals, 1e-6)
-            R_extended = eigvecs @ np.diag(eigvals) @ eigvecs.T
-            L = cholesky(R_extended, lower=True)
+            R = eigvecs @ np.diag(eigvals) @ eigvecs.T
+            L = cholesky(R, lower=True)
 
-        # t-copula: Z ~ N(0, R_extended), chi2 ~ chi2(df), T = Z * sqrt(df/chi2)
-        Z = self.rng.standard_normal((n_iter, 2 * n_trends))
+        # t-copula: Z ~ N(0, R), chi2 ~ chi2(df), T = Z * sqrt(df/chi2)
+        Z = self.rng.standard_normal((n_iter, n_trends))
         Z_correlated = Z @ L.T
 
         chi2_samples = self.rng.chisquare(df, size=(n_iter, 1))
@@ -190,29 +171,21 @@ class BayesianMonteCarloEngine:
 
         # Transform to uniform via t-CDF
         U = t_cdf(T, df=df)
-        U = np.clip(U, 0.001, 0.999)  # Avoid boundary issues
+        U = np.clip(U, 0.001, 0.999)
 
-        # Transform uniforms to Beta-distributed impact/probability samples
+        # Transform uniforms to Beta-distributed probability samples
         samples = np.zeros((n_iter, n_trends))
         for j, trend in enumerate(trends):
-            # Probability of materialization: Beta(α, β) → scale to [0, 1]
-            # This is the core stochastic variable — "how likely does this trend fully play out?"
+            # Probability of materialization: Beta(α, β) → [0, 1]
+            # The sole stochastic driver — "how likely does this trend fully play out?"
             a_p, b_p = trend.probability_posterior
-            prob_01 = beta_ppf(U[:, n_trends + j], a_p, b_p)
-            # prob_01 is already [0, 1] — the probability of full materialization
+            prob_01 = beta_ppf(U[:, j], a_p, b_p)
 
-            # gp1_pct_affected is the economic magnitude — "what fraction of the
-            # category's GP1 can this trend realistically touch at full materialization?"
-            # This replaces the old (impact × probability)/25 formula which
-            # double-counted: impact (1-5) and gp1_pct_affected both captured magnitude.
-            # Now: probability drives likelihood, gp1_pct_affected drives magnitude.
-
-            # Impact score (1-5) is used as a shape modifier on gp1_pct_affected:
-            # it stretches or compresses the economic ceiling slightly.
-            # A 5/5 impact trend uses its full gp1_pct_affected; a 1/5 uses ~40%.
-            a_i, b_i = trend.impact_posterior
-            impact_01 = beta_ppf(U[:, j], a_i, b_i)
-            impact_modifier = 0.4 + 0.6 * impact_01  # Range [0.4, 1.0]
+            # gp1_pct_affected: economic magnitude — "what fraction of the
+            # category's GP1 can this trend touch at full materialization?"
+            # This is the only magnitude variable. Impact score is NOT used
+            # here — it already informed gp1_pct_affected when the trend was
+            # authored (high-impact trends get higher gp1_pct assignments).
 
             # Direction flip: small probability that trend reverses
             flip_prob = 0.02  # 2% chance of direction reversal
@@ -220,10 +193,9 @@ class BayesianMonteCarloEngine:
             direction_signs = np.full(n_iter, trend.direction_sign)
             direction_signs[flip_mask] *= -1
 
-            # Final score = probability × gp1_pct_affected × impact_modifier × direction
-            # At full materialization (prob=1, impact=5): score ≈ gp1_pct_affected
-            # At low probability (prob=0.2, impact=3): score ≈ 0.2 × 0.76 × gp1_pct
-            samples[:, j] = prob_01 * trend.gp1_pct_affected * impact_modifier * direction_signs
+            # Final score = probability × gp1_pct_affected × direction
+            # Clean separation: probability = likelihood, gp1_pct = magnitude
+            samples[:, j] = prob_01 * trend.gp1_pct_affected * direction_signs
 
         return samples
 
