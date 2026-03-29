@@ -1102,6 +1102,7 @@ def create_app(args=None) -> FastAPI:
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
             "region_weights": getattr(config, 'region_weights', {}),
+            "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
             "path_years": config.path_years,
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
@@ -1119,6 +1120,10 @@ def create_app(args=None) -> FastAPI:
         force_weights: Optional[dict] = None
         vc_weights: Optional[dict] = None
         region_weights: Optional[dict] = None
+        force_correlation_matrix: Optional[dict] = Field(None,
+            description="6×6 force correlation matrix for copula. "
+                        "Each force maps to a dict with all 6 forces. "
+                        "Diagonal must be 1.0, off-diagonal in [0,1].")
         iterations: Optional[int] = Field(None, ge=1000, le=100000)
         within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
         t_copula_df: Optional[int] = Field(None, ge=2, le=30)
@@ -1161,6 +1166,35 @@ def create_app(args=None) -> FastAPI:
             changes["region_weights"] = {"old": old_rw, "new": req.region_weights}
             config.region_weights = req.region_weights
 
+        if req.force_correlation_matrix is not None:
+            # Validate: must be symmetric, diagonal 1.0, off-diagonal in [0, 1]
+            fcm = req.force_correlation_matrix
+            forces = ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"]
+            for f in forces:
+                if f not in fcm:
+                    raise HTTPException(400, f"Force correlation matrix missing force '{f}'")
+                row = fcm[f]
+                if not isinstance(row, dict) or len(row) != 6:
+                    raise HTTPException(400, f"Force correlation matrix row '{f}' must have all 6 forces")
+                # Check diagonal is 1.0, off-diagonal in [0, 1]
+                if abs(row.get(f, 0) - 1.0) > 0.01:
+                    raise HTTPException(400, f"Diagonal ({f},{f}) must be 1.0")
+                for other_f, val in row.items():
+                    if not isinstance(val, (int, float)):
+                        raise HTTPException(400, f"Force correlation ({f},{other_f}) must be numeric")
+                    if val < 0 or val > 1:
+                        raise HTTPException(400, f"Force correlation ({f},{other_f}) must be in [0, 1], got {val}")
+            # Check symmetry
+            for f1 in forces:
+                for f2 in forces:
+                    v12 = fcm.get(f1, {}).get(f2, 0)
+                    v21 = fcm.get(f2, {}).get(f1, 0)
+                    if abs(v12 - v21) > 0.001:
+                        raise HTTPException(400, f"Force correlation matrix not symmetric: ({f1},{f2})={v12} but ({f2},{f1})={v21}")
+            old_fcm = getattr(config, 'force_correlation_matrix', {})
+            changes["force_correlation_matrix"] = {"old": old_fcm, "new": fcm}
+            config.force_correlation_matrix = fcm
+
         if req.iterations is not None:
             changes["iterations"] = {"old": config.iterations, "new": req.iterations}
             config.iterations = req.iterations
@@ -1189,6 +1223,7 @@ def create_app(args=None) -> FastAPI:
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
             "region_weights": getattr(config, 'region_weights', {}),
+            "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
             "t_copula_df": config.t_copula_df,

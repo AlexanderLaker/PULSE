@@ -72,6 +72,18 @@ DEFAULT_WITHIN_FORCE_RHO = 0.3
 DEFAULT_T_COPULA_DF = 4  # Low df → heavy tails → crisis correlation
 DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 
+# ── Force correlation matrix (cross-force correlations for copula) ──────
+# Replaces DAG-based correlation for Monte Carlo sampling.
+# Diagonal is always 1.0, off-diagonal values from DAG weights × 0.5.
+DEFAULT_FORCE_CORRELATIONS = {
+    "Consumer": {"Consumer": 1.0, "Customer": 0.25, "Technology": 0.15, "Government": 0.05, "Environmental": 0.20, "Competitive": 0.20},
+    "Customer": {"Consumer": 0.25, "Customer": 1.0, "Technology": 0.15, "Government": 0.20, "Environmental": 0.05, "Competitive": 0.25},
+    "Technology": {"Consumer": 0.15, "Customer": 0.15, "Technology": 1.0, "Government": 0.30, "Environmental": 0.15, "Competitive": 0.25},
+    "Government": {"Consumer": 0.05, "Customer": 0.20, "Technology": 0.30, "Government": 1.0, "Environmental": 0.30, "Competitive": 0.05},
+    "Environmental": {"Consumer": 0.20, "Customer": 0.05, "Technology": 0.15, "Government": 0.30, "Environmental": 1.0, "Competitive": 0.05},
+    "Competitive": {"Consumer": 0.20, "Customer": 0.25, "Technology": 0.25, "Government": 0.05, "Environmental": 0.05, "Competitive": 1.0},
+}
+
 # ── Financial data firewall patterns ───────────────────────────────
 FINANCIAL_KEYWORDS = {"NES", "GP1", "GP2", "revenue", "sales", "profit",
                       "EBIT", "EBITDA", "margin", "turnover", "net income"}
@@ -98,6 +110,7 @@ class ModelConfig:
     iterations: int = DEFAULT_ITERATIONS
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     t_copula_df: int = DEFAULT_T_COPULA_DF
+    force_correlation_matrix: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_CORRELATIONS))
     backtesting_accuracy: Optional[float] = None
 
     def to_json(self) -> str:

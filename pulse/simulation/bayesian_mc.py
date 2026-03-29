@@ -23,18 +23,19 @@ logger = logging.getLogger(__name__)
 
 class BayesianMonteCarloEngine:
     """
-    Bayesian Monte Carlo with copula dependencies and causal propagation.
+    Bayesian Monte Carlo with copula dependencies.
 
     Key differences from v1.2:
     - Beta priors instead of triangular (learnable from data)
-    - Copula-based correlation instead of flat ρ (captures tail dependence)
-    - Causal DAG propagation instead of independent force combination
+    - Copula-based correlation instead of flat ρ (captures tail dependence via force_correlation_matrix)
+    - Multiplicative compounding without causal propagation
     - Continuous annual paths instead of 2 discrete points
     """
 
     def __init__(self, config: ModelConfig, causal_dag: Optional[CausalDAG] = None):
         self.config = config
-        self.dag = causal_dag
+        # causal_dag parameter kept for backward compatibility but not used
+        # (causal propagation removed; correlations now from force_correlation_matrix)
         self.rng = np.random.default_rng(seed=42)
 
     def run(self, db: TrendDatabase, iterations: Optional[int] = None,
@@ -91,28 +92,25 @@ class BayesianMonteCarloEngine:
 
     def _build_correlation_matrix(self, trends: list) -> np.ndarray:
         """
-        Build correlation matrix from causal DAG structure.
+        Build correlation matrix from force correlation matrix.
 
         Within-force: Gaussian copula with ρ from config
-        Cross-force with causal link: ρ derived from DAG weight
-        Cross-force without link: residual macro correlation
+        Cross-force: ρ from force_correlation_matrix or residual macro correlation
         """
         n = len(trends)
         if n == 0:
             return np.eye(0)
 
         R = np.eye(n)
+        fcm = getattr(self.config, 'force_correlation_matrix', {})
 
         for i in range(n):
             for j in range(i + 1, n):
                 if trends[i].force == trends[j].force:
                     rho = self.config.within_force_rho
-                elif self.dag:
-                    # Causal DAG-informed correlation
-                    dag_weight = self.dag.get_propagation_weight(
-                        trends[i].force, trends[j].force
-                    )
-                    rho = max(dag_weight * 0.5, DEFAULT_RESIDUAL_CROSS_RHO)
+                elif fcm:
+                    # Use force correlation matrix
+                    rho = fcm.get(trends[i].force, {}).get(trends[j].force, DEFAULT_RESIDUAL_CROSS_RHO)
                 else:
                     rho = DEFAULT_RESIDUAL_CROSS_RHO
 
@@ -205,7 +203,7 @@ class BayesianMonteCarloEngine:
         """
         Compute shift path for a single category in one MC iteration.
 
-        Uses multiplicative compounding with causal propagation that respects lag structure.
+        Uses multiplicative compounding with per-force materialization schedules.
         Returns: array of shifts for each year in path_years
         """
         n_years = len(self.config.path_years)
@@ -263,40 +261,10 @@ class BayesianMonteCarloEngine:
 
             base_force_contributions[force] = force_score * force_weight
 
-        # Compute year-by-year shifts with lag-aware causal propagation
-        # Store per-year force contributions for correct lagged referencing
-        force_contributions_history = []  # list of dicts, indexed by y_idx
-
+        # Compute year-by-year shifts with multiplicative compounding
         for y_idx, year in enumerate(self.config.path_years):
-            # Start with base contributions for this year
+            # Use base contributions for all years (no causal propagation)
             force_contributions = dict(base_force_contributions)
-
-            # Add lagged causal propagation if DAG available
-            if self.dag:
-                propagated = {}
-                for edge in self.dag.edges:
-                    if edge.lag_years == 0:
-                        # Same-year propagation: use current base contribution
-                        source_contrib = base_force_contributions.get(edge.source_force, 0.0)
-                    elif y_idx >= edge.lag_years:
-                        # Lagged propagation: use the ACTUAL force contribution
-                        # from lag_years ago (includes that year's propagation effects)
-                        source_contrib = force_contributions_history[y_idx - edge.lag_years].get(
-                            edge.source_force, 0.0
-                        )
-                    else:
-                        continue  # Not enough years have passed for this lag
-
-                    if abs(source_contrib) > 0.001:
-                        target = edge.target_force
-                        amount = source_contrib * edge.propagation_weight
-                        propagated[target] = propagated.get(target, 0) + amount
-
-                for target, extra in propagated.items():
-                    force_contributions[target] = force_contributions.get(target, 0) + extra
-
-            # Store this year's final force contributions for future lag references
-            force_contributions_history.append(dict(force_contributions))
 
             # Multiplicative compounding with per-force materialization + attenuation
             product = 1.0
@@ -362,36 +330,22 @@ class BayesianMonteCarloEngine:
                 "converged": r_hat < 1.05,
             }
 
-            # Basic causal decomposition: attribute to direct vs propagated effects
-            # Direct effects: immediate force impacts
-            # Propagated effects: impacts from causal propagation
+            # Direct effects: immediate force impacts only (no causal propagation)
             direct_effects = {}
-            propagated_effects = {}
 
-            # Sum force contributions (direct)
+            # Sum trend-level contributions by force
             for force in FORCES:
                 direct_effects[force] = 0.0
-                propagated_effects[force] = 0.0
 
-            # Simplified decomposition: attribute shifts by force presence
+            # Attribute shifts by force presence in category
             trends = db.trends
             for trend in trends:
                 exposure = trend.category_exposure.get(cat, 0)
                 if exposure > 0:
                     direct_effects[trend.force] += trend.normalized_score * (exposure / 5.0)
 
-            # Propagated effects from causal links
-            if self.dag:
-                for edge in self.dag.edges:
-                    source_force = edge.source_force
-                    target_force = edge.target_force
-                    if direct_effects[source_force] != 0:
-                        propagated_amount = direct_effects[source_force] * edge.propagation_weight
-                        propagated_effects[target_force] += propagated_amount
-
             causal_decomposition[cat] = {
                 "direct_effects": {f: float(v) for f, v in direct_effects.items()},
-                "propagated_effects": {f: float(v) for f, v in propagated_effects.items()},
             }
 
         # ── Value Chain Decomposition ──────────────────────────────────

@@ -1,23 +1,20 @@
-import { Suspense, lazy, useState, useCallback } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FullPageSkeleton } from './components/LoadingSkeleton';
 import { useAuth } from './hooks/useAuth';
 import AuthPage from './components/AuthPage';
 import AdminUsersPanel from './components/AdminUsersPanel';
-import AdminConfigPanel from './components/AdminConfigPanel';
+import SettingsPage from './components/SettingsPage';
 import BurgerMenu from './components/BurgerMenu';
 
 const WarRoom = lazy(() => import('./components/WarRoom'));
 
+type Page = 'warroom' | 'settings';
+
 export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
   const [showUsers, setShowUsers] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-
-  // Refs for WarRoom actions exposed via burger menu
-  const [burgerExport, setBurgerExport] = useState(false);
-  const [burgerDelphi, setBurgerDelphi] = useState(false);
-  const [burgerSnapshots, setBurgerSnapshots] = useState(false);
+  const [page, setPage] = useState<Page>('warroom');
 
   // Still checking stored token
   if (loading && !user) {
@@ -39,6 +36,15 @@ export default function App() {
 
   const isAdmin = user?.role === 'admin';
 
+  // Settings page — full screen, no burger menu overlay
+  if (page === 'settings' && isAdmin) {
+    return (
+      <ErrorBoundary>
+        <SettingsPage onBack={() => setPage('warroom')} />
+      </ErrorBoundary>
+    );
+  }
+
   // Authenticated → show War Room
   return (
     <ErrorBoundary>
@@ -46,7 +52,7 @@ export default function App() {
         <WarRoom isAdmin={isAdmin} />
       </Suspense>
 
-      {/* Burger Menu — top-right, replaces old floating user bar */}
+      {/* Burger Menu — top-right */}
       <div style={{
         position: 'fixed', top: 12, right: 16, zIndex: 9999,
         fontFamily: "'Inter', sans-serif",
@@ -56,9 +62,8 @@ export default function App() {
           isAdmin={isAdmin}
           onLogout={logout}
           onShowUsers={() => setShowUsers(true)}
-          onShowConfig={() => setShowConfig(true)}
+          onShowConfig={() => setPage('settings')}
           onShowExport={() => {
-            // Toggle the export panel inside WarRoom — dispatch custom event
             window.dispatchEvent(new CustomEvent('pulse:toggle-export'));
           }}
           onShowDelphi={() => {
@@ -68,7 +73,6 @@ export default function App() {
             window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
           }}
           onChangePassword={() => {
-            // Simple password change via prompt for now
             const newPw = window.prompt('Enter new password (min 6 characters):');
             if (newPw && newPw.length >= 6) {
               const token = localStorage.getItem('pulse_token');
@@ -89,12 +93,9 @@ export default function App() {
         />
       </div>
 
-      {/* Admin panels */}
+      {/* Admin user management panel */}
       {isAdmin && (
-        <>
-          <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
-          <AdminConfigPanel isOpen={showConfig} onClose={() => setShowConfig(false)} />
-        </>
+        <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
       )}
     </ErrorBoundary>
   );
