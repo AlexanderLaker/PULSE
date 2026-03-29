@@ -462,6 +462,9 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
   const [editName, setEditName] = useState(trend.name || '');
   const [editDesc, setEditDesc] = useState(trend.description || '');
   const [editImplication, setEditImplication] = useState(trend.strategic_implication || '');
+  const [editSources, setEditSources] = useState<Array<{ url: string; title: string; data: string }>>(
+    (trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' }))
+  );
 
   const handleSave = (): void => {
     const updates: Partial<TrendData> = {
@@ -474,6 +477,9 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
       if (editName !== trend.name) (updates as any).name = editName;
       if (editDesc !== trend.description) (updates as any).description = editDesc;
       if (editImplication !== trend.strategic_implication) (updates as any).strategic_implication = editImplication;
+      // Include sources (filter out empty entries)
+      const validSources = editSources.filter(s => s.url || s.title);
+      (updates as any).sources = validSources;
     }
     onUpdateTrend(trend.id, updates);
     setIsEditing(false);
@@ -647,15 +653,106 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 </div>
               </div>
 
-              {/* 4. Sources — clickable links with API icons (same style as EmergingTrends) */}
-              {trend.sources && trend.sources.length > 0 && (
+              {/* 4. Sources — editable when editing, clickable links otherwise */}
+              {isEditing ? (
+                <div>
+                  <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                    SOURCES ({editSources.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {editSources.map((src, i) => (
+                      <div key={i} style={{
+                        display: 'flex', flexDirection: 'column', gap: '4px',
+                        padding: '8px', borderRadius: '6px', backgroundColor: T.bg2,
+                        border: `1px solid ${T.border1}`,
+                      }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <input
+                            value={src.title}
+                            onChange={(e) => {
+                              const updated = [...editSources];
+                              updated[i] = { ...updated[i], title: e.target.value };
+                              setEditSources(updated);
+                            }}
+                            placeholder="Source title"
+                            style={{
+                              flex: 1, fontSize: '11px', color: T.text, backgroundColor: T.bg1,
+                              border: `1px solid ${T.border1}`, borderRadius: '4px', padding: '5px 8px',
+                              outline: 'none', fontFamily: 'inherit',
+                            }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                          />
+                          <button
+                            onClick={() => setEditSources(editSources.filter((_, idx) => idx !== i))}
+                            style={{
+                              padding: '4px', backgroundColor: 'transparent', border: 'none',
+                              borderRadius: '4px', cursor: 'pointer', color: T.text4,
+                              display: 'flex', alignItems: 'center',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = T.red; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = T.text4; }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <input
+                          value={src.url}
+                          onChange={(e) => {
+                            const updated = [...editSources];
+                            updated[i] = { ...updated[i], url: e.target.value };
+                            setEditSources(updated);
+                          }}
+                          placeholder="https://..."
+                          style={{
+                            fontSize: '10px', color: T.accent, backgroundColor: T.bg1,
+                            border: `1px solid ${T.border1}`, borderRadius: '4px', padding: '5px 8px',
+                            outline: 'none', fontFamily: T.mono,
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                        />
+                        <input
+                          value={src.data}
+                          onChange={(e) => {
+                            const updated = [...editSources];
+                            updated[i] = { ...updated[i], data: e.target.value };
+                            setEditSources(updated);
+                          }}
+                          placeholder="Additional context (optional)"
+                          style={{
+                            fontSize: '10px', color: T.text3, backgroundColor: T.bg1,
+                            border: `1px solid ${T.border1}`, borderRadius: '4px', padding: '5px 8px',
+                            outline: 'none', fontFamily: 'inherit',
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                        />
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setEditSources([...editSources, { url: '', title: '', data: '' }])}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '6px 10px', fontSize: '10px', fontWeight: 500,
+                        color: T.accent, backgroundColor: 'transparent',
+                        border: `1px dashed ${T.border1}`, borderRadius: '6px',
+                        cursor: 'pointer', width: 'fit-content',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                    >
+                      <Plus size={10} /> Add Source
+                    </button>
+                  </div>
+                </div>
+              ) : (trend.sources && trend.sources.length > 0 && (
                 <div>
                   <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
                     SOURCES ({trend.sources.length})
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     {trend.sources.map((src, i) => {
-                      // Detect API/source type from URL domain
                       const url = (src.url || '').toLowerCase();
                       const apiName = url.includes('eur-lex') ? 'EUR-Lex'
                         : url.includes('echa') ? 'ECHA'
@@ -670,7 +767,6 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                         : url.includes('cosmetics') || url.includes('happi') || url.includes('retaildetail') || url.includes('grocery') || url.includes('packaging') ? 'RSS'
                         : url.includes('environment.ec.europa') || url.includes('europa.eu') ? 'EUR-Lex'
                         : 'GNews';
-
                       return (
                         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                           <a
@@ -678,17 +774,11 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '5px 8px',
-                              paddingBottom: src.data ? '2px' : '5px',
+                              display: 'flex', alignItems: 'center', gap: '6px',
+                              padding: '5px 8px', paddingBottom: src.data ? '2px' : '5px',
                               borderRadius: src.data ? '4px 4px 0 0' : '4px',
-                              backgroundColor: T.bg3 + '40',
-                              textDecoration: 'none',
-                              fontSize: '10px',
-                              color: T.accent,
-                              transition: 'background-color 0.15s',
+                              backgroundColor: T.bg3 + '40', textDecoration: 'none',
+                              fontSize: '10px', color: T.accent, transition: 'background-color 0.15s',
                               pointerEvents: src.url ? 'auto' : 'none',
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = T.bg3; }}
@@ -701,13 +791,9 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                           </a>
                           {src.data && (
                             <div style={{
-                              padding: '3px 8px 5px 27px',
-                              borderRadius: '0 0 4px 4px',
-                              backgroundColor: T.bg3 + '40',
-                              fontSize: '9px',
-                              fontFamily: T.mono,
-                              color: T.text3,
-                              lineHeight: 1.4,
+                              padding: '3px 8px 5px 27px', borderRadius: '0 0 4px 4px',
+                              backgroundColor: T.bg3 + '40', fontSize: '9px', fontFamily: T.mono,
+                              color: T.text3, lineHeight: 1.4,
                             }}>
                               {src.data}
                             </div>
@@ -717,7 +803,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                     })}
                   </div>
                 </div>
-              )}
+              ))}
 
               {trend.ai_suggested && (
                 <div style={{
@@ -773,6 +859,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   setEditName(trend.name || '');
                   setEditDesc(trend.description || '');
                   setEditImplication(trend.strategic_implication || '');
+                  setEditSources((trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' })));
                 } else {
                   onClose();
                 }

@@ -45,6 +45,9 @@ const VC_LABELS: Record<ValueChainStep, string> = {
   after_sales: 'After Sales',
 };
 
+type RegionKey = 'Europe' | 'North America' | 'Asia' | 'High Growth';
+const REGIONS: RegionKey[] = ['Europe', 'North America', 'Asia', 'High Growth'];
+
 interface AdminConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -62,6 +65,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     attenuation: true,
     forceWeights: true,
     vcWeights: false,
+    regionWeights: false,
     copula: false,
     simulation: false,
   });
@@ -87,6 +91,12 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     marketing: 0.18,
     trade: 0.1,
     after_sales: 0.06,
+  });
+  const [regionWeights, setRegionWeights] = useState<Record<RegionKey, number>>({
+    'Europe': 0.25,
+    'North America': 0.25,
+    'Asia': 0.25,
+    'High Growth': 0.25,
   });
   const [withinForceRho, setWithinForceRho] = useState(0.3);
   const [tCopulaDf, setTCopulaDf] = useState(4);
@@ -117,9 +127,9 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
       if (data.attenuation) setAttenuation(data.attenuation);
       if (data.force_weights) setForceWeights(data.force_weights as Record<ForceName, number>);
       if (data.vc_weights) setVCWeights(data.vc_weights as Record<ValueChainStep, number>);
-      // Note: These are assumed to exist in the response or config defaults
-      setWithinForceRho(0.3);
-      setTCopulaDf(4);
+      if ((data as any).region_weights) setRegionWeights((data as any).region_weights as Record<RegionKey, number>);
+      if ((data as any).within_force_rho) setWithinForceRho((data as any).within_force_rho);
+      if ((data as any).t_copula_df) setTCopulaDf((data as any).t_copula_df);
       if (data.iterations) setIterations(data.iterations);
     } catch (e: any) {
       setError(e.message || 'Failed to load configuration');
@@ -143,6 +153,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
   /* ── Calculate sum and remaining for weights ──────────────────────– */
   const sumForceWeights = Object.values(forceWeights).reduce((a, b) => a + b, 0);
   const sumVCWeights = Object.values(vcWeights).reduce((a, b) => a + b, 0);
+  const sumRegionWeights = Object.values(regionWeights).reduce((a, b) => a + b, 0);
 
   /* ── Auto-normalize weights on change ────────────────────────────– */
   const normalizeForceWeights = (weights: Record<ForceName, number>) => {
@@ -163,6 +174,15 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     }, {} as Record<ValueChainStep, number>);
   };
 
+  const normalizeRegionWeights = (weights: Record<RegionKey, number>) => {
+    const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+    if (sum === 0) return weights;
+    return Object.entries(weights).reduce((acc, [k, v]) => {
+      acc[k as RegionKey] = Number((v / sum).toFixed(4));
+      return acc;
+    }, {} as Record<RegionKey, number>);
+  };
+
   const handleForceWeightChange = (force: ForceName, value: number) => {
     const updated = { ...forceWeights, [force]: Math.max(0, value) };
     setForceWeights(updated);
@@ -171,6 +191,11 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
   const handleVCWeightChange = (step: ValueChainStep, value: number) => {
     const updated = { ...vcWeights, [step]: Math.max(0, value) };
     setVCWeights(updated);
+  };
+
+  const handleRegionWeightChange = (region: RegionKey, value: number) => {
+    const updated = { ...regionWeights, [region]: Math.max(0, value) };
+    setRegionWeights(updated);
   };
 
   /* ── Save configuration ──────────────────────────────────────────– */
@@ -185,12 +210,14 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
 
       const normalized_force_weights = normalizeForceWeights(forceWeights);
       const normalized_vc_weights = normalizeVCWeights(vcWeights);
+      const normalized_region_weights = normalizeRegionWeights(regionWeights);
 
       const payload = {
         attenuation: Number(attenuation.toFixed(4)),
         attenuation_source: attenuationSource,
         force_weights: normalized_force_weights,
         vc_weights: normalized_vc_weights,
+        region_weights: normalized_region_weights,
         within_force_rho: Number(withinForceRho.toFixed(2)),
         t_copula_df: Math.round(tCopulaDf),
         iterations: Math.round(iterations),
@@ -211,6 +238,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
       // Update the local config with normalized values
       setForceWeights(normalized_force_weights);
       setVCWeights(normalized_vc_weights);
+      setRegionWeights(normalized_region_weights);
       setAttenuationSource('admin_override');
 
       // Auto-trigger re-simulation with new config
@@ -301,7 +329,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     );
   };
 
-  /* ── Slider component ──────────────────────────────────────────– */
+  /* ── Slider component with typeable input ──────────────────────– */
   const SliderInput: FC<{
     label: string;
     value: number;
@@ -311,37 +339,71 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     step: number;
     showValue?: boolean;
     suffix?: string;
-  }> = ({ label, value, onChange, min, max, step, showValue = true, suffix = '' }) => (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: T.text2 }}>
-          {label}
-        </label>
-        {showValue && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.accent, fontFamily: T.mono }}>
-            {value.toFixed(step < 0.01 ? 4 : step < 0.1 ? 2 : 1)}{suffix}
-          </span>
-        )}
+  }> = ({ label, value, onChange, min, max, step, showValue = true, suffix = '' }) => {
+    const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 0.1 ? 2 : 1;
+    const pct = ((value - min) / (max - min)) * 100;
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: T.text2 }}>
+            {label}
+          </label>
+          {showValue && (
+            <input
+              type="number"
+              value={value.toFixed(decimals)}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)));
+              }}
+              min={min}
+              max={max}
+              step={step}
+              style={{
+                width: 72,
+                padding: '2px 6px',
+                borderRadius: 6,
+                border: `1px solid ${T.border}`,
+                background: T.bg,
+                color: T.accent,
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: T.mono,
+                textAlign: 'right',
+                outline: 'none',
+                transition: 'border-color 0.15s, box-shadow 0.15s',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = T.accent;
+                e.target.style.boxShadow = '0 0 0 2px rgba(212, 168, 71, 0.15)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = T.border;
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+          )}
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          style={{
+            width: '100%',
+            height: 6,
+            borderRadius: 3,
+            background: `linear-gradient(to right, ${T.accent} 0%, ${T.accent} ${pct}%, rgba(148, 163, 184, 0.2) ${pct}%, rgba(148, 163, 184, 0.2) 100%)`,
+            cursor: 'pointer',
+            WebkitAppearance: 'none',
+            appearance: 'none',
+          } as React.CSSProperties}
+        />
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        style={{
-          width: '100%',
-          height: 6,
-          borderRadius: 3,
-          background: 'linear-gradient(to right, ' + T.accent + ' 0%, ' + T.accent + ' ' + ((value - min) / (max - min) * 100) + '%, rgba(148, 163, 184, 0.2) ' + ((value - min) / (max - min) * 100) + '%, rgba(148, 163, 184, 0.2) 100%)',
-          cursor: 'pointer',
-          WebkitAppearance: 'none',
-          appearance: 'none',
-        } as React.CSSProperties}
-      />
-    </div>
-  );
+    );
+  };
 
   /* ── Number input component ──────────────────────────────────────– */
   const NumberInput: FC<{
@@ -655,6 +717,58 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
                       >
                         {sumVCWeights.toFixed(3)}
                       </span>
+                    </div>
+                  </Section>
+
+                  {/* ─── Region Weights ─── */}
+                  <Section id="regionWeights" title="Region Weights">
+                    {REGIONS.map((region) => (
+                      <SliderInput
+                        key={region}
+                        label={region}
+                        value={regionWeights[region]}
+                        onChange={(v) => handleRegionWeightChange(region, v)}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                      />
+                    ))}
+                    <div
+                      style={{
+                        padding: 10,
+                        borderRadius: 8,
+                        background: T.bg,
+                        border: `1px solid ${T.border}`,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ color: T.text2 }}>Sum</span>
+                      <span
+                        style={{
+                          color: Math.abs(sumRegionWeights - 1.0) < 0.01 ? '#22C55E' : '#EF4444',
+                          fontFamily: T.mono,
+                        }}
+                      >
+                        {sumRegionWeights.toFixed(3)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 10,
+                        padding: 8,
+                        fontSize: 10,
+                        color: T.text3,
+                        borderRadius: 6,
+                        background: 'rgba(212, 168, 71, 0.04)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      Region weights proportionally scale each trend's impact based on its regional exposure.
+                      A trend affecting only North America will have its impact scaled by that region's weight.
                     </div>
                   </Section>
 

@@ -277,6 +277,48 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
   }, []);
   const forceNames = Object.keys(FORCES) as ForceName[];
 
+  // ─── Recompute force contributions from real trend data ──────────────
+  useEffect(() => {
+    if (!data.trends || data.trends.length === 0) return;
+
+    const newFC: Record<string, ForceContribution[]> = {};
+    CATEGORIES.forEach(cat => {
+      // Sum trend contributions per force (same logic as ForceShiftMatrix)
+      const sums: Record<ForceName, number> = {
+        Consumer: 0, Customer: 0, Technology: 0,
+        Government: 0, Environmental: 0, Competitive: 0,
+      };
+      data.trends.forEach((trend: any) => {
+        const force = trend.force as ForceName;
+        if (!sums.hasOwnProperty(force)) return;
+        const gp1Shift = trend.gp1_shift ?? trend.normalized_score ?? 0;
+        const catExp = trend.category_exposure?.[cat.id] ?? 0;
+        sums[force] += gp1Shift * (Math.max(0, Math.min(5, catExp)) / 5);
+      });
+
+      // Scale proportionally to match MC 2030 total (if available)
+      const rawTotal = Object.values(sums).reduce((a, b) => a + b, 0);
+      const catShift = data.shifts?.[cat.id];
+      let mcTotal = 0;
+      if (catShift) {
+        const p = catShift as any;
+        if (p[2030]) {
+          const v = p[2030];
+          mcTotal = typeof v === 'object' ? (v.median ?? v.p50 ?? 0) : (typeof v === 'number' ? v : 0);
+        }
+      }
+      const scale = (Math.abs(rawTotal) > 1e-6 && Math.abs(mcTotal) > 1e-6) ? mcTotal / rawTotal : 1;
+
+      newFC[cat.id] = forceNames.map(force => ({
+        force,
+        value: sums[force] * scale,
+        normalized: sums[force] * scale,
+      }));
+    });
+
+    setInitialData(prev => ({ ...prev, forceContributions: newFC }));
+  }, [data.trends, data.shifts]);
+
   // ─── Listen for burger menu events (toggle export, delphi, snapshots) ──
   useEffect(() => {
     const onExport = () => setShowSettings(prev => !prev);

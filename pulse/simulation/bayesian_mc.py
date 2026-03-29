@@ -242,7 +242,39 @@ class BayesianMonteCarloEngine:
                 exposure = trend.category_exposure.get(category, 0)
                 if exposure > 0:
                     exposure_frac = exposure / 5.0
-                    total_score += trend_scores[j] * exposure_frac
+
+                    # Region weighting: scale contribution by how much of the
+                    # trend's regional exposure overlaps with configured region weights.
+                    # If a trend only affects "North America" (exposure=5) and NA weight=25%,
+                    # then region_factor ~ 0.25. If all regions equally exposed, factor ~ 1.0.
+                    region_weights = getattr(self.config, 'region_weights', {})
+                    regional_exp = getattr(trend, 'regional_exposure', {}) or {}
+                    if regional_exp and region_weights:
+                        weighted_sum = 0.0
+                        total_possible = 0.0
+                        for region, r_weight in region_weights.items():
+                            r_exp = regional_exp.get(region, 0)
+                            weighted_sum += (r_exp / 5.0) * r_weight
+                            total_possible += r_weight
+                        region_factor = weighted_sum / max(total_possible, 1e-6)
+                    else:
+                        region_factor = 1.0  # No regional data → full impact
+
+                    # VC weighting: scale by weighted avg of trend's VC exposures
+                    vc_weights = getattr(self.config, 'vc_weights', {})
+                    vc_exp = getattr(trend, 'vc_exposure', {}) or {}
+                    if vc_exp and vc_weights:
+                        vc_sum = 0.0
+                        vc_total_w = 0.0
+                        for step, w in vc_weights.items():
+                            v_exp = vc_exp.get(step, 0)
+                            vc_sum += (v_exp / 5.0) * w
+                            vc_total_w += w
+                        vc_factor = vc_sum / max(vc_total_w, 1e-6)
+                    else:
+                        vc_factor = 1.0  # No VC data → full impact
+
+                    total_score += trend_scores[j] * exposure_frac * region_factor * vc_factor
                     count += 1
 
             avg_score = total_score / max(count, 1)

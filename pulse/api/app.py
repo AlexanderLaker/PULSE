@@ -582,8 +582,15 @@ def create_app(args=None) -> FastAPI:
             sources = getattr(t, 'sources', None) or []
             if sources:
                 return sources
-            # Fallback: parse data_source text
+            # Try parsing data_source as JSON (structured sources)
             if t.data_source:
+                try:
+                    parsed = json.loads(t.data_source)
+                    if isinstance(parsed, list):
+                        return parsed
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                # Fallback: parse data_source text
                 result = []
                 for part in t.data_source.split(';'):
                     part = part.strip()
@@ -740,7 +747,14 @@ def create_app(args=None) -> FastAPI:
         if update.strategic_implication is not None:
             trend.strategic_implication = update.strategic_implication
         if update.sources is not None:
-            trend.data_source = update.sources if isinstance(update.sources, str) else "; ".join(update.sources)
+            # Store structured sources as JSON in data_source
+            if isinstance(update.sources, list) and len(update.sources) > 0 and isinstance(update.sources[0], dict):
+                import json as _json
+                trend.data_source = _json.dumps(update.sources)
+            elif isinstance(update.sources, str):
+                trend.data_source = update.sources
+            else:
+                trend.data_source = "; ".join(str(s) for s in update.sources)
         trend.__post_init__()
 
         # Persist updated exposures
@@ -1085,6 +1099,7 @@ def create_app(args=None) -> FastAPI:
             "attenuation_source": config.attenuation_source,
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
+            "region_weights": getattr(config, 'region_weights', {}),
             "path_years": config.path_years,
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
@@ -1101,6 +1116,7 @@ def create_app(args=None) -> FastAPI:
             description="'assumed' | 'backtested' | 'admin_override'")
         force_weights: Optional[dict] = None
         vc_weights: Optional[dict] = None
+        region_weights: Optional[dict] = None
         iterations: Optional[int] = Field(None, ge=1000, le=100000)
         within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
         t_copula_df: Optional[int] = Field(None, ge=2, le=30)
@@ -1135,6 +1151,14 @@ def create_app(args=None) -> FastAPI:
             changes["vc_weights"] = {"old": config.vc_weights, "new": req.vc_weights}
             config.vc_weights = req.vc_weights
 
+        if req.region_weights is not None:
+            total = sum(req.region_weights.values())
+            if abs(total - 1.0) > 0.01:
+                raise HTTPException(400, f"Region weights must sum to 1.0, got {total}")
+            old_rw = getattr(config, 'region_weights', {})
+            changes["region_weights"] = {"old": old_rw, "new": req.region_weights}
+            config.region_weights = req.region_weights
+
         if req.iterations is not None:
             changes["iterations"] = {"old": config.iterations, "new": req.iterations}
             config.iterations = req.iterations
@@ -1162,6 +1186,7 @@ def create_app(args=None) -> FastAPI:
             "attenuation_source": config.attenuation_source,
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
+            "region_weights": getattr(config, 'region_weights', {}),
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
             "t_copula_df": config.t_copula_df,
