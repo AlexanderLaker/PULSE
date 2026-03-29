@@ -167,23 +167,23 @@ class TestDeterministicPaths:
             assert magnitudes[-1] >= magnitudes[0]
 
     def test_path_respects_materialization_schedule(self, mock_model_config, mock_trends_database):
-        """Should verify paths respect materialization schedule."""
-        # Get ratio of 2026 to 2030
+        """Should verify paths are monotonically increasing in magnitude.
+
+        With per-force materialization curves (regulatory front-loads,
+        technology back-loads), the exact ratio of 2026/2030 varies by
+        category depending on its force mix. We verify monotonicity instead.
+        """
         engine = DeterministicEngine(mock_model_config)
         result = engine.run(mock_trends_database)
 
-        mat_2026 = mock_model_config.materialization[2026]
-        mat_2030 = mock_model_config.materialization[2030]
-
         for cat in CATEGORIES:
-            shift_2026 = result[cat][2026]
-            shift_2030 = result[cat][2030]
-
-            if abs(shift_2030) > 0.001:
-                # Ratio should approximately match materialization ratio
-                ratio_actual = abs(shift_2026 / shift_2030)
-                ratio_expected = mat_2026 / mat_2030
-                assert abs(ratio_actual - ratio_expected) < 0.01
+            shifts = [abs(result[cat][y]) for y in sorted(result[cat].keys())]
+            # Each year's absolute shift should be >= the previous year
+            for i in range(1, len(shifts)):
+                assert shifts[i] >= shifts[i-1] - 0.001, (
+                    f"{cat}: shift at year {i} ({shifts[i]:.4f}) < "
+                    f"year {i-1} ({shifts[i-1]:.4f})"
+                )
 
 
 class TestDeterministicCompounding:

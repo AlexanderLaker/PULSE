@@ -48,18 +48,20 @@ class Trend:
     def __post_init__(self):
         direction_sign = 1 if self.direction == "Expansion" else -1
         self.weighted_score = self.impact * self.probability * direction_sign
-        # normalized_score now incorporates gp1_pct_affected:
-        # The raw score (impact × prob × direction / 25) is scaled by
-        # the fraction of GP1 actually exposed to this trend.
-        # Old: normalized_score ∈ [-1.0, +1.0] — meaningless at extremes
-        # New: normalized_score ∈ [-gp1_pct, +gp1_pct] — economically anchored
-        raw_normalized = self.weighted_score / 25.0
-        self.normalized_score = raw_normalized * self.gp1_pct_affected
-        # Default Bayesian priors centered on expert score
-        if self.impact_posterior is None:
-            self.impact_posterior = (max(self.impact, 1), max(6 - self.impact, 1))
-        if self.probability_posterior is None:
-            self.probability_posterior = (max(self.probability, 1), max(6 - self.probability, 1))
+        # Bayesian priors centered on expert score — always recompute from
+        # current impact/probability values so sensitivity analysis works
+        # (tornado analysis changes these fields and re-calls __post_init__).
+        self.impact_posterior = (max(self.impact, 1), max(6 - self.impact, 1))
+        self.probability_posterior = (max(self.probability, 1), max(6 - self.probability, 1))
+        # normalized_score aligned with MC engine formula:
+        #   MC samples: prob_01 × gp1_pct_affected × direction
+        #   Deterministic: E[prob_01] × gp1_pct_affected × direction
+        # where E[prob_01] = alpha / (alpha + beta) from the Beta posterior.
+        # Impact is NOT a separate multiplier — it is already reflected in
+        # gp1_pct_affected (high-impact trends get higher gp1_pct assignments).
+        a_p, b_p = self.probability_posterior
+        prob_mean = a_p / (a_p + b_p)  # Expected probability of materialization
+        self.normalized_score = prob_mean * self.gp1_pct_affected * direction_sign
 
     @property
     def direction_sign(self) -> int:

@@ -261,6 +261,9 @@ class BayesianMonteCarloEngine:
             base_force_contributions[force] = avg_score * force_weight
 
         # Compute year-by-year shifts with lag-aware causal propagation
+        # Store per-year force contributions for correct lagged referencing
+        force_contributions_history = []  # list of dicts, indexed by y_idx
+
         for y_idx, year in enumerate(self.config.path_years):
             # Start with base contributions for this year
             force_contributions = dict(base_force_contributions)
@@ -268,38 +271,42 @@ class BayesianMonteCarloEngine:
             # Add lagged causal propagation if DAG available
             if self.dag:
                 propagated = {}
-                for force, contrib in force_contributions.items():
-                    if abs(contrib) > 0.001:
-                        # Propagate with lag awareness: only include edges whose
-                        # lag allows them to affect this year
-                        for edge in self.dag.edges:
-                            if edge.source_force == force and edge.lag_years == 0:
-                                # Same-year propagation
-                                target = edge.target_force
-                                amount = contrib * edge.propagation_weight
-                                propagated[target] = propagated.get(target, 0) + amount
-                            elif edge.source_force == force and edge.lag_years > 0 and y_idx >= edge.lag_years:
-                                # Lagged propagation: only apply if we're far enough in the path
-                                target = edge.target_force
-                                # Use the contribution from lag years ago
-                                source_idx = y_idx - edge.lag_years
-                                if source_idx >= 0:
-                                    amount = contrib * edge.propagation_weight
-                                    propagated[target] = propagated.get(target, 0) + amount
+                for edge in self.dag.edges:
+                    if edge.lag_years == 0:
+                        # Same-year propagation: use current base contribution
+                        source_contrib = base_force_contributions.get(edge.source_force, 0.0)
+                    elif y_idx >= edge.lag_years:
+                        # Lagged propagation: use the ACTUAL force contribution
+                        # from lag_years ago (includes that year's propagation effects)
+                        source_contrib = force_contributions_history[y_idx - edge.lag_years].get(
+                            edge.source_force, 0.0
+                        )
+                    else:
+                        continue  # Not enough years have passed for this lag
+
+                    if abs(source_contrib) > 0.001:
+                        target = edge.target_force
+                        amount = source_contrib * edge.propagation_weight
+                        propagated[target] = propagated.get(target, 0) + amount
 
                 for target, extra in propagated.items():
                     force_contributions[target] = force_contributions.get(target, 0) + extra
 
-            # Multiplicative compounding with attenuation
-            product = 1.0
-            for contribution in force_contributions.values():
-                attenuated = contribution * self.config.attenuation
-                product *= (1.0 + attenuated)
-            total_shift = product - 1.0
+            # Store this year's final force contributions for future lag references
+            force_contributions_history.append(dict(force_contributions))
 
-            # Apply materialization schedule
-            mat_frac = self.config.materialization.get(year, 1.0)
-            year_shifts[y_idx] = total_shift * mat_frac
+            # Multiplicative compounding with per-force materialization + attenuation
+            product = 1.0
+            for force, contribution in force_contributions.items():
+                # Force-specific materialization: regulatory shocks front-load,
+                # technology trends back-load, others use default S-curve
+                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(force, {})
+                mat_frac = force_mat.get(year, self.config.materialization.get(year, 1.0))
+
+                attenuated = contribution * self.config.attenuation * mat_frac
+                product *= (1.0 + attenuated)
+
+            year_shifts[y_idx] = product - 1.0
 
         return year_shifts
 

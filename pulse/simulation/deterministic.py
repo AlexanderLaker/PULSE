@@ -12,7 +12,7 @@ from typing import Optional
 
 import numpy as np
 
-from pulse.config import ModelConfig, FORCES
+from pulse.config import ModelConfig, FORCES, FORCE_MATERIALIZATION_OVERRIDES
 from pulse.ingestion.models import TrendDatabase
 
 logger = logging.getLogger(__name__)
@@ -41,38 +41,48 @@ class DeterministicEngine:
                 force_trends = db.get_trends_by_force(force)
                 force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
 
-                # Sum normalized scores weighted by category exposure
+                # Sum normalized scores weighted by category exposure + region
                 total_score = 0.0
                 count = 0
                 for trend in force_trends:
                     exposure = trend.category_exposure.get(cat, 0)
                     if exposure > 0:
-                        # Exposure as fraction (0-5 → 0-1)
                         exposure_frac = exposure / 5.0
-                        total_score += trend.normalized_score * exposure_frac
+
+                        # Region weighting (dampened soft modifier) — same as MC engine
+                        region_weights = getattr(self.config, 'region_weights', {})
+                        regional_exp = getattr(trend, 'regional_exposure', {}) or {}
+                        if regional_exp and region_weights:
+                            weighted_sum = 0.0
+                            total_possible = 0.0
+                            for region, r_weight in region_weights.items():
+                                r_exp = regional_exp.get(region, 0)
+                                weighted_sum += (r_exp / 5.0) * r_weight
+                                total_possible += r_weight
+                            raw_region = weighted_sum / max(total_possible, 1e-6)
+                            region_factor = 1.0 - 0.5 * (1.0 - raw_region)
+                        else:
+                            region_factor = 1.0
+
+                        total_score += trend.normalized_score * exposure_frac * region_factor
                         count += 1
 
-                # Average across trends in this force for this category
-                if count > 0:
-                    avg_score = total_score / count
-                else:
-                    avg_score = 0.0
-
+                avg_score = total_score / max(count, 1)
                 force_contributions[force] = avg_score * force_weight
 
-            # Multiplicative compounding with attenuation
-            product = 1.0
-            for force, contribution in force_contributions.items():
-                attenuated = contribution * self.config.attenuation
-                product *= (1.0 + attenuated)
-
-            shift_pct = product - 1.0
-
-            # Apply to each path year based on materialization schedule
+            # Compute per-year shifts with per-force materialization
             year_shifts = {}
             for year in self.config.path_years:
-                mat_frac = self.config.materialization.get(year, 1.0)
-                year_shifts[year] = shift_pct * mat_frac
+                product = 1.0
+                for force, contribution in force_contributions.items():
+                    # Force-specific materialization curves
+                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(force, {})
+                    mat_frac = force_mat.get(year, self.config.materialization.get(year, 1.0))
+
+                    attenuated = contribution * self.config.attenuation * mat_frac
+                    product *= (1.0 + attenuated)
+
+                year_shifts[year] = product - 1.0
 
             results[cat] = year_shifts
 
