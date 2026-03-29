@@ -457,14 +457,14 @@ def create_app(args=None) -> FastAPI:
             db_trends = load_trends()
             steps.append(f"existing_trends={len(db_trends)}")
 
-            if not db_trends:
-                from pulse.seed_trends import get_report_trends
-                seed = get_report_trends()
-                steps.append(f"seed_trends_loaded={len(seed)}")
-                save_trends(seed)
-                steps.append("save_trends OK")
-                db_trends = load_trends()
-                steps.append(f"after_seed_count={len(db_trends)}")
+            # Always re-seed to update source URLs and any trend metadata changes
+            from pulse.seed_trends import get_report_trends
+            seed = get_report_trends()
+            steps.append(f"seed_trends_loaded={len(seed)}")
+            save_trends(seed)
+            steps.append("save_trends OK (re-seeded)")
+            db_trends = load_trends()
+            steps.append(f"after_seed_count={len(db_trends)}")
 
             # Rebuild TrendDatabase in memory
             _state["db"] = TrendDatabase(
