@@ -10,7 +10,7 @@ import React, { useState, useMemo, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronUp, Search, Sparkles, ExternalLink,
-  Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle, Trash2,
+  Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle, Trash2, Plus,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS, FORCE_ICONS, CATEGORIES, fmtShift, fmtPct, shortCat, shiftColorHex } from '../lib/format';
 import type { ForceName, CategoryId } from '../types';
@@ -46,6 +46,7 @@ interface TrendExplorerProps {
   onForceFilter: (force: string) => void;
   onUpdateTrend: (id: string, updates: Partial<TrendData>) => void;
   onDeleteTrend?: (id: string) => void;
+  onCreateTrend?: (trend: Partial<TrendData>) => void;
   isAdmin?: boolean;
 }
 
@@ -201,9 +202,10 @@ interface CategoryExposureGridProps {
   exposures: Record<CategoryId, number>;
   onChange: (exp: Record<CategoryId, number>) => void;
   direction?: 'Expansion' | 'Contraction';
+  isAdmin?: boolean;
 }
 
-const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChange, direction }) => {
+const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChange, direction, isAdmin }) => {
   const grouped = {
     'Hair': CATEGORIES.filter(c => c.group === 'Hair'),
     'LHC': CATEGORIES.filter(c => c.group === 'LHC'),
@@ -295,9 +297,10 @@ interface ValueChainExposureGridProps {
   exposures: Record<string, number>;
   onChange: (exp: Record<string, number>) => void;
   direction?: 'Expansion' | 'Contraction';
+  isAdmin?: boolean;
 }
 
-const ValueChainExposureGrid: FC<ValueChainExposureGridProps> = ({ exposures, onChange, direction }) => {
+const ValueChainExposureGrid: FC<ValueChainExposureGridProps> = ({ exposures, onChange, direction, isAdmin }) => {
   const vcSteps: ValueChainStep[] = [
     { id: 'raw_materials', label: 'Raw Materials' },
     { id: 'formulation', label: 'Formulation' },
@@ -373,9 +376,10 @@ interface RegionalExposureGridProps {
   exposures: Record<string, number>;
   onChange: (exp: Record<string, number>) => void;
   direction?: 'Expansion' | 'Contraction';
+  isAdmin?: boolean;
 }
 
-const RegionalExposureGrid: FC<RegionalExposureGridProps> = ({ exposures, onChange, direction }) => {
+const RegionalExposureGrid: FC<RegionalExposureGridProps> = ({ exposures, onChange, direction, isAdmin }) => {
   const regions = [
     { id: 'Europe', label: 'Europe' },
     { id: 'North America', label: 'North America' },
@@ -454,6 +458,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
   const [catExposure, setCatExposure] = useState<Record<CategoryId, number>>(trend.category_exposure || {});
   const [vcExposure, setVcExposure] = useState<Record<string, number>>(trend.vc_exposure || {});
   const [regionalExposure, setRegionalExposure] = useState<Record<string, number>>(trend.regional_exposure || {});
+  const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(trend.name || '');
   const [editDesc, setEditDesc] = useState(trend.description || '');
   const [editImplication, setEditImplication] = useState(trend.strategic_implication || '');
@@ -471,6 +476,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
       if (editImplication !== trend.strategic_implication) (updates as any).strategic_implication = editImplication;
     }
     onUpdateTrend(trend.id, updates);
+    setIsEditing(false);
     onClose();
   };
 
@@ -500,20 +506,22 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   <input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
+                    readOnly={!isEditing}
                     style={{
                       width: '100%',
                       fontSize: '12px',
                       fontWeight: 600,
                       color: T.text,
-                      backgroundColor: T.bg2,
-                      border: `1px solid ${T.border1}`,
+                      backgroundColor: isEditing ? T.bg2 : T.bg1,
+                      border: `1px solid ${isEditing ? T.border1 : 'transparent'}`,
                       borderRadius: '6px',
                       padding: '8px 10px',
                       outline: 'none',
                       fontFamily: 'inherit',
+                      cursor: isEditing ? 'text' : 'default',
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                    onFocus={(e) => { if (isEditing) e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = isEditing ? T.border1 : 'transparent'; }}
                   />
                 ) : (
                   <p style={{ fontSize: '12px', fontWeight: 600, color: T.text, margin: 0 }}>
@@ -531,22 +539,24 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   <textarea
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
+                    readOnly={!isEditing}
                     rows={4}
                     style={{
                       width: '100%',
                       fontSize: '11px',
                       color: T.text2,
-                      backgroundColor: T.bg2,
-                      border: `1px solid ${T.border1}`,
+                      backgroundColor: isEditing ? T.bg2 : T.bg1,
+                      border: `1px solid ${isEditing ? T.border1 : 'transparent'}`,
                       borderRadius: '6px',
                       padding: '8px 10px',
                       lineHeight: 1.6,
                       resize: 'vertical',
                       outline: 'none',
                       fontFamily: 'inherit',
+                      cursor: isEditing ? 'text' : 'default',
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                    onFocus={(e) => { if (isEditing) e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = isEditing ? T.border1 : 'transparent'; }}
                   />
                 ) : (
                   <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -564,22 +574,24 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   <textarea
                     value={editImplication}
                     onChange={(e) => setEditImplication(e.target.value)}
+                    readOnly={!isEditing}
                     rows={3}
                     style={{
                       width: '100%',
                       fontSize: '11px',
                       color: T.text2,
-                      backgroundColor: T.bg2,
-                      border: `1px solid ${T.border1}`,
+                      backgroundColor: isEditing ? T.bg2 : T.bg1,
+                      border: `1px solid ${isEditing ? T.border1 : 'transparent'}`,
                       borderRadius: '6px',
                       padding: '8px 10px',
                       lineHeight: 1.6,
                       resize: 'vertical',
                       outline: 'none',
                       fontFamily: 'inherit',
+                      cursor: isEditing ? 'text' : 'default',
                     }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                    onFocus={(e) => { if (isEditing) e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = isEditing ? T.border1 : 'transparent'; }}
                   />
                 ) : (
                   <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
@@ -755,7 +767,16 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
             borderTop: `1px solid ${T.border1}`,
           }}>
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (isEditing) {
+                  setIsEditing(false);
+                  setEditName(trend.name || '');
+                  setEditDesc(trend.description || '');
+                  setEditImplication(trend.strategic_implication || '');
+                } else {
+                  onClose();
+                }
+              }}
               style={{
                 padding: '8px 16px',
                 borderRadius: '6px',
@@ -778,28 +799,56 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
             >
               Cancel
             </button>
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#fff',
-                backgroundColor: T.accent,
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all 120ms ease',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-              }}
-            >
-              Save Changes
-            </button>
+            {isAdmin && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: T.text,
+                  backgroundColor: T.bg3,
+                  border: `1px solid ${T.border1}`,
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = T.bg4;
+                  e.currentTarget.style.borderColor = T.border2;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = T.bg3;
+                  e.currentTarget.style.borderColor = T.border1;
+                }}
+              >
+                Edit
+              </button>
+            )}
+            {isEditing && (
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#fff',
+                  backgroundColor: T.accent,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+                }}
+              >
+                Save Changes
+              </button>
+            )}
           </div>
         </motion.div>
       </td>
@@ -915,12 +964,18 @@ function BadgeStyled({ badge }: { badge: TrendBadge }): React.ReactNode {
   }
 }
 
-const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend, isAdmin = false }) => {
+const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend, onCreateTrend, isAdmin = false }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedTrendId, setExpandedTrendId] = useState<string | null>(null);
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'flagged' | 'ai' | 'regulatory'>('all');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTrendForce, setNewTrendForce] = useState<ForceName>('Consumer');
+  const [newTrendName, setNewTrendName] = useState('');
+  const [newTrendDirection, setNewTrendDirection] = useState<'Expansion' | 'Contraction'>('Expansion');
+  const [newTrendImpact, setNewTrendImpact] = useState(3);
+  const [newTrendProbability, setNewTrendProbability] = useState(3);
 
   const trends = data?.trends || [];
   const forces = ['All', ...Object.keys(FORCES)];
@@ -1013,6 +1068,27 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
       : <ChevronUp size={12} style={{ display: 'inline', marginLeft: '4px' }} />;
   };
 
+  const handleCreateTrend = (): void => {
+    if (!newTrendName.trim()) {
+      alert('Please enter a trend name');
+      return;
+    }
+    onCreateTrend?.({
+      force: newTrendForce,
+      name: newTrendName,
+      direction: newTrendDirection,
+      impact: newTrendImpact,
+      probability: newTrendProbability,
+    });
+    // Reset form
+    setNewTrendName('');
+    setNewTrendForce('Consumer');
+    setNewTrendDirection('Expansion');
+    setNewTrendImpact(3);
+    setNewTrendProbability(3);
+    setShowAddForm(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1040,35 +1116,64 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
             — {filtered.length} trends
           </span>
         </h2>
-        <div style={{
-          position: 'relative',
-          width: '240px',
-          backgroundColor: T.bg1,
-          border: `1px solid ${T.border1}`,
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          paddingLeft: '12px',
-        }}>
-          <Search size={14} style={{ color: T.text2 }} />
-          <input
-            type="text"
-            placeholder="Search trends…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              flex: 1,
-              marginLeft: '8px',
-              paddingRight: '12px',
-              paddingTop: '8px',
-              paddingBottom: '8px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              outline: 'none',
-              fontSize: '12px',
-              color: T.text,
-            }}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isAdmin && (
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#fff',
+                backgroundColor: T.accent,
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 120ms ease',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+              }}
+            >
+              <Plus size={14} /> Add Trend
+            </button>
+          )}
+          <div style={{
+            position: 'relative',
+            width: '240px',
+            backgroundColor: T.bg1,
+            border: `1px solid ${T.border1}`,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            paddingLeft: '12px',
+          }}>
+            <Search size={14} style={{ color: T.text2 }} />
+            <input
+              type="text"
+              placeholder="Search trends…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                flex: 1,
+                marginLeft: '8px',
+                paddingRight: '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontSize: '12px',
+                color: T.text,
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -1165,6 +1270,211 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
         ))}
       </div>
 
+      {/* Add Trend Form (admin only) */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              padding: '20px 24px',
+              borderBottom: `1px solid ${T.border1}`,
+              backgroundColor: T.bg1,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              gap: '16px',
+              alignItems: 'flex-end',
+            }}
+          >
+            {/* Force dropdown */}
+            <div>
+              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                FORCE
+              </div>
+              <select
+                value={newTrendForce}
+                onChange={(e) => setNewTrendForce(e.target.value as ForceName)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  border: `1px solid ${T.border1}`,
+                  backgroundColor: T.bg2,
+                  color: T.text,
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {Object.keys(FORCES).map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Trend Name */}
+            <div>
+              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                TREND NAME
+              </div>
+              <input
+                type="text"
+                value={newTrendName}
+                onChange={(e) => setNewTrendName(e.target.value)}
+                placeholder="Enter trend name…"
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  border: `1px solid ${T.border1}`,
+                  backgroundColor: T.bg2,
+                  color: T.text,
+                  fontSize: '11px',
+                  outline: 'none',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+              />
+            </div>
+
+            {/* Direction */}
+            <div>
+              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                DIRECTION
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => setNewTrendDirection('Expansion')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: `1px solid ${newTrendDirection === 'Expansion' ? T.accent : T.border1}`,
+                    backgroundColor: newTrendDirection === 'Expansion' ? '#D1FAE5' : T.bg2,
+                    color: newTrendDirection === 'Expansion' ? T.green : T.text2,
+                    fontSize: '10px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 120ms',
+                  }}
+                >
+                  ▲ Expansion
+                </button>
+                <button
+                  onClick={() => setNewTrendDirection('Contraction')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: `1px solid ${newTrendDirection === 'Contraction' ? T.accent : T.border1}`,
+                    backgroundColor: newTrendDirection === 'Contraction' ? '#FEE2E2' : T.bg2,
+                    color: newTrendDirection === 'Contraction' ? T.red : T.text2,
+                    fontSize: '10px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 120ms',
+                  }}
+                >
+                  ▼ Contraction
+                </button>
+              </div>
+            </div>
+
+            {/* Impact */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                IMPACT
+              </div>
+              <DotBar
+                value={newTrendImpact}
+                onChange={setNewTrendImpact}
+                editable
+                color="blue"
+                size="sm"
+                direction={newTrendDirection}
+                labelType="impact"
+              />
+            </div>
+
+            {/* Probability */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
+                PROBABILITY
+              </div>
+              <DotBar
+                value={newTrendProbability}
+                onChange={setNewTrendProbability}
+                editable
+                color="amber"
+                size="sm"
+                direction={newTrendDirection}
+                labelType="probability"
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => {
+                  setShowAddForm(false);
+                  setNewTrendName('');
+                  setNewTrendForce('Consumer');
+                  setNewTrendDirection('Expansion');
+                  setNewTrendImpact(3);
+                  setNewTrendProbability(3);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: T.text,
+                  backgroundColor: T.bg3,
+                  border: `1px solid ${T.border1}`,
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = T.bg4;
+                  e.currentTarget.style.borderColor = T.border2;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = T.bg3;
+                  e.currentTarget.style.borderColor = T.border1;
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTrend}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#fff',
+                  backgroundColor: T.accent,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 120ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+                }}
+              >
+                Create Trend
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Table */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
@@ -1207,7 +1517,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
             <AnimatePresence mode="popLayout">
               {filtered.map((trend) => {
                 const isExpanded = expandedTrendId === trend.id;
-                const scoreColor = trend.score! > 0 ? T.green : trend.score! < 0 ? T.red : T.text3;
+                const scoreColor = trend.direction === 'Expansion' ? T.green : trend.direction === 'Contraction' ? T.red : T.text3;
 
                 return (
                   <React.Fragment key={trend.id}>

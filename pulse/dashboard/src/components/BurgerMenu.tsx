@@ -82,11 +82,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 0.15s ease-in-out',
-          hover: {
-            backgroundColor: '#334155',
-            color: '#F8FAFC',
-          },
-        }}
+        } as React.CSSProperties}
         onMouseEnter={(e) => {
           (e.target as HTMLButtonElement).style.backgroundColor = '#334155';
           (e.target as HTMLButtonElement).style.color = '#F8FAFC';
@@ -237,7 +233,9 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon: Icon, label, onClick, isDestr
         transition: 'background-color 0.15s ease-in-out',
       }}
     >
-      <Icon size={16} style={{ flexShrink: 0 }} />
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+        <Icon size={16} />
+      </div>
       <span>{label}</span>
     </button>
   );

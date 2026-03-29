@@ -483,7 +483,9 @@ const ScanProgressOverlay: FC<{ progress: ScanProgress; errors: string[] }> = ({
           const isOk = status.startsWith('ok');
           const isError = status.startsWith('error');
           const isResearching = !isOk && !isError;
-          const [force, qNum] = taskKey.split(':');
+          const parts = taskKey.split(':');
+          const force = parts[0] ?? '';
+          const qNum = parts[1] ?? '';
           const forceColors: Record<string, string> = {
             Consumer: '#3B82F6', Customer: '#8B5CF6', Technology: '#06B6D4',
             Government: '#F59E0B', Environmental: '#22C55E', Competitive: '#EF4444',

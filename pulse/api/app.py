@@ -9,7 +9,7 @@ import logging
 import asyncio
 import numpy as np
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -211,6 +211,13 @@ def create_app(args=None) -> FastAPI:
             _state["dag"] = CausalDAG()
             _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
 
+            # Always initialize the database schema (creates all tables including session_snapshots)
+            try:
+                from pulse.database import init_db
+                init_db()
+            except Exception as e:
+                logger.warning(f"Database initialization failed: {e}")
+
             # Initialize Delphi protocol
             from pulse.elicitation.delphi import DelphiProtocol
             _state["delphi"] = DelphiProtocol()
@@ -227,8 +234,6 @@ def create_app(args=None) -> FastAPI:
             # If no Excel loaded, load from database (seeds if empty)
             if not _state["db"]:
                 try:
-                    from pulse.database import init_db
-                    init_db()
                     _state["db"] = _load_trend_database()
                     logger.info(f"Loaded {_state['db'].trend_count} trends from database")
                 except Exception as e:
@@ -1376,7 +1381,7 @@ def create_app(args=None) -> FastAPI:
         trends: list = []
         trend_count: int = 0
         net_shift: float = 0.0
-        notes: str = ""
+        notes: Optional[str] = None
 
     @app.get("/api/v1/snapshots")
     async def list_snapshots():

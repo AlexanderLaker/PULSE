@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
-  Brain, AlertTriangle, FileDown, Settings, X, RefreshCw, Users,
+  Brain, AlertTriangle, X, RefreshCw,
   Presentation,
 } from 'lucide-react';
 
@@ -30,17 +30,15 @@ import type {
 import HeadlineKPI from './HeadlineKPI';
 import ShiftHeatmap from './Heatmap';
 import PathTimeline from './PathTimeline';
-import CausalFlow from './CausalFlow';
-import ForceWaterfall from './ForceWaterfall';
-import AllocationChart from './AllocationChart';
 import TrendExplorer from './TrendExplorer';
 // EmergingTrends removed — external API scanning disabled
 import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
 import ProductImpactRankings from './ProductImpactRankings';
+import ForceShiftMatrix from './ForceShiftMatrix';
 
 // Extracted components
-import ScenarioSelectorPanel from './ScenarioSelectorPanel';
+import { BurgerMenu } from './BurgerMenu';
 import ForceWeightSliders from './ForceWeightSliders';
 import SettingsPanel from './SettingsPanel';
 import OnboardingTooltips from './OnboardingTooltips';
@@ -120,11 +118,7 @@ function generateInitialData(): InitialDataResult {
 
   // Scenarios
   const scenarios: Scenario[] = [
-    { id: 'base', name: 'Base Case', description: 'Current expert scores with causal DAG active. No external shocks applied. This is the central planning scenario.' },
-    { id: 'green_squeeze', name: 'Green Squeeze', description: 'Environmental regulation accelerates (+30%) and Government force shocks (+20%). Propagates via DAG to reformulation costs, shelf prices, and consumer willingness to pay.' },
-    { id: 'tech_disruption', name: 'Tech Disruption', description: 'Technology force accelerates (+40%). Propagates via DAG to consumer adoption curves, competitive gaps, and channel economics.' },
-    { id: 'price_war', name: 'Price War', description: 'Competitive intensity spikes (+35%) with Customer pressure (+15%). Propagates to margin compression, consumer trading down, and channel power shifts.' },
-    { id: 'perfect_storm', name: 'Perfect Storm', description: 'Correlated tail event — all 6 forces shocked at +30% simultaneously. Uses t-copula tail dependence. No DAG propagation (the shock IS the tail event).' },
+    { id: 'base', name: 'Base Case', description: 'Current expert scores with causal DAG active. No external shocks applied.' },
   ];
 
   // Allocation — equal weights until simulation provides recommendations
@@ -187,7 +181,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
   const [activeView, setActiveView] = useState<'overview' | 'trends'>('overview');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [deepDiveCategory, setDeepDiveCategory] = useState<string | null>(null);
-  const [shockedForce, setShockedForce] = useState<ForceName | null>(null);
   const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
   const [showDelphi, setShowDelphi] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -197,25 +190,25 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
   // Initial data — zeroed until backend provides real simulation
   const [initialData, setInitialData] = useState(() => generateInitialData());
   const data = initialData;
-  const scenarioOptions = initialData.scenarios;
 
   // ─── Merge backend simulation results into data when available ──────
   useEffect(() => {
-    if (!simulation || !simulation.shift_matrix) return;
+    const shiftMatrix = simulation?.shift_matrix || simulation?.shifts;
+    if (!simulation || !shiftMatrix) return;
 
     // Map backend shift_matrix keys to frontend category IDs
     const normCatId = (k: string): string =>
       k.toLowerCase().replace(/^(hair|lhc):\s*/, (_, g: string) => g + '_').replace(/\s+/g, '_');
 
     const newShifts: typeof data.shifts = {};
-    for (const [catKey, catData] of Object.entries(simulation.shift_matrix)) {
+    for (const [catKey, catData] of Object.entries(shiftMatrix)) {
       const catId = normCatId(catKey);
-      newShifts[catId] = {} as any;
+      const yearMap: Record<string, any> = {};
       // Handle both flat format {"2026": {...}} and nested {"path": {"2026": {...}}}
       const yearData = (catData as any)?.path ?? catData;
       for (const [year, pcts] of Object.entries(yearData as Record<string, any>)) {
         if (year === 'velocity' || year === 'path') continue; // skip non-year keys
-        newShifts[catId][year] = {
+        yearMap[year] = {
           median: pcts.median ?? 0,
           p10: pcts.p10 ?? 0,
           p25: pcts.p25 ?? 0,
@@ -223,6 +216,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
           p90: pcts.p90 ?? 0,
         };
       }
+      newShifts[catId] = yearMap;
     }
 
     setInitialData(prev => ({
@@ -234,9 +228,9 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
         iterations: simulation.iterations ?? 5000,
         backtestingAccuracy: simulation.convergence?.backtesting_accuracy ?? 0,
       },
-      allocation: simulation.allocation ? {
+      allocation: (simulation.allocation || simulation.allocation_recommendation) ? {
         ...prev.allocation,
-        ...simulation.allocation,
+        ...(simulation.allocation || simulation.allocation_recommendation),
       } : prev.allocation,
     }));
   }, [simulation]);
@@ -479,6 +473,17 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             <div style={{ fontSize: 11, fontWeight: 600, color: T.text2, letterSpacing: 0.5 } as React.CSSProperties}>
               PULSE War Room
             </div>
+            <BurgerMenu
+              user={{ name: 'Admin', role: isAdmin ? 'Admin' : 'Viewer' }}
+              isAdmin={isAdmin}
+              onLogout={() => {}}
+              onShowUsers={() => {}}
+              onShowConfig={() => {}}
+              onShowExport={() => setShowSettings(true)}
+              onShowDelphi={() => setShowDelphi(true)}
+              onShowSnapshots={() => setShowSnapshots(true)}
+              onChangePassword={() => {}}
+            />
             <div
               style={{
                 width: 1,
@@ -527,44 +532,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             })}
           </div>
 
-          {/* Scenario Selector — Admin only */}
-          {isAdmin && <div data-onboarding="scenario" style={{ display: 'flex', gap: 6, flex: 1, justifyContent: 'center' } as React.CSSProperties}>
-            {scenarioOptions.slice(0, 5).map(scenario => (
-              <motion.button
-                key={scenario.id || scenario.name}
-                onClick={() => {
-                  const sid = scenario.id || scenario.name;
-                  setActiveScenario(sid);
-                  // Auto-trigger simulation with the selected scenario
-                  simulate({ scenario: sid });
-                }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                title={scenario.description}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: `1px solid ${
-                    (activeScenario === (scenario.id || scenario.name)) ? T.accent : T.border}`,
-                  background:
-                    activeScenario === (scenario.id || scenario.name)
-                      ? T.accentDim
-                      : 'transparent',
-                  color:
-                    activeScenario === (scenario.id || scenario.name)
-                      ? T.accent
-                      : T.text3,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s',
-                } as React.CSSProperties}
-              >
-                {scenario.name || scenario.id}
-              </motion.button>
-            ))}
-          </div>}
 
           {/* Right: Badges & Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' } as React.CSSProperties}>
@@ -617,72 +584,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               </motion.button>
             )}
 
-            {/* Export Button */}
-            <motion.button
-              onClick={() => setShowSettings(!showSettings)}
-              data-onboarding="export"
-              whileHover={{ background: T.bg3 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                border: `1px solid ${showSettings ? T.accent : T.border}`,
-                background: showSettings ? T.accentDim : 'transparent',
-                color: showSettings ? T.accent : T.text2,
-                cursor: 'pointer',
-              } as React.CSSProperties}
-            >
-              <FileDown size={16} />
-            </motion.button>
-
-            {/* Delphi Button */}
-            <motion.button
-              onClick={() => setShowDelphi(!showDelphi)}
-              whileHover={{ background: T.bg3 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                border: `1px solid ${showDelphi ? T.accent : T.border}`,
-                background: showDelphi ? T.accentDim : 'transparent',
-                color: showDelphi ? T.accent : T.text2,
-                cursor: 'pointer',
-              } as React.CSSProperties}
-              title="Expert Elicitation"
-            >
-              <Users size={16} />
-            </motion.button>
-
-            {/* Session History Button */}
-            <motion.button
-              onClick={() => setShowSnapshots(!showSnapshots)}
-              whileHover={{ background: T.bg3 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                border: `1px solid ${showSnapshots ? T.accent : T.border}`,
-                background: showSnapshots ? T.accentDim : 'transparent',
-                color: showSnapshots ? T.accent : T.text2,
-                cursor: 'pointer',
-              } as React.CSSProperties}
-              title="Session History"
-            >
-              <Clock size={16} />
-            </motion.button>
-
             {/* Executive Briefing Button */}
             <motion.button
               onClick={() => setShowBriefing(true)}
@@ -703,28 +604,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               title="Executive Briefing"
             >
               <Presentation size={16} />
-            </motion.button>
-
-            {/* Settings Button */}
-            <motion.button
-              onClick={() => setShowSettings(!showSettings)}
-              whileHover={{ background: T.bg3 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                border: `1px solid ${showSettings ? T.accent : T.border}`,
-                background: showSettings ? T.accentDim : 'transparent',
-                color: showSettings ? T.accent : T.text2,
-                cursor: 'pointer',
-              } as React.CSSProperties}
-              title="Settings & Export"
-            >
-              <Settings size={16} />
             </motion.button>
           </div>
         </div>
@@ -814,25 +693,12 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               onCategorySelect={setSelectedCategory}
             />
 
-            {/* Row 3: Causal + Forces + Allocation */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.1fr 0.9fr 1fr',
-                gap: 24,
-                marginBottom: 32,
-              } as React.CSSProperties}
-            >
-              <CausalFlow
-                dag={{ edges: data.dagEdges, forces: forceNames as ForceName[] }}
-                shockedForce={shockedForce}
-                onShockForce={setShockedForce}
-              />
-              <ForceWaterfall
-                selectedCategory={selectedCategory}
-              />
-              <AllocationChart
-                allocation={data.allocation[0] || undefined}
+            {/* Force × Category Shift Matrix (2030) */}
+            <div style={{ marginTop: 32 }}>
+              <ForceShiftMatrix
+                shifts={data.shifts}
+                trends={data.trends}
+                onSelectCategory={setSelectedCategory}
               />
             </div>
           </motion.div>
@@ -881,6 +747,53 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                     return merged;
                   }) as any,
                 }));
+              }}
+              onCreateTrend={async (trendData: any) => {
+                try {
+                  const tkn = localStorage.getItem('pulse_token');
+                  const newId = `trend_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                  const payload = {
+                    id: newId,
+                    force: trendData.force || 'Consumer',
+                    name: trendData.name || 'New Trend',
+                    description: trendData.description || '',
+                    direction: trendData.direction || 'Expansion',
+                    impact: trendData.impact || 3,
+                    probability: trendData.probability || 3,
+                    gp1_pct_affected: 0.10,
+                    category_exposure: {},
+                    vc_exposure: {},
+                    sources: [],
+                    ai_suggested: false,
+                    confidence: 'Medium',
+                  };
+                  const res = await fetch('/api/v1/trends', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(tkn ? { Authorization: `Bearer ${tkn}` } : {}),
+                    },
+                    body: JSON.stringify(payload),
+                  });
+                  if (res.ok) {
+                    const created = await res.json();
+                    const impact = created.impact || payload.impact;
+                    const probability = created.probability || payload.probability;
+                    const dirSign = (created.direction || payload.direction) === 'Contraction' ? -1 : 1;
+                    const gp1Pct = created.gp1_pct_affected ?? 0.10;
+                    setInitialData(prev => ({
+                      ...prev,
+                      trends: [...prev.trends, {
+                        ...payload,
+                        ...created,
+                        score: impact * probability,
+                        gp1_shift: (impact * probability * dirSign / 25) * gp1Pct,
+                      }] as any,
+                    }));
+                  }
+                } catch (err) {
+                  console.error('Failed to create trend:', err);
+                }
               }}
               onDeleteTrend={async (id: string) => {
                 try {

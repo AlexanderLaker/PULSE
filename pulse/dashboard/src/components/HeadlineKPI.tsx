@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import React from 'react';
 import type { ShiftMatrix, ConvergenceDiagnostics } from '../types';
-import { T, fmtShift, fmtPct, shiftColorHex } from '../lib/format';
+import { T, fmtShift, shiftColorHex } from '../lib/format';
 
 interface KPICardProps {
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
@@ -163,8 +163,8 @@ export default function HeadlineKPI({
   }
 
   const hasConverged = convergence?.converged ?? false;
-  const rHat = convergence?.r_hat?.toFixed(2) ?? '1.03';
-  const backtestAccuracy = convergence?.backtestingAccuracy ?? 0.73;
+  const rHat = convergence?.r_hat?.toFixed(2) ?? '—';
+  const iterations = convergence?.iterations ?? 10000;
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
@@ -207,12 +207,12 @@ export default function HeadlineKPI({
         delay={0.16}
       />
 
-      {/* KPI 4: Model Quality */}
+      {/* KPI 4: Simulation Status */}
       <KPICard
         icon={CheckCircle2}
-        label="Model Quality"
+        label="Simulation Status"
         value={hasConverged ? 'Converged' : 'Running'}
-        detail={`R̂ ${rHat} · ${fmtPct(backtestAccuracy)} accurate`}
+        detail={`R̂ ${rHat} · ${iterations.toLocaleString()} iterations`}
         color={hasConverged ? T.green : T.amber}
         bgIcon={hasConverged ? T.greenDim : T.amberDim}
         delay={0.24}

@@ -77,6 +77,7 @@ export interface ModelConfig {
   force_weights?: Record<ForceName, number>;
   vc_weights?: Record<ValueChainStep, number>;
   category_names?: string[];
+  iterations?: number;
   backtesting_accuracy?: number;
   ai_provider?: AIProvider;
 }

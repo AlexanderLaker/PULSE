@@ -67,6 +67,7 @@ export interface ConvergenceDiagnostics {
   r_hat?: number;
   ess?: number;
   backtestingAccuracy?: number;
+  backtesting_accuracy?: number;
   iterations?: number;
   model_type?: ModelType;
 }
@@ -74,12 +75,15 @@ export interface ConvergenceDiagnostics {
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
+  shift_matrix?: ShiftMatrix;
   causal_decomposition?: CategoryRecord<CausalDecomposition>;
   allocation_recommendation?: AllocationRecommendation;
+  allocation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;
   scenario?: ScenarioId;
   generated?: string;
   model_version?: string;
+  iterations?: number;
 }
 
 /** Parameters for running a simulation. */
