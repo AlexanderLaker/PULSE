@@ -866,6 +866,7 @@ def create_app(args=None) -> FastAPI:
             "model_type": mc.get("model_type", "bayesian_copula"),
             "allocation": _state.get("allocation"),
             "competitive": _state.get("competitive"),
+            "vc_decomposition": mc.get("vc_decomposition"),
         })
 
     @app.post("/api/v1/simulate")
@@ -935,6 +936,7 @@ def create_app(args=None) -> FastAPI:
                 "model_type": mc_result["model_type"],
                 "allocation": _state.get("allocation"),
                 "competitive": _state.get("competitive"),
+                "vc_decomposition": mc_result.get("vc_decomposition"),
             })
 
     @app.post("/api/v1/simulate/deterministic")

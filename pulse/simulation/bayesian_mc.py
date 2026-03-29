@@ -195,15 +195,24 @@ class BayesianMonteCarloEngine:
         # Transform uniforms to Beta-distributed impact/probability samples
         samples = np.zeros((n_iter, n_trends))
         for j, trend in enumerate(trends):
-            # Impact: Beta(α, β) → scale to [1, 5]
-            a_i, b_i = trend.impact_posterior
-            impact_01 = beta_ppf(U[:, j], a_i, b_i)
-            impact_scaled = 1 + impact_01 * 4  # [1, 5]
-
-            # Probability: use correlated copula dimension (second half of U)
+            # Probability of materialization: Beta(α, β) → scale to [0, 1]
+            # This is the core stochastic variable — "how likely does this trend fully play out?"
             a_p, b_p = trend.probability_posterior
             prob_01 = beta_ppf(U[:, n_trends + j], a_p, b_p)
-            prob_scaled = 1 + prob_01 * 4  # [1, 5]
+            # prob_01 is already [0, 1] — the probability of full materialization
+
+            # gp1_pct_affected is the economic magnitude — "what fraction of the
+            # category's GP1 can this trend realistically touch at full materialization?"
+            # This replaces the old (impact × probability)/25 formula which
+            # double-counted: impact (1-5) and gp1_pct_affected both captured magnitude.
+            # Now: probability drives likelihood, gp1_pct_affected drives magnitude.
+
+            # Impact score (1-5) is used as a shape modifier on gp1_pct_affected:
+            # it stretches or compresses the economic ceiling slightly.
+            # A 5/5 impact trend uses its full gp1_pct_affected; a 1/5 uses ~40%.
+            a_i, b_i = trend.impact_posterior
+            impact_01 = beta_ppf(U[:, j], a_i, b_i)
+            impact_modifier = 0.4 + 0.6 * impact_01  # Range [0.4, 1.0]
 
             # Direction flip: small probability that trend reverses
             flip_prob = 0.02  # 2% chance of direction reversal
@@ -211,9 +220,10 @@ class BayesianMonteCarloEngine:
             direction_signs = np.full(n_iter, trend.direction_sign)
             direction_signs[flip_mask] *= -1
 
-            # Normalized score = (impact * probability * direction) / 25 × gp1_pct_affected
-            # gp1_pct_affected caps the maximum economic impact of this trend
-            samples[:, j] = (impact_scaled * prob_scaled * direction_signs) / 25.0 * trend.gp1_pct_affected
+            # Final score = probability × gp1_pct_affected × impact_modifier × direction
+            # At full materialization (prob=1, impact=5): score ≈ gp1_pct_affected
+            # At low probability (prob=0.2, impact=3): score ≈ 0.2 × 0.76 × gp1_pct
+            samples[:, j] = prob_01 * trend.gp1_pct_affected * impact_modifier * direction_signs
 
         return samples
 
@@ -263,31 +273,11 @@ class BayesianMonteCarloEngine:
                     else:
                         region_factor = 1.0  # No regional data → full impact
 
-                    # VC weighting: soft modifier based on weighted avg of VC exposures.
-                    # Key normalization: match DB keys (Title Case) to config keys
-                    # (which may be snake_case from frontend or Title Case from defaults).
-                    vc_weights = getattr(self.config, 'vc_weights', {})
-                    vc_exp = getattr(trend, 'vc_exposure', {}) or {}
-                    if vc_exp and vc_weights:
-                        # Build a case-insensitive lookup from vc_exp
-                        vc_exp_lower = {k.lower().replace(' ', '_'): v for k, v in vc_exp.items()}
-                        vc_sum = 0.0
-                        vc_total_w = 0.0
-                        for step, w in vc_weights.items():
-                            # Try exact match first, then normalized key
-                            v_exp = vc_exp.get(step, None)
-                            if v_exp is None:
-                                norm_key = step.lower().replace(' ', '_')
-                                v_exp = vc_exp_lower.get(norm_key, 0)
-                            vc_sum += (v_exp / 5.0) * w
-                            vc_total_w += w
-                        raw_vc = vc_sum / max(vc_total_w, 1e-6)
-                        # Dampen: same 50% approach
-                        vc_factor = 1.0 - 0.5 * (1.0 - raw_vc)
-                    else:
-                        vc_factor = 1.0  # No VC data → full impact
+                    # NOTE: VC weights are NOT applied here as input multipliers.
+                    # VC weights decompose the resulting shift across value chain
+                    # steps in _compile_results (post-hoc allocation, not attenuation).
 
-                    total_score += trend_scores[j] * exposure_frac * region_factor * vc_factor
+                    total_score += trend_scores[j] * exposure_frac * region_factor
                     count += 1
 
             avg_score = total_score / max(count, 1)
@@ -422,10 +412,59 @@ class BayesianMonteCarloEngine:
                 "propagated_effects": {f: float(v) for f, v in propagated_effects.items()},
             }
 
+        # ── Value Chain Decomposition ──────────────────────────────────
+        # VC weights allocate the total category shift across VC steps.
+        # For each category, compute how much of the shift lands on each
+        # VC step based on trend VC exposures × vc_weights (normalized).
+        vc_decomposition = {}
+        vc_weights = getattr(self.config, 'vc_weights', {})
+        if vc_weights:
+            # Build case-insensitive lookup helper
+            def _vc_lookup(vc_exp: dict, step: str) -> float:
+                v = vc_exp.get(step, None)
+                if v is not None:
+                    return float(v)
+                norm = step.lower().replace(' ', '_')
+                for k, val in vc_exp.items():
+                    if k.lower().replace(' ', '_') == norm:
+                        return float(val)
+                return 0.0
+
+            trends = db.trends
+            for c_idx, cat in enumerate(self.config.category_names):
+                # Compute raw relevance score per VC step for this category
+                step_scores = {}
+                for step, w in vc_weights.items():
+                    raw = 0.0
+                    for trend in trends:
+                        cat_exp = trend.category_exposure.get(cat, 0)
+                        if cat_exp > 0:
+                            vc_exp = getattr(trend, 'vc_exposure', {}) or {}
+                            v = _vc_lookup(vc_exp, step)
+                            raw += abs(trend.normalized_score) * (cat_exp / 5.0) * (v / 5.0) * w
+                    step_scores[step] = raw
+
+                # Normalize to proportions summing to 1.0
+                total_raw = sum(step_scores.values())
+                if total_raw > 0:
+                    step_shares = {s: v / total_raw for s, v in step_scores.items()}
+                else:
+                    n_steps = len(vc_weights)
+                    step_shares = {s: 1.0 / n_steps for s in vc_weights}
+
+                # Apply shares to the median 2030 shift for this category
+                last_year = self.config.path_years[-1]
+                median_shift = shift_matrix[cat]["path"][last_year]["median"]
+                vc_decomposition[cat] = {
+                    step: float(share * median_shift)
+                    for step, share in step_shares.items()
+                }
+
         return {
             "shift_matrix": shift_matrix,
             "convergence": convergence,
             "causal_decomposition": causal_decomposition,
+            "vc_decomposition": vc_decomposition,
             "raw_samples": samples,
             "iterations": n_iter,
             "model_type": "bayesian_copula",
