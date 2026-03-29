@@ -26,6 +26,7 @@ interface TrendData {
   probability?: number;
   score?: number;
   gp1_shift?: number;
+  gp1_pct_affected?: number;
   description?: string;
   strategic_implication?: string;
   category_exposure?: Record<CategoryId, number>;
@@ -498,7 +499,54 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 </p>
               </div>
 
-              {/* 3. Sources — clickable links with API icons (same style as EmergingTrends) */}
+              {/* 3. GP1 % Affected — Economic Anchoring */}
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                backgroundColor: T.accent + '08',
+                border: `1px solid ${T.accent}20`,
+              }}>
+                <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '8px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <BarChart3 size={10} /> GP1 % AFFECTED — ECONOMIC ANCHORING
+                </div>
+                <p style={{ fontSize: '10px', color: T.text3, lineHeight: 1.5, margin: '0 0 10px 0' }}>
+                  What fraction of a category's GP1 can this trend realistically affect at full materialization?
+                  A 5/5 impact trend with 15% GP1 affected means: maximum-severity trend, but only touches 15% of the pool.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    step={1}
+                    value={Math.round((trend.gp1_pct_affected || 0.10) * 100)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10) / 100;
+                      onUpdateTrend(trend.id, { gp1_pct_affected: val } as any);
+                    }}
+                    style={{
+                      flex: 1,
+                      height: '4px',
+                      accentColor: T.accent,
+                      cursor: 'pointer',
+                    }}
+                  />
+                  <div style={{
+                    minWidth: '56px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: T.bg2,
+                    border: `1px solid ${T.border1}`,
+                    textAlign: 'center',
+                  }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, fontFamily: T.mono, color: T.accent }}>
+                      {Math.round((trend.gp1_pct_affected || 0.10) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Sources — clickable links with API icons (same style as EmergingTrends) */}
               {trend.sources && trend.sources.length > 0 && (
                 <div>
                   <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
@@ -1040,6 +1088,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                 { key: 'impact', label: 'Impact' },
                 { key: 'probability', label: 'Probability' },
                 { key: 'score', label: 'Score' },
+                { key: 'gp1_pct_affected', label: 'GP1 % Affected' },
                 { key: 'gp1_shift', label: 'GP1 Shift %' },
                 { key: '_actions', label: '' },
               ].map(col => (
@@ -1183,6 +1232,38 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         color: scoreColor,
                       }}>
                         {fmtPct((trend.score || 0) / 25, 1)}
+                      </td>
+                      <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={Math.round((trend.gp1_pct_affected || 0.10) * 100)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const raw = parseInt(e.target.value, 10);
+                            if (!isNaN(raw) && raw >= 1 && raw <= 100) {
+                              onUpdateTrend(trend.id, { gp1_pct_affected: raw / 100 } as any);
+                            }
+                          }}
+                          style={{
+                            width: '48px',
+                            padding: '4px 4px',
+                            borderRadius: '4px',
+                            border: `1px solid ${T.border1}`,
+                            backgroundColor: T.bg2,
+                            color: T.accent,
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            fontFamily: T.mono,
+                            textAlign: 'center',
+                            outline: 'none',
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                        />
+                        <span style={{ fontSize: '9px', color: T.text3, marginLeft: '2px' }}>%</span>
                       </td>
                       <td style={{
                         padding: '12px 16px',

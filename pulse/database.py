@@ -182,10 +182,18 @@ def init_db() -> None:
                 debiasing_applied BOOLEAN DEFAULT FALSE,
                 impact_posterior TEXT,
                 probability_posterior TEXT,
+                gp1_pct_affected REAL DEFAULT 0.10,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Migration: add gp1_pct_affected column if missing (for existing DBs)
+        try:
+            cursor.execute("ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
 
         # ── Category exposure ────────────────────────────────────────
         cursor.execute("""
@@ -483,8 +491,9 @@ def save_trends(trends: List[Trend]) -> None:
                     impact, probability, start_year, normalized_score,
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, scorer_count, score_variance,
-                    debiasing_applied, impact_posterior, probability_posterior
-                ) VALUES ({ph(21)})
+                    debiasing_applied, impact_posterior, probability_posterior,
+                    gp1_pct_affected
+                ) VALUES ({ph(22)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -495,6 +504,7 @@ def save_trends(trends: List[Trend]) -> None:
                     trend.scorer_count, trend.score_variance, trend.debiasing_applied,
                     json.dumps(trend.impact_posterior) if trend.impact_posterior else None,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
+                    getattr(trend, 'gp1_pct_affected', 0.10),
                 ),
             )
 
@@ -614,6 +624,7 @@ def load_trends() -> List[Trend]:
                 scorer_count=row.get("scorer_count", 1),
                 score_variance=row.get("score_variance", 0.0),
                 debiasing_applied=row.get("debiasing_applied", False),
+                gp1_pct_affected=row.get("gp1_pct_affected", 0.10) or 0.10,
                 impact_posterior=impact_posterior,
                 probability_posterior=prob_posterior,
             )

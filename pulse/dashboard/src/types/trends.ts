@@ -47,6 +47,7 @@ export interface Trend {
   normalized_score?: number;
   score?: number;        // impact × probability (for display)
   gp1_shift?: number;    // computed shift
+  gp1_pct_affected?: number;  // 0.0-1.0: fraction of category GP1 exposed
   strategic_implication?: string;
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
@@ -74,6 +75,7 @@ export interface TrendUpdate {
   impact?: number;
   probability?: number;
   direction?: Direction;
+  gp1_pct_affected?: number;
   description?: string;
   strategic_implication?: string;
   confidence?: Confidence;

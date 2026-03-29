@@ -134,6 +134,8 @@ class TrendUpdate(BaseModel):
     impact: Optional[int] = Field(None, ge=1, le=5)
     probability: Optional[int] = Field(None, ge=1, le=5)
     direction: Optional[str] = None
+    gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0,
+        description="Fraction of category GP1 exposed to this trend (0.0-1.0)")
     category_exposure: Optional[dict] = None
     vc_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
@@ -549,6 +551,7 @@ def create_app(args=None) -> FastAPI:
             "weighted_score": t.weighted_score,
             "normalized_score": t.normalized_score,
             "gp1_shift": t.normalized_score,
+            "gp1_pct_affected": t.gp1_pct_affected,
             "start_year": t.start_year,
             "category_exposure": t.category_exposure,
             "vc_exposure": t.vc_exposure,
@@ -669,6 +672,12 @@ def create_app(args=None) -> FastAPI:
             trend.probability = max(1, min(5, update.probability))
         if update.direction is not None:
             trend.direction = update.direction
+        if update.gp1_pct_affected is not None:
+            audit.log("score_change", "trend", trend_id,
+                       old_value=str(trend.gp1_pct_affected),
+                       new_value=str(update.gp1_pct_affected),
+                       reason="gp1_pct_affected update")
+            trend.gp1_pct_affected = max(0.0, min(1.0, update.gp1_pct_affected))
         if update.category_exposure is not None:
             trend.category_exposure = update.category_exposure
         if update.vc_exposure is not None:
