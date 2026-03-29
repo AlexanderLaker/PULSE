@@ -35,6 +35,35 @@ def _sanitize(obj):
         return obj.tolist()
     return obj
 
+def _summarize_convergence(conv: dict) -> dict:
+    """Summarize per-category convergence into a flat top-level dict for the frontend.
+
+    Backend produces: {"Hair: Color": {"r_hat": 1.02, "ess": 500, "converged": true}, ...}
+    Frontend expects: {"r_hat": 1.03, "converged": true, "categories": {...}}
+    """
+    if not conv or not isinstance(conv, dict):
+        return {"r_hat": 0, "converged": False, "categories": {}}
+
+    # If it already has a top-level r_hat, it's already summarized
+    if "r_hat" in conv and not any(isinstance(v, dict) for v in conv.values()):
+        return conv
+
+    r_hats = []
+    all_converged = True
+    for cat_key, cat_val in conv.items():
+        if isinstance(cat_val, dict) and "r_hat" in cat_val:
+            r_hats.append(cat_val["r_hat"])
+            if not cat_val.get("converged", True):
+                all_converged = False
+
+    max_r_hat = max(r_hats) if r_hats else 0
+    return {
+        "r_hat": float(max_r_hat),
+        "converged": all_converged and max_r_hat < 1.05 if r_hats else False,
+        "categories": conv,
+    }
+
+
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.excel_reader import ExcelReader
@@ -818,7 +847,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(404, "No simulation results. Run a simulation first.")
         return _sanitize({
             "shift_matrix": mc["shift_matrix"],
-            "convergence": mc.get("convergence", {}),
+            "convergence": _summarize_convergence(mc.get("convergence", {})),
             "iterations": mc.get("iterations", 5000),
             "model_type": mc.get("model_type", "bayesian_copula"),
             "allocation": _state.get("allocation"),
@@ -887,7 +916,7 @@ def create_app(args=None) -> FastAPI:
 
             return _sanitize({
                 "shift_matrix": mc_result["shift_matrix"],
-                "convergence": mc_result["convergence"],
+                "convergence": _summarize_convergence(mc_result.get("convergence", {})),
                 "iterations": mc_result["iterations"],
                 "model_type": mc_result["model_type"],
                 "allocation": _state.get("allocation"),

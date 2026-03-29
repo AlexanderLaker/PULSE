@@ -101,14 +101,28 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
   trends,
   onSelectCategory,
 }) => {
-  // Compute force contributions for all categories
+  // Compute force contributions for all categories, scaled to match MC 2030 total
   const forceContributions = useMemo(() => {
     const result: Record<string, Record<ForceName, number>> = {};
     CATEGORIES.forEach(cat => {
-      result[cat.id] = computeForceContributions(cat.id, trends);
+      const raw = computeForceContributions(cat.id, trends);
+      const rawTotal = Object.values(raw).reduce((a, b) => a + b, 0);
+      const mcTotal = shifts?.[cat.id] ? extract2030Shift(shifts[cat.id]) : 0;
+
+      // Scale force contributions proportionally so they sum to the MC 2030 shift
+      if (Math.abs(rawTotal) > 1e-6 && Math.abs(mcTotal) > 1e-6) {
+        const scale = mcTotal / rawTotal;
+        const scaled: Record<ForceName, number> = {} as Record<ForceName, number>;
+        for (const [f, v] of Object.entries(raw)) {
+          scaled[f as ForceName] = v * scale;
+        }
+        result[cat.id] = scaled;
+      } else {
+        result[cat.id] = raw;
+      }
     });
     return result;
-  }, [trends]);
+  }, [trends, shifts]);
 
   // Group categories by group (Hair / LHC)
   const categoryGroups = useMemo(() => {
@@ -120,9 +134,9 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
     ];
   }, []);
 
-  // Compute totals by force (sum across all categories)
+  // Compute averages by force (average across all categories)
   const totalsByForce = useMemo(() => {
-    const totals: Record<ForceName, number> = {
+    const sums: Record<ForceName, number> = {
       Consumer: 0,
       Customer: 0,
       Technology: 0,
@@ -131,14 +145,20 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
       Competitive: 0,
     };
 
+    const catCount = CATEGORIES.length || 1;
     CATEGORIES.forEach(cat => {
       const contributions = forceContributions[cat.id] ?? {};
       Object.entries(contributions).forEach(([force, val]) => {
-        totals[force as ForceName] += (val as number);
+        sums[force as ForceName] += (val as number);
       });
     });
 
-    return totals;
+    // Return average, not sum
+    const avgs: Record<ForceName, number> = {} as Record<ForceName, number>;
+    for (const [force, sum] of Object.entries(sums)) {
+      avgs[force as ForceName] = sum / catCount;
+    }
+    return avgs;
   }, [forceContributions]);
 
   // Fallback if no data
@@ -574,9 +594,9 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
           lineHeight: 1.5,
         }}
       >
-        <strong>Values represent 2030 shift contribution by force:</strong> Each force's impact is calculated as the sum
-        of trend-driven shifts, weighted by category exposure. Values sum to portfolio total shift. Click a category
-        row to see detailed causal decomposition.
+        <strong>Values represent 2030 shift contribution by force:</strong> Each force's impact is calculated from
+        trend scores weighted by category exposure, scaled to match the Monte Carlo total. Portfolio row shows the average across categories.
+        Click a category row to see detailed causal decomposition.
       </div>
     </motion.div>
   );
