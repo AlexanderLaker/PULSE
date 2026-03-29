@@ -837,12 +837,23 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(updates),
                 }).catch(() => {});
-                // Update local state immediately
+                // Update local state immediately with client-side recalculation
                 setInitialData(prev => ({
                   ...prev,
-                  trends: prev.trends.map((t: any) =>
-                    t.id === id ? { ...t, ...updates } : t
-                  ) as any,
+                  trends: prev.trends.map((t: any) => {
+                    if (t.id !== id) return t;
+                    const merged = { ...t, ...updates };
+                    // Recalculate gp1_shift (normalized_score) when impact, probability,
+                    // direction, or gp1_pct_affected changes
+                    const impact = merged.impact || 3;
+                    const probability = merged.probability || 3;
+                    const dirSign = merged.direction === 'Contraction' ? -1 : 1;
+                    const gp1Pct = merged.gp1_pct_affected ?? 0.10;
+                    const rawNorm = (impact * probability * dirSign) / 25;
+                    merged.gp1_shift = rawNorm * gp1Pct;
+                    merged.score = impact * probability;
+                    return merged;
+                  }) as any,
                 }));
               }}
               onDeleteTrend={async (id: string) => {
