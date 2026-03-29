@@ -243,10 +243,10 @@ class BayesianMonteCarloEngine:
                 if exposure > 0:
                     exposure_frac = exposure / 5.0
 
-                    # Region weighting: scale contribution by how much of the
+                    # Region weighting: soft modifier based on how much of the
                     # trend's regional exposure overlaps with configured region weights.
-                    # If a trend only affects "North America" (exposure=5) and NA weight=25%,
-                    # then region_factor ~ 0.25. If all regions equally exposed, factor ~ 1.0.
+                    # Uses dampened scaling: factor = 1 - damping*(1 - raw)
+                    # so exposure scores modulate impact gently (not as hard multipliers).
                     region_weights = getattr(self.config, 'region_weights', {})
                     regional_exp = getattr(trend, 'regional_exposure', {}) or {}
                     if regional_exp and region_weights:
@@ -256,21 +256,34 @@ class BayesianMonteCarloEngine:
                             r_exp = regional_exp.get(region, 0)
                             weighted_sum += (r_exp / 5.0) * r_weight
                             total_possible += r_weight
-                        region_factor = weighted_sum / max(total_possible, 1e-6)
+                        raw_region = weighted_sum / max(total_possible, 1e-6)
+                        # Dampen: 50% of the way between raw and 1.0
+                        # raw=1.0 → 1.0, raw=0.6 → 0.8, raw=0.0 → 0.5
+                        region_factor = 1.0 - 0.5 * (1.0 - raw_region)
                     else:
                         region_factor = 1.0  # No regional data → full impact
 
-                    # VC weighting: scale by weighted avg of trend's VC exposures
+                    # VC weighting: soft modifier based on weighted avg of VC exposures.
+                    # Key normalization: match DB keys (Title Case) to config keys
+                    # (which may be snake_case from frontend or Title Case from defaults).
                     vc_weights = getattr(self.config, 'vc_weights', {})
                     vc_exp = getattr(trend, 'vc_exposure', {}) or {}
                     if vc_exp and vc_weights:
+                        # Build a case-insensitive lookup from vc_exp
+                        vc_exp_lower = {k.lower().replace(' ', '_'): v for k, v in vc_exp.items()}
                         vc_sum = 0.0
                         vc_total_w = 0.0
                         for step, w in vc_weights.items():
-                            v_exp = vc_exp.get(step, 0)
+                            # Try exact match first, then normalized key
+                            v_exp = vc_exp.get(step, None)
+                            if v_exp is None:
+                                norm_key = step.lower().replace(' ', '_')
+                                v_exp = vc_exp_lower.get(norm_key, 0)
                             vc_sum += (v_exp / 5.0) * w
                             vc_total_w += w
-                        vc_factor = vc_sum / max(vc_total_w, 1e-6)
+                        raw_vc = vc_sum / max(vc_total_w, 1e-6)
+                        # Dampen: same 50% approach
+                        vc_factor = 1.0 - 0.5 * (1.0 - raw_vc)
                     else:
                         vc_factor = 1.0  # No VC data → full impact
 

@@ -32,17 +32,18 @@ const T = {
 };
 
 const FORCES: ForceName[] = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
-const VC_STEPS: ValueChainStep[] = ['raw_materials', 'formulation', 'packaging', 'manufacturing', 'logistics', 'marketing', 'trade', 'after_sales'];
+// VC step keys must match DB keys (Title Case) for correct simulation lookup
+const VC_STEPS: string[] = ['Raw Materials', 'Formulation', 'Manufacturing', 'Packaging', 'Supply Chain', 'Marketing', 'Commercial', 'Consumer'];
 
-const VC_LABELS: Record<ValueChainStep, string> = {
-  raw_materials: 'Raw Materials',
-  formulation: 'Formulation',
-  packaging: 'Packaging',
-  manufacturing: 'Manufacturing',
-  logistics: 'Logistics',
-  marketing: 'Marketing',
-  trade: 'Trade',
-  after_sales: 'After Sales',
+const VC_LABELS: Record<string, string> = {
+  'Raw Materials': 'Raw Materials',
+  'Formulation': 'Formulation',
+  'Manufacturing': 'Manufacturing',
+  'Packaging': 'Packaging',
+  'Supply Chain': 'Supply Chain',
+  'Marketing': 'Marketing',
+  'Commercial': 'Commercial',
+  'Consumer': 'Consumer',
 };
 
 type RegionKey = 'Europe' | 'North America' | 'Asia' | 'High Growth';
@@ -82,15 +83,15 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     Environmental: 0.15,
     Competitive: 0.1,
   });
-  const [vcWeights, setVCWeights] = useState<Record<ValueChainStep, number>>({
-    raw_materials: 0.15,
-    formulation: 0.15,
-    packaging: 0.12,
-    manufacturing: 0.12,
-    logistics: 0.12,
-    marketing: 0.18,
-    trade: 0.1,
-    after_sales: 0.06,
+  const [vcWeights, setVCWeights] = useState<Record<string, number>>({
+    'Raw Materials': 0.125,
+    'Formulation': 0.125,
+    'Manufacturing': 0.125,
+    'Packaging': 0.125,
+    'Supply Chain': 0.125,
+    'Marketing': 0.125,
+    'Commercial': 0.125,
+    'Consumer': 0.125,
   });
   const [regionWeights, setRegionWeights] = useState<Record<RegionKey, number>>({
     'Europe': 0.25,
@@ -126,7 +127,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
 
       if (data.attenuation) setAttenuation(data.attenuation);
       if (data.force_weights) setForceWeights(data.force_weights as Record<ForceName, number>);
-      if (data.vc_weights) setVCWeights(data.vc_weights as Record<ValueChainStep, number>);
+      if (data.vc_weights) setVCWeights(data.vc_weights as Record<string, number>);
       if ((data as any).region_weights) setRegionWeights((data as any).region_weights as Record<RegionKey, number>);
       if ((data as any).within_force_rho) setWithinForceRho((data as any).within_force_rho);
       if ((data as any).t_copula_df) setTCopulaDf((data as any).t_copula_df);
@@ -165,13 +166,13 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     }, {} as Record<ForceName, number>);
   };
 
-  const normalizeVCWeights = (weights: Record<ValueChainStep, number>) => {
+  const normalizeVCWeights = (weights: Record<string, number>) => {
     const sum = Object.values(weights).reduce((a, b) => a + b, 0);
     if (sum === 0) return weights;
     return Object.entries(weights).reduce((acc, [k, v]) => {
-      acc[k as ValueChainStep] = Number((v / sum).toFixed(4));
+      acc[k] = Number((v / sum).toFixed(4));
       return acc;
-    }, {} as Record<ValueChainStep, number>);
+    }, {} as Record<string, number>);
   };
 
   const normalizeRegionWeights = (weights: Record<RegionKey, number>) => {
@@ -188,7 +189,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
     setForceWeights(updated);
   };
 
-  const handleVCWeightChange = (step: ValueChainStep, value: number) => {
+  const handleVCWeightChange = (step: string, value: number) => {
     const updated = { ...vcWeights, [step]: Math.max(0, value) };
     setVCWeights(updated);
   };
