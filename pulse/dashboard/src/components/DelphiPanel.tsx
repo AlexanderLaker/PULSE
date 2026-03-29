@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2, Clock,
   Download, Play, Zap, Users, BarChart3, Send, ArrowRight, ArrowLeft,
-  Eye, Lock, RefreshCw,
+  Eye, Lock, RefreshCw, Trash2,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS } from '../lib/format';
 import * as api from '../api/client';
@@ -582,12 +582,13 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
 // ── Sessions Overview ─────────────────────────────────────────
 
 function SessionsOverview({
-  sessions, loading, onSelect, onCreateSession,
+  sessions, loading, onSelect, onCreateSession, onDeleteSession,
 }: {
   sessions: SessionData[];
   loading: boolean;
   onSelect: (s: SessionData) => void;
   onCreateSession: (name: string) => Promise<void>;
+  onDeleteSession?: (id: string) => Promise<void>;
 }) {
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState('');
@@ -761,6 +762,27 @@ function SessionsOverview({
                   }}>
                     {roundLabel}
                   </span>
+                  {onDeleteSession && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete session "${session.name}"? This cannot be undone.`)) {
+                          onDeleteSession(session.id);
+                        }
+                      }}
+                      title="Delete session"
+                      style={{
+                        padding: 6, backgroundColor: 'transparent', border: 'none',
+                        borderRadius: 6, cursor: 'pointer', color: T.text4,
+                        display: 'flex', alignItems: 'center',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = T.red; e.currentTarget.style.backgroundColor = T.redDim; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = T.text4; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   <ChevronRight size={16} style={{ color: T.text3 }} />
                 </div>
               </button>
@@ -1136,18 +1158,20 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
 
   const handleCreateSession = async (name: string) => {
     try {
+      // Don't pass trend_ids — backend auto-populates from DB
       const result = await api.createDelphiSession({ name, trend_ids: [], scorer_ids: [] });
+      const trendCount = (result as any).trend_count || 0;
       const newSession: SessionData = {
         id: (result as any).session_id || (result as any).id || `session_${Date.now()}`,
         name,
         status: 'Round 1',
         current_round: 1,
         scorer_count: 0,
-        trend_count: MOCK_TRENDS.length,
+        trend_count: trendCount,
       };
       setSessions(prev => [newSession, ...prev]);
       handleSelectSession(newSession);
-      setToast({ msg: 'Session created successfully', type: 'success' });
+      setToast({ msg: `Session created with ${trendCount} trends`, type: 'success' });
     } catch {
       // Fallback mock session
       const mockSession: SessionData = {
@@ -1156,7 +1180,7 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
         status: 'Round 1',
         current_round: 1,
         scorer_count: 0,
-        trend_count: MOCK_TRENDS.length,
+        trend_count: 0,
       };
       setSessions(prev => [mockSession, ...prev]);
       handleSelectSession(mockSession);
@@ -1234,10 +1258,44 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
   const handleComplete = async () => {
     if (!selectedSession) return;
     try {
+      // First complete the session to compute consensus
       await api.completeDelphiSession(selectedSession.id);
-      setToast({ msg: 'Consensus applied to PULSE!', type: 'success' });
+      // Then apply consensus scores back to the trends in the DB
+      const token = localStorage.getItem('pulse_token');
+      await fetch(`/api/v1/delphi/sessions/${selectedSession.id}/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      // Trigger simulation refresh
+      window.dispatchEvent(new CustomEvent('pulse:config-updated'));
+      setToast({ msg: 'Consensus applied to PULSE — model recalculating!', type: 'success' });
     } catch {
       setToast({ msg: 'Failed to complete session', type: 'error' });
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      const token = localStorage.getItem('pulse_token');
+      const res = await fetch(`/api/v1/delphi/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error('Delete failed');
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (selectedSession?.id === sessionId) {
+        setSelectedSession(null);
+        setView('sessions');
+      }
+      setToast({ msg: 'Session deleted', type: 'success' });
+    } catch {
+      setToast({ msg: 'Failed to delete session', type: 'error' });
     }
   };
 
@@ -1368,6 +1426,7 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
                   loading={loading}
                   onSelect={handleSelectSession}
                   onCreateSession={handleCreateSession}
+                  onDeleteSession={handleDeleteSession}
                 />
               </motion.div>
             )}

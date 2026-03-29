@@ -139,6 +139,10 @@ class TrendUpdate(BaseModel):
     category_exposure: Optional[dict] = None
     vc_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    strategic_implication: Optional[str] = None
+    sources: Optional[list] = None
 
 class ScenarioCreate(BaseModel):
     id: str
@@ -694,6 +698,14 @@ def create_app(args=None) -> FastAPI:
             trend.vc_exposure = update.vc_exposure
         if update.regional_exposure is not None:
             trend.regional_exposure = update.regional_exposure
+        if update.name is not None:
+            trend.name = update.name
+        if update.description is not None:
+            trend.description = update.description
+        if update.strategic_implication is not None:
+            trend.strategic_implication = update.strategic_implication
+        if update.sources is not None:
+            trend.data_source = update.sources if isinstance(update.sources, str) else "; ".join(update.sources)
         trend.__post_init__()
 
         # Persist updated exposures

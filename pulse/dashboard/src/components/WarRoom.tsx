@@ -527,8 +527,8 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             })}
           </div>
 
-          {/* Scenario Selector */}
-          <div data-onboarding="scenario" style={{ display: 'flex', gap: 6, flex: 1, justifyContent: 'center' } as React.CSSProperties}>
+          {/* Scenario Selector — Admin only */}
+          {isAdmin && <div data-onboarding="scenario" style={{ display: 'flex', gap: 6, flex: 1, justifyContent: 'center' } as React.CSSProperties}>
             {scenarioOptions.slice(0, 5).map(scenario => (
               <motion.button
                 key={scenario.id || scenario.name}
@@ -564,7 +564,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                 {scenario.name || scenario.id}
               </motion.button>
             ))}
-          </div>
+          </div>}
 
           {/* Right: Badges & Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' } as React.CSSProperties}>
@@ -851,6 +851,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               data={{ trends: data.trends }}
               forceFilter={forceFilter || ''}
               onForceFilter={setForceFilter}
+              isAdmin={isAdmin}
               onUpdateTrend={(id: string, updates: any) => {
                 // Persist to API (include auth token for serverless)
                 const token = localStorage.getItem('pulse_token');

@@ -76,17 +76,37 @@ async def create_session(req: CreateSessionRequest) -> Dict[str, Any]:
     """
     try:
         delphi = get_delphi()
+
+        # Auto-populate trend_ids if empty
+        trend_ids = req.trend_ids
+        if not trend_ids:
+            trend_db = get_trend_db()
+            if trend_db:
+                trend_ids = [t.id for t in trend_db.trends]
+                logger.info(f"Auto-populated {len(trend_ids)} trend IDs for session")
+            else:
+                # Try loading from database directly
+                try:
+                    from pulse.database import load_trends
+                    trends = load_trends()
+                    trend_ids = [t.id for t in trends]
+                    logger.info(f"Loaded {len(trend_ids)} trend IDs from database")
+                except Exception as db_error:
+                    logger.warning(f"Failed to load trends from database: {db_error}")
+                    trend_ids = []
+
         session_id = delphi.create_session(
             name=req.name,
             description=req.description,
-            trend_ids=req.trend_ids,
+            trend_ids=trend_ids,
             scorer_ids=req.scorer_ids,
         )
-        logger.info(f"Created Delphi session {session_id}")
+        logger.info(f"Created Delphi session {session_id} with {len(trend_ids or [])} trends")
         return {
             "status": "created",
             "session_id": session_id,
             "name": req.name,
+            "trend_count": len(trend_ids or []),
         }
     except Exception as e:
         logger.error(f"Failed to create session: {e}")
@@ -108,6 +128,38 @@ async def list_sessions() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}")
         raise HTTPException(500, f"Failed to list sessions: {str(e)}")
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str) -> Dict[str, Any]:
+    """
+    Delete a Delphi session and all associated scores.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        Confirmation of deletion
+    """
+    try:
+        delphi = get_delphi()
+        # Remove from in-memory
+        if session_id in delphi.sessions:
+            del delphi.sessions[session_id]
+        # Remove from database
+        from pulse.database import get_db_connection, placeholder
+        p = placeholder()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"DELETE FROM delphi_rounds WHERE session_id = {p}", (session_id,))
+            cursor.execute(f"DELETE FROM delphi_calibration WHERE session_id = {p}", (session_id,))
+            cursor.execute(f"DELETE FROM delphi_sessions WHERE id = {p}", (session_id,))
+            conn.commit()
+        logger.info(f"Deleted Delphi session {session_id}")
+        return {"status": "deleted", "session_id": session_id}
+    except Exception as e:
+        logger.error(f"Failed to delete session: {e}")
+        raise HTTPException(500, f"Failed to delete session: {str(e)}")
 
 
 @router.get("/sessions/{session_id}")
@@ -182,6 +234,37 @@ async def complete_session(session_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to complete session: {e}")
         raise HTTPException(500, f"Failed to complete session: {str(e)}")
+
+
+@router.post("/sessions/{session_id}/apply")
+async def apply_consensus(session_id: str) -> Dict[str, Any]:
+    """
+    Apply Delphi consensus scores back to the trend database.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        Summary of applied changes
+    """
+    try:
+        delphi = get_delphi()
+        trend_db = get_trend_db()
+        if not trend_db:
+            raise HTTPException(404, "No trend database loaded")
+        result = delphi.apply_consensus_to_trends(session_id, trend_db)
+        # Persist updated trends
+        from pulse.database import save_trends
+        save_trends(trend_db.trends)
+        logger.info(f"Applied consensus from session {session_id}")
+        return result
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        logger.error(f"Failed to apply consensus: {e}")
+        raise HTTPException(500, f"Failed to apply consensus: {str(e)}")
 
 
 # ── Scoring Endpoints ────────────────────────────────────────────────────

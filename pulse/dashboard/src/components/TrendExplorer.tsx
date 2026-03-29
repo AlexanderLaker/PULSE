@@ -46,6 +46,7 @@ interface TrendExplorerProps {
   onForceFilter: (force: string) => void;
   onUpdateTrend: (id: string, updates: Partial<TrendData>) => void;
   onDeleteTrend?: (id: string) => void;
+  isAdmin?: boolean;
 }
 
 // ─── Source Icons ─────────────────────────────────────────────────────────
@@ -269,7 +270,7 @@ const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChan
                 <DotBar
                   value={exposures?.[cat.id as CategoryId] || 0}
                   onChange={(val) => handleChange(cat.id as CategoryId, val)}
-                  editable={true}
+                  editable={isAdmin}
                   color="emerald"
                   size="sm"
                   direction={direction}
@@ -354,7 +355,7 @@ const ValueChainExposureGrid: FC<ValueChainExposureGridProps> = ({ exposures, on
             <DotBar
               value={exposures?.[step.id] || 0}
               onChange={(val) => handleChange(step.id, val)}
-              editable={true}
+              editable={isAdmin}
               color="purple"
               size="sm"
               direction={direction}
@@ -428,7 +429,7 @@ const RegionalExposureGrid: FC<RegionalExposureGridProps> = ({ exposures, onChan
             <DotBar
               value={exposures?.[region.id] || 0}
               onChange={(val) => handleChange(region.id, val)}
-              editable={true}
+              editable={isAdmin}
               color="cyan"
               size="sm"
               direction={direction}
@@ -446,19 +447,30 @@ interface ExpandedTrendRowProps {
   trend: TrendData;
   onUpdateTrend: (id: string, updates: Partial<TrendData>) => void;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
-const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onClose }) => {
+const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onClose, isAdmin = false }) => {
   const [catExposure, setCatExposure] = useState<Record<CategoryId, number>>(trend.category_exposure || {});
   const [vcExposure, setVcExposure] = useState<Record<string, number>>(trend.vc_exposure || {});
   const [regionalExposure, setRegionalExposure] = useState<Record<string, number>>(trend.regional_exposure || {});
+  const [editName, setEditName] = useState(trend.name || '');
+  const [editDesc, setEditDesc] = useState(trend.description || '');
+  const [editImplication, setEditImplication] = useState(trend.strategic_implication || '');
 
   const handleSave = (): void => {
-    onUpdateTrend(trend.id, {
+    const updates: Partial<TrendData> = {
       category_exposure: catExposure,
       vc_exposure: vcExposure,
       regional_exposure: regionalExposure,
-    });
+    };
+    // Include text field changes if admin edited them
+    if (isAdmin) {
+      if (editName !== trend.name) (updates as any).name = editName;
+      if (editDesc !== trend.description) (updates as any).description = editDesc;
+      if (editImplication !== trend.strategic_implication) (updates as any).strategic_implication = editImplication;
+    }
+    onUpdateTrend(trend.id, updates);
     onClose();
   };
 
@@ -477,26 +489,103 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
           }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-            {/* Left: Description → PULSE Analysis → Sources (matches EmergingTrends structure) */}
+            {/* Left: Name → Description → PULSE Analysis → Sources */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* 0. Trend Name (admin editable) */}
+              <div>
+                <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px', letterSpacing: '0.5px' }}>
+                  TREND NAME
+                </div>
+                {isAdmin ? (
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: T.text,
+                      backgroundColor: T.bg2,
+                      border: `1px solid ${T.border1}`,
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                  />
+                ) : (
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: T.text, margin: 0 }}>
+                    {trend.name}
+                  </p>
+                )}
+              </div>
+
               {/* 1. Description */}
               <div>
                 <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px', letterSpacing: '0.5px' }}>
                   DESCRIPTION
                 </div>
-                <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {trend.description || '(No description provided)'}
-                </p>
+                {isAdmin ? (
+                  <textarea
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      fontSize: '11px',
+                      color: T.text2,
+                      backgroundColor: T.bg2,
+                      border: `1px solid ${T.border1}`,
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      lineHeight: 1.6,
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                  />
+                ) : (
+                  <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                    {trend.description || '(No description provided)'}
+                  </p>
+                )}
               </div>
 
-              {/* 2. PULSE Analysis */}
+              {/* 2. PULSE Analysis / Strategic Implication */}
               <div>
                 <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Sparkles size={10} /> PULSE ANALYSIS
                 </div>
-                <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
-                  {trend.strategic_implication || '(No strategic implication documented)'}
-                </p>
+                {isAdmin ? (
+                  <textarea
+                    value={editImplication}
+                    onChange={(e) => setEditImplication(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      fontSize: '11px',
+                      color: T.text2,
+                      backgroundColor: T.bg2,
+                      border: `1px solid ${T.border1}`,
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      lineHeight: 1.6,
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = T.accent; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = T.border1; }}
+                  />
+                ) : (
+                  <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
+                    {trend.strategic_implication || '(No strategic implication documented)'}
+                  </p>
+                )}
               </div>
 
               {/* 3. GP1 % Affected — Economic Anchoring */}
@@ -826,7 +915,7 @@ function BadgeStyled({ badge }: { badge: TrendBadge }): React.ReactNode {
   }
 }
 
-const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend }) => {
+const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend, isAdmin = false }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -1174,6 +1263,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!isAdmin) return;
                             const newDirection = trend.direction === 'Expansion' ? 'Contraction' : 'Expansion';
                             onUpdateTrend(trend.id, { direction: newDirection });
                           }}
@@ -1205,7 +1295,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         <DotBar
                           value={trend.impact || 0}
                           onChange={(val) => onUpdateTrend(trend.id, { impact: val })}
-                          editable={true}
+                          editable={isAdmin}
                           color="blue"
                           size="sm"
                           direction={trend.direction}
@@ -1216,7 +1306,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         <DotBar
                           value={trend.probability || 0}
                           onChange={(val) => onUpdateTrend(trend.id, { probability: val })}
-                          editable={true}
+                          editable={isAdmin}
                           color="amber"
                           size="sm"
                           direction={trend.direction}
@@ -1241,7 +1331,9 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                           step={1}
                           value={Math.round((trend.gp1_pct_affected || 0.10) * 100)}
                           onClick={(e) => e.stopPropagation()}
+                          readOnly={!isAdmin}
                           onChange={(e) => {
+                            if (!isAdmin) return;
                             const raw = parseInt(e.target.value, 10);
                             if (!isNaN(raw) && raw >= 1 && raw <= 100) {
                               onUpdateTrend(trend.id, { gp1_pct_affected: raw / 100 } as any);
@@ -1275,7 +1367,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                       }}>
                         {fmtShift(trend.gp1_shift || 0, 2)}
                       </td>
-                      {onDeleteTrend && (
+                      {isAdmin && onDeleteTrend && (
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                           <button
                             onClick={(e) => {
@@ -1317,6 +1409,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                         trend={trend}
                         onUpdateTrend={onUpdateTrend}
                         onClose={() => setExpandedTrendId(null)}
+                        isAdmin={isAdmin}
                       />
                     )}
                   </React.Fragment>
