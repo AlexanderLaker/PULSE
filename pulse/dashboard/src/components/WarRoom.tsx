@@ -532,7 +532,12 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             {scenarioOptions.slice(0, 5).map(scenario => (
               <motion.button
                 key={scenario.id || scenario.name}
-                onClick={() => setActiveScenario(scenario.id || scenario.name)}
+                onClick={() => {
+                  const sid = scenario.id || scenario.name;
+                  setActiveScenario(sid);
+                  // Auto-trigger simulation with the selected scenario
+                  simulate({ scenario: sid });
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 title={scenario.description}
