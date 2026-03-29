@@ -8,3 +8,4 @@ dist/
 *.xlsx
 *.egg-info/
 .DS_Store
+.next/

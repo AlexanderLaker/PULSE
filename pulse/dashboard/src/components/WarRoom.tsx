@@ -120,11 +120,11 @@ function generateInitialData(): InitialDataResult {
 
   // Scenarios
   const scenarios: Scenario[] = [
-    { id: 'base', name: 'Base Case', description: 'Current scores, causal DAG active' },
-    { id: 'green', name: 'Green Squeeze', description: 'Environmental force shock' },
-    { id: 'tech', name: 'Tech Disruption', description: 'Technology force acceleration' },
-    { id: 'price', name: 'Price War', description: 'Competitive pricing pressure' },
-    { id: 'storm', name: 'Perfect Storm', description: 'Correlated tail events' },
+    { id: 'base', name: 'Base Case', description: 'Current expert scores with causal DAG active. No external shocks applied. This is the central planning scenario.' },
+    { id: 'green_squeeze', name: 'Green Squeeze', description: 'Environmental regulation accelerates (+30%) and Government force shocks (+20%). Propagates via DAG to reformulation costs, shelf prices, and consumer willingness to pay.' },
+    { id: 'tech_disruption', name: 'Tech Disruption', description: 'Technology force accelerates (+40%). Propagates via DAG to consumer adoption curves, competitive gaps, and channel economics.' },
+    { id: 'price_war', name: 'Price War', description: 'Competitive intensity spikes (+35%) with Customer pressure (+15%). Propagates to margin compression, consumer trading down, and channel power shifts.' },
+    { id: 'perfect_storm', name: 'Perfect Storm', description: 'Correlated tail event — all 6 forces shocked at +30% simultaneously. Uses t-copula tail dependence. No DAG propagation (the shock IS the tail event).' },
   ];
 
   // Allocation — equal weights until simulation provides recommendations
@@ -282,6 +282,21 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
       .catch(() => { /* keep initial data on failure */ });
   }, []);
   const forceNames = Object.keys(FORCES) as ForceName[];
+
+  // ─── Listen for burger menu events (toggle export, delphi, snapshots) ──
+  useEffect(() => {
+    const onExport = () => setShowSettings(prev => !prev);
+    const onDelphi = () => setShowDelphi(prev => !prev);
+    const onSnaps = () => setShowSnapshots(prev => !prev);
+    window.addEventListener('pulse:toggle-export', onExport);
+    window.addEventListener('pulse:toggle-delphi', onDelphi);
+    window.addEventListener('pulse:toggle-snapshots', onSnaps);
+    return () => {
+      window.removeEventListener('pulse:toggle-export', onExport);
+      window.removeEventListener('pulse:toggle-delphi', onDelphi);
+      window.removeEventListener('pulse:toggle-snapshots', onSnaps);
+    };
+  }, []);
 
   // AI insights — empty until scanner provides real data
   const aiInsights: AIInsight[] = [];
@@ -520,6 +535,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                 onClick={() => setActiveScenario(scenario.id || scenario.name)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                title={scenario.description}
                 style={{
                   padding: '4px 10px',
                   borderRadius: 6,
@@ -831,12 +847,16 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               forceFilter={forceFilter || ''}
               onForceFilter={setForceFilter}
               onUpdateTrend={(id: string, updates: any) => {
-                // Persist to API
+                // Persist to API (include auth token for serverless)
+                const token = localStorage.getItem('pulse_token');
                 fetch(`/api/v1/trends/${id}`, {
                   method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
                   body: JSON.stringify(updates),
-                }).catch(() => {});
+                }).catch(err => console.error('Failed to persist trend update:', err));
                 // Update local state immediately with client-side recalculation
                 setInitialData(prev => ({
                   ...prev,
@@ -858,7 +878,11 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               }}
               onDeleteTrend={async (id: string) => {
                 try {
-                  const res = await fetch(`/api/v1/trends/${id}`, { method: 'DELETE' });
+                  const tkn = localStorage.getItem('pulse_token');
+                  const res = await fetch(`/api/v1/trends/${id}`, {
+                    method: 'DELETE',
+                    headers: tkn ? { Authorization: `Bearer ${tkn}` } : {},
+                  });
                   if (res.ok) {
                     setInitialData(prev => ({
                       ...prev,

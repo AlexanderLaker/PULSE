@@ -53,6 +53,7 @@ class AllocationOptimizer:
                 "risk": float,
                 "sharpe_proxy": float,
                 "frontier": [{risk, return, weights}],
+                "defense_ranking": [{category, shift, rank}],  # NEW: for contraction scenarios
             }
         """
         categories = list(shift_matrix.keys())
@@ -80,6 +81,22 @@ class AllocationOptimizer:
                 mu[i] = float(final)
                 sigma[i] = abs(mu[i]) * 0.3  # Rough estimate
 
+        # CRITICAL FIX: Handle all-same-sign case (all negative or all positive)
+        # When all returns have the same sign, mean-variance optimization produces
+        # equal weights because there's no "good" vs "bad" to differentiate on.
+        # Transform to relative returns so optimizer can identify "least bad" categories.
+        all_same_sign = (np.all(mu >= 0) and np.any(mu > 0)) or np.all(mu <= 0)
+        mu_relative = mu  # Will be used for optimization if needed
+
+        if all_same_sign:
+            # Transform: mu_relative = mu - min(mu)
+            # Now worst category = 0, others get positive delta
+            mu_relative = mu - mu.min()
+            logger.info(f"All-same-sign detected (all {'negative' if np.all(mu <= 0) else 'positive'}). "
+                       f"Using relative returns for optimization.")
+        else:
+            mu_relative = mu
+
         # Build covariance matrix (diagonal + small cross-correlation)
         cov = np.diag(sigma ** 2)
         for i in range(n):
@@ -94,7 +111,7 @@ class AllocationOptimizer:
 
         # Optimization
         def neg_utility(w):
-            portfolio_return = w @ mu
+            portfolio_return = w @ mu_relative  # Use relative returns if transformed
             portfolio_risk = risk_aversion * (w @ cov @ w)
             return -(portfolio_return - portfolio_risk)
 
@@ -131,6 +148,25 @@ class AllocationOptimizer:
         # Compute efficient frontier
         frontier = self._compute_frontier(mu, cov, n, min_weight, max_weight, categories)
 
+        # INCREASED SENSITIVITY: Changed thresholds from ±0.02 to ±0.01
+        # This surfaces smaller but meaningful allocation differences
+        equal_weight = 1.0 / n
+        invest_more = [c for c, w in weights.items() if w > equal_weight + 0.01]
+        reduce = [c for c, w in weights.items() if w < equal_weight - 0.01]
+
+        # NEW: Defense ranking for all-contraction scenarios
+        # Ranks categories from "least impacted" to "most impacted"
+        # (i.e., from highest to lowest shift, where higher = less bad when negative)
+        defense_ranking = [
+            {
+                "category": cat,
+                "shift": round(mu[i], 6),
+                "rank": j + 1,
+                "weight": weights[cat],
+            }
+            for j, (i, cat) in enumerate(sorted(enumerate(categories), key=lambda x: mu[x[0]], reverse=True))
+        ]
+
         return {
             "weights": weights,
             "expected_pool_shift": round(expected_return, 6),
@@ -138,8 +174,10 @@ class AllocationOptimizer:
             "sharpe_proxy": round(expected_return / max(risk, 1e-6), 4),
             "risk_aversion_used": risk_aversion,
             "frontier": frontier,
-            "invest_more": [c for c, w in weights.items() if w > 1.0/n + 0.02],
-            "reduce": [c for c, w in weights.items() if w < 1.0/n - 0.02],
+            "invest_more": invest_more,
+            "reduce": reduce,
+            "defense_ranking": defense_ranking,  # NEW: for strategy in contraction mode
+            "all_same_sign_scenario": all_same_sign,  # Transparency flag
         }
 
     def _compute_frontier(self, mu, cov, n, min_w, max_w, categories,

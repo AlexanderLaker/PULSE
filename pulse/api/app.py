@@ -430,6 +430,16 @@ def create_app(args=None) -> FastAPI:
 
     app.add_middleware(LazyInitMiddleware)
 
+    # ── Helpers ─────────────────────────────────────────────────────
+    def _has_persisted_simulation() -> bool:
+        """Check if there's a simulation run in the database (for serverless cold starts)."""
+        try:
+            from pulse.database import load_simulation_runs
+            runs = load_simulation_runs(limit=1)
+            return len(runs) > 0
+        except Exception:
+            return False
+
     # ── Health ──────────────────────────────────────────────────────
     @app.get("/api/v1/health")
     async def health():
@@ -440,7 +450,7 @@ def create_app(args=None) -> FastAPI:
             "model_loaded": db is not None,
             "trend_count": db.trend_count if db else 0,
             "categories": len(db.categories) if db else 0,
-            "has_simulation": _state.get("mc_result") is not None,
+            "has_simulation": _state.get("mc_result") is not None or _has_persisted_simulation(),
         }
 
     # ── Manual Seed + Simulate (for Vercel debugging) ──────────────
@@ -763,15 +773,36 @@ def create_app(args=None) -> FastAPI:
     # ── Simulation ──────────────────────────────────────────────────
     @app.get("/api/v1/simulation")
     async def get_simulation():
-        """Get current cached simulation results."""
+        """Get current cached simulation results. Falls back to DB on serverless cold start."""
         mc = _state.get("mc_result")
+        if not mc:
+            # Serverless cold start — try loading latest simulation from database
+            try:
+                from pulse.database import load_simulation_runs
+                runs = load_simulation_runs(limit=1)
+                if runs:
+                    latest = runs[0]
+                    # Reconstruct mc_result from DB
+                    mc = {
+                        "shift_matrix": latest.get("results", {}),
+                        "convergence": latest.get("convergence_diagnostics", {}),
+                        "iterations": latest.get("iterations", 5000),
+                        "model_type": latest.get("model_type", "bayesian_copula"),
+                    }
+                    _state["mc_result"] = mc
+                    if latest.get("allocation_recommendation"):
+                        _state["allocation"] = latest["allocation_recommendation"]
+                    logger.info("Restored simulation from database (serverless cold start)")
+            except Exception as e:
+                logger.warning(f"Failed to load simulation from DB: {e}")
+
         if not mc:
             raise HTTPException(404, "No simulation results. Run a simulation first.")
         return _sanitize({
             "shift_matrix": mc["shift_matrix"],
-            "convergence": mc["convergence"],
-            "iterations": mc["iterations"],
-            "model_type": mc["model_type"],
+            "convergence": mc.get("convergence", {}),
+            "iterations": mc.get("iterations", 5000),
+            "model_type": mc.get("model_type", "bayesian_copula"),
             "allocation": _state.get("allocation"),
             "competitive": _state.get("competitive"),
         })

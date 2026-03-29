@@ -1,15 +1,23 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FullPageSkeleton } from './components/LoadingSkeleton';
 import { useAuth } from './hooks/useAuth';
 import AuthPage from './components/AuthPage';
 import AdminUsersPanel from './components/AdminUsersPanel';
+import AdminConfigPanel from './components/AdminConfigPanel';
+import BurgerMenu from './components/BurgerMenu';
 
 const WarRoom = lazy(() => import('./components/WarRoom'));
 
 export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
   const [showUsers, setShowUsers] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  // Refs for WarRoom actions exposed via burger menu
+  const [burgerExport, setBurgerExport] = useState(false);
+  const [burgerDelphi, setBurgerDelphi] = useState(false);
+  const [burgerSnapshots, setBurgerSnapshots] = useState(false);
 
   // Still checking stored token
   if (loading && !user) {
@@ -37,67 +45,56 @@ export default function App() {
       <Suspense fallback={<FullPageSkeleton />}>
         <WarRoom isAdmin={isAdmin} />
       </Suspense>
-      {/* Top-right user bar */}
+
+      {/* Burger Menu — top-right, replaces old floating user bar */}
       <div style={{
-        position: 'fixed', top: 14, right: 16, zIndex: 9999,
-        display: 'flex', alignItems: 'center', gap: 10,
+        position: 'fixed', top: 12, right: 16, zIndex: 9999,
         fontFamily: "'Inter', sans-serif",
       }}>
-        {isAdmin && (
-          <button
-            onClick={() => setShowUsers(true)}
-            style={{
-              padding: '6px 14px', borderRadius: 8,
-              border: '1px solid rgba(212, 168, 71, 0.3)',
-              background: 'rgba(212, 168, 71, 0.1)',
-              color: '#D4A847', fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(212, 168, 71, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(212, 168, 71, 0.1)';
-            }}
-          >
-            Users
-          </button>
-        )}
-        <span style={{ fontSize: 12, color: '#64748B' }}>
-          {user?.name}
-          {isAdmin && (
-            <span style={{
-              marginLeft: 6, fontSize: 10, fontWeight: 600,
-              color: '#D4A847', textTransform: 'uppercase', letterSpacing: '0.04em',
-            }}>
-              Admin
-            </span>
-          )}
-        </span>
-        <button
-          onClick={logout}
-          style={{
-            padding: '6px 14px', borderRadius: 8,
-            border: '1px solid rgba(71, 85, 105, 0.4)',
-            background: 'rgba(30, 41, 59, 0.8)',
-            color: '#94A3B8', fontSize: 12, fontWeight: 500,
-            cursor: 'pointer', transition: 'all 0.2s',
+        <BurgerMenu
+          user={user}
+          isAdmin={isAdmin}
+          onLogout={logout}
+          onShowUsers={() => setShowUsers(true)}
+          onShowConfig={() => setShowConfig(true)}
+          onShowExport={() => {
+            // Toggle the export panel inside WarRoom — dispatch custom event
+            window.dispatchEvent(new CustomEvent('pulse:toggle-export'));
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-            e.currentTarget.style.color = '#FCA5A5';
+          onShowDelphi={() => {
+            window.dispatchEvent(new CustomEvent('pulse:toggle-delphi'));
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(71, 85, 105, 0.4)';
-            e.currentTarget.style.color = '#94A3B8';
+          onShowSnapshots={() => {
+            window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
           }}
-        >
-          Sign Out
-        </button>
+          onChangePassword={() => {
+            // Simple password change via prompt for now
+            const newPw = window.prompt('Enter new password (min 6 characters):');
+            if (newPw && newPw.length >= 6) {
+              const token = localStorage.getItem('pulse_token');
+              fetch('/api/v1/auth/change-password', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ new_password: newPw }),
+              })
+                .then(r => r.ok ? alert('Password changed successfully.') : alert('Failed to change password.'))
+                .catch(() => alert('Failed to change password.'));
+            } else if (newPw !== null) {
+              alert('Password must be at least 6 characters.');
+            }
+          }}
+        />
       </div>
-      {/* Admin users panel */}
+
+      {/* Admin panels */}
       {isAdmin && (
-        <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
+        <>
+          <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
+          <AdminConfigPanel isOpen={showConfig} onClose={() => setShowConfig(false)} />
+        </>
       )}
     </ErrorBoundary>
   );

@@ -106,6 +106,9 @@ export const getHealth = (): Promise<HealthStatus> =>
 export const getConfig = (): Promise<ModelConfig> =>
   request('/config');
 
+export const updateConfig = (data: Record<string, unknown>): Promise<ModelConfig> =>
+  request('/config', { method: 'PUT', body: JSON.stringify(data) });
+
 // ── Trends ───────────────────────────────────────────────────────
 
 export const getTrends = (force?: string): Promise<Trend[]> =>
