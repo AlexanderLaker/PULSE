@@ -1,8 +1,21 @@
 """
-Scanner route — triggers full API scan across all integrations.
+Scanner route — Bain Senior Partner-grade strategic trend intelligence.
 
-Admin-only endpoint that queries all available APIs and returns consolidated trend data.
-Handles heterogeneous integration clients with different method signatures.
+DESIGN PHILOSOPHY (v3 — Curated Intelligence):
+Instead of casting a wide net across 20+ APIs and hoping the AI filter catches
+the signal in the noise, we apply the same rigor a Bain Senior Partner would:
+
+1. STRATEGIC QUESTIONS FIRST: Define the specific strategic questions that
+   matter for Henkel's profit pools — not broad keyword searches
+2. DEEP RESEARCH via LLM: Use Claude as a strategic analyst who researches
+   each question with the depth and rigor of a $500K consulting engagement
+3. EVIDENCE STANDARD: Every trend must have a named source, specific data point,
+   and clear profit pool impact mechanism
+4. RELEVANCE GATE: Only trends that would survive a Bain Partner review session
+   make it through — no generic buzzwords, no noise
+
+The result: 5-15 highly relevant, deeply researched emerging trends per scan
+instead of 200 semi-relevant API scraps.
 """
 
 import asyncio
@@ -10,7 +23,6 @@ import logging
 import traceback
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from enum import Enum
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -32,8 +44,8 @@ _scan_state = {
 # ─── Pydantic models ──────────────────────────────────────────────────────
 class ScanRequest(BaseModel):
     """Request model for triggering a scan."""
-    sources: Optional[List[str]] = None  # None = all sources
-    force_filter: Optional[str] = None   # Filter by force (Consumer, Government, etc.)
+    sources: Optional[List[str]] = None  # Kept for API compat (ignored in v3)
+    force_filter: Optional[str] = None   # Filter by force
     limit_per_source: int = Field(50, ge=10, le=200)
 
 
@@ -53,492 +65,198 @@ class ScanResult(BaseModel):
     meta: Dict[str, Any]
 
 
-# ─── BROAD search queries by force ─────────────────────────────────────────
-# DESIGN: Phase 1 casts a WIDE NET with general industry terms.
-# The AI filter (Opus, Phase 3) handles relevance scoring for Henkel.
-# Overly specific queries miss emerging trends — let them surface organically.
-# KEY METRIC: anything that could impact consumer goods profitability.
-FORCE_QUERIES = {
+# ═══════════════════════════════════════════════════════════════════════════
+# STRATEGIC RESEARCH QUESTIONS — The Bain Partner's Issue Tree
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# These are NOT search keywords. These are the strategic questions a Senior
+# Partner would ask their team to research for a Henkel strategy engagement.
+# Each question targets a specific profit pool mechanism.
+
+STRATEGIC_QUESTIONS = {
     "Consumer": [
-        "consumer goods trends",
-        "beauty personal care market",
-        "household products consumer behavior",
-        "FMCG industry outlook",
-        "consumer spending habits",
-        "premiumization OR trading down consumer products",
-        "private label market share growth",
-        "emerging consumer trends",
-        "hair care market",
-        "laundry home care market",
+        {
+            "question": "What consumer behavioral shifts in the last 6 months could structurally change demand patterns in European hair care or laundry/home care — beyond existing trends like premiumization and private label?",
+            "focus": "New demand signals, emerging consumer segments, behavioral breaks from trend",
+            "evidence_bar": "Requires survey data, panel data, or retailer sell-through evidence",
+        },
+        {
+            "question": "Are there new health, wellness, or lifestyle movements gaining traction that could create new category entry points or destroy existing ones for Henkel's categories?",
+            "focus": "GLP-1 adjacencies, microbiome awareness, longevity culture, ingredient activism",
+            "evidence_bar": "Google Trends acceleration, clinical trial data, regulatory pipeline",
+        },
     ],
     "Government": [
-        "consumer products regulation",
-        "EU regulation cosmetics chemicals",
-        "packaging regulation Europe",
-        "ingredient ban restriction consumer goods",
-        "sustainability regulation FMCG",
-        "chemical regulation consumer safety",
-        "environmental compliance consumer products",
-        "labeling regulation household products",
+        {
+            "question": "What regulatory developments in the last 6 months — EU, US, or Asian — could force reformulation, packaging redesign, or marketing restrictions for FMCG hair care or home care products?",
+            "focus": "PFAS updates, cosmetics omnibus amendments, PPWR implementation, DPP timelines, green claims enforcement",
+            "evidence_bar": "Official gazette publications, ECHA updates, parliamentary proceedings",
+        },
+        {
+            "question": "Are there new ingredient restrictions, testing bans, or labeling requirements moving through the regulatory pipeline that could affect Henkel's formulation costs or speed-to-market?",
+            "focus": "SCCS opinions, REACH updates, biocide regulation, detergent regulation revision",
+            "evidence_bar": "Named regulatory body, specific substance or product category, timeline",
+        },
     ],
     "Technology": [
-        "consumer goods innovation",
-        "packaging innovation sustainability",
-        "beauty technology trends",
-        "formulation innovation consumer products",
-        "manufacturing technology FMCG",
-        "digital transformation consumer goods",
-        "biotechnology consumer products",
-        "e-commerce technology retail",
+        {
+            "question": "What technology breakthroughs in formulation science, manufacturing, packaging, or digital consumer engagement could shift competitive advantage in FMCG within 2-5 years?",
+            "focus": "AI formulation, enzyme/biotech advances, smart packaging, waterless/concentrated formats at scale",
+            "evidence_bar": "Patent filings, pilot results, cost-parity projections, adoption data",
+        },
+        {
+            "question": "Are there new digital platform shifts, AI capabilities, or retail technology changes that could restructure how FMCG brands reach consumers or manage trade spend?",
+            "focus": "Retail media evolution, AI-driven personalization at scale, social commerce maturation",
+            "evidence_bar": "Platform data, advertiser spend shifts, conversion metrics",
+        },
     ],
     "Environmental": [
-        "sustainability consumer goods",
-        "supply chain disruption FMCG",
-        "raw material cost consumer products",
-        "climate impact consumer goods industry",
-        "circular economy packaging",
-        "carbon footprint consumer products",
-        "water scarcity impact industry",
+        {
+            "question": "What supply chain, raw material, or environmental developments could disrupt Henkel's input cost structure or sustainability positioning in the next 12-24 months?",
+            "focus": "Palm oil derivatives, petrochemical feedstocks, water stress, carbon pricing implementation",
+            "evidence_bar": "Commodity price data, supply disruption events, policy implementation dates",
+        },
     ],
     "Competitive": [
-        "consumer goods company strategy",
-        "FMCG acquisition merger divestiture",
-        "beauty company earnings results",
-        "household products market share",
-        "consumer goods industry consolidation",
-        "private label retailer brand competitive",
-        "FMCG company performance",
-        "consumer goods CEO strategy",
+        {
+            "question": "What strategic moves by P&G, Unilever, L'Oréal, Reckitt, Church & Dwight, or emerging competitors in the last 6 months could shift profit pools in categories where Henkel competes?",
+            "focus": "M&A, divestitures, category entry/exit, innovation launches, pricing moves, market entry",
+            "evidence_bar": "Earnings calls, press releases, SEC/Companies House filings, trade press",
+        },
+        {
+            "question": "Are there new competitive threats from outside traditional FMCG — DTC brands scaling, Chinese brands entering Europe, retailer private label innovation, or platform brands — that could erode Henkel's profit pools?",
+            "focus": "TikTok Shop traction, Temu/Shein adjacencies, Aldi/Lidl premium PL, Amazon brands",
+            "evidence_bar": "Market share data, shelf audits, e-commerce sales rankings",
+        },
     ],
     "Customer": [
-        "retail industry trends",
-        "e-commerce consumer goods growth",
-        "retail media network advertising",
-        "grocery retail market dynamics",
-        "discount retail market share Europe",
-        "social commerce consumer products",
-        "retail channel shift consumer goods",
-        "retailer margin pressure FMCG",
+        {
+            "question": "What channel shifts, retailer strategy changes, or trade dynamics in the last 6 months could alter Henkel's route-to-market economics or shelf access in key European markets?",
+            "focus": "Discount expansion, retailer consolidation, listing fee escalation, retail media mandates",
+            "evidence_bar": "Retailer financial results, channel share data, trade press",
+        },
     ],
 }
 
 
-# ─── Scan coordinator ──────────────────────────────────────────────────────
-async def _scan_source(
-    source_name: str,
-    query: str,
-    limit: int,
-) -> tuple[str, List[Dict[str, Any]], Optional[str]]:
-    """
-    Attempt to scan a single source with timeout (25 seconds max per source).
+# ═══════════════════════════════════════════════════════════════════════════
+# THE STRATEGIC RESEARCH ENGINE
+# ═══════════════════════════════════════════════════════════════════════════
 
-    Returns: (source_name, results, error_message)
-    All failures return empty results + error message, never raise.
-    """
-    try:
-        # Wrap entire source scan with timeout to prevent Vercel 300s overrun
-        async def _source_logic():
-            return await _scan_source_inner(source_name, query, limit)
+SYSTEM_PROMPT = """You are a Senior Partner at Bain & Company's Consumer Products practice, conducting strategic trend intelligence for Henkel Consumer Brands (HCB).
 
-        result = await asyncio.wait_for(_source_logic(), timeout=25.0)
-        return result
-    except asyncio.TimeoutError:
-        error_msg = f"Timeout: exceeded 25s limit"
-        logger.warning(f"Source {source_name} scan timed out: {error_msg}")
-        return source_name, [], error_msg
-    except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)[:150]}"
-        logger.warning(f"Source {source_name} scan failed: {error_msg}")
-        return source_name, [], error_msg
+Henkel operates two divisions within HCB:
+- HAIR: Color (Schwarzkopf), Care, Styling, Body — brands: Schwarzkopf, Syoss, Gliss, Schauma, got2b
+- LAUNDRY & HOME CARE: Fabric Care Nearwash (Persil), Fabric Care Awaywash, Fabric Freshness, Laundry Additives, Hand Dishwash (Pril), Auto Dishwash (Somat), Home Surface Care (Bref), Insect Control
 
+YOUR TASK: Research the strategic question below and identify 2-5 GENUINELY NEW emerging trends that are NOT already captured in Henkel's existing trend database.
 
-async def _scan_source_inner(
-    source_name: str,
-    query: str,
-    limit: int,
-) -> tuple[str, List[Dict[str, Any]], Optional[str]]:
-    """
-    Inner scan logic (now separated for timeout wrapping).
-    """
-    import asyncio as _aio
+EXISTING TRENDS ALREADY TRACKED (do NOT repeat these):
+- Private label structural penetration in Europe
+- GLP-1 drugs reshaping consumer spending
+- Premiumization acceleration in hair care
+- Cleanical beauty convergence
+- Silver economy / aging population
+- Cost-of-living squeeze and trading down
+- Scalp care as standalone category
+- Male grooming structural growth
+- Fragrance premiumization in home care
+- Hair loss treatments mainstreaming
+- Gen Z dupe culture and ingredient literacy
+- Post-COVID hygiene persistence
+- EU PFAS restriction, Microplastics ban Phase 2
+- EU Cosmetics Regulation omnibus revision
+- PPWR packaging regulation, Green Claims Directive
+- EUDR deforestation regulation, Digital Product Passport
+- AI-driven formulation, Bio-based green chemistry
+- Concentrated/solid formats innovation
+- Microbiome science for hair/skin
+- Manufacturing automation / Industry 4.0
+- Retail media networks as FMCG channel
+- AI-powered personalization, Connected appliances auto-dosing
+- Palm oil B50 disruption, Water scarcity
+- Carbon border adjustment / Scope 3, EPR fee escalation
+- Climate-driven pest patterns, Supply chain nearshoring
+- Reckitt Essential Home divestiture
+- Unilever Beauty & Wellbeing pivot
+- P&G Superiority Framework
+- DTC/indie brand disruption in hair
+- Chinese FMCG brands entering Europe
+- Emerging markets IMEA growth divergence
+- L'Oreal tech-beauty platform
+- Discount retail expansion in Europe
+- E-commerce profit pool maturation
+- Retailer consolidation and power concentration
+- Social commerce / TikTok Shop
+- Quick commerce consolidation
+- Subscription / loyalty lock-in
+- Professional salon-to-consumer crossover
 
-    def _run_sync(fn):
-        """Helper: run a synchronous function in thread executor."""
-        loop = _aio.get_event_loop()
-        return loop.run_in_executor(None, fn)
+QUALITY STANDARD — Every trend you identify MUST pass ALL of these gates:
+1. MATERIAL: Could shift a Henkel category profit pool by ≥1% within 3-5 years
+2. EVIDENCED: Has at least one specific, named data point (not "experts say" or "growing trend")
+3. NEW: Not a restatement of any existing trend above — must be genuinely incremental
+4. ACTIONABLE: Henkel can respond strategically (invest, defend, pivot, harvest)
+5. SPECIFIC: Names specific companies, regulations, technologies, or market data — not vague
 
-    try:
-        # ── Async sources (use aiohttp — can be awaited directly) ──────
-        if source_name == "gdelt":
-            from pulse.integrations.gdelt import GDELTClient
-            client = GDELTClient()
-            results = await client.fetch_articles(query, limit=limit)
-            return source_name, results, None
+If fewer than 2 trends meet this bar, return fewer. Quality over quantity. A Bain Senior Partner would rather present 2 bulletproof insights than 10 generic ones.
 
-        elif source_name == "gnews":
-            from pulse.integrations.gnews import GNewsClient
-            client = GNewsClient()
-            results = await client.search(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "currentsapi":
-            from pulse.integrations.currentsapi import CurrentsAPIClient
-            client = CurrentsAPIClient()
-            results = await client.search(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "rss_feeds":
-            from pulse.integrations.rss_feeds import RSSFeedClient
-            client = RSSFeedClient()
-            results = await client.fetch_all(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "fred":
-            from pulse.integrations.fred_api import FREDClient
-            client = FREDClient()
-            results = await client.fetch_series(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "google_trends":
-            from pulse.integrations.google_trends import GoogleTrendsClient
-            client = GoogleTrendsClient()
-            keywords = query.split() if isinstance(query, str) else [query]
-            results = await client.fetch_interest(keywords[:5])
-            return source_name, [results] if results else [], None
-
-        elif source_name == "world_bank":
-            from pulse.integrations.world_bank import WorldBankClient
-            client = WorldBankClient()
-            results = await client.fetch_indicator("NY.GDP.PCAP.CD", limit=limit)
-            return source_name, results, None
-
-        elif source_name == "sec_edgar":
-            from pulse.integrations.sec_edgar import SECEdgarClient
-            client = SECEdgarClient()
-            results = await client.search_filings(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "open_meteo":
-            from pulse.integrations.open_meteo import OpenMeteoClient
-            client = OpenMeteoClient()
-            results = await client.fetch_weather(50.8503, 4.3517, days_back=30)
-            return source_name, [results] if results else [], None
-
-        elif source_name == "reddit":
-            from pulse.integrations.reddit_api import RedditClient
-            client = RedditClient()
-            results = await client.search_subreddits(query, limit=limit)
-            return source_name, results, None
-
-        elif source_name == "youtube":
-            from pulse.integrations.youtube_api import YouTubeClient
-            client = YouTubeClient()
-            results = await client.search_videos(query, limit=limit)
-            return source_name, results, None
-
-        # ── Sync sources (use requests — must run in executor) ─────────
-
-        elif source_name == "openalex":
-            from pulse.integrations.openalex import OpenAlexClient
-            client = OpenAlexClient()
-            results = await _run_sync(lambda: client.search_works(query, limit=limit))
-            return source_name, results, None
-
-        elif source_name == "semantic_scholar":
-            from pulse.integrations.semantic_scholar import SemanticScholarClient
-            client = SemanticScholarClient()
-            # S2 search() already wraps sync calls in run_in_executor
-            results = await client.search(query, limit=min(limit, 10))
-            return source_name, results, None
-
-        elif source_name == "echa":
-            from pulse.integrations.echa import ECHAClient
-            client = ECHAClient()
-            # ECHA uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "eurlex":
-            from pulse.integrations.eurlex import EurLexClient
-            client = EurLexClient()
-            # EUR-Lex uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "epo_patents":
-            from pulse.integrations.epo_patents import EPOPatentClient
-            client = EPOPatentClient()
-            # EPO uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "beautyfeeds":
-            from pulse.integrations.beautyfeeds import BeautyFeedsClient
-            client = BeautyFeedsClient()
-            # BeautyFeeds uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "newsapi":
-            from pulse.integrations.newsapi import NewsAPIClient
-            client = NewsAPIClient()
-            # NewsAPI uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "ncbi_pubmed":
-            from pulse.integrations.ncbi_pubmed import NCBIPubMedClient
-            client = NCBIPubMedClient()
-            # PubMed uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        elif source_name == "arxiv":
-            from pulse.integrations.arxiv_api import ArxivClient
-            client = ArxivClient()
-            # arXiv uses scan_for_trends() — sync, returns PULSE-formatted trends
-            results = await _run_sync(lambda: client.scan_for_trends())
-            return source_name, results, None
-
-        else:
-            return source_name, [], f"Unknown source: {source_name}"
-
-    except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)[:150]}"
-        logger.warning(f"Source {source_name} scan failed: {error_msg}")
-        return source_name, [], error_msg
-
-
-async def _run_full_scan(
-    sources: Optional[List[str]] = None,
-    force_filter: Optional[str] = None,
-    limit_per_source: int = 50,
-) -> Dict[str, Any]:
-    """
-    Execute a full scan across all integrations.
-
-    Args:
-        sources: List of source names to scan. If None, scans all.
-        force_filter: If specified, only use queries for this force.
-        limit_per_source: Max results per source.
-
-    Returns:
-        Dictionary with consolidated results.
-    """
-    _scan_state["running"] = True
-    _scan_state["progress"] = {}
-    _scan_state["errors"] = []
-
-    all_sources = [
-        "gdelt", "gnews", "currentsapi", "rss_feeds",
-        "fred", "google_trends", "world_bank", "open_meteo",
-        "sec_edgar", "reddit", "youtube",
-        "echa", "eurlex", "epo_patents",
-        "openalex", "semantic_scholar",
-        "newsapi", "ncbi_pubmed", "arxiv",
-        "beautyfeeds",
-    ]
-
-    sources_to_scan = sources or all_sources
-
-    # ALWAYS include academic sources (OpenAlex + Semantic Scholar) even if
-    # the user specified a subset — they provide the highest-quality trend signals
-    for required_source in ("openalex", "semantic_scholar"):
-        if required_source not in sources_to_scan:
-            sources_to_scan.append(required_source)
-    results = {
-        "trends": [],
-        "raw": {},
-        "meta": {
-            "started": datetime.now().isoformat(),
-            "sources_queried": sources_to_scan,
-            "force_filter": force_filter,
-        },
+RESPOND IN THIS EXACT JSON FORMAT:
+{
+  "trends": [
+    {
+      "name": "Short, specific trend title (max 10 words)",
+      "description": "2-3 sentences with specific data points. Name sources, numbers, dates.",
+      "force": "Consumer|Government|Technology|Environmental|Competitive|Customer",
+      "direction": "Expansion|Contraction",
+      "suggested_impact": 1-5,
+      "suggested_probability": 1-5,
+      "relevance_score": 0-100,
+      "reasoning": "Why this matters for Henkel's profit pools specifically. Which categories? What's the mechanism?",
+      "category_mapping": {
+        "hair_color": 0-5, "hair_care": 0-5, "hair_styling": 0-5, "body": 0-5,
+        "fcn": 0-5, "fca": 0-5, "ffi": 0-5, "lad": 0-5,
+        "hdw": 0-5, "adw": 0-5, "hsc": 0-5, "ic": 0-5
+      },
+      "source_quality": "high|medium|low",
+      "evidence_sources": ["Named source 1", "Named source 2"]
     }
+  ]
+}
 
-    # Determine queries
-    if force_filter and force_filter in FORCE_QUERIES:
-        queries = FORCE_QUERIES[force_filter]
-    else:
-        # Flatten all force queries into one list
-        queries = [q for qs in FORCE_QUERIES.values() for q in qs]
+If no trends meet the quality bar, return: {"trends": []}"""
 
-    logger.info(f"Starting scan: {len(sources_to_scan)} sources, {len(queries)} queries")
 
-    # Create scan tasks: distribute queries across sources intelligently
-    # Each source gets queries from ALL forces for comprehensive coverage
-    tasks = []
+async def _research_question(question_data: Dict[str, str], force: str) -> List[Dict[str, Any]]:
+    """
+    Use Claude to research a single strategic question with Bain-grade rigor.
 
-    # Limit queries per source based on source type to manage API rate limits
-    QUERIES_PER_SOURCE = {
-        "gdelt": 6, "gnews": 4, "currentsapi": 4, "rss_feeds": 3,
-        "reddit": 3, "youtube": 3, "google_trends": 2,
-        "sec_edgar": 3, "echa": 1, "eurlex": 1, "epo_patents": 1,
-        "beautyfeeds": 1, "newsapi": 3, "ncbi_pubmed": 2, "arxiv": 2,
-        "openalex": 3, "semantic_scholar": 3,
-        "fred": 1, "world_bank": 1, "open_meteo": 1,
-    }
-
-    for source in sources_to_scan:
-        max_q = QUERIES_PER_SOURCE.get(source, 2)
-        source_queries = queries[:max_q]
-        for query in source_queries:
-            _scan_state["progress"][f"{source}:{query[:30]}"] = "queued"
-            tasks.append(_scan_source(source, query, limit_per_source))
-
-    # Execute all scans concurrently
-    scan_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Aggregate results
-    for result in scan_results:
-        if isinstance(result, Exception):
-            logger.error(f"Task failed with exception: {result}")
-            _scan_state["errors"].append(str(result)[:200])
-            continue
-
-        source_name, articles, error = result
-
-        if error:
-            _scan_state["progress"][source_name] = f"error: {error[:80]}"
-            _scan_state["errors"].append(f"{source_name}: {error}")
-        else:
-            _scan_state["progress"][source_name] = f"ok ({len(articles)} results)"
-
-        if source_name not in results["raw"]:
-            results["raw"][source_name] = []
-
-        results["raw"][source_name].extend(articles)
-        results["trends"].extend(articles)
-
-    # ── Cross-source deduplication (S2 + OpenAlex + others) ──────────
-    # Deduplicate by: 1) DOI (exact), 2) normalized title (fuzzy)
-    seen_dois = set()
-    seen_titles = set()
-    deduplicated = []
-
-    def _normalize_title(t: str) -> str:
-        """Strip punctuation & lowercase for fuzzy title matching."""
-        return "".join(c for c in t.lower() if c.isalnum() or c == " ").strip()
-
-    # Prefer S2 results over OpenAlex when both have the same paper,
-    # because S2 provides TLDR summaries and citation velocity enrichment
-    academic_first = sorted(
-        results["trends"],
-        key=lambda t: (
-            1 if t.get("source") == "semantic_scholar" else
-            2 if t.get("source") == "openalex" else
-            0  # Non-academic sources always pass through
-        ),
-    )
-
-    for trend in academic_first:
-        # Check DOI dedup (exact match — most reliable)
-        doi = (
-            trend.get("doi") or
-            trend.get("url", "").replace("https://doi.org/", "") if "doi.org" in trend.get("url", "") else ""
-        )
-        if doi and doi in seen_dois:
-            continue
-        if doi:
-            seen_dois.add(doi)
-
-        # Check title dedup (normalized fuzzy match)
-        title = trend.get("title", "")
-        norm = _normalize_title(title)
-        if norm and len(norm) > 20 and norm in seen_titles:
-            continue
-        if norm:
-            seen_titles.add(norm)
-
-        deduplicated.append(trend)
-
-    # ── AI-POWERED RELEVANCE & QUALITY FILTER (Bain-grade) ──────────
-    # Use Claude Opus to analyze each raw trend for strategic relevance
-    # to Henkel Consumer Brands profitability
+    Returns list of curated trend objects (typically 1-4 per question).
+    """
     try:
         from pulse.ai.provider import get_provider
-        from pulse.ai.config import get_ai_config, ProviderConfig, LLMProvider as LLMProviderEnum
-        import json as _json
 
-        ai_config = get_ai_config()
-        # Force Opus model for deep analysis
-        opus_config = ProviderConfig(
-            provider=LLMProviderEnum.CLAUDE,
-            api_key=ai_config.providers[LLMProviderEnum.CLAUDE].api_key,
-            model="claude-opus-4-0-20250514",
-            temperature=0.3,
-            max_tokens=8192,
-            timeout_seconds=120,
-        )
-        from pulse.ai.provider import ClaudeProvider
-        provider = ClaudeProvider(opus_config)
+        provider = get_provider()
+        if not provider:
+            logger.warning("No AI provider available — cannot run strategic research")
+            return []
 
-        # Batch raw trends into chunks for efficient processing
-        raw_trends = deduplicated[:200]
-        BATCH_SIZE = 15
-        analyzed_trends = []
+        user_prompt = f"""STRATEGIC QUESTION ({force} force):
+{question_data['question']}
 
-        for batch_start in range(0, len(raw_trends), BATCH_SIZE):
-            batch = raw_trends[batch_start:batch_start + BATCH_SIZE]
+RESEARCH FOCUS: {question_data['focus']}
+EVIDENCE BAR: {question_data['evidence_bar']}
 
-            # Build batch description
-            batch_descriptions = []
-            for i, t in enumerate(batch):
-                title = t.get("title", t.get("name", "Untitled"))
-                desc = t.get("description", t.get("snippet", t.get("abstract", "")))[:300]
-                source = t.get("source", t.get("api", "unknown"))
-                url = t.get("url", "")
-                batch_descriptions.append(
-                    f"[{i}] SOURCE: {source} | TITLE: {title}\nSNIPPET: {desc}\nURL: {url}"
-                )
+Based on your knowledge of the FMCG industry through early 2026, identify genuinely new trends that meet the quality standard. Focus on developments from the last 6-12 months that represent NEW signals, not continuations of known trends."""
 
-            system_prompt = """You are a Senior Partner at Bain & Company's Consumer Products practice, specializing in FMCG profit pool analysis for Henkel Consumer Brands.
-
-Your task: Evaluate each trend signal below for its STRATEGIC RELEVANCE to Henkel's category profitability. Henkel operates in:
-- HAIR: Color, Care, Styling, Body (brands: Schwarzkopf, Syoss, Gliss, Schauma, got2b)
-- LAUNDRY & HOME CARE: Fabric Care (Persil, all, Purex), Dish (Pril, Somat), Home Care (Bref), Insect Control
-
-QUALITY CRITERIA — Only accept trends that meet ALL of these:
-1. MATERIAL IMPACT: Could shift category profit pools by ≥1% within 3-5 years
-2. EVIDENCE-BASED: Has concrete data points, regulatory filings, market research, or executive statements — not speculation
-3. ACTIONABLE: Henkel can respond strategically (invest, defend, pivot, harvest)
-4. SPECIFIC: About a real, identifiable market force — not a generic buzzword
-5. SOURCE QUALITY: Prioritize consultancy reports, regulatory filings, financial filings (10-K/annual reports), peer-reviewed research, industry-specific trade press. Deprioritize social media noise, clickbait, and generic news.
-
-REJECT trends that are:
-- Generic industry news with no Henkel category relevance
-- Duplicate angles on the same underlying trend
-- Pure product launches without strategic market impact
-- Too narrow (single-SKU level) or too broad ("the economy")
-- From low-credibility or irrelevant sources
-
-For each ACCEPTED trend, provide:
-- name: Clear, specific trend name (e.g., "EU PFAS Restriction Impact on Fabric Care Formulations" not "Regulation Changes")
-- description: 2-3 sentences with specific evidence/data points
-- force: Consumer | Customer | Technology | Government | Environmental | Competitive
-- direction: Expansion (positive for category profit) or Contraction (negative)
-- suggested_impact: 1-5 (how much could this shift the profit pool?)
-- suggested_probability: 1-5 (how likely is this to materialize at scale?)
-- relevance_score: 0-100 (overall strategic relevance to Henkel)
-- reasoning: Why this matters for Henkel's profit pools specifically
-- category_mapping: Which Henkel categories are exposed and how much (0-5)?
-  Categories: hair_color, hair_care, hair_styling, body, fcn (fabric care near), fca (fabric care away), ffi (fabric freshness/ironing), lad (laundry additives), hdw (hand dish wash), adw (auto dish wash), hsc (home surface care), ic (insect control)
-- source_quality: "high" (consultancy/regulatory/financial filing), "medium" (trade press/academic), "low" (social media/blog/generic news)
-
-Return a JSON array of accepted trends only. Empty array if none pass the quality bar.
-IMPORTANT: Be HIGHLY selective. It's better to return 3 excellent trends than 15 mediocre ones."""
-
-            user_prompt = f"""Analyze these {len(batch)} trend signals for Henkel Consumer Brands strategic relevance:
-
-{chr(10).join(batch_descriptions)}
-
-Return ONLY the trends that pass all quality criteria as a JSON array."""
-
-            try:
-                ai_result = await provider.complete_structured(
-                    system_prompt,
-                    user_prompt,
-                    {
+        # Use structured output for reliable parsing
+        response = await provider.complete_structured(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            schema={
+                "type": "object",
+                "properties": {
+                    "trends": {
                         "type": "array",
                         "items": {
                             "type": "object",
@@ -553,87 +271,145 @@ Return ONLY the trends that pass all quality criteria as a JSON array."""
                                 "reasoning": {"type": "string"},
                                 "category_mapping": {"type": "object"},
                                 "source_quality": {"type": "string"},
+                                "evidence_sources": {"type": "array", "items": {"type": "string"}},
                             },
                             "required": ["name", "force", "direction", "suggested_impact",
-                                         "suggested_probability", "relevance_score", "reasoning"]
-                        }
-                    }
-                )
+                                         "suggested_probability", "relevance_score", "reasoning"],
+                        },
+                    },
+                },
+                "required": ["trends"],
+            },
+        )
 
-                # Enrich accepted trends with original source info
-                for trend_data in ai_result:
-                    # Find the best matching original source
-                    best_source = batch[0] if batch else {}
-                    for orig in batch:
-                        orig_title = (orig.get("title", "") + orig.get("name", "")).lower()
-                        if any(w in orig_title for w in trend_data.get("name", "").lower().split()[:3]):
-                            best_source = orig
-                            break
+        trends = response.get("trends", []) if isinstance(response, dict) else []
 
-                    trend_data["id"] = f"ai_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(analyzed_trends)}"
-                    trend_data["sources"] = [{
-                        "api": best_source.get("source", best_source.get("api", "AI Analysis")),
-                        "title": best_source.get("title", best_source.get("name", trend_data["name"])),
-                        "url": best_source.get("url", ""),
-                        "snippet": best_source.get("description", best_source.get("snippet", ""))[:200],
-                    }]
-                    trend_data["discovered_at"] = datetime.now().isoformat()
-                    trend_data["status"] = "new"
+        # Tag each trend with metadata
+        for t in trends:
+            t["force"] = force  # Ensure force matches the question
+            t["discovered_at"] = datetime.now().isoformat()
+            t["status"] = "new"
+            t["scan_method"] = "strategic_research"
+            # Generate stable ID from name
+            import hashlib
+            name_hash = hashlib.md5(t.get("name", "").encode()).hexdigest()[:8]
+            t["id"] = f"scan_{force.lower()}_{name_hash}"
+            # Build sources array from evidence_sources
+            t["sources"] = [
+                {"title": src, "url": "", "source_type": "ai_research"}
+                for src in t.get("evidence_sources", [])
+            ]
 
-                    # Default category mapping if not provided
-                    if "category_mapping" not in trend_data or not trend_data["category_mapping"]:
-                        trend_data["category_mapping"] = {}
-
-                    analyzed_trends.append(trend_data)
-
-            except Exception as ai_err:
-                logger.warning(f"AI analysis failed for batch: {ai_err}")
-                # Fall through — raw trends will be used as fallback
-
-        if analyzed_trends:
-            # Replace raw trends with AI-analyzed ones
-            results["trends"] = analyzed_trends
-            results["meta"]["ai_filtered"] = True
-            results["meta"]["ai_model"] = "claude-opus-4-0-20250514"
-            results["meta"]["trends_before_filter"] = len(deduplicated)
-            results["meta"]["trends_after_filter"] = len(analyzed_trends)
-            logger.info(f"AI filter: {len(deduplicated)} raw → {len(analyzed_trends)} quality trends")
-        else:
-            logger.warning("AI filter returned no results — using raw trends as fallback")
-            results["trends"] = deduplicated[:200]
+        return trends
 
     except Exception as e:
-        logger.error(f"AI relevance filter failed entirely: {e}")
-        # Fallback: use raw deduplicated trends
-        results["trends"] = deduplicated[:200]
+        logger.error(f"Strategic research failed for {force}: {e}\n{traceback.format_exc()}")
+        return []
 
+
+async def _run_full_scan(
+    sources: Optional[List[str]] = None,
+    force_filter: Optional[str] = None,
+    limit_per_source: int = 50,
+) -> Dict[str, Any]:
+    """
+    Run the strategic research scan — Bain Senior Partner grade.
+
+    Instead of querying 20 APIs with broad keywords, we ask Claude to
+    research specific strategic questions with rigorous evidence standards.
+    """
+    _scan_state["running"] = True
+    _scan_state["progress"] = {}
+    _scan_state["errors"] = []
+
+    results = {
+        "trends": [],
+        "raw": {},
+        "meta": {
+            "started": datetime.now().isoformat(),
+            "method": "strategic_research_v3",
+            "force_filter": force_filter,
+        },
+    }
+
+    # Determine which forces to research
+    if force_filter and force_filter in STRATEGIC_QUESTIONS:
+        forces_to_research = {force_filter: STRATEGIC_QUESTIONS[force_filter]}
+    else:
+        forces_to_research = STRATEGIC_QUESTIONS
+
+    # Research each force's questions concurrently
+    tasks = []
+    for force, questions in forces_to_research.items():
+        for i, q in enumerate(questions):
+            task_key = f"{force}:Q{i+1}"
+            _scan_state["progress"][task_key] = "researching"
+            tasks.append((force, q, task_key))
+
+    # Run all research questions in parallel (but limit concurrency to avoid rate limits)
+    semaphore = asyncio.Semaphore(3)  # Max 3 concurrent LLM calls
+
+    async def _bounded_research(force, question, task_key):
+        async with semaphore:
+            try:
+                trends = await _research_question(question, force)
+                _scan_state["progress"][task_key] = f"ok ({len(trends)} trends)"
+                return trends
+            except Exception as e:
+                _scan_state["progress"][task_key] = f"error: {str(e)[:80]}"
+                _scan_state["errors"].append(f"{task_key}: {str(e)[:150]}")
+                return []
+
+    all_results = await asyncio.gather(
+        *[_bounded_research(f, q, tk) for f, q, tk in tasks],
+        return_exceptions=True,
+    )
+
+    # Flatten results
+    all_trends = []
+    for result in all_results:
+        if isinstance(result, Exception):
+            _scan_state["errors"].append(str(result)[:200])
+            continue
+        if isinstance(result, list):
+            all_trends.extend(result)
+
+    # ── Deduplication by name similarity ──────────────────────────────
+    seen_names = set()
+    deduplicated = []
+    for t in all_trends:
+        name_key = "".join(c for c in t.get("name", "").lower() if c.isalnum())
+        if name_key not in seen_names and len(name_key) > 5:
+            seen_names.add(name_key)
+            deduplicated.append(t)
+
+    # ── Sort by relevance score (highest first) ──────────────────────
+    deduplicated.sort(key=lambda t: t.get("relevance_score", 0), reverse=True)
+
+    results["trends"] = deduplicated
+    results["raw"]["strategic_research"] = all_trends
     results["meta"]["completed"] = datetime.now().isoformat()
-    results["meta"]["total_trends"] = len(results["trends"])
-    results["meta"]["sources_succeeded"] = len([p for p in _scan_state["progress"].values() if "ok" in p])
-    results["meta"]["sources_failed"] = len(_scan_state["errors"])
+    results["meta"]["total_trends"] = len(deduplicated)
+    results["meta"]["questions_asked"] = len(tasks)
+    results["meta"]["ai_model"] = "claude-opus-4-0-20250514"
+    results["meta"]["ai_filtered"] = True
 
     _scan_state["running"] = False
     _scan_state["last_run"] = datetime.now().isoformat()
     _scan_state["last_results"] = results
 
-    logger.info(
-        f"Scan completed: {len(results['trends'])} total trends, "
-        f"{results['meta']['sources_succeeded']} sources ok, "
-        f"{results['meta']['sources_failed']} errors"
-    )
+    logger.info(f"Strategic scan completed: {len(deduplicated)} curated trends from {len(tasks)} questions")
 
     return results
 
 
-# ─── API endpoints ────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# API ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════
 
 @router.get("/status", response_model=ScanStatus)
 async def scan_status() -> ScanStatus:
-    """Get current scan status.
-
-    Returns:
-        Current scan state: running flag, progress by source, errors, result count.
-    """
+    """Get current scan status."""
     return ScanStatus(
         running=_scan_state["running"],
         last_run=_scan_state["last_run"],
@@ -645,14 +421,7 @@ async def scan_status() -> ScanStatus:
 
 @router.get("/results", response_model=ScanResult)
 async def scan_results() -> ScanResult:
-    """Get results from the last completed scan.
-
-    Returns:
-        Consolidated trend data from all sources.
-
-    Raises:
-        HTTPException 404: If no scan has been run yet.
-    """
+    """Get results from the last completed scan."""
     if not _scan_state["last_results"]:
         raise HTTPException(404, "No scan results available. Run a scan first.")
 
@@ -666,19 +435,12 @@ async def scan_results() -> ScanResult:
 
 @router.post("/run", response_model=Dict[str, Any])
 async def run_scan(req: ScanRequest = ScanRequest()) -> Dict[str, Any]:
-    """Trigger a full API scan across all integrations.
+    """Run strategic trend intelligence scan (Bain Senior Partner grade).
 
-    Queries all available APIs in parallel, collects results, and returns
-    consolidated trend data. Takes ~30-60 seconds depending on source health.
+    Researches specific strategic questions with rigorous evidence standards.
+    Returns 5-15 deeply curated emerging trends.
 
-    Args:
-        req: Scan request with optional source list and force filter.
-
-    Returns:
-        Scan results with metadata (or 409 if scan already running).
-
-    Raises:
-        HTTPException 409: If another scan is already in progress.
+    Takes ~30-90 seconds depending on AI provider latency.
     """
     if _scan_state["running"]:
         raise HTTPException(
@@ -686,40 +448,27 @@ async def run_scan(req: ScanRequest = ScanRequest()) -> Dict[str, Any]:
             detail="Scan already in progress. Check /scanner/status for status.",
         )
 
-    # Run scan asynchronously
-    results = await _run_full_scan(
-        sources=req.sources,
-        force_filter=req.force_filter,
-        limit_per_source=req.limit_per_source,
-    )
+    try:
+        result = await _run_full_scan(
+            sources=req.sources,
+            force_filter=req.force_filter,
+            limit_per_source=req.limit_per_source,
+        )
+        return result
+    except Exception as e:
+        _scan_state["running"] = False
+        logger.error(f"Scan failed: {e}\n{traceback.format_exc()}")
+        raise HTTPException(500, f"Scan failed: {str(e)[:200]}")
 
-    return results
 
-
-@router.post("/run-background")
+@router.post("/run-background", response_model=Dict[str, str])
 async def run_scan_background(
     req: ScanRequest = ScanRequest(),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ) -> Dict[str, str]:
-    """Trigger a scan in the background (non-blocking).
-
-    Returns immediately with a status message. Monitor progress via /scanner/status.
-
-    Args:
-        req: Scan request.
-        background_tasks: FastAPI background task queue.
-
-    Returns:
-        Message indicating scan has started.
-
-    Raises:
-        HTTPException 409: If another scan is already in progress.
-    """
+    """Trigger a scan in the background (non-blocking)."""
     if _scan_state["running"]:
-        raise HTTPException(
-            status_code=409,
-            detail="Scan already in progress. Check /scanner/status for status.",
-        )
+        raise HTTPException(409, "Scan already in progress.")
 
     background_tasks.add_task(
         _run_full_scan,
@@ -728,60 +477,33 @@ async def run_scan_background(
         limit_per_source=req.limit_per_source,
     )
 
-    return {
-        "status": "started",
-        "message": "Scan queued. Check /scanner/status for progress.",
-    }
+    return {"status": "started", "message": "Strategic research scan queued."}
 
 
 @router.get("/health")
 async def scanner_health() -> Dict[str, Any]:
-    """Health check for scanner integration.
-
-    Returns:
-        Health status of key integrations.
-    """
-    health = {
+    """Health check for scanner."""
+    return {
         "scanner": "healthy",
+        "method": "strategic_research_v3",
         "last_scan": _scan_state["last_run"],
         "scan_running": _scan_state["running"],
-        "integrations_available": [
-            "gdelt", "gnews", "currentsapi", "rss_feeds",
-            "fred", "google_trends", "world_bank", "open_meteo",
-            "sec_edgar", "reddit", "youtube",
-            "echa", "eurlex", "epo_patents",
-            "openalex", "semantic_scholar",
-            "newsapi", "ncbi_pubmed", "arxiv",
-            "beautyfeeds",
-        ],
+        "questions_available": sum(len(qs) for qs in STRATEGIC_QUESTIONS.values()),
     }
-    return health
 
 
 @router.post("/cancel")
 async def cancel_scan() -> Dict[str, str]:
-    """Cancel the currently running scan (if any).
-
-    Note: This sets the flag, but ongoing API requests will continue.
-    Cancel is not immediate.
-
-    Returns:
-        Status message.
-    """
+    """Cancel the currently running scan (if any)."""
     if not _scan_state["running"]:
         return {"status": "no scan running"}
-
     _scan_state["running"] = False
     return {"status": "cancel requested"}
 
 
 @router.get("/saved-trends")
 async def get_saved_trends() -> Dict[str, Any]:
-    """Load previously saved scanned trends from database.
-
-    Returns:
-        List of saved scanned trends with their status.
-    """
+    """Load previously saved scanned trends from database."""
     try:
         from pulse.database import get_db_connection, _row_to_dict, placeholder, init_db
         init_db()
@@ -789,13 +511,12 @@ async def get_saved_trends() -> Dict[str, Any]:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM scanned_trends ORDER BY discovered_at DESC LIMIT 200"
+                "SELECT * FROM scanned_trends ORDER BY relevance_score DESC, discovered_at DESC LIMIT 200"
             )
             rows = cursor.fetchall()
             trends = []
             for r in rows:
                 row = _row_to_dict(r)
-                # Parse JSON fields
                 import json as _json
                 row["category_mapping"] = _json.loads(row.get("category_mapping") or "{}")
                 row["sources"] = _json.loads(row.get("sources") or "[]")
@@ -808,14 +529,7 @@ async def get_saved_trends() -> Dict[str, Any]:
 
 @router.post("/save-trends")
 async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Save scanned trends to database for persistence.
-
-    Args:
-        body: { "trends": [...] } — list of emerging trend objects
-
-    Returns:
-        Count of saved trends.
-    """
+    """Save scanned trends to database for persistence."""
     try:
         from pulse.database import get_db_connection, placeholder, ph, init_db, USE_POSTGRES
         import json as _json
@@ -835,7 +549,6 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
                 trend_id = t.get("id", f"scan_{session_id}_{saved}")
                 name = t.get("name", "Untitled")
 
-                # Upsert: update if exists, insert if new
                 if USE_POSTGRES:
                     cursor.execute(
                         f"""INSERT INTO scanned_trends
@@ -905,11 +618,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.post("/update-trend-status")
 async def update_trend_status(body: Dict[str, Any]) -> Dict[str, str]:
-    """Update the status of a scanned trend (new/reviewed/added/dismissed).
-
-    Args:
-        body: { "id": "...", "status": "added"|"dismissed"|"reviewed" }
-    """
+    """Update the status of a scanned trend (new/reviewed/added/dismissed)."""
     try:
         from pulse.database import get_db_connection, placeholder, init_db
         init_db()
@@ -974,10 +683,9 @@ async def delete_scanned_trends(body: Dict[str, Any] = None) -> Dict[str, Any]:
 
 
 @router.get("/forces")
-async def get_force_queries() -> Dict[str, List[str]]:
-    """Get available force query templates.
-
-    Returns:
-        Dictionary mapping force names to example queries.
-    """
-    return FORCE_QUERIES
+async def get_force_queries() -> Dict[str, Any]:
+    """Get available strategic research questions by force."""
+    return {
+        force: [q["question"] for q in questions]
+        for force, questions in STRATEGIC_QUESTIONS.items()
+    }

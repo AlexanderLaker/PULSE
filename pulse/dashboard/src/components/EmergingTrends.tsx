@@ -477,24 +477,34 @@ const ScanProgressOverlay: FC<{ progress: ScanProgress; errors: string[] }> = ({
         </span>
       </div>
 
-      {/* Source status grid */}
+      {/* Research question status */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {entries.map(([source, status]) => {
+        {entries.map(([taskKey, status]) => {
           const isOk = status.startsWith('ok');
           const isError = status.startsWith('error');
-          const isQuerying = !isOk && !isError;
+          const isResearching = !isOk && !isError;
+          const [force, qNum] = taskKey.split(':');
+          const forceColors: Record<string, string> = {
+            Consumer: '#3B82F6', Customer: '#8B5CF6', Technology: '#06B6D4',
+            Government: '#F59E0B', Environmental: '#22C55E', Competitive: '#EF4444',
+          };
+          const color = isOk ? T.green : isError ? T.red : (forceColors[force] || T.accent);
           return (
-            <span key={source} style={{
-              padding: '2px 6px',
+            <span key={taskKey} style={{
+              padding: '2px 8px',
               borderRadius: '4px',
               fontSize: '8px',
               fontWeight: 500,
               fontFamily: T.mono,
-              backgroundColor: isOk ? T.green + '15' : isError ? T.red + '15' : T.accent + '10',
-              color: isOk ? T.green : isError ? T.red : T.accent,
+              backgroundColor: color + '15',
+              color: color,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
             }}>
-              {isQuerying && <Loader size={7} style={{ marginRight: '3px', display: 'inline' }} />}
-              {source.split(':')[0]}
+              {isResearching && <Loader size={7} />}
+              {force} {qNum}
+              {isOk && ` ✓`}
             </span>
           );
         })}
@@ -502,7 +512,7 @@ const ScanProgressOverlay: FC<{ progress: ScanProgress; errors: string[] }> = ({
 
       {errors.length > 0 && (
         <div style={{ marginTop: '6px', fontSize: '9px', color: T.red }}>
-          {errors.length} source(s) had errors
+          {errors.length} research question(s) encountered errors
         </div>
       )}
     </motion.div>
@@ -569,18 +579,23 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
     }
   }, []);
 
-  // ─── API Scan Handler ─────────────────────────────────────────────────
+  // ─── Strategic Scan Handler ──────────────────────────────────────────────
   const handleScan = useCallback(async () => {
     setIsScanning(true);
     setScanProgress({});
     setScanErrors([]);
 
+    // Show initial progress for all 6 forces
+    const forces = ['Consumer', 'Government', 'Technology', 'Environmental', 'Competitive', 'Customer'];
+    const initProgress: ScanProgress = {};
+    forces.forEach(f => { initProgress[`${f}:Q1`] = 'researching'; });
+    setScanProgress(initProgress);
+
     try {
-      // Vercel serverless: use synchronous endpoint directly (no background tasks)
       const res = await fetch('/api/v1/scanner/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit_per_source: 20 }),
+        body: JSON.stringify({}),
       });
 
       if (res.ok) {
@@ -590,28 +605,19 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
           setEmergingTrends(prev => {
             const existingNames = new Set(prev.map(t => t.name));
             const newOnes = mapped.filter(t => !existingNames.has(t.name));
-            // Mark previously-seen trends as 'reviewed'
             const updated = prev.map(t => t.status === 'new' ? { ...t, status: 'reviewed' as const } : t);
             const merged = [...newOnes, ...updated].slice(0, MAX_VISIBLE_TRENDS);
-            // Persist merged trends to database
             saveTrendsToDb(merged);
             return merged;
           });
         }
-        // Update progress from meta
-        if (data.meta) {
-          setScanProgress(
-            Object.fromEntries(
-              (data.meta.sources_queried || []).map((s: string) => [s, 'ok'])
-            )
-          );
-          if (data.meta.sources_failed > 0) {
-            setScanErrors([`${data.meta.sources_failed} source(s) had errors`]);
-          }
-        }
+        // Mark all forces as complete
+        const doneProgress: ScanProgress = {};
+        forces.forEach(f => { doneProgress[`${f}:Q1`] = `ok (${data.meta?.total_trends || 0} total)`; });
+        setScanProgress(doneProgress);
       } else {
         const errText = await res.text();
-        setScanErrors([`Scan failed: ${res.status} ${errText.slice(0, 100)}`]);
+        setScanErrors([`Research failed: ${res.status} ${errText.slice(0, 100)}`]);
       }
     } catch (err) {
       console.warn('Scanner request failed:', err);
@@ -832,7 +838,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
             >
               <RefreshCw size={12} />
             </motion.div>
-            {isScanning ? 'Scanning 19 APIs...' : 'Scan All Sources'}
+            {isScanning ? 'Researching...' : 'Run Strategic Scan'}
           </motion.button>
           {emergingTrends.length > 0 && !isScanning && (
             <motion.button
@@ -883,7 +889,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
         gap: '6px',
       }}>
         <Sparkles size={10} style={{ color: T.accent }} />
-        Scans GDELT · GNews · CurrentsAPI · RSS · FRED · Google Trends · World Bank · ECHA · EUR-Lex · SEC EDGAR · Reddit · YouTube · OpenAlex · PubMed · arXiv · EPO Patents · Open-Meteo · NewsAPI
+        AI-powered strategic research across 6 forces — Consumer · Government · Technology · Environmental · Competitive · Customer — with Bain Senior Partner-grade rigor
       </div>
 
       {/* Filters + Select All */}
@@ -1074,9 +1080,9 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
             fontSize: '12px',
           }}>
             {isScanning
-              ? 'Scanning 19 API sources for emerging trends...'
+              ? 'AI is researching strategic questions across all 6 forces with Bain-grade rigor...'
               : emergingTrends.length === 0
-                ? 'No trends loaded yet. Click "Scan All Sources" above to discover trends from 19 live API sources.'
+                ? 'No emerging trends yet. Click "Run Strategic Scan" to discover new trends using AI-powered strategic research.'
                 : 'No trends match the current filter.'}
           </div>
         ) : (

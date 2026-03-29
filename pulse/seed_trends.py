@@ -671,147 +671,157 @@ TRENDS = [
 # ═══════════════════════════════════════════════════════════════════════
 
 SOURCE_URLS = {
-    "consumer_r01": [
+    # ═══ CONSUMER ═══
+    "consumer_r01": [  # Private Label Structural Penetration in Europe
         {"title": "NIQ: Private Label Power in Western Europe", "url": "https://nielseniq.com/global/en/insights/analysis/2025/private-label-power-in-western-europe-confidence-value-and-innovation-drive-growth/", "source_type": "market_report"},
     ],
-    "consumer_r02": [
+    "consumer_r02": [  # GLP-1 Drugs Reshape Consumer Spending
         {"title": "McKinsey: Future of Wellness Trends 2025", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/future-of-wellness-trends", "source_type": "research_report"},
     ],
-    "consumer_r03": [
+    "consumer_r03": [  # Premiumization Acceleration in Hair Care
         {"title": "Euromonitor: Premiumisation in Hair Care", "url": "https://www.euromonitor.com/premiumisation-in-hair-care/report", "source_type": "market_report"},
     ],
-    "consumer_r04": [
+    "consumer_r04": [  # Conscious Consumption and Cleanical Beauty
         {"title": "Mintel: Global Beauty & Personal Care Trends 2025", "url": "https://www.mintel.com/press-centre/mintel-announces-global-beauty-and-personal-care-trends-for-2025/", "source_type": "research_report"},
     ],
-    "consumer_r05": [
-        {"title": "Euromonitor: Men's Grooming Market Report", "url": "https://www.euromonitor.com/mens-grooming-in-the-us/report", "source_type": "market_report"},
+    "consumer_r05": [  # Silver Economy — Aging Population
+        {"title": "Eurostat: Ageing Europe — Statistics on Population Developments", "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Ageing_Europe_-_statistics_on_population_developments", "source_type": "government_data"},
     ],
-    "consumer_r06": [
-        {"title": "Circana: US Beauty Industry Sales Report", "url": "https://www.circana.com/post/us-beauty-industry-sales-accelerate-in-q3-circana-reports", "source_type": "market_report"},
-    ],
-    "consumer_r07": [
-        {"title": "Grand View Research: Microbiome Skincare Market", "url": "https://www.grandviewresearch.com/industry-analysis/microbiome-skincare-market-report", "source_type": "market_report"},
-    ],
-    "consumer_r08": [
+    "consumer_r06": [  # Cost-of-Living Squeeze and Trading Down
         {"title": "Euromonitor: Affordability, Value & Cost of Living", "url": "https://www.euromonitor.com/affordability-value-and-the-cost-of-living/report", "source_type": "market_report"},
     ],
-    "consumer_r09": [
+    "consumer_r07": [  # Scalp Care Emerges as Standalone Category
+        {"title": "Grand View Research: Scalp Care Market Size Report", "url": "https://www.grandviewresearch.com/industry-analysis/scalp-care-market-report", "source_type": "market_report"},
+    ],
+    "consumer_r08": [  # Male Grooming Structural Growth
+        {"title": "Euromonitor: Men's Grooming Market Report", "url": "https://www.euromonitor.com/mens-grooming-in-the-us/report", "source_type": "market_report"},
+    ],
+    "consumer_r09": [  # Fragrance and Sensory Premiumization in Home Care
         {"title": "McKinsey: Trends Defining the $1.8T Global Wellness Market", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/the-trends-defining-the-1-point-8-trillion-dollar-global-wellness-market-in-2024", "source_type": "research_report"},
     ],
-    "consumer_r10": [
+    "consumer_r10": [  # Hair Loss and Thinning Treatments
         {"title": "Hair Loss Treatment Market Size & Forecast 2025-2032", "url": "https://www.coherentmarketinsights.com/market-insight/hair-loss-treatment-market-4374", "source_type": "market_report"},
     ],
-    "consumer_r11": [
+    "consumer_r11": [  # Gen Z Dupe Culture and Ingredient Literacy
         {"title": "Mintel: US Gen Z Beauty Consumer Report", "url": "https://store.mintel.com/report/us-gen-z-beauty-consumer-market-report", "source_type": "market_report"},
     ],
-    "consumer_r12": [
-        {"title": "FMI: Professional Hair Care Products Market", "url": "https://www.futuremarketinsights.com/reports/global-professional-hair-care-products-market", "source_type": "market_report"},
+    "consumer_r12": [  # Post-COVID Hygiene Habits Persistence
+        {"title": "Allied Market Research: Surface Disinfectant Market 2025", "url": "https://www.alliedmarketresearch.com/surface-disinfectant-market", "source_type": "market_report"},
     ],
-    "government_r01": [
+
+    # ═══ GOVERNMENT ═══
+    "government_r01": [  # EU PFAS Universal Restriction
+        {"title": "ECHA: Universal PFAS Restriction Proposal", "url": "https://echa.europa.eu/hot-topics/perfluoroalkyl-chemicals-pfas", "source_type": "regulation"},
+    ],
+    "government_r02": [  # EU Microplastics Ban Phase 2
+        {"title": "ECHA: Microplastics Restriction", "url": "https://echa.europa.eu/hot-topics/microplastics", "source_type": "regulation"},
+    ],
+    "government_r03": [  # EU Cosmetics Regulation Omnibus VII/VIII
+        {"title": "EUR-Lex: EC 1223/2009 Cosmetics Regulation", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009R1223", "source_type": "regulation"},
+    ],
+    "government_r04": [  # EU PPWR — Packaging Waste Regulation
+        {"title": "EC: Packaging and Packaging Waste Regulation", "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/packaging-waste/packaging-packaging-waste-regulation_en", "source_type": "regulation"},
+    ],
+    "government_r05": [  # EU Green Claims Directive / EmpCo
         {"title": "EUR-Lex: Green Claims Directive COM/2023/166", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex:52023PC0166", "source_type": "regulation"},
     ],
-    "government_r02": [
-        {"title": "EC: REACH Chemical Restrictions", "url": "https://single-market-economy.ec.europa.eu/sectors/chemicals/reach/restrictions_en", "source_type": "regulation"},
-    ],
-    "government_r03": [
-        {"title": "EU Digital Product Passport Initiative", "url": "https://data.europa.eu/en/news-events/news/eus-digital-product-passport-advancing-transparency-and-sustainability", "source_type": "regulation"},
-    ],
-    "government_r04": [
+    "government_r06": [  # EU Deforestation Regulation (EUDR)
         {"title": "EC: Regulation on Deforestation-free Products", "url": "https://environment.ec.europa.eu/topics/forests/deforestation/regulation-deforestation-free-products_en", "source_type": "regulation"},
     ],
-    "government_r05": [
-        {"title": "EC: Packaging and Packaging Waste Regulation", "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/packaging-waste/packaging-packaging-waste-regulation_en", "source_type": "regulation"},
+    "government_r07": [  # EU Digital Product Passport (DPP)
+        {"title": "EU Digital Product Passport Initiative", "url": "https://data.europa.eu/en/news-events/news/eus-digital-product-passport-advancing-transparency-and-sustainability", "source_type": "regulation"},
     ],
-    "government_r06": [
-        {"title": "Understanding GB Standards for Product Compliance in China", "url": "https://ecqa.com/gb-standards-product-compliance-china/", "source_type": "standards"},
+
+    # ═══ TECHNOLOGY ═══
+    "technology_r01": [  # AI-Driven Formulation and Speed-to-Market
+        {"title": "Deloitte: AI in Manufacturing & Formulation", "url": "https://www2.deloitte.com/us/en/insights/industry/manufacturing/ai-in-manufacturing.html", "source_type": "research_report"},
     ],
-    "government_r07": [
-        {"title": "EC: EU Taxonomy for Sustainable Activities", "url": "https://finance.ec.europa.eu/sustainable-finance/tools-and-standards/eu-taxonomy-sustainable-activities_en", "source_type": "regulation"},
+    "technology_r02": [  # Bio-Based and Green Chemistry Alternatives
+        {"title": "Novozymes: Enzyme Solutions for Laundry", "url": "https://www.novozymes.com/en/solutions/household-care/laundry", "source_type": "company_page"},
     ],
-    "technology_r01": [
-        {"title": "Perfect Corp: AI-Powered Beauty Personalization", "url": "https://www.perfectcorp.com/business", "source_type": "company_page"},
+    "technology_r03": [  # Concentrated and Solid Formats Innovation
+        {"title": "Unilever: Concentrated Refill Systems", "url": "https://www.unilever.com/news/press-and-media/press-releases/2024/unilever-to-roll-out-refill-and-reuse-solutions/", "source_type": "company_page"},
     ],
-    "technology_r02": [
-        {"title": "Evonik: Eco-Friendly Cosmetic Solutions", "url": "https://www.evonik.com/en/products-and-solutions/personal-care", "source_type": "company_page"},
+    "technology_r04": [  # Microbiome Science for Hair and Skin
+        {"title": "Grand View Research: Microbiome Skincare Market", "url": "https://www.grandviewresearch.com/industry-analysis/microbiome-skincare-market-report", "source_type": "market_report"},
     ],
-    "technology_r03": [
-        {"title": "McKinsey: Digital & AI Transformation in CPG", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/fortune-or-fiction-the-real-value-of-a-digital-and-ai-transformation-in-cpg", "source_type": "research_report"},
-    ],
-    "technology_r04": [
+    "technology_r05": [  # Manufacturing Automation and Industry 4.0
         {"title": "BCG: Unlocking AI Value in Manufacturing", "url": "https://www.bcg.com/publications/2025/ai-in-manufacturing", "source_type": "research_report"},
     ],
-    "technology_r05": [
-        {"title": "ScienceDirect: Sustainable Life Cycle for Cosmetics", "url": "https://www.sciencedirect.com/science/article/pii/S2352554123002127", "source_type": "research_article"},
+    "technology_r06": [  # Retail Media Networks as Primary FMCG Channel
+        {"title": "eMarketer: Retail Media Forecast 2025", "url": "https://www.emarketer.com/content/global-retail-media-ad-spending-forecast-2025", "source_type": "market_report"},
     ],
-    "technology_r06": [
-        {"title": "McKinsey: E-Commerce Growth in CPG", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights", "source_type": "research_report"},
+    "technology_r07": [  # AI-Powered Personalization at Scale
+        {"title": "Perfect Corp: AI-Powered Beauty Personalization", "url": "https://www.perfectcorp.com/business", "source_type": "company_page"},
     ],
-    "technology_r07": [
-        {"title": "IFF: Bioscience Solutions for Innovation", "url": "https://www.iff.com/science/bioscience/", "source_type": "company_page"},
-    ],
-    "technology_r08": [
+    "technology_r08": [  # Connected Appliances and Auto-Dosing
         {"title": "Henkel: Smart Home & Connected Solutions", "url": "https://www.henkel.com/innovation", "source_type": "company_page"},
     ],
-    "environmental_r01": [
-        {"title": "CDP: Supply Chain Report — Strengthening the Chain", "url": "https://www.cdp.net/en/insights/strengthening-the-chain", "source_type": "research_report"},
+
+    # ═══ ENVIRONMENTAL ═══
+    "environmental_r01": [  # Palm Oil Supply Chain Disruption (Indonesia B50)
+        {"title": "Reuters: Indonesia B50 Biodiesel Mandate Impact", "url": "https://www.reuters.com/business/energy/indonesia-launches-b50-biodiesel-programme-2025-02-13/", "source_type": "news"},
     ],
-    "environmental_r02": [
-        {"title": "Ellen MacArthur Foundation: Circular Economy", "url": "https://www.ellenmacarthurfoundation.org", "source_type": "organization"},
-        {"title": "EC: Packaging and Packaging Waste Regulation", "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/packaging-waste/packaging-packaging-waste-regulation_en", "source_type": "regulation"},
-    ],
-    "environmental_r03": [
+    "environmental_r02": [  # Water Scarcity Drives Low-Water Formulations
         {"title": "WRI: Aqueduct Water Risk Atlas", "url": "https://www.wri.org/applications/aqueduct/water-risk-atlas/", "source_type": "data_tool"},
     ],
-    "environmental_r04": [
-        {"title": "IPCC: Sixth Assessment Report (AR6)", "url": "https://www.ipcc.ch/report/sixth-assessment-report-cycle/", "source_type": "research_report"},
+    "environmental_r03": [  # Carbon Border Adjustment and Scope 3 Reporting
+        {"title": "EC: Carbon Border Adjustment Mechanism (CBAM)", "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en", "source_type": "regulation"},
     ],
-    "environmental_r05": [
-        {"title": "Euromonitor: Top Global Consumer Trends 2025", "url": "https://www.euromonitor.com/press/press-releases/november-2024/euromonitor-international-reveals-top-global-consumer-trends-for-2025", "source_type": "market_report"},
+    "environmental_r04": [  # EPR Fee Escalation and Eco-Modulation
+        {"title": "CITEO France: EPR Fee Schedule and Eco-Modulation", "url": "https://www.citeo.com/en", "source_type": "regulation"},
     ],
-    "environmental_r06": [
-        {"title": "UNEP: Global Chemicals Outlook", "url": "https://www.unep.org/topics/chemicals-and-pollution-action/chemicals-management/global-chemicals-outlook", "source_type": "organization"},
+    "environmental_r05": [  # Climate-Driven Pest Pattern Shifts
+        {"title": "ECDC: Vector-borne Disease Surveillance", "url": "https://www.ecdc.europa.eu/en/disease-vectors/surveillance-and-disease-data", "source_type": "government_data"},
     ],
-    "competitive_r01": [
-        {"title": "P&G: Annual Report 2024", "url": "https://us.pg.com/annualreport2024/", "source_type": "annual_report"},
+    "environmental_r06": [  # Supply Chain Nearshoring and Geopolitical Diversification
+        {"title": "McKinsey: Supply Chain Resilience Report 2025", "url": "https://www.mckinsey.com/capabilities/operations/our-insights/supply-chains-to-build-resilience-manage-proactively", "source_type": "research_report"},
     ],
-    "competitive_r02": [
-        {"title": "Reckitt: Full Year Results 2025", "url": "https://www.reckitt.com/investors/", "source_type": "earnings_report"},
+
+    # ═══ COMPETITIVE ═══
+    "competitive_r01": [  # Reckitt Essential Home Divestiture
+        {"title": "Reckitt: Strategic Review and Investor Update", "url": "https://www.reckitt.com/investors/", "source_type": "earnings_report"},
     ],
-    "competitive_r03": [
-        {"title": "Unilever: Growth Action Plan", "url": "https://www.unilever.com/our-company/strategy/", "source_type": "strategy_document"},
+    "competitive_r02": [  # Unilever Beauty and Wellbeing Pivot
+        {"title": "Unilever: Growth Action Plan and Strategy", "url": "https://www.unilever.com/our-company/strategy/", "source_type": "strategy_document"},
     ],
-    "competitive_r04": [
-        {"title": "Church & Dwight: Investor Relations", "url": "https://www.churchdwight.com/investors/", "source_type": "annual_report"},
+    "competitive_r03": [  # P&G Superiority Framework and Innovation Fortress
+        {"title": "P&G: Annual Report and Investor Presentation 2024", "url": "https://us.pg.com/annualreport2024/", "source_type": "annual_report"},
     ],
-    "competitive_r05": [
+    "competitive_r04": [  # DTC and Indie Brand Disruption in Hair
+        {"title": "Euromonitor: Hair Care — DTC and Indie Brand Disruption", "url": "https://www.euromonitor.com/hair-care", "source_type": "market_report"},
+    ],
+    "competitive_r05": [  # Chinese FMCG Brands Enter European Market
         {"title": "Technavio: FMCG Market Growth Forecast 2025-2029", "url": "https://www.technavio.com/report/fmcg-market-industry-analysis", "source_type": "market_report"},
     ],
-    "competitive_r06": [
-        {"title": "Amazon Private Label Brands — Complete Guide", "url": "https://www.pattern.com/blog/amazons-private-label-brands-complete-guide", "source_type": "market_analysis"},
+    "competitive_r06": [  # Emerging Markets Growth Divergence — IMEA Leads
+        {"title": "Henkel FY2025 Annual Report — IMEA Segment", "url": "https://www.henkel.com/investors-and-analysts/financial-reports", "source_type": "annual_report"},
     ],
-    "competitive_r07": [
-        {"title": "BCG: 2025 M&A Report — Brave New World of Dealmaking", "url": "https://www.bcg.com/publications/2025/the-brave-new-world-of-dealmaking-in-the-global-market", "source_type": "research_report"},
+    "competitive_r07": [  # L'Oreal Tech-Beauty Platform Strategy
+        {"title": "L'Oreal: Annual Report and Beauty Tech Strategy", "url": "https://www.loreal.com/en/group/about-loreal/strategy/", "source_type": "strategy_document"},
     ],
-    "customer_r01": [
-        {"title": "NIQ: Channel Strategy Report 2025", "url": "https://nielseniq.com/global/en/insights/report/2025/on-premise-channel-strategy-report-2025/", "source_type": "market_report"},
-    ],
-    "customer_r02": [
-        {"title": "Statista: Quick Commerce Market Forecast", "url": "https://www.statista.com/outlook/emo/online-food-delivery/grocery-delivery/quick-commerce/worldwide", "source_type": "market_forecast"},
-    ],
-    "customer_r03": [
+
+    # ═══ CUSTOMER ═══
+    "customer_r01": [  # Discount Retail Channel Expansion in Europe
         {"title": "ESM: Lidl Reports Double-Digit Turnover Growth", "url": "https://www.esmmagazine.com/retail/lidl-gb-reports-double-digit-turnover-growth-in-fy-2024-277606", "source_type": "news"},
     ],
-    "customer_r04": [
-        {"title": "Amazon Beauty: Prime Day 2025 Report", "url": "https://www.prnewswire.com/news-releases/market-defenses-annual-amazon-prime-day-2025-beauty-report-unpacks-four-days-of-record-breaking-beauty-trends-302515096.html", "source_type": "market_report"},
+    "customer_r02": [  # E-Commerce Profit Pool Maturation
+        {"title": "eMarketer: FMCG E-Commerce Penetration Forecast", "url": "https://www.emarketer.com/content/global-ecommerce-forecast-2025", "source_type": "market_report"},
     ],
-    "customer_r05": [
+    "customer_r03": [  # Retailer Consolidation and Power Concentration
+        {"title": "NIQ: Channel Strategy Report 2025", "url": "https://nielseniq.com/global/en/insights/report/2025/on-premise-channel-strategy-report-2025/", "source_type": "market_report"},
+    ],
+    "customer_r04": [  # Social Commerce and TikTok Shop Emergence
+        {"title": "Euromonitor: Top Retail Trends 2025 — Social Commerce", "url": "https://www.euromonitor.com/article/top-retail-trends-in-2025-discount-formats-and-social-commerce-drive-growth", "source_type": "market_report"},
+    ],
+    "customer_r05": [  # Quick Commerce Consolidation
+        {"title": "Statista: Quick Commerce Market Forecast", "url": "https://www.statista.com/outlook/emo/online-food-delivery/grocery-delivery/quick-commerce/worldwide", "source_type": "market_forecast"},
+    ],
+    "customer_r06": [  # FMCG Subscription and Loyalty Ecosystem Lock-in
         {"title": "NIQ: Retail Media's Billion-Euro Mirage", "url": "https://nielseniq.com/global/en/insights/analysis/2025/retail-medias-billion-euro-mirage/", "source_type": "market_analysis"},
     ],
-    "customer_r06": [
-        {"title": "NIQ: Category Management That Delivers", "url": "https://nielseniq.com/global/en/insights/webinar/2026/category-management-that-delivers/", "source_type": "market_report"},
-    ],
-    "customer_r07": [
-        {"title": "Euromonitor: Top Retail Trends 2025", "url": "https://www.euromonitor.com/article/top-retail-trends-in-2025-discount-formats-and-social-commerce-drive-growth", "source_type": "market_report"},
+    "customer_r07": [  # Professional Salon Channel to Consumer Crossover
+        {"title": "FMI: Professional Hair Care Products Market", "url": "https://www.futuremarketinsights.com/reports/global-professional-hair-care-products-market", "source_type": "market_report"},
     ],
 }
 
