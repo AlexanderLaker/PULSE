@@ -569,8 +569,8 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               </span>
             </div>
 
-            {/* Simulate Button — admin only */}
-            {isAdmin && (
+            {/* Simulate Button — all authenticated users */}
+            {(
               <motion.button
                 onClick={handleSimulate}
                 disabled={simulating}
