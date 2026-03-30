@@ -57,6 +57,7 @@ export default function App() {
             onNavigateWarRoom={() => { setTrendSearch(undefined); setPage('warroom'); }}
             onNavigateTrends={() => { setTrendSearch(undefined); setPage('warroom'); }}
             onNavigateToTrend={(search) => { setTrendSearch(search); setPage('warroom'); }}
+            isAdmin={isAdmin}
           />
         </Suspense>
         {/* Burger Menu — top-right */}

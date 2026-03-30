@@ -454,6 +454,7 @@ interface ConsumerJourneyProps {
   onNavigateToTrend?: (trendSearch: string) => void;
   onNavigateWarRoom?: () => void;
   onNavigateTrends?: () => void;
+  isAdmin?: boolean;
 }
 
 interface SelectedProduct {
@@ -519,15 +520,27 @@ const TREND_CONTEXT: Record<string, { name: string; force: string; description: 
   'E-05': { name: 'Climate-Driven Pest & Allergen Shifts', force: 'Environmental', description: 'Changing climate patterns altering pest distribution, allergen seasons, and consumer needs for protection and treatment products.' },
 };
 
-export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateWarRoom, onNavigateTrends }: ConsumerJourneyProps) {
+export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateWarRoom, onNavigateTrends, isAdmin }: ConsumerJourneyProps) {
   const [activeTab, setActiveTab] = useState<'lhc' | 'hair'>('lhc');
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState<{
+    trendDrivers: string;
+    stageName: string;
+    type: 'product' | 'tech' | 'service';
+    direction: 'expansion' | 'contraction';
+    intensity: 1 | 2 | 3;
+  } | null>(null);
+  const [lhcJourney, setLhcJourney] = useState<JourneyStage[]>(LHC_JOURNEY);
+  const [hairJourney, setHairJourney] = useState<JourneyStage[]>(HAIR_JOURNEY);
 
   const handleProductClick = useCallback((entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string) => {
     setSelectedProduct({ entry, direction, stageName });
+    setIsEditing(false);
+    setEditValues(null);
   }, []);
 
-  const journey = activeTab === 'lhc' ? LHC_JOURNEY : HAIR_JOURNEY;
+  const journey = activeTab === 'lhc' ? lhcJourney : hairJourney;
   const title = activeTab === 'lhc'
     ? 'Laundry & Home Care — Consumer Journey'
     : 'Hair Consumer Business — Consumer Journey';
@@ -806,7 +819,11 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                 </div>
               </div>
               <button
-                onClick={() => setSelectedProduct(null)}
+                onClick={() => {
+                  setSelectedProduct(null);
+                  setIsEditing(false);
+                  setEditValues(null);
+                }}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   padding: 4, borderRadius: 6, color: T.text3,
@@ -981,6 +998,216 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                   </div>
                 </div>
               </div>
+
+              {/* Edit Button & Form (Admin Only) */}
+              {isAdmin && !isEditing && (
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setEditValues({
+                        trendDrivers: selectedProduct.entry.trendDrivers,
+                        stageName: selectedProduct.stageName,
+                        type: selectedProduct.entry.type,
+                        direction: selectedProduct.direction,
+                        intensity: selectedProduct.entry.intensity || 2,
+                      });
+                    }}
+                    style={{
+                      width: '100%', padding: '8px 0', borderRadius: 8,
+                      background: T.accentDim, border: `1px solid ${T.accent}30`,
+                      color: T.accent, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: T.sans,
+                    }}
+                  >
+                    Edit Entry
+                  </button>
+                </div>
+              )}
+
+              {isAdmin && isEditing && editValues && (
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.accent, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 }}>
+                    Edit Entry
+                  </div>
+
+                  {/* Linked Trend */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Linked Trend</label>
+                    <select
+                      value={editValues.trendDrivers.split('+')[0].trim().match(/^([TCGKE]-\d{2})/)?.[1] || ''}
+                      onChange={e => {
+                        const code = e.target.value;
+                        const ctx = TREND_CONTEXT[code];
+                        setEditValues(prev => prev ? { ...prev, trendDrivers: ctx ? `${code} ${ctx.name}` : code } : null);
+                      }}
+                      style={{
+                        width: '100%', padding: '6px 8px', borderRadius: 6,
+                        background: T.bg1, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 11, fontFamily: T.sans,
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="">Select trend...</option>
+                      {Object.entries(TREND_CONTEXT)
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([code, ctx]) => (
+                          <option key={code} value={code}>{code}: {ctx.name}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+
+                  {/* Journey Stage */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Journey Stage</label>
+                    <select
+                      value={editValues.stageName}
+                      onChange={e => setEditValues(prev => prev ? { ...prev, stageName: e.target.value } : null)}
+                      style={{
+                        width: '100%', padding: '6px 8px', borderRadius: 6,
+                        background: T.bg1, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 11, fontFamily: T.sans,
+                        outline: 'none',
+                      }}
+                    >
+                      {(activeTab === 'lhc' ? lhcJourney : hairJourney).map(stage => (
+                        <option key={stage.id} value={stage.label}>{stage.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Type */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Type</label>
+                    <select
+                      value={editValues.type}
+                      onChange={e => setEditValues(prev => prev ? { ...prev, type: e.target.value as 'product' | 'tech' | 'service' } : null)}
+                      style={{
+                        width: '100%', padding: '6px 8px', borderRadius: 6,
+                        background: T.bg1, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 11, fontFamily: T.sans,
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="product">Product</option>
+                      <option value="tech">Tech/Device</option>
+                      <option value="service">Service</option>
+                    </select>
+                  </div>
+
+                  {/* Direction */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Direction</label>
+                    <select
+                      value={editValues.direction}
+                      onChange={e => setEditValues(prev => prev ? { ...prev, direction: e.target.value as 'expansion' | 'contraction' } : null)}
+                      style={{
+                        width: '100%', padding: '6px 8px', borderRadius: 6,
+                        background: T.bg1, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 11, fontFamily: T.sans,
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="expansion">Expansion</option>
+                      <option value="contraction">Contraction</option>
+                    </select>
+                  </div>
+
+                  {/* Intensity */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Intensity</label>
+                    <select
+                      value={editValues.intensity}
+                      onChange={e => setEditValues(prev => prev ? { ...prev, intensity: parseInt(e.target.value) as 1 | 2 | 3 } : null)}
+                      style={{
+                        width: '100%', padding: '6px 8px', borderRadius: 6,
+                        background: T.bg1, border: `1px solid ${T.border}`,
+                        color: T.text, fontSize: 11, fontFamily: T.sans,
+                        outline: 'none',
+                      }}
+                    >
+                      <option value={1}>1 — Mild</option>
+                      <option value={2}>2 — Moderate</option>
+                      <option value={3}>3 — Strong</option>
+                    </select>
+                  </div>
+
+                  {/* Save / Cancel buttons */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => {
+                        if (!editValues || !selectedProduct) return;
+                        const journeyArr = activeTab === 'lhc' ? lhcJourney : hairJourney;
+                        const setJourney = activeTab === 'lhc' ? setLhcJourney : setHairJourney;
+
+                        // Find original stage and remove the entry
+                        const origStageName = selectedProduct.stageName;
+                        const origDirection = selectedProduct.direction;
+                        const entryName = selectedProduct.entry.name;
+
+                        const updated = journeyArr.map(stage => {
+                          const newStage = { ...stage, benefiting: [...stage.benefiting], negativelyImpacted: [...stage.negativelyImpacted] };
+                          // Remove from original position
+                          if (stage.label === origStageName) {
+                            if (origDirection === 'expansion') {
+                              newStage.benefiting = newStage.benefiting.filter(e => e.name !== entryName);
+                            } else {
+                              newStage.negativelyImpacted = newStage.negativelyImpacted.filter(e => e.name !== entryName);
+                            }
+                          }
+                          return newStage;
+                        });
+
+                        // Add to new position
+                        const updatedEntry: ProductEntry = {
+                          name: entryName,
+                          type: editValues.type,
+                          trendDrivers: editValues.trendDrivers,
+                          intensity: editValues.intensity,
+                        };
+
+                        const targetStage = updated.find(s => s.label === editValues.stageName);
+                        if (targetStage) {
+                          if (editValues.direction === 'expansion') {
+                            targetStage.benefiting.push(updatedEntry);
+                          } else {
+                            targetStage.negativelyImpacted.push(updatedEntry);
+                          }
+                        }
+
+                        setJourney(updated);
+                        setSelectedProduct({
+                          entry: updatedEntry,
+                          direction: editValues.direction,
+                          stageName: editValues.stageName,
+                        });
+                        setIsEditing(false);
+                        setEditValues(null);
+                      }}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 8,
+                        background: '#30D158', border: 'none',
+                        color: '#000', fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: T.sans,
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setIsEditing(false); setEditValues(null); }}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 8,
+                        background: T.bg3, border: `1px solid ${T.border}`,
+                        color: T.text2, fontSize: 12, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: T.sans,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <style>{`
