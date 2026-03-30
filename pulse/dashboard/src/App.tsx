@@ -105,7 +105,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<FullPageSkeleton />}>
-        <WarRoom isAdmin={isAdmin} />
+        <WarRoom isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} />
       </Suspense>
 
       {/* Burger Menu — top-right */}

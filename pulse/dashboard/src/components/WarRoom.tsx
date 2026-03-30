@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
   Brain, AlertTriangle, X, RefreshCw,
-  Presentation,
+  Presentation, Route,
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
@@ -227,7 +227,7 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
 }
 
 // ─── WarRoom Component ──────────────────────────────────────────────
-export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): React.ReactNode {
+export default function WarRoom({ isAdmin = false, onNavigateJourney }: { isAdmin?: boolean; onNavigateJourney?: () => void }): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate, simulation,
@@ -634,6 +634,31 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                 </motion.button>
               );
             })}
+            {/* Consumer Journey — navigates to separate page */}
+            {onNavigateJourney && (
+              <motion.button
+                onClick={onNavigateJourney}
+                whileHover={{ background: T.bg3 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                  background: 'transparent',
+                  color: T.text2,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                } as React.CSSProperties}
+              >
+                <Route size={14} />
+                Consumer Journey
+              </motion.button>
+            )}
           </div>
 
 

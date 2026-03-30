@@ -14,7 +14,7 @@
  * directional impact of PRISM's force assessment.
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { T } from '../lib/format';
 
 // ═══════════════════════════════════════════════════════════════
@@ -452,8 +452,45 @@ interface ConsumerJourneyProps {
   onBack?: () => void;
 }
 
+interface SelectedProduct {
+  entry: ProductEntry;
+  direction: 'expansion' | 'contraction';
+  stageName: string;
+}
+
+// PRISM Analysis generator — contextual explanation for each product
+function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string): string {
+  const dirWord = direction === 'expansion' ? 'growth opportunity' : 'decline risk';
+  const typeWord = entry.type === 'tech' ? 'technology solution' : entry.type === 'service' ? 'service model' : 'product category';
+
+  // Extract trend codes from trendDrivers
+  const trends = entry.trendDrivers;
+  const isMultiTrend = trends.includes('+') || trends.includes(',');
+
+  if (direction === 'expansion') {
+    return `PRISM's force assessment identifies "${entry.name}" as a ${dirWord} within the "${stageName}" stage of the consumer journey.\n\n` +
+      `As a ${typeWord}, it is positioned to capture value from ${isMultiTrend ? 'multiple converging forces' : 'a key structural force'}. ` +
+      `The primary driver — ${trends.split('+')[0].trim().split('(')[0].trim()} — creates a tailwind that increases demand, justifies premium pricing, or opens new use occasions.\n\n` +
+      `Strategic implication: This represents an addressable whitespace for innovation investment. ` +
+      `Categories touching this product type should see expanding profit pools as the underlying trends materialize through 2030. ` +
+      `First-mover advantage is significant given the ${entry.type === 'tech' ? 'technology adoption curve' : entry.type === 'service' ? 'service model lock-in' : 'consumer switching costs'}.`;
+  } else {
+    return `PRISM's force assessment flags "${entry.name}" as a ${dirWord} within the "${stageName}" stage of the consumer journey.\n\n` +
+      `This ${typeWord} faces structural headwinds from ${isMultiTrend ? 'multiple converging negative forces' : 'a key disruptive force'}. ` +
+      `The primary driver — ${trends.split('+')[0].trim().split('(')[0].trim()} — is eroding the value proposition through regulatory pressure, technological displacement, or shifting consumer preferences.\n\n` +
+      `Strategic implication: Portfolio exposure to this product type should be actively managed. ` +
+      `Consider defensive strategies (reformulation, repositioning) or planned exit. ` +
+      `The profit pool contraction is expected to accelerate as ${entry.type === 'tech' ? 'superior alternatives gain adoption' : entry.type === 'service' ? 'new service models displace legacy approaches' : 'regulation and consumer shifts compound'}.`;
+  }
+}
+
 export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
   const [activeTab, setActiveTab] = useState<'lhc' | 'hair'>('lhc');
+  const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
+
+  const handleProductClick = useCallback((entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string) => {
+    setSelectedProduct({ entry, direction, stageName });
+  }, []);
 
   const journey = activeTab === 'lhc' ? LHC_JOURNEY : HAIR_JOURNEY;
   const title = activeTab === 'lhc'
@@ -549,7 +586,7 @@ export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${journey.length}, minmax(170px, 1fr))`,
+          gridTemplateColumns: `repeat(${journey.length}, minmax(140px, 1fr))`,
           gap: 1,
           background: T.border,
           borderRadius: 10,
@@ -594,7 +631,7 @@ export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
                 ▲ Benefiting
               </div>
               {stage.benefiting.map((p, i) => (
-                <ProductPill key={i} entry={p} direction="expansion" />
+                <ProductPill key={i} entry={p} direction="expansion" onClick={() => handleProductClick(p, 'expansion', stage.label)} isSelected={selectedProduct?.entry.name === p.name && selectedProduct?.direction === 'expansion'} />
               ))}
             </div>
           ))}
@@ -613,7 +650,7 @@ export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
                 ▼ Declining
               </div>
               {stage.negativelyImpacted.map((p, i) => (
-                <ProductPill key={i} entry={p} direction="contraction" />
+                <ProductPill key={i} entry={p} direction="contraction" onClick={() => handleProductClick(p, 'contraction', stage.label)} isSelected={selectedProduct?.entry.name === p.name && selectedProduct?.direction === 'contraction'} />
               ))}
             </div>
           ))}
@@ -640,6 +677,184 @@ export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
           }
         </div>
       </div>
+
+      {/* ── Product Detail Panel (slide-in overlay) ─────────────── */}
+      {selectedProduct && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setSelectedProduct(null)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 200,
+              background: 'rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(2px)',
+            }}
+          />
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0,
+            width: 420, maxWidth: '90vw', zIndex: 201,
+            background: '#fff', borderLeft: `1px solid ${T.border1}`,
+            boxShadow: '-8px 0 30px rgba(0,0,0,0.08)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideInRight 0.2s ease-out',
+          }}>
+            {/* Panel header */}
+            <div style={{
+              padding: '16px 20px', borderBottom: `1px solid ${T.border}`,
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                    background: selectedProduct.direction === 'expansion' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.10)',
+                    color: selectedProduct.direction === 'expansion' ? '#30D158' : '#FF453A',
+                    letterSpacing: 0.5, textTransform: 'uppercase',
+                  }}>
+                    {selectedProduct.direction === 'expansion' ? '▲ Expansion' : '▼ Contraction'}
+                  </span>
+                  <span style={{
+                    fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                    background: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).bg,
+                    color: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).text,
+                  }}>
+                    {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).label}
+                  </span>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.text, lineHeight: 1.3 }}>
+                  {selectedProduct.entry.name}
+                </div>
+                <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>
+                  Stage: {selectedProduct.stageName}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedProduct(null)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 4, borderRadius: 6, color: T.text3,
+                  fontSize: 18, lineHeight: 1,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Panel body */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+              {/* Trend Drivers section */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: 0.8,
+                  textTransform: 'uppercase', marginBottom: 8,
+                }}>
+                  Trend Drivers — Rationale
+                </div>
+                <div style={{
+                  padding: '12px 14px', borderRadius: 8,
+                  background: T.bg1, border: `1px solid ${T.border}`,
+                }}>
+                  {selectedProduct.entry.trendDrivers.split('+').map((driver, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      padding: '6px 0',
+                      borderBottom: i < selectedProduct.entry.trendDrivers.split('+').length - 1 ? `1px solid ${T.border}` : 'none',
+                    }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700,
+                        color: selectedProduct.direction === 'expansion' ? '#30D158' : '#FF453A',
+                        marginTop: 1, flexShrink: 0,
+                      }}>
+                        {selectedProduct.direction === 'expansion' ? '↑' : '↓'}
+                      </span>
+                      <span style={{ fontSize: 12, color: T.text, lineHeight: 1.5, fontWeight: 500 }}>
+                        {driver.trim()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* PRISM Analysis section */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: T.accent, letterSpacing: 0.8,
+                  textTransform: 'uppercase', marginBottom: 8,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  PRISM Analysis
+                </div>
+                <div style={{
+                  padding: '14px 16px', borderRadius: 8,
+                  background: `linear-gradient(135deg, ${T.accentDim}, rgba(123,97,255,0.04))`,
+                  border: `1px solid ${T.accent}15`,
+                }}>
+                  {generatePrismAnalysis(selectedProduct.entry, selectedProduct.direction, selectedProduct.stageName)
+                    .split('\n\n')
+                    .map((paragraph, i) => (
+                      <p key={i} style={{
+                        fontSize: 12, color: T.text, lineHeight: 1.65,
+                        margin: i === 0 ? '0 0 10px' : '10px 0 0',
+                      }}>
+                        {paragraph}
+                      </p>
+                    ))}
+                </div>
+              </div>
+
+              {/* Impact Summary */}
+              <div style={{
+                padding: '12px 14px', borderRadius: 8,
+                background: selectedProduct.direction === 'expansion' ? 'rgba(48,209,88,0.05)' : 'rgba(255,69,58,0.04)',
+                border: `1px solid ${selectedProduct.direction === 'expansion' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.12)'}`,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Impact Summary
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: T.text3, marginBottom: 2 }}>Direction</div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700,
+                      color: selectedProduct.direction === 'expansion' ? '#30D158' : '#FF453A',
+                    }}>
+                      {selectedProduct.direction === 'expansion' ? 'Pool Expansion ↑' : 'Pool Contraction ↓'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: T.text3, marginBottom: 2 }}>Type</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
+                      {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).label}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: T.text3, marginBottom: 2 }}>Journey Stage</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
+                      {selectedProduct.stageName}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: T.text3, marginBottom: 2 }}>Force Count</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
+                      {selectedProduct.entry.trendDrivers.split('+').length} trend{selectedProduct.entry.trendDrivers.split('+').length > 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes slideInRight {
+              from { transform: translateX(100%); opacity: 0; }
+              to { transform: translateX(0); opacity: 1; }
+            }
+          `}</style>
+        </>
+      )}
     </div>
   );
 }
@@ -648,23 +863,38 @@ export default function ConsumerJourney({ onBack }: ConsumerJourneyProps) {
 // SUB-COMPONENT: Product Pill
 // ═══════════════════════════════════════════════════════════════
 
-function ProductPill({ entry, direction }: { entry: ProductEntry; direction: 'expansion' | 'contraction' }) {
+function ProductPill({ entry, direction, onClick, isSelected }: { entry: ProductEntry; direction: 'expansion' | 'contraction'; onClick?: () => void; isSelected?: boolean }) {
   const typeStyle = (TYPE_STYLES[entry.type] ?? TYPE_STYLES['product'])!;
-  const borderColor = direction === 'expansion'
-    ? 'rgba(48,209,88,0.15)'
-    : 'rgba(255,69,58,0.12)';
+  const borderColor = isSelected
+    ? (direction === 'expansion' ? 'rgba(48,209,88,0.5)' : 'rgba(255,69,58,0.4)')
+    : (direction === 'expansion' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.12)');
 
   return (
     <div
+      onClick={onClick}
       style={{
         marginBottom: 4,
         padding: '4px 6px',
         borderRadius: 5,
-        background: direction === 'expansion' ? 'rgba(48,209,88,0.05)' : 'rgba(255,69,58,0.04)',
+        background: isSelected
+          ? (direction === 'expansion' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.10)')
+          : (direction === 'expansion' ? 'rgba(48,209,88,0.05)' : 'rgba(255,69,58,0.04)'),
         border: `1px solid ${borderColor}`,
         display: 'flex', alignItems: 'flex-start', gap: 4,
+        cursor: 'pointer',
+        transition: 'all 0.12s ease',
       }}
-      title={entry.trendDrivers}
+      title="Click to view analysis"
+      onMouseEnter={e => {
+        e.currentTarget.style.background = direction === 'expansion' ? 'rgba(48,209,88,0.10)' : 'rgba(255,69,58,0.08)';
+        e.currentTarget.style.borderColor = direction === 'expansion' ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.25)';
+      }}
+      onMouseLeave={e => {
+        if (!isSelected) {
+          e.currentTarget.style.background = direction === 'expansion' ? 'rgba(48,209,88,0.05)' : 'rgba(255,69,58,0.04)';
+          e.currentTarget.style.borderColor = direction === 'expansion' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.12)';
+        }
+      }}
     >
       <span style={{
         fontSize: 8, fontWeight: 600, padding: '0px 3px', borderRadius: 2,
@@ -673,18 +903,11 @@ function ProductPill({ entry, direction }: { entry: ProductEntry; direction: 'ex
       }}>
         {entry.type === 'tech' ? 'T' : entry.type === 'service' ? 'S' : 'P'}
       </span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <span style={{
-          fontSize: 10, color: T.text2, lineHeight: 1.3, fontWeight: 500,
-        }}>
-          {entry.name}
-        </span>
-        <span style={{
-          fontSize: 8, color: T.text4, lineHeight: 1.2, fontStyle: 'italic',
-        }}>
-          {entry.trendDrivers}
-        </span>
-      </div>
+      <span style={{
+        fontSize: 10, color: T.text2, lineHeight: 1.3, fontWeight: 500,
+      }}>
+        {entry.name}
+      </span>
     </div>
   );
 }
