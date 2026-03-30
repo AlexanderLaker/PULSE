@@ -159,6 +159,8 @@ class TrendCreate(BaseModel):
     data_source: str = ""
     confidence: str = "Medium"
     ai_suggested: bool = True
+    peak_year: Optional[int] = Field(None, ge=2025, le=2035)
+    diffusion_curve: Optional[str] = None
 
 class TrendUpdate(BaseModel):
     impact: Optional[int] = Field(None, ge=1, le=5)
@@ -173,6 +175,10 @@ class TrendUpdate(BaseModel):
     description: Optional[str] = None
     strategic_implication: Optional[str] = None
     sources: Optional[list] = None
+    peak_year: Optional[int] = Field(None, ge=2025, le=2035,
+        description="Year when 100% of trend impact materializes (0 = default 2030)")
+    diffusion_curve: Optional[str] = Field(None,
+        description="Materialization shape: s_curve, linear, front_loaded, back_loaded, step_function")
 
 class ScenarioCreate(BaseModel):
     id: str
@@ -193,6 +199,57 @@ class AllocationRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+
+
+def _backfill_diffusion_fields(db) -> None:
+    """
+    One-time migration: assign logical peak_year and diffusion_curve to
+    existing trends that still have the default (0 / 's_curve').
+
+    Heuristics by force type:
+      Government  → front_loaded, peak 2028 (regulation kicks in fast)
+      Technology  → back_loaded, peak 2030 (slow adoption then scale)
+      Consumer    → s_curve, peak 2029 (classic diffusion of preferences)
+      Customer    → linear, peak 2030 (gradual channel evolution)
+      Environmental → s_curve, peak 2030 (awareness tipping point)
+      Competitive → front_loaded, peak 2029 (competitors react within 1-2 years)
+
+    Trends with keywords like "ban", "phase-out", "regulation" get step_function.
+    Already-set trends (peak_year != 0) are left untouched.
+    """
+    changed = []
+    step_keywords = ["ban", "phase-out", "phase out", "prohibition", "deadline", "effective date", "mandatory"]
+    force_defaults = {
+        "Government":    ("front_loaded", 2028),
+        "Technology":    ("back_loaded",  2030),
+        "Consumer":      ("s_curve",      2029),
+        "Customer":      ("linear",       2030),
+        "Environmental": ("s_curve",      2030),
+        "Competitive":   ("front_loaded", 2029),
+    }
+    for trend in db.trends:
+        if getattr(trend, 'peak_year', 0) not in (0, None):
+            continue  # already set by user
+        curve, peak = force_defaults.get(trend.force, ("s_curve", 2030))
+        # Override: step_function for hard regulatory deadlines
+        desc_lower = (trend.description or "").lower() + (trend.name or "").lower()
+        if any(kw in desc_lower for kw in step_keywords):
+            curve = "step_function"
+            peak = 2028
+        # Override: high-probability trends peak sooner
+        if trend.probability >= 5 and peak > 2028:
+            peak = peak - 1
+        trend.peak_year = peak
+        trend.diffusion_curve = curve
+        changed.append(trend)
+
+    if changed:
+        try:
+            from pulse.database import save_trends
+            save_trends(changed)
+            logger.info(f"Backfilled peak_year/diffusion_curve for {len(changed)} trends")
+        except Exception as e:
+            logger.warning(f"Failed to backfill diffusion fields: {e}")
 
 
 def create_app(args=None) -> FastAPI:
@@ -267,6 +324,10 @@ def create_app(args=None) -> FastAPI:
                     logger.info(f"Loaded {_state['db'].trend_count} trends from database")
                 except Exception as e:
                     logger.error(f"Failed to load trends: {e}")
+
+            # Migrate: backfill peak_year and diffusion_curve for existing trends
+            if _state.get("db"):
+                _backfill_diffusion_fields(_state["db"])
 
         # Auto-load latest simulation from DB if available
         if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
@@ -623,6 +684,8 @@ def create_app(args=None) -> FastAPI:
             "score_variance": t.score_variance,
             "impact_posterior": {"alpha": t.impact_posterior[0], "beta": t.impact_posterior[1]} if t.impact_posterior else None,
             "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
+            "peak_year": getattr(t, 'peak_year', 0),
+            "diffusion_curve": getattr(t, 'diffusion_curve', 's_curve'),
         } for t in trends]
 
     @app.post("/api/v1/trends")
@@ -662,6 +725,8 @@ def create_app(args=None) -> FastAPI:
             source_type="scanner",
             confidence=req.confidence,
             ai_suggested=req.ai_suggested,
+            peak_year=req.peak_year or 0,
+            diffusion_curve=req.diffusion_curve or "s_curve",
         )
 
         # Persist to database
@@ -755,6 +820,13 @@ def create_app(args=None) -> FastAPI:
                 trend.data_source = update.sources
             else:
                 trend.data_source = "; ".join(str(s) for s in update.sources)
+        if update.peak_year is not None:
+            trend.peak_year = update.peak_year
+        if update.diffusion_curve is not None:
+            from pulse.config import VALID_DIFFUSION_CURVES
+            if update.diffusion_curve not in VALID_DIFFUSION_CURVES:
+                raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+            trend.diffusion_curve = update.diffusion_curve
         trend.__post_init__()
 
         # Persist updated exposures

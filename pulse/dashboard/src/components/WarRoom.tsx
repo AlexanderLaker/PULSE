@@ -274,9 +274,28 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
       newShifts[catId] = yearMap;
     }
 
+    // Build force contributions from backend causal_decomposition if available
+    const causalDecomp = simulation?.causal_decomposition;
+    let newFC: Record<string, ForceContribution[]> | undefined;
+    if (causalDecomp && typeof causalDecomp === 'object') {
+      newFC = {};
+      for (const [catKey, decomp] of Object.entries(causalDecomp)) {
+        const catId = normCatId(catKey);
+        const directEffects = (decomp as any)?.direct_effects || decomp;
+        if (directEffects && typeof directEffects === 'object') {
+          newFC[catId] = Object.entries(directEffects).map(([force, value]) => ({
+            force: force as ForceName,
+            value: value as number,
+            normalized: value as number,
+          }));
+        }
+      }
+    }
+
     setInitialData(prev => ({
       ...prev,
       shifts: { ...prev.shifts, ...newShifts },
+      ...(newFC ? { forceContributions: { ...prev.forceContributions, ...newFC } } : {}),
       convergence: {
         r_hat: simulation.convergence?.r_hat ?? 0,
         converged: simulation.convergence?.converged ?? true,
@@ -1027,22 +1046,15 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                       return result;
                     })(),
                     force_decomposition: (() => {
-                      // Transform ForceContribution[] → Record<ForceName, signed_shift_contribution>
-                      // Allocate the total shift (2030 median) proportionally across forces
+                      // Use per-force shift contributions directly (already computed
+                      // in the useEffect from trend data × category exposure, scaled to MC total)
                       const result: Record<string, Record<string, number>> = {};
-                      if (data.forceContributions && selectedCategory && data.shifts) {
+                      if (data.forceContributions && selectedCategory) {
                         const contribs = data.forceContributions[selectedCategory];
-                        const catShifts = (data.shifts as any)[selectedCategory];
-                        if (contribs && Array.isArray(contribs) && catShifts) {
-                          // Get 2030 median shift as the total
-                          const total2030Shift = catShifts[2030]?.median || 0;
-                          // Compute normalized weights
-                          const totalWeight = contribs.reduce((sum: number, fc: any) => sum + (fc?.normalized || 0), 0);
+                        if (contribs && Array.isArray(contribs)) {
                           const forceMap: Record<string, number> = {};
                           contribs.forEach((fc: any) => {
-                            // Allocate shift proportionally: force_contribution = normalized_weight × total_shift
-                            const weight = totalWeight > 0 ? (fc?.normalized || 0) / totalWeight : 1 / contribs.length;
-                            forceMap[fc.force] = weight * total2030Shift;
+                            forceMap[fc.force] = fc.value || 0;
                           });
                           result[selectedCategory] = forceMap;
                         }

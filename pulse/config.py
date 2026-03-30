@@ -51,7 +51,7 @@ DEFAULT_MATERIALIZATION = {
     2030: 1.00,
 }
 
-# Force-specific materialization overrides
+# Force-specific materialization overrides (legacy — used when trend has no diffusion_curve)
 REGULATORY_MATERIALIZATION = {2026: 0.05, 2027: 0.15, 2028: 0.60, 2029: 0.90, 2030: 1.00}
 TECHNOLOGY_MATERIALIZATION = {2026: 0.05, 2027: 0.12, 2028: 0.30, 2029: 0.60, 2030: 1.00}
 CONSUMER_MATERIALIZATION = {2026: 0.12, 2027: 0.28, 2028: 0.50, 2029: 0.75, 2030: 1.00}
@@ -61,6 +61,64 @@ FORCE_MATERIALIZATION_OVERRIDES = {
     "Technology": TECHNOLOGY_MATERIALIZATION,
     "Consumer": CONSUMER_MATERIALIZATION,
 }
+
+# ── MECE Diffusion Curve Types ──────────────────────────────────────
+# Each curve maps a normalized progress (0→1) to a materialization fraction.
+VALID_DIFFUSION_CURVES = ["s_curve", "linear", "front_loaded", "back_loaded", "step_function"]
+
+def compute_materialization_schedule(
+    peak_year: int,
+    diffusion_curve: str,
+    path_years: list[int] | None = None,
+    base_year: int = DEFAULT_BASE_YEAR,
+) -> dict[int, float]:
+    """
+    Compute a year→fraction materialization schedule for a single trend.
+
+    Args:
+        peak_year: year when 100% impact materializes (0 = use last path year)
+        diffusion_curve: one of VALID_DIFFUSION_CURVES
+        path_years: list of years to compute fractions for
+        base_year: start year (fraction = 0.0)
+
+    Returns:
+        dict mapping each path year to a fraction in [0.0, 1.0]
+    """
+    import math
+    years = path_years or DEFAULT_PATH_YEARS
+    py = peak_year if peak_year and peak_year > base_year else years[-1]
+
+    schedule = {}
+    for year in years:
+        if year >= py:
+            schedule[year] = 1.0
+            continue
+        # t = normalized progress from base_year to peak_year: 0.0 → 1.0
+        span = max(py - base_year, 1)
+        t = max(0.0, min(1.0, (year - base_year) / span))
+
+        if diffusion_curve == "linear":
+            frac = t
+        elif diffusion_curve == "front_loaded":
+            # Concave: sqrt curve — fast early, flattens
+            frac = math.sqrt(t)
+        elif diffusion_curve == "back_loaded":
+            # Convex: quadratic — slow early, accelerates
+            frac = t * t
+        elif diffusion_curve == "step_function":
+            # Near-zero until 80% of the way, then jumps
+            frac = 0.05 if t < 0.8 else (0.05 + (t - 0.8) / 0.2 * 0.95)
+        else:  # s_curve (default)
+            # Logistic S-curve centered at t=0.5
+            frac = 1.0 / (1.0 + math.exp(-12 * (t - 0.5)))
+            # Normalize so frac(0)≈0 and frac(1)≈1
+            f0 = 1.0 / (1.0 + math.exp(-12 * (0 - 0.5)))
+            f1 = 1.0 / (1.0 + math.exp(-12 * (1 - 0.5)))
+            frac = (frac - f0) / (f1 - f0)
+
+        schedule[year] = round(max(0.0, min(1.0, frac)), 4)
+
+    return schedule
 
 # ── Default weights ─────────────────────────────────────────────────
 DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}  # Equal: ~16.7%

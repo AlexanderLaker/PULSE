@@ -183,22 +183,28 @@ def init_db() -> None:
                 impact_posterior TEXT,
                 probability_posterior TEXT,
                 gp1_pct_affected REAL DEFAULT 0.10,
+                peak_year INTEGER DEFAULT 0,
+                diffusion_curve TEXT DEFAULT 's_curve',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Migration: add gp1_pct_affected column if missing (for existing DBs)
-        # Use SAVEPOINT so a failure doesn't poison the Postgres transaction
-        try:
-            if POSTGRES_URL:
-                cursor.execute("SAVEPOINT sp_migrate_gp1")
-            cursor.execute("ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10")
-            conn.commit()
-        except Exception:
-            if POSTGRES_URL:
-                cursor.execute("ROLLBACK TO SAVEPOINT sp_migrate_gp1")
-            pass  # Column already exists
+        # Migration: add columns if missing (for existing DBs)
+        for col_sql in [
+            "ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10",
+            "ALTER TABLE trends ADD COLUMN peak_year INTEGER DEFAULT 0",
+            "ALTER TABLE trends ADD COLUMN diffusion_curve TEXT DEFAULT 's_curve'",
+        ]:
+            try:
+                if POSTGRES_URL:
+                    cursor.execute("SAVEPOINT sp_migrate_col")
+                cursor.execute(col_sql)
+                conn.commit()
+            except Exception:
+                if POSTGRES_URL:
+                    cursor.execute("ROLLBACK TO SAVEPOINT sp_migrate_col")
+                pass  # Column already exists
 
         # ── Category exposure ────────────────────────────────────────
         cursor.execute("""
@@ -497,8 +503,8 @@ def save_trends(trends: List[Trend]) -> None:
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, scorer_count, score_variance,
                     debiasing_applied, impact_posterior, probability_posterior,
-                    gp1_pct_affected
-                ) VALUES ({ph(22)})
+                    gp1_pct_affected, peak_year, diffusion_curve
+                ) VALUES ({ph(24)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -510,6 +516,8 @@ def save_trends(trends: List[Trend]) -> None:
                     json.dumps(trend.impact_posterior) if trend.impact_posterior else None,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
                     getattr(trend, 'gp1_pct_affected', 0.10),
+                    getattr(trend, 'peak_year', 0),
+                    getattr(trend, 'diffusion_curve', 's_curve'),
                 ),
             )
 
@@ -630,6 +638,8 @@ def load_trends() -> List[Trend]:
                 score_variance=row.get("score_variance", 0.0),
                 debiasing_applied=row.get("debiasing_applied", False),
                 gp1_pct_affected=row.get("gp1_pct_affected", 0.10) or 0.10,
+                peak_year=row.get("peak_year", 0) or 0,
+                diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
                 impact_posterior=impact_posterior,
                 probability_posterior=prob_posterior,
             )

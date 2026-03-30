@@ -68,6 +68,10 @@ export interface Trend {
   // Bayesian posteriors
   impact_posterior?: BetaPosterior;
   probability_posterior?: BetaPosterior;
+
+  // Materialization timing
+  peak_year?: number;       // Year when 100% impact materializes (0 = default 2030)
+  diffusion_curve?: string; // s_curve | linear | front_loaded | back_loaded | step_function
 }
 
 /** Subset of Trend fields that can be updated via PUT /trends/{id}. */

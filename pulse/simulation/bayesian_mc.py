@@ -14,7 +14,8 @@ from pulse.simulation._scipy_compat import cholesky, beta_ppf, t_cdf
 
 from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,
-                           FORCE_MATERIALIZATION_OVERRIDES)
+                           FORCE_MATERIALIZATION_OVERRIDES,
+                           compute_materialization_schedule)
 from pulse.ingestion.models import TrendDatabase, Trend
 from pulse.causal.dag import CausalDAG
 
@@ -203,78 +204,80 @@ class BayesianMonteCarloEngine:
         """
         Compute shift path for a single category in one MC iteration.
 
-        Uses multiplicative compounding with per-force materialization schedules.
+        Uses multiplicative compounding with per-trend materialization schedules.
+        Each trend has its own peak_year and diffusion_curve, producing a unique
+        materialization schedule. Falls back to force-level overrides for legacy trends.
         Returns: array of shifts for each year in path_years
         """
         n_years = len(self.config.path_years)
         year_shifts = np.zeros(n_years)
 
-        # Compute per-force contribution for the base (no-lag) year
-        base_force_contributions = {}
-        for force in FORCES:
-            force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
-            total_score = 0.0
-            count = 0
-
-            for j, trend in enumerate(trends):
-                if trend.force != force:
-                    continue
-                exposure = trend.category_exposure.get(category, 0)
-                if exposure > 0:
-                    exposure_frac = exposure / 5.0
-
-                    # Region weighting: soft modifier based on how much of the
-                    # trend's regional exposure overlaps with configured region weights.
-                    # Uses dampened scaling: factor = 1 - damping*(1 - raw)
-                    # so exposure scores modulate impact gently (not as hard multipliers).
-                    region_weights = getattr(self.config, 'region_weights', {})
-                    regional_exp = getattr(trend, 'regional_exposure', {}) or {}
-                    if regional_exp and region_weights:
-                        weighted_sum = 0.0
-                        total_possible = 0.0
-                        for region, r_weight in region_weights.items():
-                            r_exp = regional_exp.get(region, 0)
-                            weighted_sum += (r_exp / 5.0) * r_weight
-                            total_possible += r_weight
-                        raw_region = weighted_sum / max(total_possible, 1e-6)
-                        # Dampen: 50% of the way between raw and 1.0
-                        # raw=1.0 → 1.0, raw=0.6 → 0.8, raw=0.0 → 0.5
-                        region_factor = 1.0 - 0.5 * (1.0 - raw_region)
-                    else:
-                        region_factor = 1.0  # No regional data → full impact
-
-                    # NOTE: VC weights are NOT applied here as input multipliers.
-                    # VC weights decompose the resulting shift across value chain
-                    # steps in _compile_results (post-hoc allocation, not attenuation).
-
-                    total_score += trend_scores[j] * exposure_frac * region_factor
-                    count += 1
-
-            # Additive aggregation: total pressure from all trends in this force.
-            # More trends affecting a category = more total pressure on the pool,
-            # not less (which averaging would cause by diluting strong signals).
-            force_score = total_score
-
-            # Apply scenario override if present
-            if scenario_overrides and force in scenario_overrides:
-                force_score += scenario_overrides[force]
-
-            base_force_contributions[force] = force_score * force_weight
+        # Pre-compute per-trend materialization schedules
+        trend_mat_schedules = {}
+        for j, trend in enumerate(trends):
+            pk = getattr(trend, 'peak_year', 0) or 0
+            dc = getattr(trend, 'diffusion_curve', '') or ''
+            if pk > 0 and dc:
+                # Per-trend curve from config.compute_materialization_schedule
+                trend_mat_schedules[j] = compute_materialization_schedule(
+                    pk, dc, self.config.path_years, self.config.base_year
+                )
+            else:
+                # Fallback: force-level override or global default
+                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
+                trend_mat_schedules[j] = {
+                    yr: force_mat.get(yr, self.config.materialization.get(yr, 1.0))
+                    for yr in self.config.path_years
+                }
 
         # Compute year-by-year shifts with multiplicative compounding
         for y_idx, year in enumerate(self.config.path_years):
-            # Use base contributions for all years (no causal propagation)
-            force_contributions = dict(base_force_contributions)
+            # Build per-force contributions for this year using per-trend materialization
+            force_contributions = {}
+            for force in FORCES:
+                force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
+                total_score = 0.0
 
-            # Multiplicative compounding with per-force materialization + attenuation
+                for j, trend in enumerate(trends):
+                    if trend.force != force:
+                        continue
+                    exposure = trend.category_exposure.get(category, 0)
+                    if exposure > 0:
+                        exposure_frac = exposure / 5.0
+
+                        # Region weighting: soft modifier
+                        region_weights = getattr(self.config, 'region_weights', {})
+                        regional_exp = getattr(trend, 'regional_exposure', {}) or {}
+                        if regional_exp and region_weights:
+                            weighted_sum = 0.0
+                            total_possible = 0.0
+                            for region, r_weight in region_weights.items():
+                                r_exp = regional_exp.get(region, 0)
+                                weighted_sum += (r_exp / 5.0) * r_weight
+                                total_possible += r_weight
+                            raw_region = weighted_sum / max(total_possible, 1e-6)
+                            region_factor = 1.0 - 0.5 * (1.0 - raw_region)
+                        else:
+                            region_factor = 1.0
+
+                        # Per-trend materialization fraction for this year
+                        mat_frac = trend_mat_schedules[j].get(year, 1.0)
+
+                        total_score += trend_scores[j] * exposure_frac * region_factor * mat_frac
+
+                force_score = total_score
+
+                # Apply scenario override if present
+                if scenario_overrides and force in scenario_overrides:
+                    force_score += scenario_overrides[force]
+
+                force_contributions[force] = force_score * force_weight
+
+            # Multiplicative compounding with attenuation (no per-force materialization
+            # here — already applied per-trend above)
             product = 1.0
             for force, contribution in force_contributions.items():
-                # Force-specific materialization: regulatory shocks front-load,
-                # technology trends back-load, others use default S-curve
-                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(force, {})
-                mat_frac = force_mat.get(year, self.config.materialization.get(year, 1.0))
-
-                attenuated = contribution * self.config.attenuation * mat_frac
+                attenuated = contribution * self.config.attenuation
                 product *= (1.0 + attenuated)
 
             year_shifts[y_idx] = product - 1.0
@@ -330,22 +333,43 @@ class BayesianMonteCarloEngine:
                 "converged": r_hat < 1.05,
             }
 
-            # Direct effects: immediate force impacts only (no causal propagation)
-            direct_effects = {}
-
-            # Sum trend-level contributions by force
+            # Direct effects: per-force contribution to total category shift.
+            # Compute using same logic as the simulation: normalized_score × exposure × force_weight × region
+            # Then scale proportionally so contributions sum to the MC median at 2030.
+            raw_force_sums = {}
             for force in FORCES:
-                direct_effects[force] = 0.0
+                raw_force_sums[force] = 0.0
 
-            # Attribute shifts by force presence in category
             trends = db.trends
             for trend in trends:
                 exposure = trend.category_exposure.get(cat, 0)
                 if exposure > 0:
-                    direct_effects[trend.force] += trend.normalized_score * (exposure / 5.0)
+                    exposure_frac = exposure / 5.0
+                    # Region weighting (same as simulation)
+                    region_weights = getattr(self.config, 'region_weights', {})
+                    regional_exp = getattr(trend, 'regional_exposure', {}) or {}
+                    if regional_exp and region_weights:
+                        weighted_sum = 0.0
+                        total_possible = 0.0
+                        for region, r_weight in region_weights.items():
+                            r_exp = regional_exp.get(region, 0)
+                            weighted_sum += (r_exp / 5.0) * r_weight
+                            total_possible += r_weight
+                        raw_region = weighted_sum / max(total_possible, 1e-6)
+                        region_factor = 1.0 - 0.5 * (1.0 - raw_region)
+                    else:
+                        region_factor = 1.0
+                    force_weight = self.config.force_weights.get(trend.force, 1.0 / len(FORCES))
+                    raw_force_sums[trend.force] += trend.normalized_score * exposure_frac * region_factor * force_weight
+
+            # Scale to match MC median at 2030 so contributions add up
+            raw_total = sum(raw_force_sums.values())
+            last_year = self.config.path_years[-1]
+            mc_median = path[last_year]["median"]
+            scale = mc_median / raw_total if abs(raw_total) > 1e-10 else 1.0
 
             causal_decomposition[cat] = {
-                "direct_effects": {f: float(v) for f, v in direct_effects.items()},
+                "direct_effects": {f: float(v * scale) for f, v in raw_force_sums.items()},
             }
 
         # ── Value Chain Decomposition ──────────────────────────────────

@@ -41,6 +41,18 @@ class Trend:
     # means: "this is a maximum-severity trend, but even at full force
     # it only touches 15% of the category's GP1."
     gp1_pct_affected: float = 0.10  # default 10% — conservative baseline
+    # Materialization timing — when does the full impact arrive?
+    # peak_year: the year by which 100% of the trend's impact has materialized.
+    # 0 = use default (2030). Must be >= base_year and <= 2035.
+    peak_year: int = 0
+    # Diffusion curve — the temporal shape of how the impact builds up.
+    # MECE taxonomy:
+    #   "s_curve"       — slow start, rapid middle, plateau (classic adoption)
+    #   "linear"        — steady equal increments each year
+    #   "front_loaded"  — most impact happens early, then flattens
+    #   "back_loaded"   — slow start, accelerates toward the end
+    #   "step_function" — minimal impact then sudden jump at peak_year
+    diffusion_curve: str = "s_curve"
     # Bayesian posteriors — (alpha, beta) for Beta distribution
     impact_posterior: Optional[tuple] = None
     probability_posterior: Optional[tuple] = None

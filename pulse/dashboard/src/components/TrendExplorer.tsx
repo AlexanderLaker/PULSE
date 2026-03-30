@@ -9,7 +9,7 @@
 import React, { useState, useMemo, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronDown, ChevronUp, Search, Sparkles, ExternalLink,
+  ChevronDown, ChevronUp, Search, Sparkles, ExternalLink, Clock,
   Globe, Newspaper, FileText, TrendingUp, BarChart3, AlertTriangle, Trash2, Plus,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS, FORCE_ICONS, CATEGORIES, fmtShift, fmtPct, shortCat, shiftColorHex } from '../lib/format';
@@ -34,6 +34,8 @@ interface TrendData {
   regional_exposure?: Record<string, number>;
   sources?: Array<{ url?: string; title?: string; data?: string }>;
   ai_suggested?: boolean;
+  peak_year?: number;
+  diffusion_curve?: string;
 }
 
 interface TrendExplorerData {
@@ -462,6 +464,8 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
   const [editName, setEditName] = useState(trend.name || '');
   const [editDesc, setEditDesc] = useState(trend.description || '');
   const [editImplication, setEditImplication] = useState(trend.strategic_implication || '');
+  const [editPeakYear, setEditPeakYear] = useState<number>(trend.peak_year || 2030);
+  const [editDiffusion, setEditDiffusion] = useState<string>(trend.diffusion_curve || 's_curve');
   const [editSources, setEditSources] = useState<Array<{ url: string; title: string; data: string }>>(
     (trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' }))
   );
@@ -472,6 +476,9 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
       vc_exposure: vcExposure,
       regional_exposure: regionalExposure,
     };
+    // Always include materialization timing fields
+    if (editPeakYear !== (trend.peak_year || 2030)) (updates as any).peak_year = editPeakYear;
+    if (editDiffusion !== (trend.diffusion_curve || 's_curve')) (updates as any).diffusion_curve = editDiffusion;
     // Include text field changes if admin edited them
     if (isAdmin) {
       if (editName !== trend.name) (updates as any).name = editName;
@@ -653,7 +660,87 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 </div>
               </div>
 
-              {/* 4. Sources — editable when editing, clickable links otherwise */}
+              {/* 4. Materialization Timing — Peak Year & Diffusion Curve */}
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                backgroundColor: '#8B5CF620',
+                border: '1px solid #8B5CF630',
+              }}>
+                <div style={{ fontSize: '9px', fontWeight: 600, color: '#8B5CF6', marginBottom: '8px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={10} /> MATERIALIZATION TIMING
+                </div>
+                <p style={{ fontSize: '10px', color: T.text3, lineHeight: 1.5, margin: '0 0 10px 0' }}>
+                  When does this trend reach full impact, and how does it build over time?
+                </p>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                  {/* Peak Year */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px' }}>Peak Year</div>
+                    <select
+                      value={editPeakYear}
+                      onChange={(e) => setEditPeakYear(parseInt(e.target.value, 10))}
+                      style={{
+                        width: '100%',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        fontFamily: T.mono,
+                        color: T.text,
+                        backgroundColor: T.bg2,
+                        border: `1px solid ${T.border1}`,
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        appearance: 'auto' as any,
+                      }}
+                    >
+                      {[2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: '9px', color: T.text4, marginTop: '3px' }}>
+                      Year when 100% of impact materializes
+                    </div>
+                  </div>
+                  {/* Diffusion Curve */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '4px' }}>Diffusion Curve</div>
+                    <select
+                      value={editDiffusion}
+                      onChange={(e) => setEditDiffusion(e.target.value)}
+                      style={{
+                        width: '100%',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: T.text,
+                        backgroundColor: T.bg2,
+                        border: `1px solid ${T.border1}`,
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        appearance: 'auto' as any,
+                      }}
+                    >
+                      <option value="s_curve">S-Curve (default)</option>
+                      <option value="linear">Linear</option>
+                      <option value="front_loaded">Front-Loaded</option>
+                      <option value="back_loaded">Back-Loaded</option>
+                      <option value="step_function">Step Function</option>
+                    </select>
+                    <div style={{ fontSize: '9px', color: T.text4, marginTop: '3px' }}>
+                      {editDiffusion === 's_curve' && 'Logistic — slow start, fast middle, plateau'}
+                      {editDiffusion === 'linear' && 'Steady constant rate of materialization'}
+                      {editDiffusion === 'front_loaded' && 'Fast early impact, then flattens (√t)'}
+                      {editDiffusion === 'back_loaded' && 'Slow start, accelerates late (t²)'}
+                      {editDiffusion === 'step_function' && 'Near-zero until ~80%, then sudden jump'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Sources — editable when editing, clickable links otherwise */}
               {isEditing ? (
                 <div>
                   <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
@@ -859,6 +946,8 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   setEditName(trend.name || '');
                   setEditDesc(trend.description || '');
                   setEditImplication(trend.strategic_implication || '');
+                  setEditPeakYear(trend.peak_year || 2030);
+                  setEditDiffusion(trend.diffusion_curve || 's_curve');
                   setEditSources((trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' })));
                 } else {
                   onClose();

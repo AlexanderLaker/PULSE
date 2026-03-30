@@ -12,7 +12,7 @@ from typing import Optional
 
 import numpy as np
 
-from pulse.config import ModelConfig, FORCES, FORCE_MATERIALIZATION_OVERRIDES
+from pulse.config import ModelConfig, FORCES, FORCE_MATERIALIZATION_OVERRIDES, compute_materialization_schedule
 from pulse.ingestion.models import TrendDatabase
 
 logger = logging.getLogger(__name__)
@@ -26,60 +26,75 @@ class DeterministicEngine:
 
     def run(self, db: TrendDatabase) -> dict:
         """
-        Run deterministic calculation matching V12 logic.
+        Run deterministic calculation with per-trend materialization.
+
+        Each trend uses its own peak_year + diffusion_curve to compute
+        a materialization schedule. Falls back to force-level overrides
+        for legacy trends without these fields.
 
         Returns:
             dict: {category: {year: shift_pct}} — percentage shifts
         """
         results = {}
 
+        # Pre-compute per-trend materialization schedules
+        trend_mat_schedules = {}
+        for trend in db.trends:
+            pk = getattr(trend, 'peak_year', 0) or 0
+            dc = getattr(trend, 'diffusion_curve', '') or ''
+            if pk > 0 and dc:
+                trend_mat_schedules[trend.id] = compute_materialization_schedule(
+                    pk, dc, self.config.path_years, self.config.base_year
+                )
+            else:
+                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
+                trend_mat_schedules[trend.id] = {
+                    yr: force_mat.get(yr, self.config.materialization.get(yr, 1.0))
+                    for yr in self.config.path_years
+                }
+
         for cat in self.config.category_names:
-            # Compute per-force contribution to this category
-            force_contributions = {}
-
-            for force in FORCES:
-                force_trends = db.get_trends_by_force(force)
-                force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
-
-                # Sum normalized scores weighted by category exposure + region
-                total_score = 0.0
-                count = 0
-                for trend in force_trends:
-                    exposure = trend.category_exposure.get(cat, 0)
-                    if exposure > 0:
-                        exposure_frac = exposure / 5.0
-
-                        # Region weighting (dampened soft modifier) — same as MC engine
-                        region_weights = getattr(self.config, 'region_weights', {})
-                        regional_exp = getattr(trend, 'regional_exposure', {}) or {}
-                        if regional_exp and region_weights:
-                            weighted_sum = 0.0
-                            total_possible = 0.0
-                            for region, r_weight in region_weights.items():
-                                r_exp = regional_exp.get(region, 0)
-                                weighted_sum += (r_exp / 5.0) * r_weight
-                                total_possible += r_weight
-                            raw_region = weighted_sum / max(total_possible, 1e-6)
-                            region_factor = 1.0 - 0.5 * (1.0 - raw_region)
-                        else:
-                            region_factor = 1.0
-
-                        total_score += trend.normalized_score * exposure_frac * region_factor
-                        count += 1
-
-                # Additive: total pressure from all trends (same as MC engine)
-                force_contributions[force] = total_score * force_weight
-
-            # Compute per-year shifts with per-force materialization
+            # Compute per-year shifts with per-trend materialization
             year_shifts = {}
             for year in self.config.path_years:
+                # Build per-force contributions for this year
+                force_contributions = {}
+                for force in FORCES:
+                    force_trends = db.get_trends_by_force(force)
+                    force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
+
+                    total_score = 0.0
+                    for trend in force_trends:
+                        exposure = trend.category_exposure.get(cat, 0)
+                        if exposure > 0:
+                            exposure_frac = exposure / 5.0
+
+                            # Region weighting (dampened soft modifier) — same as MC engine
+                            region_weights = getattr(self.config, 'region_weights', {})
+                            regional_exp = getattr(trend, 'regional_exposure', {}) or {}
+                            if regional_exp and region_weights:
+                                weighted_sum = 0.0
+                                total_possible = 0.0
+                                for region, r_weight in region_weights.items():
+                                    r_exp = regional_exp.get(region, 0)
+                                    weighted_sum += (r_exp / 5.0) * r_weight
+                                    total_possible += r_weight
+                                raw_region = weighted_sum / max(total_possible, 1e-6)
+                                region_factor = 1.0 - 0.5 * (1.0 - raw_region)
+                            else:
+                                region_factor = 1.0
+
+                            # Per-trend materialization fraction
+                            mat_frac = trend_mat_schedules[trend.id].get(year, 1.0)
+
+                            total_score += trend.normalized_score * exposure_frac * region_factor * mat_frac
+
+                    force_contributions[force] = total_score * force_weight
+
+                # Multiplicative compounding with attenuation
                 product = 1.0
                 for force, contribution in force_contributions.items():
-                    # Force-specific materialization curves
-                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(force, {})
-                    mat_frac = force_mat.get(year, self.config.materialization.get(year, 1.0))
-
-                    attenuated = contribution * self.config.attenuation * mat_frac
+                    attenuated = contribution * self.config.attenuation
                     product *= (1.0 + attenuated)
 
                 year_shifts[year] = product - 1.0
