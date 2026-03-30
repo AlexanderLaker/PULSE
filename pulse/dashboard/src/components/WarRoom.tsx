@@ -38,7 +38,6 @@ import ProductImpactRankings from './ProductImpactRankings';
 import ForceShiftMatrix from './ForceShiftMatrix';
 
 // Extracted components
-import { BurgerMenu } from './BurgerMenu';
 import ForceWeightSliders from './ForceWeightSliders';
 import SettingsPanel from './SettingsPanel';
 import OnboardingTooltips from './OnboardingTooltips';
@@ -515,17 +514,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             <div style={{ fontSize: 11, fontWeight: 600, color: T.text2, letterSpacing: 0.5 } as React.CSSProperties}>
               PULSE War Room
             </div>
-            <BurgerMenu
-              user={{ name: 'Admin', role: isAdmin ? 'Admin' : 'Viewer' }}
-              isAdmin={isAdmin}
-              onLogout={() => {}}
-              onShowUsers={() => {}}
-              onShowConfig={() => {}}
-              onShowExport={() => setShowSettings(true)}
-              onShowDelphi={() => setShowDelphi(true)}
-              onShowSnapshots={() => setShowSnapshots(true)}
-              onChangePassword={() => {}}
-            />
             <div
               style={{
                 width: 1,
