@@ -25,8 +25,9 @@ class SensitivityEngine:
         """
         Which individual trends have the highest leverage on total/category shift?
 
-        For each trend, set it to max impact (5,5) and min impact (1,1),
-        measure the change in output. Sorted by range.
+        For each trend, set it to max exposure (prob=5, gp1_pct=1.0) and
+        min exposure (prob=1, gp1_pct=0.02), measure the change in output.
+        Sorted by range.
 
         Returns: list of {trend_id, trend_name, force, low, high, range, base}
         """
@@ -44,26 +45,26 @@ class SensitivityEngine:
 
         for trend in db.trends:
             # Save originals
-            orig_impact = trend.impact
             orig_prob = trend.probability
+            orig_gp1 = trend.gp1_pct_affected
 
-            # Low case: minimized
-            trend.impact = 1
+            # Low case: minimized probability and gp1 exposure
             trend.probability = 1
+            trend.gp1_pct_affected = 0.02
             trend.__post_init__()
             low_result = self.det_engine.run(db)
             low_val = _get_metric(low_result)
 
-            # High case: maximized
-            trend.impact = 5
+            # High case: maximized probability and gp1 exposure
             trend.probability = 5
+            trend.gp1_pct_affected = 1.0
             trend.__post_init__()
             high_result = self.det_engine.run(db)
             high_val = _get_metric(high_result)
 
             # Restore
-            trend.impact = orig_impact
             trend.probability = orig_prob
+            trend.gp1_pct_affected = orig_gp1
             trend.__post_init__()
 
             swing = abs(high_val - low_val)
@@ -102,23 +103,23 @@ class SensitivityEngine:
             if trend is None:
                 continue
 
-            # Binary search for the score that makes shift ≈ 0
-            orig_impact = trend.impact
-            for test_impact in range(1, 6):
-                trend.impact = test_impact
+            # Binary search for the probability that makes shift ≈ 0
+            orig_prob = trend.probability
+            for test_prob in range(1, 6):
+                trend.probability = test_prob
                 trend.__post_init__()
                 test_result = self.det_engine.run(db)
                 test_shift = test_result.get(category, {}).get(2030, 0.0)
                 if abs(test_shift) < abs(current_shift) * 0.5:
                     breakevens[trend.id] = {
                         "trend_name": trend.name,
-                        "current_impact": orig_impact,
-                        "required_impact": test_impact,
+                        "current_probability": orig_prob,
+                        "required_probability": test_prob,
                         "resulting_shift": round(test_shift, 6),
                     }
                     break
 
-            trend.impact = orig_impact
+            trend.probability = orig_prob
             trend.__post_init__()
 
         return {

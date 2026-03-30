@@ -566,7 +566,7 @@ const AdminUsersPanel: FC<AdminUsersPanelProps> = ({ isOpen, onClose, currentUse
               flexShrink: 0,
             }}>
               <span style={{ fontSize: 11, color: T.text3 }}>
-                Invite codes: PULSE-2026 · HENKEL-STRATEGY · WARROOM-ACCESS
+                Invite codes: PRISM-2026 · HENKEL-STRATEGY · WARROOM-ACCESS
               </span>
               <button
                 onClick={fetchUsers}

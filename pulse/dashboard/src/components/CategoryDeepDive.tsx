@@ -160,8 +160,8 @@ const CategoryDeepDive: FC<CategoryDeepDiveProps> = ({
       return exp[categoryId] && exp[categoryId] > 0;
     })
     .sort((a, b) => {
-      const aScore = (a.impact || 0) * (a.probability || 0);
-      const bScore = (b.impact || 0) * (b.probability || 0);
+      const aScore = (a.probability || 0);
+      const bScore = (b.probability || 0);
       return bScore - aScore;
     });
 
@@ -626,7 +626,7 @@ const CategoryDeepDive: FC<CategoryDeepDiveProps> = ({
                   }}
                 >
                   {relatedTrends.slice(0, 6).map(trend => {
-                    const score = (trend.impact || 0) * (trend.probability || 0);
+                    const score = (trend.probability || 0);
                     const forceColor = FORCE_COLORS[trend.force as ForceName] || T.text3;
                     return (
                       <motion.div

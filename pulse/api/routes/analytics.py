@@ -51,7 +51,7 @@ class ThresholdDefRequest(BaseModel):
 # ── Helper to extract from global state (module uses module-level injection) ────
 
 def get_state_snapshot() -> Dict[str, Any]:
-    """Get current PULSE state snapshot for analytics."""
+    """Get current PRISM state snapshot for analytics."""
     from pulse.api.app import _state
     return {
         "db": _state.get("db"),
@@ -225,11 +225,10 @@ async def compute_sobol(request: SobolRequest):
 
             # Wrapper for trend scores
             def trend_model(score_dict):
-                # Temporarily update trend scores
+                # Temporarily update trend probability scores
                 for trend in db.trends:
                     if trend.id in score_dict:
-                        trend.impact = int(score_dict[trend.id])
-                        trend.probability = int(score_dict[trend.id])
+                        trend.probability = max(1, min(5, int(score_dict[trend.id])))
                         trend.__post_init__()
 
                 mc = BayesianMonteCarloEngine(config, state.get("dag"))
@@ -371,8 +370,7 @@ async def reverse_stress_test(request: ReverseStressRequest):
         def model(score_dict):
             for trend in db.trends:
                 if trend.id in score_dict:
-                    trend.impact = int(score_dict[trend.id])
-                    trend.probability = int(score_dict[trend.id])
+                    trend.probability = max(1, min(5, int(score_dict[trend.id])))
                     trend.__post_init__()
 
             mc = BayesianMonteCarloEngine(config, state.get("dag"))
@@ -389,7 +387,7 @@ async def reverse_stress_test(request: ReverseStressRequest):
         # Get all trend IDs
         trend_names = [t.id for t in db.trends]
         param_bounds = {t: (1, 5) for t in trend_names}
-        current_values = {t.id: t.impact for t in db.trends}
+        current_values = {t.id: t.probability for t in db.trends}
 
         stress_result = tester.find_stress_scenario(
             model,
@@ -434,8 +432,7 @@ async def multi_category_stress(request: MultiStressRequest):
         def model(score_dict):
             for trend in db.trends:
                 if trend.id in score_dict:
-                    trend.impact = int(score_dict[trend.id])
-                    trend.probability = int(score_dict[trend.id])
+                    trend.probability = max(1, min(5, int(score_dict[trend.id])))
                     trend.__post_init__()
 
             mc = BayesianMonteCarloEngine(config, state.get("dag"))
@@ -449,7 +446,7 @@ async def multi_category_stress(request: MultiStressRequest):
 
         trend_names = [t.id for t in db.trends]
         param_bounds = {t: (1, 5) for t in trend_names}
-        current_values = {t.id: t.impact for t in db.trends}
+        current_values = {t.id: t.probability for t in db.trends}
 
         stress_result = tester.find_multi_category_stress(
             model,

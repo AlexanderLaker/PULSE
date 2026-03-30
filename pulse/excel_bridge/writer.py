@@ -1,4 +1,4 @@
-"""Shift Matrix Excel writer — exports PULSE results to Excel.
+"""Shift Matrix Excel writer — exports PRISM results to Excel.
 
 Writes continuous path shift matrices with percentile distributions,
 causal decomposition, velocity data, and allocation recommendations.
@@ -34,7 +34,7 @@ BORDER = Border(
 
 
 class ShiftMatrixWriter:
-    """Writes PULSE simulation results to Excel."""
+    """Writes PRISM simulation results to Excel."""
 
     def __init__(self, config: ModelConfig):
         self.config = config
@@ -46,7 +46,7 @@ class ShiftMatrixWriter:
               competitive_adjustments: dict = None,
               metadata: dict = None):
         """
-        Write complete PULSE output to Excel.
+        Write complete PRISM output to Excel.
 
         Creates sheets:
         1. Shift Matrix — continuous paths with percentiles
@@ -269,7 +269,7 @@ class ShiftMatrixWriter:
         ws = wb.create_sheet("Metadata")
 
         data = [
-            ("PULSE Shift Matrix", ""),
+            ("PRISM Shift Matrix", ""),
             ("Generated", datetime.now().isoformat()),
             ("Model Version", "2.0 — Bayesian Copula + Causal DAG"),
             ("Iterations", mc_result.get("iterations", "N/A")),

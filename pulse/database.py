@@ -1,4 +1,4 @@
-"""Database persistence for PULSE — dual-mode Postgres (Vercel) / SQLite (local).
+"""Database persistence for PRISM — dual-mode Postgres (Vercel) / SQLite (local).
 
 When POSTGRES_URL is set (Vercel Postgres / Neon), uses psycopg2.
 Otherwise falls back to SQLite for local development.
@@ -49,8 +49,8 @@ if not USE_POSTGRES:
 def _get_sqlite_path() -> Path:
     """Get SQLite database file path."""
     _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-    default = "/tmp/pulse.db" if _is_vercel else "data/pulse.db"
-    db_path = os.environ.get("PULSE_DB_PATH", default)
+    default = "/tmp/prism.db" if _is_vercel else "data/prism.db"
+    db_path = os.environ.get("PRISM_DB_PATH", default)
     return Path(db_path)
 
 
@@ -167,7 +167,6 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 description TEXT,
                 direction TEXT,
-                impact INTEGER,
                 probability INTEGER,
                 start_year INTEGER,
                 normalized_score REAL,
@@ -180,7 +179,6 @@ def init_db() -> None:
                 scorer_count INTEGER DEFAULT 1,
                 score_variance REAL DEFAULT 0.0,
                 debiasing_applied BOOLEAN DEFAULT FALSE,
-                impact_posterior TEXT,
                 probability_posterior TEXT,
                 gp1_pct_affected REAL DEFAULT 0.10,
                 peak_year INTEGER DEFAULT 0,
@@ -330,7 +328,6 @@ def init_db() -> None:
                 round_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 trend_id TEXT,
                 scorer_id TEXT,
-                impact_score INTEGER,
                 probability_score INTEGER,
                 rationale TEXT,
                 calibration_factor REAL DEFAULT 1.0,
@@ -451,7 +448,7 @@ def init_db() -> None:
                 description TEXT,
                 force TEXT,
                 direction TEXT DEFAULT 'Expansion',
-                suggested_impact INTEGER DEFAULT 3,
+                suggested_gp1_pct_affected REAL DEFAULT 0.10,
                 suggested_probability INTEGER DEFAULT 3,
                 relevance_score INTEGER DEFAULT 65,
                 category_mapping TEXT,
@@ -499,21 +496,20 @@ def save_trends(trends: List[Trend]) -> None:
                 f"""
                 INSERT INTO trends (
                     id, force, sub_category, name, description, direction,
-                    impact, probability, start_year, normalized_score,
+                    probability, start_year, normalized_score,
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, scorer_count, score_variance,
-                    debiasing_applied, impact_posterior, probability_posterior,
+                    debiasing_applied, probability_posterior,
                     gp1_pct_affected, peak_year, diffusion_curve
-                ) VALUES ({ph(24)})
+                ) VALUES ({ph(22)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
-                    trend.description, trend.direction, trend.impact,
+                    trend.description, trend.direction,
                     trend.probability, trend.start_year, trend.normalized_score,
                     trend.strategic_implication, trend.data_source, trend.source_type,
                     trend.confidence, trend.ai_suggested, trend.user_override,
                     trend.scorer_count, trend.score_variance, trend.debiasing_applied,
-                    json.dumps(trend.impact_posterior) if trend.impact_posterior else None,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
                     getattr(trend, 'gp1_pct_affected', 0.10),
                     getattr(trend, 'peak_year', 0),
@@ -589,11 +585,6 @@ def load_trends() -> List[Trend]:
             )
             regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-            impact_posterior = (
-                tuple(json.loads(row["impact_posterior"]))
-                if row.get("impact_posterior")
-                else None
-            )
             prob_posterior = (
                 tuple(json.loads(row["probability_posterior"]))
                 if row.get("probability_posterior")
@@ -620,7 +611,6 @@ def load_trends() -> List[Trend]:
                 name=row["name"],
                 description=row.get("description"),
                 direction=row.get("direction"),
-                impact=row.get("impact"),
                 probability=row.get("probability"),
                 start_year=row.get("start_year"),
                 normalized_score=row.get("normalized_score"),
@@ -640,7 +630,6 @@ def load_trends() -> List[Trend]:
                 gp1_pct_affected=row.get("gp1_pct_affected", 0.10) or 0.10,
                 peak_year=row.get("peak_year", 0) or 0,
                 diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
-                impact_posterior=impact_posterior,
                 probability_posterior=prob_posterior,
             )
             # Attach sources as transient attribute (not in dataclass)
@@ -682,11 +671,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
         )
         regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-        impact_posterior = (
-            tuple(json.loads(row["impact_posterior"]))
-            if row.get("impact_posterior")
-            else None
-        )
         prob_posterior = (
             tuple(json.loads(row["probability_posterior"]))
             if row.get("probability_posterior")
@@ -700,7 +684,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             name=row["name"],
             description=row.get("description"),
             direction=row.get("direction"),
-            impact=row.get("impact"),
             probability=row.get("probability"),
             start_year=row.get("start_year"),
             normalized_score=row.get("normalized_score"),
@@ -717,7 +700,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             scorer_count=row.get("scorer_count", 1),
             score_variance=row.get("score_variance", 0.0),
             debiasing_applied=row.get("debiasing_applied", False),
-            impact_posterior=impact_posterior,
             probability_posterior=prob_posterior,
         )
 

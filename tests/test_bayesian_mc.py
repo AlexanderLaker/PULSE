@@ -292,7 +292,6 @@ class TestBayesianMCBayesianPriors:
 
         # Verify trends have posteriors
         for trend in mock_trends_database.trends:
-            assert trend.impact_posterior is not None
             assert trend.probability_posterior is not None
 
         engine = BayesianMonteCarloEngine(config)

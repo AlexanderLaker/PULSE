@@ -1,10 +1,10 @@
 """
-Standalone seed data for PULSE engine.
+Standalone seed data for PRISM engine.
 
 Provides a fully populated TrendDatabase with ~35 realistic FMCG/HCB/LHC trends
 and comprehensive competitor intelligence, replacing the need for an Excel file.
 
-This enables PULSE to run standalone without external data dependencies.
+This enables PRISM to run standalone without external data dependencies.
 """
 
 from datetime import datetime
@@ -1155,7 +1155,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "AI Hair Color Formulation via Generative Chemistry",
             "description": "Generative AI models are being used to design novel hair color molecules with reduced allergen profiles. L'Oréal and P&G have filed 12+ patents in Q1 2026.",
             "force": "Technology",
-            "suggested_impact": 4,
+            "suggested_gp1_pct_affected": 0.15,
             "suggested_probability": 3,
             "direction": "Expansion",
             "relevance_score": 88,
@@ -1173,7 +1173,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "EU Microplastics Ban Phase 2 — Rinse-off Products by 2028",
             "description": "European Commission confirmed Phase 2 timeline for complete microplastics elimination in rinse-off cosmetics and detergents. Affects ~40% of current formulations.",
             "force": "Government",
-            "suggested_impact": 5,
+            "suggested_gp1_pct_affected": 0.22,
             "suggested_probability": 4,
             "direction": "Contraction",
             "relevance_score": 95,
@@ -1191,7 +1191,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "Refill Station Rollout Accelerating in DACH Retail",
             "description": "dm and Rossmann expanding in-store refill stations to 2,000+ locations by H2 2026. Covers laundry detergent, dish soap, and shampoo categories.",
             "force": "Customer",
-            "suggested_impact": 3,
+            "suggested_gp1_pct_affected": 0.08,
             "suggested_probability": 4,
             "direction": "Expansion",
             "relevance_score": 82,
@@ -1209,7 +1209,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "Scalp Microbiome Science Driving Premium Hair Care Segment",
             "description": "Clinical trials show scalp microbiome-targeted products deliver 3x better efficacy for dandruff and scalp health. Consumer search volume up 180% YoY.",
             "force": "Consumer",
-            "suggested_impact": 4,
+            "suggested_gp1_pct_affected": 0.15,
             "suggested_probability": 3,
             "direction": "Expansion",
             "relevance_score": 79,
@@ -1227,7 +1227,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "Water-Scarcity Laundry Innovation — Dry Wash Technologies",
             "description": "Water-free and ultra-low-water laundry technologies gaining traction in Southern Europe and Middle East. Unilever piloting dry-clean consumer products.",
             "force": "Environmental",
-            "suggested_impact": 3,
+            "suggested_gp1_pct_affected": 0.08,
             "suggested_probability": 2,
             "direction": "Expansion",
             "relevance_score": 71,
@@ -1245,7 +1245,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "Amazon Private Label Hair Care Expansion in Europe",
             "description": "Amazon launching premium-positioned private label hair care under 'Belei' brand across DE, FR, UK. Leveraging consumer review data for product development.",
             "force": "Competitive",
-            "suggested_impact": 4,
+            "suggested_gp1_pct_affected": 0.15,
             "suggested_probability": 3,
             "direction": "Contraction",
             "relevance_score": 85,
@@ -1263,7 +1263,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "TikTok Shop Launch in DACH — Social Commerce for Beauty",
             "description": "TikTok Shop expanding to Germany and Austria in Q2 2026. Beauty and personal care expected to be #1 category based on UK/US launch data.",
             "force": "Customer",
-            "suggested_impact": 3,
+            "suggested_gp1_pct_affected": 0.08,
             "suggested_probability": 4,
             "direction": "Expansion",
             "relevance_score": 76,
@@ -1281,7 +1281,7 @@ def get_emerging_trends() -> list[dict]:
             "name": "Bioethanol-Based Surfactants Reaching Price Parity",
             "description": "New bioethanol surfactant production at scale reaching cost parity with petrochemical alternatives. Could transform detergent and cleaning product formulation economics.",
             "force": "Technology",
-            "suggested_impact": 3,
+            "suggested_gp1_pct_affected": 0.08,
             "suggested_probability": 2,
             "direction": "Expansion",
             "relevance_score": 68,

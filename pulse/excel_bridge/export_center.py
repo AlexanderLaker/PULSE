@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExportCenter:
-    """Generates professional PPTX, PDF, and Excel reports from PULSE Shift Matrix."""
+    """Generates professional PPTX, PDF, and Excel reports from PRISM Shift Matrix."""
 
     # Color scheme — matches War Room design
     COLOR_BLUE = RGBColor(59, 130, 246)  # #3B82F6
@@ -73,7 +73,7 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PULSE_Report_{scenario}_{timestamp}.pptx")
+            output_path = str(self.output_dir / f"PRISM_Report_{scenario}_{timestamp}.pptx")
 
         prs = Presentation()
         prs.slide_width = Inches(10)
@@ -125,7 +125,7 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PULSE_Report_{scenario}_{timestamp}.pdf")
+            output_path = str(self.output_dir / f"PRISM_Report_{scenario}_{timestamp}.pdf")
 
         doc = SimpleDocTemplate(output_path, pagesize=letter,
                                 rightMargin=0.5*inch, leftMargin=0.5*inch,
@@ -153,7 +153,7 @@ class ExportCenter:
         )
 
         # Title
-        story.append(Paragraph(f"PULSE Profit Pool Analysis: {scenario}", title_style))
+        story.append(Paragraph(f"PRISM Profit Pool Analysis: {scenario}", title_style))
         story.append(Spacer(1, 0.2*inch))
 
         # Metadata
@@ -248,7 +248,7 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PULSE_Export_{scenario}_{timestamp}.xlsx")
+            output_path = str(self.output_dir / f"PRISM_Export_{scenario}_{timestamp}.xlsx")
 
         wb = openpyxl.Workbook()
         wb.remove(wb.active)  # Remove default sheet
@@ -291,7 +291,7 @@ class ExportCenter:
         title_frame = title_box.text_frame
         title_frame.word_wrap = True
         p = title_frame.paragraphs[0]
-        p.text = "PULSE Profit Pool Analysis"
+        p.text = "PRISM Profit Pool Analysis"
         p.font.size = Pt(54)
         p.font.bold = True
         p.font.color.rgb = self.COLOR_BLUE
@@ -652,17 +652,17 @@ Security:
         ws = wb.create_sheet("Application Template")
 
         # Instructions
-        ws['A1'] = "PULSE Application Template — Applying Shifts to Your Financials"
+        ws['A1'] = "PRISM Application Template — Applying Shifts to Your Financials"
         ws['A1'].font = Font(bold=True, size=12)
 
         ws['A3'] = "Instructions:"
         ws['A3'].font = Font(bold=True)
         ws['A4'] = "1. Enter your actual GP1 (€M) in column B"
-        ws['A5'] = "2. The formula in column C automatically applies the PULSE shift"
+        ws['A5'] = "2. The formula in column C automatically applies the PRISM shift"
         ws['A6'] = "3. Result: Projected GP1 with shift impact"
 
         # Headers
-        headers = ["Category", "GP1 Actual (€M)", "PULSE Shift (%)", "GP1 Projected (€M)"]
+        headers = ["Category", "GP1 Actual (€M)", "PRISM Shift (%)", "GP1 Projected (€M)"]
         ws['A8'] = headers[0]
         ws['B8'] = headers[1]
         ws['C8'] = headers[2]
@@ -786,7 +786,7 @@ Security:
         """Create Methodology sheet with model info and backtesting results."""
         ws = wb.create_sheet("Methodology")
 
-        ws['A1'] = "PULSE Model — Methodology & Confidence"
+        ws['A1'] = "PRISM Model — Methodology & Confidence"
         ws['A1'].font = Font(bold=True, size=12)
 
         row = 3

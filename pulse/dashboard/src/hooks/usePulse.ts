@@ -1,5 +1,5 @@
 /**
- * Central state hook for PULSE War Room.
+ * Central state hook for PRISM War Room.
  * Single source of truth — all components read from here.
  * Connects to real FastAPI backend. No mock data — shows empty state when backend unavailable.
  */

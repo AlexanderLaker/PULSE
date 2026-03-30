@@ -25,23 +25,21 @@ class CreateSessionRequest(BaseModel):
 class SubmitScoreRequest(BaseModel):
     scorer_id: str
     trend_id: str
-    impact_score: int
     probability_score: int
     rationale: Optional[str] = ""
 
 
 class CalibrationRequest(BaseModel):
     scorer_id: str
-    responses: Dict[int, tuple]  # {exercise_idx: (impact, probability)}
+    responses: Dict[int, int]  # {exercise_idx: probability_score}
 
 
 class CalibrateExerciseResponse(BaseModel):
     exercise_idx: int
-    impact_response: int
     probability_response: int
 
 
-# ── Helper to extract PULSE state ──────────────────────────────────────
+# ── Helper to extract PRISM state ──────────────────────────────────────
 
 def get_delphi():
     """Get Delphi protocol instance from app state."""
@@ -279,7 +277,6 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
         session_id: Session ID
         scorer_id: Scorer identifier
         trend_id: Trend ID being scored
-        impact_score: Impact score (1-5)
         probability_score: Probability score (1-5)
         rationale: Optional explanation
 
@@ -287,8 +284,6 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
         Confirmation and current round status
     """
     try:
-        if not (1 <= req.impact_score <= 5):
-            raise ValueError("impact_score must be between 1 and 5")
         if not (1 <= req.probability_score <= 5):
             raise ValueError("probability_score must be between 1 and 5")
 
@@ -312,7 +307,6 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
             round_number=session["current_round"],
             trend_id=req.trend_id,
             scorer_id=req.scorer_id,
-            impact_score=req.impact_score,
             probability_score=req.probability_score,
             rationale=req.rationale,
         )
@@ -378,7 +372,6 @@ async def get_session_scores(
                     "trend_id": t_id,
                     "round_number": round_data["round_number"],
                     "scorer_id": round_data["scorer_id"],
-                    "impact_score": round_data["impact_score"],
                     "probability_score": round_data["probability_score"],
                     "rationale": round_data["rationale"],
                     "calibration_factor": round_data["calibration_factor"],
@@ -402,7 +395,7 @@ async def calibrate_scorer(session_id: str, req: CalibrationRequest) -> Dict[str
     Args:
         session_id: Session ID
         scorer_id: Scorer to calibrate
-        responses: {exercise_idx: (impact, probability)}
+        responses: {exercise_idx: probability_score}
 
     Returns:
         Calibration results with bias flags
@@ -410,10 +403,10 @@ async def calibrate_scorer(session_id: str, req: CalibrationRequest) -> Dict[str
     try:
         delphi = get_delphi()
 
-        # Convert tuple responses to dict
+        # Convert responses to dict
         responses_dict = {}
-        for idx, (impact, prob) in req.responses.items():
-            responses_dict[int(idx)] = (int(impact), int(prob))
+        for idx, prob in req.responses.items():
+            responses_dict[int(idx)] = int(prob)
 
         result = delphi.run_calibration(req.scorer_id, responses_dict)
         logger.info(f"Calibrated scorer {req.scorer_id} in session {session_id}")
@@ -643,8 +636,8 @@ async def get_scorer_view(session_id: str, scorer_id: str) -> Dict[str, Any]:
                 "name": trend.name if trend else trend_id,
                 "description": trend.description if trend else "",
                 "force": trend.force if trend else "",
-                "current_impact": trend.impact if trend else None,
                 "current_probability": trend.probability if trend else None,
+                "current_gp1_pct": trend.gp1_pct_affected if trend else None,
             })
 
         # Get anonymized group distributions for current round
@@ -660,7 +653,6 @@ async def get_scorer_view(session_id: str, scorer_id: str) -> Dict[str, Any]:
                 {
                     "trend_id": s["trend_id"],
                     "round": s["round_number"],
-                    "impact": s["impact_score"],
                     "probability": s["probability_score"],
                 }
                 for s in scorer_history["scores"][:10]

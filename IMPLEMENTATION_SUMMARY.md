@@ -1,4 +1,4 @@
-# PULSE Export & Integration Implementation Summary
+# PRISM Export & Integration Implementation Summary
 
 **Date:** March 26, 2026  
 **Status:** Complete — All modules implemented and documented
@@ -272,7 +272,7 @@ palm_oil_data = await fred.fetch_series("PALMOILD")
 - IntegrationManager provides trend data for AI calibration
 - Scan results feed into trend scoring and debiasing
 - Power BI consumer connects to PowerBIExporter output
-- Monthly scheduler: PULSE → Shift Matrix → Power BI DAX
+- Monthly scheduler: PRISM → Shift Matrix → Power BI DAX
 
 ## Testing Strategy
 
@@ -305,4 +305,4 @@ async def test_gdelt_client():
 
 ---
 
-**Implementation complete and ready for integration into PULSE Phase 2 and Phase 3 pipelines.**
+**Implementation complete and ready for integration into PRISM Phase 2 and Phase 3 pipelines.**

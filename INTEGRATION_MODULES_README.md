@@ -1,8 +1,8 @@
-# PULSE Integration Modules — Complete Documentation
+# PRISM Integration Modules — Complete Documentation
 
 ## Overview
 
-Five production-ready Python integration modules for the PULSE Profit Pool Unified Landscape Simulation Engine. These modules scan external data sources for FMCG-relevant trends in research, regulations, and innovation.
+Five production-ready Python integration modules for the PRISM Profit Pool Unified Landscape Simulation Engine. These modules scan external data sources for FMCG-relevant trends in research, regulations, and innovation.
 
 **Status**: ✓ Complete and validated  
 **Total Lines of Code**: ~1,800  
@@ -39,9 +39,9 @@ articles = client.search_regulatory_toxicology()
 count = client.get_citation_count("34567890")
 # Returns: citation count for specific PMID
 
-# Trend scanning (returns PULSE format)
+# Trend scanning (returns PRISM format)
 trends = client.scan_for_trends()
-# Identifies: high-impact recent research in cosmetics/FMCG with mapping to PULSE forces & categories
+# Identifies: high-impact recent research in cosmetics/FMCG with mapping to PRISM forces & categories
 ```
 
 ### API Details
@@ -94,7 +94,7 @@ papers = client.search_ai_formulation(max_results=10)
 
 # Trend scanning
 trends = client.scan_for_trends()
-# Identifies: rapidly-emerging preprints with mapping to PULSE forces & categories
+# Identifies: rapidly-emerging preprints with mapping to PRISM forces & categories
 ```
 
 ### API Details
@@ -267,7 +267,7 @@ trends = client.analyze_innovation_trends("A61Q", years_back=5)
 
 # Trend scanning
 trends = client.scan_for_trends()
-# Identifies: patent activity in key innovation areas with PULSE force/category mapping
+# Identifies: patent activity in key innovation areas with PRISM force/category mapping
 ```
 
 ### API Details
@@ -358,7 +358,7 @@ EPO_API_KEY        # Optional, future ESPACENET OPS integration
 ```
 
 ### scan_for_trends() Format
-All modules' `scan_for_trends()` methods return `List[Dict]` in PULSE format:
+All modules' `scan_for_trends()` methods return `List[Dict]` in PRISM format:
 
 ```python
 {
@@ -370,7 +370,7 @@ All modules' `scan_for_trends()` methods return `List[Dict]` in PULSE format:
     "suggested_impact": int,            # 1-5 (strength of potential impact)
     "suggested_probability": int,       # 1-5 (likelihood of materialization)
     "relevance_score": int,             # 0-100 (direct relevance to FMCG)
-    "category_mapping": {               # Which PULSE categories affected
+    "category_mapping": {               # Which PRISM categories affected
         "Hair: Care": 3,
         "Hair: Color": 2,
         "LHC: FCN": 4,
@@ -393,7 +393,7 @@ All modules' `scan_for_trends()` methods return `List[Dict]` in PULSE format:
 
 ---
 
-## Integration into PULSE
+## Integration into PRISM
 
 ### Phase 1: Basic Scanning
 ```python
@@ -410,7 +410,7 @@ for Client in [NCBIPubMedClient, ArxivClient, ECHAClient, EurLexClient, EPOPaten
     trends = client.scan_for_trends()
     all_trends.extend(trends)
 
-# Store in PULSE database
+# Store in PRISM database
 for trend in all_trends:
     # Insert into pulse.ai_suggestions or similar
     db.insert_trend(trend)
@@ -418,7 +418,7 @@ for trend in all_trends:
 
 ### Phase 2: Scheduled Scanning
 ```python
-# In PULSE scheduler (Phase 3)
+# In PRISM scheduler (Phase 3)
 # Daily: arXiv & NCBI (fast, high signal)
 # Weekly: ECHA & EUR-Lex (slower to change)
 # Monthly: Patents (annual perspective)
@@ -483,7 +483,7 @@ for trend in all_trends:
 - ✓ Logging (no print statements, proper levels)
 - ✓ Context manager support (__enter__, __exit__)
 - ✓ Environment variable handling
-- ✓ Return format validation (PULSE format compliance)
+- ✓ Return format validation (PRISM format compliance)
 
 ---
 
@@ -506,7 +506,7 @@ for trend in all_trends:
 ## Next Steps
 
 ### Immediate (Week 1)
-- [ ] Integrate scan_for_trends() calls into PULSE main workflow
+- [ ] Integrate scan_for_trends() calls into PRISM main workflow
 - [ ] Store returned trends in database
 - [ ] Add UI for viewing detected trends in War Room
 
@@ -554,11 +554,11 @@ for trend in all_trends:
 
 ## Contact & Questions
 
-For issues, enhancements, or questions about these modules, contact the PULSE team.
+For issues, enhancements, or questions about these modules, contact the PRISM team.
 
 ---
 
 **Module Documentation Version**: 1.0  
 **Last Updated**: March 2026  
-**Maintainers**: PULSE Integration Team  
+**Maintainers**: PRISM Integration Team  
 **Status**: Production Ready ✓

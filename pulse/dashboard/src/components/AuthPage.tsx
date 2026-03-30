@@ -1,5 +1,5 @@
 /**
- * PULSE War Room — Authentication Page
+ * PRISM War Room — Authentication Page
  * Professional auth flow: Sign In, Register, Forgot Password (email-based via Resend),
  * and Reset Password (via token from email link).
  */
@@ -228,13 +228,13 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
             fontSize: 26, fontWeight: 700, color: T.text,
             letterSpacing: '-0.025em', margin: '0 0 4px',
           }}>
-            PULSE
+            PRISM
           </h1>
           <p style={{
             fontSize: 12, color: T.text3, margin: 0, letterSpacing: '0.06em',
             textTransform: 'uppercase', fontWeight: 500,
           }}>
-            Profit Pool Simulation Engine
+            Profit Pool Risk & Intelligence Simulation Model
           </p>
         </div>
 
@@ -483,7 +483,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                           type="text"
                           value={inviteCode}
                           onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                          placeholder="PULSE-2026"
+                          placeholder="PRISM-2026"
                           required
                           style={inputStyle}
                           onFocus={handleInputFocus}

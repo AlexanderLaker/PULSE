@@ -285,7 +285,7 @@ export default function HeadlineKPI({
               Bayesian Monte Carlo Simulation
             </div>
             <div style={{ marginBottom: 10, lineHeight: 1.55 }}>
-              PULSE runs {iterations.toLocaleString()} Monte Carlo iterations, each sampling trend impacts from Bayesian posterior distributions and combining them via a t-copula dependency structure to estimate profit pool shifts.
+              PRISM runs {iterations.toLocaleString()} Monte Carlo iterations, each sampling trend impacts from Bayesian posterior distributions and combining them via a t-copula dependency structure to estimate profit pool shifts.
             </div>
             <div style={{ fontWeight: 600, marginBottom: 4, color: '#F8FAFC' }}>R̂ (Gelman–Rubin Statistic)</div>
             <div style={{ marginBottom: 10, lineHeight: 1.55 }}>

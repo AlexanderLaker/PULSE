@@ -6,7 +6,7 @@
 
 ## Overview
 
-A complete React UI for structured expert elicitation (Delphi method) integrated into the PULSE War Room dashboard. This implementation enables multi-round trend scoring with transparency, calibration, and consensus generation.
+A complete React UI for structured expert elicitation (Delphi method) integrated into the PRISM War Room dashboard. This implementation enables multi-round trend scoring with transparency, calibration, and consensus generation.
 
 ## Files Delivered
 
@@ -41,7 +41,7 @@ Main component that slides in from the right of the War Room. Contains 4 tabs:
 - Final consensus scores displayed prominently
 - Confidence badges (High/Medium/Low)
 - Metadata: scorer count, α values
-- "Apply Consensus Scores to PULSE" button
+- "Apply Consensus Scores to PRISM" button
 - "Export Scoring Documentation" button
 
 **Key Features:**

@@ -1,8 +1,8 @@
-# PULSE War Room — Authentication Pages Reference
+# PRISM War Room — Authentication Pages Reference
 
 ## Overview
 
-Four premium authentication pages created for the PULSE War Room Next.js app, featuring Apple.com-inspired design with clean white backgrounds, elegant spacing, and seamless API integration.
+Four premium authentication pages created for the PRISM War Room Next.js app, featuring Apple.com-inspired design with clean white backgrounds, elegant spacing, and seamless API integration.
 
 ## Page Structure
 

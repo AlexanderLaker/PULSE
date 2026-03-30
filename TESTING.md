@@ -1,4 +1,4 @@
-# PULSE Testing Guide
+# PRISM Testing Guide
 
 ## Quick Start
 
@@ -183,5 +183,5 @@ Tests are designed to run in CI/CD pipelines:
 ---
 
 **Last Updated:** March 26, 2026
-**PULSE Version:** 2.0
+**PRISM Version:** 2.0
 **Status:** 172/199 passing (86.4%)

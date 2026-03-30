@@ -1,5 +1,5 @@
 /**
- * AdminConfigPanel — PULSE model configuration editor.
+ * AdminConfigPanel — PRISM model configuration editor.
  * Slide-over panel for admins to adjust:
  *   - Attenuation factor (0.05 to 1.0)
  *   - Force weights (6 forces, sum to 1.0)
@@ -7,7 +7,7 @@
  *   - Copula parameters (within_force_rho, t_copula_df)
  *   - Simulation settings (iterations)
  *
- * Dark theme matching PULSE spec:
+ * Dark theme matching PRISM spec:
  *   bg: #0F172A | surface: #1E293B | accent: #D4A847 | text: #F8FAFC/#94A3B8
  */
 

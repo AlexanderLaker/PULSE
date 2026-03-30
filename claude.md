@@ -1,16 +1,16 @@
-# PULSE — Profit Pool Unified Landscape Simulation Engine
+# PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v2.2
+## Project Specification & Architecture — v2.3
 
 ---
 
 ## 1. EXECUTIVE SUMMARY
 
 ### What This Is
-PULSE is an **AI-augmented profit pool simulation engine** that transforms a static Excel-based strategic force assessment (currently V12) into a living, probabilistic, causally-structured, AI-enhanced strategic decision platform for enterprise deployment within Henkel's cloud infrastructure.
+PRISM is an **AI-augmented profit pool simulation engine** that transforms a static Excel-based strategic force assessment (currently V12) into a living, probabilistic, causally-structured, AI-enhanced strategic decision platform for enterprise deployment within Henkel's cloud infrastructure.
 
 ### The Core Innovation
-PULSE operates on a **probabilistic profit pool shifting architecture**: the entire simulation, AI, and optimization layer works with directional scores, percentage shifts, causal propagation weights, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path. Users apply these shifts to their financial models in Excel or consume them directly through Power BI integration.
+PRISM operates on a **probabilistic profit pool shifting architecture**: the entire simulation, AI, and optimization layer works with directional scores, percentage shifts, causal propagation weights, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path. Users apply these shifts to their financial models in Excel or consume them directly through Power BI integration.
 
 ### What Changed in v2.0 (vs. v1.2)
 This specification was elevated based on ten critical feedback dimensions that a Bain Quant team or McKinsey QuantumBlack would demand:
@@ -26,10 +26,15 @@ This specification was elevated based on ten critical feedback dimensions that a
 9. **Formal Delphi Expert Elicitation Protocol** — structured scoring with calibration and debiasing
 10. **War Room UX** replaces 8 separate pages — one screen tells the story, drill-down on demand
 
-### What Changed in v2.2 (vs. v2.1)
+### What Changed in v2.3 (vs. v2.2)
+One critical simplification for model clarity:
+
+13. **Impact Variable Removal** — The `impact` (1-5) scoring dimension has been removed as redundant with `gp1_pct_affected`. The model now uses a clean two-dimensional scoring: `probability` (1-5, likelihood of materialization) × `gp1_pct_affected` (0.0-1.0, economic magnitude). Formula: `normalized_score = prob_mean × gp1_pct_affected × direction_sign`. This eliminates double-counting and makes the economic anchoring cleaner.
+
+### What Remained from v2.2
 Two critical model integrity improvements:
 
-11. **Economic Anchoring via `gp1_pct_affected`** — Each trend now carries a "% of GP1 affected" parameter (0.0 to 1.0) that caps the maximum fraction of a category's profit pool that this trend can realistically touch at full materialization. This replaces the implicit assumption that every 5/5 trend affects 100% of the pool. AI-preset per trend (range: 2-25%), expert-adjustable via dashboard or Delphi. Implemented in both the Trend dataclass (`normalized_score = raw_score × gp1_pct_affected`) and the Bayesian MC copula sampler.
+11. **Economic Anchoring via `gp1_pct_affected`** — Each trend carries a "% of GP1 affected" parameter (0.0 to 1.0) that caps the maximum fraction of a category's profit pool that this trend can realistically touch at full materialization. AI-preset per trend (range: 2-25%), expert-adjustable via dashboard or Delphi. Implemented in both the Trend dataclass and the Bayesian MC copula sampler.
 12. **Admin-Configurable Model Parameters** — The attenuation factor, force weights, copula parameters, and iteration count are now configurable via `PUT /api/v1/config` with validation, audit logging, and simulation cache invalidation. Attenuation source is tracked as `"assumed"`, `"backtested"`, or `"admin_override"`.
 
 ### Design Philosophy
@@ -41,18 +46,18 @@ Two critical model integrity improvements:
 6. **Incrementally valuable** — each phase delivers standalone value
 7. **Analysis → Decision** — every output answers "so what should we do?"
 8. **LLM-provider agnostic** — MVP uses Claude API for fastest iteration. Production deployment swaps to Azure OpenAI inside Henkel's Microsoft tenant via config change — zero additional InfoSec approval (rides on existing Copilot approval). The provider-agnostic interface (LLMProvider ABC) ensures switching is a one-line config change, not a code change.
-9. **Power BI as financial lens** — PULSE outputs relative shifts only. Power BI consumes the Shift Matrix and applies it to actual financials. One-directional data flow. PULSE never sees €M figures. The React dashboard serves the strategy team (relative %, interactive, broad access). The Power BI dashboard serves ExCo/Finance (€M denomination, restricted access). Same truth, two lenses.
+9. **Power BI as financial lens** — PRISM outputs relative shifts only. Power BI consumes the Shift Matrix and applies it to actual financials. One-directional data flow. PRISM never sees €M figures. The React dashboard serves the strategy team (relative %, interactive, broad access). The Power BI dashboard serves ExCo/Finance (€M denomination, restricted access). Same truth, two lenses.
 
 ---
 
 ## 2. CLOUD DEPLOYMENT & INTEGRATION
 
 ### Hosting Architecture
-PULSE is deployed within Henkel's corporate cloud environment with standard enterprise security, identity management, and data governance controls. All data processing, storage, and API services operate under Henkel's information security policies.
+PRISM is deployed within Henkel's corporate cloud environment with standard enterprise security, identity management, and data governance controls. All data processing, storage, and API services operate under Henkel's information security policies.
 
 ### The Shift Matrix Interface
 
-PULSE outputs a primary artifact — the **Shift Matrix** — a JSON/CSV table with **continuous path data**:
+PRISM outputs a primary artifact — the **Shift Matrix** — a JSON/CSV table with **continuous path data**:
 
 ```json
 {
@@ -100,7 +105,7 @@ GP1_bull_case = GP1_actual × (1 + shift_p10)
 
 ### Power BI Integration
 
-PULSE's Shift Matrix integrates with Power BI for financial impact visualization. The Shift Matrix contains category names, scenario labels, time horizons, and percentage values (typically -1.0 to +1.0). Power BI applies these shifts to actual financial data using DAX formulas: `GP1_Projected = [GP1_Actual] * (1 + [shift_median])`
+PRISM's Shift Matrix integrates with Power BI for financial impact visualization. The Shift Matrix contains category names, scenario labels, time horizons, and percentage values (typically -1.0 to +1.0). Power BI applies these shifts to actual financial data using DAX formulas: `GP1_Projected = [GP1_Actual] * (1 + [shift_median])`
 
 The React War Room dashboard serves the strategy team with interactive, relative-percentage analysis. The Power BI dashboard serves ExCo and Finance with absolute financial impact (€M) analysis. Both consume the same underlying Shift Matrix, presenting the same truth through different analytical lenses.
 
@@ -122,7 +127,7 @@ The React War Room dashboard serves the strategy team with interactive, relative
 │                        └────────────────────┬──────────────────────────┘  │
 │                                             │                             │
 │  ┌──────────────────────────────────────────┴──────────────────────────┐  │
-│  │              PULSE ENGINE (Python, runs locally)                     │  │
+│  │              PRISM ENGINE (Python, runs locally)                      │  │
 │  │                                                                      │  │
 │  │  ┌─────────────┐  ┌──────────────┐  ┌──────────┐  ┌─────────────┐  │  │
 │  │  │  INGESTION   │  │  SIMULATION  │  │  CAUSAL  │  │   AI LAYER  │  │  │
@@ -186,11 +191,9 @@ class Trend:
     name: str                        # e.g., "Natural / Clean Beauty Movement"
     description: str                 # Evidence text
     direction: str                   # "Expansion" | "Contraction"
-    impact: int                      # 1-5 (expert-scored via Delphi)
-    probability: int                 # 1-5 (expert-scored via Delphi)
+    probability: int                 # 1-5 (expert-scored via Delphi), likelihood of materialization
     start_year: int                  # Year effect begins
-    weighted_score: float            # impact × probability × direction_sign
-    normalized_score: float          # (weighted_score / 25) × gp1_pct_affected
+    normalized_score: float          # prob_mean × gp1_pct_affected × direction_sign
     strategic_implication: str       # Action text
     category_exposure: dict[str, int]  # {"Color": 3, "Care": 3, ...}
     vc_exposure: dict[str, int]      # {"Raw Materials": 2, ...}
@@ -204,12 +207,12 @@ class Trend:
     scorer_count: int                # Number of experts who scored
     score_variance: float            # Inter-rater variance
     debiasing_applied: bool          # Whether anchoring correction was applied
-    # Economic anchoring (v2.2)
-    gp1_pct_affected: float          # 0.0-1.0: fraction of category GP1 exposed to this trend
+    # Economic anchoring (v2.3)
+    gp1_pct_affected: float          # 0.0-1.0: fraction of category GP1 exposed to this trend at full materialization
                                      # AI-preset, expert-adjustable. Default 0.10 (10%).
                                      # Example: PL penetration = 0.25, DPP compliance = 0.02
+                                     # Represents the maximum economic scope this trend can touch
     # Bayesian posterior
-    impact_posterior: tuple           # (alpha, beta) for Beta distribution
     probability_posterior: tuple      # (alpha, beta) for Beta distribution
 
 @dataclass
@@ -246,7 +249,7 @@ class CausalEdge:
 **2a. Deterministic Engine** (V12 parity — trust anchor)
 - Reproduces V12 multiplicative compounding exactly: `GP1_shift% = Π(1 + F_i% × attenuation) - 1`
 - Validates against V12 output to ensure parity
-- Users can verify PULSE matches their Excel before trusting probabilistic outputs
+- Users can verify PRISM matches their Excel before trusting probabilistic outputs
 
 **2b. Bayesian Monte Carlo Engine** (the core upgrade)
 
@@ -254,7 +257,7 @@ The fundamental shift from v1.2: instead of assuming distribution shapes (triang
 
 **Prior specification:**
 ```python
-# Each trend's impact/probability has a prior, updated with evidence
+# Each trend's probability has a prior, updated with evidence
 # Prior: Beta(α₀, β₀) where α₀, β₀ are set from historical calibration
 # When backtesting data exists: posterior = Beta(α₀ + successes, β₀ + failures)
 # When no backtesting data: weakly informative prior Beta(2, 2)
@@ -263,20 +266,12 @@ class BayesianTrendModel:
     def __init__(self, trend, backtest_data=None):
         if backtest_data:
             # Empirically calibrated from historical prediction accuracy
-            self.impact_dist = Beta(
-                alpha=backtest_data.impact_hits + 2,
-                beta=backtest_data.impact_misses + 2
-            )
             self.prob_dist = Beta(
                 alpha=backtest_data.prob_hits + 2,
                 beta=backtest_data.prob_misses + 2
             )
         else:
-            # Weakly informative prior centered on expert score
-            self.impact_dist = Beta(
-                alpha=trend.impact,
-                beta=5 - trend.impact + 1
-            )
+            # Weakly informative prior centered on expert probability score
             self.prob_dist = Beta(
                 alpha=trend.probability,
                 beta=5 - trend.probability + 1
@@ -660,7 +655,7 @@ class BacktestingEngine:
     actual category-level market evolution (public Euromonitor data or
     EM_Input from those periods), we can ask:
 
-    "If we'd run PULSE with 2020's assessments, would it have predicted
+    "If we'd run PRISM with 2020's assessments, would it have predicted
     the market shifts we actually saw by 2024?"
 
     This calibration determines:
@@ -708,7 +703,7 @@ class BacktestingEngine:
         Overall model accuracy: weighted average of per-category
         prediction accuracy across all historical periods.
 
-        Reported as: "PULSE predicted X% of historical shifts within
+        Reported as: "PRISM predicted X% of historical shifts within
         the 80% confidence interval."
         """
         pass
@@ -729,7 +724,7 @@ class BacktestingEngine:
 ```python
 class DelphiProtocol:
     """
-    Formal expert elicitation process replacing unstructured 1-5 scoring.
+    Formal expert elicitation process for probability scoring only.
 
     The Delphi method ensures:
     1. Structured scoring workshops with calibration exercises
@@ -738,8 +733,12 @@ class DelphiProtocol:
     4. Documented rationale per score
     5. Convergence through iterative rounds
 
+    Scoring dimensions (v2.3):
+    - probability (1-5): likelihood the trend materializes
+    - gp1_pct_affected: estimated by AI, expert-adjustable via separate interface
+
     Flow:
-    Round 1: Independent scoring (blind) → collect scores + rationale
+    Round 1: Independent probability scoring (blind) → collect scores + rationale
     Round 2: Share anonymized distribution → re-score with group context
     Round 3: Discussion of outliers → final scores
 
@@ -804,7 +803,7 @@ McKinsey's best digital tools converge on a "single war room view" — one scree
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  PULSE War Room                              [Settings] [Export] │
+│  PRISM War Room                              [Settings] [Export] │
 │                                                                  │
 │  ┌─── HEADLINE KPI ─────────────────────────────────────────┐   │
 │  │  Net Pool Shift: -3.1%  (80% CI: -1.5% to -5.5%)       │   │
@@ -868,7 +867,7 @@ McKinsey's best digital tools converge on a "single war room view" — one scree
 - **Micro-interactions** — hover states, focus rings, loading shimmer
 
 #### Module 9: EXCEL BRIDGE (`pulse/excel_bridge/`)
-**Purpose:** Bidirectional integration between PULSE and Excel for trend input and output.
+**Purpose:** Bidirectional integration between PRISM and Excel for trend input and output.
 
 **9a. Import from Excel** (`reader.py`)
 - Reads V12.xlsx sheets (trends, scores, category/VC exposures)
@@ -888,7 +887,7 @@ McKinsey's best digital tools converge on a "single war room view" — one scree
 - **New in v2.0**: Causal decomposition sheet (which forces drive which categories)
 
 **9c. Template Generator** (`template.py`)
-- PULSE Output Excel template with:
+- PRISM Output Excel template with:
   - Shift Matrix sheet (continuous paths, all percentiles)
   - Application sheet (user enters their GP1, formulas auto-calculate)
   - Allocation sheet (relative investment weights per category)
@@ -909,7 +908,7 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def score_trend(self, trend_description: str) -> dict:
-        """Suggest impact & probability scores for a trend."""
+        """Suggest probability score and gp1_pct_affected for a trend."""
         pass
 
     @abstractmethod
@@ -929,13 +928,13 @@ class ClaudeProvider(LLMProvider):
         self.client = Anthropic(api_key=api_key)
 
     def score_trend(self, trend_description: str) -> dict:
-        prompt = f"Rate this trend (1-5 impact, 1-5 probability):\n{trend_description}"
+        prompt = f"Rate this trend (1-5 probability, 0.0-1.0 gp1_pct_affected):\n{trend_description}"
         response = self.client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}]
         )
-        # Parse and return {impact: int, probability: int}
+        # Parse and return {probability: int, gp1_pct_affected: float}
         pass
 
 class AzureOpenAIProvider(LLMProvider):
@@ -950,14 +949,14 @@ class AzureOpenAIProvider(LLMProvider):
         self.deployment_id = deployment_id
 
     def score_trend(self, trend_description: str) -> dict:
-        prompt = f"Rate this trend (1-5 impact, 1-5 probability):\n{trend_description}"
+        prompt = f"Rate this trend (1-5 probability, 0.0-1.0 gp1_pct_affected):\n{trend_description}"
         response = self.client.chat.completions.create(
             deployment_id=self.deployment_id,
             model="gpt-4-turbo",
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}]
         )
-        # Parse and return {impact: int, probability: int}
+        # Parse and return {probability: int, gp1_pct_affected: float}
         pass
 
 # Configuration (loaded from environment or config file)
@@ -969,7 +968,7 @@ AI_CONFIG = {
     "azure": {
         "endpoint": "${AZURE_OPENAI_ENDPOINT}",
         "api_key": "${AZURE_OPENAI_KEY}",
-        "deployment_id": "pulse-gpt4",
+        "deployment_id": "prism-gpt4",
     }
 }
 
@@ -989,7 +988,7 @@ def get_llm_provider() -> LLMProvider:
 
 **10a. Trend Scanner** (`scanner.py`)
 - Multi-source waterfall: GDELT → GNews → CurrentsAPI → RSS feeds → regulatory APIs
-- Processing: Raw Article → Relevance Filter → Category Mapping → Impact Assessment → Score Suggestion → Human Review Queue
+- Processing: Raw Article → Relevance Filter → Category Mapping → Probability & Economic Scope Assessment → Score Suggestion → Human Review Queue
 - **Staleness Detection**: flags trends whose evidence base has materially changed
 
 **10b. Score Calibrator** (`calibrator.py`)
@@ -1020,7 +1019,7 @@ def get_llm_provider() -> LLMProvider:
 ## 4. ORGANIZATIONAL EMBEDDING FRAMEWORK
 
 ### Why This Matters
-Tools that don't embed into decision processes become shelfware within 18 months. This section ensures PULSE changes decisions, not just produces analysis.
+Tools that don't embed into decision processes become shelfware within 18 months. This section ensures PRISM changes decisions, not just produces analysis.
 
 ### RACI Matrix
 
@@ -1046,7 +1045,7 @@ Q1 (Jan-Mar): ANNUAL CALIBRATION
 ├── Attenuation factor recalibration
 ├── Causal DAG weight review
 ├── Delphi Round 1: independent scoring
-└── PULSE model parameter update
+└── PRISM model parameter update
 
 Q2 (Apr-Jun): STRATEGIC PLANNING INPUT
 ├── Delphi Round 2: calibrated scoring with AI suggestions
@@ -1072,7 +1071,7 @@ Q4 (Oct-Dec): BUDGET INTEGRATION
 
 ### Decision Rights Framework
 
-| Decision | Authority | When PULSE Disagrees with GM |
+| Decision | Authority | When PRISM Disagrees with GM |
 |----------|-----------|------------------------------|
 | Trend scores | Delphi consensus (no single person) | Present data, document disagreement, Delphi score stands |
 | Category allocation | Strategy VP (informed by optimizer) | Optimizer recommendation is advisory, VP decides |
@@ -1164,8 +1163,8 @@ CREATE TABLE trends (
     name TEXT NOT NULL,
     description TEXT,
     direction TEXT CHECK(direction IN ('Expansion', 'Contraction')),
-    impact INTEGER CHECK(impact BETWEEN 1 AND 5),
     probability INTEGER CHECK(probability BETWEEN 1 AND 5),
+    gp1_pct_affected REAL CHECK(gp1_pct_affected BETWEEN 0.0 AND 1.0),
     start_year INTEGER,
     normalized_score REAL,
     strategic_implication TEXT,
@@ -1178,8 +1177,7 @@ CREATE TABLE trends (
     scorer_count INTEGER DEFAULT 1,
     score_variance REAL DEFAULT 0.0,
     debiasing_applied BOOLEAN DEFAULT FALSE,
-    -- Bayesian posteriors (JSON)
-    impact_posterior TEXT,       -- {"alpha": 3, "beta": 3}
+    -- Bayesian posterior (JSON)
     probability_posterior TEXT,  -- {"alpha": 4, "beta": 2}
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1260,7 +1258,7 @@ CREATE TABLE backtest_results (
     historical_version TEXT,    -- "V5", "V8", etc.
     prediction_year INTEGER,
     actual_shifts TEXT,         -- JSON: public market-level shifts
-    predicted_shifts TEXT,      -- JSON: what PULSE would have predicted
+    predicted_shifts TEXT,      -- JSON: what PRISM would have predicted
     accuracy_score REAL,
     calibration_params TEXT     -- JSON: derived attenuation, distributions, etc.
 );
@@ -1272,8 +1270,8 @@ CREATE TABLE delphi_rounds (
     round_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     trend_id TEXT REFERENCES trends(id),
     scorer_id TEXT,
-    impact_score INTEGER,
     probability_score INTEGER,
+    gp1_pct_affected_score REAL,
     rationale TEXT,
     calibration_factor REAL DEFAULT 1.0,
     bias_flags TEXT             -- JSON: ["anchoring", "optimism", etc.]
@@ -1402,7 +1400,7 @@ If historical data is unavailable:
 - Chat interface: natural language queries
 - Delphi workflow: structured scoring rounds with AI-assisted calibration
 - Automated Power BI export: `python -m pulse --export-powerbi` → Shift Matrix pushed to Power BI semantic model
-- Monthly reconciliation workflow: Power BI dashboard reflects latest Shift Matrix, ExCo sees €M impact without touching PULSE
+- Monthly reconciliation workflow: Power BI dashboard reflects latest Shift Matrix, ExCo sees €M impact without touching PRISM
 - Provider-agnostic AI: one `--ai` config flag switches from Claude (MVP) to Azure OpenAI (production) with zero code change
 
 ---
@@ -1513,10 +1511,10 @@ Axes: React uses %, Power BI uses €M, but same directional red/green semantics
 ```
 
 **Data Integrity Check:**
-- Every night: PULSE exports Shift Matrix (% values)
+- Every night: PRISM exports Shift Matrix (% values)
 - Power BI semantic model consumes via API
 - DAX formula applies: `€M_shift = €M_actual × (1 + shift_median)`
-- One-way flow: PULSE → Power BI. Never reverse.
+- One-way flow: PRISM → Power BI. Never reverse.
 - Audit log tracks every export & sync timestamp
 
 ### Dashboard Export Center & Power BI Integration (Page 8)
@@ -1546,12 +1544,12 @@ The Export Center is a dedicated page within the War Room accessible via a float
          ↓
    [€M impact visible in ExCo dashboard]
          ↓
-   [Monthly reconciliation: PULSE updates trigger PBI refresh]
+   [Monthly reconciliation: PRISM updates trigger PBI refresh]
 ```
 
 **Key Features:**
 - **One-click export:** Button triggers Shift Matrix → JSON → Power BI API
-- **Monthly scheduler:** Automates weekly PULSE runs + Power BI push (Phase 3)
+- **Monthly scheduler:** Automates weekly PRISM runs + Power BI push (Phase 3)
 - **Version tracking:** Each export tagged with scenario, model version, backtesting accuracy
 - **Audit log:** Export timestamp, user, destination, file hash
 - **Two-audience UI:**
@@ -1638,7 +1636,7 @@ POST /export/shift-matrix           → Raw Shift Matrix (CSV/JSON) for Power BI
 POST /export/powerbi                → Push Shift Matrix to Power BI semantic model
   Body: { tenant_id, workspace_id, dataset_id, auth_token }
   Returns: { status, upload_timestamp, record_count, next_sync_scheduled }
-POST /export/powerbi/schedule       → Automate weekly PULSE → Power BI sync
+POST /export/powerbi/schedule       → Automate weekly PRISM → Power BI sync
   Body: { day_of_week, time_utc, enabled }
 
 # Config
@@ -1978,14 +1976,14 @@ PROFIT_POOL_ENGINE/
 │   ├── test_sensitivity.py
 │   └── test_api.py
 ├── data/
-│   └── pulse.db
+│   └── prism.db
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-*Document Version: 2.2 — March 2026*
+*Document Version: 2.3 — March 2026*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Bayesian hierarchical + copula dependencies + causal DAG + game theory + Delphi elicitation*

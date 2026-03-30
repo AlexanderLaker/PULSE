@@ -1,5 +1,5 @@
 /**
- * PULSE War Room — Typed API Client
+ * PRISM War Room — Typed API Client
  * Fully typed interface to the FastAPI backend.
  * Zero `any` types. Every request and response is typed.
  */

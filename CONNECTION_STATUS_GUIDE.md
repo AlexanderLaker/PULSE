@@ -1,8 +1,8 @@
-# PULSE War Room Connection Status Implementation Guide
+# PRISM War Room Connection Status Implementation Guide
 
 ## Overview
 
-The PULSE War Room now includes a real-time backend connection status indicator in the header. This provides users with visual feedback about the API connection state and allows for manual reconnection attempts.
+The PRISM War Room now includes a real-time backend connection status indicator in the header. This provides users with visual feedback about the API connection state and allows for manual reconnection attempts.
 
 ## Visual States
 
@@ -42,7 +42,7 @@ The PULSE War Room now includes a real-time backend connection status indicator 
 
 ## Implementation Details
 
-### Hook: `usePulse.ts`
+### Hook: `usePrism.ts`
 
 #### New State
 ```typescript
@@ -411,7 +411,7 @@ describe('usePulse hook', () => {
 
 ## References
 
-- PULSE v4.0 Specification: `claude.md`
+- PRISM v4.0 Specification: `claude.md`
 - Apple Design System: https://developer.apple.com/design/
 - Framer Motion: https://www.framer.com/motion/
 - Lucide Icons: https://lucide.dev/

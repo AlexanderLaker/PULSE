@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Import 47 trends from the PULSE Trend Intelligence Report (March 2026) into the database.
+"""Import 47 trends from the PRISM Trend Intelligence Report (March 2026) into the database.
 
 Usage:
     python scripts/import_report_trends.py
 
-Each trend maps to the exact PULSE data model:
+Each trend maps to the exact PRISM data model:
 - trends table: id, force, name, description, direction, impact, probability
 - trend_category_exposure: 12 HCB categories (0-5)
 - trend_vc_exposure: 8 value chain steps (0-5)
@@ -845,7 +845,6 @@ def main():
     for t in TRENDS:
         assert t.force in ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"], f"Invalid force: {t.force} for {t.id}"
         assert t.direction in ["Expansion", "Contraction"], f"Invalid direction: {t.direction} for {t.id}"
-        assert 1 <= t.impact <= 5, f"Invalid impact: {t.impact} for {t.id}"
         assert 1 <= t.probability <= 5, f"Invalid probability: {t.probability} for {t.id}"
         for k, v in t.category_exposure.items():
             assert k in CATEGORIES, f"Invalid category: {k} for {t.id}"

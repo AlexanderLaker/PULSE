@@ -2,7 +2,7 @@
 
 Reads force sheets (1_Consumer through 6_Competitive), Config, Helper,
 and EM_Input. Explicitly skips financial sheets. All data passes through
-the Financial Data Firewall before entering PULSE.
+the Financial Data Firewall before entering PRISM.
 """
 
 import logging
@@ -179,9 +179,7 @@ class ExcelReader:
             trend_id = f"{force_prefix}_{trend_counter:02d}"
 
             # Extract scores
-            impact = self._safe_int(row, col_map.get("impact"), default=3)
             probability = self._safe_int(row, col_map.get("probability"), default=3)
-            impact = max(1, min(5, impact))
             probability = max(1, min(5, probability))
 
             # Direction
@@ -217,7 +215,6 @@ class ExcelReader:
                 name=name.strip(),
                 description=desc,
                 direction=direction,
-                impact=impact,
                 probability=probability,
                 start_year=start_year,
                 strategic_implication=impl,

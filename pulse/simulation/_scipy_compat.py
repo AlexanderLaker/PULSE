@@ -2,7 +2,7 @@
 
 On Vercel serverless (250MB limit), scipy (~150MB) cannot be included.
 These fallbacks use numpy-only implementations that are sufficient for
-the PULSE Monte Carlo engine.
+the PRISM Monte Carlo engine.
 """
 
 import numpy as np

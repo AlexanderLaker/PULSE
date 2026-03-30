@@ -203,7 +203,7 @@ class TestAdvancedAnalyticsWorkflow:
 
 
 class TestRealisticPulseScenario:
-    """Test with realistic PULSE-like scenario."""
+    """Test with realistic PRISM-like scenario."""
 
     def test_profit_pool_risk_analysis(self, sample_database):
         """Realistic profit pool risk analysis workflow."""

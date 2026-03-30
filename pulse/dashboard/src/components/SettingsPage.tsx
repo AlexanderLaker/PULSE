@@ -1,5 +1,5 @@
 /**
- * SettingsPage — Full-page PULSE model configuration editor.
+ * SettingsPage — Full-page PRISM model configuration editor.
  *
  * Replaces the slide-over AdminConfigPanel with a dedicated full-page layout.
  * Contains:
@@ -11,7 +11,7 @@
  *   - Editable 6×6 Force Correlation Matrix
  *   - Simulation settings (iterations)
  *
- * Dark theme matching PULSE spec.
+ * Dark theme matching PRISM spec.
  */
 
 import { useState, useEffect, useCallback, type FC } from 'react';

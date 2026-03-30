@@ -1,4 +1,4 @@
-"""Data models for PULSE — Trend, CausalEdge, CompetitorProfile."""
+"""Data models for PRISM — Trend, CausalEdge, CompetitorProfile."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -14,10 +14,8 @@ class Trend:
     name: str = ""
     description: str = ""
     direction: str = "Expansion"               # "Expansion" | "Contraction"
-    impact: int = 3                            # 1-5
     probability: int = 3                       # 1-5
     start_year: int = 2028
-    weighted_score: float = 0.0
     normalized_score: float = 0.0
     strategic_implication: str = ""
     category_exposure: dict = field(default_factory=dict)  # {cat: 0-5}
@@ -37,8 +35,8 @@ class Trend:
     # realistically exposed to this trend at full materialization.
     # AI-preset, expert-adjustable. Range 0.0 to 1.0 (e.g. 0.15 = 15%).
     # This replaces the implicit assumption that every trend can affect
-    # 100% of the pool. A 5/5 impact trend with gp1_pct_affected=0.15
-    # means: "this is a maximum-severity trend, but even at full force
+    # 100% of the pool. A high-materialization trend with gp1_pct_affected=0.15
+    # means: "this trend can fully materialize, but even at full force
     # it only touches 15% of the category's GP1."
     gp1_pct_affected: float = 0.10  # default 10% — conservative baseline
     # Materialization timing — when does the full impact arrive?
@@ -54,23 +52,20 @@ class Trend:
     #   "step_function" — minimal impact then sudden jump at peak_year
     diffusion_curve: str = "s_curve"
     # Bayesian posteriors — (alpha, beta) for Beta distribution
-    impact_posterior: Optional[tuple] = None
     probability_posterior: Optional[tuple] = None
 
     def __post_init__(self):
         direction_sign = 1 if self.direction == "Expansion" else -1
-        self.weighted_score = self.impact * self.probability * direction_sign
         # Bayesian priors centered on expert score — always recompute from
-        # current impact/probability values so sensitivity analysis works
+        # current probability values so sensitivity analysis works
         # (tornado analysis changes these fields and re-calls __post_init__).
-        self.impact_posterior = (max(self.impact, 1), max(6 - self.impact, 1))
         self.probability_posterior = (max(self.probability, 1), max(6 - self.probability, 1))
         # normalized_score aligned with MC engine formula:
         #   MC samples: prob_01 × gp1_pct_affected × direction
         #   Deterministic: E[prob_01] × gp1_pct_affected × direction
         # where E[prob_01] = alpha / (alpha + beta) from the Beta posterior.
-        # Impact is NOT a separate multiplier — it is already reflected in
-        # gp1_pct_affected (high-impact trends get higher gp1_pct assignments).
+        # Economic magnitude is captured by gp1_pct_affected (high-materialization
+        # trends get higher gp1_pct assignments).
         a_p, b_p = self.probability_posterior
         prob_mean = a_p / (a_p + b_p)  # Expected probability of materialization
         self.normalized_score = prob_mean * self.gp1_pct_affected * direction_sign
@@ -78,10 +73,6 @@ class Trend:
     @property
     def direction_sign(self) -> int:
         return 1 if self.direction == "Expansion" else -1
-
-    @property
-    def abs_score(self) -> float:
-        return abs(self.weighted_score)
 
 
 @dataclass

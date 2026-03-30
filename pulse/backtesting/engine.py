@@ -60,7 +60,7 @@ class CalibrationResult:
 
     def to_report(self) -> str:
         lines = [
-            "═══ PULSE BACKTESTING CALIBRATION REPORT ═══",
+            "═══ PRISM BACKTESTING CALIBRATION REPORT ═══",
             "",
             f"Periods tested: {self.backtest_periods}",
             f"Optimal attenuation: {self.optimal_attenuation:.3f} "
@@ -287,7 +287,7 @@ class BacktestingEngine:
             Markdown-formatted report string
         """
         lines = [
-            "# PULSE Backtesting Calibration Report",
+            "# PRISM Backtesting Calibration Report",
             "",
             "## Executive Summary",
             "",
@@ -300,7 +300,7 @@ class BacktestingEngine:
             "",
             "## Interpretation",
             "",
-            f"PULSE predicts {result.accuracy_score:.0%} of historical shifts within ±2pp accuracy.",
+            f"PRISM predicts {result.accuracy_score:.0%} of historical shifts within ±2pp accuracy.",
             "This means the model's confidence intervals are appropriately calibrated to data.",
             "",
             "## Per-Period Breakdown",
@@ -339,7 +339,7 @@ class BacktestingEngine:
     def generate_no_backtest_report(self) -> str:
         """Report when no historical data is available."""
         return (
-            "═══ PULSE BACKTESTING STATUS ═══\n\n"
+            "═══ PRISM BACKTESTING STATUS ═══\n\n"
             "No historical data available for backtesting.\n"
             f"Using default attenuation: {self.config.attenuation:.2f} (ASSUMED, not calibrated)\n\n"
             "To enable backtesting:\n"

@@ -1,6 +1,6 @@
-# PULSE War Room v3 Components — Usage Guide
+# PRISM War Room v3 Components — Usage Guide
 
-Three production-grade React components for the PULSE War Room dashboard. Apple × Bain × Goldman Sachs design aesthetic.
+Three production-grade React components for the PRISM War Room dashboard. Apple × Bain × Goldman Sachs design aesthetic.
 
 ## Quick Start
 

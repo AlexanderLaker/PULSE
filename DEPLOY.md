@@ -1,4 +1,4 @@
-# PULSE — Deployment Guide
+# PRISM — Deployment Guide
 
 ## One-Command Deploy
 
@@ -28,12 +28,12 @@ cd pulse/dashboard && npm install && cd ../..
 
 ### 2. Connect to Vercel
 
-The project is already connected to Vercel via GitHub (`AlexanderLaker/PULSE`).
+The project is already connected to Vercel via GitHub (`AlexanderLaker/PRISM`).
 If you need to re-link:
 
 ```bash
 npx vercel link
-# Select: AlexanderLaker → PULSE
+# Select: AlexanderLaker → PRISM
 ```
 
 ### 3. Set Environment Variables
@@ -54,7 +54,7 @@ Add these three keys:
 git push --force origin main
 ```
 
-> **Important:** This will replace the existing Next.js app on GitHub with the PULSE engine. The `--force` is needed because the codebases are different.
+> **Important:** This will replace the existing Next.js app on GitHub with the PRISM engine. The `--force` is needed because the codebases are different.
 
 ---
 

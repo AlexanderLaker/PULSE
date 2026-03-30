@@ -80,7 +80,7 @@ function generateSlides(
     const forceImpacts: Record<string, number> = {};
     trends.forEach(t => {
       const key = t.force;
-      forceImpacts[key] = (forceImpacts[key] || 0) + ((t.impact || 0) * (t.probability || 0)) * (t.direction === 'Contraction' ? -1 : 1);
+      forceImpacts[key] = (forceImpacts[key] || 0) + ((t.probability || 0)) * (t.direction === 'Contraction' ? -1 : 1);
     });
     const dominant = Object.entries(forceImpacts).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
     return {

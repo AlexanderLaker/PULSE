@@ -1,5 +1,5 @@
 /**
- * PULSE War Room — Authentication Hook
+ * PRISM War Room — Authentication Hook
  * Manages login/register state, token persistence, and user context.
  */
 import { useState, useEffect, useCallback } from 'react';

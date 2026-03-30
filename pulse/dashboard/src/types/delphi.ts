@@ -1,5 +1,5 @@
 /**
- * PULSE — Delphi Expert Elicitation types.
+ * PRISM — Delphi Expert Elicitation types.
  * Maps to pulse/elicitation/delphi.py and API routes.
  */
 
@@ -39,7 +39,6 @@ export interface DelphiRoundDetail {
 export interface DelphiScoreSubmission {
   scorer_id: string;
   trend_id: string;
-  impact: number;       // 1-5
   probability: number;  // 1-5
   rationale: string;    // min 20 chars
   round_number?: number;
@@ -49,7 +48,6 @@ export interface DelphiScoreSubmission {
 export interface DelphiScore {
   scorer_id: string;
   trend_id: string;
-  impact: number;
   probability: number;
   rationale: string;
   round_number: number;
@@ -58,7 +56,7 @@ export interface DelphiScore {
   submitted_at: string;
 }
 
-/** Distribution statistics for a single dimension (impact or probability). */
+/** Distribution statistics for a single dimension. */
 export interface ScoreDistribution {
   scores: number[];
   median: number;
@@ -70,7 +68,6 @@ export interface ScoreDistribution {
 
 /** Trend-level score distribution in a round summary. */
 export interface TrendScoreDistribution {
-  impact: ScoreDistribution;
   probability: ScoreDistribution;
   score_count: number;
 }
@@ -100,7 +97,6 @@ export interface CalibrationResult {
 export interface DelphiConsensus {
   session_id: string;
   consensus_scores: Record<string, {
-    impact: number;
     probability: number;
     confidence: number;
     agreement_level: string;

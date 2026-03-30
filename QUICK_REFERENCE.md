@@ -1,4 +1,4 @@
-# PULSE Backend Implementation — Quick Reference
+# PRISM Backend Implementation — Quick Reference
 
 ## Task 1: Competitor Profiles
 **File:** `pulse/game_theory/competitive.py`

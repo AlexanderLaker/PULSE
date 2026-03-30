@@ -209,7 +209,7 @@ RESPOND IN THIS EXACT JSON FORMAT:
       "description": "2-3 sentences with specific data points. Name sources, numbers, dates.",
       "force": "Consumer|Government|Technology|Environmental|Competitive|Customer",
       "direction": "Expansion|Contraction",
-      "suggested_impact": 1-5,
+      "suggested_gp1_pct_affected": 0.0-1.0,
       "suggested_probability": 1-5,
       "relevance_score": 0-100,
       "reasoning": "Why this matters for Henkel's profit pools specifically. Which categories? What's the mechanism?",
@@ -265,7 +265,7 @@ Based on your knowledge of the FMCG industry through early 2026, identify genuin
                                 "description": {"type": "string"},
                                 "force": {"type": "string"},
                                 "direction": {"type": "string"},
-                                "suggested_impact": {"type": "number"},
+                                "suggested_gp1_pct_affected": {"type": "number"},
                                 "suggested_probability": {"type": "number"},
                                 "relevance_score": {"type": "number"},
                                 "reasoning": {"type": "string"},
@@ -273,7 +273,7 @@ Based on your knowledge of the FMCG industry through early 2026, identify genuin
                                 "source_quality": {"type": "string"},
                                 "evidence_sources": {"type": "array", "items": {"type": "string"}},
                             },
-                            "required": ["name", "force", "direction", "suggested_impact",
+                            "required": ["name", "force", "direction", "suggested_gp1_pct_affected",
                                          "suggested_probability", "relevance_score", "reasoning"],
                         },
                     },
@@ -552,7 +552,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
                 if USE_POSTGRES:
                     cursor.execute(
                         f"""INSERT INTO scanned_trends
-                            (id, name, description, force, direction, suggested_impact,
+                            (id, name, description, force, direction, suggested_gp1_pct_affected,
                              suggested_probability, relevance_score, category_mapping,
                              sources, discovered_at, reasoning, status, scan_session, updated_at)
                             VALUES ({ph(15)})
@@ -570,7 +570,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
                             t.get("description", ""),
                             t.get("force", "Consumer"),
                             t.get("direction", "Expansion"),
-                            t.get("suggested_impact", 3),
+                            t.get("suggested_gp1_pct_affected", 0.10),
                             t.get("suggested_probability", 3),
                             t.get("relevance_score", 65),
                             _json.dumps(t.get("category_mapping", {})),
@@ -585,7 +585,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     cursor.execute(
                         f"""INSERT OR REPLACE INTO scanned_trends
-                            (id, name, description, force, direction, suggested_impact,
+                            (id, name, description, force, direction, suggested_gp1_pct_affected,
                              suggested_probability, relevance_score, category_mapping,
                              sources, discovered_at, reasoning, status, scan_session, updated_at)
                             VALUES ({ph(15)})""",
@@ -594,7 +594,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
                             t.get("description", ""),
                             t.get("force", "Consumer"),
                             t.get("direction", "Expansion"),
-                            t.get("suggested_impact", 3),
+                            t.get("suggested_gp1_pct_affected", 0.10),
                             t.get("suggested_probability", 3),
                             t.get("relevance_score", 65),
                             _json.dumps(t.get("category_mapping", {})),

@@ -1,5 +1,5 @@
 /**
- * PULSE — API response wrapper types.
+ * PRISM — API response wrapper types.
  */
 
 /** Generic API error response. */

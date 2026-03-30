@@ -1,8 +1,8 @@
-# PULSE Test Suite Documentation
+# PRISM Test Suite Documentation
 
 ## Overview
 
-Comprehensive test suite for the PULSE (Profit Pool Unified Landscape Simulation Engine) project, covering all critical modules and functionality.
+Comprehensive test suite for the PRISM (Profit Pool Unified Landscape Simulation Engine) project, covering all critical modules and functionality.
 
 **Test Statistics:**
 - Total test files: 8
@@ -64,7 +64,7 @@ Comprehensive test suite for the PULSE (Profit Pool Unified Landscape Simulation
   - Case-insensitive processing
   - Multiple red flags per value
 
-**Key Assertion:** No financial data can enter PULSE through any vector
+**Key Assertion:** No financial data can enter PRISM through any vector
 
 ### 3. `tests/test_deterministic.py` (39 tests, 36 passing)
 **Deterministic Engine Tests — V12 Parity**
@@ -481,5 +481,5 @@ def test_with_multiple_fixtures(mock_trends_database, mock_causal_dag, determini
 ---
 
 *Test Suite Created: March 26, 2026*
-*PULSE Version: 2.0 (Bayesian + Copula + Causal DAG)*
+*PRISM Version: 2.0 (Bayesian + Copula + Causal DAG)*
 *Framework: pytest*

@@ -1,6 +1,6 @@
-# PULSE Phase 3: AI Intelligence Layer
+# PRISM Phase 3: AI Intelligence Layer
 
-Complete AI intelligence layer for the PULSE simulation engine. All components are production-ready with async support, comprehensive error handling, and Financial Data Firewall integration.
+Complete AI intelligence layer for the PRISM simulation engine. All components are production-ready with async support, comprehensive error handling, and Financial Data Firewall integration.
 
 ## Architecture Overview
 
@@ -171,7 +171,7 @@ All components check prompts and outputs through `FinancialDataFirewall`:
 - Validates no currency patterns or financial keywords leak through
 - Logs violations but allows execution to continue with flagged data masked
 
-### With Existing PULSE Config
+### With Existing PRISM Config
 - Reads `pulse.config.FORCES`, `pulse.config.CATEGORIES`, `pulse.config.VC_STEPS`
 - Compatible with `ModelConfig` data structures
 - Uses same force and category taxonomies

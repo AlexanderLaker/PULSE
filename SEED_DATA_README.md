@@ -1,10 +1,10 @@
-# PULSE Seed Data Module
+# PRISM Seed Data Module
 
 **Status:** Ready for production | **Trends:** 35 | **Competitors:** 12 | **Lines:** 1,108
 
 ## What Is This?
 
-`pulse/api/seed_data.py` provides a fully populated FMCG/HCB/LHC trend database and competitive intelligence for PULSE. This eliminates the need for Excel input files and enables PULSE to run standalone in any environment (cloud, docker, CI/CD, or local).
+`pulse/api/seed_data.py` provides a fully populated FMCG/HCB/LHC trend database and competitive intelligence for PRISM. This eliminates the need for Excel input files and enables PRISM to run standalone in any environment (cloud, docker, CI/CD, or local).
 
 ## Quick Start
 
@@ -174,7 +174,7 @@ CompetitorProfile(
 - Strategic implications tied to actual Henkel decisions
 
 ### 4. Integration-Ready
-- Uses standard PULSE dataclasses (Trend, TrendDatabase, CompetitorProfile)
+- Uses standard PRISM dataclasses (Trend, TrendDatabase, CompetitorProfile)
 - Compatible with all simulation engines (Bayesian MC, game theory, optimizer, backtesting)
 - Easy to extend with new trends or competitors
 
@@ -276,7 +276,7 @@ All seed data has passed:
 3. **Game Theory** — Connect competitor profiles to `pulse/game_theory/competitive.py`
 4. **Extend Intelligence** — Add more competitor profiles to `get_seed_competitive_intelligence()`
 5. **Automation** — Use in CI/CD for automated testing without Excel dependencies
-6. **Cloud Deployment** — Deploy PULSE container without mounting Excel files
+6. **Cloud Deployment** — Deploy PRISM container without mounting Excel files
 
 ## Questions?
 

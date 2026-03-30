@@ -168,15 +168,15 @@ class TestSensitivityEdgeCases:
         # Store originals
         originals = {}
         for trend in mock_trends_database.trends:
-            originals[trend.id] = (trend.impact, trend.probability)
+            originals[trend.id] = (trend.probability, trend.gp1_pct_affected)
 
         # Run analysis
         engine.tornado_analysis(mock_trends_database)
 
         # Verify scores restored
         for trend in mock_trends_database.trends:
-            assert trend.impact == originals[trend.id][0]
-            assert trend.probability == originals[trend.id][1]
+            assert trend.probability == originals[trend.id][0]
+            assert trend.gp1_pct_affected == originals[trend.id][1]
 
     def test_sensitivity_with_dag(self, mock_model_config, mock_trends_database, mock_causal_dag):
         """Should support sensitivity with causal DAG."""

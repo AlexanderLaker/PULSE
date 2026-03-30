@@ -1,4 +1,4 @@
-# PULSE Export & Integration Modules — Delivery Checklist
+# PRISM Export & Integration Modules — Delivery Checklist
 
 ## Task 1: Power BI CSV Export ✓
 
@@ -252,7 +252,7 @@
 - [x] API keys from environment variables only
 - [x] Financial Data Firewall in PowerBIExporter
 - [x] No credentials in source code
-- [x] One-directional data flow (PULSE → Power BI)
+- [x] One-directional data flow (PRISM → Power BI)
 - [x] All outputs auditable
 - [x] Export validation built-in
 
@@ -319,5 +319,5 @@ Total NEW code: ~147 KB
 - ✅ Security compliance
 - ✅ Phase 2 & 3 ready
 
-**Ready for integration into PULSE Phase 2 and Phase 3 pipelines.**
+**Ready for integration into PRISM Phase 2 and Phase 3 pipelines.**
 

@@ -1,4 +1,4 @@
-"""Authentication module for PULSE — JWT-based auth with shared database.
+"""Authentication module for PRISM — JWT-based auth with shared database.
 
 Uses pulse.database for Postgres (Vercel) / SQLite (local) dual-mode persistence.
 
@@ -30,17 +30,17 @@ from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, ini
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────
-JWT_SECRET = os.environ.get("PULSE_JWT_SECRET", "pulse-dev-secret-change-in-production-2026")
+JWT_SECRET = os.environ.get("PRISM_JWT_SECRET", "prism-dev-secret-change-in-production-2026")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
 
 # Invite codes — required to register. Admin can create new ones.
-INVITE_CODES = set(os.environ.get("PULSE_INVITE_CODES", "PULSE-2026,HENKEL-STRATEGY,WARROOM-ACCESS").split(","))
+INVITE_CODES = set(os.environ.get("PRISM_INVITE_CODES", "PRISM-2026,HENKEL-STRATEGY,WARROOM-ACCESS").split(","))
 
 # Admin emails — these users are automatically assigned admin role on registration
 ADMIN_EMAILS = set(
     e.strip().lower()
-    for e in os.environ.get("PULSE_ADMIN_EMAILS", "laker.alexander@gmail.com,alexander.laker@gmx.com").split(",")
+    for e in os.environ.get("PRISM_ADMIN_EMAILS", "laker.alexander@gmail.com,alexander.laker@gmx.com").split(",")
     if e.strip()
 )
 
@@ -201,8 +201,8 @@ def _seed_default_users(conn):
         {
             "id": "seed-admin-002",
             "name": "Admin",
-            "email": "admin@pulse.app",
-            "password": "pulse2026",
+            "email": "admin@prism.app",
+            "password": "prism2026",
             "role": "admin",
         },
         {
@@ -360,7 +360,7 @@ RESET_TOKEN_EXPIRY = 3600  # 1 hour
 def _get_app_url() -> str:
     """Get the app's base URL for reset links."""
     # Use explicit override if set
-    explicit = os.environ.get("PULSE_APP_URL")
+    explicit = os.environ.get("PRISM_APP_URL")
     if explicit:
         return explicit.rstrip("/")
     # Vercel production URL (stable across deployments)
@@ -383,9 +383,9 @@ def _send_reset_email(to_email: str, reset_token: str) -> bool:
     reset_link = f"{app_url}#reset={reset_token}"
 
     payload = json.dumps({
-        "from": f"PULSE <{RESEND_FROM_EMAIL}>",
+        "from": f"PRISM <{RESEND_FROM_EMAIL}>",
         "to": [to_email],
-        "subject": "PULSE — Password Reset",
+        "subject": "PRISM — Password Reset",
         "html": f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
             <div style="text-align: center; margin-bottom: 32px;">
@@ -395,7 +395,7 @@ def _send_reset_email(to_email: str, reset_token: str) -> bool:
             </div>
             <h2 style="font-size: 20px; font-weight: 600; color: #1D1D1F; text-align: center; margin-bottom: 8px;">Reset Your Password</h2>
             <p style="font-size: 14px; color: #6E6E73; text-align: center; line-height: 1.6; margin-bottom: 32px;">
-                Click the button below to set a new password for your PULSE account. This link expires in 1 hour.
+                Click the button below to set a new password for your PRISM account. This link expires in 1 hour.
             </p>
             <div style="text-align: center; margin-bottom: 32px;">
                 <a href="{reset_link}" style="display: inline-block; padding: 12px 32px; border-radius: 10px; background: #0071E3; color: white; font-size: 14px; font-weight: 600; text-decoration: none;">

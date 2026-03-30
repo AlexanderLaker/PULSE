@@ -1,4 +1,4 @@
-# PULSE AI Layer — Quick Start Guide
+# PRISM AI Layer — Quick Start Guide
 
 ## File Locations
 All files created in: `/sessions/determined-blissful-fermi/mnt/Working Files/PROFIT_POOL_ENGINE/pulse/ai/`
@@ -172,9 +172,9 @@ python3 -m py_compile __init__.py config.py provider.py \
   scanner.py calibrator.py narrator.py chat.py
 ```
 
-## Integration with PULSE
+## Integration with PRISM
 
-The AI layer integrates seamlessly with existing PULSE components:
+The AI layer integrates seamlessly with existing PRISM components:
 - Uses `pulse.config.FORCES`, `pulse.config.CATEGORIES`
 - Respects `FinancialDataFirewall` from `pulse.ingestion.firewall`
 - Compatible with `ModelConfig` structures

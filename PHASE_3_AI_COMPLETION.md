@@ -1,4 +1,4 @@
-# PULSE Phase 3 AI Modules — Completion Report
+# PRISM Phase 3 AI Modules — Completion Report
 
 ## Executive Summary
 
@@ -75,7 +75,7 @@ All four Phase 3 AI modules have been completed, tested, and verified as fully f
 
 ### 4. **PulseChat** (`pulse/ai/chat.py`)
 
-**Purpose**: Natural language interface to PULSE with financial data protection.
+**Purpose**: Natural language interface to PRISM with financial data protection.
 
 **Key Features**:
 - ✅ `ask()` - Answer questions about simulations (with firewall protection)
@@ -334,5 +334,5 @@ All four modules are production-ready (with "no API key" graceful fallback). The
 ---
 
 *Document Generated: 2026-03-26*
-*PULSE Version: 2.1*
+*PRISM Version: 2.1*
 *Module Version: 3.0.0*

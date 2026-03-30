@@ -1,7 +1,7 @@
-# PULSE Backend Implementation — Tasks Summary
+# PRISM Backend Implementation — Tasks Summary
 
 ## Overview
-Four backend modules implemented for the PULSE profit pool simulation engine with full test coverage.
+Four backend modules implemented for the PRISM profit pool simulation engine with full test coverage.
 
 ---
 

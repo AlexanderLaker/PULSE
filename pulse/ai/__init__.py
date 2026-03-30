@@ -1,7 +1,7 @@
-"""PULSE Phase 3 AI Intelligence Layer.
+"""PRISM Phase 3 AI Intelligence Layer.
 
 Provides LLM-powered analysis, trend scanning, score calibration, and natural language
-interfaces to the PULSE simulation engine.
+interfaces to the PRISM simulation engine.
 
 Main Classes:
 - TrendScanner: Multi-source news/trend detection with LLM classification

@@ -1,4 +1,4 @@
-"""FastAPI application — PULSE War Room backend.
+"""FastAPI application — PRISM War Room backend.
 
 Serves simulation results, handles real-time re-simulation on score changes,
 and provides all data for the React War Room dashboard.
@@ -150,7 +150,6 @@ class TrendCreate(BaseModel):
     name: str
     description: str = ""
     direction: str = "Expansion"
-    impact: int = Field(3, ge=1, le=5)
     probability: int = Field(3, ge=1, le=5)
     category_exposure: Optional[dict] = None   # {"Hair: Color": 3, ...}
     vc_exposure: Optional[dict] = None
@@ -159,11 +158,11 @@ class TrendCreate(BaseModel):
     data_source: str = ""
     confidence: str = "Medium"
     ai_suggested: bool = True
+    gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0, description="Fraction of category GP1 exposed (0.0-1.0)")
     peak_year: Optional[int] = Field(None, ge=2025, le=2035)
     diffusion_curve: Optional[str] = None
 
 class TrendUpdate(BaseModel):
-    impact: Optional[int] = Field(None, ge=1, le=5)
     probability: Optional[int] = Field(None, ge=1, le=5)
     direction: Optional[str] = None
     gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0,
@@ -364,7 +363,7 @@ def create_app(args=None) -> FastAPI:
             pass
 
     app = FastAPI(
-        title="PULSE War Room API",
+        title="PRISM War Room API",
         version=__version__,
         description="Profit Pool Simulation Engine — Bayesian MC + Causal DAG",
         lifespan=lifespan
@@ -409,7 +408,7 @@ def create_app(args=None) -> FastAPI:
         if _initialized["done"]:
             return
         _initialized["done"] = True
-        print("[PULSE] Lazy init: Vercel serverless cold start...", flush=True)
+        print("[PRISM] Lazy init: Vercel serverless cold start...", flush=True)
 
         try:
             async with _state_lock:
@@ -417,11 +416,11 @@ def create_app(args=None) -> FastAPI:
                     # Initialize database tables with retry (handles Neon connection issues)
                     try:
                         from pulse.database import init_db, USE_POSTGRES, POSTGRES_URL
-                        print(f"[PULSE] DB mode: postgres={USE_POSTGRES}, url_set={bool(POSTGRES_URL)}", flush=True)
+                        print(f"[PRISM] DB mode: postgres={USE_POSTGRES}, url_set={bool(POSTGRES_URL)}", flush=True)
                         init_db()
-                        print("[PULSE] Database initialized successfully", flush=True)
+                        print("[PRISM] Database initialized successfully", flush=True)
                     except Exception as e:
-                        print(f"[PULSE] Database init FAILED: {e}", flush=True)
+                        print(f"[PRISM] Database init FAILED: {e}", flush=True)
                         _initialized["done"] = False  # Allow retry on next request
                         return
 
@@ -448,12 +447,12 @@ def create_app(args=None) -> FastAPI:
                     # Load trends from database (auto-seeds if empty)
                     if not _state["db"]:
                         try:
-                            print("[PULSE] Loading trends from database...", flush=True)
+                            print("[PRISM] Loading trends from database...", flush=True)
                             _state["db"] = _load_trend_database()
                             tc = _state["db"].trend_count if _state["db"] else 0
-                            print(f"[PULSE] Loaded {tc} trends", flush=True)
+                            print(f"[PRISM] Loaded {tc} trends", flush=True)
                         except Exception as e:
-                            print(f"[PULSE] Failed to load trends: {e}", flush=True)
+                            print(f"[PRISM] Failed to load trends: {e}", flush=True)
                             import traceback; traceback.print_exc()
 
                     # Try to load latest simulation from DB so War Room fills immediately
@@ -479,10 +478,10 @@ def create_app(args=None) -> FastAPI:
                                     "model_type": latest.get("model_type", "bayesian_copula"),
                                 }
                                 _state["allocation"] = alloc
-                                print("[PULSE] Loaded latest simulation from database", flush=True)
+                                print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
                                 # No simulation in DB — run one now
-                                print("[PULSE] No simulation in DB — auto-running simulation...", flush=True)
+                                print("[PRISM] No simulation in DB — auto-running simulation...", flush=True)
                                 try:
                                     config = _state["config"]
                                     dag = _state["dag"]
@@ -507,14 +506,14 @@ def create_app(args=None) -> FastAPI:
                                         allocation_recommendation=_sanitize(_state.get("allocation")),
                                         convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                                     )
-                                    print("[PULSE] Auto-simulation complete and persisted to DB", flush=True)
+                                    print("[PRISM] Auto-simulation complete and persisted to DB", flush=True)
                                 except Exception as e:
-                                    print(f"[PULSE] Auto-simulation failed: {e}", flush=True)
+                                    print(f"[PRISM] Auto-simulation failed: {e}", flush=True)
                                     import traceback; traceback.print_exc()
                         except Exception as e:
-                            print(f"[PULSE] Failed to load/run simulation: {e}", flush=True)
+                            print(f"[PRISM] Failed to load/run simulation: {e}", flush=True)
         except Exception as e:
-            print(f"[PULSE] Lazy init failed completely: {e}", flush=True)
+            print(f"[PRISM] Lazy init failed completely: {e}", flush=True)
             import traceback; traceback.print_exc()
             _initialized["done"] = False  # Allow retry
 
@@ -663,9 +662,7 @@ def create_app(args=None) -> FastAPI:
         return [{
             "id": t.id, "force": t.force, "sub_category": t.sub_category,
             "name": t.name, "direction": t.direction,
-            "impact": t.impact, "probability": t.probability,
-            "score": t.impact * t.probability,
-            "weighted_score": t.weighted_score,
+            "probability": t.probability,
             "normalized_score": t.normalized_score,
             "gp1_shift": t.normalized_score,
             "gp1_pct_affected": t.gp1_pct_affected,
@@ -682,7 +679,6 @@ def create_app(args=None) -> FastAPI:
             "user_override": t.user_override,
             "scorer_count": t.scorer_count,
             "score_variance": t.score_variance,
-            "impact_posterior": {"alpha": t.impact_posterior[0], "beta": t.impact_posterior[1]} if t.impact_posterior else None,
             "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
             "peak_year": getattr(t, 'peak_year', 0),
             "diffusion_curve": getattr(t, 'diffusion_curve', 's_curve'),
@@ -714,7 +710,6 @@ def create_app(args=None) -> FastAPI:
             name=req.name,
             description=req.description,
             direction=req.direction,
-            impact=req.impact,
             probability=req.probability,
             start_year=2026,
             strategic_implication=req.strategic_implication,
@@ -725,6 +720,7 @@ def create_app(args=None) -> FastAPI:
             source_type="scanner",
             confidence=req.confidence,
             ai_suggested=req.ai_suggested,
+            gp1_pct_affected=req.gp1_pct_affected or 0.10,
             peak_year=req.peak_year or 0,
             diffusion_curve=req.diffusion_curve or "s_curve",
         )
@@ -762,14 +758,14 @@ def create_app(args=None) -> FastAPI:
         return {
             "id": trend.id, "force": trend.force, "name": trend.name,
             "description": trend.description, "direction": trend.direction,
-            "impact": trend.impact, "probability": trend.probability,
+            "probability": trend.probability,
             "start_year": trend.start_year, "normalized_score": trend.normalized_score,
             "strategic_implication": trend.strategic_implication,
+            "gp1_pct_affected": trend.gp1_pct_affected,
             "category_exposure": trend.category_exposure,
             "vc_exposure": trend.vc_exposure,
             "regional_exposure": trend.regional_exposure,
             "confidence": trend.confidence, "ai_suggested": trend.ai_suggested,
-            "impact_posterior": trend.impact_posterior,
             "probability_posterior": trend.probability_posterior,
             "scorer_count": trend.scorer_count,
             "score_variance": trend.score_variance,
@@ -785,9 +781,6 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(404, f"Trend {trend_id} not found")
 
         audit = _state["audit"]
-        if update.impact is not None:
-            audit.log_score_change(trend_id, "impact", trend.impact, update.impact)
-            trend.impact = max(1, min(5, update.impact))
         if update.probability is not None:
             audit.log_score_change(trend_id, "probability", trend.probability, update.probability)
             trend.probability = max(1, min(5, update.probability))
@@ -1456,7 +1449,7 @@ def create_app(args=None) -> FastAPI:
 
             out_dir = os.path.join(tempfile.gettempdir(), "pulse_exports")
             os.makedirs(out_dir, exist_ok=True)
-            out_file = os.path.join(out_dir, "PULSE_War_Room.pptx")
+            out_file = os.path.join(out_dir, "PRISM_War_Room.pptx")
 
             # Get current scenario (for slide titles)
             db = _state.get("db")
@@ -1466,7 +1459,6 @@ def create_app(args=None) -> FastAPI:
                     "name": t.name,
                     "force": t.force,
                     "direction": t.direction,
-                    "impact": t.impact,
                     "probability": t.probability,
                     "normalized_score": t.normalized_score,
                     "description": t.description,
@@ -1490,7 +1482,7 @@ def create_app(args=None) -> FastAPI:
             return FileResponse(
                 out_file,
                 media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                filename="PULSE_War_Room.pptx",
+                filename="PRISM_War_Room.pptx",
             )
         except Exception as e:
             import traceback
@@ -1522,7 +1514,7 @@ def create_app(args=None) -> FastAPI:
             context = {
                 "simulation": _state.get("mc_result"),
                 "trends": [{"id": t.id, "name": t.name, "force": t.force,
-                            "direction": t.direction, "impact": t.impact,
+                            "direction": t.direction,
                             "probability": t.probability,
                             "normalized_score": t.normalized_score}
                            for t in (_state.get("db").trends if _state.get("db") else [])],

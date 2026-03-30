@@ -29,20 +29,16 @@ interface TrendData {
   description: string;
   force: string;
   direction: 'Expansion' | 'Contraction';
-  impact?: number;
   probability?: number;
   strategic_implication?: string;
   previous_round_scores?: {
-    impact?: number[];
     probability?: number[];
-    impact_alpha?: number | null;
     probability_alpha?: number | null;
   };
 }
 
 interface TrendScore {
   trend_id: string;
-  impact: number;
   probability: number;
   rationale: string;
 }
@@ -184,7 +180,6 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const currentTrendId = current?.id || '';
   const currentScore = (currentTrendId && scores[currentTrendId]) || {
     trend_id: currentTrendId,
-    impact: 0,
     probability: 0,
     rationale: '',
   };
@@ -203,7 +198,6 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
         ...prev,
         [current.id]: {
           trend_id: current.id,
-          impact: 0,
           probability: 0,
           rationale: '',
         },
@@ -228,14 +222,13 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   // Check if all trends have been scored (impact + probability > 0)
   const allScored = sortedTrends.every(t => {
     const s = scores[t.id];
-    return s && s.impact > 0 && s.probability > 0;
+    return s && s.probability > 0;
   });
 
   const handleSubmit = async () => {
     if (!allScored) return;
     const allScores: TrendScore[] = sortedTrends.map(t => ({
       trend_id: t.id,
-      impact: scores[t.id]?.impact || 3,
       probability: scores[t.id]?.probability || 3,
       rationale: scores[t.id]?.rationale ?? '',
     }));
@@ -431,15 +424,6 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
               <div style={{ fontSize: 12, fontWeight: 600, color: T.text, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Your Assessment
               </div>
-
-              <ScoreSlider
-                label="Impact"
-                value={currentScore.impact}
-                onChange={(v) => updateScore('impact', v)}
-                previousScores={current.previous_round_scores?.impact}
-                previousAlpha={current.previous_round_scores?.impact_alpha}
-                showPrevious={showPreviousDistributions}
-              />
 
               <ScoreSlider
                 label="Probability"
@@ -815,14 +799,13 @@ function RoundSummaryView({
   }
 
   // Group scores by trend
-  const byTrend: Record<string, { impact: number[]; probability: number[]; name?: string }> = {};
+  const byTrend: Record<string, { probability: number[]; name?: string }> = {};
   if (Array.isArray(scores)) {
     scores.forEach((s: any) => {
       if (!s?.trend_id) return;
-      if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { impact: [], probability: [], name: s.trend_name };
+      if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { probability: [], name: s.trend_name };
       const trend = byTrend[s.trend_id];
       if (trend) {
-        if (s.impact != null) trend.impact.push(s.impact);
         if (s.probability != null) trend.probability.push(s.probability);
       }
     });
@@ -845,9 +828,6 @@ function RoundSummaryView({
       </div>
 
       {Object.entries(byTrend).map(([trendId, data]) => {
-        const impactMedian = data.impact.length
-          ? [...data.impact].sort((a, b) => a - b)[Math.floor(data.impact.length / 2)]
-          : null;
         const probMedian = data.probability.length
           ? [...data.probability].sort((a, b) => a - b)[Math.floor(data.probability.length / 2)]
           : null;
@@ -870,7 +850,6 @@ function RoundSummaryView({
               {data.name || trendId}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <DelphiDistribution scores={data.impact} median={impactMedian} alpha={calcAlpha(data.impact)} label="Impact" />
               <DelphiDistribution scores={data.probability} median={probMedian} alpha={calcAlpha(data.probability)} label="Probability" />
             </div>
           </div>
@@ -945,12 +924,6 @@ function ConsensusView({
               </div>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: T.text3 }}>Impact</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: T.accent, fontFamily: T.mono }}>
-                    {data?.impact || 3}/5
-                  </div>
-                </div>
-                <div>
                   <div style={{ fontSize: 10, color: T.text3 }}>Probability</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: T.accent, fontFamily: T.mono }}>
                     {data?.probability || 3}/5
@@ -984,7 +957,7 @@ function ConsensusView({
           }}
         >
           <CheckCircle2 size={16} />
-          Apply Consensus to PULSE
+          Apply Consensus to PRISM
         </button>
         <button
           style={{
@@ -1005,19 +978,19 @@ function ConsensusView({
 // ── Mock Trends ───────────────────────────────────────────────
 
 const MOCK_TRENDS: TrendData[] = [
-  { id: 'con_01', name: 'Natural / Clean Beauty Movement', description: 'Global clean beauty market projected to reach $22B by 2030 at 12% CAGR. Consumers increasingly demanding transparent, "free-from" formulations across hair care, skin care and laundry products.', force: 'Consumer', direction: 'Expansion', impact: 5, probability: 4, strategic_implication: 'Reformulate core SKUs to clean standards. Invest in DBA communication for "pure" positioning.' },
-  { id: 'con_02', name: 'Premiumization in Hair Care', description: 'Premium hair care segment growing at 2x mass market rate. Salon-quality at-home products driving trade-up behavior, particularly in damage repair and color protection.', force: 'Consumer', direction: 'Expansion', impact: 4, probability: 4, strategic_implication: 'Expand Schwarzkopf Professional retail range. Launch premium tier within Gliss.' },
-  { id: 'con_03', name: 'Private Label Acceptance in Laundry', description: 'Private label share in EU laundry detergent reached 42.1% in 2024, accelerating in discount channel. Quality perception gap narrowing across mainstream segments.', force: 'Consumer', direction: 'Contraction', impact: 4, probability: 4, strategic_implication: 'Defend Persil with innovation that PL cannot replicate. Protect distribution in NKA.' },
-  { id: 'cus_01', name: 'Discount Channel Expansion (Aldi/Lidl)', description: 'Discounters now control 35%+ of FMCG volume in key EU markets. Expanding into premium tiers with curated brand partnerships.', force: 'Customer', direction: 'Contraction', impact: 4, probability: 5, strategic_implication: 'Develop dedicated discounter strategy. Create exclusive formats that protect margin.' },
-  { id: 'cus_02', name: 'D2C & Social Commerce Growth', description: 'Direct-to-consumer beauty sales growing at 25% CAGR. TikTok Shop and Instagram Checkout bypassing traditional retail channels.', force: 'Customer', direction: 'Expansion', impact: 3, probability: 4, strategic_implication: 'Launch DTC pilot for Schwarzkopf. Build creator partnerships for social commerce.' },
-  { id: 'tec_01', name: 'AI-Powered Personalization', description: 'AI beauty diagnostics market growing at 29% CAGR. Hair/skin analysis tools driving personalized product recommendations and increased basket size.', force: 'Technology', direction: 'Expansion', impact: 4, probability: 3, strategic_implication: 'Deploy AI shade-matching for Schwarzkopf Color. Launch personalization engine for DTC.' },
-  { id: 'tec_02', name: 'Green Chemistry / Bio-based Ingredients', description: 'Enzymatic cleaning and bio-surfactant technologies reaching price parity with petrochemical alternatives. Regulatory tailwind accelerating adoption.', force: 'Technology', direction: 'Expansion', impact: 4, probability: 4, strategic_implication: 'Invest in bio-surfactant sourcing. Patent key green formulation innovations.' },
-  { id: 'gov_01', name: 'EU Green Deal Chemical Regulation (CSS)', description: 'EU Chemicals Strategy for Sustainability will restrict 5,000+ substances by 2030. Affects formulations across beauty, laundry, and home care categories.', force: 'Government', direction: 'Contraction', impact: 5, probability: 5, strategic_implication: 'Establish cross-BU regulatory task force. Begin reformulation pipeline for at-risk SKUs.' },
-  { id: 'gov_02', name: 'Packaging Extended Producer Responsibility', description: 'EPR fees increasing 30-50% across EU markets. Single-use packaging taxes expanding from plastic to multi-material formats.', force: 'Government', direction: 'Contraction', impact: 3, probability: 5, strategic_implication: 'Accelerate refill/concentrate formats. Invest in mono-material packaging redesign.' },
-  { id: 'env_01', name: 'Water Scarcity & Concentrated Formats', description: 'Water stress affecting 40% of global population by 2030. Driving demand for waterless, concentrated, and solid format products.', force: 'Environmental', direction: 'Expansion', impact: 3, probability: 4, strategic_implication: 'Fast-track concentrated detergent and solid shampoo formats. Communicate water-saving benefits.' },
-  { id: 'env_02', name: 'Microplastics Ban', description: 'EU microplastics restriction (Oct 2023) phasing out synthetic polymers in cosmetics and detergents. Full compliance required by 2029-2035 depending on category.', force: 'Environmental', direction: 'Contraction', impact: 4, probability: 5, strategic_implication: 'Complete microplastic-free reformulation across all SKUs. Communicate proactive compliance.' },
-  { id: 'com_01', name: 'P&G Innovation Acceleration', description: 'P&G increased R&D spend to 3.1% of sales ($2.4B). Launching AI-driven formulation platforms and 50+ new patents/year in beauty/HPC.', force: 'Competitive', direction: 'Contraction', impact: 5, probability: 4, strategic_implication: 'Match innovation velocity. Strengthen patent portfolio in key technology domains.' },
-  { id: 'com_02', name: 'Unilever Portfolio Rationalization', description: 'Unilever divesting underperforming brands, focusing resources on "power brands." Creating white space opportunities in divested categories.', force: 'Competitive', direction: 'Expansion', impact: 3, probability: 3, strategic_implication: 'Monitor Unilever divestiture pipeline. Evaluate acquisition or market-share capture opportunities.' },
+  { id: 'con_01', name: 'Natural / Clean Beauty Movement', description: 'Global clean beauty market projected to reach $22B by 2030 at 12% CAGR. Consumers increasingly demanding transparent, "free-from" formulations across hair care, skin care and laundry products.', force: 'Consumer', direction: 'Expansion', probability: 4, strategic_implication: 'Reformulate core SKUs to clean standards. Invest in DBA communication for "pure" positioning.' },
+  { id: 'con_02', name: 'Premiumization in Hair Care', description: 'Premium hair care segment growing at 2x mass market rate. Salon-quality at-home products driving trade-up behavior, particularly in damage repair and color protection.', force: 'Consumer', direction: 'Expansion', probability: 4, strategic_implication: 'Expand Schwarzkopf Professional retail range. Launch premium tier within Gliss.' },
+  { id: 'con_03', name: 'Private Label Acceptance in Laundry', description: 'Private label share in EU laundry detergent reached 42.1% in 2024, accelerating in discount channel. Quality perception gap narrowing across mainstream segments.', force: 'Consumer', direction: 'Contraction', probability: 4, strategic_implication: 'Defend Persil with innovation that PL cannot replicate. Protect distribution in NKA.' },
+  { id: 'cus_01', name: 'Discount Channel Expansion (Aldi/Lidl)', description: 'Discounters now control 35%+ of FMCG volume in key EU markets. Expanding into premium tiers with curated brand partnerships.', force: 'Customer', direction: 'Contraction', probability: 5, strategic_implication: 'Develop dedicated discounter strategy. Create exclusive formats that protect margin.' },
+  { id: 'cus_02', name: 'D2C & Social Commerce Growth', description: 'Direct-to-consumer beauty sales growing at 25% CAGR. TikTok Shop and Instagram Checkout bypassing traditional retail channels.', force: 'Customer', direction: 'Expansion', probability: 4, strategic_implication: 'Launch DTC pilot for Schwarzkopf. Build creator partnerships for social commerce.' },
+  { id: 'tec_01', name: 'AI-Powered Personalization', description: 'AI beauty diagnostics market growing at 29% CAGR. Hair/skin analysis tools driving personalized product recommendations and increased basket size.', force: 'Technology', direction: 'Expansion', probability: 3, strategic_implication: 'Deploy AI shade-matching for Schwarzkopf Color. Launch personalization engine for DTC.' },
+  { id: 'tec_02', name: 'Green Chemistry / Bio-based Ingredients', description: 'Enzymatic cleaning and bio-surfactant technologies reaching price parity with petrochemical alternatives. Regulatory tailwind accelerating adoption.', force: 'Technology', direction: 'Expansion', probability: 4, strategic_implication: 'Invest in bio-surfactant sourcing. Patent key green formulation innovations.' },
+  { id: 'gov_01', name: 'EU Green Deal Chemical Regulation (CSS)', description: 'EU Chemicals Strategy for Sustainability will restrict 5,000+ substances by 2030. Affects formulations across beauty, laundry, and home care categories.', force: 'Government', direction: 'Contraction', probability: 5, strategic_implication: 'Establish cross-BU regulatory task force. Begin reformulation pipeline for at-risk SKUs.' },
+  { id: 'gov_02', name: 'Packaging Extended Producer Responsibility', description: 'EPR fees increasing 30-50% across EU markets. Single-use packaging taxes expanding from plastic to multi-material formats.', force: 'Government', direction: 'Contraction', probability: 5, strategic_implication: 'Accelerate refill/concentrate formats. Invest in mono-material packaging redesign.' },
+  { id: 'env_01', name: 'Water Scarcity & Concentrated Formats', description: 'Water stress affecting 40% of global population by 2030. Driving demand for waterless, concentrated, and solid format products.', force: 'Environmental', direction: 'Expansion', probability: 4, strategic_implication: 'Fast-track concentrated detergent and solid shampoo formats. Communicate water-saving benefits.' },
+  { id: 'env_02', name: 'Microplastics Ban', description: 'EU microplastics restriction (Oct 2023) phasing out synthetic polymers in cosmetics and detergents. Full compliance required by 2029-2035 depending on category.', force: 'Environmental', direction: 'Contraction', probability: 5, strategic_implication: 'Complete microplastic-free reformulation across all SKUs. Communicate proactive compliance.' },
+  { id: 'com_01', name: 'P&G Innovation Acceleration', description: 'P&G increased R&D spend to 3.1% of sales ($2.4B). Launching AI-driven formulation platforms and 50+ new patents/year in beauty/HPC.', force: 'Competitive', direction: 'Contraction', probability: 4, strategic_implication: 'Match innovation velocity. Strengthen patent portfolio in key technology domains.' },
+  { id: 'com_02', name: 'Unilever Portfolio Rationalization', description: 'Unilever divesting underperforming brands, focusing resources on "power brands." Creating white space opportunities in divested categories.', force: 'Competitive', direction: 'Expansion', probability: 3, strategic_implication: 'Monitor Unilever divestiture pipeline. Evaluate acquisition or market-share capture opportunities.' },
 ];
 
 // ── Main DelphiPanel Component ────────────────────────────────
@@ -1104,12 +1077,11 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
         try {
           const prevScores = await api.getDelphiScores(session.id, { round: String(session.current_round - 1) });
           const scoreList = Array.isArray(prevScores) ? prevScores : (prevScores as any)?.scores || [];
-          const byTrend: Record<string, { impact: number[]; probability: number[] }> = {};
+          const byTrend: Record<string, { probability: number[] }> = {};
           scoreList.forEach((s: any) => {
-            if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { impact: [], probability: [] };
+            if (!byTrend[s.trend_id]) byTrend[s.trend_id] = { probability: [] };
             const trend = byTrend[s.trend_id];
             if (trend) {
-              if (s.impact != null) trend.impact.push(s.impact);
               if (s.probability != null) trend.probability.push(s.probability);
             }
           });
@@ -1118,9 +1090,7 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
             return {
               ...t,
               previous_round_scores: trendScores ? {
-                impact: trendScores.impact,
                 probability: trendScores.probability,
-                impact_alpha: trendScores.impact.length > 1 ? 0.75 : null,
                 probability_alpha: trendScores.probability.length > 1 ? 0.75 : null,
               } : undefined,
             };
@@ -1197,7 +1167,6 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
         await api.submitDelphiScore(sessionId, {
           scorer_id: scorerName,
           trend_id: score.trend_id,
-          impact: score.impact,
           probability: score.probability,
           rationale: score.rationale,
         });
@@ -1271,7 +1240,7 @@ export default function DelphiPanel({ onClose }: DelphiPanelProps) {
       });
       // Trigger simulation refresh
       window.dispatchEvent(new CustomEvent('pulse:config-updated'));
-      setToast({ msg: 'Consensus applied to PULSE — model recalculating!', type: 'success' });
+      setToast({ msg: 'Consensus applied to PRISM — model recalculating!', type: 'success' });
     } catch {
       setToast({ msg: 'Failed to complete session', type: 'error' });
     }

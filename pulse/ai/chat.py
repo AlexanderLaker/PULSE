@@ -1,4 +1,4 @@
-"""Natural language chat interface to PULSE simulation engine."""
+"""Natural language chat interface to PRISM simulation engine."""
 
 import logging
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
@@ -31,9 +31,9 @@ class ChatContext:
             self.recent_queries = []
 
 
-class PulseChat:
+class PRISMChat:
     """
-    Natural language interface to query and analyze PULSE simulations.
+    Natural language interface to query and analyze PRISM simulations.
 
     Allows users to ask questions like:
     - "Which categories face the most headwinds?"
@@ -65,7 +65,7 @@ class PulseChat:
 
     async def ask(self, question: str) -> str:
         """
-        Answer a natural language question about PULSE simulations.
+        Answer a natural language question about PRISM simulations.
 
         Args:
             question: User question

@@ -2,7 +2,7 @@
 
 ## Overview
 
-All four advanced analytics modules for the PULSE profit pool simulation engine have been fully implemented, tested, and validated. These modules provide sophisticated risk analysis, sensitivity testing, stress scenario generation, and path dynamics detection.
+All four advanced analytics modules for the PRISM profit pool simulation engine have been fully implemented, tested, and validated. These modules provide sophisticated risk analysis, sensitivity testing, stress scenario generation, and path dynamics detection.
 
 **Implementation Status: COMPLETE ✓**
 
@@ -396,7 +396,7 @@ breaches = detector.detect_threshold_breach(
 
 ## Performance Metrics
 
-### Runtime (typical 13-category PULSE problem)
+### Runtime (typical 13-category PRISM problem)
 
 | Module | Operation | Time |
 |--------|-----------|------|
@@ -432,7 +432,7 @@ breaches = detector.detect_threshold_breach(
 
 ---
 
-## Usage in PULSE Pipeline
+## Usage in PRISM Pipeline
 
 ### Phase 1: Deterministic Validation
 ```python
@@ -519,7 +519,7 @@ All four advanced analytics modules are **production-ready**, fully tested, and 
 - **Stress Scenario Discovery** (Reverse Stress)
 - **Path Dynamics** (Tipping Points)
 
-When used together, they enable the PULSE executive dashboard to:
+When used together, they enable the PRISM executive dashboard to:
 1. Show what can go wrong (CVaR tail risk)
 2. Identify why (Sobol drivers)
 3. Find how it happens (Reverse stress scenarios)

@@ -65,14 +65,14 @@ function generateAINarrative(item: ProductImpactItem, trends: Trend[]): string {
   const forceLabel = forceDef?.label || item.force;
 
   if (item.direction === 'Expansion') {
-    return `PULSE analysis identifies **${item.productType}** within ${item.categoryName} as showing ${intensity} ${dir} profit pool dynamics, with a projected median shift of ${fmtShift(item.shift2030)} by 2030. ` +
+    return `PRISM analysis identifies **${item.productType}** within ${item.categoryName} as showing ${intensity} ${dir} profit pool dynamics, with a projected median shift of ${fmtShift(item.shift2030)} by 2030. ` +
       `The primary driver is the **${forceLabel}** force, specifically through "${primaryTrend}"${secondTrend ? ` compounded by "${secondTrend}"` : ''}. ` +
       `The trajectory is ${accel}, with the shift path moving from ${fmtShift(item.shift2028)} in 2028 to ${fmtShift(item.shift2030)} by 2030. ` +
       `${geoNarr}, suggesting region-prioritized investment. ` +
       `This product type represents a growth pocket where early-mover advantage can capture disproportionate margin. ` +
       `The confidence level is ${item.confidence}, based on ${item.trendNames.length} contributing trend${item.trendNames.length > 1 ? 's' : ''} and ${item.sources.length} external source${item.sources.length > 1 ? 's' : ''}.`;
   } else {
-    return `PULSE analysis flags **${item.productType}** within ${item.categoryName} as facing ${intensity} ${dir} profit pool pressure, with a projected median shift of ${fmtShift(item.shift2030)} by 2030. ` +
+    return `PRISM analysis flags **${item.productType}** within ${item.categoryName} as facing ${intensity} ${dir} profit pool pressure, with a projected median shift of ${fmtShift(item.shift2030)} by 2030. ` +
       `The key headwind originates from the **${forceLabel}** force, driven by "${primaryTrend}"${secondTrend ? ` and amplified by "${secondTrend}"` : ''}. ` +
       `The contraction path is ${accel}: from ${fmtShift(item.shift2028)} at mid-term to ${fmtShift(item.shift2030)} at long-term horizon. ` +
       `${geoNarr}, indicating where defensive measures are most urgent. ` +
@@ -241,8 +241,8 @@ const ProductImpactDetail: FC<ProductImpactDetailProps> = ({
         {/* ── Body ──────────────────────────────────────── */}
         <div style={{ padding: '24px 28px 28px' }}>
 
-          {/* ─ Section 1: PULSE AI Analysis ──────────── */}
-          <Section icon={<Sparkles size={14} color={T.accent} />} title="PULSE AI Analysis" color={T.accent}>
+          {/* ─ Section 1: PRISM AI Analysis ──────────── */}
+          <Section icon={<Sparkles size={14} color={T.accent} />} title="PRISM AI Analysis" color={T.accent}>
             <p style={{
               fontSize: 13.5, color: T.text2, lineHeight: 1.75,
               margin: 0,
@@ -401,7 +401,7 @@ const ProductImpactDetail: FC<ProductImpactDetailProps> = ({
                         fontSize: 11, fontWeight: 600, color: T.text3,
                         fontFamily: T.mono, marginLeft: 'auto',
                       }}>
-                        Impact {trend.impact ?? '?'} × Prob {trend.probability ?? '?'}
+                        Prob {trend.probability ?? '?'}
                       </span>
                     </div>
                     <div style={{

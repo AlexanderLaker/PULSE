@@ -1,5 +1,5 @@
 """
-PULSE seed data: 47 trends from the Trend Intelligence Report (March 2026).
+PRISM seed data: 47 trends from the Trend Intelligence Report (March 2026).
 
 This module lives inside the pulse package so it's importable on Vercel serverless.
 """
@@ -55,7 +55,7 @@ TRENDS = [
         id="consumer_r01", force="Consumer", sub_category="Market Structure",
         name="Private Label Structural Penetration in Europe",
         description="Private label crossed 40% market share in European FMCG (€291B, NIQ 2025). Structural, not cyclical — retailer brands invested in quality, packaging, and premium tiers. In Germany/Benelux, PL laundry share exceeds 45%. Branded-to-PL price gap narrowed to 15-20%.",
-        direction="Contraction", impact=5, probability=5, start_year=2025,
+        direction="Contraction", probability=5, start_year=2025,
         # 25%: PL directly competes for ~40-50% of volume but branded margin
         # defense limits GP1 exposure to the price-gap erosion portion
         gp1_pct_affected=0.25,
@@ -71,7 +71,7 @@ TRENDS = [
         id="consumer_r02", force="Consumer", sub_category="Behavioral",
         name="GLP-1 Drugs Reshape Consumer Spending Patterns",
         description="12.4% of US adults on GLP-1 receptor agonists. Consumer spending data shows reduced impulse purchasing but increased premium self-care investment. European adoption 18-24 months behind US but accelerating.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 5%: Indirect effect via spending reallocation; affects premium
         # tier only, EU adoption still early — small pool exposure
         gp1_pct_affected=0.05,
@@ -87,7 +87,7 @@ TRENDS = [
         id="consumer_r03", force="Consumer", sub_category="Premiumization",
         name="Premiumization Acceleration in Hair Care",
         description="Global premium hair care growing at 2-3x mass market rate. Skinification logic applied to hair — ingredient-conscious, multi-step routines, professional-grade at home. Henkel Hair grew +3.2% organic FY2025.",
-        direction="Expansion", impact=4, probability=5, start_year=2024,
+        direction="Expansion", probability=5, start_year=2024,
         # 18%: Premium tier is ~25-30% of Hair GP1 but growing; affects
         # mix/margin improvement across the portfolio
         gp1_pct_affected=0.18,
@@ -103,7 +103,7 @@ TRENDS = [
         id="consumer_r04", force="Consumer", sub_category="Behavioral",
         name="Conscious Consumption and Cleanical Beauty",
         description="Consumers simultaneously demand clean (no harmful chemicals) and clinical (proven efficacy). Cleanical convergence requires reformulation investment but rewards brands delivering both. Reinforced by EU Green Claims Directive.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 10%: Affects the ~30% of consumers who actively select on
         # clean/clinical criteria, translating to ~10% GP1 exposure
         gp1_pct_affected=0.10,
@@ -119,7 +119,7 @@ TRENDS = [
         id="consumer_r05", force="Consumer", sub_category="Demographics",
         name="Silver Economy — Aging Population Shifts Category Demand",
         description="Europe 65+ population exceeds 25% by 2030. Gray coverage is the #1 CEP in hair color. Aging consumers need gentler formulations, ease-of-use packaging, different cleaning patterns.",
-        direction="Expansion", impact=3, probability=5, start_year=2025,
+        direction="Expansion", probability=5, start_year=2025,
         # 12%: 65+ already ~20% of buyers; incremental growth in Color
         # (gray coverage) and gentle formulation segments
         gp1_pct_affected=0.12,
@@ -135,7 +135,7 @@ TRENDS = [
         id="consumer_r06", force="Consumer", sub_category="Macroeconomic",
         name="Cost-of-Living Squeeze and Persistent Trading Down",
         description="70%+ of European consumers continue trading down on everyday essentials. ECB mortgage resets shave up to 1pp off consumption growth through 2030. Structural affordability squeeze beyond inflation.",
-        direction="Contraction", impact=4, probability=4, start_year=2024,
+        direction="Contraction", probability=4, start_year=2024,
         # 20%: Broad-based macro effect; 70% of consumers trading down
         # but only ~20% of GP1 exposed because many already buy value
         gp1_pct_affected=0.20,
@@ -151,7 +151,7 @@ TRENDS = [
         id="consumer_r07", force="Consumer", sub_category="Category Creation",
         name="Scalp Care Emerges as Standalone Category",
         description="Fastest-growing Hair sub-segment. Scalp health growing at 2x prestige hair care rate. Google searches for scalp+microbiome up 120%. Hair-and-scalp market projected $175.8B by 2032.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 6%: New adjacent pool — additive, not substitutive;
         # captures incremental occasions, currently small base
         gp1_pct_affected=0.06,
@@ -167,7 +167,7 @@ TRENDS = [
         id="consumer_r08", force="Consumer", sub_category="Demographics",
         name="Male Grooming Structural Growth",
         description="European male grooming market: $23.6B in 2025, growing at 7.65% CAGR. Germany projected $5.3B by 2026. Under-penetrated in Hair relative to female segments.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 8%: Males ~15-20% of Hair buyers; under-penetrated segment
         # growth adds to pool but from small base
         gp1_pct_affected=0.08,
@@ -183,7 +183,7 @@ TRENDS = [
         id="consumer_r09", force="Consumer", sub_category="Premiumization",
         name="Fragrance and Sensory Premiumization in Home Care",
         description="Luxury fragrance entering mainstream home care. Laundry perfume products growing 15%+ in Southern Europe and Asia. Creates a premiumization path for LHC categories that historically lacked pricing power.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 10%: Fragrance premiumization creates new margin layer but
         # only for ~20% of LHC volume that goes premium
         gp1_pct_affected=0.10,
@@ -199,7 +199,7 @@ TRENDS = [
         id="consumer_r10", force="Consumer", sub_category="Category Creation",
         name="Hair Loss and Thinning Treatments Enter Consumer Mainstream",
         description="Hair loss treatment market: $2.93B in 2025, 7.77% CAGR. Minoxidil market $6.6B. OTC availability expanding, destigmatization accelerating. 80M Americans affected by hereditary hair loss.",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 5%: New adjacent pool with small overlap to existing Care;
         # additive but niche relative to total Hair GP1
         gp1_pct_affected=0.05,
@@ -215,7 +215,7 @@ TRENDS = [
         id="consumer_r11", force="Consumer", sub_category="Behavioral",
         name="Gen Z Dupe Culture and Ingredient Literacy",
         description="32% of consumers actively seek high-quality dupes over branded products. Gen Z decodes INCI lists on TikTok, compares formulations across price tiers. Minimalist routines (3-5 steps) reduce consumption occasions.",
-        direction="Contraction", impact=3, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 12%: Gen Z ~20% of category spend; dupe-seeking erodes
         # branded price premium for ~60% of that cohort
         gp1_pct_affected=0.12,
@@ -231,7 +231,7 @@ TRENDS = [
         id="consumer_r12", force="Consumer", sub_category="Behavioral",
         name="Post-COVID Hygiene Habits Persistence in Home Care",
         description="Surface disinfectant market: $8.1B in 2025, 7.8% CAGR. Elevated hygiene consciousness persists — daily surface disinfection routine. Baseline cleaning frequency 20-30% above pre-COVID.",
-        direction="Expansion", impact=2, probability=4, start_year=2022,
+        direction="Expansion", probability=4, start_year=2022,
         # 7%: Elevated baseline already mostly priced in; incremental
         # GP1 exposure limited to frequency-driven volume lift
         gp1_pct_affected=0.07,
@@ -252,7 +252,7 @@ TRENDS = [
         id="government_r01", force="Government", sub_category="Chemical Regulation",
         name="EU PFAS Universal Restriction",
         description="EU's proposed universal restriction on ~10,000 PFAS substances. ECHA received 5,642 consultation comments. Affects surface treatments, water-repellent coatings, stain resistance, industrial cleaning. Phased 2027-2030.",
-        direction="Contraction", impact=5, probability=4, start_year=2027,
+        direction="Contraction", probability=4, start_year=2027,
         # 12%: Reformulation cost + temporary delisting risk for affected
         # SKUs; ~20-30% of LHC formulations contain PFAS-adjacent chemistry
         gp1_pct_affected=0.12,
@@ -268,7 +268,7 @@ TRENDS = [
         id="government_r02", force="Government", sub_category="Chemical Regulation",
         name="EU Microplastics Ban — Phase 2 Implementation",
         description="Phase 2 (2027-2029) targets leave-on cosmetics and detergent capsule coatings. PVA film in laundry/dishwasher pods under scrutiny. Bio-based alternatives technically immature at scale.",
-        direction="Contraction", impact=4, probability=5, start_year=2027,
+        direction="Contraction", probability=5, start_year=2027,
         # 10%: Pod/capsule formats are ~15-20% of LAD/ADW volume;
         # reformulation + potential format disruption
         gp1_pct_affected=0.10,
@@ -284,7 +284,7 @@ TRENDS = [
         id="government_r03", force="Government", sub_category="Cosmetics Regulation",
         name="EU Cosmetics Regulation Omnibus VII/VIII Revision",
         description="Rolling restriction of UV filters, preservatives, fragrances, colorants under EC 1223/2009 amendments. SCCS opinions driving restrictions on widely-used ingredients.",
-        direction="Contraction", impact=4, probability=4, start_year=2026,
+        direction="Contraction", probability=4, start_year=2026,
         # 15%: Hair dye reformulation among hardest in consumer chemistry;
         # Color portfolio disproportionately exposed (colorant restrictions)
         gp1_pct_affected=0.15,
@@ -300,7 +300,7 @@ TRENDS = [
         id="government_r04", force="Government", sub_category="Packaging",
         name="EU PPWR — Packaging and Packaging Waste Regulation",
         description="Mandates 30% recycled content by 2030, 65% by 2040. DRS expansion. Reuse/refill targets. Applies from August 2026. Affects every Henkel SKU.",
-        direction="Contraction", impact=3, probability=5, start_year=2026,
+        direction="Contraction", probability=5, start_year=2026,
         # 6%: COGS increase from PCR resin premium (~10-15% packaging cost
         # uplift); packaging is ~8-12% of COGS
         gp1_pct_affected=0.06,
@@ -316,7 +316,7 @@ TRENDS = [
         id="government_r05", force="Government", sub_category="Sustainability Claims",
         name="EU Green Claims Directive / EmpCo Enforcement",
         description="Empowering Consumers Directive applies September 2026. Bans generic green claims without robust substantiation. Restricts sustainability marketing — a key premiumization lever.",
-        direction="Contraction", impact=3, probability=5, start_year=2026,
+        direction="Contraction", probability=5, start_year=2026,
         # 8%: Restricts a marketing lever, not the product itself;
         # mainly affects the sustainability-premium pricing delta
         gp1_pct_affected=0.08,
@@ -332,7 +332,7 @@ TRENDS = [
         id="government_r06", force="Government", sub_category="Supply Chain",
         name="EU Deforestation Regulation (EUDR)",
         description="Applies December 2026 for large companies. Covers palm oil and derivatives. Requires geolocation-level traceability back to plantation, proving no deforestation after Dec 31 2020.",
-        direction="Contraction", impact=3, probability=4, start_year=2026,
+        direction="Contraction", probability=4, start_year=2026,
         # 5%: Supply chain compliance cost; palm-derived surfactants are
         # ~15% of raw material cost, traceability adds ~2-3% to that
         gp1_pct_affected=0.05,
@@ -348,7 +348,7 @@ TRENDS = [
         id="government_r07", force="Government", sub_category="Digital Compliance",
         name="EU Digital Product Passport (DPP)",
         description="Under ESPR, DPPs required for detergents ~2027-2028, broader goods through 2030. Digital record of composition, lifecycle, sustainability data via QR code.",
-        direction="Contraction", impact=2, probability=4, start_year=2027,
+        direction="Contraction", probability=4, start_year=2027,
         # 2%: Pure IT/compliance cost; no impact on demand or pricing
         gp1_pct_affected=0.02,
         strategic_implication="Compliance/IT cost — not a fundamental business model change. Detergents in first wave.",
@@ -367,7 +367,7 @@ TRENDS = [
     Trend(
         id="technology_r01", force="Technology", sub_category="R&D",
         name="AI-Driven Formulation and Speed-to-Market",
-        direction="Expansion", impact=4, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 8%: COGS efficiency + speed-to-market advantage; affects R&D
         # cost structure (~5% of revenue) and innovation hit rate
         gp1_pct_affected=0.08,
@@ -383,7 +383,7 @@ TRENDS = [
     Trend(
         id="technology_r02", force="Technology", sub_category="Green Chemistry",
         name="Bio-Based and Green Chemistry Alternatives",
-        direction="Expansion", impact=4, probability=3, start_year=2026,
+        direction="Expansion", probability=3, start_year=2026,
         # 10%: Turns regulatory compliance cost into margin advantage;
         # affects raw material cost (~25% of COGS) for reformulated products
         gp1_pct_affected=0.10,
@@ -399,7 +399,7 @@ TRENDS = [
     Trend(
         id="technology_r03", force="Technology", sub_category="Format Innovation",
         name="Concentrated and Solid Formats Innovation",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 7%: Improves per-use margin but from niche base; affects
         # ~10% of volume currently transitioning to new formats
         gp1_pct_affected=0.07,
@@ -415,7 +415,7 @@ TRENDS = [
     Trend(
         id="technology_r04", force="Technology", sub_category="Biotech",
         name="Microbiome Science for Hair and Skin",
-        direction="Expansion", impact=3, probability=3, start_year=2025,
+        direction="Expansion", probability=3, start_year=2025,
         # 4%: Nascent science, small addressable market within Care;
         # additive pool but early-stage
         gp1_pct_affected=0.04,
@@ -431,7 +431,7 @@ TRENDS = [
     Trend(
         id="technology_r05", force="Technology", sub_category="Operations",
         name="Manufacturing Automation and Industry 4.0",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 6%: COGS efficiency across entire portfolio; 20-30% inventory
         # reduction translates to ~2-3pp margin improvement on ~30% of ops
         gp1_pct_affected=0.06,
@@ -447,7 +447,7 @@ TRENDS = [
     Trend(
         id="technology_r06", force="Technology", sub_category="Digital",
         name="Retail Media Networks as Primary FMCG Channel",
-        direction="Contraction", impact=3, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 10%: Retail media is a margin extraction layer; ~8-12% of
         # marketing spend shifting to retail media with lower ROI
         gp1_pct_affected=0.10,
@@ -463,7 +463,7 @@ TRENDS = [
     Trend(
         id="technology_r07", force="Technology", sub_category="Digital",
         name="AI-Powered Personalization at Scale",
-        direction="Expansion", impact=3, probability=3, start_year=2026,
+        direction="Expansion", probability=3, start_year=2026,
         # 3%: Still nascent; affects niche DTC/premium segment only
         gp1_pct_affected=0.03,
         description="AI personalization moving from DTC niche toward mass feasibility. AI diagnostics, customized formulations, adaptive recommendations. L'Oreal Modiface is benchmark. Still nascent.",
@@ -478,7 +478,7 @@ TRENDS = [
     Trend(
         id="technology_r08", force="Technology", sub_category="Smart Home",
         name="Connected Appliances and Auto-Dosing Transform Detergent Economics",
-        direction="Expansion", impact=3, probability=3, start_year=2025,
+        direction="Expansion", probability=3, start_year=2025,
         # 5%: Auto-dosing affects per-cycle volume (-23%) but creates
         # platform lock-in; net GP1 effect limited to smart washer owners
         gp1_pct_affected=0.05,
@@ -499,7 +499,7 @@ TRENDS = [
     Trend(
         id="environmental_r01", force="Environmental", sub_category="Supply Chain",
         name="Palm Oil Supply Chain Disruption (Indonesia B50)",
-        direction="Contraction", impact=4, probability=4, start_year=2025,
+        direction="Contraction", probability=4, start_year=2025,
         # 12%: Palm-derived surfactants are ~15-20% of raw material input;
         # B50 diverts supply, driving 20-40% price spikes on oleochemicals
         gp1_pct_affected=0.12,
@@ -515,7 +515,7 @@ TRENDS = [
     Trend(
         id="environmental_r02", force="Environmental", sub_category="Resource",
         name="Water Scarcity Drives Low-Water Formulations",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 6%: Creates demand for new formats (dry shampoo, cold-wash)
         # but from small base; additive pool opportunity
         gp1_pct_affected=0.06,
@@ -531,7 +531,7 @@ TRENDS = [
     Trend(
         id="environmental_r03", force="Environmental", sub_category="Carbon",
         name="Carbon Border Adjustment and Scope 3 Reporting",
-        direction="Contraction", impact=3, probability=4, start_year=2026,
+        direction="Contraction", probability=4, start_year=2026,
         # 4%: CBAM adds ~1-3% to imported raw material costs;
         # Scope 3 reporting is compliance cost, not margin destruction
         gp1_pct_affected=0.04,
@@ -547,7 +547,7 @@ TRENDS = [
     Trend(
         id="environmental_r04", force="Environmental", sub_category="Packaging",
         name="EPR Fee Escalation and Eco-Modulation",
-        direction="Contraction", impact=3, probability=5, start_year=2025,
+        direction="Contraction", probability=5, start_year=2025,
         # 4%: EPR fees are ~1-2% of packaging cost; eco-modulation
         # penalties can 2-5x for non-compliant materials, but small base
         gp1_pct_affected=0.04,
@@ -563,7 +563,7 @@ TRENDS = [
     Trend(
         id="environmental_r05", force="Environmental", sub_category="Climate",
         name="Climate-Driven Pest Pattern Shifts (Insecticide Demand)",
-        direction="Expansion", impact=2, probability=4, start_year=2024,
+        direction="Expansion", probability=4, start_year=2024,
         # 8%: Directly expands FFI addressable market by geographic
         # and seasonal expansion; concentrated effect on one category
         gp1_pct_affected=0.08,
@@ -579,7 +579,7 @@ TRENDS = [
     Trend(
         id="environmental_r06", force="Environmental", sub_category="Supply Chain",
         name="Supply Chain Nearshoring and Geopolitical Diversification",
-        direction="Contraction", impact=3, probability=4, start_year=2024,
+        direction="Contraction", probability=4, start_year=2024,
         # 5%: Short-term COGS uplift from dual-sourcing premium;
         # affects raw material + logistics costs
         gp1_pct_affected=0.05,
@@ -600,7 +600,7 @@ TRENDS = [
     Trend(
         id="competitive_r01", force="Competitive", sub_category="Restructuring",
         name="Reckitt Essential Home Divestiture",
-        direction="Expansion", impact=4, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 10%: Share capture opportunity in overlapping LHC categories;
         # Reckitt transition creates ~2-3 year window in ~30% of EU LHC shelf
         gp1_pct_affected=0.10,
@@ -616,7 +616,7 @@ TRENDS = [
     Trend(
         id="competitive_r02", force="Competitive", sub_category="Strategy",
         name="Unilever Beauty and Wellbeing Pivot",
-        direction="Contraction", impact=4, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 15%: Direct competitive overlap in Hair Care/Body; Unilever's
         # €50B war chest intensifies fight for ~30% of Hair shelf
         gp1_pct_affected=0.15,
@@ -632,7 +632,7 @@ TRENDS = [
     Trend(
         id="competitive_r03", force="Competitive", sub_category="Strategy",
         name="P&G Superiority Framework and Innovation Fortress",
-        direction="Contraction", impact=3, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 12%: P&G directly overlaps in LAD, ADW; their innovation
         # pace pressures GP1 via price/quality competition in ~40% of LHC
         gp1_pct_affected=0.12,
@@ -648,7 +648,7 @@ TRENDS = [
     Trend(
         id="competitive_r04", force="Competitive", sub_category="Disruption",
         name="DTC and Indie Brand Disruption in Hair",
-        direction="Contraction", impact=3, probability=4, start_year=2023,
+        direction="Contraction", probability=4, start_year=2023,
         # 8%: Indie brands capture premium sub-segments (~15% of Hair
         # premium) but limited mass-market GP1 exposure
         gp1_pct_affected=0.08,
@@ -664,7 +664,7 @@ TRENDS = [
     Trend(
         id="competitive_r05", force="Competitive", sub_category="Disruption",
         name="Chinese FMCG Brands Enter European Market",
-        direction="Contraction", impact=2, probability=3, start_year=2025,
+        direction="Contraction", probability=3, start_year=2025,
         # 3%: Early-warning stage; <2% EU market share today;
         # potential future threat but current GP1 exposure minimal
         gp1_pct_affected=0.03,
@@ -680,7 +680,7 @@ TRENDS = [
     Trend(
         id="competitive_r06", force="Competitive", sub_category="Growth",
         name="Emerging Markets Growth Divergence — IMEA Leads",
-        direction="Expansion", impact=3, probability=4, start_year=2024,
+        direction="Expansion", probability=4, start_year=2024,
         # 12%: IMEA = ~15-20% of total revenue but fastest-growing;
         # structural growth driver for portfolio diversification
         gp1_pct_affected=0.12,
@@ -696,7 +696,7 @@ TRENDS = [
     Trend(
         id="competitive_r07", force="Competitive", sub_category="Strategy",
         name="L'Oreal Tech-Beauty Platform Strategy",
-        direction="Contraction", impact=3, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 10%: L'Oreal's €1.7B R&D directly threatens Henkel Hair
         # Color innovation leadership; affects ~25% of premium Hair
         gp1_pct_affected=0.10,
@@ -717,7 +717,7 @@ TRENDS = [
     Trend(
         id="customer_r01", force="Customer", sub_category="Channel Shift",
         name="Discount Retail Channel Expansion in Europe",
-        direction="Contraction", impact=4, probability=5, start_year=2024,
+        direction="Contraction", probability=5, start_year=2024,
         # 20%: Discount = 25-35% of grocery; every share point to
         # discount erodes branded margin by ~3-5pp on that volume
         gp1_pct_affected=0.20,
@@ -733,7 +733,7 @@ TRENDS = [
     Trend(
         id="customer_r02", force="Customer", sub_category="E-Commerce",
         name="E-Commerce Profit Pool Maturation",
-        direction="Contraction", impact=3, probability=4, start_year=2024,
+        direction="Contraction", probability=4, start_year=2024,
         # 8%: E-com is 12-15% of sales; pay-to-play economics erode
         # ~2-3pp margin vs offline, affecting that volume slice
         gp1_pct_affected=0.08,
@@ -749,7 +749,7 @@ TRENDS = [
     Trend(
         id="customer_r03", force="Customer", sub_category="Market Structure",
         name="Retailer Consolidation and Power Concentration",
-        direction="Contraction", impact=3, probability=4, start_year=2024,
+        direction="Contraction", probability=4, start_year=2024,
         # 15%: Top 10 grocers = 40-50% of sales; listing fee and
         # promotional pressure erodes ~2-4pp on the negotiated volume
         gp1_pct_affected=0.15,
@@ -765,7 +765,7 @@ TRENDS = [
     Trend(
         id="customer_r04", force="Customer", sub_category="Channel Shift",
         name="Social Commerce and TikTok Shop Emergence",
-        direction="Expansion", impact=2, probability=3, start_year=2024,
+        direction="Expansion", probability=3, start_year=2024,
         # 3%: Still <3% of FMCG sales; additive channel opportunity
         # but small current pool exposure
         gp1_pct_affected=0.03,
@@ -781,7 +781,7 @@ TRENDS = [
     Trend(
         id="customer_r05", force="Customer", sub_category="Channel Shift",
         name="Quick Commerce Consolidation and FMCG Integration",
-        direction="Contraction", impact=2, probability=3, start_year=2024,
+        direction="Contraction", probability=3, start_year=2024,
         # 2%: Marginal channel; ~1-2% of total FMCG sales after
         # consolidation, limited GP1 impact
         gp1_pct_affected=0.02,
@@ -797,7 +797,7 @@ TRENDS = [
     Trend(
         id="customer_r06", force="Customer", sub_category="Business Model",
         name="FMCG Subscription and Loyalty Ecosystem Lock-in",
-        direction="Contraction", impact=2, probability=4, start_year=2024,
+        direction="Contraction", probability=4, start_year=2024,
         # 5%: Subscription lock-in affects ~10% of volume in LAD/ADW
         # with ~2pp margin erosion from platform economics
         gp1_pct_affected=0.05,
@@ -813,7 +813,7 @@ TRENDS = [
     Trend(
         id="customer_r07", force="Customer", sub_category="Channel Creation",
         name="Professional Salon Channel to Consumer Crossover",
-        direction="Expansion", impact=3, probability=4, start_year=2025,
+        direction="Expansion", probability=4, start_year=2025,
         # 10%: Salon-to-retail crossover creates new profit pool for
         # premium Hair; B2C = 63% of $23.4B market, growing at 4.6% CAGR
         gp1_pct_affected=0.10,
@@ -1009,7 +1009,6 @@ def main():
     for t in TRENDS:
         assert t.force in ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"], f"Invalid force: {t.force} for {t.id}"
         assert t.direction in ["Expansion", "Contraction"], f"Invalid direction: {t.direction} for {t.id}"
-        assert 1 <= t.impact <= 5, f"Invalid impact: {t.impact} for {t.id}"
         assert 1 <= t.probability <= 5, f"Invalid probability: {t.probability} for {t.id}"
         for k, v in t.category_exposure.items():
             assert k in CATEGORIES, f"Invalid category: {k} for {t.id}"

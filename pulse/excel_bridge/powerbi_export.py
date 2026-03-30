@@ -1,4 +1,4 @@
-"""Power BI export module — exports PULSE results to flat JSON and CSV.
+"""Power BI export module — exports PRISM results to flat JSON and CSV.
 
 Produces flat table format optimized for Power BI import. Each row represents
 one category × scenario × time horizon combination.
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class PowerBIExporter:
-    """Exports PULSE simulation results to flat JSON and CSV formats for Power BI."""
+    """Exports PRISM simulation results to flat JSON and CSV formats for Power BI."""
 
     def __init__(self, config: ModelConfig):
         """Initialize the Power BI exporter.

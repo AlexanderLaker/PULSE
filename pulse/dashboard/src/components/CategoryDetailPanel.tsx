@@ -38,9 +38,7 @@ interface Trend {
   name: string;
   force: ForceName;
   direction: 'Expansion' | 'Contraction';
-  score?: number;
   exposure_level?: number;
-  impact?: number;
   probability?: number;
   description?: string;
   strategic_implication?: string;
@@ -409,10 +407,6 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
                   backgroundColor: T.bg3 + '60',
                   borderRadius: '4px',
                 }}>
-                  <div style={{ fontSize: '8px', color: T.text3, marginBottom: '2px' }}>Impact</div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>
-                    {trend.impact || '—'}/5
-                  </div>
                 </div>
                 <div style={{
                   flex: 1,

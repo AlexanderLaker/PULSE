@@ -1,4 +1,4 @@
-# PULSE Dashboard Upgrade Summary
+# PRISM Dashboard Upgrade Summary
 
 ## Completed Tasks
 
@@ -194,5 +194,5 @@ Added `data-onboarding` attributes to key elements:
 - Implement actual backend endpoints (FastAPI)
 - Set up Power BI semantic model integration
 - Configure Azure OpenAI provider for production
-- Set up monthly automated PULSE → Power BI sync workflow
-- Create monthly task scheduler for PULSE runs
+- Set up monthly automated PRISM → Power BI sync workflow
+- Create monthly task scheduler for PRISM runs

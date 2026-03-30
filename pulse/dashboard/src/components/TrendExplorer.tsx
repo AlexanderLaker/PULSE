@@ -22,9 +22,7 @@ interface TrendData {
   force: ForceName;
   name: string;
   direction: 'Expansion' | 'Contraction';
-  impact?: number;
   probability?: number;
-  score?: number;
   gp1_shift?: number;
   gp1_pct_affected?: number;
   description?: string;
@@ -80,7 +78,6 @@ interface DotBarProps {
 }
 
 const LABEL_MAPS = {
-  impact: ['Negligible', 'Low', 'Moderate', 'High', 'Transformative'],
   probability: ['Very Unlikely', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'],
   exposure: ['None', 'Minimal', 'Low', 'Moderate', 'High'],
 };
@@ -508,7 +505,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
           }}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-            {/* Left: Name → Description → PULSE Analysis → Sources */}
+            {/* Left: Name → Description → PRISM Analysis → Sources */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* 0. Trend Name (admin editable) */}
               <div>
@@ -578,10 +575,10 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 )}
               </div>
 
-              {/* 2. PULSE Analysis / Strategic Implication */}
+              {/* 2. PRISM Analysis / Strategic Implication */}
               <div>
                 <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={10} /> PULSE ANALYSIS
+                  <Sparkles size={10} /> PRISM ANALYSIS
                 </div>
                 {isAdmin ? (
                   <textarea
@@ -1044,11 +1041,6 @@ interface TrendBadge {
 function detectTrendBadges(trend: TrendData): TrendBadge[] {
   const badges: TrendBadge[] = [];
 
-  // High Impact badge: (impact * probability >= 16) AND Contraction
-  if ((trend.impact || 0) * (trend.probability || 0) >= 16 && trend.direction === 'Contraction') {
-    badges.push({ type: 'high_impact', label: 'High Impact' });
-  }
-
   // AI Suggested badge
   if (trend.ai_suggested) {
     badges.push({ type: 'ai_suggested', label: 'AI Suggested' });
@@ -1060,8 +1052,8 @@ function detectTrendBadges(trend: TrendData): TrendBadge[] {
     badges.push({ type: 'regulatory', label: 'Regulatory Watch' });
   }
 
-  // Monitor badge: impact === 5 OR probability === 5
-  if (trend.impact === 5 || trend.probability === 5) {
+  // Monitor badge: probability === 5
+  if (trend.probability === 5) {
     badges.push({ type: 'monitor', label: 'Monitor' });
   }
 
@@ -1150,7 +1142,6 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
   const [newTrendForce, setNewTrendForce] = useState<ForceName>('Consumer');
   const [newTrendName, setNewTrendName] = useState('');
   const [newTrendDirection, setNewTrendDirection] = useState<'Expansion' | 'Contraction'>('Expansion');
-  const [newTrendImpact, setNewTrendImpact] = useState(3);
   const [newTrendProbability, setNewTrendProbability] = useState(3);
 
   const trends = data?.trends || [];
@@ -1253,14 +1244,12 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
       force: newTrendForce,
       name: newTrendName,
       direction: newTrendDirection,
-      impact: newTrendImpact,
       probability: newTrendProbability,
     });
     // Reset form
     setNewTrendName('');
     setNewTrendForce('Consumer');
     setNewTrendDirection('Expansion');
-    setNewTrendImpact(3);
     setNewTrendProbability(3);
     setShowAddForm(false);
   };
@@ -1559,22 +1548,6 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
               </div>
             </div>
 
-            {/* Impact */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
-                IMPACT
-              </div>
-              <DotBar
-                value={newTrendImpact}
-                onChange={setNewTrendImpact}
-                editable
-                color="blue"
-                size="sm"
-                direction={newTrendDirection}
-                labelType="impact"
-              />
-            </div>
-
             {/* Probability */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ fontSize: '9px', fontWeight: 600, color: T.text3, marginBottom: '6px', letterSpacing: '0.5px' }}>
@@ -1599,7 +1572,6 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                   setNewTrendName('');
                   setNewTrendForce('Consumer');
                   setNewTrendDirection('Expansion');
-                  setNewTrendImpact(3);
                   setNewTrendProbability(3);
                 }}
                 style={{
@@ -1660,11 +1632,8 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                 { key: 'force', label: 'Force' },
                 { key: 'name', label: 'Trend Name' },
                 { key: 'direction', label: 'Direction' },
-                { key: 'impact', label: 'Impact' },
                 { key: 'probability', label: 'Probability' },
-                { key: 'score', label: 'Score' },
                 { key: 'gp1_pct_affected', label: 'GP1 % Affected' },
-                { key: 'gp1_shift', label: 'GP1 Shift %' },
                 { key: '_actions', label: '' },
               ].map(col => (
                 <th
@@ -1779,17 +1748,6 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <DotBar
-                          value={trend.impact || 0}
-                          onChange={(val) => onUpdateTrend(trend.id, { impact: val })}
-                          editable={isAdmin}
-                          color="blue"
-                          size="sm"
-                          direction={trend.direction}
-                          labelType="impact"
-                        />
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <DotBar
                           value={trend.probability || 0}
                           onChange={(val) => onUpdateTrend(trend.id, { probability: val })}
                           editable={isAdmin}
@@ -1798,16 +1756,6 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                           direction={trend.direction}
                           labelType="probability"
                         />
-                      </td>
-                      <td style={{
-                        padding: '12px 16px',
-                        textAlign: 'right',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        fontFamily: T.mono,
-                        color: scoreColor,
-                      }}>
-                        {fmtPct((trend.score || 0) / 25, 1)}
                       </td>
                       <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                         <input

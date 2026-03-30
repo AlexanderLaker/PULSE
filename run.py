@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PULSE Quick Launcher — run this from the PROFIT_POOL_ENGINE folder.
+PRISM Quick Launcher — run this from the PROFIT_POOL_ENGINE folder.
 
 Usage:
     python run.py                           # Auto-find V12 Excel and launch dashboard
@@ -50,7 +50,7 @@ def check_deps():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PULSE Quick Launcher")
+    parser = argparse.ArgumentParser(description="PRISM Quick Launcher")
     parser.add_argument("--input", "-i", help="Path to V12 Excel file (auto-detected if omitted)")
     parser.add_argument("--port", "-p", type=int, default=8000, help="Server port (default: 8000)")
     parser.add_argument("--no-dashboard", action="store_true", help="Run simulation only, no dashboard")
@@ -74,7 +74,7 @@ def main():
         sys.exit(1)
 
     print(f"\n{'═' * 60}")
-    print(f"  PULSE — Profit Pool Simulation Engine")
+    print(f"  PRISM — Profit Pool Simulation Engine")
     print(f"  V12 Input: {excel_path}")
     print(f"{'═' * 60}\n")
 

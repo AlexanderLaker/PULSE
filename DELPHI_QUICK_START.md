@@ -2,7 +2,7 @@
 
 ## What Was Built
 
-A complete expert elicitation system for PULSE that enables:
+A complete expert elicitation system for PRISM that enables:
 - Multi-round structured scoring of strategic trends (1-5 scales)
 - Automatic bias detection and calibration
 - Inter-rater reliability measurement (Krippendorff's alpha)
@@ -212,7 +212,7 @@ All tables created automatically on `DelphiProtocol()` init.
 ✅ **Bias Detection**: Automatic anchoring and optimism bias flags
 ✅ **Inter-rater Reliability**: Krippendorff's alpha calculated per trend
 
-## Integration with PULSE
+## Integration with PRISM
 
 **Upstream of:** Bayesian MC Engine
 - Consensus scores update trend.impact and trend.probability
@@ -283,4 +283,4 @@ All components tested and verified:
 
 ---
 
-**Ready to use.** No additional setup required beyond existing PULSE installation.
+**Ready to use.** No additional setup required beyond existing PRISM installation.

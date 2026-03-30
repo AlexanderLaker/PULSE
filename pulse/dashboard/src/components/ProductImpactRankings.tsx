@@ -217,7 +217,7 @@ function computeRankings(
       // Compute weighted impact from contributing trends
       const totalWeight = forceTrends.reduce((sum, t) => {
         const exp = (t.category_exposure?.[cat.id as keyof typeof t.category_exposure] ?? 3) as number;
-        const score = (t.impact ?? 3) * (t.probability ?? 3);
+        const score = (t.probability ?? 3);
         return sum + score * exp;
       }, 0);
 
@@ -225,7 +225,7 @@ function computeRankings(
       const allForceWeights = Object.entries(forceGroups).reduce((acc, [f, fts]) => {
         acc[f] = fts.reduce((s, t) => {
           const exp = (t.category_exposure?.[cat.id as keyof typeof t.category_exposure] ?? 3) as number;
-          return s + (t.impact ?? 3) * (t.probability ?? 3) * exp;
+          return s + (t.probability ?? 3) * exp;
         }, 0);
         return acc;
       }, {} as Record<string, number>);
@@ -240,10 +240,10 @@ function computeRankings(
       // Aggregate direction from trends
       const expansionScore = forceTrends
         .filter(t => t.direction === 'Expansion')
-        .reduce((s, t) => s + (t.impact ?? 3) * (t.probability ?? 3), 0);
+        .reduce((s, t) => s + (t.probability ?? 3), 0);
       const contractionScore = forceTrends
         .filter(t => t.direction === 'Contraction')
-        .reduce((s, t) => s + (t.impact ?? 3) * (t.probability ?? 3), 0);
+        .reduce((s, t) => s + (t.probability ?? 3), 0);
 
       // Determine primary direction
       let direction: 'Expansion' | 'Contraction' = forceShift2030 >= 0 ? 'Expansion' : 'Contraction';
@@ -306,7 +306,7 @@ function computeRankings(
 
       // Strategic implication from top trend
       const topTrend = forceTrends.sort((a, b) =>
-        ((b.impact ?? 3) * (b.probability ?? 3)) - ((a.impact ?? 3) * (a.probability ?? 3))
+        (b.probability ?? 3) - (a.probability ?? 3)
       )[0];
 
       items.push({
@@ -398,7 +398,7 @@ const ProductImpactRankings: FC<ProductImpactRankingsProps> = ({
             <p style={{
               fontSize: 12, color: T.text3, margin: '2px 0 0', fontFamily: T.sans,
             }}>
-              Top 15 highest positive and negative profit pool impacts by product type — click for PULSE AI analysis
+              Top 15 highest positive and negative profit pool impacts by product type — click for PRISM AI analysis
             </p>
           </div>
         </div>

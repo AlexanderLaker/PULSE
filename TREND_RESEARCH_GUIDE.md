@@ -1,8 +1,8 @@
-# PULSE Emerging Trends — API Research Pipeline Guide
+# PRISM Emerging Trends — API Research Pipeline Guide
 
 ## How the Trend Research System Works
 
-PULSE scans 19 free APIs in parallel to discover emerging trends relevant to Henkel Consumer Brands (HCB). Every trend visible in the "Emerging Trends" section comes exclusively from live API data — there is no mock or static fallback data.
+PRISM scans 19 free APIs in parallel to discover emerging trends relevant to Henkel Consumer Brands (HCB). Every trend visible in the "Emerging Trends" section comes exclusively from live API data — there is no mock or static fallback data.
 
 ---
 
@@ -294,4 +294,4 @@ REDDIT_CLIENT_SECRET=your_secret     # Reddit OAuth2
 ---
 
 *Document Version: 1.0 — March 2026*
-*Part of PULSE — Profit Pool Unified Landscape Simulation Engine*
+*Part of PRISM — Profit Pool Unified Landscape Simulation Engine*

@@ -1,4 +1,4 @@
-"""Environment variable loader for PULSE configuration.
+"""Environment variable loader for PRISM configuration.
 
 Loads settings from .env file using python-dotenv and provides
 a clean interface for accessing credentials and configuration.
@@ -59,7 +59,7 @@ def get_env(key: str, default: Optional[str] = None) -> Optional[str]:
 
     Example:
         api_key = get_env("ANTHROPIC_API_KEY")
-        db_path = get_env("PULSE_DB_PATH", default="data/pulse.db")
+        db_path = get_env("PRISM_DB_PATH", default="data/pulse.db")
     """
     value = os.getenv(key, default)
 
@@ -155,7 +155,7 @@ class EnvConfig:
         # This path is only used for SQLite fallback.
         _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
         _default_db = "/tmp/pulse.db" if _is_vercel else "data/pulse.db"
-        self.db_path = get_env("PULSE_DB_PATH", default=_default_db)
+        self.db_path = get_env("PRISM_DB_PATH", default=_default_db)
 
         # ── Application Settings ────────────────────────────────────────
 

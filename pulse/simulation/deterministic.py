@@ -1,6 +1,6 @@
 """Deterministic engine — replicates V12 multiplicative compounding exactly.
 
-This is the trust anchor: users verify PULSE matches their Excel before
+This is the trust anchor: users verify PRISM matches their Excel before
 trusting the probabilistic outputs.
 
 V12 formula: GP1_shift% = Π(1 + F_i% × attenuation) - 1
@@ -105,8 +105,8 @@ class DeterministicEngine:
 
     def compute_force_scorecard(self, db: TrendDatabase) -> dict:
         """
-        Compute weighted score per force (across all categories).
-        Returns: {force: weighted_score}
+        Compute normalized score per force (across all categories).
+        Returns: {force: score}
         """
         scorecard = {}
         for force in FORCES:
@@ -118,8 +118,8 @@ class DeterministicEngine:
 
     def compute_vc_scorecard(self, db: TrendDatabase) -> dict:
         """
-        Compute weighted score per value chain step.
-        Returns: {vc_step: weighted_score}
+        Compute normalized score per value chain step.
+        Returns: {vc_step: score}
         """
         from pulse.config import VC_STEPS
         scorecard = {}
@@ -138,7 +138,7 @@ class DeterministicEngine:
     def validate_against_v12(self, db: TrendDatabase, v12_values: dict,
                               tolerance: float = 0.0001) -> dict:
         """
-        Compare PULSE deterministic output against V12 Dashboard values.
+        Compare PRISM deterministic output against V12 Dashboard values.
 
         Args:
             v12_values: {category: shift_pct} from V12 Dashboard
@@ -168,6 +168,6 @@ class DeterministicEngine:
             }
             if not passed:
                 report["passed"] = False
-                logger.warning(f"V12 parity FAIL: {cat} — PULSE={pulse_val:.4f} vs V12={v12_val:.4f}")
+                logger.warning(f"V12 parity FAIL: {cat} — PRISM={pulse_val:.4f} vs V12={v12_val:.4f}")
 
         return report

@@ -1,4 +1,4 @@
-"""Vercel serverless entry point for PULSE FastAPI backend.
+"""Vercel serverless entry point for PRISM FastAPI backend.
 
 Vercel's Python runtime looks for an `app` variable that is an ASGI application.
 This module imports and re-exports the FastAPI app from the pulse package.
@@ -47,7 +47,7 @@ def _create_app_with_retry(max_retries: int = 3, backoff: float = 0.5):
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    fallback = FastAPI(title="PULSE (degraded mode)")
+    fallback = FastAPI(title="PRISM (degraded mode)")
     fallback.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

@@ -1,4 +1,4 @@
-"""Shared fixtures for PULSE test suite."""
+"""Shared fixtures for PRISM test suite."""
 
 import pytest
 import numpy as np

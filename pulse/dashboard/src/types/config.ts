@@ -1,5 +1,5 @@
 /**
- * PULSE — Configuration types.
+ * PRISM — Configuration types.
  * Maps to ModelConfig and application settings.
  */
 
@@ -86,7 +86,6 @@ export interface ModelConfig {
 export interface ForceSummary {
   name: ForceName;
   trend_count?: number;
-  avg_impact?: number;
   net_direction?: string;
 }
 

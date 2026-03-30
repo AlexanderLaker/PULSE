@@ -1,16 +1,16 @@
-# PULSE Trend Intelligence Report — v2.0
+# PRISM Trend Intelligence Report — v2.0
 
 **Prepared for:** Henkel Consumer Brands — Global Category Strategy
 **Date:** March 28, 2026
 **Classification:** Confidential — Internal Use Only
-**Methodology:** Multi-source intelligence scan across 6 strategic forces, scored using PULSE schema
-**Format:** Database-ready — every trend includes all fields required for direct import into PULSE
+**Methodology:** Multi-source intelligence scan across 6 strategic forces, scored using PRISM schema
+**Format:** Database-ready — every trend includes all fields required for direct import into PRISM
 
 ---
 
 ## Executive Summary
 
-This report identifies and scores **47 strategic trends** across all six PULSE forces with material implications for Henkel Consumer Brands' profit pool trajectory through 2030. Each trend is scored with the complete PULSE data model: Impact (1-5), Probability (1-5), Direction, Relevance (0-100), plus full mappings for **12 categories**, **8 value chain steps**, and **4 regions** — ready for direct database import.
+This report identifies and scores **47 strategic trends** across all six PRISM forces with material implications for Henkel Consumer Brands' profit pool trajectory through 2030. Each trend is scored with the complete PRISM data model: Impact (1-5), Probability (1-5), Direction, Relevance (0-100), plus full mappings for **12 categories**, **8 value chain steps**, and **4 regions** — ready for direct database import.
 
 **Structural assessment:** 22 of 47 trends carry a Contraction direction. 15 are Expansion. 10 are Mixed. The HCB profit pool is under systemic pressure from regulatory, competitive, and channel forces. The strongest Expansion signals — Hair Premiumization (C-03), Professional Salon Crossover (S-10), Bio-Based Chemistry (T-02), Scalp Care (C-07), Hair Loss Treatments (S-06), Fragrance Premiumization (S-02), and Henkel Smartwash (S-08) — represent Henkel's primary strategic paths to offset the compression. Hair is offense. LHC is defense through innovation, not price.
 
@@ -24,7 +24,7 @@ This report identifies and scores **47 strategic trends** across all six PULSE f
 
 ---
 
-## Scoring Schema — Complete PULSE Data Model
+## Scoring Schema — Complete PRISM Data Model
 
 Every trend below maps to these exact database fields:
 

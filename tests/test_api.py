@@ -238,10 +238,10 @@ class TestAPIDataValidation:
     """Test data validation on API requests."""
 
     def test_trend_update_validates_scores(self, client):
-        """Should validate impact/probability scores (1-5)."""
+        """Should validate probability scores (1-5) and gp1_pct_affected (0-1)."""
         response = client.put(
             "/api/v1/trends/test_id",
-            json={"impact": 10}  # Out of range
+            json={"probability": 10}  # Out of range
         )
         # Should reject or validate
         assert response.status_code in [400, 404, 422]
@@ -360,8 +360,8 @@ class TestAPIEdgeCases:
                 "force": "Consumer",
                 "name": "Spécial Café ñ é ü",
                 "direction": "Expansion",
-                "impact": 3,
-                "probability": 3
+                "probability": 3,
+                "gp1_pct_affected": 0.15
             }
         )
         # Should handle Unicode gracefully in trend creation

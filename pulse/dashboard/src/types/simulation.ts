@@ -1,5 +1,5 @@
 /**
- * PULSE — Simulation & Shift Matrix types.
+ * PRISM — Simulation & Shift Matrix types.
  * Maps to the core Shift Matrix output contract (CLAUDE.md §2).
  */
 

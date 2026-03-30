@@ -1,8 +1,8 @@
-# PULSE Test Suite — Comprehensive Summary
+# PRISM Test Suite — Comprehensive Summary
 
 ## Test Suite Delivery
 
-A production-ready pytest test suite for the PULSE project with comprehensive coverage across all critical modules.
+A production-ready pytest test suite for the PRISM project with comprehensive coverage across all critical modules.
 
 ### Deliverables
 
@@ -35,7 +35,7 @@ A production-ready pytest test suite for the PULSE project with comprehensive co
 ### 1. Financial Data Firewall (test_firewall.py)
 **59 tests | 56 passing | 3 failing**
 
-Multi-layer security validation preventing any financial data from entering PULSE:
+Multi-layer security validation preventing any financial data from entering PRISM:
 - Column header scanning (blocks NES, GP1, GP2, Revenue, Profit)
 - Value scanning (blocks €M, EUR, $ patterns)
 - DataFrame scanning (removes unsafe columns)
@@ -335,7 +335,7 @@ For test suite questions or updates:
 ---
 
 **Created:** March 26, 2026
-**PULSE Version:** 2.0 (Bayesian + Copula + Causal DAG)
+**PRISM Version:** 2.0 (Bayesian + Copula + Causal DAG)
 **Test Framework:** pytest 9.0+
 **Python Version:** 3.10+
 **Status:** Production-Ready (172/199 passing, 86.4%)

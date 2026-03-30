@@ -1,4 +1,4 @@
-"""Global configuration for PULSE engine."""
+"""Global configuration for PRISM engine."""
 
 from dataclasses import dataclass, field
 from typing import Optional

@@ -15,15 +15,12 @@ interface TrendData {
   description: string;
   force: string;
   direction: 'Expansion' | 'Contraction';
-  impact?: number;
   probability?: number;
   strategic_implication?: string;
 }
 
 interface PreviousScoresData {
-  impact?: number[];
   probability?: number[];
-  impact_alpha?: number;
   probability_alpha?: number;
 }
 
@@ -36,7 +33,7 @@ interface DelphiScoreCardProps {
 }
 
 interface ScoreSliderProps {
-  label: 'Impact' | 'Probability';
+  label: 'Probability';
   value: number;
   onChange: (value: number) => void;
   previousScores?: number[] | null;
@@ -51,12 +48,10 @@ const ScoreSlider: React.FC<ScoreSliderProps> = ({
   previousAlpha = null,
 }) => {
   const labels = {
-    impact: ['Negligible', 'Low', 'Moderate', 'High', 'Transformative'],
     probability: ['Very Unlikely', 'Unlikely', 'Possible', 'Likely', 'Almost Certain'],
   };
 
-  const scoreType = label === 'Impact' ? 'impact' : 'probability';
-  const scoreLabels = labels[scoreType];
+  const scoreLabels = labels.probability;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -148,7 +143,6 @@ export default function DelphiScoreCard({
   isSubmitting = false,
 }: DelphiScoreCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const [impact, setImpact] = useState(trend.impact || 3);
   const [probability, setProbability] = useState(trend.probability || 3);
   const [rationale, setRationale] = useState('');
   const [touched, setTouched] = useState(false);
@@ -162,7 +156,6 @@ export default function DelphiScoreCard({
     setTouched(true);
     onSubmit({
       trend_id: trend.id,
-      impact,
       probability,
       rationale: rationale.trim(),
       round: currentRound,
@@ -333,14 +326,6 @@ export default function DelphiScoreCard({
 
           {/* Scoring section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <ScoreSlider
-              label="Impact"
-              value={impact}
-              onChange={setImpact}
-              previousScores={previousScores?.impact}
-              previousAlpha={previousScores?.impact_alpha}
-            />
-
             <ScoreSlider
               label="Probability"
               value={probability}

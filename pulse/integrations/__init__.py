@@ -1,4 +1,4 @@
-"""External API integrations for PULSE trend intelligence.
+"""External API integrations for PRISM trend intelligence.
 
 Free-first architecture: all APIs are free tier or open source.
 €0 running cost with multi-source redundancy.

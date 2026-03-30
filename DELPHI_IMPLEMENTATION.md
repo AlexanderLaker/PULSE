@@ -1,4 +1,4 @@
-# Delphi Expert Elicitation Implementation — PULSE v2.1
+# Delphi Expert Elicitation Implementation — PRISM v2.1
 
 ## Overview
 
@@ -392,5 +392,5 @@ curl http://localhost:8000/api/v1/delphi/sessions/abc123/consensus
 ---
 
 **Implementation Date:** March 26, 2026
-**Version:** PULSE v2.1
+**Version:** PRISM v2.1
 **Classification:** CONFIDENTIAL — Internal Use Only

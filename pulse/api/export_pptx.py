@@ -1,4 +1,4 @@
-"""PowerPoint export for PULSE War Room results.
+"""PowerPoint export for PRISM War Room results.
 
 Generates professional executive decks with shift matrices, trend analysis,
 and strategic recommendations. All values are percentages only.
@@ -42,7 +42,7 @@ FORCE_COLORS = {
 
 
 class PowerPointExporter:
-    """Generate PULSE PowerPoint presentation."""
+    """Generate PRISM PowerPoint presentation."""
 
     def __init__(self):
         self.prs = Presentation()
@@ -103,7 +103,7 @@ class PowerPointExporter:
         title_frame = title_box.text_frame
         title_frame.word_wrap = True
         p = title_frame.paragraphs[0]
-        p.text = "PULSE War Room"
+        p.text = "PRISM War Room"
         p.font.size = Pt(54)
         p.font.bold = True
         p.font.color.rgb = COLORS["bg"]

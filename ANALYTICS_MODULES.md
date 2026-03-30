@@ -1,10 +1,10 @@
-# Advanced Analytics Modules — PULSE v2.1
+# Advanced Analytics Modules — PRISM v2.1
 
 ## Overview
 
-Four new advanced analytics modules extend PULSE's simulation engine with enterprise-grade risk assessment, sensitivity analysis, tipping point detection, and inverse scenario planning.
+Four new advanced analytics modules extend PRISM's simulation engine with enterprise-grade risk assessment, sensitivity analysis, tipping point detection, and inverse scenario planning.
 
-**Installation**: All modules are installed with core PULSE dependencies. SALib is required for Sobol analysis:
+**Installation**: All modules are installed with core PRISM dependencies. SALib is required for Sobol analysis:
 ```bash
 pip install SALib>=1.4
 ```
@@ -470,7 +470,7 @@ Content-Type: application/json
 
 ---
 
-## Integration with PULSE Workflow
+## Integration with PRISM Workflow
 
 ### Phase 2 (War Room Dashboard)
 

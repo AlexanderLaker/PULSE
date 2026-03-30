@@ -1,4 +1,4 @@
-"""PULSE CLI — Main entry point for the Profit Pool Simulation Engine.
+"""PRISM CLI — Main entry point for the Profit Pool Simulation Engine.
 
 Usage:
     python -m pulse --input v12.xlsx --output shift_matrix.xlsx
@@ -40,7 +40,7 @@ logger = logging.getLogger("pulse")
 def create_parser():
     parser = argparse.ArgumentParser(
         prog="pulse",
-        description="PULSE — Profit Pool Unified Landscape Simulation Engine v" + __version__
+        description="PRISM — Profit Pool Risk & Intelligence Simulation Model v" + __version__
     )
     parser.add_argument("--input", "-i", help="Path to V12 Excel file")
     parser.add_argument("--output", "-o", help="Output path for Shift Matrix Excel",
@@ -88,7 +88,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
 
     print(f"\n{'═' * 60}")
-    print(f"  PULSE v{__version__} — Profit Pool Simulation Engine")
+    print(f"  PRISM v{__version__} — Profit Pool Simulation Engine")
     print(f"  Bayesian MC · Causal DAG · Copula Dependencies")
     print(f"{'═' * 60}\n")
 
@@ -256,7 +256,7 @@ def main():
 
     # ── Summary ─────────────────────────────────────────────────────
     print(f"\n{'═' * 60}")
-    print("  PULSE SIMULATION COMPLETE")
+    print("  PRISM SIMULATION COMPLETE")
     print(f"{'═' * 60}")
     print(f"  Mode:       {mc_result.get('model_type', args.mode)}")
     print(f"  Scenario:   {args.scenario}")

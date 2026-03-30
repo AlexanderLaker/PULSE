@@ -1,5 +1,5 @@
 /**
- * PULSE — Trend data types.
+ * PRISM — Trend data types.
  * Maps to pulse/ingestion/models.py Trend dataclass.
  */
 
@@ -40,12 +40,9 @@ export interface Trend {
   name: string;
   description: string;
   direction: Direction;
-  impact: number;        // 1-5
   probability: number;   // 1-5
   start_year?: number;
-  weighted_score?: number;
   normalized_score?: number;
-  score?: number;        // impact × probability (for display)
   gp1_shift?: number;    // computed shift
   gp1_pct_affected?: number;  // 0.0-1.0: fraction of category GP1 exposed
   strategic_implication?: string;
@@ -66,7 +63,6 @@ export interface Trend {
   debiasing_applied?: boolean;
 
   // Bayesian posteriors
-  impact_posterior?: BetaPosterior;
   probability_posterior?: BetaPosterior;
 
   // Materialization timing
@@ -76,7 +72,6 @@ export interface Trend {
 
 /** Subset of Trend fields that can be updated via PUT /trends/{id}. */
 export interface TrendUpdate {
-  impact?: number;
   probability?: number;
   direction?: Direction;
   gp1_pct_affected?: number;

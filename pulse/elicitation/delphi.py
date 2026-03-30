@@ -26,11 +26,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ScoringRound:
-    """A single round of Delphi scoring."""
+    """A single round of Delphi scoring (probability only — gp1_pct_affected is set separately)."""
     round_number: int
     trend_id: str
     scorer_id: str
-    impact_score: int
     probability_score: int
     rationale: str = ""
     calibration_factor: float = 1.0
@@ -41,7 +40,6 @@ class ScoringRound:
 class CalibrationExercise:
     """A historical question used to calibrate scorer accuracy."""
     question: str
-    known_outcome_impact: int
     known_outcome_probability: int
     scorer_responses: dict = field(default_factory=dict)
 
@@ -190,16 +188,15 @@ class DelphiProtocol:
         }
 
     def submit_score(self, session_id: str, round_number: int, scorer_id: str,
-                     trend_id: str, impact: int, probability: int, rationale: str = "") -> Dict[str, Any]:
-        """Submit a score from a scorer for a trend in a round."""
-        if not (1 <= impact <= 5 and 1 <= probability <= 5):
-            return {"error": "Impact and probability must be between 1 and 5"}
+                     trend_id: str, probability: int, rationale: str = "") -> Dict[str, Any]:
+        """Submit a probability score from a scorer for a trend in a round."""
+        if not (1 <= probability <= 5):
+            return {"error": "Probability must be between 1 and 5"}
 
         score = ScoringRound(
             round_number=round_number,
             trend_id=trend_id,
             scorer_id=scorer_id,
-            impact_score=impact,
             probability_score=probability,
             rationale=rationale,
             calibration_factor=self.scorer_calibration.get(scorer_id, 1.0),
@@ -215,7 +212,7 @@ class DelphiProtocol:
                            and r.round_number == round_number - 1]
             if prev_rounds:
                 prev = prev_rounds[0]
-                if (prev.impact_score == impact and prev.probability_score == probability):
+                if prev.probability_score == probability:
                     anchoring_detected = True
                     score.bias_flags.append("anchoring")
 
@@ -228,13 +225,13 @@ class DelphiProtocol:
                     f"""
                     INSERT INTO delphi_rounds (
                         session_id, round_number, trend_id, scorer_id,
-                        impact_score, probability_score, rationale,
+                        probability_score, rationale,
                         calibration_factor, bias_flags
-                    ) VALUES ({ph(9)})
+                    ) VALUES ({ph(8)})
                     """,
                     (
                         session_id, round_number, trend_id, scorer_id,
-                        impact, probability, rationale,
+                        probability, rationale,
                         score.calibration_factor, json.dumps(score.bias_flags),
                     ),
                 )
@@ -261,7 +258,7 @@ class DelphiProtocol:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""
-                    SELECT trend_id, scorer_id, impact_score, probability_score, calibration_factor
+                    SELECT trend_id, scorer_id, probability_score, calibration_factor
                     FROM delphi_rounds
                     WHERE session_id = {p} AND round_number = {p}
                     ORDER BY trend_id, scorer_id
@@ -276,7 +273,6 @@ class DelphiProtocol:
                         scores_by_trend[trend_id] = []
                     scores_by_trend[trend_id].append({
                         "scorer_id": row["scorer_id"],
-                        "impact": row["impact_score"],
                         "probability": row["probability_score"],
                         "calibration_factor": row["calibration_factor"]
                     })
@@ -299,8 +295,8 @@ class DelphiProtocol:
 
         if not relevant:
             return {
-                "impact": 3, "probability": 3,
-                "impact_raw": 3.0, "probability_raw": 3.0,
+                "probability": 3,
+                "probability_raw": 3.0,
                 "variance": 0.0, "reliability_alpha": 0.0,
                 "confidence": "Low", "scorers": 0,
             }
@@ -311,19 +307,16 @@ class DelphiProtocol:
             total_weight = 1.0
             weights = [1.0] * len(relevant)
 
-        w_impact = sum(r.impact_score * w for r, w in zip(relevant, weights)) / total_weight
         w_prob = sum(r.probability_score * w for r, w in zip(relevant, weights)) / total_weight
 
-        impact_scores = [r.impact_score for r in relevant]
-        variance = float(np.var(impact_scores)) if impact_scores else 0.0
+        prob_scores = [r.probability_score for r in relevant]
+        variance = float(np.var(prob_scores)) if prob_scores else 0.0
 
         alpha = self.inter_rater_reliability(trend_id)
         confidence = "High" if alpha > 0.8 else "Medium" if alpha > 0.67 else "Low"
 
         return {
-            "impact": round(w_impact),
             "probability": round(w_prob),
-            "impact_raw": round(w_impact, 2),
             "probability_raw": round(w_prob, 2),
             "variance": round(variance, 2),
             "reliability_alpha": alpha,
@@ -345,22 +338,21 @@ class DelphiProtocol:
             return {
                 "anchoring_detected": False,
                 "reason": "Missing scores in one or both rounds",
-                "impact_change": None, "probability_change": None
+                "probability_change": None
             }
 
         r1 = r1_scores[0]
         r2 = r2_scores[0]
-        impact_change = abs(r2.impact_score - r1.impact_score)
         prob_change = abs(r2.probability_score - r1.probability_score)
-        anchoring_detected = (impact_change == 0 and prob_change == 0)
+        anchoring_detected = (prob_change == 0)
 
         return {
             "anchoring_detected": anchoring_detected,
             "trend_id": trend_id, "scorer_id": scorer_id,
             "round1": round1, "round2": round2,
-            "impact_change": impact_change, "probability_change": prob_change,
-            "round1_impact": r1.impact_score, "round1_probability": r1.probability_score,
-            "round2_impact": r2.impact_score, "round2_probability": r2.probability_score,
+            "probability_change": prob_change,
+            "round1_probability": r1.probability_score,
+            "round2_probability": r2.probability_score,
         }
 
     def detect_optimism_bias(self, scorer_id: str) -> Dict[str, Any]:
@@ -384,16 +376,16 @@ class DelphiProtocol:
             for sr in scorer_rounds:
                 trend = get_trend_by_id(sr.trend_id)
                 if trend:
-                    avg_score = (sr.impact_score + sr.probability_score) / 2.0
+                    prob_score = sr.probability_score
                     if trend.direction == "Expansion":
-                        expansion_scores.append(avg_score)
+                        expansion_scores.append(prob_score)
                     elif trend.direction == "Contraction":
-                        contraction_scores.append(avg_score)
+                        contraction_scores.append(prob_score)
         except Exception:
             pass
 
         if not expansion_scores and not contraction_scores:
-            all_scores = [(r.impact_score + r.probability_score) / 2.0 for r in scorer_rounds]
+            all_scores = [float(r.probability_score) for r in scorer_rounds]
             mean_score = float(np.mean(all_scores)) if all_scores else 3.0
             optimism_detected = mean_score > 3.5
             correction_factor = 0.95 if optimism_detected else 1.0
@@ -423,17 +415,14 @@ class DelphiProtocol:
         if len(relevant) < 2:
             return 1.0
 
-        impact_scores = [r.impact_score for r in relevant]
         prob_scores = [r.probability_score for r in relevant]
 
-        if np.std(impact_scores) == 0 and np.std(prob_scores) == 0:
+        if np.std(prob_scores) == 0:
             return 1.0
 
-        mean_impact = max(np.mean(impact_scores), 1)
         mean_prob = max(np.mean(prob_scores), 1)
-        cv_impact = np.std(impact_scores) / mean_impact
         cv_prob = np.std(prob_scores) / mean_prob
-        alpha = 1.0 - (cv_impact + cv_prob) / 2.0
+        alpha = 1.0 - cv_prob
         return round(max(0.0, min(1.0, alpha)), 3)
 
     def calibration_exercise(self, scorer_id: str, known_outcomes: Dict[str, tuple]) -> Dict[str, Any]:
@@ -445,29 +434,26 @@ class DelphiProtocol:
                 "note": "No calibration exercises available"
             }
 
-        impact_errors = []
         prob_errors = []
 
-        for idx, (impact_guess, prob_guess) in known_outcomes.items():
+        for idx, prob_guess in known_outcomes.items():
             if idx < len(self.calibration_exercises):
                 ex = self.calibration_exercises[idx]
-                impact_errors.append(impact_guess - ex.known_outcome_impact)
                 prob_errors.append(prob_guess - ex.known_outcome_probability)
 
         biases = []
         calibration_factor = 1.0
 
-        if impact_errors and prob_errors:
-            mean_impact_error = float(np.mean(impact_errors))
+        if prob_errors:
             mean_prob_error = float(np.mean(prob_errors))
 
-            if mean_impact_error < -0.5:
+            if mean_prob_error < -0.5:
                 biases.append("optimism_bias")
                 calibration_factor *= 1.1
-            if mean_impact_error > 0.5:
+            if mean_prob_error > 0.5:
                 biases.append("pessimism_bias")
                 calibration_factor *= 0.9
-            if prob_errors and len(set([round(e) for e in prob_errors])) <= 1:
+            if len(set([round(e) for e in prob_errors])) <= 1:
                 biases.append("probability_neglect")
                 calibration_factor *= 1.05
 
@@ -484,12 +470,11 @@ class DelphiProtocol:
                     f"""
                     INSERT INTO delphi_calibration (
                         scorer_id, calibration_factor, bias_flags,
-                        mean_impact_error, mean_prob_error
-                    ) VALUES ({ph(5)})
+                        mean_prob_error
+                    ) VALUES ({ph(4)})
                     """,
                     (
                         scorer_id, calibration_factor, json.dumps(biases),
-                        round(float(np.mean(impact_errors)), 2) if impact_errors else 0,
                         round(float(np.mean(prob_errors)), 2) if prob_errors else 0,
                     ),
                 )
@@ -501,9 +486,8 @@ class DelphiProtocol:
             "scorer_id": scorer_id,
             "calibration_factor": round(calibration_factor, 3),
             "biases": biases,
-            "mean_impact_error": round(float(np.mean(impact_errors)), 2) if impact_errors else 0.0,
             "mean_prob_error": round(float(np.mean(prob_errors)), 2) if prob_errors else 0.0,
-            "exercises_completed": len(impact_errors)
+            "exercises_completed": len(prob_errors)
         }
 
     # ── Session Management ─────────────────────────────────────────────────
@@ -572,7 +556,6 @@ class DelphiProtocol:
                     rounds_by_trend[trend_id].append({
                         "round_number": row["round_number"],
                         "scorer_id": row["scorer_id"],
-                        "impact_score": row["impact_score"],
                         "probability_score": row["probability_score"],
                         "rationale": row.get("rationale", ""),
                         "calibration_factor": row.get("calibration_factor", 1.0),
@@ -585,17 +568,9 @@ class DelphiProtocol:
                     if rounds:
                         latest_round = max(r["round_number"] for r in rounds)
                         latest_scores = [r for r in rounds if r["round_number"] == latest_round]
-                        impact_scores = [r["impact_score"] for r in latest_scores]
                         prob_scores = [r["probability_score"] for r in latest_scores]
 
                         trend_stats[trend_id] = {
-                            "impact": {
-                                "median": int(np.median(impact_scores)),
-                                "mean": round(float(np.mean(impact_scores)), 2),
-                                "std": round(float(np.std(impact_scores)), 2),
-                                "min": int(np.min(impact_scores)),
-                                "max": int(np.max(impact_scores)),
-                            },
                             "probability": {
                                 "median": int(np.median(prob_scores)),
                                 "mean": round(float(np.mean(prob_scores)), 2),
@@ -646,7 +621,7 @@ class DelphiProtocol:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""
-                    SELECT session_id, round_number, trend_id, impact_score,
+                    SELECT session_id, round_number, trend_id,
                            probability_score, rationale, calibration_factor, bias_flags
                     FROM delphi_rounds
                     WHERE scorer_id = {p}
@@ -662,7 +637,6 @@ class DelphiProtocol:
                         "session_id": row["session_id"],
                         "round_number": row["round_number"],
                         "trend_id": row["trend_id"],
-                        "impact_score": row["impact_score"],
                         "probability_score": row["probability_score"],
                         "rationale": row.get("rationale", ""),
                         "calibration_factor": row.get("calibration_factor", 1.0),
@@ -681,7 +655,6 @@ class DelphiProtocol:
                     calibration = {
                         "calibration_factor": cr["calibration_factor"],
                         "bias_flags": json.loads(cr["bias_flags"]) if cr.get("bias_flags") else [],
-                        "mean_impact_error": cr.get("mean_impact_error", 0),
                         "mean_prob_error": cr.get("mean_prob_error", 0),
                         "calibrated_at": cr.get("calibrated_at"),
                     }
@@ -771,9 +744,7 @@ class DelphiProtocol:
                 if trend_db:
                     trend = trend_db.get_trend_by_id(trend_id)
                     if trend:
-                        old_impact = trend.impact
                         old_prob = trend.probability
-                        trend.impact = consensus["impact"]
                         trend.probability = consensus["probability"]
                         trend.scorer_count = consensus["scorers"]
                         trend.score_variance = consensus["variance"]
@@ -782,14 +753,13 @@ class DelphiProtocol:
 
                         log_audit(
                             "UPDATE", "trend", trend_id,
-                            old_value=f"impact={old_impact}, prob={old_prob}",
-                            new_value=f"impact={consensus['impact']}, prob={consensus['probability']}",
+                            old_value=f"prob={old_prob}",
+                            new_value=f"prob={consensus['probability']}",
                             reason=f"Delphi consensus (session {session_id})",
                             user_id="delphi_protocol",
                         )
 
                         applied[trend_id] = {
-                            "impact": consensus["impact"],
                             "probability": consensus["probability"],
                             "reliability_alpha": consensus["reliability_alpha"],
                         }
@@ -832,7 +802,7 @@ class DelphiProtocol:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""
-                    SELECT trend_id, impact_score, probability_score, calibration_factor
+                    SELECT trend_id, probability_score, calibration_factor
                     FROM delphi_rounds
                     WHERE session_id = {p} AND round_number = {p}
                     ORDER BY trend_id
@@ -845,23 +815,13 @@ class DelphiProtocol:
                     row = _row_to_dict(raw_row)
                     trend_id = row["trend_id"]
                     if trend_id not in distributions:
-                        distributions[trend_id] = {"impact": [], "probability": []}
-                    distributions[trend_id]["impact"].append(row["impact_score"])
+                        distributions[trend_id] = {"probability": []}
                     distributions[trend_id]["probability"].append(row["probability_score"])
 
                 summary = {}
                 for trend_id, scores in distributions.items():
-                    impact_scores = scores["impact"]
                     prob_scores = scores["probability"]
                     summary[trend_id] = {
-                        "impact": {
-                            "median": int(np.median(impact_scores)),
-                            "mean": round(float(np.mean(impact_scores)), 2),
-                            "std": round(float(np.std(impact_scores)), 2),
-                            "min": int(np.min(impact_scores)),
-                            "max": int(np.max(impact_scores)),
-                            "count": len(impact_scores),
-                        },
                         "probability": {
                             "median": int(np.median(prob_scores)),
                             "mean": round(float(np.mean(prob_scores)), 2),

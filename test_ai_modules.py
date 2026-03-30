@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 from pulse.ai.scanner import TrendScanner, TrendSuggestion
 from pulse.ai.calibrator import ScoreCalibrator
 from pulse.ai.narrator import ScenarioNarrator
-from pulse.ai.chat import PulseChat, ChatContext
+from pulse.ai.chat import PRISMChat, ChatContext
 from pulse.ai.config import get_ai_config, set_ai_config, AI_CONFIG, ProviderConfig, LLMProvider
 from pulse.ai.provider import get_provider
 
@@ -220,13 +220,13 @@ async def test_scenario_narrator():
         print("  Fallback narrative generation ready")
 
 
-async def test_pulse_chat():
-    """Test PulseChat module."""
+async def test_prism_chat():
+    """Test PRISMChat module."""
     print("\n" + "="*70)
-    print("TEST 4: Pulse Chat")
+    print("TEST 4: PRISM Chat")
     print("="*70)
 
-    chat = PulseChat()
+    chat = PRISMChat()
 
     # Set up context
     context_data = ChatContext(
@@ -342,7 +342,7 @@ async def test_fallback_modes():
         print(f"  ✗ ScenarioNarrator: {e}")
 
     try:
-        chat = PulseChat()
+        chat = PRISMChat()
         print("  ✓ PulseChat initialized")
     except Exception as e:
         print(f"  ✗ PulseChat: {e}")
@@ -351,7 +351,7 @@ async def test_fallback_modes():
 async def main():
     """Run all tests."""
     print("\n" + "="*70)
-    print("PULSE Phase 3 AI MODULES - COMPREHENSIVE TEST SUITE")
+    print("PRISM Phase 3 AI MODULES - COMPREHENSIVE TEST SUITE")
     print("="*70)
 
     print("\nEnvironment:")
@@ -364,7 +364,7 @@ async def main():
     await test_trend_scanner()
     await test_score_calibrator()
     await test_scenario_narrator()
-    await test_pulse_chat()
+    await test_prism_chat()
     await test_fallback_modes()
 
     # Summary

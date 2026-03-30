@@ -121,7 +121,7 @@ class AuditLogger:
         if not entries:
             return "No audit entries recorded yet."
 
-        lines = ["=== PULSE AUDIT LOG ===", ""]
+        lines = ["=== PRISM AUDIT LOG ===", ""]
         for e in entries:
             lines.append(f"[{e['timestamp']}] {e['action']} -- {e['entity_type']}: "
                          f"{e['entity_id']} -- {e.get('reason') or str(e.get('new_value', ''))[:60]}")

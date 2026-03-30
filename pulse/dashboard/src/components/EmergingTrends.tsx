@@ -34,8 +34,8 @@ interface EmergingTrend {
   description: string;
   force: ForceName;
   direction: 'Expansion' | 'Contraction';
-  suggested_impact: number;
   suggested_probability: number;
+  suggested_gp1_pct_affected: number;
   relevance_score: number;
   category_mapping: Record<string, number>;
   sources: EmergingTrendSource[];
@@ -225,7 +225,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
           minWidth: '36px',
           textAlign: 'center',
         }}>
-          {trend.suggested_impact}×{trend.suggested_probability}
+          P{trend.suggested_probability}
         </div>
 
         {/* Relevance badge */}
@@ -272,7 +272,7 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
                 </div>
                 <div>
                   <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '4px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Sparkles size={10} /> PULSE ANALYSIS
+                    <Sparkles size={10} /> PRISM ANALYSIS
                   </div>
                   <p style={{ fontSize: '11px', color: T.text2, lineHeight: 1.6, margin: 0 }}>
                     {trend.reasoning}
@@ -318,12 +318,12 @@ const EmergingTrendCard: FC<EmergingTrendCardProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Impact</div>
-                    <div style={{ fontSize: '18px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_impact}<span style={{ fontSize: '11px', color: T.text3 }}>/5</span></div>
-                  </div>
-                  <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
                     <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Probability</div>
                     <div style={{ fontSize: '18px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{trend.suggested_probability}<span style={{ fontSize: '11px', color: T.text3 }}>/5</span></div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>GP1 % Affected</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: T.text, fontFamily: T.mono }}>{Math.round((trend.suggested_gp1_pct_affected || 0.10) * 100)}<span style={{ fontSize: '11px', color: T.text3 }}>%</span></div>
                   </div>
                   <div style={{ flex: 1, padding: '10px', backgroundColor: T.bg3 + '60', borderRadius: '8px' }}>
                     <div style={{ fontSize: '9px', color: T.text3, marginBottom: '4px' }}>Relevance</div>
@@ -549,8 +549,8 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
             description: t.description || '',
             force: t.force || 'Consumer',
             direction: t.direction || 'Expansion',
-            suggested_impact: t.suggested_impact || 3,
             suggested_probability: t.suggested_probability || 3,
+            suggested_gp1_pct_affected: t.suggested_gp1_pct_affected || 0.10,
             relevance_score: t.relevance_score || 65,
             category_mapping: typeof t.category_mapping === 'string'
               ? JSON.parse(t.category_mapping || '{}')
@@ -623,7 +623,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
       }
     } catch (err) {
       console.warn('Scanner request failed:', err);
-      setScanErrors(['Backend unreachable — ensure the PULSE API server is running']);
+      setScanErrors(['Backend unreachable — ensure the PRISM API server is running']);
     } finally {
       setIsScanning(false);
       setLastScanned(new Date());
@@ -640,8 +640,8 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
         description: r.description || r.snippet || r.abstract || '',
         force: (r.force || inferForce(r)) as ForceName,
         direction: (r.direction || 'Expansion') as 'Expansion' | 'Contraction',
-        suggested_impact: r.suggested_impact || r.impact || 3,
         suggested_probability: r.suggested_probability || r.probability || 3,
+        suggested_gp1_pct_affected: r.suggested_gp1_pct_affected || 0.10,
         relevance_score: r.relevance_score || r.relevance || 65,
         category_mapping: r.category_mapping || r.categories || {},
         sources: Array.isArray(r.sources) ? r.sources : [
@@ -756,7 +756,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
       if (a.status !== 'added' && b.status === 'added') return -1;
       switch (sortBy) {
         case 'relevance': return b.relevance_score - a.relevance_score;
-        case 'impact': return (b.suggested_impact * b.suggested_probability) - (a.suggested_impact * a.suggested_probability);
+        case 'impact': return b.suggested_probability - a.suggested_probability;
         case 'date': return new Date(b.discovered_at).getTime() - new Date(a.discovered_at).getTime();
         default: return 0;
       }

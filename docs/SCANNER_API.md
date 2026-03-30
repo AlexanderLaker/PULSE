@@ -1,13 +1,13 @@
-# PULSE Scanner API Documentation
+# PRISM Scanner API Documentation
 
 ## Overview
 
-The Scanner API provides comprehensive endpoints for triggering full-scale trend intelligence scans across all 19 PULSE integrations. The scanner queries multiple external APIs in parallel, aggregates results, and returns consolidated trend data suitable for PULSE analysis.
+The Scanner API provides comprehensive endpoints for triggering full-scale trend intelligence scans across all 19 PRISM integrations. The scanner queries multiple external APIs in parallel, aggregates results, and returns consolidated trend data suitable for PRISM analysis.
 
 ## Features
 
 - **Multi-source scanning**: Query 19 integrations simultaneously
-- **Force-based queries**: Pre-configured FMCG queries aligned with PULSE forces
+- **Force-based queries**: Pre-configured FMCG queries aligned with PRISM forces
 - **Robust error handling**: Graceful degradation if individual APIs fail
 - **Real-time progress tracking**: Monitor scan progress via status endpoint
 - **Result deduplication**: Eliminate duplicate trends by title
@@ -320,7 +320,7 @@ Some integrations require API keys (GNews, YouTube, Reddit, etc.). If not config
 
 ---
 
-## Integration with PULSE Architecture
+## Integration with PRISM Architecture
 
 ### Workflow: Scanner → Ingestion → Simulation
 
@@ -391,7 +391,7 @@ Missing keys result in graceful skipping of that integration.
 ## Security
 
 - **No authentication required** (assumes internal Henkel network)
-- **No financial data scanned** (PULSE works with relative shifts only)
+- **No financial data scanned** (PRISM works with relative shifts only)
 - **All external data** (articles, papers, regulations) are public
 - **Rate limiting**: Handled by individual API clients (respect free tier limits)
 
