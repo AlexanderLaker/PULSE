@@ -9,6 +9,7 @@ import {
   Lock,
   LogOut,
   Shield,
+  Map,
 } from 'lucide-react';
 
 interface BurgerMenuProps {
@@ -20,6 +21,7 @@ interface BurgerMenuProps {
   onShowExport: () => void;
   onShowDelphi: () => void;
   onShowSnapshots: () => void;
+  onShowJourney: () => void;
   onChangePassword: () => void;
 }
 
@@ -32,6 +34,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
   onShowExport,
   onShowDelphi,
   onShowSnapshots,
+  onShowJourney,
   onChangePassword,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -174,6 +177,15 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
               icon={Clock}
               label="Session History"
               onClick={() => handleMenuItemClick(onShowSnapshots)}
+            />
+
+            <Divider />
+
+            {/* Strategic Views */}
+            <MenuItem
+              icon={Map}
+              label="Consumer Journey"
+              onClick={() => handleMenuItemClick(onShowJourney)}
             />
 
             {/* Divider */}

@@ -8,8 +8,9 @@ import SettingsPage from './components/SettingsPage';
 import BurgerMenu from './components/BurgerMenu';
 
 const WarRoom = lazy(() => import('./components/WarRoom'));
+const ConsumerJourney = lazy(() => import('./components/ConsumerJourney'));
 
-type Page = 'warroom' | 'settings';
+type Page = 'warroom' | 'settings' | 'journey';
 
 export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
@@ -45,6 +46,61 @@ export default function App() {
     );
   }
 
+  // Consumer Journey page — full screen with own back navigation
+  if (page === 'journey') {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<FullPageSkeleton />}>
+          <ConsumerJourney onBack={() => setPage('warroom')} />
+        </Suspense>
+        {/* Burger Menu — top-right */}
+        <div style={{
+          position: 'fixed', top: 12, right: 16, zIndex: 9999,
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          <BurgerMenu
+            user={user}
+            isAdmin={isAdmin}
+            onLogout={logout}
+            onShowUsers={() => setShowUsers(true)}
+            onShowConfig={() => setPage('settings')}
+            onShowExport={() => {
+              window.dispatchEvent(new CustomEvent('pulse:toggle-export'));
+            }}
+            onShowDelphi={() => {
+              window.dispatchEvent(new CustomEvent('pulse:toggle-delphi'));
+            }}
+            onShowSnapshots={() => {
+              window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
+            }}
+            onShowJourney={() => setPage('journey')}
+            onChangePassword={() => {
+              const newPw = window.prompt('Enter new password (min 6 characters):');
+              if (newPw && newPw.length >= 6) {
+                const token = localStorage.getItem('pulse_token');
+                fetch('/api/v1/auth/change-password', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                  body: JSON.stringify({ new_password: newPw }),
+                })
+                  .then(r => r.ok ? alert('Password changed successfully.') : alert('Failed to change password.'))
+                  .catch(() => alert('Failed to change password.'));
+              } else if (newPw !== null) {
+                alert('Password must be at least 6 characters.');
+              }
+            }}
+          />
+        </div>
+        {isAdmin && (
+          <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
+        )}
+      </ErrorBoundary>
+    );
+  }
+
   // Authenticated → show War Room
   return (
     <ErrorBoundary>
@@ -72,6 +128,7 @@ export default function App() {
           onShowSnapshots={() => {
             window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
           }}
+          onShowJourney={() => setPage('journey')}
           onChangePassword={() => {
             const newPw = window.prompt('Enter new password (min 6 characters):');
             if (newPw && newPw.length >= 6) {
