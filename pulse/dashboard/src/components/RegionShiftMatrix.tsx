@@ -20,10 +20,10 @@ import { T, CATEGORIES, fmtShift, shiftColorHex, shortCat } from '../lib/format'
 const REGIONS: Region[] = ['Europe', 'North America', 'Asia', 'High Growth'];
 
 const REGION_EMOJIS: Record<Region, string> = {
-  'Europe': '🇪🇺',
-  'North America': '🇺🇸',
-  'Asia': '🌏',
-  'High Growth': '🚀',
+  'Europe': '◧',
+  'North America': '◨',
+  'Asia': '◩',
+  'High Growth': '▲',
 };
 
 const REGION_SHORT: Record<Region, string> = {
