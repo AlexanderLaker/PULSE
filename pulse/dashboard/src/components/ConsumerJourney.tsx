@@ -525,7 +525,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<{
-    trendDrivers: string;
+    trendCodes: string[];  // Array of trend codes like ['T-01', 'C-04']
     stageName: string;
     type: 'product' | 'tech' | 'service';
     direction: 'expansion' | 'contraction';
@@ -1005,8 +1005,13 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                   <button
                     onClick={() => {
                       setIsEditing(true);
+                      // Parse existing trendDrivers string into array of codes
+                      const codes = selectedProduct.entry.trendDrivers
+                        .split('+')
+                        .map(d => d.trim().match(/^([TCGKE]-\d{2})/)?.[1])
+                        .filter((c): c is string => !!c);
                       setEditValues({
-                        trendDrivers: selectedProduct.entry.trendDrivers,
+                        trendCodes: codes.length > 0 ? codes : [''],
                         stageName: selectedProduct.stageName,
                         type: selectedProduct.entry.type,
                         direction: selectedProduct.direction,
@@ -1031,31 +1036,65 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                     Edit Entry
                   </div>
 
-                  {/* Linked Trend */}
+                  {/* Linked Trends (multi) */}
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Linked Trend</label>
-                    <select
-                      value={editValues.trendDrivers.split('+')[0].trim().match(/^([TCGKE]-\d{2})/)?.[1] || ''}
-                      onChange={e => {
-                        const code = e.target.value;
-                        const ctx = TREND_CONTEXT[code];
-                        setEditValues(prev => prev ? { ...prev, trendDrivers: ctx ? `${code} ${ctx.name}` : code } : null);
+                    <label style={{ fontSize: 10, color: T.text3, display: 'block', marginBottom: 4 }}>Linked Trends</label>
+                    {editValues.trendCodes.map((code, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                        <select
+                          value={code}
+                          onChange={e => {
+                            const newCodes = [...editValues.trendCodes];
+                            newCodes[idx] = e.target.value;
+                            setEditValues(prev => prev ? { ...prev, trendCodes: newCodes } : null);
+                          }}
+                          style={{
+                            flex: 1, padding: '6px 8px', borderRadius: 6,
+                            background: T.bg1, border: `1px solid ${T.border}`,
+                            color: T.text, fontSize: 11, fontFamily: T.sans,
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="">Select trend...</option>
+                          {Object.entries(TREND_CONTEXT)
+                            .sort((a, b) => a[0].localeCompare(b[0]))
+                            .map(([c, ctx]) => (
+                              <option key={c} value={c}>{c}: {ctx.name}</option>
+                            ))
+                          }
+                        </select>
+                        {editValues.trendCodes.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const newCodes = editValues.trendCodes.filter((_, i) => i !== idx);
+                              setEditValues(prev => prev ? { ...prev, trendCodes: newCodes } : null);
+                            }}
+                            style={{
+                              padding: '0 8px', borderRadius: 6,
+                              background: 'rgba(255,69,58,0.10)', border: `1px solid rgba(255,69,58,0.25)`,
+                              color: '#FF453A', fontSize: 14, cursor: 'pointer', fontFamily: T.sans,
+                              lineHeight: 1, flexShrink: 0,
+                            }}
+                            title="Remove trend"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setEditValues(prev => prev ? { ...prev, trendCodes: [...prev.trendCodes, ''] } : null);
                       }}
                       style={{
-                        width: '100%', padding: '6px 8px', borderRadius: 6,
-                        background: T.bg1, border: `1px solid ${T.border}`,
-                        color: T.text, fontSize: 11, fontFamily: T.sans,
-                        outline: 'none',
+                        marginTop: 4, padding: '4px 10px', borderRadius: 6,
+                        background: T.accentDim, border: `1px solid ${T.accent}25`,
+                        color: T.accent, fontSize: 10, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: T.sans,
                       }}
                     >
-                      <option value="">Select trend...</option>
-                      {Object.entries(TREND_CONTEXT)
-                        .sort((a, b) => a[0].localeCompare(b[0]))
-                        .map(([code, ctx]) => (
-                          <option key={code} value={code}>{code}: {ctx.name}</option>
-                        ))
-                      }
-                    </select>
+                      + Add trend
+                    </button>
                   </div>
 
                   {/* Journey Stage */}
@@ -1159,11 +1198,17 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                           return newStage;
                         });
 
+                        // Build trendDrivers string from codes array
+                        const validCodes = editValues.trendCodes.filter(c => c && TREND_CONTEXT[c]);
+                        const trendDriversStr = validCodes.length > 0
+                          ? validCodes.map(c => `${c} ${TREND_CONTEXT[c].name}`).join(' + ')
+                          : selectedProduct.entry.trendDrivers; // fallback to original if nothing valid
+
                         // Add to new position
                         const updatedEntry: ProductEntry = {
                           name: entryName,
                           type: editValues.type,
-                          trendDrivers: editValues.trendDrivers,
+                          trendDrivers: trendDriversStr,
                           intensity: editValues.intensity,
                         };
 
@@ -1229,14 +1274,14 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
 // Intensity-based color scales
 const INTENSITY_COLORS = {
   expansion: {
-    1: { bg: 'rgba(48,209,88,0.10)', border: 'rgba(48,209,88,0.25)', hoverBg: 'rgba(48,209,88,0.18)', hoverBorder: 'rgba(48,209,88,0.40)', selectedBg: 'rgba(48,209,88,0.22)' },
-    2: { bg: 'rgba(48,209,88,0.20)', border: 'rgba(48,209,88,0.40)', hoverBg: 'rgba(48,209,88,0.30)', hoverBorder: 'rgba(48,209,88,0.55)', selectedBg: 'rgba(48,209,88,0.35)' },
-    3: { bg: 'rgba(48,209,88,0.32)', border: 'rgba(48,209,88,0.55)', hoverBg: 'rgba(48,209,88,0.42)', hoverBorder: 'rgba(48,209,88,0.70)', selectedBg: 'rgba(48,209,88,0.48)' },
+    1: { bg: 'rgba(48,209,88,0.15)', border: 'rgba(48,209,88,0.35)', hoverBg: 'rgba(48,209,88,0.25)', hoverBorder: 'rgba(48,209,88,0.50)', selectedBg: 'rgba(48,209,88,0.30)' },
+    2: { bg: 'rgba(48,209,88,0.30)', border: 'rgba(48,209,88,0.55)', hoverBg: 'rgba(48,209,88,0.42)', hoverBorder: 'rgba(48,209,88,0.70)', selectedBg: 'rgba(48,209,88,0.48)' },
+    3: { bg: 'rgba(48,209,88,0.50)', border: 'rgba(48,209,88,0.75)', hoverBg: 'rgba(48,209,88,0.60)', hoverBorder: 'rgba(48,209,88,0.85)', selectedBg: 'rgba(48,209,88,0.65)' },
   },
   contraction: {
-    1: { bg: 'rgba(255,69,58,0.08)', border: 'rgba(255,69,58,0.22)', hoverBg: 'rgba(255,69,58,0.15)', hoverBorder: 'rgba(255,69,58,0.35)', selectedBg: 'rgba(255,69,58,0.18)' },
-    2: { bg: 'rgba(255,69,58,0.18)', border: 'rgba(255,69,58,0.38)', hoverBg: 'rgba(255,69,58,0.28)', hoverBorder: 'rgba(255,69,58,0.50)', selectedBg: 'rgba(255,69,58,0.32)' },
-    3: { bg: 'rgba(255,69,58,0.30)', border: 'rgba(255,69,58,0.52)', hoverBg: 'rgba(255,69,58,0.40)', hoverBorder: 'rgba(255,69,58,0.65)', selectedBg: 'rgba(255,69,58,0.45)' },
+    1: { bg: 'rgba(255,69,58,0.12)', border: 'rgba(255,69,58,0.30)', hoverBg: 'rgba(255,69,58,0.22)', hoverBorder: 'rgba(255,69,58,0.45)', selectedBg: 'rgba(255,69,58,0.25)' },
+    2: { bg: 'rgba(255,69,58,0.28)', border: 'rgba(255,69,58,0.50)', hoverBg: 'rgba(255,69,58,0.38)', hoverBorder: 'rgba(255,69,58,0.65)', selectedBg: 'rgba(255,69,58,0.42)' },
+    3: { bg: 'rgba(255,69,58,0.45)', border: 'rgba(255,69,58,0.70)', hoverBg: 'rgba(255,69,58,0.55)', hoverBorder: 'rgba(255,69,58,0.82)', selectedBg: 'rgba(255,69,58,0.60)' },
   },
 };
 
