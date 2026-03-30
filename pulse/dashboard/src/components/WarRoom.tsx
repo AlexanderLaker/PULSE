@@ -1,5 +1,5 @@
 /**
- * PULSE War Room v3 — Main Container Component
+ * PRISM War Room v3 — Main Container Component
  * Single unified view with contextual drill-down
  * Apple × Bain × Goldman Sachs aesthetic
  */
@@ -36,6 +36,7 @@ import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
 import ProductImpactRankings from './ProductImpactRankings';
 import ForceShiftMatrix from './ForceShiftMatrix';
+import RegionShiftMatrix from './RegionShiftMatrix';
 
 // Extracted components
 import ForceWeightSliders from './ForceWeightSliders';
@@ -330,9 +331,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
             force: t.force,
             name: t.name,
             direction: t.direction || 'Expansion',
-            impact: t.impact || 3,
             probability: t.probability || 3,
-            score: (t.impact || 3) * (t.probability || 3),
             gp1_shift: t.normalized_score || 0,
             description: t.description || '',
             strategic_implication: t.strategic_implication || '',
@@ -493,7 +492,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
 
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition');
-      let filename = 'PULSE_War_Room.pptx';
+      let filename = 'PRISM_War_Room.pptx';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="?([^"]+)"?/);
         if (match && match[1]) filename = match[1];
@@ -587,7 +586,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
               P
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: T.text2, letterSpacing: 0.5 } as React.CSSProperties}>
-              PULSE War Room
+              PRISM War Room
             </div>
             <div
               style={{
@@ -845,6 +844,15 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                 onSelectCategory={setSelectedCategory}
               />
             </div>
+
+            {/* Region × Category Shift Matrix (2030) */}
+            <div style={{ marginTop: 32 }}>
+              <RegionShiftMatrix
+                shifts={data.shifts}
+                trends={data.trends}
+                onSelectCategory={setSelectedCategory}
+              />
+            </div>
           </motion.div>
         )}
 
@@ -879,15 +887,13 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                   trends: prev.trends.map((t: any) => {
                     if (t.id !== id) return t;
                     const merged = { ...t, ...updates };
-                    // Recalculate gp1_shift (normalized_score) when impact, probability,
+                    // Recalculate gp1_shift (normalized_score) when probability,
                     // direction, or gp1_pct_affected changes
-                    const impact = merged.impact || 3;
                     const probability = merged.probability || 3;
                     const dirSign = merged.direction === 'Contraction' ? -1 : 1;
                     const gp1Pct = merged.gp1_pct_affected ?? 0.10;
-                    const rawNorm = (impact * probability * dirSign) / 25;
+                    const rawNorm = (probability * dirSign) / 5;
                     merged.gp1_shift = rawNorm * gp1Pct;
-                    merged.score = impact * probability;
                     return merged;
                   }) as any,
                 }));
@@ -902,7 +908,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                     name: trendData.name || 'New Trend',
                     description: trendData.description || '',
                     direction: trendData.direction || 'Expansion',
-                    impact: trendData.impact || 3,
                     probability: trendData.probability || 3,
                     gp1_pct_affected: 0.10,
                     category_exposure: {},
@@ -921,7 +926,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                   });
                   if (res.ok) {
                     const created = await res.json();
-                    const impact = created.impact || payload.impact;
                     const probability = created.probability || payload.probability;
                     const dirSign = (created.direction || payload.direction) === 'Contraction' ? -1 : 1;
                     const gp1Pct = created.gp1_pct_affected ?? 0.10;
@@ -930,8 +934,7 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                       trends: [...prev.trends, {
                         ...payload,
                         ...created,
-                        score: impact * probability,
-                        gp1_shift: (impact * probability * dirSign / 25) * gp1Pct,
+                        gp1_shift: (probability * dirSign / 5) * gp1Pct,
                       }] as any,
                     }));
                   }
@@ -1068,7 +1071,6 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
                         t.category_exposure && t.category_exposure[selectedCategory] > 0
                       ).map((t: any) => ({
                         ...t,
-                        score: t.score || (t.impact * t.probability * (t.direction === 'Expansion' ? 1 : -1)),
                         exposure_level: t.category_exposure?.[selectedCategory] || 0,
                       }));
                       return { [selectedCategory]: filtered };
