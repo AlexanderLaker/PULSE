@@ -25,9 +25,24 @@ interface HoveredCell {
  * Extract shift value from nested path structure.
  * Handles multiple data formats: direct number, nested by year, nested percentiles.
  */
+interface CellDist {
+  median: number;
+  p10: number;
+  p90: number;
+  hasCI: boolean;
+}
+
 function extractVal(path: unknown, year: number): number {
-  if (!path) return 0;
-  if (typeof path === 'number') return path;
+  return extractDist(path, year).median;
+}
+
+/**
+ * Extract full percentile distribution for a cell.
+ */
+function extractDist(path: unknown, year: number): CellDist {
+  const none: CellDist = { median: 0, p10: 0, p90: 0, hasCI: false };
+  if (!path) return none;
+  if (typeof path === 'number') return { median: path, p10: path, p90: path, hasCI: false };
 
   const pathObj = path as Record<string, unknown>;
 
@@ -36,9 +51,13 @@ function extractVal(path: unknown, year: number): number {
     const val = pathObj[year];
     if (typeof val === 'object' && val !== null) {
       const obj = val as Record<string, unknown>;
-      return (obj.median ?? obj.p50 ?? 0) as number;
+      const med = (obj.median ?? obj.p50 ?? 0) as number;
+      const p10 = (obj.p10 ?? med) as number;
+      const p90 = (obj.p90 ?? med) as number;
+      return { median: med, p10, p90, hasCI: obj.p10 != null && obj.p90 != null };
     }
-    return val as number;
+    const v = val as number;
+    return { median: v, p10: v, p90: v, hasCI: false };
   }
 
   // Nested: p50 or mean → year
@@ -47,7 +66,8 @@ function extractVal(path: unknown, year: number): number {
     typeof pathObj.p50 === 'object' &&
     (pathObj.p50 as Record<string, unknown>)[year] != null
   ) {
-    return ((pathObj.p50 as Record<string, number>)[year] as number) || 0;
+    const med = ((pathObj.p50 as Record<string, number>)[year] as number) || 0;
+    return { median: med, p10: med, p90: med, hasCI: false };
   }
 
   if (
@@ -55,7 +75,8 @@ function extractVal(path: unknown, year: number): number {
     typeof pathObj.mean === 'object' &&
     (pathObj.mean as Record<string, unknown>)[year] != null
   ) {
-    return ((pathObj.mean as Record<string, number>)[year] as number) || 0;
+    const med = ((pathObj.mean as Record<string, number>)[year] as number) || 0;
+    return { median: med, p10: med, p90: med, hasCI: false };
   }
 
   if (
@@ -63,7 +84,8 @@ function extractVal(path: unknown, year: number): number {
     typeof pathObj.median === 'object' &&
     (pathObj.median as Record<string, unknown>)[year] != null
   ) {
-    return ((pathObj.median as Record<string, number>)[year] as number) || 0;
+    const med = ((pathObj.median as Record<string, number>)[year] as number) || 0;
+    return { median: med, p10: med, p90: med, hasCI: false };
   }
 
   if (
@@ -72,10 +94,12 @@ function extractVal(path: unknown, year: number): number {
     (pathObj.percentiles as Record<string, unknown>).p50
   ) {
     const p50Obj = (pathObj.percentiles as Record<string, Record<string, number> | undefined>).p50;
-    if (p50Obj && p50Obj[year] != null) return p50Obj[year];
+    if (p50Obj && p50Obj[year] != null) {
+      return { median: p50Obj[year], p10: p50Obj[year], p90: p50Obj[year], hasCI: false };
+    }
   }
 
-  return 0;
+  return none;
 }
 
 const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory, onDoubleClickCategory }) => {
@@ -281,7 +305,8 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
 
                 {/* Year Value Cells */}
                 {YEARS.map(year => {
-                  const val = extractVal(shifts[catId], year);
+                  const dist = extractDist(shifts[catId], year);
+                  const val = dist.median;
                   const isHovered = hoveredCell?.cat === catId && hoveredCell?.year === year;
 
                   return (
@@ -295,10 +320,10 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                       <motion.div
                         onMouseEnter={() => setHoveredCell({ cat: catId, year })}
                         onMouseLeave={() => setHoveredCell(null)}
-                        whileHover={{ scale: 1.08 }}
+                        whileHover={{ scale: 1.05 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                         style={{
-                          padding: '8px 12px',
+                          padding: dist.hasCI ? '6px 10px 5px' : '8px 12px',
                           borderRadius: 8,
                           fontSize: 12,
                           fontWeight: 600,
@@ -310,6 +335,19 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                         } as React.CSSProperties}
                       >
                         {fmtShift(val)}
+                        {/* p10–p90 confidence range, subtle */}
+                        {dist.hasCI && (
+                          <div style={{
+                            fontSize: 8,
+                            fontWeight: 400,
+                            color: T.text4,
+                            marginTop: 3,
+                            letterSpacing: -0.2,
+                            lineHeight: 1,
+                          }}>
+                            {fmtShift(dist.p10)} … {fmtShift(dist.p90)}
+                          </div>
+                        )}
 
                         {/* Hover Tooltip */}
                         <AnimatePresence>
@@ -323,19 +361,23 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                 bottom: '100%',
                                 left: '50%',
                                 transform: 'translateX(-50%)',
-                                background: T.bg1,
-                                border: `1px solid ${T.border2}`,
+                                background: '#1D1D1F',
+                                border: '1px solid rgba(255,255,255,0.1)',
                                 borderRadius: 8,
                                 padding: '8px 12px',
                                 fontSize: 10,
-                                color: T.text2,
+                                color: '#94A3B8',
                                 whiteSpace: 'nowrap',
                                 zIndex: 50,
                                 fontFamily: T.mono,
-                                boxShadow: `0 10px 25px rgba(0,0,0,0.3)`,
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
                               } as React.CSSProperties}
                             >
-                              {catId} · {year} · {fmtShift(val, 2)}
+                              <div style={{ color: '#F8FAFC', fontWeight: 600, marginBottom: 3 }}>{catId} · {year}</div>
+                              <div>Median {fmtShift(val, 2)}</div>
+                              {dist.hasCI && (
+                                <div style={{ marginTop: 2 }}>p10 {fmtShift(dist.p10, 2)}  ·  p90 {fmtShift(dist.p90, 2)}</div>
+                              )}
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -345,29 +387,46 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                 })}
 
                 {/* Δ 2030 Pill */}
-                <td
-                  style={{
-                    padding: 6,
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: shiftColorHex(val2030),
-                      background: `${shiftColorHex(val2030)}20`,
-                      border: `1px solid ${shiftColorHex(val2030)}40`,
-                    }}
-                  >
-                    {fmtShift(val2030)}
-                  </div>
-                </td>
+                {(() => {
+                  const dist2030 = extractDist(shifts[catId], 2030);
+                  return (
+                    <td
+                      style={{
+                        padding: 6,
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: dist2030.hasCI ? '5px 10px 4px' : '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: shiftColorHex(val2030),
+                          background: `${shiftColorHex(val2030)}20`,
+                          border: `1px solid ${shiftColorHex(val2030)}40`,
+                        }}
+                      >
+                        {fmtShift(val2030)}
+                        {dist2030.hasCI && (
+                          <div style={{
+                            fontSize: 8,
+                            fontWeight: 400,
+                            color: T.text4,
+                            marginTop: 2,
+                            lineHeight: 1,
+                          }}>
+                            {fmtShift(dist2030.p10)} … {fmtShift(dist2030.p90)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })()}
               </motion.tr>
             );
           })}

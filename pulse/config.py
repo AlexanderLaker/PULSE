@@ -38,7 +38,7 @@ SKIP_SHEETS = {"Input", "Financials_Input", "Cover", "Dashboard", "Sensitivity",
 # ── Default model parameters ────────────────────────────────────────
 DEFAULT_ATTENUATION = 0.5          # Will be overridden by backtesting if available
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
-DEFAULT_ITERATIONS = 10_000
+DEFAULT_ITERATIONS = 50_000
 DEFAULT_BASE_YEAR = 2025
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030]
 

@@ -14,6 +14,7 @@ interface KPICardProps {
   label: string;
   value: string;
   detail?: string;
+  subDetail?: React.ReactNode;
   color?: string;
   delay?: number;
   bg?: string;
@@ -30,6 +31,7 @@ function KPICard({
   label,
   value,
   detail,
+  subDetail,
   color,
   delay = 0,
   bg,
@@ -121,6 +123,9 @@ function KPICard({
         </div>
       )}
 
+      {/* Sub-detail (p10–p90 range) */}
+      {subDetail}
+
       {/* Tooltip */}
       <AnimatePresence>
         {showTip && tooltip && (
@@ -166,41 +171,60 @@ export default function HeadlineKPI({
   convergence,
   selectedCategory
 }: HeadlineKPIProps) {
+  // Helper to extract percentile distribution from a path entry
+  function getDist(entry: unknown): { median: number; p10: number; p90: number } {
+    if (typeof entry === 'object' && entry !== null && 'median' in entry) {
+      const d = entry as { median: number; p10?: number; p90?: number };
+      return { median: d.median, p10: d.p10 ?? d.median, p90: d.p90 ?? d.median };
+    }
+    const v = typeof entry === 'number' ? entry : 0;
+    return { median: v, p10: v, p90: v };
+  }
+
   // Compute portfolio average shift at 2030
   let avgShift = 0;
-  let maxExpansion = { name: '—', val: -Infinity };
-  let maxContraction = { name: '—', val: Infinity };
+  let avgP10 = 0;
+  let avgP90 = 0;
+  let maxExpansion = { name: '—', val: -Infinity, p10: 0, p90: 0 };
+  let maxContraction = { name: '—', val: Infinity, p10: 0, p90: 0 };
   let catCount = 0;
 
   if (shifts && typeof shifts === 'object') {
     Object.entries(shifts).forEach(([catId, pathData]) => {
-      // Handle both direct shift values and nested path objects
       const pathObj = typeof pathData === 'object' && pathData !== null ? pathData : { 2030: pathData };
-      const val2030Entry = pathObj[2030];
-      const val2030 = typeof val2030Entry === 'object' && val2030Entry !== null && 'median' in val2030Entry
-        ? val2030Entry.median
-        : (typeof val2030Entry === 'number' ? val2030Entry : 0);
+      const dist = getDist(pathObj[2030]);
 
-      avgShift += val2030;
+      avgShift += dist.median;
+      avgP10 += dist.p10;
+      avgP90 += dist.p90;
       catCount += 1;
 
-      // Track expansions and contractions
-      if (val2030 > maxExpansion.val) {
-        maxExpansion = { name: catId, val: val2030 };
+      if (dist.median > maxExpansion.val) {
+        maxExpansion = { name: catId, val: dist.median, p10: dist.p10, p90: dist.p90 };
       }
-      if (val2030 < maxContraction.val) {
-        maxContraction = { name: catId, val: val2030 };
+      if (dist.median < maxContraction.val) {
+        maxContraction = { name: catId, val: dist.median, p10: dist.p10, p90: dist.p90 };
       }
     });
 
     if (catCount > 0) {
-      avgShift = avgShift / catCount;
+      avgShift /= catCount;
+      avgP10 /= catCount;
+      avgP90 /= catCount;
     }
   }
 
   const hasConverged = convergence?.converged ?? false;
   const rHat = convergence?.r_hat?.toFixed(2) ?? '—';
-  const iterations = convergence?.iterations ?? 10000;
+  const iterations = convergence?.iterations ?? 50000;
+
+  // Format confidence interval as subtle sub-detail
+  const ciStyle: React.CSSProperties = {
+    fontSize: 10,
+    color: T.text4,
+    fontFamily: T.mono,
+    marginTop: 2,
+  };
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
@@ -216,6 +240,7 @@ export default function HeadlineKPI({
         label="Portfolio Shift 2030"
         value={fmtShift(avgShift)}
         detail={`${catCount} categories analyzed`}
+        subDetail={<div style={ciStyle}>p10 {fmtShift(avgP10)}  ·  p90 {fmtShift(avgP90)}</div>}
         color={shiftColorHex(avgShift)}
         bgIcon={avgShift >= 0 ? T.greenDim : T.redDim}
         delay={0}
@@ -227,6 +252,7 @@ export default function HeadlineKPI({
         label="Top Expansion"
         value={fmtShift(maxExpansion.val)}
         detail={maxExpansion.name || '—'}
+        subDetail={<div style={ciStyle}>p10 {fmtShift(maxExpansion.p10)}  ·  p90 {fmtShift(maxExpansion.p90)}</div>}
         color={T.green}
         bgIcon={T.greenDim}
         delay={0.08}
@@ -238,6 +264,7 @@ export default function HeadlineKPI({
         label="Top Contraction"
         value={fmtShift(maxContraction.val)}
         detail={maxContraction.name || '—'}
+        subDetail={<div style={ciStyle}>p10 {fmtShift(maxContraction.p10)}  ·  p90 {fmtShift(maxContraction.p90)}</div>}
         color={T.red}
         bgIcon={T.redDim}
         delay={0.16}

@@ -101,7 +101,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
   });
   const [withinForceRho, setWithinForceRho] = useState(0.3);
   const [tCopulaDf, setTCopulaDf] = useState(4);
-  const [iterations, setIterations] = useState(10000);
+  const [iterations, setIterations] = useState(50000);
 
   /* ── Auto-dismiss toast ──────────────────────────────────────────– */
   useEffect(() => {

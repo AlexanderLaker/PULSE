@@ -84,7 +84,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
   );
   const [withinForceRho, setWithinForceRho] = useState(0.3);
   const [tCopulaDf, setTCopulaDf] = useState(4);
-  const [iterations, setIterations] = useState(10000);
+  const [iterations, setIterations] = useState(50000);
   const [correlationMatrix, setCorrelationMatrix] = useState<Record<string, Record<string, number>>>({});
 
   /* ── Toast auto-dismiss ────────────────────────────────────── */

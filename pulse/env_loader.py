@@ -169,10 +169,10 @@ class EnvConfig:
         self.ai_provider = ai_provider_env
 
         try:
-            self.mc_iterations = int(get_env("MC_ITERATIONS", default="10000"))
+            self.mc_iterations = int(get_env("MC_ITERATIONS", default="50000"))
         except ValueError:
-            logger.warning("MC_ITERATIONS not a valid integer, using 10000")
-            self.mc_iterations = 10000
+            logger.warning("MC_ITERATIONS not a valid integer, using 50000")
+            self.mc_iterations = 50000
 
         self.debug = get_env("DEBUG", default="false").lower() in ("true", "1", "yes")
 

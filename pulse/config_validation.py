@@ -268,7 +268,7 @@ class ModelConfigValidator(BaseModel):
         if v < 100:
             raise ValueError(
                 f"iterations must be >= 100 for meaningful Bayesian sampling "
-                f"(got {v}). Default is 10,000; final runs use 50,000"
+                f"(got {v}). Default is 50,000"
             )
 
         if v > 1_000_000:
