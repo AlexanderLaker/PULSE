@@ -1167,6 +1167,7 @@ def create_app(args=None) -> FastAPI:
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
             "region_weights": getattr(config, 'region_weights', {}),
+            "category_weights": getattr(config, 'category_weights', {}),
             "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
             "path_years": config.path_years,
             "iterations": config.iterations,
@@ -1185,6 +1186,7 @@ def create_app(args=None) -> FastAPI:
         force_weights: Optional[dict] = None
         vc_weights: Optional[dict] = None
         region_weights: Optional[dict] = None
+        category_weights: Optional[dict] = None
         force_correlation_matrix: Optional[dict] = Field(None,
             description="6×6 force correlation matrix for copula. "
                         "Each force maps to a dict with all 6 forces. "
@@ -1230,6 +1232,14 @@ def create_app(args=None) -> FastAPI:
             old_rw = getattr(config, 'region_weights', {})
             changes["region_weights"] = {"old": old_rw, "new": req.region_weights}
             config.region_weights = req.region_weights
+
+        if req.category_weights is not None:
+            total = sum(req.category_weights.values())
+            if abs(total - 1.0) > 0.01:
+                raise HTTPException(400, f"Category weights must sum to 1.0, got {total}")
+            old_cw = getattr(config, 'category_weights', {})
+            changes["category_weights"] = {"old": old_cw, "new": req.category_weights}
+            config.category_weights = req.category_weights
 
         if req.force_correlation_matrix is not None:
             # Validate: must be symmetric, diagonal 1.0, off-diagonal in [0, 1]
@@ -1288,6 +1298,7 @@ def create_app(args=None) -> FastAPI:
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
             "region_weights": getattr(config, 'region_weights', {}),
+            "category_weights": getattr(config, 'category_weights', {}),
             "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,

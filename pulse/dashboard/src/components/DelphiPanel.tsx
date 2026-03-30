@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2, Clock,
   Download, Play, Zap, Users, BarChart3, Send, ArrowRight, ArrowLeft,
-  Eye, Lock, RefreshCw, Trash2,
+  Eye, Lock, RefreshCw, Trash2, SkipForward,
 } from 'lucide-react';
 import { T, FORCES, FORCE_COLORS } from '../lib/format';
 import * as api from '../api/client';
@@ -30,7 +30,9 @@ interface TrendData {
   force: string;
   direction: 'Expansion' | 'Contraction';
   probability?: number;
+  gp1_pct_affected?: number;
   strategic_implication?: string;
+  sources?: Array<{ url?: string; title?: string; data?: string }>;
   previous_round_scores?: {
     probability?: number[];
     probability_alpha?: number | null;
@@ -40,7 +42,12 @@ interface TrendData {
 interface TrendScore {
   trend_id: string;
   probability: number;
+  gp1_pct_affected: number;
   rationale: string;
+  skipped: boolean;
+  category_weights?: Record<string, number>;
+  vc_weights?: Record<string, number>;
+  regional_weights?: Record<string, number>;
 }
 
 interface SessionData {
@@ -78,6 +85,72 @@ const ROUND_INFO: Record<number, { title: string; subtitle: string; icon: React.
     icon: <Lock size={16} />,
   },
 };
+
+// ── Weight Defaults ──────────────────────────────────────────
+const DEFAULT_CATEGORY_WEIGHTS: Record<string, number> = {
+  'Hair: Color': 0, 'Hair: Care': 0, 'Hair: Styling': 0, 'Hair: Body': 0,
+  'LHC: FCN': 0, 'LHC: FCA': 0, 'LHC: FFI': 0, 'LHC: LAD': 0,
+  'LHC: HDW': 0, 'LHC: ADW': 0, 'LHC: HSC': 0, 'LHC: IC': 0,
+};
+const DEFAULT_VC_WEIGHTS: Record<string, number> = {
+  'Raw Materials': 0, 'Manufacturing': 0, 'Packaging': 0, 'Logistics': 0,
+  'Marketing': 0, 'Sales': 0, 'Trade Spend': 0, 'Overhead': 0,
+};
+const DEFAULT_REGIONAL_WEIGHTS: Record<string, number> = {
+  'Europe': 0, 'North America': 0, 'Asia': 0, 'High Growth': 0,
+};
+const WEIGHT_LABELS: Record<number, string> = { 0: 'None', 1: 'Low', 2: 'Med-Low', 3: 'Medium', 4: 'Med-High', 5: 'High' };
+
+// ── Inline Weight Grid (compact 0-5 dots) ───────────────────
+function WeightGrid({ title, weights, onChange }: {
+  title: string;
+  weights: Record<string, number>;
+  onChange: (key: string, val: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const entries = Object.entries(weights);
+  return (
+    <div style={{ borderTop: `1px solid ${T.border1}`, paddingTop: 12 }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center',
+          backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.text2 }}>{title}</span>
+        <ChevronRight size={14} style={{
+          color: T.text3, transform: expanded ? 'rotate(90deg)' : 'none',
+          transition: 'transform 0.15s',
+        }} />
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {entries.map(([key, val]) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.text3, width: 100, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {key.includes(':') ? key.split(':')[1]?.trim() : key}
+              </span>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[0, 1, 2, 3, 4, 5].map(d => (
+                  <button key={d} onClick={() => onChange(key, d)} title={WEIGHT_LABELS[d]}
+                    style={{
+                      width: 20, height: 20, borderRadius: 5, border: 'none', fontSize: 9, fontWeight: 700,
+                      backgroundColor: d === val ? T.accent : T.bg4,
+                      color: d === val ? '#fff' : T.text4,
+                      cursor: 'pointer', transition: 'all 0.1s',
+                    }}
+                  >{d}</button>
+                ))}
+              </div>
+              <span style={{ fontSize: 9, color: T.text4, fontFamily: T.mono }}>{WEIGHT_LABELS[val]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Score Slider Component ────────────────────────────────────
 
@@ -181,7 +254,12 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
   const currentScore = (currentTrendId && scores[currentTrendId]) || {
     trend_id: currentTrendId,
     probability: 0,
+    gp1_pct_affected: current?.gp1_pct_affected ?? 0.10,
     rationale: '',
+    skipped: false,
+    category_weights: { ...DEFAULT_CATEGORY_WEIGHTS },
+    vc_weights: { ...DEFAULT_VC_WEIGHTS },
+    regional_weights: { ...DEFAULT_REGIONAL_WEIGHTS },
   };
 
   const updateScore = (field: keyof TrendScore, value: any) => {
@@ -199,14 +277,46 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
         [current.id]: {
           trend_id: current.id,
           probability: 0,
+          gp1_pct_affected: current.gp1_pct_affected ?? 0.10,
           rationale: '',
+          skipped: false,
+          category_weights: { ...DEFAULT_CATEGORY_WEIGHTS },
+          vc_weights: { ...DEFAULT_VC_WEIGHTS },
+          regional_weights: { ...DEFAULT_REGIONAL_WEIGHTS },
         },
       }));
     }
   }, [currentIndex, current]);
 
+  // Auto-save current score to backend on navigation
+  const saveCurrentScore = useCallback(async () => {
+    const sc = scores[currentTrendId];
+    if (!sc || (!sc.probability && !sc.skipped)) return;
+    try {
+      const token = localStorage.getItem('pulse_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch(`/api/v1/delphi/sessions/${session.id}/scores/draft`, {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          scorer_name: scorerName,
+          trend_id: sc.trend_id,
+          probability: sc.probability,
+          gp1_pct_affected: sc.gp1_pct_affected,
+          rationale: sc.rationale,
+          skipped: sc.skipped,
+          round: session.current_round,
+          category_weights: sc.category_weights,
+          vc_weights: sc.vc_weights,
+          regional_weights: sc.regional_weights,
+        }),
+      });
+    } catch { /* silent save */ }
+  }, [scores, currentTrendId, session.id, session.current_round, scorerName]);
+
   const goNext = () => {
     if (!isLast) {
+      saveCurrentScore();
       setDirection(1);
       setCurrentIndex(i => i + 1);
     }
@@ -214,29 +324,37 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
 
   const goPrev = () => {
     if (!isFirst) {
+      saveCurrentScore();
       setDirection(-1);
       setCurrentIndex(i => i - 1);
     }
   };
 
-  // Check if all trends have been scored (impact + probability > 0)
+  // Check if all trends have been scored or skipped
   const allScored = sortedTrends.every(t => {
     const s = scores[t.id];
-    return s && s.probability > 0;
+    return s && (s.probability > 0 || s.skipped);
   });
 
   const handleSubmit = async () => {
     if (!allScored) return;
-    const allScores: TrendScore[] = sortedTrends.map(t => ({
-      trend_id: t.id,
-      probability: scores[t.id]?.probability || 3,
-      rationale: scores[t.id]?.rationale ?? '',
-    }));
+    const allScores: TrendScore[] = sortedTrends
+      .filter(t => !scores[t.id]?.skipped)
+      .map(t => ({
+        trend_id: t.id,
+        probability: scores[t.id]?.probability || 3,
+        gp1_pct_affected: scores[t.id]?.gp1_pct_affected ?? 0.10,
+        rationale: scores[t.id]?.rationale ?? '',
+        skipped: false,
+      }));
     await onSubmitAll(allScores);
   };
 
-  // Count scored trends (those with rationale)
-  const scoredCount = sortedTrends.filter(t => (scores[t.id]?.rationale?.length || 0) >= 10).length;
+  // Count scored trends (those with probability > 0 or skipped)
+  const scoredCount = sortedTrends.filter(t => {
+    const s = scores[t.id];
+    return s && (s.probability > 0 || s.skipped);
+  }).length;
 
   // Detect force group transition
   const currentForce = current?.force || '';
@@ -250,7 +368,8 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
       const force = t.force || 'Unknown';
       if (!counts[force]) counts[force] = { total: 0, scored: 0 };
       counts[force].total++;
-      if ((scores[t.id]?.rationale?.length || 0) >= 10) counts[force].scored++;
+      const sc = scores[t.id];
+      if (sc && (sc.probability > 0 || sc.skipped)) counts[force].scored++;
     });
     return counts;
   }, [sortedTrends, scores]);
@@ -413,9 +532,64 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
               <p style={{ margin: 0, fontSize: 13, color: T.text2, lineHeight: 1.6 }}>
                 {current.description}
               </p>
+              {/* Sources */}
+              {current.sources && current.sources.length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border1}` }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: T.text3, textTransform: 'uppercase', marginBottom: 4 }}>
+                    Sources
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {current.sources.map((src, i) => (
+                      <a
+                        key={i}
+                        href={src.url || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: 11, color: T.accent, textDecoration: 'none',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '3px 6px', borderRadius: 4,
+                          backgroundColor: T.bg3 + '40',
+                          pointerEvents: src.url ? 'auto' : 'none',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = T.bg3; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = T.bg3 + '40'; }}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {src.title || src.url || 'Source'}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Scoring */}
+            {/* Skipped indicator */}
+            {currentScore.skipped && (
+              <div style={{
+                padding: '12px 16px', borderRadius: 12,
+                backgroundColor: T.amberDim, border: `1px solid ${T.amber}30`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.amber }}>
+                  This trend has been skipped
+                </span>
+                <button
+                  onClick={() => updateScore('skipped', false)}
+                  style={{
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${T.amber}40`, borderRadius: 6,
+                    backgroundColor: 'transparent', color: T.amber, cursor: 'pointer',
+                  }}
+                >
+                  Undo Skip
+                </button>
+              </div>
+            )}
+
+            {/* Scoring (hidden if skipped) */}
+            {!currentScore.skipped && (
             <div style={{
               padding: 20, borderRadius: 12,
               backgroundColor: T.bg2, border: `1px solid ${T.border2}`,
@@ -432,6 +606,47 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
                 previousScores={current.previous_round_scores?.probability}
                 previousAlpha={current.previous_round_scores?.probability_alpha}
                 showPrevious={showPreviousDistributions}
+              />
+
+              {/* GP1 % Affected */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.text2 }}>GP1 % Affected</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: T.accent, fontFamily: T.mono }}>
+                    {Math.round((currentScore.gp1_pct_affected || 0.10) * 100)}%
+                  </span>
+                </div>
+                <p style={{ fontSize: 10, color: T.text3, lineHeight: 1.4, margin: '0 0 8px' }}>
+                  What fraction of a category's GP1 can this trend realistically affect at full materialization?
+                </p>
+                <input
+                  type="range"
+                  min={1} max={50} step={1}
+                  value={Math.round((currentScore.gp1_pct_affected || 0.10) * 100)}
+                  onChange={(e) => updateScore('gp1_pct_affected', parseInt(e.target.value, 10) / 100)}
+                  style={{ width: '100%', height: 4, accentColor: T.accent, cursor: 'pointer' }}
+                />
+              </div>
+
+              {/* Category Exposure Weights */}
+              <WeightGrid
+                title="Category Exposure (0-5)"
+                weights={currentScore.category_weights || DEFAULT_CATEGORY_WEIGHTS}
+                onChange={(key, val) => updateScore('category_weights', { ...(currentScore.category_weights || DEFAULT_CATEGORY_WEIGHTS), [key]: val })}
+              />
+
+              {/* Value Chain Weights */}
+              <WeightGrid
+                title="Value Chain Exposure (0-5)"
+                weights={currentScore.vc_weights || DEFAULT_VC_WEIGHTS}
+                onChange={(key, val) => updateScore('vc_weights', { ...(currentScore.vc_weights || DEFAULT_VC_WEIGHTS), [key]: val })}
+              />
+
+              {/* Regional Weights */}
+              <WeightGrid
+                title="Regional Exposure (0-5)"
+                weights={currentScore.regional_weights || DEFAULT_REGIONAL_WEIGHTS}
+                onChange={(key, val) => updateScore('regional_weights', { ...(currentScore.regional_weights || DEFAULT_REGIONAL_WEIGHTS), [key]: val })}
               />
 
               {/* Rationale */}
@@ -465,6 +680,7 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
                 />
               </div>
             </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -495,6 +711,28 @@ function ScoringWizard({ session, trends, scorerName, onScorerNameChange, onSubm
           <ArrowLeft size={16} />
           Previous
         </button>
+
+        {/* Skip this trend */}
+        {!currentScore.skipped && (
+          <button
+            onClick={() => { updateScore('skipped', true); if (!isLast) goNext(); }}
+            style={{
+              padding: '8px 14px', borderRadius: 8,
+              border: `1px solid ${T.amber}40`,
+              backgroundColor: 'transparent',
+              color: T.amber,
+              fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = T.amberDim; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          >
+            <SkipForward size={14} />
+            Skip
+          </button>
+        )}
 
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: 3 }}>

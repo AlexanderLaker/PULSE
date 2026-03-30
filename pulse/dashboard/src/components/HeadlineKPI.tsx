@@ -254,8 +254,8 @@ export default function HeadlineKPI({
         value={fmtShift(maxExpansion.val)}
         detail={maxExpansion.name || '—'}
         subDetail={<div style={ciStyle}>p10 {fmtShift(maxExpansion.p10)}  ·  p90 {fmtShift(maxExpansion.p90)}</div>}
-        color={T.green}
-        bgIcon={T.greenDim}
+        color={maxExpansion.val > 0 ? T.green : T.red}
+        bgIcon={maxExpansion.val > 0 ? T.greenDim : T.redDim}
         delay={0.08}
       />
 

@@ -553,6 +553,65 @@ async def get_scorers_analysis(session_id: str) -> Dict[str, Any]:
         raise HTTPException(500, f"Failed to get scorers: {str(e)}")
 
 
+# ── Draft Auto-Save Endpoint ──────────────────────────────────────────
+
+class DraftScoreRequest(BaseModel):
+    scorer_name: str
+    trend_id: str
+    probability: int = 0
+    gp1_pct_affected: float = 0.10
+    rationale: str = ""
+    skipped: bool = False
+    round: int = 1
+    category_weights: Optional[Dict[str, int]] = None
+    vc_weights: Optional[Dict[str, int]] = None
+    regional_weights: Optional[Dict[str, int]] = None
+
+
+# In-memory draft storage keyed by (session_id, scorer_name, trend_id)
+_draft_store: Dict[str, Dict[str, Any]] = {}
+
+
+@router.post("/sessions/{session_id}/scores/draft")
+async def save_draft_score(session_id: str, req: DraftScoreRequest) -> Dict[str, Any]:
+    """
+    Auto-save a draft score so the user can resume later.
+    Stored in-memory (survives within server lifetime, not across restarts).
+    """
+    try:
+        key = f"{session_id}:{req.scorer_name}:{req.trend_id}"
+        _draft_store[key] = {
+            "scorer_name": req.scorer_name,
+            "trend_id": req.trend_id,
+            "probability": req.probability,
+            "gp1_pct_affected": req.gp1_pct_affected,
+            "rationale": req.rationale,
+            "skipped": req.skipped,
+            "round": req.round,
+            "category_weights": req.category_weights,
+            "vc_weights": req.vc_weights,
+            "regional_weights": req.regional_weights,
+        }
+        return {"status": "saved", "key": key}
+    except Exception as e:
+        logger.error(f"Failed to save draft: {e}")
+        raise HTTPException(500, f"Failed to save draft: {str(e)}")
+
+
+@router.get("/sessions/{session_id}/scores/drafts")
+async def get_draft_scores(session_id: str, scorer_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Retrieve saved draft scores for a session so the user can resume.
+    """
+    try:
+        prefix = f"{session_id}:{scorer_name}:" if scorer_name else f"{session_id}:"
+        drafts = {k: v for k, v in _draft_store.items() if k.startswith(prefix)}
+        return {"drafts": list(drafts.values()), "count": len(drafts)}
+    except Exception as e:
+        logger.error(f"Failed to get drafts: {e}")
+        raise HTTPException(500, f"Failed to get drafts: {str(e)}")
+
+
 @router.get("/sessions/{session_id}/audit")
 async def get_session_audit(session_id: str) -> Dict[str, Any]:
     """

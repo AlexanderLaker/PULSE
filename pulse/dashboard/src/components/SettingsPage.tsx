@@ -69,6 +69,14 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
   const [withinForceRho, setWithinForceRho] = useState(0.3);
   const [tCopulaDf, setTCopulaDf] = useState(4);
   const [iterations, setIterations] = useState(50000);
+  const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>(
+    () => {
+      const cats = ['Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
+        'LHC: FCN', 'LHC: FCA', 'LHC: FFI', 'LHC: LAD',
+        'LHC: HDW', 'LHC: ADW', 'LHC: HSC', 'LHC: IC'];
+      return Object.fromEntries(cats.map(c => [c, 1 / cats.length]));
+    }
+  );
   const [correlationMatrix, setCorrelationMatrix] = useState<Record<string, Record<string, number>>>({});
 
   /* ── Toast auto-dismiss ────────────────────────────────────── */
@@ -97,6 +105,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       if (data.within_force_rho != null) setWithinForceRho(data.within_force_rho);
       if (data.t_copula_df != null) setTCopulaDf(data.t_copula_df);
       if (data.iterations != null) setIterations(data.iterations);
+      if (data.category_weights) setCategoryWeights(data.category_weights);
       if (data.force_correlation_matrix) setCorrelationMatrix(data.force_correlation_matrix);
     } catch (e: any) {
       setToast({ msg: e.message || 'Failed to load config', type: 'error' });
@@ -139,6 +148,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
         force_weights: normalize(forceWeights),
         vc_weights: normalize(vcWeights),
         region_weights: normalize(regionWeights),
+        category_weights: normalize(categoryWeights),
         within_force_rho: +withinForceRho.toFixed(2),
         t_copula_df: Math.round(tCopulaDf),
         iterations: Math.round(iterations),
@@ -156,19 +166,11 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       setForceWeights(normalize(forceWeights) as Record<ForceName, number>);
       setVCWeights(normalize(vcWeights));
       setRegionWeights(normalize(regionWeights) as Record<RegionKey, number>);
-      setToast({ msg: 'Configuration saved. Re-simulating…', type: 'success' });
+      setCategoryWeights(normalize(categoryWeights));
+      setToast({ msg: 'Configuration saved. Press Simulate in the War Room to apply.', type: 'success' });
 
-      // Re-run simulation with updated config, then notify dashboard
-      fetch('/api/v1/simulate', { method: 'POST', headers, body: JSON.stringify({ scenario: 'base', iterations: Math.round(iterations), include_allocation: true }) })
-        .then(r => {
-          if (r.ok) {
-            setToast({ msg: 'Simulation complete with new config.', type: 'success' });
-          }
-          window.dispatchEvent(new CustomEvent('pulse:config-updated'));
-        })
-        .catch(() => {
-          window.dispatchEvent(new CustomEvent('pulse:config-updated'));
-        });
+      // Notify dashboard of config change (no auto-simulation)
+      window.dispatchEvent(new CustomEvent('pulse:config-updated'));
     } catch (e: any) {
       setToast({ msg: e.message || 'Failed to save', type: 'error' });
     } finally {
@@ -285,6 +287,30 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
             ))}
             <SumIndicator value={sumOf(regionWeights)} />
             <Hint>Scales each trend by its regional exposure overlap with these weights.</Hint>
+          </Card>
+
+          {/* Category Weights */}
+          <Card title="Category Weights" subtitle="How categories are weighted in portfolio-level aggregation.">
+            {Object.keys(categoryWeights).filter(c => c.startsWith('Hair')).length > 0 && (
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: '0.5px', margin: '0 0 6px' }}>HAIR</div>
+            )}
+            {Object.keys(categoryWeights).filter(c => c.startsWith('Hair')).map(c => (
+              <SliderInput key={c} label={c.replace('Hair: ', '')} value={categoryWeights[c] ?? 0}
+                onChange={v => setCategoryWeights(prev => ({ ...prev, [c]: Math.max(0, v) }))}
+                min={0} max={1} step={0.01}
+              />
+            ))}
+            {Object.keys(categoryWeights).filter(c => c.startsWith('LHC')).length > 0 && (
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: '0.5px', margin: '10px 0 6px' }}>LHC</div>
+            )}
+            {Object.keys(categoryWeights).filter(c => c.startsWith('LHC')).map(c => (
+              <SliderInput key={c} label={c.replace('LHC: ', '')} value={categoryWeights[c] ?? 0}
+                onChange={v => setCategoryWeights(prev => ({ ...prev, [c]: Math.max(0, v) }))}
+                min={0} max={1} step={0.01}
+              />
+            ))}
+            <SumIndicator value={sumOf(categoryWeights)} />
+            <Hint>Auto-normalizes to 1.0 on save. Higher weight = more influence on portfolio-level metrics.</Hint>
           </Card>
 
           {/* Simulation Settings */}

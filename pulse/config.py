@@ -124,6 +124,7 @@ def compute_materialization_schedule(
 DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}  # Equal: ~16.7%
 DEFAULT_VC_WEIGHTS = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}  # Equal: 12.5%
 DEFAULT_REGION_WEIGHTS = {r: 1.0 / len(REGIONS) for r in REGIONS}  # Equal: 25%
+DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equal: ~8.3%
 
 # ── Copula parameters ──────────────────────────────────────────────
 DEFAULT_WITHIN_FORCE_RHO = 0.3
@@ -165,6 +166,7 @@ class ModelConfig:
     vc_weights: dict = field(default_factory=lambda: dict(DEFAULT_VC_WEIGHTS))
     region_weights: dict = field(default_factory=lambda: dict(DEFAULT_REGION_WEIGHTS))
     category_names: list = field(default_factory=lambda: list(CATEGORIES))
+    category_weights: dict = field(default_factory=lambda: dict(DEFAULT_CATEGORY_WEIGHTS))
     iterations: int = DEFAULT_ITERATIONS
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     t_copula_df: int = DEFAULT_T_COPULA_DF

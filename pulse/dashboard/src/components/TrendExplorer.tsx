@@ -914,16 +914,19 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 exposures={catExposure}
                 onChange={setCatExposure}
                 direction={trend.direction}
+                isAdmin={isAdmin && isEditing}
               />
               <ValueChainExposureGrid
                 exposures={vcExposure}
                 onChange={setVcExposure}
                 direction={trend.direction}
+                isAdmin={isAdmin && isEditing}
               />
               <RegionalExposureGrid
                 exposures={regionalExposure}
                 onChange={setRegionalExposure}
                 direction={trend.direction}
+                isAdmin={isAdmin && isEditing}
               />
             </div>
           </div>
@@ -1388,7 +1391,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
               }
             }}
           >
-            {force === 'All' ? '● All Forces' : `${FORCE_ICONS[force as ForceName]} ${force}`}
+            {force === 'All' ? '⚡ All Forces' : `${FORCE_ICONS[force as ForceName]} ${force}`}
           </button>
         ))}
       </div>
