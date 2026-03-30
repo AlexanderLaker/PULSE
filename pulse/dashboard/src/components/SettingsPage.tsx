@@ -157,10 +157,18 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       setVCWeights(normalize(vcWeights));
       setRegionWeights(normalize(regionWeights) as Record<RegionKey, number>);
       setToast({ msg: 'Configuration saved. Re-simulating…', type: 'success' });
-      window.dispatchEvent(new CustomEvent('pulse:config-updated'));
 
-      // Fire-and-forget re-simulation
-      fetch('/api/v1/simulate', { method: 'POST', headers, body: JSON.stringify({ scenario: 'base', iterations: Math.round(iterations), include_allocation: true }) }).catch(() => {});
+      // Re-run simulation with updated config, then notify dashboard
+      fetch('/api/v1/simulate', { method: 'POST', headers, body: JSON.stringify({ scenario: 'base', iterations: Math.round(iterations), include_allocation: true }) })
+        .then(r => {
+          if (r.ok) {
+            setToast({ msg: 'Simulation complete with new config.', type: 'success' });
+          }
+          window.dispatchEvent(new CustomEvent('pulse:config-updated'));
+        })
+        .catch(() => {
+          window.dispatchEvent(new CustomEvent('pulse:config-updated'));
+        });
     } catch (e: any) {
       setToast({ msg: e.message || 'Failed to save', type: 'error' });
     } finally {

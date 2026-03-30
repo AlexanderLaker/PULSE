@@ -131,7 +131,7 @@ def _load_trend_database() -> TrendDatabase:
 
 # ── Pydantic models ────────────────────────────────────────────────
 class SimulationRequest(BaseModel):
-    iterations: int = Field(5000, ge=1, le=50000)  # 1 to 50k iterations
+    iterations: int = Field(5000, ge=1, le=100000)  # 1 to 100k iterations
     scenario: str = "base"
     include_sensitivity: bool = False
     include_allocation: bool = True

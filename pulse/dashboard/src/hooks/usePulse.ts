@@ -126,6 +126,20 @@ export default function usePulse(): UsePulseReturn {
     return () => { mounted.current = false; };
   }, [loadAll]);
 
+  // ── Listen for config updates (from SettingsPage) and auto-reload ──
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      // Re-fetch config and simulation results after settings change
+      api.getConfig().then(c => { if (mounted.current) setConfig(c); }).catch(() => {});
+      // Wait a moment for the fire-and-forget re-simulation to complete, then reload
+      setTimeout(() => {
+        api.getSimulation().then(sim => { if (mounted.current && sim) setSimulation(sim); }).catch(() => {});
+      }, 2000);
+    };
+    window.addEventListener('pulse:config-updated', handleConfigUpdate);
+    return () => window.removeEventListener('pulse:config-updated', handleConfigUpdate);
+  }, []);
+
   // ── Run simulation ──────────────────────────────────────────
   const simulate = useCallback(async (params: SimulationParams = {}) => {
     setSimulating(true);
@@ -136,9 +150,12 @@ export default function usePulse(): UsePulseReturn {
         return;
       }
 
+      // Use iterations from config if available, otherwise default to 5000
+      const configIterations = config?.iterations ?? 5000;
+
       const result = await api.runSimulation({
         scenario: activeScenario,
-        iterations: 5000,
+        iterations: configIterations,
         include_allocation: true,
         ...params,
       });
@@ -154,7 +171,7 @@ export default function usePulse(): UsePulseReturn {
     } finally {
       if (mounted.current) setSimulating(false);
     }
-  }, [activeScenario, backendAvailable]);
+  }, [activeScenario, backendAvailable, config]);
 
   // ── Update trend score ──────────────────────────────────────
   const updateTrend = useCallback(async (trendId: string, updates: TrendUpdate) => {
