@@ -3,9 +3,9 @@
  * Apple × Bain design: 4 KPI cards showing portfolio shift, expansions, contractions, model quality.
  */
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
-import React from 'react';
+import React, { useState } from 'react';
 import type { ShiftMatrix, ConvergenceDiagnostics } from '../types';
 import { T, fmtShift, shiftColorHex } from '../lib/format';
 
@@ -18,6 +18,7 @@ interface KPICardProps {
   delay?: number;
   bg?: string;
   bgIcon?: string;
+  tooltip?: React.ReactNode;
 }
 
 /**
@@ -32,8 +33,10 @@ function KPICard({
   color,
   delay = 0,
   bg,
-  bgIcon
+  bgIcon,
+  tooltip
 }: KPICardProps) {
+  const [showTip, setShowTip] = useState(false);
   const cardStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
@@ -92,7 +95,9 @@ function KPICard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: 'easeOut' }}
-      style={cardStyle}
+      style={{ ...cardStyle, position: 'relative' as const, cursor: tooltip ? 'help' : undefined }}
+      onMouseEnter={() => tooltip && setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
     >
       {/* Label + Icon */}
       <div style={labelContainerStyle}>
@@ -115,6 +120,37 @@ function KPICard({
           {detail}
         </div>
       )}
+
+      {/* Tooltip */}
+      <AnimatePresence>
+        {showTip && tooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: 8,
+              padding: '14px 16px',
+              borderRadius: 12,
+              background: '#1D1D1F',
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: '#94A3B8',
+              zIndex: 10000,
+              pointerEvents: 'none',
+            } as React.CSSProperties}
+          >
+            {tooltip}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -216,6 +252,26 @@ export default function HeadlineKPI({
         color={hasConverged ? T.green : T.amber}
         bgIcon={hasConverged ? T.greenDim : T.amberDim}
         delay={0.24}
+        tooltip={
+          <>
+            <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 12, color: '#F8FAFC' }}>
+              Bayesian Monte Carlo Simulation
+            </div>
+            <div style={{ marginBottom: 10, lineHeight: 1.55 }}>
+              PULSE runs {iterations.toLocaleString()} Monte Carlo iterations, each sampling trend impacts from Bayesian posterior distributions and combining them via a t-copula dependency structure to estimate profit pool shifts.
+            </div>
+            <div style={{ fontWeight: 600, marginBottom: 4, color: '#F8FAFC' }}>R̂ (Gelman–Rubin Statistic)</div>
+            <div style={{ marginBottom: 10, lineHeight: 1.55 }}>
+              Measures whether simulation chains have converged to a stable distribution. R̂ {'<'} 1.05 = excellent, R̂ {'<'} 1.10 = acceptable, R̂ {'>'} 1.10 = results may be unreliable.
+            </div>
+            <div style={{ fontWeight: 600, marginBottom: 4, color: '#F8FAFC' }}>"{hasConverged ? 'Converged' : 'Running'}" means</div>
+            <div style={{ lineHeight: 1.55 }}>
+              {hasConverged
+                ? 'All parameter chains have stabilized (R̂ < 1.10). The shift percentiles (p10, p25, median, p75, p90) are statistically reliable and safe to use for strategic decisions.'
+                : 'The simulation chains have not yet stabilized. Consider increasing iterations in Model Configuration for more reliable results.'}
+            </div>
+          </>
+        }
       />
     </div>
   );

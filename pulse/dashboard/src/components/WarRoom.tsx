@@ -169,6 +169,62 @@ function generateInitialData(): InitialDataResult {
   };
 }
 
+// ─── SimTooltip — hover tooltip for simulation status pills ─────────
+function SimTooltip({ children, content }: { children: React.ReactNode; content: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const handleEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPos({ x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+    }
+    setShow(true);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setShow(false)}
+      style={{ position: 'relative', display: 'inline-flex' }}
+    >
+      {children}
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'fixed',
+              left: pos.x,
+              top: pos.y,
+              transform: 'translateX(-50%)',
+              width: 320,
+              padding: '14px 16px',
+              borderRadius: 12,
+              background: '#1D1D1F',
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: '#94A3B8',
+              zIndex: 10000,
+              fontFamily: "'Inter', sans-serif",
+              pointerEvents: 'none',
+            } as React.CSSProperties}
+          >
+            {content}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── WarRoom Component ──────────────────────────────────────────────
 export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): React.ReactNode {
   const {
@@ -565,27 +621,66 @@ export default function WarRoom({ isAdmin = false }: { isAdmin?: boolean }): Rea
 
           {/* Right: Badges & Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' } as React.CSSProperties}>
-            {/* Convergence Pill */}
-            <div
-              style={{
-                ...WarRoomStyles.pill,
-                background: T.greenDim,
-                border: `1px solid ${T.green}20`,
-              } as React.CSSProperties}
+            {/* Convergence Pill with tooltip */}
+            <SimTooltip
+              content={
+                <>
+                  <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12, color: '#F8FAFC' }}>Gelman–Rubin R̂ Statistic</div>
+                  <div style={{ marginBottom: 8, lineHeight: 1.55 }}>
+                    R̂ measures whether the Monte Carlo simulation chains have converged to the same distribution. It compares variance within each chain to variance between chains.
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 8 }}>
+                    <div><span style={{ color: T.green, fontWeight: 600 }}>R̂ {'<'} 1.05</span> — Excellent convergence</div>
+                    <div><span style={{ color: T.green, fontWeight: 600 }}>R̂ {'<'} 1.10</span> — Acceptable convergence</div>
+                    <div><span style={{ color: T.amber, fontWeight: 600 }}>R̂ {'>'} 1.10</span> — Poor convergence, results unreliable</div>
+                  </div>
+                  <div style={{ opacity: 0.7, fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6 }}>
+                    Current value: R̂ = {data.convergence?.r_hat?.toFixed(4) || '1.0300'}. {(data.convergence?.r_hat ?? 1.03) < 1.05 ? 'Simulation has fully converged — results are statistically reliable.' : (data.convergence?.r_hat ?? 1.03) < 1.10 ? 'Acceptable convergence — results are usable.' : 'Low convergence — consider increasing iterations.'}
+                  </div>
+                </>
+              }
             >
-              <CheckCircle2 size={12} style={{ color: T.green }} />
-              <span style={{ color: T.green, fontSize: 11, fontWeight: 600 }}>
-                R̂ {data.convergence?.r_hat?.toFixed(2) || '1.03'}
-              </span>
-            </div>
+              <div
+                style={{
+                  ...WarRoomStyles.pill,
+                  background: T.greenDim,
+                  border: `1px solid ${T.green}20`,
+                  cursor: 'help',
+                } as React.CSSProperties}
+              >
+                <CheckCircle2 size={12} style={{ color: T.green }} />
+                <span style={{ color: T.green, fontSize: 11, fontWeight: 600 }}>
+                  R̂ {data.convergence?.r_hat?.toFixed(2) || '1.03'}
+                </span>
+              </div>
+            </SimTooltip>
 
-            {/* Iteration Count Pill */}
-            <div style={{ ...WarRoomStyles.pill, background: T.border1 } as React.CSSProperties}>
-              <Clock size={12} style={{ color: T.text3 }} />
-              <span style={{ color: T.text3, fontSize: 11, fontWeight: 600 }}>
-                {data.convergence?.iterations?.toLocaleString() || '5k'} iter
-              </span>
-            </div>
+            {/* Iteration Count Pill with tooltip */}
+            <SimTooltip
+              content={
+                <>
+                  <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 12, color: '#F8FAFC' }}>Monte Carlo Iterations</div>
+                  <div style={{ marginBottom: 8, lineHeight: 1.55 }}>
+                    The number of random simulation runs used to estimate the probability distribution of profit pool shifts. Each iteration samples trend impacts from Bayesian posteriors and combines them via a copula dependency structure.
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 8 }}>
+                    <div><span style={{ fontWeight: 600 }}>5,000</span> — Fast exploratory run</div>
+                    <div><span style={{ fontWeight: 600 }}>10,000</span> — Standard analysis (default)</div>
+                    <div><span style={{ fontWeight: 600 }}>50,000</span> — High-precision for final sign-off</div>
+                  </div>
+                  <div style={{ opacity: 0.7, fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6 }}>
+                    More iterations = tighter confidence intervals but longer runtime. Configurable in Model Configuration.
+                  </div>
+                </>
+              }
+            >
+              <div style={{ ...WarRoomStyles.pill, background: T.border1, cursor: 'help' } as React.CSSProperties}>
+                <Clock size={12} style={{ color: T.text3 }} />
+                <span style={{ color: T.text3, fontSize: 11, fontWeight: 600 }}>
+                  {data.convergence?.iterations?.toLocaleString() || '5k'} iter
+                </span>
+              </div>
+            </SimTooltip>
 
             {/* Simulate Button — admin only */}
             {isAdmin && (
