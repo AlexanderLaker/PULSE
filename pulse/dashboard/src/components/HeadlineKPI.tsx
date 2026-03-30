@@ -136,20 +136,21 @@ function KPICard({
             transition={{ duration: 0.15 }}
             style={{
               position: 'absolute',
-              bottom: '100%',
+              top: 0,
               left: 0,
               right: 0,
-              marginBottom: 8,
-              padding: '14px 16px',
+              bottom: 0,
+              padding: '10px 12px',
               borderRadius: 12,
-              background: '#1D1D1F',
+              background: 'rgba(29,29,31,0.95)',
               border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
-              fontSize: 11,
-              lineHeight: 1.5,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              fontSize: 10,
+              lineHeight: 1.45,
               color: '#94A3B8',
               zIndex: 10000,
               pointerEvents: 'none',
+              overflow: 'auto',
             } as React.CSSProperties}
           >
             {tooltip}

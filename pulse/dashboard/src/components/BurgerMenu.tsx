@@ -104,7 +104,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
         <div
           style={{
             position: 'absolute',
-            right: 0,
+            left: 0,
             top: '44px',
             width: '240px',
             backgroundColor: '#1E293B',
