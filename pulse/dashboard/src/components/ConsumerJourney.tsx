@@ -533,6 +533,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
   } | null>(null);
   const [lhcJourney, setLhcJourney] = useState<JourneyStage[]>(LHC_JOURNEY);
   const [hairJourney, setHairJourney] = useState<JourneyStage[]>(HAIR_JOURNEY);
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set(['product', 'tech', 'service']));
 
   const handleProductClick = useCallback((entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string) => {
     setSelectedProduct({ entry, direction, stageName });
@@ -665,14 +666,31 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
           <span style={{ fontSize: 11, color: T.text2 }}>Negatively Impacted (Contraction)</span>
         </div>
         <div style={{ width: 1, height: 14, background: T.border }} />
-        {Object.entries(TYPE_STYLES).map(([key, s]) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{
-              fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
-              background: s.bg, color: s.text, letterSpacing: 0.3,
-            }}>{s.label}</span>
-          </div>
-        ))}
+        {Object.entries(TYPE_STYLES).map(([key, s]) => {
+          const isActive = typeFilter.has(key);
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                setTypeFilter(prev => {
+                  const next = new Set(prev);
+                  if (next.has(key)) { next.delete(key); } else { next.add(key); }
+                  return next;
+                });
+              }}
+              style={{
+                fontSize: 10, fontWeight: 600, padding: '4px 10px', borderRadius: 12,
+                background: isActive ? s.bg : 'transparent',
+                color: isActive ? s.text : T.text3,
+                border: `1px solid ${isActive ? s.text + '40' : T.border}`,
+                cursor: 'pointer', fontFamily: T.sans,
+                opacity: isActive ? 1 : 0.5,
+                transition: 'all 0.15s',
+                letterSpacing: 0.3,
+              }}
+            >{s.label}</button>
+          );
+        })}
       </div>
 
       {/* Journey grid */}
@@ -727,7 +745,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
               }}>
                 ▲ Benefiting
               </div>
-              {stage.benefiting.map((p, i) => (
+              {stage.benefiting.filter(p => typeFilter.has(p.type)).sort((a, b) => (b.intensity || 2) - (a.intensity || 2)).map((p, i) => (
                 <ProductPill key={i} entry={p} direction="expansion" onClick={() => handleProductClick(p, 'expansion', stage.label)} isSelected={selectedProduct?.entry.name === p.name && selectedProduct?.direction === 'expansion'} />
               ))}
             </div>
@@ -746,7 +764,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
               }}>
                 ▼ Declining
               </div>
-              {stage.negativelyImpacted.map((p, i) => (
+              {stage.negativelyImpacted.filter(p => typeFilter.has(p.type)).sort((a, b) => (b.intensity || 2) - (a.intensity || 2)).map((p, i) => (
                 <ProductPill key={i} entry={p} direction="contraction" onClick={() => handleProductClick(p, 'contraction', stage.label)} isSelected={selectedProduct?.entry.name === p.name && selectedProduct?.direction === 'contraction'} />
               ))}
             </div>
@@ -859,18 +877,24 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                   background: T.bg1, border: `1px solid ${T.border}`,
                   overflow: 'hidden',
                 }}>
-                  {selectedProduct.entry.trendDrivers.split('+').map((driver, i) => {
-                    const trimmed = driver.trim();
-                    // Extract trend code like T-01, G-02, C-04, K-06, E-02
-                    const codeMatch = trimmed.match(/^([TCGKE]-\d{2})/);
-                    const trendCode = codeMatch ? codeMatch[1] : null;
-                    const context = trendCode ? TREND_CONTEXT[trendCode] : null;
-                    const drivers = selectedProduct.entry.trendDrivers.split('+');
+                  {(() => {
+                    // Filter to only trends that exist in the master TREND_CONTEXT list
+                    const validDrivers = selectedProduct.entry.trendDrivers.split('+')
+                      .map(d => d.trim())
+                      .filter(d => {
+                        const match = d.match(/^([TCGKE]-\d{2})/);
+                        return match && TREND_CONTEXT[match[1]];
+                      });
+                    if (validDrivers.length === 0) return <div style={{ padding: '10px 14px', fontSize: 11, color: T.text3 }}>No linked trends from master list</div>;
+                    return validDrivers.map((driver, i) => {
+                      const codeMatch = driver.match(/^([TCGKE]-\d{2})/);
+                      const trendCode = codeMatch![1];
+                      const context = TREND_CONTEXT[trendCode];
 
                     return (
                       <div key={i} style={{
                         padding: '10px 14px',
-                        borderBottom: i < drivers.length - 1 ? `1px solid ${T.border}` : 'none',
+                        borderBottom: i < validDrivers.length - 1 ? `1px solid ${T.border}` : 'none',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                           <span style={{
@@ -882,11 +906,9 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                           </span>
                           <div style={{ flex: 1 }}>
                             <span style={{ fontSize: 12, color: T.text, lineHeight: 1.5, fontWeight: 600 }}>
-                              {context ? `${trendCode}: ${context.name}` : trimmed}
+                              {trendCode}: {context.name}
                             </span>
-                            {context && (
-                              <>
-                                <span style={{
+                              <span style={{
                                   display: 'inline-block', marginLeft: 6,
                                   fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
                                   background: 'rgba(0,113,227,0.08)', color: T.accent,
@@ -899,19 +921,9 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                                 }}>
                                   {context.description}
                                 </p>
-                              </>
-                            )}
-                            {!context && (
-                              <p style={{
-                                fontSize: 11, color: T.text2, lineHeight: 1.5,
-                                margin: '4px 0 0',
-                              }}>
-                                {trimmed}
-                              </p>
-                            )}
-                            {onNavigateToTrend && trendCode && (
+                            {onNavigateToTrend && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); onNavigateToTrend(context?.name || trendCode); }}
+                                onClick={(e) => { e.stopPropagation(); onNavigateToTrend(context.name); }}
                                 style={{
                                   marginTop: 6, fontSize: 10, fontWeight: 600,
                                   color: T.accent, background: 'none', border: 'none',
@@ -929,7 +941,8 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                         </div>
                       </div>
                     );
-                  })}
+                  });
+                  })()}
                 </div>
               </div>
 
