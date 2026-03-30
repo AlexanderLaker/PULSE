@@ -62,7 +62,7 @@ export default function App() {
         </Suspense>
         {/* Burger Menu — top-right */}
         <div style={{
-          position: 'fixed', top: 12, right: 16, zIndex: 9999,
+          position: 'fixed', top: 12, left: 16, zIndex: 9999,
           fontFamily: "'Inter', sans-serif",
         }}>
           <BurgerMenu
@@ -117,7 +117,7 @@ export default function App() {
 
       {/* Burger Menu — top-right */}
       <div style={{
-        position: 'fixed', top: 12, right: 16, zIndex: 9999,
+        position: 'fixed', top: 12, left: 16, zIndex: 9999,
         fontFamily: "'Inter', sans-serif",
       }}>
         <BurgerMenu

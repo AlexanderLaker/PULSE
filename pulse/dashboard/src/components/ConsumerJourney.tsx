@@ -560,11 +560,19 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
           <div style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: `linear-gradient(135deg, ${T.accent}, #5856D6)`,
+            width: 28, height: 28,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 13, fontWeight: 700,
-          }}>P</div>
+            marginLeft: 36,
+          }}>
+            <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="50,5 95,85 5,85" fill="#1a1a2e" />
+              <polygon points="50,5 72,85 50,70 28,85" fill="#2d2d44" />
+              <polygon points="50,5 72,85 50,70" fill="#3a3a55" />
+              <line x1="50" y1="5" x2="50" y2="70" stroke="#6366f1" strokeWidth="1.5" opacity="0.5" />
+              <line x1="50" y1="70" x2="28" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+              <line x1="50" y1="70" x2="72" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+            </svg>
+          </div>
           <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>PRISM War Room</span>
           <span style={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>v6.0</span>
         </div>

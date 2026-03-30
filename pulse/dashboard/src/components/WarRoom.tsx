@@ -579,17 +579,20 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               style={{
                 width: 28,
                 height: 28,
-                borderRadius: 8,
-                background: `linear-gradient(135deg, ${T.accent} 0%, ${T.purple} 100%)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: 14,
-                color: T.bg,
+                marginLeft: 36,
               } as React.CSSProperties}
             >
-              P
+              <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="50,5 95,85 5,85" fill="#1a1a2e" />
+                <polygon points="50,5 72,85 50,70 28,85" fill="#2d2d44" />
+                <polygon points="50,5 72,85 50,70" fill="#3a3a55" />
+                <line x1="50" y1="5" x2="50" y2="70" stroke="#6366f1" strokeWidth="1.5" opacity="0.5" />
+                <line x1="50" y1="70" x2="28" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+                <line x1="50" y1="70" x2="72" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+              </svg>
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: T.text2, letterSpacing: 0.5 } as React.CSSProperties}>
               PRISM War Room
