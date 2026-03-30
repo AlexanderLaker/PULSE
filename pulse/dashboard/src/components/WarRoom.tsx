@@ -226,7 +226,7 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
 }
 
 // ─── WarRoom Component ──────────────────────────────────────────────
-export default function WarRoom({ isAdmin = false, onNavigateJourney }: { isAdmin?: boolean; onNavigateJourney?: () => void }): React.ReactNode {
+export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate, simulation,
@@ -241,6 +241,13 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney }: { isAdmi
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSnapshots, setShowSnapshots] = useState<boolean>(false);
   const [showBriefing, setShowBriefing] = useState<boolean>(false);
+
+  // Switch to trends view when navigating from Consumer Journey trend link
+  useEffect(() => {
+    if (initialTrendSearch) {
+      setActiveView('trends');
+    }
+  }, [initialTrendSearch]);
 
   // Initial data — zeroed until backend provides real simulation
   const [initialData, setInitialData] = useState(() => generateInitialData());
@@ -887,6 +894,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney }: { isAdmi
               forceFilter={forceFilter || ''}
               onForceFilter={setForceFilter}
               isAdmin={isAdmin}
+              initialSearchQuery={initialTrendSearch}
               onUpdateTrend={(id: string, updates: any) => {
                 // Persist to API (include auth token for serverless)
                 const token = localStorage.getItem('pulse_token');

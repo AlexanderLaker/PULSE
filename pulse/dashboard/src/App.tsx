@@ -16,6 +16,7 @@ export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
   const [showUsers, setShowUsers] = useState(false);
   const [page, setPage] = useState<Page>('warroom');
+  const [trendSearch, setTrendSearch] = useState<string | undefined>(undefined);
 
   // Still checking stored token
   if (loading && !user) {
@@ -52,10 +53,10 @@ export default function App() {
       <ErrorBoundary>
         <Suspense fallback={<FullPageSkeleton />}>
           <ConsumerJourney
-            onBack={() => setPage('warroom')}
-            onNavigateWarRoom={() => setPage('warroom')}
-            onNavigateTrends={() => setPage('warroom')}
-            onNavigateToTrend={(search) => { setPage('warroom'); }}
+            onBack={() => { setTrendSearch(undefined); setPage('warroom'); }}
+            onNavigateWarRoom={() => { setTrendSearch(undefined); setPage('warroom'); }}
+            onNavigateTrends={() => { setTrendSearch(undefined); setPage('warroom'); }}
+            onNavigateToTrend={(search) => { setTrendSearch(search); setPage('warroom'); }}
           />
         </Suspense>
         {/* Burger Menu — top-right */}
@@ -110,7 +111,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<FullPageSkeleton />}>
-        <WarRoom isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} />
+        <WarRoom isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} initialTrendSearch={trendSearch} />
       </Suspense>
 
       {/* Burger Menu — top-right */}

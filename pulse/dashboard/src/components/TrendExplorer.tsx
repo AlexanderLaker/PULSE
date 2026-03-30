@@ -6,7 +6,7 @@
  *
  * Apple × Bain × Goldman Sachs design: glass cards, generous whitespace, silk transitions.
  */
-import React, { useState, useMemo, FC } from 'react';
+import React, { useState, useMemo, useEffect, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronUp, Search, Sparkles, ExternalLink, Clock,
@@ -48,6 +48,7 @@ interface TrendExplorerProps {
   onDeleteTrend?: (id: string) => void;
   onCreateTrend?: (trend: Partial<TrendData>) => void;
   isAdmin?: boolean;
+  initialSearchQuery?: string;
 }
 
 // ─── Source Icons ─────────────────────────────────────────────────────────
@@ -1132,8 +1133,8 @@ function BadgeStyled({ badge }: { badge: TrendBadge }): React.ReactNode {
   }
 }
 
-const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend, onCreateTrend, isAdmin = false }) => {
-  const [searchQuery, setSearchQuery] = useState<string>('');
+const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilter, onUpdateTrend, onDeleteTrend, onCreateTrend, isAdmin = false, initialSearchQuery }) => {
+  const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery || '');
   const [sortBy, setSortBy] = useState<string>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedTrendId, setExpandedTrendId] = useState<string | null>(null);
@@ -1143,6 +1144,13 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
   const [newTrendName, setNewTrendName] = useState('');
   const [newTrendDirection, setNewTrendDirection] = useState<'Expansion' | 'Contraction'>('Expansion');
   const [newTrendProbability, setNewTrendProbability] = useState(3);
+
+  // Sync search query when navigating from Consumer Journey trend link
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
 
   const trends = data?.trends || [];
   const forces = ['All', ...Object.keys(FORCES)];

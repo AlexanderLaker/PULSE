@@ -1002,14 +1002,14 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
 // Intensity-based color scales
 const INTENSITY_COLORS = {
   expansion: {
-    1: { bg: 'rgba(48,209,88,0.04)', border: 'rgba(48,209,88,0.12)', hoverBg: 'rgba(48,209,88,0.08)', hoverBorder: 'rgba(48,209,88,0.25)', selectedBg: 'rgba(48,209,88,0.10)' },
-    2: { bg: 'rgba(48,209,88,0.08)', border: 'rgba(48,209,88,0.20)', hoverBg: 'rgba(48,209,88,0.14)', hoverBorder: 'rgba(48,209,88,0.35)', selectedBg: 'rgba(48,209,88,0.16)' },
-    3: { bg: 'rgba(48,209,88,0.14)', border: 'rgba(48,209,88,0.30)', hoverBg: 'rgba(48,209,88,0.20)', hoverBorder: 'rgba(48,209,88,0.45)', selectedBg: 'rgba(48,209,88,0.24)' },
+    1: { bg: 'rgba(48,209,88,0.10)', border: 'rgba(48,209,88,0.25)', hoverBg: 'rgba(48,209,88,0.18)', hoverBorder: 'rgba(48,209,88,0.40)', selectedBg: 'rgba(48,209,88,0.22)' },
+    2: { bg: 'rgba(48,209,88,0.20)', border: 'rgba(48,209,88,0.40)', hoverBg: 'rgba(48,209,88,0.30)', hoverBorder: 'rgba(48,209,88,0.55)', selectedBg: 'rgba(48,209,88,0.35)' },
+    3: { bg: 'rgba(48,209,88,0.32)', border: 'rgba(48,209,88,0.55)', hoverBg: 'rgba(48,209,88,0.42)', hoverBorder: 'rgba(48,209,88,0.70)', selectedBg: 'rgba(48,209,88,0.48)' },
   },
   contraction: {
-    1: { bg: 'rgba(255,69,58,0.03)', border: 'rgba(255,69,58,0.10)', hoverBg: 'rgba(255,69,58,0.06)', hoverBorder: 'rgba(255,69,58,0.20)', selectedBg: 'rgba(255,69,58,0.08)' },
-    2: { bg: 'rgba(255,69,58,0.07)', border: 'rgba(255,69,58,0.18)', hoverBg: 'rgba(255,69,58,0.12)', hoverBorder: 'rgba(255,69,58,0.30)', selectedBg: 'rgba(255,69,58,0.14)' },
-    3: { bg: 'rgba(255,69,58,0.12)', border: 'rgba(255,69,58,0.28)', hoverBg: 'rgba(255,69,58,0.18)', hoverBorder: 'rgba(255,69,58,0.40)', selectedBg: 'rgba(255,69,58,0.22)' },
+    1: { bg: 'rgba(255,69,58,0.08)', border: 'rgba(255,69,58,0.22)', hoverBg: 'rgba(255,69,58,0.15)', hoverBorder: 'rgba(255,69,58,0.35)', selectedBg: 'rgba(255,69,58,0.18)' },
+    2: { bg: 'rgba(255,69,58,0.18)', border: 'rgba(255,69,58,0.38)', hoverBg: 'rgba(255,69,58,0.28)', hoverBorder: 'rgba(255,69,58,0.50)', selectedBg: 'rgba(255,69,58,0.32)' },
+    3: { bg: 'rgba(255,69,58,0.30)', border: 'rgba(255,69,58,0.52)', hoverBg: 'rgba(255,69,58,0.40)', hoverBorder: 'rgba(255,69,58,0.65)', selectedBg: 'rgba(255,69,58,0.45)' },
   },
 };
 
