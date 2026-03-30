@@ -136,10 +136,10 @@ function KPICard({
             transition={{ duration: 0.15 }}
             style={{
               position: 'absolute',
-              top: '100%',
+              bottom: '100%',
               left: 0,
               right: 0,
-              marginTop: 8,
+              marginBottom: 8,
               padding: '14px 16px',
               borderRadius: 12,
               background: '#1D1D1F',

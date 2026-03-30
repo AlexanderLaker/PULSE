@@ -4,7 +4,7 @@
  * Apple × Bain aesthetic: glass card, subtle grid, smooth curves, intentional whitespace.
  */
 
-import { useMemo, FC } from 'react';
+import { useMemo, useState, FC } from 'react';
 import { motion } from 'framer-motion';
 import {
   AreaChart,
@@ -176,9 +176,12 @@ function extractBand(
 }
 
 const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory = null }) => {
-  const { chartData, visibleCategories, categoryName } = useMemo(() => {
+  // State for user-toggled categories (null = default behavior)
+  const [toggledCategories, setToggledCategories] = useState<Set<string> | null>(null);
+
+  const { chartData, visibleCategories, allAvailableCategories, categoryName } = useMemo(() => {
     if (!shifts || !shifts || typeof shifts !== 'object') {
-      return { chartData: [], visibleCategories: [], categoryName: null };
+      return { chartData: [], visibleCategories: [], allAvailableCategories: [], categoryName: null };
     }
 
     const shiftsObj = shifts as Record<string, unknown>;
@@ -188,8 +191,11 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
     let catsToShow = allCats;
     if (selectedCategory) {
       catsToShow = [selectedCategory];
+    } else if (toggledCategories !== null) {
+      // User has explicitly toggled categories
+      catsToShow = allCats.filter(cat => toggledCategories.has(cat));
     } else {
-      // Top 5–6 by absolute shift magnitude at 2030
+      // Default: top 6 by absolute shift magnitude at 2030
       const byMagnitude = allCats
         .map(cat => {
           const path = extractPath(shiftsObj[cat]);
@@ -224,9 +230,35 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
     return {
       chartData: points,
       visibleCategories: catsToShow,
+      allAvailableCategories: allCats,
       categoryName: selectedCatObj?.name || null,
     };
-  }, [shifts, selectedCategory]);
+  }, [shifts, selectedCategory, toggledCategories]);
+
+  // Toggle a category on/off
+  const handleCategoryToggle = (cat: string) => {
+    if (selectedCategory) return; // Don't toggle when a single category is selected from heatmap
+    setToggledCategories(prev => {
+      const current = prev ?? new Set(visibleCategories);
+      const next = new Set(current);
+      if (next.has(cat)) {
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  };
+
+  // Select all / deselect all
+  const handleSelectAll = () => {
+    if (selectedCategory) return;
+    setToggledCategories(new Set(allAvailableCategories));
+  };
+  const handleDeselectAll = () => {
+    if (selectedCategory) return;
+    setToggledCategories(new Set());
+  };
 
   if (chartData.length === 0) {
     return (
@@ -249,7 +281,7 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
     );
   }
 
-  // Color palette for categories
+  // Color palette for categories (extended for up to 12+)
   const catColors = [
     '#3B82F6',
     '#A78BFA',
@@ -259,6 +291,10 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
     '#F87171',
     '#FB923C',
     '#8B5CF6',
+    '#06B6D4',
+    '#10B981',
+    '#F59E0B',
+    '#EC4899',
   ];
 
   return (
@@ -395,35 +431,73 @@ const PathTimeline: FC<PathTimelineProps> = ({ shifts = null, selectedCategory =
         </ResponsiveContainer>
       </div>
 
-      {/* Legend */}
+      {/* Legend — clickable category toggles */}
       <div
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 12,
           paddingTop: 8,
           borderTop: `1px solid ${T.border}`,
         }}
       >
-        {visibleCategories.map((cat, i) => {
-          const color = catColors[i % catColors.length];
-          const catLabel = shortCat(CATEGORIES.find(c => c.id === cat)?.name || cat);
-          return (
-            <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div
+        {!selectedCategory && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+            <button
+              onClick={handleSelectAll}
+              style={{
+                fontSize: 9, fontWeight: 600, color: T.accent, background: 'none',
+                border: 'none', cursor: 'pointer', padding: 0, fontFamily: T.sans,
+              }}
+            >
+              All
+            </button>
+            <span style={{ color: T.text4, fontSize: 9 }}>·</span>
+            <button
+              onClick={handleDeselectAll}
+              style={{
+                fontSize: 9, fontWeight: 600, color: T.text3, background: 'none',
+                border: 'none', cursor: 'pointer', padding: 0, fontFamily: T.sans,
+              }}
+            >
+              None
+            </button>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {(selectedCategory ? visibleCategories : allAvailableCategories).map((cat, i) => {
+            const isActive = visibleCategories.includes(cat);
+            const colorIdx = selectedCategory
+              ? i
+              : allAvailableCategories.indexOf(cat);
+            const color = catColors[colorIdx % catColors.length];
+            const catLabel = shortCat(CATEGORIES.find(c => c.id === cat)?.name || cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => handleCategoryToggle(cat)}
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: color,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '3px 8px', borderRadius: 6,
+                  border: `1px solid ${isActive ? color + '40' : T.border}`,
+                  background: isActive ? color + '12' : 'transparent',
+                  cursor: selectedCategory ? 'default' : 'pointer',
+                  opacity: isActive ? 1 : 0.45,
+                  transition: 'all 0.12s',
                 }}
-              />
-              <span style={{ fontSize: 10, color: T.text2, fontFamily: T.mono }}>
-                {catLabel}
-              </span>
-            </div>
-          );
-        })}
+              >
+                <div
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: isActive ? color : T.text4,
+                  }}
+                />
+                <span style={{ fontSize: 10, color: isActive ? T.text : T.text3, fontFamily: T.mono, fontWeight: isActive ? 600 : 400 }}>
+                  {catLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </motion.div>
   );

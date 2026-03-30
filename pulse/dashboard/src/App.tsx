@@ -51,7 +51,12 @@ export default function App() {
     return (
       <ErrorBoundary>
         <Suspense fallback={<FullPageSkeleton />}>
-          <ConsumerJourney onBack={() => setPage('warroom')} />
+          <ConsumerJourney
+            onBack={() => setPage('warroom')}
+            onNavigateWarRoom={() => setPage('warroom')}
+            onNavigateTrends={() => setPage('warroom')}
+            onNavigateToTrend={(search) => { setPage('warroom'); }}
+          />
         </Suspense>
         {/* Burger Menu — top-right */}
         <div style={{

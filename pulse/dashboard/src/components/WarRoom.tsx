@@ -34,7 +34,6 @@ import TrendExplorer from './TrendExplorer';
 // EmergingTrends removed — external API scanning disabled
 import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
-import ProductImpactRankings from './ProductImpactRankings';
 import ForceShiftMatrix from './ForceShiftMatrix';
 import RegionShiftMatrix from './RegionShiftMatrix';
 
@@ -853,13 +852,6 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney }: { isAdmi
               />
               </div>
             </div>
-
-            {/* Row 2.5: Product Type Impact Rankings */}
-            <ProductImpactRankings
-              shifts={data.shifts}
-              trends={data.trends}
-              onCategorySelect={setSelectedCategory}
-            />
 
             {/* Force × Category Shift Matrix (2030) */}
             <div style={{ marginTop: 32 }}>
