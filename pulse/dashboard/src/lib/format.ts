@@ -39,12 +39,12 @@ export const T: DesignTokens = {
 
 // ─── Force Definitions ──────────────────────────────────────
 export const FORCES: Record<ForceName, ForceDefinition> = {
-  Consumer:      { color: '#0071E3', label: 'Consumer',      emoji: '◉' },
-  Customer:      { color: '#7B61FF', label: 'Customer',      emoji: '▣' },
-  Technology:    { color: '#00B4D8', label: 'Technology',     emoji: '◈' },
-  Government:    { color: '#FF9F0A', label: 'Government',     emoji: '▧' },
-  Environmental: { color: '#30D158', label: 'Environmental',  emoji: '◎' },
-  Competitive:   { color: '#FF453A', label: 'Competitive',    emoji: '◆' },
+  Consumer:      { color: '#0071E3', label: 'Consumer',      emoji: '●' },
+  Customer:      { color: '#7B61FF', label: 'Customer',      emoji: '■' },
+  Technology:    { color: '#00B4D8', label: 'Technology',     emoji: '▶' },
+  Government:    { color: '#FF9F0A', label: 'Government',     emoji: '★' },
+  Environmental: { color: '#30D158', label: 'Environmental',  emoji: '◆' },
+  Competitive:   { color: '#FF453A', label: 'Competitive',    emoji: '▲' },
 };
 
 export const FORCE_COLORS: Record<ForceName, string> = Object.fromEntries(

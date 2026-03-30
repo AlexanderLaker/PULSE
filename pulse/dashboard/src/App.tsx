@@ -72,15 +72,20 @@ export default function App() {
             onShowUsers={() => setShowUsers(true)}
             onShowConfig={() => setPage('settings')}
             onShowExport={() => {
-              window.dispatchEvent(new CustomEvent('pulse:toggle-export'));
+              setTrendSearch(undefined);
+              setPage('warroom');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-export')), 100);
             }}
             onShowDelphi={() => {
-              window.dispatchEvent(new CustomEvent('pulse:toggle-delphi'));
+              setTrendSearch(undefined);
+              setPage('warroom');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-delphi')), 100);
             }}
             onShowSnapshots={() => {
-              window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
+              setTrendSearch(undefined);
+              setPage('warroom');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots')), 100);
             }}
-            onShowJourney={() => setPage('journey')}
             onChangePassword={() => {
               const newPw = window.prompt('Enter new password (min 6 characters):');
               if (newPw && newPw.length >= 6) {
@@ -115,7 +120,7 @@ export default function App() {
         <WarRoom isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} initialTrendSearch={trendSearch} />
       </Suspense>
 
-      {/* Burger Menu — top-right */}
+      {/* Burger Menu — top-left */}
       <div style={{
         position: 'fixed', top: 12, left: 16, zIndex: 9999,
         fontFamily: "'Inter', sans-serif",
@@ -135,7 +140,6 @@ export default function App() {
           onShowSnapshots={() => {
             window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
           }}
-          onShowJourney={() => setPage('journey')}
           onChangePassword={() => {
             const newPw = window.prompt('Enter new password (min 6 characters):');
             if (newPw && newPw.length >= 6) {

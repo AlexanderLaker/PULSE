@@ -1388,7 +1388,7 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
               }
             }}
           >
-            {force === 'All' ? '◆ All Forces' : `${FORCE_ICONS[force as ForceName]} ${force}`}
+            {force === 'All' ? '● All Forces' : `${FORCE_ICONS[force as ForceName]} ${force}`}
           </button>
         ))}
       </div>
