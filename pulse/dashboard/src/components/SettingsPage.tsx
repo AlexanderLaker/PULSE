@@ -17,23 +17,7 @@
 import { useState, useEffect, useCallback, type FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Save, RotateCcw } from 'lucide-react';
-
-/* ── Design tokens ───────────────────────────────────────────────── */
-const T = {
-  bg: '#0F172A',
-  bg1: '#1E293B',
-  bg2: '#334155',
-  border: 'rgba(71, 85, 105, 0.5)',
-  accent: '#D4A847',
-  accentDim: 'rgba(212, 168, 71, 0.08)',
-  text: '#F8FAFC',
-  text2: '#94A3B8',
-  text3: '#64748B',
-  green: '#22C55E',
-  red: '#EF4444',
-  sans: "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
-  mono: "'JetBrains Mono', 'Fira Code', monospace",
-};
+import { T } from '../lib/format';
 
 type ForceName = 'Consumer' | 'Customer' | 'Technology' | 'Government' | 'Environmental' | 'Competitive';
 const FORCES: ForceName[] = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
@@ -204,7 +188,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       {/* ── Top Bar ──────────────────────────────────────────── */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)',
+        background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(16px)',
         borderBottom: `1px solid ${T.border}`,
         padding: '12px 24px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -239,10 +223,10 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
           </button>
           <button onClick={handleSave} disabled={saving} style={{
             padding: '7px 20px', borderRadius: 8, border: 'none',
-            background: T.accent, color: '#000', fontSize: 13, fontWeight: 600,
+            background: T.accent, color: '#fff', fontSize: 13, fontWeight: 600,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
             display: 'flex', alignItems: 'center', gap: 6, fontFamily: T.sans,
-            boxShadow: '0 2px 8px rgba(212, 168, 71, 0.25)',
+            boxShadow: '0 2px 8px rgba(0, 113, 227, 0.25)',
           }}>
             <Save size={14} /> {saving ? 'Saving…' : 'Save Configuration'}
           </button>
@@ -353,9 +337,9 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
             style={{
               position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
               zIndex: 10000, padding: '10px 20px', borderRadius: 10,
-              background: toast.type === 'success' ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)',
+              background: toast.type === 'success' ? 'rgba(48, 209, 88, 0.95)' : 'rgba(255, 69, 58, 0.95)',
               color: '#fff', fontSize: 13, fontWeight: 600,
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)', fontFamily: T.sans,
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)', fontFamily: T.sans,
             }}
           >
             {toast.type === 'success' ? '✓' : '✕'} {toast.msg}
@@ -434,7 +418,7 @@ const SliderInput: FC<{
         style={{
           width: '100%', height: 5, borderRadius: 3, cursor: 'pointer',
           WebkitAppearance: 'none', appearance: 'none',
-          background: `linear-gradient(to right, ${barColor} 0%, ${barColor} ${pct}%, rgba(148,163,184,0.15) ${pct}%, rgba(148,163,184,0.15) 100%)`,
+          background: `linear-gradient(to right, ${barColor} 0%, ${barColor} ${pct}%, rgba(0,0,0,0.06) ${pct}%, rgba(0,0,0,0.06) 100%)`,
         } as React.CSSProperties}
       />
     </div>
@@ -487,11 +471,11 @@ const CorrelationMatrixEditor: FC<{
   forces: ForceName[];
   onChange: (row: ForceName, col: ForceName, value: number) => void;
 }> = ({ matrix, forces, onChange }) => {
-  // Color scale: 0 → dark/neutral, 0.3+ → accent glow
+  // Color scale: 0 → neutral, 0.3+ → accent glow
   const cellBg = (val: number, isDiag: boolean) => {
-    if (isDiag) return 'rgba(212, 168, 71, 0.12)';
-    if (val >= 0.3) return `rgba(212, 168, 71, ${0.06 + val * 0.15})`;
-    if (val >= 0.15) return `rgba(59, 130, 246, ${0.04 + val * 0.12})`;
+    if (isDiag) return 'rgba(0, 113, 227, 0.08)';
+    if (val >= 0.3) return `rgba(0, 113, 227, ${0.04 + val * 0.12})`;
+    if (val >= 0.15) return `rgba(0, 113, 227, ${0.02 + val * 0.08})`;
     return 'transparent';
   };
 
@@ -536,7 +520,7 @@ const CorrelationMatrixEditor: FC<{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: cellBg(val, isDiag),
                   borderRadius: 6, margin: 1,
-                  border: isDiag ? `1px solid rgba(212, 168, 71, 0.25)` : `1px solid transparent`,
+                  border: isDiag ? `1px solid rgba(0, 113, 227, 0.2)` : `1px solid transparent`,
                   transition: 'all 0.15s',
                 }}>
                   {isDiag ? (
@@ -558,7 +542,7 @@ const CorrelationMatrixEditor: FC<{
                         textAlign: 'center', outline: 'none',
                         borderRadius: 4,
                       }}
-                      onFocus={e => { e.target.style.background = 'rgba(212, 168, 71, 0.08)'; }}
+                      onFocus={e => { e.target.style.background = 'rgba(0, 113, 227, 0.06)'; }}
                       onBlur={e => { e.target.style.background = 'transparent'; }}
                     />
                   )}

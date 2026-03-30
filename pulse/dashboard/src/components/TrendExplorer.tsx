@@ -1634,7 +1634,8 @@ const TrendExplorer: FC<TrendExplorerProps> = ({ data, forceFilter, onForceFilte
                 { key: 'direction', label: 'Direction' },
                 { key: 'probability', label: 'Probability' },
                 { key: 'gp1_pct_affected', label: 'GP1 % Affected' },
-                { key: '_actions', label: '' },
+                { key: 'gp1_shift', label: 'Shift' },
+                ...(isAdmin && onDeleteTrend ? [{ key: '_delete', label: '' }] : []),
               ].map(col => (
                 <th
                   key={col.key}
