@@ -734,7 +734,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
           {/* Benefiting row (green) */}
           {journey.map(stage => (
             <div key={stage.id + '_benefit'} style={{
-              background: 'rgba(48,209,88,0.03)',
+              background: 'rgba(34,197,94,0.06)',
               padding: '6px 5px',
               minHeight: 160,
               borderBottom: `1px solid ${T.border1}`,
@@ -754,7 +754,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
           {/* Negatively impacted row (red) */}
           {journey.map(stage => (
             <div key={stage.id + '_negative'} style={{
-              background: 'rgba(255,69,58,0.02)',
+              background: 'rgba(239,68,68,0.05)',
               padding: '6px 5px',
               minHeight: 120,
             }}>
@@ -1295,14 +1295,14 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
 // Intensity-based color scales
 const INTENSITY_COLORS = {
   expansion: {
-    1: { bg: 'rgba(48,209,88,0.15)', border: 'rgba(48,209,88,0.35)', hoverBg: 'rgba(48,209,88,0.25)', hoverBorder: 'rgba(48,209,88,0.50)', selectedBg: 'rgba(48,209,88,0.30)' },
-    2: { bg: 'rgba(48,209,88,0.30)', border: 'rgba(48,209,88,0.55)', hoverBg: 'rgba(48,209,88,0.42)', hoverBorder: 'rgba(48,209,88,0.70)', selectedBg: 'rgba(48,209,88,0.48)' },
-    3: { bg: 'rgba(48,209,88,0.50)', border: 'rgba(48,209,88,0.75)', hoverBg: 'rgba(48,209,88,0.60)', hoverBorder: 'rgba(48,209,88,0.85)', selectedBg: 'rgba(48,209,88,0.65)' },
+    1: { bg: 'rgba(34,197,94,0.18)', border: 'rgba(34,197,94,0.45)', hoverBg: 'rgba(34,197,94,0.28)', hoverBorder: 'rgba(34,197,94,0.60)', selectedBg: 'rgba(34,197,94,0.35)' },
+    2: { bg: 'rgba(34,197,94,0.35)', border: 'rgba(34,197,94,0.60)', hoverBg: 'rgba(34,197,94,0.48)', hoverBorder: 'rgba(34,197,94,0.78)', selectedBg: 'rgba(34,197,94,0.55)' },
+    3: { bg: 'rgba(22,163,74,0.55)', border: 'rgba(22,163,74,0.80)', hoverBg: 'rgba(22,163,74,0.68)', hoverBorder: 'rgba(22,163,74,0.92)', selectedBg: 'rgba(22,163,74,0.72)' },
   },
   contraction: {
-    1: { bg: 'rgba(255,69,58,0.12)', border: 'rgba(255,69,58,0.30)', hoverBg: 'rgba(255,69,58,0.22)', hoverBorder: 'rgba(255,69,58,0.45)', selectedBg: 'rgba(255,69,58,0.25)' },
-    2: { bg: 'rgba(255,69,58,0.28)', border: 'rgba(255,69,58,0.50)', hoverBg: 'rgba(255,69,58,0.38)', hoverBorder: 'rgba(255,69,58,0.65)', selectedBg: 'rgba(255,69,58,0.42)' },
-    3: { bg: 'rgba(255,69,58,0.45)', border: 'rgba(255,69,58,0.70)', hoverBg: 'rgba(255,69,58,0.55)', hoverBorder: 'rgba(255,69,58,0.82)', selectedBg: 'rgba(255,69,58,0.60)' },
+    1: { bg: 'rgba(239,68,68,0.16)', border: 'rgba(239,68,68,0.40)', hoverBg: 'rgba(239,68,68,0.26)', hoverBorder: 'rgba(239,68,68,0.55)', selectedBg: 'rgba(239,68,68,0.32)' },
+    2: { bg: 'rgba(239,68,68,0.35)', border: 'rgba(239,68,68,0.58)', hoverBg: 'rgba(239,68,68,0.48)', hoverBorder: 'rgba(239,68,68,0.72)', selectedBg: 'rgba(239,68,68,0.52)' },
+    3: { bg: 'rgba(220,38,38,0.55)', border: 'rgba(220,38,38,0.78)', hoverBg: 'rgba(220,38,38,0.68)', hoverBorder: 'rgba(220,38,38,0.90)', selectedBg: 'rgba(220,38,38,0.72)' },
   },
 };
 
