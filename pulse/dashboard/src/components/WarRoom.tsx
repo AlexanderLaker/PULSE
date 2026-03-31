@@ -603,7 +603,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
           {/* Tab Buttons */}
           <div style={{ display: 'flex', gap: 8 } as React.CSSProperties}>
             {[
-              { id: 'overview' as const, label: 'War Room', icon: BarChart3 },
+              { id: 'overview' as const, label: 'Profit Pool Analysis', icon: BarChart3 },
               { id: 'trends' as const, label: 'Trends', icon: Layers },
             ].map(tab => {
               const Icon = tab.icon;
