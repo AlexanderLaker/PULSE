@@ -407,14 +407,14 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                     gap: 10,
                                   }}>
                                     <div style={{ textAlign: 'left' }}>
-                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (downside)</div>
                                       <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist.p10) }}>
                                         {fmtShift(dist.p10, 2)}
                                       </div>
                                     </div>
                                     <div style={{ fontSize: 12, color: '#94A3B8', alignSelf: 'center', marginTop: 8 }}>…</div>
                                     <div style={{ textAlign: 'right' }}>
-                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (upside)</div>
                                       <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist.p90) }}>
                                         {fmtShift(dist.p90, 2)}
                                       </div>
@@ -426,7 +426,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                     fontSize: 8, color: '#64748B', marginTop: 8, lineHeight: 1.4,
                                     fontFamily: 'Inter, sans-serif',
                                   }}>
-                                    80% CI from Monte Carlo. P10 = optimistic, P90 = pessimistic.
+                                    80% CI from Monte Carlo. P10 = pessimistic, P90 = optimistic.
                                   </div>
                                 </>
                               )}
@@ -553,14 +553,14 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                     gap: 10,
                                   }}>
                                     <div style={{ textAlign: 'left' }}>
-                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (downside)</div>
                                       <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist2030.p10) }}>
                                         {fmtShift(dist2030.p10, 2)}
                                       </div>
                                     </div>
                                     <div style={{ fontSize: 12, color: '#94A3B8', alignSelf: 'center', marginTop: 8 }}>…</div>
                                     <div style={{ textAlign: 'right' }}>
-                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (upside)</div>
                                       <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist2030.p90) }}>
                                         {fmtShift(dist2030.p90, 2)}
                                       </div>
@@ -572,7 +572,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                                     fontSize: 8, color: '#64748B', marginTop: 8, lineHeight: 1.4,
                                     fontFamily: 'Inter, sans-serif',
                                   }}>
-                                    80% CI from Monte Carlo. P10 = optimistic, P90 = pessimistic.
+                                    80% CI from Monte Carlo. P10 = pessimistic, P90 = optimistic.
                                   </div>
                                 </>
                               )}

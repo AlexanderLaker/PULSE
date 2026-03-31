@@ -928,31 +928,70 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                                     style={{
                                       position: 'absolute',
                                       bottom: '100%',
-                                      left: '50%',
-                                      transform: 'translateX(-50%)',
+                                      right: 0,
                                       marginBottom: '8px',
-                                      paddingLeft: '12px',
-                                      paddingRight: '12px',
-                                      paddingTop: '8px',
-                                      paddingBottom: '8px',
-                                      backgroundColor: '#1e293b',
-                                      color: '#e2e8f0',
+                                      padding: '10px 12px',
+                                      backgroundColor: '#F5F5F7',
+                                      color: '#1e293b',
                                       fontSize: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #475569',
-                                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
-                                      whiteSpace: 'nowrap',
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(0,0,0,0.12)',
+                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                                       opacity: 0,
                                       pointerEvents: 'none',
                                       zIndex: 50,
                                       transition: 'opacity 0.2s ease-in-out',
-                                      maxWidth: '180px',
+                                      width: '160px',
                                       textAlign: 'center',
                                       lineHeight: 1.3,
                                     }}
                                     className="tier-tooltip"
                                   >
-                                    {tierCfg.description}
+                                    {/* Large rating letter */}
+                                    <div style={{ fontSize: '22px', fontWeight: 800, color: tierCfg.color, letterSpacing: '-0.5px' }}>
+                                      {tierCfg.label}
+                                    </div>
+                                    {/* Scale bar */}
+                                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', margin: '6px 0 5px', alignItems: 'flex-end' }}>
+                                      {(['S','A','A-','B+','B','B-','C','D','E'] as const).map((t) => {
+                                        const isActive = t === tierKey;
+                                        const tc = TIER_CONFIG[t];
+                                        return (
+                                          <div key={t} style={{
+                                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                                          }}>
+                                            <div style={{
+                                              width: isActive ? 12 : 8,
+                                              height: isActive ? 14 : 8,
+                                              borderRadius: '2px',
+                                              backgroundColor: isActive ? (tc?.color || '#94A3B8') : (tc?.color || '#94A3B8') + '30',
+                                              border: isActive ? `1.5px solid ${tc?.color || '#94A3B8'}` : 'none',
+                                              transition: 'all 0.15s ease',
+                                            }} />
+                                            <span style={{
+                                              fontSize: '6px',
+                                              fontWeight: isActive ? 700 : 400,
+                                              color: isActive ? (tc?.color || '#64748B') : '#94A3B8',
+                                            }}>{t}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    {/* Description */}
+                                    <div style={{ fontSize: '7.5px', color: '#64748B', lineHeight: 1.35, marginTop: '2px' }}>
+                                      {tierCfg.description.split(' — ')[1] || tierCfg.description}
+                                    </div>
+                                    {/* Arrow */}
+                                    <div style={{
+                                      position: 'absolute', bottom: '-5px', right: '8px',
+                                      width: 10, height: 10, overflow: 'hidden',
+                                    }}>
+                                      <div style={{
+                                        width: 8, height: 8, background: '#F5F5F7',
+                                        border: '1px solid rgba(0,0,0,0.12)',
+                                        transform: 'rotate(45deg)', marginTop: '-4px', marginLeft: 1,
+                                      }} />
+                                    </div>
                                   </span>
                                 </span>
                                 <style>{`

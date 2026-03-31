@@ -478,6 +478,7 @@ def create_app(args=None) -> FastAPI:
                                     "model_type": latest.get("model_type", "bayesian_copula"),
                                 }
                                 _state["allocation"] = alloc
+                                _state["simulation_stale"] = False
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
                                 # No simulation in DB — mark as stale, user must press Simulate

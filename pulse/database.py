@@ -861,16 +861,27 @@ def load_simulation_runs(
             if isinstance(run_date, str):
                 run_date = datetime.fromisoformat(run_date)
 
+            def _safe_json(val):
+                """Parse JSON string or return dict as-is (Postgres returns dicts for JSONB)."""
+                if val is None:
+                    return None
+                if isinstance(val, (dict, list)):
+                    return val
+                try:
+                    return json.loads(val)
+                except (json.JSONDecodeError, TypeError):
+                    return {}
+
             run = {
                 "id": row["id"],
                 "run_date": run_date,
                 "scenario": row["scenario"],
                 "iterations": row["iterations"],
                 "model_type": row["model_type"],
-                "results": json.loads(row["results"]) if row["results"] else {},
-                "causal_decomposition": json.loads(row["causal_decomposition"]) if row.get("causal_decomposition") else None,
-                "allocation_recommendation": json.loads(row["allocation_recommendation"]) if row.get("allocation_recommendation") else None,
-                "convergence_diagnostics": json.loads(row["convergence_diagnostics"]) if row.get("convergence_diagnostics") else None,
+                "results": _safe_json(row["results"]) or {},
+                "causal_decomposition": _safe_json(row.get("causal_decomposition")),
+                "allocation_recommendation": _safe_json(row.get("allocation_recommendation")),
+                "convergence_diagnostics": _safe_json(row.get("convergence_diagnostics")),
             }
             runs.append(run)
 
