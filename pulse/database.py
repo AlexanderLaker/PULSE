@@ -193,6 +193,7 @@ def init_db() -> None:
             "ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10",
             "ALTER TABLE trends ADD COLUMN peak_year INTEGER DEFAULT 0",
             "ALTER TABLE trends ADD COLUMN diffusion_curve TEXT DEFAULT 's_curve'",
+            "ALTER TABLE trend_sources ADD COLUMN tier TEXT DEFAULT ''",
         ]:
             try:
                 if POSTGRES_URL:
@@ -241,7 +242,8 @@ def init_db() -> None:
                 trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
                 title TEXT NOT NULL,
                 url TEXT NOT NULL,
-                source_type TEXT DEFAULT ''
+                source_type TEXT DEFAULT '',
+                tier TEXT DEFAULT ''
             )
         """)
 
@@ -539,8 +541,8 @@ def save_trends(trends: List[Trend]) -> None:
             sources = getattr(trend, 'sources', None) or []
             for src in sources:
                 cursor.execute(
-                    f"INSERT INTO trend_sources (trend_id, title, url, source_type) VALUES ({ph(4)})",
-                    (trend.id, src.get("title", ""), src.get("url", ""), src.get("source_type", src.get("data", ""))),
+                    f"INSERT INTO trend_sources (trend_id, title, url, source_type, tier) VALUES ({ph(5)})",
+                    (trend.id, src.get("title", ""), src.get("url", ""), src.get("source_type", src.get("data", "")), src.get("tier", "")),
                 )
 
         conn.commit()
@@ -594,11 +596,11 @@ def load_trends() -> List[Trend]:
             # Load source URLs
             try:
                 cursor.execute(
-                    f"SELECT title, url, source_type FROM trend_sources WHERE trend_id = {p}",
+                    f"SELECT title, url, source_type, tier FROM trend_sources WHERE trend_id = {p}",
                     (row["id"],),
                 )
                 sources = [
-                    {"title": _row_to_dict(r)["title"], "url": _row_to_dict(r)["url"], "data": _row_to_dict(r).get("source_type", "")}
+                    {"title": _row_to_dict(r)["title"], "url": _row_to_dict(r)["url"], "data": _row_to_dict(r).get("source_type", ""), "tier": _row_to_dict(r).get("tier", "")}
                     for r in cursor.fetchall()
                 ]
             except Exception:
