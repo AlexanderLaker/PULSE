@@ -144,7 +144,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
         border: `1px solid ${T.border}`,
         background: `linear-gradient(135deg, ${T.bg2}88 0%, ${T.bg3}44 100%)`,
         backdropFilter: 'blur(10px)',
-        overflowX: 'auto',
+        overflow: 'visible',
       } as React.CSSProperties}
     >
       {/* Header */}
@@ -353,47 +353,47 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                         <AnimatePresence>
                           {isHovered && (
                             <motion.div
-                              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                              animate={{ opacity: 1, y: -16, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.96 }}
+                              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                              animate={{ opacity: 1, y: -10, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 position: 'absolute',
                                 bottom: '100%',
                                 left: '50%',
                                 transform: 'translateX(-50%)',
-                                background: 'linear-gradient(145deg, #1e2536 0%, #161b28 100%)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: 14,
-                                padding: '18px 24px',
+                                background: '#F5F5F7',
+                                border: '1px solid rgba(0,0,0,0.12)',
+                                borderRadius: 10,
+                                padding: '12px 16px',
                                 zIndex: 50,
                                 fontFamily: T.mono,
-                                boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
-                                minWidth: 230,
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                minWidth: 160,
                                 pointerEvents: 'none',
                               } as React.CSSProperties}
                             >
                               {/* Category · Year header */}
                               <div style={{
-                                fontSize: 13, fontWeight: 600, color: '#CBD5E1',
-                                marginBottom: 14, letterSpacing: 0.2,
-                                display: 'flex', alignItems: 'center', gap: 8,
+                                fontSize: 10, fontWeight: 600, color: '#64748B',
+                                marginBottom: 8, letterSpacing: 0.2,
+                                display: 'flex', alignItems: 'center', gap: 6,
                               }}>
                                 <div style={{
-                                  width: 4, height: 16, borderRadius: 2,
+                                  width: 3, height: 12, borderRadius: 2,
                                   background: CATEGORIES.find(c => c.id === catId)?.color || T.accent,
                                 }} />
-                                {catId} <span style={{ color: T.text4, fontWeight: 400 }}>·</span> <span style={{ color: T.accent }}>{year}</span>
+                                {catId} <span style={{ color: '#94A3B8', fontWeight: 400 }}>·</span> <span style={{ color: '#334155' }}>{year}</span>
                               </div>
 
                               {/* Big median number */}
                               <div style={{
-                                fontSize: 34, fontWeight: 300, letterSpacing: -1,
-                                color: shiftColorHex(val), lineHeight: 1, marginBottom: 6,
+                                fontSize: 24, fontWeight: 300, letterSpacing: -0.5,
+                                color: shiftColorHex(val), lineHeight: 1, marginBottom: 4,
                               }}>
                                 {fmtShift(val, 2)}
                               </div>
-                              <div style={{ fontSize: 11, color: '#64748B', marginBottom: dist.hasCI ? 16 : 0 }}>
+                              <div style={{ fontSize: 9, color: '#64748B', marginBottom: dist.hasCI ? 10 : 0 }}>
                                 Median projected GP1 pool shift
                               </div>
 
@@ -401,21 +401,21 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                               {dist.hasCI && (
                                 <>
                                   <div style={{
-                                    borderTop: '1px solid rgba(255,255,255,0.08)',
-                                    paddingTop: 14,
+                                    borderTop: '1px solid rgba(0,0,0,0.08)',
+                                    paddingTop: 10,
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                                    gap: 16,
+                                    gap: 10,
                                   }}>
                                     <div style={{ textAlign: 'left' }}>
-                                      <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
-                                      <div style={{ fontSize: 20, fontWeight: 500, color: shiftColorHex(dist.p10) }}>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist.p10) }}>
                                         {fmtShift(dist.p10, 2)}
                                       </div>
                                     </div>
-                                    <div style={{ fontSize: 16, color: '#334155', alignSelf: 'center', marginTop: 12 }}>…</div>
+                                    <div style={{ fontSize: 12, color: '#94A3B8', alignSelf: 'center', marginTop: 8 }}>…</div>
                                     <div style={{ textAlign: 'right' }}>
-                                      <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
-                                      <div style={{ fontSize: 20, fontWeight: 500, color: shiftColorHex(dist.p90) }}>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist.p90) }}>
                                         {fmtShift(dist.p90, 2)}
                                       </div>
                                     </div>
@@ -423,25 +423,24 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
 
                                   {/* Explanation */}
                                   <div style={{
-                                    fontSize: 10, color: '#475569', marginTop: 12, lineHeight: 1.5,
+                                    fontSize: 8, color: '#64748B', marginTop: 8, lineHeight: 1.4,
                                     fontFamily: 'Inter, sans-serif',
                                   }}>
-                                    80% confidence interval from Monte Carlo.
-                                    P10 = optimistic bound, P90 = pessimistic bound.
+                                    80% CI from Monte Carlo. P10 = optimistic, P90 = pessimistic.
                                   </div>
                                 </>
                               )}
 
                               {/* Tooltip arrow */}
                               <div style={{
-                                position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)',
-                                width: 14, height: 7, overflow: 'hidden',
+                                position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
+                                width: 12, height: 6, overflow: 'hidden',
                               }}>
                                 <div style={{
-                                  width: 12, height: 12, background: '#161b28',
-                                  border: '1px solid rgba(255,255,255,0.1)',
+                                  width: 10, height: 10, background: '#F5F5F7',
+                                  border: '1px solid rgba(0,0,0,0.12)',
                                   transform: 'rotate(45deg)', transformOrigin: 'top left',
-                                  marginLeft: 1, marginTop: -6,
+                                  marginLeft: 1, marginTop: -5,
                                 }} />
                               </div>
                             </motion.div>
@@ -501,46 +500,46 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                         <AnimatePresence>
                           {isDeltaHovered && (
                             <motion.div
-                              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                              animate={{ opacity: 1, y: -16, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.96 }}
+                              initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                              animate={{ opacity: 1, y: -10, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 position: 'absolute',
                                 bottom: '100%',
                                 right: 0,
-                                background: 'linear-gradient(145deg, #1e2536 0%, #161b28 100%)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: 14,
-                                padding: '18px 24px',
+                                background: '#F5F5F7',
+                                border: '1px solid rgba(0,0,0,0.12)',
+                                borderRadius: 10,
+                                padding: '12px 16px',
                                 zIndex: 50,
                                 fontFamily: T.mono,
-                                boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
-                                minWidth: 230,
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                minWidth: 160,
                                 pointerEvents: 'none',
                               } as React.CSSProperties}
                             >
                               {/* Category · Δ 2030 header */}
                               <div style={{
-                                fontSize: 13, fontWeight: 600, color: '#CBD5E1',
-                                marginBottom: 14, letterSpacing: 0.2,
-                                display: 'flex', alignItems: 'center', gap: 8,
+                                fontSize: 10, fontWeight: 600, color: '#64748B',
+                                marginBottom: 8, letterSpacing: 0.2,
+                                display: 'flex', alignItems: 'center', gap: 6,
                               }}>
                                 <div style={{
-                                  width: 4, height: 16, borderRadius: 2,
+                                  width: 3, height: 12, borderRadius: 2,
                                   background: CATEGORIES.find(c => c.id === catId)?.color || T.accent,
                                 }} />
-                                {catId} <span style={{ color: T.text4, fontWeight: 400 }}>·</span> <span style={{ color: T.accent }}>Δ 2030</span>
+                                {catId} <span style={{ color: '#94A3B8', fontWeight: 400 }}>·</span> <span style={{ color: '#334155' }}>Δ 2030</span>
                               </div>
 
                               {/* Big median number */}
                               <div style={{
-                                fontSize: 34, fontWeight: 300, letterSpacing: -1,
-                                color: shiftColorHex(val2030), lineHeight: 1, marginBottom: 6,
+                                fontSize: 24, fontWeight: 300, letterSpacing: -0.5,
+                                color: shiftColorHex(val2030), lineHeight: 1, marginBottom: 4,
                               }}>
                                 {fmtShift(val2030, 2)}
                               </div>
-                              <div style={{ fontSize: 11, color: '#64748B', marginBottom: dist2030.hasCI ? 16 : 0 }}>
+                              <div style={{ fontSize: 9, color: '#64748B', marginBottom: dist2030.hasCI ? 10 : 0 }}>
                                 Cumulative GP1 pool shift by 2030
                               </div>
 
@@ -548,21 +547,21 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                               {dist2030.hasCI && (
                                 <>
                                   <div style={{
-                                    borderTop: '1px solid rgba(255,255,255,0.08)',
-                                    paddingTop: 14,
+                                    borderTop: '1px solid rgba(0,0,0,0.08)',
+                                    paddingTop: 10,
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                                    gap: 16,
+                                    gap: 10,
                                   }}>
                                     <div style={{ textAlign: 'left' }}>
-                                      <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
-                                      <div style={{ fontSize: 20, fontWeight: 500, color: shiftColorHex(dist2030.p10) }}>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P10 (upside)</div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist2030.p10) }}>
                                         {fmtShift(dist2030.p10, 2)}
                                       </div>
                                     </div>
-                                    <div style={{ fontSize: 16, color: '#334155', alignSelf: 'center', marginTop: 12 }}>…</div>
+                                    <div style={{ fontSize: 12, color: '#94A3B8', alignSelf: 'center', marginTop: 8 }}>…</div>
                                     <div style={{ textAlign: 'right' }}>
-                                      <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
-                                      <div style={{ fontSize: 20, fontWeight: 500, color: shiftColorHex(dist2030.p90) }}>
+                                      <div style={{ fontSize: 8, color: '#64748B', marginBottom: 3, fontFamily: 'Inter, sans-serif' }}>P90 (downside)</div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: shiftColorHex(dist2030.p90) }}>
                                         {fmtShift(dist2030.p90, 2)}
                                       </div>
                                     </div>
@@ -570,25 +569,24 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
 
                                   {/* Explanation */}
                                   <div style={{
-                                    fontSize: 10, color: '#475569', marginTop: 12, lineHeight: 1.5,
+                                    fontSize: 8, color: '#64748B', marginTop: 8, lineHeight: 1.4,
                                     fontFamily: 'Inter, sans-serif',
                                   }}>
-                                    80% confidence interval from Monte Carlo.
-                                    P10 = optimistic bound, P90 = pessimistic bound.
+                                    80% CI from Monte Carlo. P10 = optimistic, P90 = pessimistic.
                                   </div>
                                 </>
                               )}
 
                               {/* Tooltip arrow */}
                               <div style={{
-                                position: 'absolute', bottom: -7, right: 16,
-                                width: 14, height: 7, overflow: 'hidden',
+                                position: 'absolute', bottom: -6, right: 14,
+                                width: 12, height: 6, overflow: 'hidden',
                               }}>
                                 <div style={{
-                                  width: 12, height: 12, background: '#161b28',
-                                  border: '1px solid rgba(255,255,255,0.1)',
+                                  width: 10, height: 10, background: '#F5F5F7',
+                                  border: '1px solid rgba(0,0,0,0.12)',
                                   transform: 'rotate(45deg)', transformOrigin: 'top left',
-                                  marginLeft: 1, marginTop: -6,
+                                  marginLeft: 1, marginTop: -5,
                                 }} />
                               </div>
                             </motion.div>
