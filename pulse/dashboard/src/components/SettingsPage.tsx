@@ -68,7 +68,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
   );
   const [withinForceRho, setWithinForceRho] = useState(0.3);
   const [tCopulaDf, setTCopulaDf] = useState(4);
-  const [iterations, setIterations] = useState(5000);
+  const [iterations, setIterations] = useState(10000);
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>(
     () => {
       const cats = ['Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
