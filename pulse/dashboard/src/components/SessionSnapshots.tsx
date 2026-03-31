@@ -1,13 +1,13 @@
 /**
  * SessionSnapshots — Persistent session history & state management panel
  *
- * Save/load/compare snapshots of simulation state (shifts, trends, scenario).
+ * Save/load/compare snapshots of simulation state (shifts, trends).
  * All snapshots are persisted to the backend SQLite database — permanent audit trail.
  * No auto-deletion, no localStorage. Weekly timestamp history by design.
  *
  * Slide-in right panel (460px wide, z-index 201) with Framer Motion animation.
  *
- * Props: { currentShifts, currentTrends, onClose, onRestoreSnapshot, currentScenario }
+ * Props: { currentShifts, currentTrends, onClose, onRestoreSnapshot }
  */
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -22,7 +22,6 @@ interface Snapshot {
   id: string;
   name: string;
   createdAt: string; // ISO date
-  scenario: string;
   shifts: ShiftMatrix;
   trends: Trend[];
   trendCount: number;
@@ -35,7 +34,6 @@ interface APISnapshot {
   id: number;
   name: string;
   created_at: string;
-  scenario: string;
   shifts: ShiftMatrix;
   trends: Trend[];
   trend_count: number;
@@ -51,7 +49,6 @@ interface SessionSnapshotsProps {
   currentTrends: Trend[];
   onClose: () => void;
   onRestoreSnapshot?: (snapshot: Snapshot) => void;
-  currentScenario?: string;
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────
@@ -110,7 +107,6 @@ function apiToSnapshot(api: APISnapshot): Snapshot {
     id: String(api.id),
     name: api.name,
     createdAt: api.created_at,
-    scenario: api.scenario,
     shifts: api.shifts,
     trends: api.trends || [],
     trendCount: api.trend_count,
@@ -126,7 +122,6 @@ export const SessionSnapshots: React.FC<SessionSnapshotsProps> = ({
   currentTrends,
   onClose,
   onRestoreSnapshot,
-  currentScenario = 'Base Case',
 }) => {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [snapshotName, setSnapshotName] = useState('');
@@ -167,7 +162,6 @@ export const SessionSnapshots: React.FC<SessionSnapshotsProps> = ({
 
       const body = {
         name: snapshotName.trim(),
-        scenario: currentScenario,
         shifts: currentShifts,
         trends: currentTrends,
         trend_count: currentTrends.length,
@@ -591,25 +585,6 @@ export const SessionSnapshots: React.FC<SessionSnapshotsProps> = ({
                               }}
                             >
                               <span>{formatRelativeDate(snapshot.createdAt)}</span>
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  width: '4px',
-                                  height: '4px',
-                                  borderRadius: '50%',
-                                  backgroundColor: T.border,
-                                }}
-                              />
-                              <span
-                                style={{
-                                  padding: '2px 6px',
-                                  backgroundColor: T.accent + '20',
-                                  borderRadius: '3px',
-                                  color: T.accent,
-                                }}
-                              >
-                                {snapshot.scenario}
-                              </span>
                             </div>
                           </div>
                         </div>

@@ -14,31 +14,26 @@ router = APIRouter(prefix="/analytics", tags=["advanced_analytics"])
 
 class CVaRRequest(BaseModel):
     confidence_level: float = 0.95
-    scenario: str = "base"
     compute_decomposition: bool = False
 
 
 class SobolRequest(BaseModel):
     n_samples: int = 1024
     analysis_type: str = "forces"  # "forces" or "trends"
-    scenario: str = "base"
 
 
 class TippingPointRequest(BaseModel):
     acceleration_threshold: float = 0.005
-    scenario: str = "base"
     thresholds: Optional[List[Dict[str, Any]]] = None
 
 
 class ReverseStressRequest(BaseModel):
     target_category: str
     target_shift: float
-    scenario: str = "base"
 
 
 class MultiStressRequest(BaseModel):
     targets: Dict[str, float]
-    scenario: str = "base"
 
 
 class ThresholdDefRequest(BaseModel):
@@ -58,7 +53,6 @@ def get_state_snapshot() -> Dict[str, Any]:
         "config": _state.get("config"),
         "dag": _state.get("dag"),
         "mc_result": _state.get("mc_result"),
-        "scenario_engine": _state.get("scenario_engine"),
     }
 
 

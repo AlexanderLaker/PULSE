@@ -16,7 +16,6 @@ import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
 import usePulse from '../hooks/usePulse';
 import type {
   Trend,
-  Scenario,
   CausalEdge,
   CausalDAG,
   ShiftMatrix,
@@ -67,7 +66,6 @@ interface InitialDataResult {
   shifts: ShiftMatrix;
   forceContributions: Record<string, ForceContribution[]>;
   trends: TrendWithSources[];
-  scenarios: Scenario[];
   allocation: AllocationWithRationale[];
   dagEdges: CausalEdge[];
   convergence: ConvergenceDiagnostics;
@@ -115,11 +113,6 @@ function generateInitialData(): InitialDataResult {
   // Trends are loaded dynamically via API
   const trends: TrendWithSources[] = [];
 
-  // Scenarios
-  const scenarios: Scenario[] = [
-    { id: 'base', name: 'Base Case', description: 'Current expert scores with causal DAG active. No external shocks applied.' },
-  ];
-
   // Allocation — equal weights until simulation provides recommendations
   const allocation: AllocationWithRationale[] = categoryIds.map((catId) => {
     const equalWeight = 1 / categoryIds.length;
@@ -162,7 +155,6 @@ function generateInitialData(): InitialDataResult {
     shifts,
     forceContributions,
     trends,
-    scenarios,
     allocation,
     dagEdges,
     convergence,
@@ -228,7 +220,7 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
 // ─── WarRoom Component ──────────────────────────────────────────────
 export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
   const {
-    loading, simulating, simulationStale, staleReason, error, activeScenario, setActiveScenario,
+    loading, simulating, simulationStale, staleReason, error,
     simulate, simulation,
   } = usePulse();
 
@@ -460,7 +452,6 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
     try {
       const payload = {
         generated: new Date().toISOString(),
-        scenario: activeScenario,
         shifts: data.shifts,
         causal_decomposition: data.forceContributions,
         model_version: 'bayesian_copula_v1',

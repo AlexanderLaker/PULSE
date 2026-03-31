@@ -70,7 +70,6 @@ from pulse.ingestion.excel_reader import ExcelReader
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.simulation.deterministic import DeterministicEngine
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.simulation.scenarios import ScenarioEngine, BUILTIN_SCENARIOS, Scenario
 from pulse.simulation.sensitivity import SensitivityEngine
 from pulse.simulation.paths import PathAnalyzer
 from pulse.causal.dag import CausalDAG
@@ -94,7 +93,6 @@ _state = {
     "det_result": None,
     "allocation": None,
     "competitive": None,
-    "scenario_engine": None,
     "audit": None,
     "delphi": None,
 }
@@ -132,7 +130,6 @@ def _load_trend_database() -> TrendDatabase:
 # ── Pydantic models ────────────────────────────────────────────────
 class SimulationRequest(BaseModel):
     iterations: int = Field(5000, ge=1, le=100000)  # 1 to 100k iterations
-    scenario: str = "base"
     include_sensitivity: bool = False
     include_allocation: bool = True
     risk_aversion: float = Field(1.0, ge=0.1, le=10.0)
@@ -178,13 +175,6 @@ class TrendUpdate(BaseModel):
         description="Year when 100% of trend impact materializes (0 = default 2030)")
     diffusion_curve: Optional[str] = Field(None,
         description="Materialization shape: s_curve, linear, front_loaded, back_loaded, step_function")
-
-class ScenarioCreate(BaseModel):
-    id: str
-    name: str
-    description: str = ""
-    primary_shocks: dict = {}
-    propagate_via_dag: bool = True
 
 class ShockRequest(BaseModel):
     shocked_force: str
@@ -254,7 +244,7 @@ def _backfill_diffusion_fields(db) -> None:
 def create_app(args=None) -> FastAPI:
     """Create and configure the FastAPI application."""
 
-    async def _run_simulation(scenario_id: str = "base", iterations: int = 5000):
+    async def _run_simulation(iterations: int = 5000):
         """Internal: run simulation and cache results (with locking)."""
         async with _state_lock:
             config = _state["config"]
@@ -269,18 +259,12 @@ def create_app(args=None) -> FastAPI:
             _state["det_result"] = det.run(db)
 
             # Bayesian MC
-            scenario = _state["scenario_engine"].get_scenario(scenario_id)
-            overrides = None
-            if scenario and scenario.primary_shocks:
-                overrides = scenario.get_effective_overrides(dag)
-
             mc = BayesianMonteCarloEngine(config, dag)
-            _state["mc_result"] = mc.run(db, iterations=iterations, scenario_overrides=overrides)
+            _state["mc_result"] = mc.run(db, iterations=iterations)
 
             # Competitive
             comp = CompetitiveResponseModel()
-            shocks = scenario.primary_shocks if scenario else {}
-            _state["competitive"] = comp.compute_all_competitive_adjustments(shocks)
+            _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
             # Allocation
             opt = AllocationOptimizer(config)
@@ -294,7 +278,6 @@ def create_app(args=None) -> FastAPI:
             _state["audit"] = AuditLogger()
             _state["config"] = ModelConfig()
             _state["dag"] = CausalDAG()
-            _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
 
             # Always initialize the database schema (creates all tables including session_snapshots)
             try:
@@ -428,8 +411,7 @@ def create_app(args=None) -> FastAPI:
                     _state["audit"] = AuditLogger()
                     _state["config"] = ModelConfig()
                     _state["dag"] = CausalDAG()
-                    _state["scenario_engine"] = ScenarioEngine(_state["config"], _state["dag"])
-
+        
                     # Initialize Delphi (uses shared database, non-critical)
                     try:
                         from pulse.elicitation.delphi import DelphiProtocol
@@ -563,9 +545,6 @@ def create_app(args=None) -> FastAPI:
             _state["config"] = config
             dag = _state.get("dag") or CausalDAG()
             _state["dag"] = dag
-            if not _state.get("scenario_engine"):
-                _state["scenario_engine"] = ScenarioEngine(config, dag)
-
             # Mark simulation as stale — admin must press Simulate
             _state["simulation_stale"] = True
             _state["stale_reason"] = "Trends re-seeded. Press Simulate to update results."
@@ -951,19 +930,13 @@ def create_app(args=None) -> FastAPI:
             _state["det_result"] = det_result
 
             # Bayesian Monte Carlo
-            scenario = _state["scenario_engine"].get_scenario(req.scenario)
-            overrides = None
-            if scenario and scenario.primary_shocks:
-                overrides = scenario.get_effective_overrides(dag)
-
             mc = BayesianMonteCarloEngine(config, dag)
-            mc_result = mc.run(db, iterations=req.iterations, scenario_overrides=overrides)
+            mc_result = mc.run(db, iterations=req.iterations)
             _state["mc_result"] = mc_result
 
             # Competitive response
             comp = CompetitiveResponseModel()
-            shocks = scenario.primary_shocks if scenario else {}
-            _state["competitive"] = comp.compute_all_competitive_adjustments(shocks)
+            _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
             # Allocation optimizer
             if req.include_allocation:
@@ -972,7 +945,7 @@ def create_app(args=None) -> FastAPI:
                     mc_result["shift_matrix"], risk_aversion=req.risk_aversion
                 )
 
-            _state["audit"].log_simulation_run(req.scenario, req.iterations, "bayesian_copula")
+            _state["audit"].log_simulation_run("base", req.iterations, "bayesian_copula")
 
             # Clear stale flag — simulation is now fresh
             _state["simulation_stale"] = False
@@ -982,7 +955,7 @@ def create_app(args=None) -> FastAPI:
             try:
                 from pulse.database import save_simulation_run
                 save_simulation_run(
-                    scenario=req.scenario,
+                    scenario="base",
                     iterations=req.iterations,
                     model_type="bayesian_copula",
                     results=_sanitize(mc_result["shift_matrix"]),
@@ -1029,29 +1002,6 @@ def create_app(args=None) -> FastAPI:
         result = dag.propagate_shock(req.shocked_force, req.magnitude, req.years)
         signature = dag.get_propagation_signature(req.shocked_force)
         return _sanitize({"propagation": result, "signature": signature})
-
-    # ── Scenarios ───────────────────────────────────────────────────
-    @app.get("/api/v1/scenarios")
-    async def list_scenarios():
-        se = _state.get("scenario_engine")
-        if not se:
-            return []
-        return [{
-            "id": s.id, "name": s.name, "description": s.description,
-            "primary_shocks": s.primary_shocks, "propagate_via_dag": s.propagate_via_dag,
-        } for s in se.get_all_scenarios().values()]
-
-    @app.post("/api/v1/scenarios")
-    async def create_scenario(req: ScenarioCreate):
-        se = _state.get("scenario_engine")
-        if not se:
-            raise HTTPException(500, "Scenario engine not initialized")
-        scenario = Scenario(
-            id=req.id, name=req.name, description=req.description,
-            primary_shocks=req.primary_shocks, propagate_via_dag=req.propagate_via_dag,
-        )
-        se.add_custom_scenario(scenario)
-        return {"status": "created", "id": req.id}
 
     # ── Sensitivity ─────────────────────────────────────────────────
     @app.get("/api/v1/sensitivity/tornado")
@@ -1403,7 +1353,6 @@ def create_app(args=None) -> FastAPI:
             out_file = os.path.join(out_dir, "shift_matrix.json")
             exporter.export_shift_matrix(
                 mc_result=mc,
-                scenarios=["Base Case"],
                 output_path=out_file,
             )
             return {"status": "exported", "path": out_file}
@@ -1462,7 +1411,6 @@ def create_app(args=None) -> FastAPI:
             os.makedirs(out_dir, exist_ok=True)
             out_file = os.path.join(out_dir, "PRISM_War_Room.pptx")
 
-            # Get current scenario (for slide titles)
             db = _state.get("db")
             trends_list = [
                 {
@@ -1481,7 +1429,6 @@ def create_app(args=None) -> FastAPI:
             exporter = PowerPointExporter()
             exporter.export(
                 output_path=out_file,
-                scenario="Base Case",
                 shifts=mc.get("shift_matrix", {}),
                 trends=trends_list,
                 convergence=mc.get("convergence"),
@@ -1529,8 +1476,6 @@ def create_app(args=None) -> FastAPI:
                             "probability": t.probability,
                             "normalized_score": t.normalized_score}
                            for t in (_state.get("db").trends if _state.get("db") else [])],
-                "scenarios": [s.id for s in (_state.get("scenario_engine").get_all_scenarios().values()
-                              if _state.get("scenario_engine") else [])],
             }
             answer = await chat_engine.ask(req.question, context)
             return {"answer": answer}
@@ -1542,7 +1487,6 @@ def create_app(args=None) -> FastAPI:
     # ── Session Snapshots (Persistent History) ──────────────────────
     class SnapshotCreate(BaseModel):
         name: str
-        scenario: str = "Base Case"
         shifts: dict
         trends: list = []
         trend_count: int = 0
@@ -1557,7 +1501,7 @@ def create_app(args=None) -> FastAPI:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT id, name, created_at, scenario, shifts, trends,
+                    SELECT id, name, created_at, shifts, trends,
                            trend_count, net_shift, notes, created_by, model_version, iterations
                     FROM session_snapshots
                     ORDER BY created_at DESC
@@ -1594,12 +1538,11 @@ def create_app(args=None) -> FastAPI:
                 cursor = conn.cursor()
                 cursor.execute(f"""
                     INSERT INTO session_snapshots
-                        (id, name, scenario, shifts, trends, trend_count, net_shift, notes, model_version)
-                    VALUES ({ph(9)})
+                        (id, name, shifts, trends, trend_count, net_shift, notes, model_version)
+                    VALUES ({ph(8)})
                 """, (
                     snapshot_id,
                     req.name,
-                    req.scenario,
                     json.dumps(req.shifts),
                     json.dumps(req.trends),
                     req.trend_count,
@@ -1610,7 +1553,7 @@ def create_app(args=None) -> FastAPI:
                 conn.commit()
                 # Fetch the created row to return full data
                 cursor.execute(f"""
-                    SELECT id, name, created_at, scenario, shifts, trends,
+                    SELECT id, name, created_at, shifts, trends,
                            trend_count, net_shift, notes, created_by, model_version, iterations
                     FROM session_snapshots WHERE id = {p}
                 """, (snapshot_id,))

@@ -3,7 +3,6 @@
 Usage:
     python -m pulse --input v12.xlsx --output shift_matrix.xlsx
     python -m pulse --input v12.xlsx --mode deterministic
-    python -m pulse --input v12.xlsx --scenario green_squeeze
     python -m pulse --input v12.xlsx --serve
     python -m pulse --validate v12.xlsx
 """
@@ -20,7 +19,6 @@ from pulse.config import ModelConfig
 from pulse.ingestion.excel_reader import ExcelReader
 from pulse.simulation.deterministic import DeterministicEngine
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.simulation.scenarios import ScenarioEngine, BUILTIN_SCENARIOS
 from pulse.simulation.sensitivity import SensitivityEngine
 from pulse.simulation.paths import PathAnalyzer
 from pulse.causal.dag import CausalDAG
@@ -47,8 +45,6 @@ def create_parser():
                         default="shift_matrix.xlsx")
     parser.add_argument("--mode", choices=["bayesian", "deterministic"],
                         default="bayesian", help="Simulation mode")
-    parser.add_argument("--scenario", default="base",
-                        help="Scenario to run (base, green_squeeze, tech_disruption, etc.)")
     parser.add_argument("--iterations", type=int, default=None,
                         help="Number of Monte Carlo iterations")
     parser.add_argument("--no-causal", action="store_true",
@@ -126,7 +122,7 @@ def main():
     if not args.no_causal:
         print("[2/6] Building Causal DAG...")
         dag = CausalDAG()
-        print(f"      {len(dag.edges)} causal edges across {len(BUILTIN_SCENARIOS)} forces")
+        print(f"      {len(dag.edges)} causal edges across 6 forces")
     else:
         print("[2/6] Causal DAG: DISABLED")
 
@@ -147,17 +143,9 @@ def main():
         return
 
     if args.mode == "bayesian":
-        # Get scenario
-        scenario_engine = ScenarioEngine(config, dag)
-        scenario = scenario_engine.get_scenario(args.scenario)
-        scenario_overrides = None
-        if scenario and scenario.primary_shocks:
-            scenario_overrides = scenario.get_effective_overrides(dag)
-            print(f"[3/6] Scenario '{scenario.name}': {scenario.description[:80]}...")
-
         print(f"[4/6] Running Bayesian Monte Carlo ({config.iterations:,} iterations)...")
         mc_engine = BayesianMonteCarloEngine(config, dag)
-        mc_result = mc_engine.run(db, scenario_overrides=scenario_overrides)
+        mc_result = mc_engine.run(db)
 
         # Convergence report
         converged = sum(1 for v in mc_result["convergence"].values() if v["converged"])
@@ -186,9 +174,7 @@ def main():
     if not args.no_competitive:
         print("[5/6] Computing competitive response dynamics...")
         comp_model = CompetitiveResponseModel()
-        scenario = scenario_engine.get_scenario(args.scenario) if 'scenario_engine' in dir() else None
-        force_shocks = scenario.primary_shocks if scenario else {}
-        competitive_adj = comp_model.compute_all_competitive_adjustments(force_shocks)
+        competitive_adj = comp_model.compute_all_competitive_adjustments({})
 
     if not args.no_allocation:
         print("[5/6] Running allocation optimizer...")
@@ -225,7 +211,6 @@ def main():
         allocation=allocation,
         competitive_adjustments=competitive_adj,
         metadata={
-            "scenario": args.scenario,
             "causal_dag": "enabled" if dag else "disabled",
             "competitive": "enabled" if competitive_adj else "disabled",
             "backtesting_accuracy": config.backtesting_accuracy or "N/A (no historical data)",
@@ -241,7 +226,6 @@ def main():
             pbi_path = args.powerbi_path or str(Path(args.output).parent / "shift_matrix_powerbi.json")
             exporter.export_shift_matrix(
                 mc_result=mc_result,
-                scenarios=[args.scenario],
                 output_path=pbi_path,
             )
             print(f"  Power BI JSON: {pbi_path}")
@@ -251,7 +235,7 @@ def main():
             print(f"  ⚠ Power BI export failed: {e}")
 
     # Audit
-    audit.log_simulation_run(args.scenario, config.iterations, args.mode)
+    audit.log_simulation_run(config.iterations, args.mode)
     audit.save_snapshot(config.to_json(), f"Run {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     # ── Summary ─────────────────────────────────────────────────────
@@ -259,7 +243,6 @@ def main():
     print("  PRISM SIMULATION COMPLETE")
     print(f"{'═' * 60}")
     print(f"  Mode:       {mc_result.get('model_type', args.mode)}")
-    print(f"  Scenario:   {args.scenario}")
     print(f"  Iterations: {mc_result.get('iterations', 1):,}")
     print(f"  Output:     {args.output}")
     print()

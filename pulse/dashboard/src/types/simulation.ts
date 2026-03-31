@@ -4,7 +4,7 @@
  */
 
 import type {
-  CategoryId, ForceName, ScenarioId, ModelType, ProjectionYear,
+  CategoryId, ForceName, ModelType, ProjectionYear,
   YearRecord, CategoryRecord,
 } from './index';
 
@@ -80,7 +80,6 @@ export interface SimulationResult {
   allocation_recommendation?: AllocationRecommendation;
   allocation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;
-  scenario?: ScenarioId;
   generated?: string;
   model_version?: string;
   iterations?: number;
@@ -88,19 +87,9 @@ export interface SimulationResult {
 
 /** Parameters for running a simulation. */
 export interface SimulationParams {
-  scenario?: ScenarioId;
   iterations?: number;
   include_allocation?: boolean;
   include_sensitivity?: boolean;
-}
-
-/** Scenario definition. */
-export interface Scenario {
-  id: ScenarioId;
-  name: string;
-  description: string;
-  shocks?: Record<ForceName, number>;
-  force_overrides?: Record<ForceName, number>;
 }
 
 /** Sensitivity tornado bar data. */

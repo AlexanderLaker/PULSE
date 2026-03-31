@@ -20,7 +20,6 @@ class ChatContext:
     """Context for a chat session."""
     current_simulation_results: Optional[Dict[str, Any]] = None
     trend_data: Optional[List[Dict[str, Any]]] = None
-    scenarios: Optional[List[Dict[str, Any]]] = None
     categories: Optional[List[str]] = None
     forces: Optional[List[str]] = None
     allocation: Optional[Dict[str, float]] = None
@@ -139,33 +138,6 @@ User Question: {question}"""
             results.append(answer)
         return results
 
-    async def explain_scenario(self, scenario_name: str) -> str:
-        """
-        Explain a specific scenario in business terms.
-
-        Args:
-            scenario_name: Name of scenario to explain
-
-        Returns:
-            Scenario explanation
-        """
-        matching_scenarios = [
-            s for s in (self.context.scenarios or [])
-            if scenario_name.lower() in s.get("name", "").lower()
-        ]
-
-        if not matching_scenarios:
-            return f"Scenario '{scenario_name}' not found."
-
-        scenario = matching_scenarios[0]
-
-        question = f"""Explain this scenario to a business executive:
-Name: {scenario.get('name')}
-Description: {scenario.get('description')}
-
-What are the key business implications?"""
-
-        return await self.ask(question)
 
     async def compare_categories(self) -> str:
         """
@@ -284,12 +256,6 @@ If asked about something not in the context, say so clearly."""
         """Build context information for prompt."""
         lines = []
 
-        # Scenario information
-        if self.context.scenarios:
-            lines.append("Available Scenarios:")
-            for s in self.context.scenarios[:3]:
-                lines.append(f"  - {s.get('name', 'Unknown')}")
-
         # Simulation results summary
         if self.context.current_simulation_results:
             lines.append("\nCurrent Simulation Results:")
@@ -375,7 +341,6 @@ If asked about something not in the context, say so clearly."""
 
         lines = [
             "Current Analysis Summary:",
-            f"  Scenarios available: {len(self.context.scenarios or [])}",
             f"  Trends tracked: {len(self.context.trend_data or [])}",
             f"  Categories: {len(self.context.categories or [])}",
             f"  Forces: {len(self.context.forces or [])}",
@@ -383,7 +348,7 @@ If asked about something not in the context, say so clearly."""
             "Ready for analysis. Ask questions like:",
             "  - 'Which categories face the most headwinds?'",
             "  - 'What drives the expansion in Hair Care?'",
-            "  - 'How does this scenario impact our competitive position?'",
+            "  - 'How do competitive dynamics affect our position?'",
             "  - 'What allocation would you recommend?'",
         ]
 

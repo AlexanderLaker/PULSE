@@ -52,7 +52,6 @@ class PowerPointExporter:
     def export(
         self,
         output_path: str,
-        scenario: str,
         shifts: Dict[str, Any],
         trends: List[Dict[str, Any]],
         convergence: Optional[Dict[str, Any]] = None,
@@ -65,7 +64,6 @@ class PowerPointExporter:
 
         Args:
             output_path: Path to write .pptx file
-            scenario: Scenario name (e.g., "Base Case", "Green Squeeze")
             shifts: Shift matrix {category: {year: {percentile: value}}}
             trends: List of trend objects with impact/probability
             convergence: Monte Carlo convergence diagnostics
@@ -76,10 +74,10 @@ class PowerPointExporter:
         Returns:
             Path to generated file
         """
-        logger.info(f"Generating PowerPoint presentation: {scenario}")
+        logger.info(f"Generating PowerPoint presentation")
 
         # Build slides
-        self._add_title_slide(scenario, model_version)
+        self._add_title_slide(model_version)
         self._add_executive_summary_slide(shifts, trends, model_accuracy)
         self._add_shift_heatmap_slide(shifts)
         self._add_top_trends_slide(trends)
@@ -90,8 +88,8 @@ class PowerPointExporter:
         logger.info(f"PowerPoint saved to {output_path}")
         return output_path
 
-    def _add_title_slide(self, scenario: str, model_version: str):
-        """Slide 1: Title slide with date and scenario."""
+    def _add_title_slide(self, model_version: str):
+        """Slide 1: Title slide with date and model version."""
         slide = self.prs.slides.add_slide(self.prs.slide_layouts[6])  # Blank layout
         background = slide.background
         fill = background.fill
@@ -114,7 +112,7 @@ class PowerPointExporter:
         subtitle_frame = subtitle_box.text_frame
         subtitle_frame.word_wrap = True
         p = subtitle_frame.paragraphs[0]
-        p.text = f"Profit Pool Shift Analysis — {scenario}"
+        p.text = "Profit Pool Shift Analysis"
         p.font.size = Pt(28)
         p.font.color.rgb = COLORS["bg"]
         p.alignment = PP_ALIGN.CENTER

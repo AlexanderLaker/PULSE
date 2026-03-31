@@ -50,7 +50,6 @@ class ExportCenter:
     def export_pptx(
         self,
         shift_matrix: Dict[str, Any],
-        scenario: str = "Base Case",
         output_path: Optional[str] = None,
     ) -> str:
         """Generate a professional PowerPoint presentation from Shift Matrix.
@@ -65,7 +64,6 @@ class ExportCenter:
 
         Args:
             shift_matrix: Full Shift Matrix with paths and metadata
-            scenario: Scenario name
             output_path: Path to save PPTX. If None, auto-generates filename.
 
         Returns:
@@ -73,14 +71,14 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PRISM_Report_{scenario}_{timestamp}.pptx")
+            output_path = str(self.output_dir / f"PRISM_Report_{timestamp}.pptx")
 
         prs = Presentation()
         prs.slide_width = Inches(10)
         prs.slide_height = Inches(7.5)
 
         # Slide 1: Title
-        self._add_title_slide(prs, scenario, shift_matrix)
+        self._add_title_slide(prs, shift_matrix)
 
         # Slide 2: Executive Summary
         self._add_executive_summary_slide(prs, shift_matrix)
@@ -104,7 +102,6 @@ class ExportCenter:
     def export_pdf(
         self,
         shift_matrix: Dict[str, Any],
-        scenario: str = "Base Case",
         output_path: Optional[str] = None,
     ) -> str:
         """Generate a professional PDF report from Shift Matrix.
@@ -117,7 +114,6 @@ class ExportCenter:
 
         Args:
             shift_matrix: Full Shift Matrix with metadata
-            scenario: Scenario name
             output_path: Path to save PDF. If None, auto-generates filename.
 
         Returns:
@@ -125,7 +121,7 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PRISM_Report_{scenario}_{timestamp}.pdf")
+            output_path = str(self.output_dir / f"PRISM_Report_{timestamp}.pdf")
 
         doc = SimpleDocTemplate(output_path, pagesize=letter,
                                 rightMargin=0.5*inch, leftMargin=0.5*inch,
@@ -153,7 +149,7 @@ class ExportCenter:
         )
 
         # Title
-        story.append(Paragraph(f"PRISM Profit Pool Analysis: {scenario}", title_style))
+        story.append(Paragraph("PRISM Profit Pool Analysis", title_style))
         story.append(Spacer(1, 0.2*inch))
 
         # Metadata
@@ -226,7 +222,6 @@ class ExportCenter:
     def export_excel(
         self,
         shift_matrix: Dict[str, Any],
-        scenario: str = "Base Case",
         output_path: Optional[str] = None,
     ) -> str:
         """Generate an Excel workbook with Shift Matrix and application templates.
@@ -240,7 +235,6 @@ class ExportCenter:
 
         Args:
             shift_matrix: Full Shift Matrix with paths and metadata
-            scenario: Scenario name
             output_path: Path to save Excel. If None, auto-generates filename.
 
         Returns:
@@ -248,7 +242,7 @@ class ExportCenter:
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = str(self.output_dir / f"PRISM_Export_{scenario}_{timestamp}.xlsx")
+            output_path = str(self.output_dir / f"PRISM_Export_{timestamp}.xlsx")
 
         wb = openpyxl.Workbook()
         wb.remove(wb.active)  # Remove default sheet
@@ -278,7 +272,7 @@ class ExportCenter:
 
     # ==================== PPTX HELPERS ====================
 
-    def _add_title_slide(self, prs: Presentation, scenario: str, shift_matrix: Dict[str, Any]) -> None:
+    def _add_title_slide(self, prs: Presentation, shift_matrix: Dict[str, Any]) -> None:
         """Add title slide to presentation."""
         slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
         background = slide.background
@@ -296,12 +290,12 @@ class ExportCenter:
         p.font.bold = True
         p.font.color.rgb = self.COLOR_BLUE
 
-        # Add scenario
-        scenario_box = slide.shapes.add_textbox(Inches(0.5), Inches(4.2), Inches(9), Inches(1))
-        scenario_frame = scenario_box.text_frame
-        p = scenario_frame.paragraphs[0]
-        p.text = f"Scenario: {scenario}"
-        p.font.size = Pt(28)
+        # Add subtitle
+        subtitle_box = slide.shapes.add_textbox(Inches(0.5), Inches(4.2), Inches(9), Inches(1))
+        subtitle_frame = subtitle_box.text_frame
+        p = subtitle_frame.paragraphs[0]
+        p.text = "Bayesian Copula · Causal DAG · Continuous Paths"
+        p.font.size = Pt(24)
         p.font.color.rgb = self.COLOR_LIGHT_TEXT
 
         # Add date
@@ -604,7 +598,7 @@ Security:
         ws = wb.create_sheet("Shift Matrix")
 
         # Header
-        headers = ["Category", "Year", "Scenario", "Median (%)", "p10 (%)", "p25 (%)", "p75 (%)", "p90 (%)", "Velocity (%)"]
+        headers = ["Category", "Year", "Median (%)", "p10 (%)", "p25 (%)", "p75 (%)", "p90 (%)", "Velocity (%)"]
         ws.append(headers)
 
         # Format header

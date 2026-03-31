@@ -75,7 +75,7 @@ export default function CVaRDisplay({
             margin: 0,
           }}
         >
-          95th percentile worst-case loss scenario
+          95th percentile worst-case loss
         </p>
       </div>
 

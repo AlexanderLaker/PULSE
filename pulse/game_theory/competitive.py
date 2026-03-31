@@ -159,7 +159,7 @@ RESPONSE_POOL_EFFECTS = {
 
 class CompetitiveResponseModel:
     """
-    Estimates how competitors respond to scenarios and adjusts pool shifts.
+    Estimates how competitors respond to market dynamics and adjusts pool shifts.
 
     This is directional modeling, not predictive. Clearly labeled as
     "competitive dynamics adjustment" in outputs.
@@ -168,26 +168,7 @@ class CompetitiveResponseModel:
     def __init__(self, competitors: Optional[dict] = None):
         self.competitors = competitors or dict(DEFAULT_COMPETITORS)
 
-    def classify_scenario_trigger(self, force_shocks: dict) -> str:
-        """Classify what type of competitive trigger this scenario represents."""
-        if not force_shocks:
-            return "pool_contraction"  # Default
-
-        max_force = max(force_shocks, key=lambda f: abs(force_shocks[f]))
-        magnitude = force_shocks[max_force]
-
-        if max_force == "Competitive":
-            return "price_war"
-        elif max_force == "Government":
-            return "regulation"
-        elif max_force == "Technology":
-            return "tech_disruption"
-        elif max_force == "Customer" and magnitude > 0:
-            return "private_label_growth"
-        else:
-            return "pool_contraction"
-
-    def estimate_competitive_response(self, scenario_trigger: str,
+    def estimate_competitive_response(self, trigger: str,
                                        category: str) -> float:
         """
         Estimate the second-order pool effect from competitive responses.
@@ -198,18 +179,13 @@ class CompetitiveResponseModel:
         total_weight = 0.0
 
         for comp_id, comp in self.competitors.items():
-            # How exposed is this competitor to this category?
             exposure = comp.category_exposure.get(category, 0.0)
             if exposure < 0.1:
-                continue  # Not meaningfully present
+                continue
 
-            # What's their likely response?
-            response = comp.typical_responses.get(scenario_trigger, "defend_core_categories")
-
-            # What effect does that response have on the pool?
+            response = comp.typical_responses.get(trigger, "defend_core_categories")
             pool_effect = RESPONSE_POOL_EFFECTS.get(response, 0.0)
 
-            # Weight by competitor exposure and response speed
             speed_factor = {"fast": 1.0, "medium": 0.7, "slow": 0.4}
             weight = exposure * speed_factor.get(comp.response_speed, 0.7)
 
@@ -226,7 +202,7 @@ class CompetitiveResponseModel:
 
         Returns: {category: competitive_adjustment_%}
         """
-        trigger = self.classify_scenario_trigger(force_shocks)
+        trigger = "pool_contraction"  # Default baseline
         adjustments = {}
 
         for cat in CATEGORIES:
@@ -236,7 +212,6 @@ class CompetitiveResponseModel:
         return adjustments
 
     def competitive_equilibrium(self, base_shifts: dict,
-                                 force_shocks: dict,
                                  max_iterations: int = 10,
                                  tolerance: float = 0.0001) -> dict:
         """
@@ -245,7 +220,7 @@ class CompetitiveResponseModel:
 
         Returns: equilibrium shift adjustments
         """
-        trigger = self.classify_scenario_trigger(force_shocks)
+        trigger = "pool_contraction"
         adjustments = {cat: 0.0 for cat in CATEGORIES}
 
         for iteration in range(max_iterations):

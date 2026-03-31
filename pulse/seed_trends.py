@@ -851,7 +851,7 @@ TRENDS = [
         direction="Contraction", probability=4, start_year=2025,
         gp1_pct_affected=0.08,
         description="US tariff escalation (25%+ on select goods), retaliatory EU measures, and China-EU trade friction create COGS volatility and sourcing complexity. Cross-border raw material costs rising 5-15% due to tariff pass-through. Distinct from nearshoring (E-06) — this captures the macro-policy driver and demand-side pricing implications for global FMCG supply chains.",
-        strategic_implication="Diversify sourcing away from single-country dependency. Model tariff scenarios into annual procurement planning. Build buffer stock for critical raw materials.",
+        strategic_implication="Diversify sourcing away from single-country dependency. Model tariff dynamics into annual procurement planning. Build buffer stock for critical raw materials.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
         vc_exposure=vc(5,2,2,3,5,1,1,1),
         regional_exposure=reg(4,5,5,4),

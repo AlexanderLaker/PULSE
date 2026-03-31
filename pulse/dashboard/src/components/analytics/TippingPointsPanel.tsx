@@ -268,7 +268,7 @@ export default function TippingPointsPanel({
           }}
         >
           <p style={{ fontSize: 14, margin: 0 }}>
-            No critical tipping points detected in current scenario
+            No critical tipping points detected
           </p>
         </div>
       )}

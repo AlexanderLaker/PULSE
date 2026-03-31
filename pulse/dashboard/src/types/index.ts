@@ -37,15 +37,6 @@ export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak';
 /** AI provider options for the LLM abstraction layer. */
 export type AIProvider = 'claude' | 'azure' | 'ollama' | 'none';
 
-/** Scenario type identifiers. */
-export type ScenarioId =
-  | 'base'
-  | 'green_squeeze'
-  | 'tech_disruption'
-  | 'price_war'
-  | 'regulatory_cascade'
-  | 'perfect_storm'
-  | string; // custom scenarios
 
 /** Simulation model types. */
 export type ModelType = 'deterministic' | 'bayesian_mc' | 'copula_mc';

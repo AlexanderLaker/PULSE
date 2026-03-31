@@ -35,18 +35,16 @@ class PowerBIExporter:
     def export_shift_matrix(
         self,
         mc_result: Dict[str, Any],
-        scenarios: List[str] = None,
         output_path: str = None,
         auto_push_path: Optional[str] = None,
     ) -> str:
         """Export shift matrix results to flat JSON format for Power BI.
 
-        Creates a flat table where each row is one category × scenario × year combination.
+        Creates a flat table where each row is one category × year combination.
         Includes percentile distributions, velocity, and force attribution.
 
         Args:
             mc_result: Monte Carlo simulation result dict with 'shift_matrix' key
-            scenarios: List of scenario names to include. If None, exports all.
             output_path: Path to write JSON file. If None, uses default naming.
             auto_push_path: Optional path to copy file to (e.g., SharePoint sync folder)
 
@@ -71,34 +69,31 @@ class PowerBIExporter:
             velocity = cat_data.get("velocity", {})
             force_attribution = cat_data.get("force_attribution", {})
 
-            # Use provided scenarios or extract from result
-            scenario_list = scenarios or self._extract_scenarios(mc_result)
-
-            for scenario in scenario_list:
-                for year in self.config.path_years:
+            for year in self.config.path_years:
                     year_data = path.get(year, {})
 
-                    # Build row
-                    row = {
-                        "category": category,
-                        "scenario": scenario,
-                        "time_horizon": year,
-                        "shift_p10": self._safe_round(year_data.get("p10", 0.0)),
-                        "shift_p25": self._safe_round(year_data.get("p25", 0.0)),
-                        "shift_median": self._safe_round(year_data.get("median", 0.0)),
-                        "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
-                        "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
-                        "velocity": self._safe_round(velocity.get(year, 0.0)),
-                    }
+                year_data = path.get(year, {})
 
-                    # Add force attribution as separate columns for flat structure
-                    for force in FORCES:
-                        attribution_val = force_attribution.get(force, 0.0)
-                        row[f"force_{force.lower().replace(' ', '_')}"] = self._safe_round(
-                            attribution_val
-                        )
+                # Build row
+                row = {
+                    "category": category,
+                    "time_horizon": year,
+                    "shift_p10": self._safe_round(year_data.get("p10", 0.0)),
+                    "shift_p25": self._safe_round(year_data.get("p25", 0.0)),
+                    "shift_median": self._safe_round(year_data.get("median", 0.0)),
+                    "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
+                    "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
+                    "velocity": self._safe_round(velocity.get(year, 0.0)),
+                }
 
-                    flat_data.append(row)
+                # Add force attribution as separate columns for flat structure
+                for force in FORCES:
+                    attribution_val = force_attribution.get(force, 0.0)
+                    row[f"force_{force.lower().replace(' ', '_')}"] = self._safe_round(
+                        attribution_val
+                    )
+
+                flat_data.append(row)
 
         # Write JSON
         with open(output_path, "w", encoding="utf-8") as f:
@@ -115,17 +110,15 @@ class PowerBIExporter:
     def export_csv(
         self,
         mc_result: Dict[str, Any],
-        scenarios: List[str] = None,
         output_path: str = None,
         auto_push_path: Optional[str] = None,
     ) -> str:
         """Export shift matrix results to flat CSV format for Power BI.
 
-        Same structure as JSON — flat table with one row per category × scenario × year.
+        Same structure as JSON — flat table with one row per category × year.
 
         Args:
             mc_result: Monte Carlo simulation result dict with 'shift_matrix' key
-            scenarios: List of scenario names to include. If None, exports all.
             output_path: Path to write CSV file. If None, uses default naming.
             auto_push_path: Optional path to copy file to (e.g., SharePoint sync folder)
 
@@ -150,34 +143,29 @@ class PowerBIExporter:
             velocity = cat_data.get("velocity", {})
             force_attribution = cat_data.get("force_attribution", {})
 
-            # Use provided scenarios or extract from result
-            scenario_list = scenarios or self._extract_scenarios(mc_result)
+            for year in self.config.path_years:
+                year_data = path.get(year, {})
 
-            for scenario in scenario_list:
-                for year in self.config.path_years:
-                    year_data = path.get(year, {})
+                # Build row
+                row = {
+                    "category": category,
+                    "time_horizon": year,
+                    "shift_p10": self._safe_round(year_data.get("p10", 0.0)),
+                    "shift_p25": self._safe_round(year_data.get("p25", 0.0)),
+                    "shift_median": self._safe_round(year_data.get("median", 0.0)),
+                    "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
+                    "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
+                    "velocity": self._safe_round(velocity.get(year, 0.0)),
+                }
 
-                    # Build row
-                    row = {
-                        "category": category,
-                        "scenario": scenario,
-                        "time_horizon": year,
-                        "shift_p10": self._safe_round(year_data.get("p10", 0.0)),
-                        "shift_p25": self._safe_round(year_data.get("p25", 0.0)),
-                        "shift_median": self._safe_round(year_data.get("median", 0.0)),
-                        "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
-                        "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
-                        "velocity": self._safe_round(velocity.get(year, 0.0)),
-                    }
+                # Add force attribution columns
+                for force in FORCES:
+                    attribution_val = force_attribution.get(force, 0.0)
+                    row[f"force_{force.lower().replace(' ', '_')}"] = self._safe_round(
+                        attribution_val
+                    )
 
-                    # Add force attribution columns
-                    for force in FORCES:
-                        attribution_val = force_attribution.get(force, 0.0)
-                        row[f"force_{force.lower().replace(' ', '_')}"] = self._safe_round(
-                            attribution_val
-                        )
-
-                    flat_data.append(row)
+                flat_data.append(row)
 
         # Write CSV
         if flat_data:
@@ -276,22 +264,6 @@ class PowerBIExporter:
             logger.error(f"Export validation error: {e}")
             return False
 
-    def _extract_scenarios(self, mc_result: Dict[str, Any]) -> List[str]:
-        """Extract scenario names from mc_result metadata.
-
-        Args:
-            mc_result: Monte Carlo result dictionary
-
-        Returns:
-            List of scenario names, defaults to ["Base Case"] if not found
-        """
-        scenarios = mc_result.get("scenarios", ["Base Case"])
-        if isinstance(scenarios, dict):
-            return list(scenarios.keys())
-        elif isinstance(scenarios, list):
-            return scenarios
-        else:
-            return ["Base Case"]
 
     def _safe_round(self, value: Any, decimals: int = 6) -> float:
         """Safely round a numeric value to specified decimal places.

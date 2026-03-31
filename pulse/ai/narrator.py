@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ScenarioNarrator:
+class SimulationNarrator:
     """
-    Generates executive-ready narrative text for scenarios and simulations.
+    Generates executive-ready narrative text for simulations and analysis.
 
     Key principle: Never includes absolute financial values (€M).
     Uses only percentages, relative terms, and qualitative descriptions.
@@ -32,18 +32,16 @@ class ScenarioNarrator:
         self.provider = provider or get_provider()
         self.firewall = FinancialDataFirewall()
 
-    async def narrate_scenario(
+    async def narrate_simulation(
         self,
-        scenario: Dict[str, Any],
         simulation_result: Dict[str, Any],
         config: Optional[Dict[str, Any]] = None,
         causal_decomposition: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Generate a narrative for a scenario and its simulation results.
+        Generate a narrative for simulation results.
 
         Args:
-            scenario: Scenario configuration and parameters
             simulation_result: Results from simulation with distribution data
             config: Optional narrative configuration
             causal_decomposition: Optional causal decomposition of effects
@@ -58,14 +56,13 @@ class ScenarioNarrator:
         max_length = config.get("max_length", 2000)
 
         # Build context ensuring no absolute values
-        scenario_context = self._prepare_scenario_context(scenario)
         results_context = self._prepare_results_context(simulation_result)
         causal_context = ""
         if causal_decomposition:
             causal_context = self._prepare_causal_context(causal_decomposition)
 
         system_prompt = f"""You are an executive communications specialist.
-Write a compelling, clear narrative about a business scenario and its potential outcomes.
+Write a compelling, clear narrative about business simulation results and their potential impact.
 
 CRITICAL REQUIREMENTS:
 1. NEVER mention absolute financial values (€M, dollars, revenue, profit, etc.)
@@ -84,10 +81,7 @@ Focus on:
 
 Write for C-level executives (CEO, CFO, CMO)."""
 
-        user_prompt = f"""Based on this scenario and simulation results, write a narrative:
-
-SCENARIO:
-{scenario_context}
+        user_prompt = f"""Based on these simulation results, write a narrative:
 
 SIMULATION RESULTS:
 {results_context}
@@ -106,7 +100,7 @@ Create a compelling narrative that helps executives understand the business impl
 
         except Exception as e:
             logger.error(f"Error generating narrative: {e}")
-            return self._generate_fallback_narrative(scenario, simulation_result)
+            return self._generate_fallback_narrative(simulation_result)
 
     async def generate_executive_summary(
         self,

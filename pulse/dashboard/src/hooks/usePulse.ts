@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '../api/client';
 import type {
-  HealthStatus, Trend, ForceSummary, SimulationResult, Scenario,
+  HealthStatus, Trend, ForceSummary, SimulationResult,
   CausalDAG, ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
   ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
   TrendUpdate,
@@ -18,7 +18,6 @@ export interface UsePulseReturn {
   trends: Trend[];
   forces: ForceSummary[];
   simulation: SimulationResult | null;
-  scenarios: Scenario[];
   dag: CausalDAG | null;
   config: ModelConfig | null;
   analytics: AnalyticsState | null;
@@ -30,8 +29,6 @@ export interface UsePulseReturn {
   staleReason: string;
   error: string | null;
   backendAvailable: boolean;
-  activeScenario: string;
-  setActiveScenario: (scenario: string) => void;
   simulate: (params?: SimulationParams) => Promise<void>;
   updateTrend: (trendId: string, updates: TrendUpdate) => Promise<void>;
   reload: () => Promise<void>;
@@ -43,7 +40,6 @@ export default function usePulse(): UsePulseReturn {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [forces, setForces] = useState<ForceSummary[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [dag, setDag] = useState<CausalDAG | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsState | null>(null);
@@ -55,7 +51,6 @@ export default function usePulse(): UsePulseReturn {
   const [staleReason, setStaleReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [backendAvailable, setBackendAvailable] = useState(true);
-  const [activeScenario, setActiveScenario] = useState('base');
   const mounted = useRef(true);
 
   // ── Initial load with graceful degradation ─────────────────
@@ -63,11 +58,10 @@ export default function usePulse(): UsePulseReturn {
     setLoading(true);
     setError(null);
     try {
-      const [h, t, f, sc, d, c] = await Promise.all([
+      const [h, t, f, d, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
         api.getTrends().catch((): Trend[] => []),
         api.getForces().catch((): ForceSummary[] => []),
-        api.getScenarios().catch((): Scenario[] => []),
         api.getDAG().catch((): null => null),
         api.getConfig().catch((): null => null),
       ]);
@@ -88,7 +82,6 @@ export default function usePulse(): UsePulseReturn {
         setForces([]);
       }
 
-      setScenarios(Array.isArray(sc) ? sc : []);
       setDag(d);
       setConfig(c);
 
@@ -176,7 +169,6 @@ export default function usePulse(): UsePulseReturn {
       const configIterations = config?.iterations ?? 5000;
 
       const result = await api.runSimulation({
-        scenario: activeScenario,
         iterations: configIterations,
         include_allocation: true,
         ...params,
@@ -195,7 +187,7 @@ export default function usePulse(): UsePulseReturn {
     } finally {
       if (mounted.current) setSimulating(false);
     }
-  }, [activeScenario, backendAvailable, config]);
+  }, [backendAvailable, config]);
 
   // ── Update trend score ──────────────────────────────────────
   const updateTrend = useCallback(async (trendId: string, updates: TrendUpdate) => {
@@ -229,11 +221,10 @@ export default function usePulse(): UsePulseReturn {
   }, [backendAvailable]);
 
   return {
-    health, trends, forces, simulation, scenarios, dag, config,
+    health, trends, forces, simulation, dag, config,
     analytics, aiSuggestions, triggers,
     loading, simulating, simulationStale, staleReason,
     error, backendAvailable,
-    activeScenario, setActiveScenario,
     simulate, updateTrend, reload: loadAll, loadAnalytics,
   };
 }

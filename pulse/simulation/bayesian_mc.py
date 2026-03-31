@@ -39,15 +39,13 @@ class BayesianMonteCarloEngine:
         # (causal propagation removed; correlations now from force_correlation_matrix)
         self.rng = np.random.default_rng(seed=42)
 
-    def run(self, db: TrendDatabase, iterations: Optional[int] = None,
-            scenario_overrides: Optional[dict] = None) -> dict:
+    def run(self, db: TrendDatabase, iterations: Optional[int] = None) -> dict:
         """
         Run Bayesian Monte Carlo simulation.
 
         Args:
             db: TrendDatabase with all trends
             iterations: number of MC iterations (default from config)
-            scenario_overrides: {force: shock_magnitude} for scenario analysis
 
         Returns:
             dict with structure:
@@ -75,7 +73,7 @@ class BayesianMonteCarloEngine:
 
         # Step 3: Compute shift paths for each category — VECTORIZED across iterations
         shift_samples = self._compute_all_paths_vectorized(
-            trends, raw_samples, scenario_overrides, n_iter, n_cats, n_years
+            trends, raw_samples, n_iter, n_cats, n_years
         )
 
         # Step 4: Compute percentiles and diagnostics
@@ -194,8 +192,7 @@ class BayesianMonteCarloEngine:
         return samples
 
     def _compute_category_path(self, trends: list, trend_scores: np.ndarray,
-                                category: str,
-                                scenario_overrides: Optional[dict] = None) -> np.ndarray:
+                                category: str) -> np.ndarray:
         """
         Compute shift path for a single category in one MC iteration.
 
@@ -261,11 +258,6 @@ class BayesianMonteCarloEngine:
                         total_score += trend_scores[j] * exposure_frac * region_factor * mat_frac
 
                 force_score = total_score
-
-                # Apply scenario override if present
-                if scenario_overrides and force in scenario_overrides:
-                    force_score += scenario_overrides[force]
-
                 force_contributions[force] = force_score * force_weight
 
             # Multiplicative compounding with attenuation (no per-force materialization
@@ -280,7 +272,6 @@ class BayesianMonteCarloEngine:
         return year_shifts
 
     def _compute_all_paths_vectorized(self, trends: list, raw_samples: np.ndarray,
-                                         scenario_overrides: Optional[dict],
                                          n_iter: int, n_cats: int, n_years: int) -> np.ndarray:
         """
         Vectorized computation of all category × year shifts across all iterations.
@@ -343,13 +334,6 @@ class BayesianMonteCarloEngine:
             for y_idx, yr in enumerate(self.config.path_years):
                 mat_matrix[j, y_idx] = sched.get(yr, 1.0)
 
-        # scenario_override_arr: (n_forces,) — additional force-level shocks
-        override_arr = np.zeros(n_forces)
-        if scenario_overrides:
-            for force, mag in scenario_overrides.items():
-                if force in force_idx_map:
-                    override_arr[force_idx_map[force]] = mag
-
         attenuation = self.config.attenuation
 
         # --- VECTORIZED CORE ---
@@ -380,10 +364,7 @@ class BayesianMonteCarloEngine:
                 # result: (n_iter, n_cats) — sum of trend_score * exposure for this force
                 force_contrib[:, f_idx, :] = effective[:, mask] @ exposure_matrix[mask, :]
 
-            # Apply scenario overrides and force weights
-            # override: (n_forces,) broadcast to (1, n_forces, 1)
-            force_contrib += override_arr[np.newaxis, :, np.newaxis]
-
+            # Apply force weights
             # Weighted: (n_iter, n_forces, n_cats) * (n_forces, 1)
             weighted = force_contrib * fw[:, np.newaxis]
 

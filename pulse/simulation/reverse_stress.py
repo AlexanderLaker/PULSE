@@ -23,7 +23,7 @@ class ReverseStressTester:
 
     This reveals:
     1. How fragile/robust each category is (how much stress needed to break?)
-    2. Which parameter combinations are dangerous (multi-factor scenarios)
+    2. Which parameter combinations are dangerous (multi-factor conditions)
     3. Most efficient ways to achieve a target portfolio shift
     """
 
@@ -39,7 +39,7 @@ class ReverseStressTester:
         self.tolerance = tolerance
         self.seed = optimization_seed
 
-    def find_stress_scenario(self,
+    def find_stress_configuration(self,
                               model_func: Callable,
                               target_category: str,
                               target_shift: float,

@@ -6,14 +6,17 @@ interfaces to the PRISM simulation engine.
 Main Classes:
 - TrendScanner: Multi-source news/trend detection with LLM classification
 - ScoreCalibrator: Bias detection and calibration against market signals
-- ScenarioNarrator: Executive narrative generation with causal explanations
+- SimulationNarrator: Executive narrative generation with causal explanations
 - PulseChat: Natural language interface with rule-based fallback mode
 """
 
 from pulse.ai.scanner import TrendScanner, TrendSuggestion
 from pulse.ai.calibrator import ScoreCalibrator, CalibrationSuggestion
-from pulse.ai.narrator import ScenarioNarrator
+from pulse.ai.narrator import SimulationNarrator
 from pulse.ai.chat import PulseChat, ChatContext
+
+# Backward compatibility alias
+ScenarioNarrator = SimulationNarrator
 from pulse.ai.config import (
     get_ai_config,
     set_ai_config,
@@ -36,7 +39,8 @@ __all__ = [
     "TrendSuggestion",
     "ScoreCalibrator",
     "CalibrationSuggestion",
-    "ScenarioNarrator",
+    "SimulationNarrator",
+    "ScenarioNarrator",  # Backward compatibility alias
     "PulseChat",
     "ChatContext",
     "get_ai_config",

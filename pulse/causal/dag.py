@@ -8,7 +8,7 @@ The DAG enables:
 - Shock propagation: shock one force, watch effects cascade
 - Propagation signatures: different forces create different cascade patterns
 - Lag structure: effects take 0-2 years to propagate
-- Structural scenario analysis: scenarios defined by initial shocks, not endpoints
+- Structural shock analysis: shocks defined by initial impulses, propagated through DAG
 """
 
 import logging

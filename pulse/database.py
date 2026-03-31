@@ -296,7 +296,6 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS simulation_runs (
                 id {serial},
                 run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                scenario TEXT,
                 iterations INTEGER,
                 model_type TEXT,
                 config_snapshot_id INTEGER,
@@ -430,7 +429,6 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                scenario TEXT DEFAULT 'Base Case',
                 shifts TEXT NOT NULL,
                 trends TEXT,
                 trend_count INTEGER DEFAULT 0,
@@ -764,7 +762,6 @@ def load_causal_edges() -> List[CausalEdge]:
 # ── SIMULATION RUNS ────────────────────────────────────────────────────
 
 def save_simulation_run(
-    scenario: str,
     iterations: int,
     model_type: str,
     results: dict,
@@ -782,13 +779,13 @@ def save_simulation_run(
             cursor.execute(
                 f"""
                 INSERT INTO simulation_runs (
-                    scenario, iterations, model_type, results,
+                    iterations, model_type, results,
                     causal_decomposition, allocation_recommendation,
                     convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(8)}) RETURNING id
+                ) VALUES ({ph(7)}) RETURNING id
                 """,
                 (
-                    scenario, iterations, model_type, json.dumps(results),
+                    iterations, model_type, json.dumps(results),
                     json.dumps(causal_decomposition) if causal_decomposition else None,
                     json.dumps(allocation_recommendation) if allocation_recommendation else None,
                     json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
@@ -800,13 +797,13 @@ def save_simulation_run(
             cursor.execute(
                 f"""
                 INSERT INTO simulation_runs (
-                    scenario, iterations, model_type, results,
+                    iterations, model_type, results,
                     causal_decomposition, allocation_recommendation,
                     convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(8)})
+                ) VALUES ({ph(7)})
                 """,
                 (
-                    scenario, iterations, model_type, json.dumps(results),
+                    iterations, model_type, json.dumps(results),
                     json.dumps(causal_decomposition) if causal_decomposition else None,
                     json.dumps(allocation_recommendation) if allocation_recommendation else None,
                     json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
@@ -816,43 +813,29 @@ def save_simulation_run(
             run_id = cursor.lastrowid
 
         conn.commit()
-        logger.info(f"Saved simulation run {run_id}: {scenario} ({iterations} iterations)")
+        logger.info(f"Saved simulation run {run_id}: ({iterations} iterations)")
         return run_id
 
 
 def load_simulation_runs(
-    limit: int = 100, scenario: Optional[str] = None
+    limit: int = 100
 ) -> List[Dict[str, Any]]:
     """Load simulation runs from database."""
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        if scenario:
-            cursor.execute(
-                f"""
-                SELECT id, run_date, scenario, iterations, model_type,
-                       results, causal_decomposition, allocation_recommendation,
-                       convergence_diagnostics
-                FROM simulation_runs
-                WHERE scenario = {p}
-                ORDER BY run_date DESC
-                LIMIT {p}
-                """,
-                (scenario, limit),
-            )
-        else:
-            cursor.execute(
-                f"""
-                SELECT id, run_date, scenario, iterations, model_type,
-                       results, causal_decomposition, allocation_recommendation,
-                       convergence_diagnostics
-                FROM simulation_runs
-                ORDER BY run_date DESC
-                LIMIT {p}
-                """,
-                (limit,),
-            )
+        cursor.execute(
+            f"""
+            SELECT id, run_date, iterations, model_type,
+                   results, causal_decomposition, allocation_recommendation,
+                   convergence_diagnostics
+            FROM simulation_runs
+            ORDER BY run_date DESC
+            LIMIT {p}
+            """,
+            (limit,),
+        )
 
         runs = []
         for raw_row in cursor.fetchall():
@@ -875,7 +858,6 @@ def load_simulation_runs(
             run = {
                 "id": row["id"],
                 "run_date": run_date,
-                "scenario": row["scenario"],
                 "iterations": row["iterations"],
                 "model_type": row["model_type"],
                 "results": _safe_json(row["results"]) or {},

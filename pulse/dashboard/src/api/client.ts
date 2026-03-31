@@ -8,7 +8,6 @@ import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
   CausalDAG, PropagationResult,
-  Scenario,
   SensitivityResult,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
@@ -146,13 +145,6 @@ export const propagateShock = (data: {
 }): Promise<PropagationResult> =>
   request('/causal/propagate', { method: 'POST', body: JSON.stringify(data) });
 
-// ── Scenarios ────────────────────────────────────────────────────
-
-export const getScenarios = (): Promise<Scenario[]> =>
-  request('/scenarios');
-
-export const createScenario = (data: Partial<Scenario>): Promise<Scenario> =>
-  request('/scenarios', { method: 'POST', body: JSON.stringify(data) });
 
 // ── Sensitivity ──────────────────────────────────────────────────
 

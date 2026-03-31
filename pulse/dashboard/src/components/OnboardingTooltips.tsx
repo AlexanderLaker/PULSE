@@ -44,12 +44,6 @@ const TOUR_STEPS: TourStep[] = [
     target: '[data-onboarding="timeline"]',
   },
   {
-    id: 'scenario',
-    title: 'Scenario Selector',
-    description: 'Compare different strategic scenarios and their impacts on your portfolio.',
-    target: '[data-onboarding="scenario"]',
-  },
-  {
     id: 'export',
     title: 'Export & Action',
     description: 'Export results to Excel, PowerPoint, or push to Power BI dashboards.',

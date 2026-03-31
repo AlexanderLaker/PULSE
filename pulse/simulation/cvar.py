@@ -191,21 +191,21 @@ class CVaRAnalyzer:
                             f"force ranking (by avg impact magnitude): {list(dominant_forces.keys())}"
         }
 
-    def cvar_by_scenario(self, scenario_samples: Dict[str, Dict[str, np.ndarray]]) -> Dict[str, Any]:
+    def cvar_by_simulation(self, simulation_samples: Dict[str, Dict[str, np.ndarray]]) -> Dict[str, Any]:
         """
-        Compare CVaR across multiple scenarios.
+        Compare CVaR across multiple simulations.
 
         Args:
-            scenario_samples: {scenario_name: {category: samples}}
+            simulation_samples: {simulation_name: {category: samples}}
 
         Returns:
-            Cross-scenario CVaR comparison
+            Cross-simulation CVaR comparison
         """
         result = {}
 
-        for scenario_name, category_dict in scenario_samples.items():
+        for simulation_name, category_dict in simulation_samples.items():
             portfolio_result = self.compute_portfolio_cvar(category_dict)
-            result[scenario_name] = portfolio_result
+            result[simulation_name] = portfolio_result
 
         # Rank scenarios by CVaR severity
         scenario_rankings = sorted(
