@@ -586,7 +586,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               </svg>
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: T.text2, letterSpacing: 0.5 } as React.CSSProperties}>
-              PRISM War Room
+              PRISM Profit Pool Analysis
             </div>
             <div
               style={{

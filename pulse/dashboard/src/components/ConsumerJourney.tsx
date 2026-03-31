@@ -574,7 +574,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
               <line x1="50" y1="70" x2="72" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
             </svg>
           </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>PRISM War Room</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>PRISM Profit Pool Analysis</span>
           <span style={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>v6.0</span>
         </div>
 
@@ -594,7 +594,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-              War Room
+              Profit Pool Analysis
             </button>
           )}
           {onNavigateTrends && (

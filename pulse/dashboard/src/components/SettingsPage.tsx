@@ -167,7 +167,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       setVCWeights(normalize(vcWeights));
       setRegionWeights(normalize(regionWeights) as Record<RegionKey, number>);
       setCategoryWeights(normalize(categoryWeights));
-      setToast({ msg: 'Configuration saved. Press Simulate in the War Room to apply.', type: 'success' });
+      setToast({ msg: 'Configuration saved. Press Simulate in Profit Pool Analysis to apply.', type: 'success' });
 
       // Notify dashboard of config change (no auto-simulation)
       window.dispatchEvent(new CustomEvent('pulse:config-updated'));
@@ -213,7 +213,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
             onMouseOver={e => { e.currentTarget.style.color = T.accent; e.currentTarget.style.background = T.accentDim; }}
             onMouseOut={e => { e.currentTarget.style.color = T.text2; e.currentTarget.style.background = 'none'; }}
           >
-            <ArrowLeft size={16} /> Back to War Room
+            <ArrowLeft size={16} /> Back to Profit Pool Analysis
           </button>
           <div style={{ width: 1, height: 20, background: T.border }} />
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
