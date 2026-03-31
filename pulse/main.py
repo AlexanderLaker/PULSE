@@ -155,8 +155,12 @@ def main():
         print("[4/6] Deterministic mode — using V12 logic")
         mc_result = {
             "shift_matrix": {
-                cat: {"path": {y: {"median": v, "p10": v * 0.7, "p25": v * 0.85,
-                                    "p50": v, "p75": v * 1.15, "p90": v * 1.3,
+                cat: {"path": {y: {"median": v,
+                                    "p10": min(v * 0.7, v * 1.3),
+                                    "p25": min(v * 0.85, v * 1.15),
+                                    "p50": v,
+                                    "p75": max(v * 0.85, v * 1.15),
+                                    "p90": max(v * 0.7, v * 1.3),
                                     "mean": v, "std": abs(v) * 0.15}
                                for y, v in years.items()},
                        "velocity": {}}
