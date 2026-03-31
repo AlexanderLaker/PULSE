@@ -26,6 +26,8 @@ export interface UsePulseReturn {
   triggers: TriggerStatus[];
   loading: boolean;
   simulating: boolean;
+  simulationStale: boolean;
+  staleReason: string;
   error: string | null;
   backendAvailable: boolean;
   activeScenario: string;
@@ -49,6 +51,8 @@ export default function usePulse(): UsePulseReturn {
   const [triggers, setTriggers] = useState<TriggerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
+  const [simulationStale, setSimulationStale] = useState(false);
+  const [staleReason, setStaleReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [activeScenario, setActiveScenario] = useState('base');
@@ -94,6 +98,13 @@ export default function usePulse(): UsePulseReturn {
         if (sim && mounted.current) setSimulation(sim);
       }
 
+      // Check if simulation is stale
+      const status = await api.getSimulationStatus().catch(() => null);
+      if (status && mounted.current) {
+        setSimulationStale(status.stale);
+        setStaleReason(status.reason || '');
+      }
+
       // Load analytics endpoints
       void Promise.all([
         api.getCVaR().catch((): null => null),
@@ -126,18 +137,29 @@ export default function usePulse(): UsePulseReturn {
     return () => { mounted.current = false; };
   }, [loadAll]);
 
-  // ── Listen for config updates (from SettingsPage) and auto-reload ──
+  // ── Listen for config updates (from SettingsPage) ──
   useEffect(() => {
     const handleConfigUpdate = () => {
-      // Re-fetch config and simulation results after settings change
+      // Re-fetch config after settings change (but don't auto-simulate)
       api.getConfig().then(c => { if (mounted.current) setConfig(c); }).catch(() => {});
-      // Wait a moment for the fire-and-forget re-simulation to complete, then reload
-      setTimeout(() => {
-        api.getSimulation().then(sim => { if (mounted.current && sim) setSimulation(sim); }).catch(() => {});
-      }, 2000);
+      // Check stale status
+      api.getSimulationStatus().then(s => {
+        if (mounted.current) { setSimulationStale(s.stale); setStaleReason(s.reason || ''); }
+      }).catch(() => {});
+    };
+    const handleStale = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (mounted.current) {
+        setSimulationStale(true);
+        setStaleReason(detail?.reason || 'Changes were made');
+      }
     };
     window.addEventListener('pulse:config-updated', handleConfigUpdate);
-    return () => window.removeEventListener('pulse:config-updated', handleConfigUpdate);
+    window.addEventListener('pulse:simulation-stale', handleStale);
+    return () => {
+      window.removeEventListener('pulse:config-updated', handleConfigUpdate);
+      window.removeEventListener('pulse:simulation-stale', handleStale);
+    };
   }, []);
 
   // ── Run simulation ──────────────────────────────────────────
@@ -161,6 +183,8 @@ export default function usePulse(): UsePulseReturn {
       });
       if (mounted.current) {
         setSimulation(result);
+        setSimulationStale(false);
+        setStaleReason('');
         const t = await api.getTrends().catch((): Trend[] => []);
         if (mounted.current) setTrends(t);
       }
@@ -179,7 +203,11 @@ export default function usePulse(): UsePulseReturn {
       if (!backendAvailable) return;
       await api.updateTrend(trendId, updates);
       const t = await api.getTrends().catch((): Trend[] => []);
-      if (mounted.current) setTrends(t);
+      if (mounted.current) {
+        setTrends(t);
+        setSimulationStale(true);
+        setStaleReason(`Trend '${trendId}' was updated`);
+      }
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
     }
@@ -203,7 +231,8 @@ export default function usePulse(): UsePulseReturn {
   return {
     health, trends, forces, simulation, scenarios, dag, config,
     analytics, aiSuggestions, triggers,
-    loading, simulating, error, backendAvailable,
+    loading, simulating, simulationStale, staleReason,
+    error, backendAvailable,
     activeScenario, setActiveScenario,
     simulate, updateTrend, reload: loadAll, loadAnalytics,
   };

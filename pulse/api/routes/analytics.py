@@ -184,6 +184,9 @@ async def compute_sobol(request: SobolRequest):
         from pulse.simulation.sobol import SobolAnalyzer
         from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 
+        # Use config iterations for analytics, capped for inner-loop performance
+        analytics_iters = min(config.iterations, 2000)
+
         if request.analysis_type == "forces":
             # Sensitivity to force weight variations
             analyzer = SobolAnalyzer(n_samples=request.n_samples)
@@ -193,7 +196,7 @@ async def compute_sobol(request: SobolRequest):
                 # Simulate with these force weights
                 config.force_weights = weights_dict
                 mc = BayesianMonteCarloEngine(config, state.get("dag"))
-                result = mc.run(db, iterations=1000)
+                result = mc.run(db, iterations=analytics_iters)
                 shift_matrix = result.get("shift_matrix", {})
                 # Return portfolio shift at 2030
                 total_shift = sum(
@@ -232,7 +235,7 @@ async def compute_sobol(request: SobolRequest):
                         trend.__post_init__()
 
                 mc = BayesianMonteCarloEngine(config, state.get("dag"))
-                result = mc.run(db, iterations=1000)
+                result = mc.run(db, iterations=analytics_iters)
                 shift_matrix = result.get("shift_matrix", {})
                 total_shift = sum(
                     shift_matrix.get(cat, {}).get(2030, {}).get(0.5, 0)
@@ -364,6 +367,8 @@ async def reverse_stress_test(request: ReverseStressRequest):
         from pulse.simulation.reverse_stress import ReverseStressTester
         from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 
+        # Use config iterations, capped for inner-loop performance
+        stress_iters = min(config.iterations, 3000)
         tester = ReverseStressTester(max_iterations=300)
 
         # Model function: vary trend scores, return category shift
@@ -374,7 +379,7 @@ async def reverse_stress_test(request: ReverseStressRequest):
                     trend.__post_init__()
 
             mc = BayesianMonteCarloEngine(config, state.get("dag"))
-            result = mc.run(db, iterations=2000)
+            result = mc.run(db, iterations=stress_iters)
             shift_matrix = result.get("shift_matrix", {})
 
             # Return shift at 2030 for target category
@@ -427,6 +432,8 @@ async def multi_category_stress(request: MultiStressRequest):
         from pulse.simulation.reverse_stress import ReverseStressTester
         from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 
+        # Use config iterations, capped for inner-loop performance
+        stress_iters = min(config.iterations, 3000)
         tester = ReverseStressTester(max_iterations=400)
 
         def model(score_dict):
@@ -436,7 +443,7 @@ async def multi_category_stress(request: MultiStressRequest):
                     trend.__post_init__()
 
             mc = BayesianMonteCarloEngine(config, state.get("dag"))
-            result = mc.run(db, iterations=2000)
+            result = mc.run(db, iterations=stress_iters)
             shift_matrix = result.get("shift_matrix", {})
 
             return {

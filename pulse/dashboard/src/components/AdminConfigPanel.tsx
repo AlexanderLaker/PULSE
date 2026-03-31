@@ -235,25 +235,16 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
         throw new Error(errData.detail || `HTTP ${res.status}`);
       }
 
-      setToast({ msg: 'Configuration saved. Re-simulating model…', type: 'success' });
+      setToast({ msg: 'Configuration saved. Press Simulate to apply changes.', type: 'success' });
       // Update the local config with normalized values
       setForceWeights(normalized_force_weights);
       setVCWeights(normalized_vc_weights);
       setRegionWeights(normalized_region_weights);
       setAttenuationSource('admin_override');
 
-      // Auto-trigger re-simulation with new config
-      try {
-        await fetch(`${BASE}/simulate`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ scenario: 'base', iterations: Math.round(iterations), include_allocation: true }),
-        });
-        // Notify the War Room to refresh data
-        window.dispatchEvent(new CustomEvent('pulse:config-updated'));
-      } catch {
-        // Simulation may take long on serverless, non-blocking
-      }
+      // Notify the War Room that config changed (simulation is now stale)
+      window.dispatchEvent(new CustomEvent('pulse:config-updated'));
+      window.dispatchEvent(new CustomEvent('pulse:simulation-stale', { detail: { reason: 'Configuration changed' } }));
     } catch (e: any) {
       setToast({ msg: e.message || 'Failed to save configuration', type: 'error' });
       setError(e.message || 'Failed to save configuration');

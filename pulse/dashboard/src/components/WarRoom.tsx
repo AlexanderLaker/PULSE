@@ -228,7 +228,7 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
 // ─── WarRoom Component ──────────────────────────────────────────────
 export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
   const {
-    loading, simulating, error, activeScenario, setActiveScenario,
+    loading, simulating, simulationStale, staleReason, error, activeScenario, setActiveScenario,
     simulate, simulation,
   } = usePulse();
 
@@ -736,29 +736,48 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
 
             {/* Simulate Button — admin only */}
             {isAdmin && (
-              <motion.button
-                onClick={handleSimulate}
-                disabled={simulating}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  border: `1px solid ${T.accent}40`,
-                  background: T.accent,
-                  color: '#000',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: simulating ? 'not-allowed' : 'pointer',
-                  opacity: simulating ? 0.6 : 1,
-                } as React.CSSProperties}
-              >
-                <Zap size={14} />
-                {simulating ? 'Simulating…' : 'Simulate'}
-              </motion.button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <motion.button
+                  onClick={handleSimulate}
+                  disabled={simulating}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  animate={simulationStale ? {
+                    boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 12px rgba(239,68,68,0.6)', '0 0 0px rgba(239,68,68,0)'],
+                  } : {}}
+                  transition={simulationStale ? { duration: 2, repeat: Infinity } : {}}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    border: simulationStale ? '1.5px solid #EF4444' : `1px solid ${T.accent}40`,
+                    background: simulationStale ? '#EF4444' : T.accent,
+                    color: simulationStale ? '#fff' : '#000',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: simulating ? 'not-allowed' : 'pointer',
+                    opacity: simulating ? 0.6 : 1,
+                  } as React.CSSProperties}
+                >
+                  <Zap size={14} />
+                  {simulating ? 'Simulating…' : simulationStale ? '● Re-Simulate' : 'Simulate'}
+                </motion.button>
+                {simulationStale && !simulating && (
+                  <span style={{
+                    fontSize: 9,
+                    color: '#EF4444',
+                    fontWeight: 500,
+                    maxWidth: 140,
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                    opacity: 0.9,
+                  }}>
+                    Changes not reflected in simulation
+                  </span>
+                )}
+              </div>
             )}
 
             {/* Executive Briefing Button */}

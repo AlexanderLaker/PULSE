@@ -480,36 +480,10 @@ def create_app(args=None) -> FastAPI:
                                 _state["allocation"] = alloc
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
-                                # No simulation in DB — run one now
-                                print("[PRISM] No simulation in DB — auto-running simulation...", flush=True)
-                                try:
-                                    config = _state["config"]
-                                    dag = _state["dag"]
-                                    db = _state["db"]
-                                    det = DeterministicEngine(config)
-                                    _state["det_result"] = det.run(db)
-                                    mc = BayesianMonteCarloEngine(config, dag)
-                                    mc_result = mc.run(db, iterations=1000)
-                                    _state["mc_result"] = mc_result
-                                    comp = CompetitiveResponseModel()
-                                    _state["competitive"] = comp.compute_all_competitive_adjustments({})
-                                    opt = AllocationOptimizer(config)
-                                    _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
-                                    # Persist to DB for future cold starts
-                                    from pulse.database import save_simulation_run
-                                    save_simulation_run(
-                                        scenario="base",
-                                        iterations=1000,
-                                        model_type="bayesian_copula",
-                                        results=_sanitize(mc_result["shift_matrix"]),
-                                        causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
-                                        allocation_recommendation=_sanitize(_state.get("allocation")),
-                                        convergence_diagnostics=_sanitize(mc_result.get("convergence")),
-                                    )
-                                    print("[PRISM] Auto-simulation complete and persisted to DB", flush=True)
-                                except Exception as e:
-                                    print(f"[PRISM] Auto-simulation failed: {e}", flush=True)
-                                    import traceback; traceback.print_exc()
+                                # No simulation in DB — mark as stale, user must press Simulate
+                                print("[PRISM] No simulation in DB — waiting for admin to press Simulate", flush=True)
+                                _state["simulation_stale"] = True
+                                _state["stale_reason"] = "No simulation has been run yet. Press Simulate to generate results."
                         except Exception as e:
                             print(f"[PRISM] Failed to load/run simulation: {e}", flush=True)
         except Exception as e:
@@ -583,7 +557,7 @@ def create_app(args=None) -> FastAPI:
             )
             steps.append(f"trend_database_count={_state['db'].trend_count}")
 
-            # Run simulation
+            # Ensure config/dag are initialized (but do NOT auto-simulate)
             config = _state.get("config") or ModelConfig()
             _state["config"] = config
             dag = _state.get("dag") or CausalDAG()
@@ -591,33 +565,10 @@ def create_app(args=None) -> FastAPI:
             if not _state.get("scenario_engine"):
                 _state["scenario_engine"] = ScenarioEngine(config, dag)
 
-            det = DeterministicEngine(config)
-            _state["det_result"] = det.run(_state["db"])
-            steps.append("deterministic OK")
-
-            mc = BayesianMonteCarloEngine(config, dag)
-            mc_result = mc.run(_state["db"], iterations=1000)
-            _state["mc_result"] = mc_result
-            steps.append(f"mc OK, categories={len(mc_result.get('shift_matrix', {}))}")
-
-            comp = CompetitiveResponseModel()
-            _state["competitive"] = comp.compute_all_competitive_adjustments({})
-            steps.append("competitive OK")
-
-            opt = AllocationOptimizer(config)
-            _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
-            steps.append("allocation OK")
-
-            # Persist simulation (sanitize numpy types for JSON)
-            from pulse.database import save_simulation_run
-            save_simulation_run(
-                scenario="base", iterations=1000, model_type="bayesian_copula",
-                results=_sanitize(mc_result["shift_matrix"]),
-                causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
-                allocation_recommendation=_sanitize(_state.get("allocation")),
-                convergence_diagnostics=_sanitize(mc_result.get("convergence")),
-            )
-            steps.append("simulation persisted OK")
+            # Mark simulation as stale — admin must press Simulate
+            _state["simulation_stale"] = True
+            _state["stale_reason"] = "Trends re-seeded. Press Simulate to update results."
+            steps.append("simulation marked stale (press Simulate to run)")
 
             return {"status": "ok", "steps": steps}
 
@@ -756,6 +707,10 @@ def create_app(args=None) -> FastAPI:
         except Exception:
             pass
 
+        # Mark simulation as stale
+        _state["simulation_stale"] = True
+        _state["stale_reason"] = f"New trend '{req.name}' was added"
+
         return {
             "status": "created",
             "trend_id": trend_id,
@@ -843,6 +798,10 @@ def create_app(args=None) -> FastAPI:
         from pulse.database import save_trends
         save_trends([trend])
 
+        # Mark simulation as stale
+        _state["simulation_stale"] = True
+        _state["stale_reason"] = f"Trend '{trend_id}' was updated"
+
         return {"status": "updated", "trend_id": trend_id}
 
     @app.delete("/api/v1/trends/{trend_id}")
@@ -879,6 +838,10 @@ def create_app(args=None) -> FastAPI:
         except Exception:
             pass
 
+        # Mark simulation as stale
+        _state["simulation_stale"] = True
+        _state["stale_reason"] = f"Trend '{trend_id}' was deleted"
+
         return {"status": "deleted", "trend_id": trend_id, "trend_count": db.trend_count}
 
     @app.delete("/api/v1/trends")
@@ -911,7 +874,21 @@ def create_app(args=None) -> FastAPI:
         except Exception:
             pass
 
+        # Mark simulation as stale
+        _state["simulation_stale"] = True
+        _state["stale_reason"] = f"All {count} trends were deleted"
+
         return {"status": "deleted_all", "trends_deleted": count}
+
+    # ── Simulation Status ─────────────────────────────────────────
+    @app.get("/api/v1/simulation/status")
+    async def get_simulation_status():
+        """Check if the current simulation is stale (needs re-run)."""
+        return {
+            "stale": _state.get("simulation_stale", False),
+            "reason": _state.get("stale_reason", ""),
+            "has_results": _state.get("mc_result") is not None,
+        }
 
     # ── Simulation ──────────────────────────────────────────────────
     @app.get("/api/v1/simulation")
@@ -995,6 +972,10 @@ def create_app(args=None) -> FastAPI:
                 )
 
             _state["audit"].log_simulation_run(req.scenario, req.iterations, "bayesian_copula")
+
+            # Clear stale flag — simulation is now fresh
+            _state["simulation_stale"] = False
+            _state.pop("stale_reason", None)
 
             # Persist simulation run to database
             try:
@@ -1305,9 +1286,10 @@ def create_app(args=None) -> FastAPI:
                        new_value=json.dumps({k: v["new"] for k, v in changes.items()}),
                        reason="Admin config update")
 
-        # Invalidate cached simulation results so next request re-runs
+        # Mark simulation as stale — admin must press Simulate to apply
+        _state["simulation_stale"] = True
+        _state["stale_reason"] = f"Configuration changed: {', '.join(changes.keys())}"
         _state.pop("simulation_results", None)
-        _state.pop("allocation", None)
 
         return {"updated": list(changes.keys()), "config": {
             "attenuation": config.attenuation,

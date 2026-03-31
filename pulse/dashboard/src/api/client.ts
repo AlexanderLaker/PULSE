@@ -125,6 +125,9 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
 export const getSimulation = (): Promise<SimulationResult> =>
   request('/simulation');
 
+export const getSimulationStatus = (): Promise<{ stale: boolean; reason: string; has_results: boolean }> =>
+  request('/simulation/status');
+
 export const runSimulation = (params: SimulationParams = {}): Promise<SimulationResult> =>
   request('/simulate', { method: 'POST', body: JSON.stringify(params) });
 
