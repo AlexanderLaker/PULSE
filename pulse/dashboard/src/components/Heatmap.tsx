@@ -320,7 +320,6 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                       <motion.div
                         onMouseEnter={() => setHoveredCell({ cat: catId, year })}
                         onMouseLeave={() => setHoveredCell(null)}
-                        whileHover={{ scale: 1.05 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                         style={{
                           padding: dist.hasCI ? '6px 10px 5px' : '8px 12px',
@@ -479,8 +478,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                           border: `1px solid ${shiftColorHex(val2030)}40`,
                           cursor: 'default',
                           position: 'relative',
-                          transition: 'transform 0.15s ease',
-                          transform: isDeltaHovered ? 'scale(1.05)' : 'scale(1)',
+                          transition: 'opacity 0.15s ease',
                         }}
                       >
                         {fmtShift(val2030)}

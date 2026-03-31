@@ -85,8 +85,8 @@ export default function usePulse(): UsePulseReturn {
       setDag(d);
       setConfig(c);
 
-      // Load simulation if available
-      if (h?.has_simulation) {
+      // Always try to load simulation (don't depend on has_simulation flag)
+      {
         const sim = await api.getSimulation().catch((): null => null);
         if (sim && mounted.current) setSimulation(sim);
       }
