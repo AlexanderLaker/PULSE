@@ -12,6 +12,7 @@ export interface TrendSource {
   title: string;
   url: string;
   data: string;
+  tier?: 'S' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C' | 'D' | 'E';
 }
 
 /** Bayesian posterior parameters (Beta distribution). */

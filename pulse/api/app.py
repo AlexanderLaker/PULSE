@@ -641,13 +641,30 @@ def create_app(args=None) -> FastAPI:
             """Get structured sources array with URLs from trend."""
             sources = getattr(t, 'sources', None) or []
             if sources:
-                return sources
+                # Ensure tier field is included if present
+                return [
+                    {
+                        "title": s.get("title", ""),
+                        "url": s.get("url", ""),
+                        "data": s.get("data", ""),
+                        "tier": s.get("tier", "")
+                    }
+                    for s in sources
+                ]
             # Try parsing data_source as JSON (structured sources)
             if t.data_source:
                 try:
                     parsed = json.loads(t.data_source)
                     if isinstance(parsed, list):
-                        return parsed
+                        return [
+                            {
+                                "title": s.get("title", ""),
+                                "url": s.get("url", ""),
+                                "data": s.get("data", ""),
+                                "tier": s.get("tier", "")
+                            }
+                            for s in parsed
+                        ]
                 except (json.JSONDecodeError, TypeError):
                     pass
                 # Fallback: parse data_source text
@@ -655,7 +672,7 @@ def create_app(args=None) -> FastAPI:
                 for part in t.data_source.split(';'):
                     part = part.strip()
                     if part:
-                        result.append({"title": part, "url": "", "data": t.source_type or ""})
+                        result.append({"title": part, "url": "", "data": t.source_type or "", "tier": ""})
                 return result
             return []
 

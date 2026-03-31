@@ -349,35 +349,101 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                           </div>
                         )}
 
-                        {/* Hover Tooltip */}
+                        {/* Hover Tooltip — enlarged numbers + P10-P90 explanation */}
                         <AnimatePresence>
                           {isHovered && (
                             <motion.div
-                              initial={{ opacity: 0, y: -8 }}
-                              animate={{ opacity: 1, y: -12 }}
-                              exit={{ opacity: 0 }}
+                              initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                              animate={{ opacity: 1, y: -14, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 position: 'absolute',
                                 bottom: '100%',
                                 left: '50%',
                                 transform: 'translateX(-50%)',
-                                background: '#1D1D1F',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                borderRadius: 8,
-                                padding: '8px 12px',
-                                fontSize: 10,
-                                color: '#94A3B8',
-                                whiteSpace: 'nowrap',
+                                background: 'linear-gradient(135deg, #1a1f2e 0%, #141821 100%)',
+                                border: '1px solid rgba(255,255,255,0.12)',
+                                borderRadius: 12,
+                                padding: '14px 18px',
                                 zIndex: 50,
                                 fontFamily: T.mono,
-                                boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                                boxShadow: '0 16px 40px rgba(0,0,0,0.55), 0 0 1px rgba(255,255,255,0.1)',
+                                minWidth: 190,
+                                pointerEvents: 'none',
                               } as React.CSSProperties}
                             >
-                              <div style={{ color: '#F8FAFC', fontWeight: 600, marginBottom: 3 }}>{catId} · {year}</div>
-                              <div>Median {fmtShift(val, 2)}</div>
+                              {/* Category · Year header */}
+                              <div style={{
+                                fontSize: 11, fontWeight: 600, color: '#94A3B8',
+                                marginBottom: 10, letterSpacing: 0.3,
+                                display: 'flex', alignItems: 'center', gap: 6,
+                              }}>
+                                <div style={{
+                                  width: 3, height: 12, borderRadius: 1,
+                                  background: CATEGORIES.find(c => c.id === catId)?.color || T.accent,
+                                }} />
+                                {catId} <span style={{ color: T.text4 }}>·</span> {year}
+                              </div>
+
+                              {/* Big median number */}
+                              <div style={{
+                                fontSize: 26, fontWeight: 300, letterSpacing: -0.5,
+                                color: shiftColorHex(val), lineHeight: 1, marginBottom: 4,
+                              }}>
+                                {fmtShift(val, 2)}
+                              </div>
+                              <div style={{ fontSize: 9, color: '#64748B', marginBottom: dist.hasCI ? 12 : 0 }}>
+                                Median projected GP1 pool shift
+                              </div>
+
+                              {/* P10-P90 range */}
                               {dist.hasCI && (
-                                <div style={{ marginTop: 2 }}>p10 {fmtShift(dist.p10, 2)}  ·  p90 {fmtShift(dist.p90, 2)}</div>
+                                <>
+                                  <div style={{
+                                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                                    paddingTop: 10,
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                                    gap: 12,
+                                  }}>
+                                    <div style={{ textAlign: 'left' }}>
+                                      <div style={{ fontSize: 9, color: '#64748B', marginBottom: 3 }}>P10 (upside)</div>
+                                      <div style={{ fontSize: 16, fontWeight: 500, color: shiftColorHex(dist.p10) }}>
+                                        {fmtShift(dist.p10, 2)}
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: 14, color: '#334155' }}>…</div>
+                                    <div style={{ textAlign: 'right' }}>
+                                      <div style={{ fontSize: 9, color: '#64748B', marginBottom: 3 }}>P90 (downside)</div>
+                                      <div style={{ fontSize: 16, fontWeight: 500, color: shiftColorHex(dist.p90) }}>
+                                        {fmtShift(dist.p90, 2)}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Explanation */}
+                                  <div style={{
+                                    fontSize: 8.5, color: '#475569', marginTop: 8, lineHeight: 1.4,
+                                    fontFamily: 'Inter, sans-serif',
+                                  }}>
+                                    80% confidence interval from Monte Carlo simulation.
+                                    P10 = 10th percentile (optimistic), P90 = 90th (pessimistic).
+                                  </div>
+                                </>
                               )}
+
+                              {/* Tooltip arrow */}
+                              <div style={{
+                                position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
+                                width: 12, height: 6, overflow: 'hidden',
+                              }}>
+                                <div style={{
+                                  width: 10, height: 10, background: '#141821',
+                                  border: '1px solid rgba(255,255,255,0.12)',
+                                  transform: 'rotate(45deg)', transformOrigin: 'top left',
+                                  marginLeft: 1, marginTop: -5,
+                                }} />
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>

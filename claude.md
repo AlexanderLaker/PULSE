@@ -26,6 +26,14 @@ This specification was elevated based on ten critical feedback dimensions that a
 9. **Formal Delphi Expert Elicitation Protocol** — structured scoring with calibration and debiasing
 10. **War Room UX** replaces 8 separate pages — one screen tells the story, drill-down on demand
 
+### What Changed in v2.3.1 (vs. v2.3)
+Trend database expansion and source credibility system:
+
+14. **Trend Database Expanded to 55 Trends** — 8 new trends added based on Senior Partner-level gap analysis: Generative AI Product Discovery Disruption (technology_r09), Tariffs/Trade Wars/Deglobalization (government_r08), Energy Cost Volatility (environmental_r07), AI Marketing Efficiency Revolution (technology_r10), Refill & Reuse Economy (consumer_r13), Between-Wash Fabric Care (consumer_r14), Textile Longevity Economy (environmental_r08), Hair Styling Between Washes (consumer_r15). Distribution: Consumer 15, Technology 10, Environmental 8, Government 8, Customer 7, Competitive 7.
+15. **Source Credibility Tier System** — All 220 sources across 55 trends rated on a 9-tier credibility scale: S (official regulatory/legislative), A (Tier-1 consulting with primary data), A- (investment bank/Big-4 analyst), B+ (specialist industry analyst), B (trade press/industry media), B- (company/PR source), C (general press), D (aggregator/blog), E (social media/unverified — weak signal only, never cited without B-tier+ corroboration). Tiers displayed as color-coded badges with hover tooltips in the War Room dashboard.
+16. **Trend Description Updates** — All trend descriptions updated with latest 2025-2026 market intelligence (e.g., Private Label at 42% Circana, PFAS RAC/SEAC March 2026, Reckitt Advent $4.8B divestiture, smart washer $9.8B market).
+17. **Scoring Recalibration** — GP1% affected adjusted for consumer_r06 (Silver Economy: 0.20→0.22) and technology_r06 (Waterless/Concentrated: 0.10→0.12) based on new market data.
+
 ### What Changed in v2.3 (vs. v2.2)
 One critical simplification for model clarity:
 
@@ -873,7 +881,7 @@ McKinsey's best digital tools converge on a "single war room view" — one scree
 - Reads V12.xlsx sheets (trends, scores, category/VC exposures)
 - Validates data structure and score ranges
 - Detects structural changes and adapts
-- Import report: "Imported 60 trends, 13 categories, 6 forces. ✓ Complete."
+- Import report: "Imported 55 trends, 12 categories, 6 forces. ✓ Complete."
 
 **9b. Export to Excel** (`writer.py`)
 - Writes Shift Matrix with continuous paths to Excel

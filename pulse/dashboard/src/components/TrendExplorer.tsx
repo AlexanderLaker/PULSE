@@ -30,7 +30,7 @@ interface TrendData {
   category_exposure?: Record<CategoryId, number>;
   vc_exposure?: Record<string, number>;
   regional_exposure?: Record<string, number>;
-  sources?: Array<{ url?: string; title?: string; data?: string }>;
+  sources?: Array<{ url?: string; title?: string; data?: string; tier?: string }>;
   ai_suggested?: boolean;
   peak_year?: number;
   diffusion_curve?: string;
@@ -66,6 +66,20 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   'Semantic Scholar': <FileText size={10} />,
 };
 
+// ─── Source Tier Configuration ────────────────────────────────────────────
+
+const TIER_CONFIG: Record<string, { label: string; color: string; description: string }> = {
+  'S':  { label: 'S',  color: '#22c55e', description: 'Official regulatory/statistical — Primary legal & statistical authority (ECHA, EUR-Lex, Eurostat, ECB)' },
+  'A':  { label: 'A',  color: '#3b82f6', description: 'Tier-1 consulting/analyst — Methodologically rigorous, primary data (McKinsey, Bain, Euromonitor, NIQ, Kantar)' },
+  'A-': { label: 'A-', color: '#60a5fa', description: 'Investment bank research — Equity research with financial discipline (Goldman Sachs, JP Morgan, Barclays)' },
+  'B+': { label: 'B+', color: '#a78bfa', description: 'Specialist market research — Category-specific depth (Kline Group, Spate, Grand View Research, Mordor Intelligence)' },
+  'B':  { label: 'B',  color: '#c084fc', description: 'Industry trade press — Real-time, editorially vetted (CosmeticsDesign-Europe, ESM Magazine, HAPPI)' },
+  'B-': { label: 'B-', color: '#e879f9', description: 'Company sources — First-party, self-serving; cross-validate (Annual reports, investor presentations)' },
+  'C':  { label: 'C',  color: '#f59e0b', description: 'General business press — Directional, not category-specific (FT, WSJ, Reuters, Bloomberg)' },
+  'D':  { label: 'D',  color: '#ef4444', description: 'Aggregator/forecast — Use with caution, methodology opaque (Statista, Allied Market Research, Technavio)' },
+  'E':  { label: 'E',  color: '#991b1b', description: 'Social media / unverified — Anecdotal, unvetted, high noise-to-signal ratio (TikTok, X, Reddit, blogs). Weak signal only; never cite without B-tier+ corroboration' },
+};
+
 // ─── DotBar ───────────────────────────────────────────────────────────────
 
 interface DotBarProps {
@@ -75,7 +89,7 @@ interface DotBarProps {
   color?: 'blue' | 'amber' | 'emerald' | 'purple' | 'cyan';
   size?: 'xs' | 'sm' | 'md';
   direction?: 'Expansion' | 'Contraction';
-  labelType?: 'impact' | 'probability' | 'exposure';
+  labelType?: 'probability' | 'exposure';
 }
 
 const LABEL_MAPS = {
@@ -464,8 +478,8 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
   const [editImplication, setEditImplication] = useState(trend.strategic_implication || '');
   const [editPeakYear, setEditPeakYear] = useState<number>(trend.peak_year || 2030);
   const [editDiffusion, setEditDiffusion] = useState<string>(trend.diffusion_curve || 's_curve');
-  const [editSources, setEditSources] = useState<Array<{ url: string; title: string; data: string }>>(
-    (trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' }))
+  const [editSources, setEditSources] = useState<Array<{ url?: string; title?: string; data?: string; tier?: string }>>(
+    (trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '', tier: s.tier || '' }))
   );
 
   const handleSave = (): void => {
@@ -873,6 +887,83 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                             <span style={{ color: T.text3, fontWeight: 500, flexShrink: 0 }}>{apiName}</span>
                             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.title || 'Source'}</span>
                             {src.url && <ExternalLink size={9} style={{ flexShrink: 0, opacity: 0.5 }} />}
+                            {(() => {
+                              const tierKey = src.tier || '';
+                              const tierCfg = TIER_CONFIG[tierKey];
+                              if (!tierCfg) return null;
+                              return (
+                              <span
+                                style={{
+                                  position: 'relative',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginLeft: 'auto',
+                                }}
+                              >
+                                <span
+                                  className="tier-badge"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    paddingLeft: '4px',
+                                    paddingRight: '4px',
+                                    paddingTop: '2px',
+                                    paddingBottom: '2px',
+                                    fontSize: '9px',
+                                    fontWeight: 'bold',
+                                    borderRadius: '3px',
+                                    backgroundColor: `${tierCfg.color}20`,
+                                    color: tierCfg.color,
+                                    border: `1px solid ${tierCfg.color}40`,
+                                    cursor: 'default',
+                                    position: 'relative',
+                                    flexShrink: 0,
+                                  }}
+                                  title={tierCfg.description}
+                                >
+                                  {tierCfg.label}
+                                  <span
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: '100%',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)',
+                                      marginBottom: '8px',
+                                      paddingLeft: '12px',
+                                      paddingRight: '12px',
+                                      paddingTop: '8px',
+                                      paddingBottom: '8px',
+                                      backgroundColor: '#1e293b',
+                                      color: '#e2e8f0',
+                                      fontSize: '8px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #475569',
+                                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+                                      whiteSpace: 'nowrap',
+                                      opacity: 0,
+                                      pointerEvents: 'none',
+                                      zIndex: 50,
+                                      transition: 'opacity 0.2s ease-in-out',
+                                      maxWidth: '180px',
+                                      textAlign: 'center',
+                                      lineHeight: 1.3,
+                                    }}
+                                    className="tier-tooltip"
+                                  >
+                                    {tierCfg.description}
+                                  </span>
+                                </span>
+                                <style>{`
+                                  a .tier-badge:hover .tier-tooltip {
+                                    opacity: 1;
+                                    pointer-events: auto;
+                                  }
+                                `}</style>
+                              </span>
+                              );
+                            })()}
                           </a>
                           {src.data && (
                             <div style={{
@@ -949,7 +1040,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                   setEditImplication(trend.strategic_implication || '');
                   setEditPeakYear(trend.peak_year || 2030);
                   setEditDiffusion(trend.diffusion_curve || 's_curve');
-                  setEditSources((trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '' })));
+                  setEditSources((trend.sources || []).map(s => ({ url: s.url || '', title: s.title || '', data: s.data || '', tier: s.tier || '' })));
                 } else {
                   onClose();
                 }
