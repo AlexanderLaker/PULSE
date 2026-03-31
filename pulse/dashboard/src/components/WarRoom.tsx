@@ -736,14 +736,14 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
 
             {/* Simulate Button — admin only */}
             {isAdmin && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <SimTooltip content={simulationStale && !simulating ? 'Changes not reflected in simulation' : simulating ? 'Running Monte Carlo…' : 'Run simulation with current config'}>
                 <motion.button
                   onClick={handleSimulate}
                   disabled={simulating}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  animate={simulationStale ? {
-                    boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 12px rgba(239,68,68,0.6)', '0 0 0px rgba(239,68,68,0)'],
+                  animate={simulationStale && !simulating ? {
+                    boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 8px rgba(239,68,68,0.5)', '0 0 0px rgba(239,68,68,0)'],
                   } : {}}
                   transition={simulationStale ? { duration: 2, repeat: Infinity } : {}}
                   style={{
@@ -762,22 +762,16 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                   } as React.CSSProperties}
                 >
                   <Zap size={14} />
-                  {simulating ? 'Simulating…' : simulationStale ? '● Re-Simulate' : 'Simulate'}
+                  {simulating ? 'Simulating…' : 'Simulate'}
+                  {simulationStale && !simulating && (
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: '#fff', display: 'inline-block',
+                      marginLeft: 2,
+                    }} />
+                  )}
                 </motion.button>
-                {simulationStale && !simulating && (
-                  <span style={{
-                    fontSize: 9,
-                    color: '#EF4444',
-                    fontWeight: 500,
-                    maxWidth: 140,
-                    textAlign: 'center',
-                    lineHeight: 1.2,
-                    opacity: 0.9,
-                  }}>
-                    Changes not reflected in simulation
-                  </span>
-                )}
-              </div>
+              </SimTooltip>
             )}
 
             {/* Executive Briefing Button */}
