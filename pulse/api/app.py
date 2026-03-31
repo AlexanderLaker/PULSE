@@ -260,7 +260,8 @@ def create_app(args=None) -> FastAPI:
 
             # Bayesian MC
             mc = BayesianMonteCarloEngine(config, dag)
-            _state["mc_result"] = mc.run(db, iterations=iterations)
+            mc_result = mc.run(db, iterations=iterations)
+            _state["mc_result"] = mc_result
 
             # Competitive
             comp = CompetitiveResponseModel()
@@ -268,7 +269,21 @@ def create_app(args=None) -> FastAPI:
 
             # Allocation
             opt = AllocationOptimizer(config)
-            _state["allocation"] = opt.optimize(_state["mc_result"]["shift_matrix"])
+            _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
+
+            # Persist to database
+            try:
+                from pulse.database import save_simulation_run
+                save_simulation_run(
+                    iterations=iterations,
+                    model_type="bayesian_copula",
+                    results=mc_result.get("shift_matrix", {}),
+                    causal_decomposition=mc_result.get("causal_decomposition"),
+                    allocation_recommendation=_state.get("allocation"),
+                    convergence_diagnostics=mc_result.get("convergence"),
+                )
+            except Exception as e:
+                logger.error(f"CRITICAL: Failed to persist simulation run: {e}")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -951,11 +966,10 @@ def create_app(args=None) -> FastAPI:
             _state["simulation_stale"] = False
             _state.pop("stale_reason", None)
 
-            # Persist simulation run to database
+            # Persist simulation run to database (must succeed)
+            from pulse.database import save_simulation_run
             try:
-                from pulse.database import save_simulation_run
                 save_simulation_run(
-                    scenario="base",
                     iterations=req.iterations,
                     model_type="bayesian_copula",
                     results=_sanitize(mc_result["shift_matrix"]),
@@ -963,8 +977,10 @@ def create_app(args=None) -> FastAPI:
                     allocation_recommendation=_sanitize(_state.get("allocation")),
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
+                logger.info(f"Simulation persisted ({req.iterations} iterations)")
             except Exception as e:
-                logger.warning(f"Failed to persist simulation run: {e}")
+                logger.error(f"CRITICAL: Failed to persist simulation run: {e}")
+                # Don't fail the request — results are still in memory
 
             return _sanitize({
                 "shift_matrix": mc_result["shift_matrix"],
