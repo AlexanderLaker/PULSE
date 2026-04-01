@@ -182,13 +182,14 @@ export default function HeadlineKPI({
     return { median: v, p10: v, p90: v };
   }
 
-  // Compute portfolio average shift at 2030
+  // Compute portfolio average shift at 2030 + top 3 expansions & contractions
   let avgShift = 0;
   let avgP10 = 0;
   let avgP90 = 0;
-  let maxExpansion = { name: '—', val: -Infinity, p10: 0, p90: 0 };
-  let maxContraction = { name: '—', val: Infinity, p10: 0, p90: 0 };
   let catCount = 0;
+
+  type CatShift = { name: string; val: number; p10: number; p90: number };
+  const allCatShifts: CatShift[] = [];
 
   if (shifts && typeof shifts === 'object') {
     Object.entries(shifts).forEach(([catId, pathData]) => {
@@ -200,12 +201,7 @@ export default function HeadlineKPI({
       avgP90 += dist.p90;
       catCount += 1;
 
-      if (dist.median > maxExpansion.val) {
-        maxExpansion = { name: catId, val: dist.median, p10: dist.p10, p90: dist.p90 };
-      }
-      if (dist.median < maxContraction.val) {
-        maxContraction = { name: catId, val: dist.median, p10: dist.p10, p90: dist.p90 };
-      }
+      allCatShifts.push({ name: catId, val: dist.median, p10: dist.p10, p90: dist.p90 });
     });
 
     if (catCount > 0) {
@@ -214,6 +210,11 @@ export default function HeadlineKPI({
       avgP90 /= catCount;
     }
   }
+
+  // Top 3 expansions (highest median shifts) and top 3 contractions (most negative median shifts)
+  const sortedDesc = [...allCatShifts].sort((a, b) => b.val - a.val);
+  const top3Expansions = sortedDesc.slice(0, 3);
+  const top3Contractions = [...allCatShifts].sort((a, b) => a.val - b.val).slice(0, 3);
 
   const hasConverged = convergence?.converged ?? false;
   const rHat = convergence?.r_hat?.toFixed(2) ?? '—';
@@ -247,29 +248,61 @@ export default function HeadlineKPI({
         delay={0}
       />
 
-      {/* KPI 2: Top Expansion */}
-      <KPICard
-        icon={TrendingUp}
-        label="Top Expansion"
-        value={fmtShift(maxExpansion.val)}
-        detail={maxExpansion.name || '—'}
-        subDetail={<div style={ciStyle}>p10 {fmtShift(maxExpansion.p10)}  ·  p90 {fmtShift(maxExpansion.p90)}</div>}
-        color={maxExpansion.val > 0 ? T.green : T.red}
-        bgIcon={maxExpansion.val > 0 ? T.greenDim : T.redDim}
-        delay={0.08}
-      />
+      {/* KPI 2: Top 3 Expansions */}
+      {(() => {
+        const e1 = top3Expansions[0] ?? { name: '—', val: 0, p10: 0, p90: 0 };
+        return (
+          <KPICard
+            icon={TrendingUp}
+            label="Top Expansions"
+            value={fmtShift(e1.val)}
+            detail={e1.name}
+            subDetail={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+                <div style={ciStyle}>p10 {fmtShift(e1.p10)}  ·  p90 {fmtShift(e1.p90)}</div>
+                {top3Expansions.slice(1).map((cat) => (
+                  <div key={cat.name} style={{ ...ciStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${T.border}`, paddingTop: 3 }}>
+                    <span style={{ color: T.text3, maxWidth: '48%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
+                    <span style={{ color: shiftColorHex(cat.val), fontWeight: 600 }}>{fmtShift(cat.val)}</span>
+                    <span style={{ color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</span>
+                  </div>
+                ))}
+              </div>
+            }
+            color={e1.val > 0 ? T.green : T.red}
+            bgIcon={e1.val > 0 ? T.greenDim : T.redDim}
+            delay={0.08}
+          />
+        );
+      })()}
 
-      {/* KPI 3: Top Contraction */}
-      <KPICard
-        icon={TrendingDown}
-        label="Top Contraction"
-        value={fmtShift(maxContraction.val)}
-        detail={maxContraction.name || '—'}
-        subDetail={<div style={ciStyle}>p10 {fmtShift(maxContraction.p10)}  ·  p90 {fmtShift(maxContraction.p90)}</div>}
-        color={T.red}
-        bgIcon={T.redDim}
-        delay={0.16}
-      />
+      {/* KPI 3: Top 3 Contractions */}
+      {(() => {
+        const c1 = top3Contractions[0] ?? { name: '—', val: 0, p10: 0, p90: 0 };
+        return (
+          <KPICard
+            icon={TrendingDown}
+            label="Top Contractions"
+            value={fmtShift(c1.val)}
+            detail={c1.name}
+            subDetail={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+                <div style={ciStyle}>p10 {fmtShift(c1.p10)}  ·  p90 {fmtShift(c1.p90)}</div>
+                {top3Contractions.slice(1).map((cat) => (
+                  <div key={cat.name} style={{ ...ciStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${T.border}`, paddingTop: 3 }}>
+                    <span style={{ color: T.text3, maxWidth: '48%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
+                    <span style={{ color: shiftColorHex(cat.val), fontWeight: 600 }}>{fmtShift(cat.val)}</span>
+                    <span style={{ color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</span>
+                  </div>
+                ))}
+              </div>
+            }
+            color={T.red}
+            bgIcon={T.redDim}
+            delay={0.16}
+          />
+        );
+      })()}
 
       {/* KPI 4: Simulation Status */}
       <KPICard

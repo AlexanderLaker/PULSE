@@ -353,6 +353,46 @@ def create_app(args=None) -> FastAPI:
             except Exception as e:
                 logger.warning(f"Failed to load simulation from DB: {e}")
 
+        # Auto-run simulation on startup if trends exist but no simulation is persisted
+        if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
+            try:
+                logger.info("No persisted simulation found — auto-running initial simulation...")
+                config = _state["config"]
+                dag = _state["dag"]
+                db = _state["db"]
+
+                det = DeterministicEngine(config)
+                det_result = det.run(db)
+                _state["det_result"] = det_result
+
+                mc = BayesianMonteCarloEngine(config, dag)
+                mc_result = mc.run(db, iterations=config.iterations or 5000)
+                _state["mc_result"] = mc_result
+
+                comp = CompetitiveResponseModel()
+                _state["competitive"] = comp.compute_all_competitive_adjustments({})
+
+                opt = AllocationOptimizer(config)
+                _state["allocation"] = opt.optimize(
+                    mc_result["shift_matrix"], risk_aversion=1.0
+                )
+
+                _state["simulation_stale"] = False
+
+                # Persist to database
+                from pulse.database import save_simulation_run
+                save_simulation_run(
+                    iterations=config.iterations or 5000,
+                    model_type="bayesian_copula",
+                    results=_sanitize(mc_result["shift_matrix"]),
+                    causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                    allocation_recommendation=_sanitize(_state.get("allocation")),
+                    convergence_diagnostics=_sanitize(mc_result.get("convergence")),
+                )
+                logger.info("Auto-simulation completed and persisted to database")
+            except Exception as e:
+                logger.warning(f"Auto-simulation on startup failed: {e}")
+
         yield
 
         # ─── Shutdown ───

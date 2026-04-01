@@ -634,6 +634,7 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
               }}>
                 <div style={{ fontSize: '9px', fontWeight: 600, color: T.accent, marginBottom: '8px', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <BarChart3 size={10} /> GP1 % AFFECTED — ECONOMIC ANCHORING
+                  {!isAdmin && <span style={{ fontSize: '8px', color: T.text4, fontWeight: 400, marginLeft: '4px' }}>(Admin only)</span>}
                 </div>
                 <p style={{ fontSize: '10px', color: T.text3, lineHeight: 1.5, margin: '0 0 10px 0' }}>
                   What fraction of a category's GP1 can this trend realistically affect at full materialization?
@@ -646,7 +647,9 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                     max={50}
                     step={1}
                     value={Math.round((trend.gp1_pct_affected || 0.10) * 100)}
+                    disabled={!isAdmin}
                     onChange={(e) => {
+                      if (!isAdmin) return;
                       const val = parseInt(e.target.value, 10) / 100;
                       onUpdateTrend(trend.id, { gp1_pct_affected: val } as any);
                     }}
@@ -654,7 +657,8 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                       flex: 1,
                       height: '4px',
                       accentColor: T.accent,
-                      cursor: 'pointer',
+                      cursor: isAdmin ? 'pointer' : 'not-allowed',
+                      opacity: isAdmin ? 1 : 0.6,
                     }}
                   />
                   <div style={{
