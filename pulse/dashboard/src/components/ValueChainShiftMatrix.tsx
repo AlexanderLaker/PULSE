@@ -15,7 +15,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { ShiftMatrix, Trend } from '../types';
 import type { VCDecomposition } from '../types/simulation';
-import { T, CATEGORIES, fmtShift, shiftColorHex, shortCat } from '../lib/format';
+import { T, CATEGORIES, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
 
 /** The 8 value chain steps (must match backend pulse/config.py VC_STEPS) */
 const VC_STEPS = [
@@ -165,6 +165,16 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
     return Object.fromEntries(Object.entries(sums).map(([k, v]) => [k, v / n]));
   }, [vcContributions]);
 
+  // Compute max absolute value across all cells for magnitude scaling
+  const maxCellVal = useMemo(() => {
+    let mx = 0;
+    CATEGORIES.forEach(cat => {
+      const contrib = vcContributions[cat.id] ?? {};
+      Object.values(contrib).forEach(v => { mx = Math.max(mx, Math.abs(v)); });
+    });
+    return mx || 0.01;
+  }, [vcContributions]);
+
   if (!shifts || Object.keys(shifts).length === 0) {
     return (
       <motion.div
@@ -291,10 +301,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
                             fontSize: 11,
                             fontWeight: 600,
                             color: shiftColorHex(val),
-                            background: Math.abs(val) < 0.001 ? 'transparent'
-                              : val > 0 ? 'rgba(48, 209, 88, 0.12)' : 'rgba(255, 69, 58, 0.12)',
-                            border: `1px solid ${Math.abs(val) < 0.001 ? 'transparent'
-                              : val > 0 ? 'rgba(48, 209, 88, 0.3)' : 'rgba(255, 69, 58, 0.3)'}`,
+                            background: shiftCellColors(val, maxCellVal).bg,
+                            border: shiftCellColors(val, maxCellVal).border,
                             cursor: 'default',
                             lineHeight: 1,
                           } as React.CSSProperties}
@@ -311,10 +319,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                       color: shiftColorHex(catTotal2030),
-                      background: Math.abs(catTotal2030) < 0.001 ? 'transparent'
-                        : catTotal2030 > 0 ? 'rgba(48, 209, 88, 0.2)' : 'rgba(255, 69, 58, 0.2)',
-                      border: `1px solid ${Math.abs(catTotal2030) < 0.001 ? 'transparent'
-                        : catTotal2030 > 0 ? 'rgba(48, 209, 88, 0.4)' : 'rgba(255, 69, 58, 0.4)'}`,
+                      background: shiftCellColors(catTotal2030, maxCellVal).bg,
+                      border: shiftCellColors(catTotal2030, maxCellVal).border,
                     }}>
                       {fmtShift(catTotal2030)}
                     </div>
@@ -342,10 +348,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     padding: '8px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                     color: shiftColorHex(val),
-                    background: Math.abs(val) < 0.001 ? 'transparent'
-                      : val > 0 ? 'rgba(48, 209, 88, 0.15)' : 'rgba(255, 69, 58, 0.15)',
-                    border: `1px solid ${Math.abs(val) < 0.001 ? 'transparent'
-                      : val > 0 ? 'rgba(48, 209, 88, 0.4)' : 'rgba(255, 69, 58, 0.4)'}`,
+                    background: shiftCellColors(val, maxCellVal).bg,
+                    border: shiftCellColors(val, maxCellVal).border,
                   }}>
                     {fmtShift(val)}
                   </div>
@@ -361,10 +365,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
                     color: shiftColorHex(portfolioTotal),
-                    background: Math.abs(portfolioTotal) < 0.001 ? 'transparent'
-                      : portfolioTotal > 0 ? 'rgba(48, 209, 88, 0.25)' : 'rgba(255, 69, 58, 0.25)',
-                    border: `1px solid ${Math.abs(portfolioTotal) < 0.001 ? 'transparent'
-                      : portfolioTotal > 0 ? 'rgba(48, 209, 88, 0.5)' : 'rgba(255, 69, 58, 0.5)'}`,
+                    background: shiftCellColors(portfolioTotal, maxCellVal).bg,
+                    border: shiftCellColors(portfolioTotal, maxCellVal).border,
                   }}>
                     {fmtShift(portfolioTotal)}
                   </div>

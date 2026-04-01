@@ -14,7 +14,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { ShiftMatrix, Trend, ForceName } from '../types';
-import { T, CATEGORIES, FORCES, FORCE_COLORS, FORCE_ICONS, fmtShift, shiftColorHex, shortCat } from '../lib/format';
+import { T, CATEGORIES, FORCES, FORCE_COLORS, FORCE_ICONS, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
 
 interface ForceShiftMatrixProps {
   shifts: ShiftMatrix | null;
@@ -159,6 +159,16 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
       avgs[force as ForceName] = sum / catCount;
     }
     return avgs;
+  }, [forceContributions]);
+
+  // Compute max absolute value across all cells for magnitude scaling
+  const maxCellVal = useMemo(() => {
+    let mx = 0;
+    CATEGORIES.forEach(cat => {
+      const contributions = forceContributions[cat.id] ?? {};
+      Object.values(contributions).forEach(v => { mx = Math.max(mx, Math.abs(v as number)); });
+    });
+    return mx || 0.01;
   }, [forceContributions]);
 
   // Fallback if no data
@@ -410,19 +420,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                             fontSize: 11,
                             fontWeight: 600,
                             color: shiftColorHex(val),
-                            background:
-                              Math.abs(val) < 0.001
-                                ? 'transparent'
-                                : val > 0
-                                  ? 'rgba(48, 209, 88, 0.12)'
-                                  : 'rgba(255, 69, 58, 0.12)',
-                            border: `1px solid ${
-                              Math.abs(val) < 0.001
-                                ? 'transparent'
-                                : val > 0
-                                  ? 'rgba(48, 209, 88, 0.3)'
-                                  : 'rgba(255, 69, 58, 0.3)'
-                            }`,
+                            background: shiftCellColors(val, maxCellVal).bg,
+                            border: shiftCellColors(val, maxCellVal).border,
                             cursor: 'default',
                             position: 'relative',
                             lineHeight: 1,
@@ -451,19 +450,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                         fontSize: 11,
                         fontWeight: 600,
                         color: shiftColorHex(catTotal2030),
-                        background:
-                          Math.abs(catTotal2030) < 0.001
-                            ? 'transparent'
-                            : catTotal2030 > 0
-                              ? 'rgba(48, 209, 88, 0.2)'
-                              : 'rgba(255, 69, 58, 0.2)',
-                        border: `1px solid ${
-                          Math.abs(catTotal2030) < 0.001
-                            ? 'transparent'
-                            : catTotal2030 > 0
-                              ? 'rgba(48, 209, 88, 0.4)'
-                              : 'rgba(255, 69, 58, 0.4)'
-                        }`,
+                        background: shiftCellColors(catTotal2030, maxCellVal).bg,
+                        border: shiftCellColors(catTotal2030, maxCellVal).border,
                       }}
                     >
                       {fmtShift(catTotal2030)}
@@ -518,19 +506,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                       fontSize: 11,
                       fontWeight: 600,
                       color: shiftColorHex(val),
-                      background:
-                        Math.abs(val) < 0.001
-                          ? 'transparent'
-                          : val > 0
-                            ? 'rgba(48, 209, 88, 0.15)'
-                            : 'rgba(255, 69, 58, 0.15)',
-                      border: `1px solid ${
-                        Math.abs(val) < 0.001
-                          ? 'transparent'
-                          : val > 0
-                            ? 'rgba(48, 209, 88, 0.4)'
-                            : 'rgba(255, 69, 58, 0.4)'
-                      }`,
+                      background: shiftCellColors(val, maxCellVal).bg,
+                      border: shiftCellColors(val, maxCellVal).border,
                     }}
                   >
                     {fmtShift(val)}
@@ -558,22 +535,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                   color: shiftColorHex(
                     (Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0)
                   ),
-                  background:
-                    Math.abs((Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0)) <
-                    0.001
-                      ? 'transparent'
-                      : (Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0) > 0
-                        ? 'rgba(48, 209, 88, 0.25)'
-                        : 'rgba(255, 69, 58, 0.25)',
-                  border: `1px solid ${
-                    Math.abs(
-                      (Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0)
-                    ) < 0.001
-                      ? 'transparent'
-                      : (Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0) > 0
-                        ? 'rgba(48, 209, 88, 0.5)'
-                        : 'rgba(255, 69, 58, 0.5)'
-                  }`,
+                  background: shiftCellColors((Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0), maxCellVal).bg,
+                  border: shiftCellColors((Object.values(totalsByForce) as number[]).reduce((a, b) => a + b, 0), maxCellVal).border,
                 }}
               >
                 {fmtShift(

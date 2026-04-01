@@ -109,6 +109,29 @@ export function shiftBgHex(v: number | null | undefined): string {
   return v > 0 ? T.greenDim : T.redDim;
 }
 
+/**
+ * Magnitude-scaled cell styling for shift matrices.
+ * Returns { bg, border } with opacity that scales from minAlpha to maxAlpha
+ * based on |value| relative to maxVal (the reference max in the matrix).
+ */
+export function shiftCellColors(
+  v: number,
+  maxVal: number = 0.05,
+  minAlpha: number = 0.06,
+  maxAlpha: number = 0.45,
+): { bg: string; border: string } {
+  if (Math.abs(v) < 0.001) return { bg: 'transparent', border: 'transparent' };
+  const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+  const t = clamp(Math.abs(v) / Math.max(maxVal, 0.001), 0, 1);
+  const alpha = minAlpha + t * (maxAlpha - minAlpha);
+  const borderAlpha = Math.min(alpha + 0.15, 0.6);
+  const [r, g, b] = v > 0 ? [48, 209, 88] : [255, 69, 58];
+  return {
+    bg: `rgba(${r},${g},${b},${alpha.toFixed(3)})`,
+    border: `1px solid rgba(${r},${g},${b},${borderAlpha.toFixed(3)})`,
+  };
+}
+
 /** Diverging heatmap color: green for positive, red for negative, intensity by magnitude */
 export function heatColor(v: number | null | undefined): string {
   if (v == null) return T.bg3;
