@@ -72,11 +72,15 @@ export interface ConvergenceDiagnostics {
   model_type?: ModelType;
 }
 
+/** Value Chain decomposition: category → VC step → shift contribution. */
+export type VCDecomposition = Record<string, Record<string, number>>;
+
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
   shift_matrix?: ShiftMatrix;
   causal_decomposition?: CategoryRecord<CausalDecomposition>;
+  vc_decomposition?: VCDecomposition;
   allocation_recommendation?: AllocationRecommendation;
   allocation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;

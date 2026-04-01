@@ -35,6 +35,7 @@ import CategoryDetailPanel from './CategoryDetailPanel';
 import CategoryDeepDive from './CategoryDeepDive';
 import ForceShiftMatrix from './ForceShiftMatrix';
 import RegionShiftMatrix from './RegionShiftMatrix';
+import ValueChainShiftMatrix from './ValueChainShiftMatrix';
 
 // Extracted components
 import ForceWeightSliders from './ForceWeightSliders';
@@ -69,6 +70,7 @@ interface InitialDataResult {
   allocation: AllocationWithRationale[];
   dagEdges: CausalEdge[];
   convergence: ConvergenceDiagnostics;
+  vcDecomposition?: Record<string, Record<string, number>> | null;
 }
 
 interface AIInsight {
@@ -291,10 +293,23 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
       }
     }
 
+    // Normalize vc_decomposition keys to frontend category IDs
+    const normCatIdForVC = (k: string): string =>
+      k.toLowerCase().replace(/^(hair|lhc):\s*/, (_, g: string) => g + '_').replace(/\s+/g, '_');
+    let newVcDecomp: Record<string, Record<string, number>> | null = null;
+    if ((simulation as any)?.vc_decomposition && typeof (simulation as any).vc_decomposition === 'object') {
+      newVcDecomp = {};
+      for (const [catKey, stepData] of Object.entries((simulation as any).vc_decomposition)) {
+        const catId = normCatIdForVC(catKey);
+        newVcDecomp[catId] = stepData as Record<string, number>;
+      }
+    }
+
     setInitialData(prev => ({
       ...prev,
       shifts: { ...prev.shifts, ...newShifts },
       ...(newFC ? { forceContributions: { ...prev.forceContributions, ...newFC } } : {}),
+      ...(newVcDecomp ? { vcDecomposition: newVcDecomp } : {}),
       convergence: {
         r_hat: simulation.convergence?.r_hat ?? 0,
         converged: simulation.convergence?.converged ?? true,
@@ -881,6 +896,16 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               <RegionShiftMatrix
                 shifts={data.shifts}
                 trends={data.trends}
+                onSelectCategory={setSelectedCategory}
+              />
+            </div>
+
+            {/* Value Chain × Category Shift Matrix (2030) */}
+            <div style={{ marginTop: 32 }}>
+              <ValueChainShiftMatrix
+                shifts={data.shifts}
+                trends={data.trends}
+                vcDecomposition={data.vcDecomposition}
                 onSelectCategory={setSelectedCategory}
               />
             </div>
