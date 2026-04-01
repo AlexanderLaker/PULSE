@@ -248,61 +248,69 @@ export default function HeadlineKPI({
         delay={0}
       />
 
-      {/* KPI 2: Top 3 Expansions */}
-      {(() => {
-        const e1 = top3Expansions[0] ?? { name: '—', val: 0, p10: 0, p90: 0 };
-        return (
-          <KPICard
-            icon={TrendingUp}
-            label="Top Expansions"
-            value={fmtShift(e1.val)}
-            detail={e1.name}
-            subDetail={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
-                <div style={ciStyle}>p10 {fmtShift(e1.p10)}  ·  p90 {fmtShift(e1.p90)}</div>
-                {top3Expansions.slice(1).map((cat) => (
-                  <div key={cat.name} style={{ ...ciStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${T.border}`, paddingTop: 3 }}>
-                    <span style={{ color: T.text3, maxWidth: '48%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
-                    <span style={{ color: shiftColorHex(cat.val), fontWeight: 600 }}>{fmtShift(cat.val)}</span>
-                    <span style={{ color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</span>
-                  </div>
-                ))}
-              </div>
-            }
-            color={e1.val > 0 ? T.green : T.red}
-            bgIcon={e1.val > 0 ? T.greenDim : T.redDim}
-            delay={0.08}
-          />
-        );
-      })()}
+      {/* KPI 2: Top 3 Expansions — numbered table */}
+      <KPICard
+        icon={TrendingUp}
+        label="Top Expansions"
+        value=""
+        subDetail={
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.mono, fontSize: 10, marginTop: -4 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>#</th>
+                <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Category</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Shift</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10–p90</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top3Expansions.map((cat, i) => (
+                <tr key={cat.name} style={{ borderBottom: i < top3Expansions.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                  <td style={{ padding: '5px 4px 5px 0', color: T.text4, fontWeight: 600 }}>{i + 1}.</td>
+                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{cat.name}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', fontWeight: 700, color: shiftColorHex(cat.val) }}>{fmtShift(cat.val)}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+        color={top3Expansions[0]?.val !== undefined && top3Expansions[0].val > 0 ? T.green : T.text3}
+        bgIcon={top3Expansions[0]?.val !== undefined && top3Expansions[0].val > 0 ? T.greenDim : T.redDim}
+        delay={0.08}
+      />
 
-      {/* KPI 3: Top 3 Contractions */}
-      {(() => {
-        const c1 = top3Contractions[0] ?? { name: '—', val: 0, p10: 0, p90: 0 };
-        return (
-          <KPICard
-            icon={TrendingDown}
-            label="Top Contractions"
-            value={fmtShift(c1.val)}
-            detail={c1.name}
-            subDetail={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
-                <div style={ciStyle}>p10 {fmtShift(c1.p10)}  ·  p90 {fmtShift(c1.p90)}</div>
-                {top3Contractions.slice(1).map((cat) => (
-                  <div key={cat.name} style={{ ...ciStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${T.border}`, paddingTop: 3 }}>
-                    <span style={{ color: T.text3, maxWidth: '48%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
-                    <span style={{ color: shiftColorHex(cat.val), fontWeight: 600 }}>{fmtShift(cat.val)}</span>
-                    <span style={{ color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</span>
-                  </div>
-                ))}
-              </div>
-            }
-            color={T.red}
-            bgIcon={T.redDim}
-            delay={0.16}
-          />
-        );
-      })()}
+      {/* KPI 3: Top 3 Contractions — numbered table */}
+      <KPICard
+        icon={TrendingDown}
+        label="Top Contractions"
+        value=""
+        subDetail={
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.mono, fontSize: 10, marginTop: -4 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>#</th>
+                <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Category</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Shift</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10–p90</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top3Contractions.map((cat, i) => (
+                <tr key={cat.name} style={{ borderBottom: i < top3Contractions.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                  <td style={{ padding: '5px 4px 5px 0', color: T.text4, fontWeight: 600 }}>{i + 1}.</td>
+                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{cat.name}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', fontWeight: 700, color: shiftColorHex(cat.val) }}>{fmtShift(cat.val)}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+        color={T.red}
+        bgIcon={T.redDim}
+        delay={0.16}
+      />
 
       {/* KPI 4: Simulation Status */}
       <KPICard
