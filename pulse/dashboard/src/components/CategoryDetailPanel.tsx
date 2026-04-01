@@ -40,10 +40,15 @@ interface Trend {
   direction: 'Expansion' | 'Contraction';
   exposure_level?: number;
   probability?: number;
+  contribution?: number; // actual shift contribution to the selected category
+  normalized_score?: number;
+  gp1_shift?: number;
+  gp1_pct_affected?: number;
   description?: string;
   strategic_implication?: string;
   sources?: Array<{ title: string; url: string; data?: string }>;
   category_exposure?: Record<string, number>;
+  [key: string]: unknown;
 }
 
 interface CategoryDetailPanelData {
@@ -351,21 +356,21 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
           </div>
         </div>
 
-        {/* Score badge */}
+        {/* Contribution badge */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: '4px',
-          minWidth: '45px',
+          minWidth: '55px',
         }}>
           <div style={{
             fontSize: '10px',
             fontWeight: 600,
             fontFamily: T.mono,
-            color: (trend.score || 0) > 0 ? T.green : (trend.score || 0) < 0 ? T.red : T.text2,
+            color: (trend.contribution || 0) > 0 ? T.green : (trend.contribution || 0) < 0 ? T.red : T.text2,
           }}>
-            {fmtPct((trend.score || 0) / 25, 1)}
+            {fmtShift(trend.contribution || 0, 2)}
           </div>
           <div style={{
             fontSize: '8px',
@@ -530,7 +535,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({ data, categor
 
   const trendList = useMemo(() => {
     if (!data?.contributing_trends?.[categoryId]) return [];
-    return data.contributing_trends[categoryId].sort((a, b) => Math.abs((b.score || 0)) - Math.abs((a.score || 0)));
+    return data.contributing_trends[categoryId].sort((a, b) => Math.abs(b.contribution || 0) - Math.abs(a.contribution || 0));
   }, [data, categoryId]);
 
   // Compute 2030 shift

@@ -1126,10 +1126,16 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                       if (!selectedCategory) return {};
                       const filtered = data.trends.filter((t: any) =>
                         t.category_exposure && t.category_exposure[selectedCategory] > 0
-                      ).map((t: any) => ({
-                        ...t,
-                        exposure_level: t.category_exposure?.[selectedCategory] || 0,
-                      }));
+                      ).map((t: any) => {
+                        const exposure = t.category_exposure?.[selectedCategory] || 0;
+                        const gp1Shift = t.gp1_shift ?? t.normalized_score ?? 0;
+                        const contribution = gp1Shift * (exposure / 5);
+                        return {
+                          ...t,
+                          exposure_level: exposure,
+                          contribution, // actual shift contribution to this category
+                        };
+                      });
                       return { [selectedCategory]: filtered };
                     })(),
                     categories: CATEGORIES,
