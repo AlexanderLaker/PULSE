@@ -34,7 +34,7 @@ export const T: DesignTokens = {
   text3:    '#999999',
   text4:    '#ADADAD',
   mono:     "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
-  sans:     "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+  sans:     "'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
 };
 
 // ─── Force Definitions ──────────────────────────────────────
