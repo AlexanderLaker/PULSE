@@ -33,7 +33,7 @@ export const T: DesignTokens = {
   text2:    '#6E6E73',
   text3:    '#999999',
   text4:    '#ADADAD',
-  mono:     "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
+  mono:     "'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
   sans:     "'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
 };
 
