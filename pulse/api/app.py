@@ -518,10 +518,44 @@ def create_app(args=None) -> FastAPI:
                                 _state["simulation_stale"] = False
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
-                                # No simulation in DB — mark as stale, user must press Simulate
-                                print("[PRISM] No simulation in DB — waiting for admin to press Simulate", flush=True)
-                                _state["simulation_stale"] = True
-                                _state["stale_reason"] = "No simulation has been run yet. Press Simulate to generate results."
+                                # No simulation in DB — auto-run one and persist it
+                                print("[PRISM] No simulation in DB — auto-running initial simulation...", flush=True)
+                                try:
+                                    config = _state["config"]
+                                    dag = _state["dag"]
+                                    db = _state["db"]
+
+                                    det = DeterministicEngine(config)
+                                    _state["det_result"] = det.run(db)
+
+                                    mc_engine = BayesianMonteCarloEngine(config, dag)
+                                    mc_result = mc_engine.run(db, iterations=config.iterations or 5000)
+                                    _state["mc_result"] = mc_result
+
+                                    comp = CompetitiveResponseModel()
+                                    _state["competitive"] = comp.compute_all_competitive_adjustments({})
+
+                                    opt = AllocationOptimizer(config)
+                                    _state["allocation"] = opt.optimize(
+                                        mc_result["shift_matrix"], risk_aversion=1.0
+                                    )
+                                    _state["simulation_stale"] = False
+
+                                    # Persist to database for next cold start
+                                    from pulse.database import save_simulation_run
+                                    save_simulation_run(
+                                        iterations=config.iterations or 5000,
+                                        model_type="bayesian_copula",
+                                        results=_sanitize(mc_result["shift_matrix"]),
+                                        causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                                        allocation_recommendation=_sanitize(_state.get("allocation")),
+                                        convergence_diagnostics=_sanitize(mc_result.get("convergence")),
+                                    )
+                                    print("[PRISM] Auto-simulation completed and persisted to database", flush=True)
+                                except Exception as sim_err:
+                                    print(f"[PRISM] Auto-simulation failed: {sim_err}", flush=True)
+                                    _state["simulation_stale"] = True
+                                    _state["stale_reason"] = "No simulation has been run yet. Press Simulate to generate results."
                         except Exception as e:
                             print(f"[PRISM] Failed to load/run simulation: {e}", flush=True)
         except Exception as e:
