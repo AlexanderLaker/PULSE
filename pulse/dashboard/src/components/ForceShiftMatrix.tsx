@@ -227,7 +227,7 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
             margin: 0,
           }}
         >
-          Shift Matrix — Category × Force (2030)
+          Category × Force (2030)
         </h3>
         <div style={{ fontSize: 10, color: T.text4, display: 'flex', gap: 16 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -10,7 +10,7 @@ import { T } from '../lib/format';
 export interface Segment {
   key: string;
   label: string;
-  icon?: string;  // emoji
+  icon?: React.ReactNode;
 }
 
 interface SegmentedControlProps {
@@ -102,7 +102,7 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
               borderRadius: 8,
             } as React.CSSProperties}
           >
-            {seg.icon && <span style={{ fontSize: 12 }}>{seg.icon}</span>}
+            {seg.icon && <span style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>{seg.icon}</span>}
             {seg.label}
           </button>
         );

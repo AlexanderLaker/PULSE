@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
   Brain, AlertTriangle, X, RefreshCw,
-  Presentation, Route,
+  Presentation, Route, TrendingUp, Shield, Globe, Link,
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
@@ -864,8 +864,8 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
+                  gap: 12,
                   marginBottom: 16,
                 }}
               >
@@ -882,10 +882,10 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                 </h3>
                 <SegmentedControl
                   segments={[
-                    { key: 'time_path', label: 'Time Path', icon: '📈' },
-                    { key: 'force', label: 'Force', icon: '⚡' },
-                    { key: 'region', label: 'Region', icon: '🌍' },
-                    { key: 'value_chain', label: 'Value Chain', icon: '🔗' },
+                    { key: 'time_path', label: 'Time Path', icon: <TrendingUp size={13} /> },
+                    { key: 'force', label: 'Force', icon: <Shield size={13} /> },
+                    { key: 'region', label: 'Region', icon: <Globe size={13} /> },
+                    { key: 'value_chain', label: 'Value Chain', icon: <Link size={13} /> },
                   ]}
                   activeKey={activeMatrix}
                   onChange={(key) => setActiveMatrix(key as 'time_path' | 'force' | 'region' | 'value_chain')}
@@ -933,11 +933,13 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <ForceShiftMatrix
-                      shifts={data.shifts}
-                      trends={data.trends}
-                      onSelectCategory={setSelectedCategory}
-                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                      <ForceShiftMatrix
+                        shifts={data.shifts}
+                        trends={data.trends}
+                        onSelectCategory={setSelectedCategory}
+                      />
+                    </div>
                   </motion.div>
                 )}
                 {activeMatrix === 'region' && (
@@ -948,11 +950,13 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <RegionShiftMatrix
-                      shifts={data.shifts}
-                      trends={data.trends}
-                      onSelectCategory={setSelectedCategory}
-                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                      <RegionShiftMatrix
+                        shifts={data.shifts}
+                        trends={data.trends}
+                        onSelectCategory={setSelectedCategory}
+                      />
+                    </div>
                   </motion.div>
                 )}
                 {activeMatrix === 'value_chain' && (
@@ -963,12 +967,14 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <ValueChainShiftMatrix
-                      shifts={data.shifts}
-                      trends={data.trends}
-                      vcDecomposition={data.vcDecomposition}
-                      onSelectCategory={setSelectedCategory}
-                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                      <ValueChainShiftMatrix
+                        shifts={data.shifts}
+                        trends={data.trends}
+                        vcDecomposition={data.vcDecomposition}
+                        onSelectCategory={setSelectedCategory}
+                      />
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

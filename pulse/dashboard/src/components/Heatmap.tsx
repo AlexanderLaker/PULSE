@@ -165,7 +165,7 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
             letterSpacing: 0.8,
           }}
         >
-          Shift Matrix — Category × Time Path
+          Category × Time Path
         </h3>
         <div style={{ fontSize: 10, color: T.text4, display: 'flex', gap: 16 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

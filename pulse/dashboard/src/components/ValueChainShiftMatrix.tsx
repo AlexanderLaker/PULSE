@@ -217,7 +217,7 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
           fontSize: 12, fontWeight: 600, color: T.text3,
           textTransform: 'uppercase', letterSpacing: 0.8, margin: 0,
         }}>
-          Shift Matrix — Category × Value Chain (2030)
+          Category × Value Chain (2030)
         </h3>
         <div style={{ fontSize: 10, color: T.text4, display: 'flex', gap: 16 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

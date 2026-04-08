@@ -233,7 +233,7 @@ const RegionShiftMatrix: React.FC<RegionShiftMatrixProps> = ({
             margin: 0,
           }}
         >
-          Shift Matrix — Category × Region (2030)
+          Category × Region (2030)
         </h3>
         <div style={{ fontSize: 10, color: T.text4, display: 'flex', gap: 16 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
