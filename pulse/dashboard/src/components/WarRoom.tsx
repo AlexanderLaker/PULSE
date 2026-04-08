@@ -933,12 +933,13 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 } as React.CSSProperties}>
                       <ForceShiftMatrix
                         shifts={data.shifts}
                         trends={data.trends}
                         onSelectCategory={setSelectedCategory}
                       />
+                      <div />
                     </div>
                   </motion.div>
                 )}
@@ -950,12 +951,13 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 } as React.CSSProperties}>
                       <RegionShiftMatrix
                         shifts={data.shifts}
                         trends={data.trends}
                         onSelectCategory={setSelectedCategory}
                       />
+                      <div />
                     </div>
                   </motion.div>
                 )}
@@ -967,13 +969,14 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 } as React.CSSProperties}>
                       <ValueChainShiftMatrix
                         shifts={data.shifts}
                         trends={data.trends}
                         vcDecomposition={data.vcDecomposition}
                         onSelectCategory={setSelectedCategory}
                       />
+                      <div />
                     </div>
                   </motion.div>
                 )}
