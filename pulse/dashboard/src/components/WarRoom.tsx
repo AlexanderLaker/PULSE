@@ -8,7 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3, Layers, Zap, CheckCircle2, Clock,
-  Brain, AlertTriangle, X, RefreshCw,
+  Brain, AlertTriangle, X, RefreshCw, Target,
   Presentation, Route, TrendingUp, Shield, Globe, Link,
 } from 'lucide-react';
 
@@ -46,6 +46,7 @@ import AIInsightsBar from './AIInsightsBar';
 import DelphiPanel from './DelphiPanel';
 import SessionSnapshots from './SessionSnapshots';
 import ExecutiveBriefing from './ExecutiveBriefing';
+import StrategicEvaluation from './StrategicEvaluation';
 
 // ─── Type Definitions ────────────────────────────────────────────
 
@@ -228,7 +229,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
   } = usePulse();
 
   // Local state
-  const [activeView, setActiveView] = useState<'overview' | 'trends'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'trends' | 'strategic'>('overview');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [deepDiveCategory, setDeepDiveCategory] = useState<string | null>(null);
   const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
@@ -622,6 +623,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
             {[
               { id: 'overview' as const, label: 'Profit Pool Analysis', icon: BarChart3 },
               { id: 'trends' as const, label: 'Trends', icon: Layers },
+              { id: 'strategic' as const, label: 'Strategic Evaluation', icon: Target },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;
@@ -1092,6 +1094,28 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
             />
 
             {/* Emerging Trends section removed */}
+          </motion.div>
+        )}
+
+        {activeView === 'strategic' && (
+          <motion.div
+            key="strategic"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <StrategicEvaluation
+              shifts={data.shifts}
+              trends={data.trends as any}
+              forceContributions={data.forceContributions}
+              dagEdges={data.dagEdges}
+              allocation={data.allocation as any}
+              convergence={data.convergence}
+              onNavigateToTrend={(search) => {
+                setActiveView('trends');
+              }}
+            />
           </motion.div>
         )}
       </motion.main>
