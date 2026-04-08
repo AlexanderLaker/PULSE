@@ -13,9 +13,19 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { User, Store, Cpu, Landmark, Leaf, Swords } from 'lucide-react';
 import type { ShiftMatrix, Trend, ForceName } from '../types';
 import { T, CATEGORIES, FORCES, FORCE_COLORS, FORCE_ICONS, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
 import ShiftPill from './ShiftPill';
+
+const FORCE_LUCIDE: Record<ForceName, React.ReactNode> = {
+  Consumer:      <User size={13} />,
+  Customer:      <Store size={13} />,
+  Technology:    <Cpu size={13} />,
+  Government:    <Landmark size={13} />,
+  Environmental: <Leaf size={13} />,
+  Competitive:   <Swords size={13} />,
+};
 
 interface ForceShiftMatrixProps {
   shifts: ShiftMatrix | null;
@@ -199,8 +209,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       style={{
-        padding: 20,
-        paddingTop: 24,
+        padding: 16,
+        paddingTop: 18,
         borderRadius: 12,
         border: `1px solid ${T.border}`,
         background: `linear-gradient(135deg, ${T.bg2}88 0%, ${T.bg3}44 100%)`,
@@ -214,7 +224,7 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 24,
+          marginBottom: 14,
         }}
       >
         <h3
@@ -270,12 +280,11 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
             <th
               style={{
                 textAlign: 'left',
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 600,
                 color: T.text3,
-                padding: 10,
-                paddingLeft: 12,
-                minWidth: 120,
+                padding: '6px 8px',
+                minWidth: 90,
               }}
             >
               Category
@@ -286,11 +295,11 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                   key={forceName}
                   style={{
                     textAlign: 'center',
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: 600,
                     color: T.text3,
-                    padding: 10,
-                    minWidth: 90,
+                    padding: '6px 4px',
+                    minWidth: 56,
                   }}
                 >
                   <div
@@ -298,11 +307,11 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 4,
+                      gap: 3,
                     }}
                   >
-                    <span style={{ fontSize: 14 }}>{forceDef.emoji}</span>
-                    <span>{forceName}</span>
+                    <span style={{ color: T.text3, display: 'flex' }}>{FORCE_LUCIDE[forceName]}</span>
+                    <span>{forceName.slice(0, 5)}</span>
                   </div>
                 </th>
               )
@@ -310,11 +319,11 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
             <th
               style={{
                 textAlign: 'center',
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 600,
                 color: T.text3,
-                padding: 10,
-                minWidth: 80,
+                padding: '6px 4px',
+                minWidth: 56,
               }}
             >
               Total
@@ -337,9 +346,8 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                 <td
                   colSpan={8}
                   style={{
-                    padding: 8,
-                    paddingLeft: 12,
-                    fontSize: 10,
+                    padding: '5px 8px',
+                    fontSize: 9,
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
@@ -380,10 +388,10 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                   {/* Category Name */}
                   <td
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 600,
                       color: T.text,
-                      padding: '10px 12px',
+                      padding: '6px 8px',
                       whiteSpace: 'nowrap',
                       textAlign: 'left',
                     } as React.CSSProperties}
@@ -438,10 +446,10 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
           >
             <td
               style={{
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 700,
                 color: T.text,
-                padding: '12px 12px',
+                padding: '8px 8px',
                 textAlign: 'left',
                 textTransform: 'uppercase',
                 letterSpacing: 0.5,
@@ -477,18 +485,9 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
         </tbody>
       </table>
 
-      {/* Footer Note */}
-      <div
-        style={{
-          marginTop: 16,
-          fontSize: 10,
-          color: T.text3,
-          lineHeight: 1.5,
-        }}
-      >
-        <strong>Values represent 2030 shift contribution by force:</strong> Each force's impact is calculated from
-        trend scores weighted by category exposure, scaled to match the Monte Carlo total. Portfolio row shows the average across categories.
-        Click a category row to see detailed causal decomposition.
+      {/* Footer */}
+      <div style={{ marginTop: 10, fontSize: 9, color: T.text4 }}>
+        2030 shift contribution by force · Portfolio = category average · Click row to drill down
       </div>
     </motion.div>
   );

@@ -320,33 +320,24 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                       <motion.div
                         onMouseEnter={() => setHoveredCell({ cat: catId, year })}
                         onMouseLeave={() => setHoveredCell(null)}
-                        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                        whileHover={{ scale: 1.06 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                         style={{
-                          padding: dist.hasCI ? '6px 10px 5px' : '8px 12px',
-                          borderRadius: 8,
-                          fontSize: 12,
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          fontSize: 10,
                           fontWeight: 600,
+                          fontFamily: T.mono,
                           color: shiftColorHex(val),
                           background: heatColor(val),
                           cursor: 'default',
                           position: 'relative',
-                          lineHeight: 1,
+                          lineHeight: 1.2,
+                          letterSpacing: '-0.01em',
+                          fontVariantNumeric: 'tabular-nums',
                         } as React.CSSProperties}
                       >
                         {fmtShift(val)}
-                        {/* p10–p90 confidence range, subtle */}
-                        {dist.hasCI && (
-                          <div style={{
-                            fontSize: 8,
-                            fontWeight: 400,
-                            color: T.text4,
-                            marginTop: 3,
-                            letterSpacing: -0.2,
-                            lineHeight: 1,
-                          }}>
-                            {fmtShift(dist.p10)} … {fmtShift(dist.p90)}
-                          </div>
-                        )}
 
                         {/* Hover Tooltip — enlarged numbers + P10-P90 explanation */}
                         <AnimatePresence>
@@ -469,30 +460,22 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: dist2030.hasCI ? '5px 10px 4px' : '6px 10px',
+                          padding: '4px 8px',
                           borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 600,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          fontFamily: T.mono,
                           color: shiftColorHex(val2030),
                           background: `${shiftColorHex(val2030)}20`,
                           border: `1px solid ${shiftColorHex(val2030)}40`,
                           cursor: 'default',
                           position: 'relative',
-                          transition: 'opacity 0.15s ease',
+                          lineHeight: 1.2,
+                          fontVariantNumeric: 'tabular-nums',
+                          letterSpacing: '-0.01em',
                         }}
                       >
                         {fmtShift(val2030)}
-                        {dist2030.hasCI && (
-                          <div style={{
-                            fontSize: 8,
-                            fontWeight: 400,
-                            color: T.text4,
-                            marginTop: 2,
-                            lineHeight: 1,
-                          }}>
-                            {fmtShift(dist2030.p10)} … {fmtShift(dist2030.p90)}
-                          </div>
-                        )}
 
                         {/* Δ 2030 Hover Tooltip */}
                         <AnimatePresence>

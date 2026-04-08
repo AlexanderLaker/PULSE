@@ -13,6 +13,7 @@
 
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { FlaskConical, TestTubes, Factory, Package, Truck, Megaphone, Handshake, User } from 'lucide-react';
 import type { ShiftMatrix, Trend } from '../types';
 import type { VCDecomposition } from '../types/simulation';
 import { T, CATEGORIES, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
@@ -20,14 +21,14 @@ import ShiftPill from './ShiftPill';
 
 /** The 8 value chain steps (must match backend pulse/config.py VC_STEPS) */
 const VC_STEPS = [
-  { id: 'Raw Materials',  short: 'Raw Mat',    emoji: '🧪' },
-  { id: 'Formulation',    short: 'Formula',    emoji: '🔬' },
-  { id: 'Manufacturing',  short: 'Mfg',        emoji: '🏭' },
-  { id: 'Packaging',      short: 'Pkg',        emoji: '📦' },
-  { id: 'Supply Chain',   short: 'Supply',     emoji: '🚛' },
-  { id: 'Marketing',      short: 'Mktg',       emoji: '📣' },
-  { id: 'Commercial',     short: 'Comm',       emoji: '🤝' },
-  { id: 'Consumer',       short: 'Consumer',   emoji: '👤' },
+  { id: 'Raw Materials',  short: 'Raw Mat',    icon: <FlaskConical size={12} /> },
+  { id: 'Formulation',    short: 'Formula',    icon: <TestTubes size={12} /> },
+  { id: 'Manufacturing',  short: 'Mfg',        icon: <Factory size={12} /> },
+  { id: 'Packaging',      short: 'Pkg',        icon: <Package size={12} /> },
+  { id: 'Supply Chain',   short: 'Supply',     icon: <Truck size={12} /> },
+  { id: 'Marketing',      short: 'Mktg',       icon: <Megaphone size={12} /> },
+  { id: 'Commercial',     short: 'Comm',       icon: <Handshake size={12} /> },
+  { id: 'Consumer',       short: 'Cons',       icon: <User size={12} /> },
 ];
 
 interface ValueChainShiftMatrixProps {
@@ -239,9 +240,9 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
               Category
             </th>
             {VC_STEPS.map(step => (
-              <th key={step.id} style={{ textAlign: 'center', fontSize: 10, fontWeight: 600, color: T.text3, padding: 10, minWidth: 72 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 14 }}>{step.emoji}</span>
+              <th key={step.id} style={{ textAlign: 'center', fontSize: 9, fontWeight: 600, color: T.text3, padding: '6px 4px', minWidth: 52 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <span style={{ color: T.text3, display: 'flex' }}>{step.icon}</span>
                   <span>{step.short}</span>
                 </div>
               </th>
@@ -338,11 +339,9 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
         </tbody>
       </table>
 
-      {/* Footer Note */}
-      <div style={{ marginTop: 16, fontSize: 10, color: T.text3, lineHeight: 1.5 }}>
-        <strong>Values represent 2030 shift contribution by value chain step:</strong> Each step's impact is allocated
-        from the Monte Carlo total based on trend VC exposures and step weights. Portfolio row shows the average
-        across categories. Click a category row to drill down.
+      {/* Footer */}
+      <div style={{ marginTop: 10, fontSize: 9, color: T.text4 }}>
+        2030 shift contribution by VC step · Portfolio = category average · Click row to drill down
       </div>
     </motion.div>
   );

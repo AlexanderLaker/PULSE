@@ -28,11 +28,11 @@ const ShiftPill: React.FC<ShiftPillProps> = ({ value, maxVal = 0.05, bold = fals
     >
       {/* Compact pill */}
       <motion.div
-        whileHover={{ scale: 1.06 }}
+        whileHover={{ scale: 1.05 }}
         transition={{ type: 'spring', stiffness: 500, damping: 25 }}
         style={{
-          padding: '4px 8px',
-          borderRadius: 6,
+          padding: '3px 6px',
+          borderRadius: 5,
           background: colors.bg,
           fontSize: 10,
           fontWeight: bold ? 700 : 600,
@@ -40,8 +40,7 @@ const ShiftPill: React.FC<ShiftPillProps> = ({ value, maxVal = 0.05, bold = fals
           color: shiftColorHex(value),
           whiteSpace: 'nowrap',
           lineHeight: 1.2,
-          letterSpacing: '-0.01em',
-          transition: 'all 0.15s ease',
+          letterSpacing: '-0.02em',
           cursor: 'default',
           border: colors.border,
           fontVariantNumeric: 'tabular-nums',
