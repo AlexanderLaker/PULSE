@@ -311,7 +311,7 @@ const ForceShiftMatrix: React.FC<ForceShiftMatrixProps> = ({
                     }}
                   >
                     <span style={{ color: T.text3, display: 'flex' }}>{FORCE_LUCIDE[forceName]}</span>
-                    <span>{forceName.slice(0, 5)}</span>
+                    <span>{forceName}</span>
                   </div>
                 </th>
               )

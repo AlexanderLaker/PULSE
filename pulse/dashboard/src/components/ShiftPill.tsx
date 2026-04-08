@@ -1,11 +1,11 @@
 /**
- * ShiftPill — Compact matrix cell showing median value with hover tooltip.
- * Apple-minimalist: tiny pill for median, dark floating tooltip for p10/p90.
+ * ShiftPill — Compact matrix cell matching Time Path heatmap style.
+ * Uses same heatColor() background as the Heatmap component.
  */
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { T, fmtShift, shiftColorHex, shiftCellColors } from '../lib/format';
+import { T, fmtShift, shiftColorHex, heatColor } from '../lib/format';
 
 interface ShiftPillProps {
   value: number;
@@ -18,31 +18,28 @@ interface ShiftPillProps {
 const ShiftPill: React.FC<ShiftPillProps> = ({ value, maxVal = 0.05, bold = false, p10, p90 }) => {
   const [hovered, setHovered] = useState(false);
 
-  const colors = shiftCellColors(value, maxVal);
-
   return (
     <div
       style={{ position: 'relative', display: 'inline-flex', justifyContent: 'center' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Compact pill */}
+      {/* Compact pill — matches Heatmap cell style */}
       <motion.div
-        whileHover={{ scale: 1.05 }}
+        whileHover={{ scale: 1.06 }}
         transition={{ type: 'spring', stiffness: 500, damping: 25 }}
         style={{
-          padding: '3px 6px',
-          borderRadius: 5,
-          background: colors.bg,
+          padding: '4px 8px',
+          borderRadius: 6,
+          background: heatColor(value),
           fontSize: 10,
           fontWeight: bold ? 700 : 600,
           fontFamily: T.mono,
           color: shiftColorHex(value),
           whiteSpace: 'nowrap',
           lineHeight: 1.2,
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.01em',
           cursor: 'default',
-          border: colors.border,
           fontVariantNumeric: 'tabular-nums',
         } as React.CSSProperties}
       >
