@@ -102,19 +102,25 @@ _state_lock = asyncio.Lock()  # Protect concurrent mutations
 def _load_trend_database() -> TrendDatabase:
     """Load trends from the Postgres/SQLite database into a TrendDatabase object.
 
-    Auto-seeds with 47 Intelligence Report trends if the database is empty.
+    Auto-seeds with Intelligence Report trends if the database is empty or
+    has fewer trends than the seed file (i.e., new trends were added to the spec).
+    save_trends() uses delete-then-insert, so existing trends are safely updated.
     """
     from pulse.database import load_trends, save_trends
     db_trends = load_trends()
 
-    if not db_trends:
-        logger.info("Database empty — auto-seeding with Intelligence Report trends...")
+    # Check if we need to seed: either empty DB or missing trends from latest spec
+    from pulse.seed_trends import get_report_trends
+    seed_trends = get_report_trends()
+    expected_count = len(seed_trends)
+
+    if not db_trends or len(db_trends) < expected_count:
+        reason = "empty" if not db_trends else f"incomplete ({len(db_trends)}/{expected_count})"
+        logger.info(f"Database {reason} — syncing with Intelligence Report ({expected_count} trends)...")
         try:
-            from pulse.seed_trends import get_report_trends
-            seed_trends = get_report_trends()
             save_trends(seed_trends)
             db_trends = load_trends()
-            logger.info(f"Seeded {len(db_trends)} trends from Intelligence Report")
+            logger.info(f"Synced {len(db_trends)} trends from Intelligence Report")
         except Exception as e:
             logger.error(f"Auto-seed failed: {e}")
 
