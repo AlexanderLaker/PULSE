@@ -102,25 +102,20 @@ _state_lock = asyncio.Lock()  # Protect concurrent mutations
 def _load_trend_database() -> TrendDatabase:
     """Load trends from the Postgres/SQLite database into a TrendDatabase object.
 
-    Auto-seeds with Intelligence Report trends if the database is empty or
-    has fewer trends than the seed file (i.e., new trends were added to the spec).
-    save_trends() uses delete-then-insert, so existing trends are safely updated.
+    Only auto-seeds if the database is completely empty (first run).
+    Use POST /api/v1/trends/sync to explicitly add missing trends.
     """
     from pulse.database import load_trends, save_trends
     db_trends = load_trends()
 
-    # Check if we need to seed: either empty DB or missing trends from latest spec
-    from pulse.seed_trends import get_report_trends
-    seed_trends = get_report_trends()
-    expected_count = len(seed_trends)
-
-    if not db_trends or len(db_trends) < expected_count:
-        reason = "empty" if not db_trends else f"incomplete ({len(db_trends)}/{expected_count})"
-        logger.info(f"Database {reason} — syncing with Intelligence Report ({expected_count} trends)...")
+    if not db_trends:
+        logger.info("Database empty — seeding with Intelligence Report trends...")
         try:
+            from pulse.seed_trends import get_report_trends
+            seed_trends = get_report_trends()
             save_trends(seed_trends)
             db_trends = load_trends()
-            logger.info(f"Synced {len(db_trends)} trends from Intelligence Report")
+            logger.info(f"Seeded {len(db_trends)} trends from Intelligence Report")
         except Exception as e:
             logger.error(f"Auto-seed failed: {e}")
 
@@ -954,6 +949,70 @@ def create_app(args=None) -> FastAPI:
         _state["stale_reason"] = f"All {count} trends were deleted"
 
         return {"status": "deleted_all", "trends_deleted": count}
+
+    @app.post("/api/v1/trends/sync")
+    async def sync_missing_trends():
+        """Explicitly sync missing trends from seed_trends.py into the database.
+
+        Compares current DB trend IDs against seed_trends.py and inserts
+        only the specific trends that are missing. Does NOT delete existing trends.
+        User-triggered only — never runs automatically.
+        """
+        from pulse.seed_trends import get_report_trends
+        from pulse.database import load_trends, save_trends
+
+        seed_trends = get_report_trends()
+        db_trends = load_trends()
+
+        db_ids = {t.id for t in db_trends}
+        seed_ids = {t.id for t in seed_trends}
+        missing_ids = seed_ids - db_ids
+
+        if not missing_ids:
+            return {
+                "status": "already_in_sync",
+                "db_count": len(db_trends),
+                "seed_count": len(seed_trends),
+                "missing": [],
+            }
+
+        # Insert only missing trends (save_trends does delete-then-insert for ALL,
+        # so we merge: keep existing DB trends + add missing from seed)
+        missing_trends = [t for t in seed_trends if t.id in missing_ids]
+
+        # We need to save the full set (existing + missing) since save_trends replaces all
+        merged = db_trends + missing_trends
+        try:
+            save_trends(merged)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to save trends: {e}")
+
+        # Reload from DB and refresh in-memory state
+        db_trends = load_trends()
+        db = _state.get("db")
+        if db:
+            db.trends = db_trends
+            _state["simulation_stale"] = True
+            _state["stale_reason"] = f"Synced {len(missing_ids)} missing trends"
+
+        # Audit log
+        try:
+            from pulse.database import log_audit
+            log_audit(
+                "trends_synced",
+                "trend",
+                ",".join(sorted(missing_ids)),
+                reason=f"Added {len(missing_ids)} missing trends from seed_trends.py",
+            )
+        except Exception:
+            pass
+
+        return {
+            "status": "synced",
+            "added": sorted(missing_ids),
+            "added_count": len(missing_ids),
+            "total_count": len(db_trends),
+        }
 
     # ── Simulation Status ─────────────────────────────────────────
     @app.get("/api/v1/simulation/status")
