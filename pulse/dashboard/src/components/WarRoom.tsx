@@ -236,7 +236,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSnapshots, setShowSnapshots] = useState<boolean>(false);
   const [showBriefing, setShowBriefing] = useState<boolean>(false);
-  const [activeMatrix, setActiveMatrix] = useState<'force' | 'region' | 'value_chain'>('force');
+  const [activeMatrix, setActiveMatrix] = useState<'time_path' | 'force' | 'region' | 'value_chain'>('time_path');
 
   // Switch to trends view when navigating from Consumer Journey trend link
   useEffect(() => {
@@ -859,33 +859,8 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               />
             </div>
 
-            {/* Row 2: Heatmap + Path Timeline */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.2fr 1fr',
-                gap: 24,
-                marginBottom: 32,
-              } as React.CSSProperties}
-            >
-              <div data-onboarding="heatmap">
-              <ShiftHeatmap
-                shifts={data.shifts}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-                onDoubleClickCategory={setDeepDiveCategory}
-              />
-              </div>
-              <div data-onboarding="timeline">
-              <PathTimeline
-                shifts={data.shifts}
-                selectedCategory={selectedCategory}
-              />
-              </div>
-            </div>
-
-            {/* Shift Matrix Toggle (Force / Region / Value Chain) */}
-            <div style={{ marginTop: 32 }}>
+            {/* Shift Matrix — unified toggle: Time Path / Force / Region / Value Chain */}
+            <div style={{ marginTop: 8 }}>
               <div
                 style={{
                   display: 'flex',
@@ -903,20 +878,53 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                     margin: 0,
                   }}
                 >
-                  Shift Matrix (2030)
+                  Shift Matrix
                 </h3>
                 <SegmentedControl
                   segments={[
+                    { key: 'time_path', label: 'Time Path', icon: '📈' },
                     { key: 'force', label: 'Force', icon: '⚡' },
                     { key: 'region', label: 'Region', icon: '🌍' },
                     { key: 'value_chain', label: 'Value Chain', icon: '🔗' },
                   ]}
                   activeKey={activeMatrix}
-                  onChange={(key) => setActiveMatrix(key as 'force' | 'region' | 'value_chain')}
+                  onChange={(key) => setActiveMatrix(key as 'time_path' | 'force' | 'region' | 'value_chain')}
                 />
               </div>
 
               <AnimatePresence mode="wait">
+                {activeMatrix === 'time_path' && (
+                  <motion.div
+                    key="time-path-matrix"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.2fr 1fr',
+                        gap: 24,
+                      } as React.CSSProperties}
+                    >
+                      <div data-onboarding="heatmap">
+                        <ShiftHeatmap
+                          shifts={data.shifts}
+                          selectedCategory={selectedCategory}
+                          onSelectCategory={setSelectedCategory}
+                          onDoubleClickCategory={setDeepDiveCategory}
+                        />
+                      </div>
+                      <div data-onboarding="timeline">
+                        <PathTimeline
+                          shifts={data.shifts}
+                          selectedCategory={selectedCategory}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
                 {activeMatrix === 'force' && (
                   <motion.div
                     key="force-matrix"
