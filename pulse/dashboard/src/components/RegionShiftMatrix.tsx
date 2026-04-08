@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import type { ShiftMatrix, Trend } from '../types';
 import type { Region } from '../types/trends';
 import { T, CATEGORIES, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
+import ShiftPill from './ShiftPill';
 
 const REGIONS: Region[] = ['Europe', 'North America', 'Asia', 'High Growth'];
 
@@ -409,55 +410,18 @@ const RegionShiftMatrix: React.FC<RegionShiftMatrixProps> = ({
                       <td
                         key={`${cat.id}-${region}`}
                         style={{
-                          padding: 6,
+                          padding: 4,
                           textAlign: 'center',
                         }}
                       >
-                        <motion.div
-                          whileHover={{ scale: 1.08 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: shiftColorHex(val),
-                            background: shiftCellColors(val, maxCellVal).bg,
-                            border: shiftCellColors(val, maxCellVal).border,
-                            cursor: 'default',
-                            position: 'relative',
-                            lineHeight: 1,
-                          } as React.CSSProperties}
-                        >
-                          {fmtShift(val)}
-                        </motion.div>
+                        <ShiftPill value={val} maxVal={maxCellVal} />
                       </td>
                     );
                   })}
 
                   {/* Total Column */}
-                  <td
-                    style={{
-                      padding: 6,
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: shiftColorHex(catTotal2030),
-                        background: shiftCellColors(catTotal2030, maxCellVal).bg,
-                        border: shiftCellColors(catTotal2030, maxCellVal).border,
-                      }}
-                    >
-                      {fmtShift(catTotal2030)}
-                    </div>
+                  <td style={{ padding: 4, textAlign: 'center' }}>
+                    <ShiftPill value={catTotal2030} maxVal={maxCellVal} bold />
                   </td>
                 </motion.tr>
               );
@@ -494,57 +458,22 @@ const RegionShiftMatrix: React.FC<RegionShiftMatrixProps> = ({
                 <td
                   key={`total-${region}`}
                   style={{
-                    padding: 8,
+                    padding: 4,
                     textAlign: 'center',
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: shiftColorHex(val),
-                      background: shiftCellColors(val, maxCellVal).bg,
-                      border: shiftCellColors(val, maxCellVal).border,
-                    }}
-                  >
-                    {fmtShift(val)}
-                  </div>
+                  <ShiftPill value={val} maxVal={maxCellVal} bold />
                 </td>
               );
             })}
 
             {/* Portfolio Total */}
-            <td
-              style={{
-                padding: 8,
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: shiftColorHex(
-                    (Object.values(totalsByRegion) as number[]).reduce((a, b) => a + b, 0)
-                  ),
-                  background: shiftCellColors((Object.values(totalsByRegion) as number[]).reduce((a, b) => a + b, 0), maxCellVal).bg,
-                  border: shiftCellColors((Object.values(totalsByRegion) as number[]).reduce((a, b) => a + b, 0), maxCellVal).border,
-                }}
-              >
-                {fmtShift(
-                  (Object.values(totalsByRegion) as number[]).reduce((a, b) => a + b, 0)
-                )}
-              </div>
+            <td style={{ padding: 4, textAlign: 'center' }}>
+              <ShiftPill
+                value={(Object.values(totalsByRegion) as number[]).reduce((a, b) => a + b, 0)}
+                maxVal={maxCellVal}
+                bold
+              />
             </td>
           </tr>
         </tbody>

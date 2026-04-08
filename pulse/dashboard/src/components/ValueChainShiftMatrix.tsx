@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import type { ShiftMatrix, Trend } from '../types';
 import type { VCDecomposition } from '../types/simulation';
 import { T, CATEGORIES, fmtShift, shiftColorHex, shiftCellColors, shortCat } from '../lib/format';
+import ShiftPill from './ShiftPill';
 
 /** The 8 value chain steps (must match backend pulse/config.py VC_STEPS) */
 const VC_STEPS = [
@@ -291,39 +292,15 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
                   {VC_STEPS.map(step => {
                     const val = contrib[step.id] ?? 0;
                     return (
-                      <td key={`${cat.id}-${step.id}`} style={{ padding: 6, textAlign: 'center' }}>
-                        <motion.div
-                          whileHover={{ scale: 1.08 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                          style={{
-                            padding: '8px 8px',
-                            borderRadius: 8,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: shiftColorHex(val),
-                            background: shiftCellColors(val, maxCellVal).bg,
-                            border: shiftCellColors(val, maxCellVal).border,
-                            cursor: 'default',
-                            lineHeight: 1,
-                          } as React.CSSProperties}
-                        >
-                          {fmtShift(val)}
-                        </motion.div>
+                      <td key={`${cat.id}-${step.id}`} style={{ padding: 4, textAlign: 'center' }}>
+                        <ShiftPill value={val} maxVal={maxCellVal} />
                       </td>
                     );
                   })}
 
                   {/* Total Column */}
-                  <td style={{ padding: 6, textAlign: 'center' }}>
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      color: shiftColorHex(catTotal2030),
-                      background: shiftCellColors(catTotal2030, maxCellVal).bg,
-                      border: shiftCellColors(catTotal2030, maxCellVal).border,
-                    }}>
-                      {fmtShift(catTotal2030)}
-                    </div>
+                  <td style={{ padding: 4, textAlign: 'center' }}>
+                    <ShiftPill value={catTotal2030} maxVal={maxCellVal} bold />
                   </td>
                 </motion.tr>
               );
@@ -343,16 +320,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
             {VC_STEPS.map(step => {
               const val = totalsByStep[step.id] ?? 0;
               return (
-                <td key={`total-${step.id}`} style={{ padding: 8, textAlign: 'center' }}>
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '8px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    color: shiftColorHex(val),
-                    background: shiftCellColors(val, maxCellVal).bg,
-                    border: shiftCellColors(val, maxCellVal).border,
-                  }}>
-                    {fmtShift(val)}
-                  </div>
+                <td key={`total-${step.id}`} style={{ padding: 4, textAlign: 'center' }}>
+                  <ShiftPill value={val} maxVal={maxCellVal} bold />
                 </td>
               );
             })}
@@ -360,16 +329,8 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
             {(() => {
               const portfolioTotal = Object.values(totalsByStep).reduce((a, b) => a + b, 0);
               return (
-                <td style={{ padding: 8, textAlign: 'center' }}>
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                    color: shiftColorHex(portfolioTotal),
-                    background: shiftCellColors(portfolioTotal, maxCellVal).bg,
-                    border: shiftCellColors(portfolioTotal, maxCellVal).border,
-                  }}>
-                    {fmtShift(portfolioTotal)}
-                  </div>
+                <td style={{ padding: 4, textAlign: 'center' }}>
+                  <ShiftPill value={portfolioTotal} maxVal={maxCellVal} bold />
                 </td>
               );
             })()}

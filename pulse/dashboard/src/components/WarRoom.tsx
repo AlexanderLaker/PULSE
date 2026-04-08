@@ -36,6 +36,7 @@ import CategoryDeepDive from './CategoryDeepDive';
 import ForceShiftMatrix from './ForceShiftMatrix';
 import RegionShiftMatrix from './RegionShiftMatrix';
 import ValueChainShiftMatrix from './ValueChainShiftMatrix';
+import SegmentedControl from './SegmentedControl';
 
 // Extracted components
 import ForceWeightSliders from './ForceWeightSliders';
@@ -235,6 +236,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showSnapshots, setShowSnapshots] = useState<boolean>(false);
   const [showBriefing, setShowBriefing] = useState<boolean>(false);
+  const [activeMatrix, setActiveMatrix] = useState<'force' | 'region' | 'value_chain'>('force');
 
   // Switch to trends view when navigating from Consumer Journey trend link
   useEffect(() => {
@@ -882,32 +884,86 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
               </div>
             </div>
 
-            {/* Force × Category Shift Matrix (2030) */}
+            {/* Shift Matrix Toggle (Force / Region / Value Chain) */}
             <div style={{ marginTop: 32 }}>
-              <ForceShiftMatrix
-                shifts={data.shifts}
-                trends={data.trends}
-                onSelectCategory={setSelectedCategory}
-              />
-            </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: T.text,
+                    letterSpacing: 0.8,
+                    margin: 0,
+                  }}
+                >
+                  Shift Matrix (2030)
+                </h3>
+                <SegmentedControl
+                  segments={[
+                    { key: 'force', label: 'Force', icon: '⚡' },
+                    { key: 'region', label: 'Region', icon: '🌍' },
+                    { key: 'value_chain', label: 'Value Chain', icon: '🔗' },
+                  ]}
+                  activeKey={activeMatrix}
+                  onChange={(key) => setActiveMatrix(key as 'force' | 'region' | 'value_chain')}
+                />
+              </div>
 
-            {/* Region × Category Shift Matrix (2030) */}
-            <div style={{ marginTop: 32 }}>
-              <RegionShiftMatrix
-                shifts={data.shifts}
-                trends={data.trends}
-                onSelectCategory={setSelectedCategory}
-              />
-            </div>
-
-            {/* Value Chain × Category Shift Matrix (2030) */}
-            <div style={{ marginTop: 32 }}>
-              <ValueChainShiftMatrix
-                shifts={data.shifts}
-                trends={data.trends}
-                vcDecomposition={data.vcDecomposition}
-                onSelectCategory={setSelectedCategory}
-              />
+              <AnimatePresence mode="wait">
+                {activeMatrix === 'force' && (
+                  <motion.div
+                    key="force-matrix"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <ForceShiftMatrix
+                      shifts={data.shifts}
+                      trends={data.trends}
+                      onSelectCategory={setSelectedCategory}
+                    />
+                  </motion.div>
+                )}
+                {activeMatrix === 'region' && (
+                  <motion.div
+                    key="region-matrix"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <RegionShiftMatrix
+                      shifts={data.shifts}
+                      trends={data.trends}
+                      onSelectCategory={setSelectedCategory}
+                    />
+                  </motion.div>
+                )}
+                {activeMatrix === 'value_chain' && (
+                  <motion.div
+                    key="vc-matrix"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <ValueChainShiftMatrix
+                      shifts={data.shifts}
+                      trends={data.trends}
+                      vcDecomposition={data.vcDecomposition}
+                      onSelectCategory={setSelectedCategory}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         )}
