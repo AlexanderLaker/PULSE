@@ -1014,6 +1014,76 @@ def create_app(args=None) -> FastAPI:
             "total_count": len(db_trends),
         }
 
+    @app.post("/api/v1/trends/revert-to-seed")
+    async def revert_trends_to_seed():
+        """Revert ALL trend probability scores back to seed_trends.py original values.
+
+        This undoes any Delphi consensus application or manual edits to probability.
+        Also resets debiasing_applied to False and score_variance to 0.
+        """
+        from pulse.seed_trends import get_report_trends
+        from pulse.database import load_trends, save_trends, log_audit
+
+        seed_trends = get_report_trends()
+        db_trends = load_trends()
+
+        seed_map = {t.id: t for t in seed_trends}
+        changes = []
+
+        for t in db_trends:
+            seed = seed_map.get(t.id)
+            if not seed:
+                continue
+            if t.probability != seed.probability or t.debiasing_applied:
+                changes.append({
+                    "id": t.id,
+                    "name": t.name,
+                    "old_probability": t.probability,
+                    "new_probability": seed.probability,
+                    "debiasing_was": t.debiasing_applied,
+                })
+                t.probability = seed.probability
+                t.debiasing_applied = False
+                t.score_variance = 0.0
+                t.scorer_count = 1
+                # Recalculate normalized_score
+                t.__post_init__()
+
+        if not changes:
+            return {"status": "no_changes", "message": "All trends already match seed values"}
+
+        try:
+            save_trends(db_trends)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to save reverted trends: {e}")
+
+        # Refresh in-memory state
+        db_trends = load_trends()
+        db = _state.get("db")
+        if db:
+            db.trends = db_trends
+            _state["simulation_stale"] = True
+            _state["stale_reason"] = f"Reverted {len(changes)} trends to seed values"
+
+        try:
+            log_audit(
+                "trends_reverted_to_seed",
+                "trend",
+                "all",
+                old_value=f"{len(changes)} trends had modified probabilities",
+                new_value="All probabilities reset to seed_trends.py",
+                reason="User requested Delphi consensus revert",
+            )
+        except Exception:
+            pass
+
+        return {
+            "status": "reverted",
+            "changes": changes,
+            "changes_count": len(changes),
+            "total_trends": len(db_trends),
+        }
+
     # ── Simulation Status ─────────────────────────────────────────
     @app.get("/api/v1/simulation/status")
     async def get_simulation_status():

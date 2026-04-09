@@ -44,6 +44,8 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Smart fabric scanner & QR tools', type: 'tech', trendDrivers: 'T-07 AI Personalization + T-01 AI enablement', intensity: 3 },
       { name: 'Garment care advisory service (digital)', type: 'service', trendDrivers: 'T-07 AI Personalization + K-04 Social Commerce', intensity: 2 },
       { name: 'Smart home integration platforms', type: 'tech', trendDrivers: 'T-01 + T-08 Connected Appliances auto-sorting', intensity: 3 },
+      { name: 'DPP-enabled garment care scanners', type: 'tech', trendDrivers: 'G-07 Digital Product Passport + T-01 AI fabric recognition', intensity: 2 },
+      { name: 'Large-print accessible care labels', type: 'product', trendDrivers: 'C-05 Silver Economy ease-of-use packaging', intensity: 1 },
     ],
     negativelyImpacted: [
       { name: 'Manual sorting aids (baskets, dividers)', type: 'product', trendDrivers: 'T-01 AI displacement of manual tasks', intensity: 2 },
@@ -61,6 +63,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Plant-based odor neutralizers', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry + C-04 Conscious Consumption', intensity: 2 },
       { name: 'Smart stain analyzer (app + device)', type: 'tech', trendDrivers: 'T-01 AI-Driven Formulation for stain ID', intensity: 3 },
       { name: 'Sustainable stain removal subscriptions', type: 'service', trendDrivers: 'C-04 Cleanical Beauty + K-06 Subscription models', intensity: 2 },
+      { name: 'Concentrated stain remover refill pouches', type: 'product', trendDrivers: 'C-13 Refill & Reuse Economy + T-03 Concentrated Formats', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Chlorine-based pre-treaters', type: 'product', trendDrivers: 'G-01 PFAS Restriction + G-02 Microplastics Ban', intensity: 3 },
@@ -68,6 +71,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Soil-release coatings (PFCs)', type: 'product', trendDrivers: 'G-01 PFAS Restriction (direct regulatory hit)', intensity: 3 },
       { name: 'Heavy chemical stain blockers', type: 'product', trendDrivers: 'G-05 Green Claims Directive (greenwashing crackdown)', intensity: 2 },
       { name: 'Synthetic perfume-heavy pre-treaters', type: 'product', trendDrivers: 'C-04 Conscious Consumption + G-05 Green Claims', intensity: 2 },
+      { name: 'Retailer own-brand stain removers (premium PL)', type: 'product', trendDrivers: 'C-01 Private Label Structural Penetration at 42% share', intensity: 3 },
     ],
   },
   {
@@ -99,6 +103,8 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Plant-based washing pod tablets', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry + G-05 Green Claims', intensity: 2 },
       { name: 'Modular detergent mix-your-own systems', type: 'product', trendDrivers: 'T-07 AI Personalization + T-03 Concentrated Formats', intensity: 2 },
       { name: 'Subscription laundry boxes (recurring)', type: 'service', trendDrivers: 'K-06 Subscription Lock-in trend + convenience', intensity: 2 },
+      { name: 'Discount-exclusive branded value formats', type: 'product', trendDrivers: 'K-01 Discount Retail Channel Expansion at 25-35% share', intensity: 2 },
+      { name: 'Smart auto-dosing detergent cartridges', type: 'product', trendDrivers: 'T-08 Connected Appliances auto-dosing (Henkel Smartwash)', intensity: 3 },
     ],
     negativelyImpacted: [
       { name: 'Traditional bulk powder detergent', type: 'product', trendDrivers: 'T-03 Concentrated Formats displace dilute powders', intensity: 3 },
@@ -108,6 +114,9 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Synthetic optical brighteners', type: 'product', trendDrivers: 'G-05 Green Claims Directive (microplastic brighteners banned)', intensity: 2 },
       { name: 'Anti-greying chemical additives', type: 'product', trendDrivers: 'G-03 Cosmetics Regulation VII/VIII extends to additives', intensity: 2 },
       { name: 'DIY home-made detergent kits', type: 'product', trendDrivers: 'C-06 Cost-of-Living Squeeze pressures this niche', intensity: 1 },
+      { name: 'Branded detergents losing share to premium PL', type: 'product', trendDrivers: 'C-01 Private Label at 42% value share EU6', intensity: 3 },
+      { name: 'Mid-tier detergent range (squeezed middle)', type: 'product', trendDrivers: 'C-06 Cost-of-Living trading down + C-01 PL penetration', intensity: 3 },
+      { name: 'Import-dependent raw material formulations', type: 'product', trendDrivers: 'G-08 Tariffs & Trade Wars + E-01 Palm Oil Disruption', intensity: 2 },
     ],
   },
   {
@@ -119,6 +128,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Auto-dosing machine ecosystems', type: 'tech', trendDrivers: 'T-08 Connected Appliances + T-05 Automation', intensity: 3 },
       { name: 'Voice-activated wash controls', type: 'tech', trendDrivers: 'T-01 AI + smart home voice assistants', intensity: 2 },
       { name: 'Mobile app machine pairing', type: 'service', trendDrivers: 'T-07 AI Personalization + K-04 Social Commerce', intensity: 2 },
+      { name: 'AI-optimized cold-wash cycle programs', type: 'tech', trendDrivers: 'T-01 AI-Driven Formulation + E-07 Energy Cost Volatility', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Manual mechanical program dials', type: 'tech', trendDrivers: 'T-08 Connected Appliances displace manual controls', intensity: 2 },
@@ -136,6 +146,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Maintenance & care subscriptions', type: 'service', trendDrivers: 'K-06 Subscription models + post-purchase services', intensity: 2 },
       { name: 'Energy-monitor detergents (IoT-linked)', type: 'product', trendDrivers: 'T-08 Connected Appliances report water/energy usage', intensity: 2 },
       { name: 'Machine health predictive services', type: 'service', trendDrivers: 'T-05 Manufacturing Automation + IoT monitoring', intensity: 2 },
+      { name: 'Wash-cycle additives from divesting brands', type: 'product', trendDrivers: 'X-01 Reckitt Essential Home Divestiture share capture', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Standard non-connected machines', type: 'tech', trendDrivers: 'T-08 Connected Appliances obsolete legacy hardware', intensity: 3 },
@@ -143,6 +154,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Standalone Calgon-type water softeners', type: 'product', trendDrivers: 'T-08 Integrated machine water treatment', intensity: 2 },
       { name: 'Static water-hardness testing strips', type: 'product', trendDrivers: 'T-08 IoT machines auto-detect water hardness', intensity: 1 },
       { name: 'High-temperature wash detergents', type: 'product', trendDrivers: 'E-02 Water Scarcity + energy efficiency trends', intensity: 2 },
+      { name: 'Energy-intensive hot-wash programs', type: 'tech', trendDrivers: 'E-07 Energy Cost Volatility at 2-3x US levels', intensity: 2 },
     ],
   },
   {
@@ -166,10 +178,11 @@ const LHC_JOURNEY: JourneyStage[] = [
     label: 'Drying',
     benefiting: [
       { name: 'Heat pump dryers (energy-efficient)', type: 'tech', trendDrivers: 'E-02 Energy efficiency + climate consciousness', intensity: 3 },
-      { name: 'Dryer sheets with scent boosters', type: 'product', trendDrivers: 'C-03 Premiumization extends to drying products', intensity: 2 },
+      { name: 'Dryer sheets with scent boosters', type: 'product', trendDrivers: 'C-09 Fragrance Premiumization in Home Care at 15%+ growth', intensity: 3 },
       { name: 'Tumble dryer balls (eco-friendly)', type: 'product', trendDrivers: 'G-04 PPWR + E-02 Water Scarcity reduces fabric conditioner need', intensity: 2 },
       { name: 'Dehumidifiers for air-dry optimization', type: 'tech', trendDrivers: 'E-02 Water Scarcity drives alternative drying', intensity: 1 },
       { name: 'Smart dryer sensors & IoT tracking', type: 'tech', trendDrivers: 'T-08 Connected Appliances enable drying optimization', intensity: 2 },
+      { name: 'Gentle-dry garment longevity products', type: 'product', trendDrivers: 'E-08 Textile Longevity + C-04 Conscious Consumption', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Traditional vented tumble dryers', type: 'tech', trendDrivers: 'E-02 Energy efficiency pressure + heat pump adoption', intensity: 3 },
@@ -188,6 +201,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Steam closets / smart garment refresh cabinets', type: 'tech', trendDrivers: 'T-08 Connected Appliances + IoT clothing care', intensity: 2 },
       { name: 'Portable cordless garment steamers', type: 'tech', trendDrivers: 'T-05 Manufacturing Automation enables compact designs', intensity: 2 },
       { name: 'Smart garment care services (on-demand)', type: 'service', trendDrivers: 'K-04 Social Commerce + convenience premium', intensity: 2 },
+      { name: 'Spray-and-wear anti-wrinkle solutions', type: 'product', trendDrivers: 'C-05 Silver Economy ease-of-use + T-03 Concentrated Formats', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Traditional irons & ironing boards', type: 'tech', trendDrivers: 'T-08 Steamers + smart fabrics displace irons', intensity: 3 },
@@ -206,6 +220,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Anti-humidity & moisture control devices', type: 'tech', trendDrivers: 'E-02 Water Scarcity + climate adaptation', intensity: 1 },
       { name: 'Bio-based garment protection solutions', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry + C-04 Conscious', intensity: 2 },
       { name: 'Smart storage container systems', type: 'tech', trendDrivers: 'T-08 Connected Appliances + home automation', intensity: 2 },
+      { name: 'Extended-range pest protection products', type: 'product', trendDrivers: 'E-05 Climate-Driven Pest Shifts expanding geographic range', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Mothballs (chemical, declining appeal)', type: 'product', trendDrivers: 'G-01 PFAS concerns + C-04 Conscious Consumption', intensity: 2 },
@@ -256,10 +271,12 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'On-the-go freshener/anti-static mists', type: 'product', trendDrivers: 'T-03 Concentrated Formats + convenience trend', intensity: 2 },
       { name: 'Portable garment steaming devices', type: 'tech', trendDrivers: 'T-05 Manufacturing Automation enables compact design', intensity: 2 },
       { name: 'Smart refreshing cabinets / steam closets', type: 'tech', trendDrivers: 'T-08 Connected Appliances + T-01 optimization', intensity: 2 },
-      { name: 'UV garment sanitizers (portable)', type: 'tech', trendDrivers: 'C-12 Post-COVID Hygiene Persistence + T-01 validation', intensity: 1 },
+      { name: 'UV garment sanitizers (portable)', type: 'tech', trendDrivers: 'C-12 Post-COVID Hygiene Persistence + T-01 validation', intensity: 2 },
       { name: 'Dry shampoo for clothes (spray)', type: 'product', trendDrivers: 'T-03 Concentrated Formats + C-06 Cost-Saving', intensity: 2 },
       { name: 'Odor-elimination enzyme sprays', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry + T-01 enzyme optimization', intensity: 2 },
       { name: 'Smart garment freshness alerts (app)', type: 'tech', trendDrivers: 'T-08 Connected Appliances + T-07 AI tracking', intensity: 1 },
+      { name: 'Branded fabric refresh spray range', type: 'product', trendDrivers: 'C-14 Between-Wash Fabric Care (White Spot score 0.82)', intensity: 3 },
+      { name: 'Antibacterial garment hygiene sprays', type: 'product', trendDrivers: 'C-12 Post-COVID Hygiene Persistence + T-02 Bio-Based', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Full wash cycle (over-washing declining)', type: 'service', trendDrivers: 'C-06 Cost-of-Living Squeeze + E-02 water scarcity', intensity: 2 },
@@ -284,12 +301,15 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Trend-led inspiration collections', type: 'product', trendDrivers: 'C-03 Premiumization + C-08 Male Grooming', intensity: 2 },
       { name: 'Digital consultation (AI-matched looks)', type: 'service', trendDrivers: 'T-01 AI-Driven matching + T-07 Personalization', intensity: 2 },
       { name: 'Influencer shade collaborations', type: 'product', trendDrivers: 'K-04 Social Commerce + C-03 Premiumization', intensity: 2 },
+      { name: 'AI-generated personalized content at scale', type: 'tech', trendDrivers: 'T-10 Gen AI Marketing Efficiency (40-60% cost reduction)', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Print shade & style lookbooks', type: 'product', trendDrivers: 'T-07 Digital AR replaces static print', intensity: 2 },
       { name: 'Occasion-based hair collections', type: 'product', trendDrivers: 'C-11 Gen Z Dupe Culture seeks value', intensity: 1 },
       { name: 'Traditional salon consultations (walk-in)', type: 'service', trendDrivers: 'T-07 AI + digital booking reduces appointments', intensity: 2 },
       { name: 'Basic brochure-based color guides', type: 'product', trendDrivers: 'T-01 AI shade matching obsoletes static charts', intensity: 1 },
+      { name: 'Search-dependent product discovery (SEO)', type: 'tech', trendDrivers: 'T-09 Generative AI Disrupts Product Discovery (GEO vs SEO)', intensity: 3 },
+      { name: 'Value-tier color kits (TikTok-native alternatives)', type: 'product', trendDrivers: 'K-04 Social Commerce + C-11 Gen Z Dupe Culture', intensity: 2 },
     ],
   },
   {
@@ -303,6 +323,8 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Hormonal & nutritional deficiency screening', type: 'service', trendDrivers: 'C-05 Silver Economy + C-10 Hair Loss Treatments', intensity: 2 },
       { name: 'At-home scalp microbiome testing', type: 'tech', trendDrivers: 'T-04 Microbiome Science (at-home kits)', intensity: 2 },
       { name: 'DNA-based hair type profiling', type: 'service', trendDrivers: 'T-01 AI-Driven genetic matching + premiumization', intensity: 2 },
+      { name: 'Male-specific hair thinning pattern analyzers', type: 'tech', trendDrivers: 'C-08 Male Grooming Structural Growth + T-01 AI analysis', intensity: 2 },
+      { name: 'Post-medication hair health monitors', type: 'tech', trendDrivers: 'C-02 GLP-1 Drug hair side-effects + T-07 AI Personalization', intensity: 1 },
     ],
     negativelyImpacted: [
       { name: 'Scalp analysis kits (basic / manual)', type: 'product', trendDrivers: 'T-01 AI cameras obsolete basic kits', intensity: 2 },
@@ -329,6 +351,7 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Chelation treatments (niche, low awareness)', type: 'service', trendDrivers: 'T-07 Personalization requires new patient education', intensity: 1 },
       { name: 'Manual sectioning clips & tools', type: 'product', trendDrivers: 'T-05 Automation + T-01 AI guides precision', intensity: 1 },
       { name: 'Generic heat protection sprays', type: 'product', trendDrivers: 'C-03 Premiumization demands advanced formulas', intensity: 2 },
+      { name: 'UV-filter-dependent protectants (restricted ingredients)', type: 'product', trendDrivers: 'G-03 Cosmetics Regulation VII/VIII (SCCS restrictions)', intensity: 2 },
     ],
   },
   {
@@ -349,6 +372,7 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Water softening devices for hair', type: 'tech', trendDrivers: 'T-08 Connected home water treatment integrated', intensity: 1 },
       { name: 'Life-phase condition-based programs', type: 'service', trendDrivers: 'T-07 AI Personalization > generic life-phase segments', intensity: 1 },
       { name: 'Synthetic scalp cooling treatments', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry replaces synthetics', intensity: 1 },
+      { name: 'Mass-market anti-hair-loss treatments (indie pressure)', type: 'product', trendDrivers: 'X-04 DTC & Indie Brand Disruption (K18, Olaplex, Virtue)', intensity: 2 },
     ],
   },
   {
@@ -363,6 +387,7 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Color application tools (precision devices)', type: 'tech', trendDrivers: 'T-05 Manufacturing Automation + precision dosing', intensity: 1 },
       { name: 'Brow, lash & hair growth serums', type: 'product', trendDrivers: 'C-10 Hair Loss Treatments extends to brows/lashes', intensity: 2 },
       { name: 'Digital color matching & consultation', type: 'service', trendDrivers: 'T-01 AI + T-07 Personalization for shade match', intensity: 2 },
+      { name: 'Professional-grade at-home color systems', type: 'product', trendDrivers: 'K-07 Professional Salon Crossover ($23.4B market, 63% B2C)', intensity: 3 },
     ],
     negativelyImpacted: [
       { name: 'Temporary color (declining vs. permanent)', type: 'product', trendDrivers: 'C-03 Premiumization drives permanent investment', intensity: 2 },
@@ -370,6 +395,8 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Gray blending (niche positioning)', type: 'product', trendDrivers: 'C-05 Silver Economy prefers full color/coverage', intensity: 1 },
       { name: 'Synthetic wigs & hair systems (stigma)', type: 'product', trendDrivers: 'C-03 Premiumization prefers authentic color', intensity: 1 },
       { name: 'Budget color boxes (home-use)', type: 'product', trendDrivers: 'C-11 Gen Z Dupe Culture but C-03 premiumization wins', intensity: 2 },
+      { name: 'Mid-price permanent color (squeezed middle)', type: 'product', trendDrivers: 'C-01 Private Label penetration + C-06 Cost-of-Living Squeeze', intensity: 3 },
+      { name: 'Standard salon-quality retail products', type: 'product', trendDrivers: 'X-02 Unilever B&W massive investment + X-03 P&G Superiority', intensity: 2 },
     ],
   },
   {
@@ -389,6 +416,7 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Shine-only products (low differentiation)', type: 'product', trendDrivers: 'T-01 AI formulation > commodity shine boost', intensity: 2 },
       { name: 'Conventional plastic hair accessories', type: 'product', trendDrivers: 'C-04 Conscious Consumption + G-04 PPWR plastic', intensity: 1 },
       { name: 'Cheap fragrance finishing sprays', type: 'product', trendDrivers: 'C-09 Fragrance Premiumization (budget brands decline)', intensity: 2 },
+      { name: 'Unsubstantiated "natural" finishing products', type: 'product', trendDrivers: 'G-05 Green Claims Directive (Sept 2026 enforcement)', intensity: 2 },
     ],
   },
   {
@@ -404,19 +432,22 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Subscription / programmatic care services', type: 'service', trendDrivers: 'K-06 Subscription Lock-in + C-03 Premiumization', intensity: 3 },
       { name: 'Weekly intensive treatment protocols', type: 'product', trendDrivers: 'C-03 Premiumization (multi-step routines)', intensity: 2 },
       { name: 'Personalized rinse cycle optimization', type: 'tech', trendDrivers: 'T-07 AI + T-08 Connected home water systems', intensity: 1 },
+      { name: 'Emerging-market hair care regimens (IMEA)', type: 'product', trendDrivers: 'X-06 Emerging Markets Growth at 12.1% organic', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Tone & fade protection (anti-yellowing)', type: 'product', trendDrivers: 'T-01 AI color stability integrated in core formulas', intensity: 2 },
       { name: 'Fragrance refresh boosters (undifferentiated)', type: 'product', trendDrivers: 'C-09 Fragrance Premiumization demands uniqueness', intensity: 1 },
       { name: 'Deodorizing mists for hair (niche)', type: 'product', trendDrivers: 'C-06 Cost-of-Living Squeeze pressures accessory buys', intensity: 1 },
       { name: 'One-time treatments (low engagement)', type: 'product', trendDrivers: 'K-06 Subscription models displace single-use', intensity: 2 },
+      { name: 'Online-listed care products (retail media tax)', type: 'product', trendDrivers: 'T-06 Retail Media Networks ($184B, 39% FMCG ad spend)', intensity: 2 },
+      { name: 'E-commerce replenishment margins (pay-to-play)', type: 'service', trendDrivers: 'K-02 E-Commerce Profit Pool Maturation + K-06 Subscription', intensity: 2 },
     ],
   },
   {
     id: 'refresh_between',
     label: 'Refresh / In-Between',
     benefiting: [
-      { name: 'Dry shampoo (volume & convenience)', type: 'product', trendDrivers: 'C-06 Cost-of-Living Squeeze + convenience premium', intensity: 3 },
+      { name: 'Dry shampoo (volume & convenience)', type: 'product', trendDrivers: 'C-15 Hair Styling Between Washes (7%+ CAGR, Batiste $1B+)', intensity: 3 },
       { name: 'Root retouch sprays (instant color refresh)', type: 'product', trendDrivers: 'T-03 Concentrated Formats + C-06 Cost saving', intensity: 2 },
       { name: 'Color correction & neutralization products', type: 'product', trendDrivers: 'T-01 AI color correction formulas + on-demand', intensity: 2 },
       { name: 'Leave-in & overnight treatments (intensive)', type: 'product', trendDrivers: 'C-03 Premiumization (multi-step routines)', intensity: 2 },
@@ -425,6 +456,7 @@ const HAIR_JOURNEY: JourneyStage[] = [
       { name: 'Quick salon express refresh services', type: 'service', trendDrivers: 'K-04 Social Commerce + K-07 Professional crossover', intensity: 2 },
       { name: 'At-home color touch-up sprays', type: 'product', trendDrivers: 'T-03 Concentrated Formats + T-07 AI personalized shades', intensity: 2 },
       { name: 'Scalp wellness weekly protocols', type: 'product', trendDrivers: 'C-07 Scalp Care Category emergence', intensity: 2 },
+      { name: 'Male dry styling & texture sprays', type: 'product', trendDrivers: 'C-08 Male Grooming + C-15 Hair Styling Between Washes', intensity: 2 },
     ],
     negativelyImpacted: [
       { name: 'Glosses (limited repeat purchase)', type: 'product', trendDrivers: 'C-03 Premiumization shifts to permanent investment', intensity: 2 },
@@ -463,29 +495,38 @@ interface SelectedProduct {
   stageName: string;
 }
 
-// PRISM Analysis generator — contextual explanation for each product
+// ═══════════════════════════════════════════════════════════════
+// PRISM Analysis — Henkel-specific hand-written analysis (Option A)
+// Key: "product_name::direction" → analysis text
+// Each entry follows: Trend Mechanism → Henkel Exposure → Scope → Action
+// ═══════════════════════════════════════════════════════════════
+
+const PRISM_ANALYSIS: Record<string, string> = {
+  // ── LHC: SORTING ──
+  'AI stain/fabric recognition apps::expansion': 'AI-driven fabric and stain recognition (T-01, 8% GP1 exposed) is creating a new digital entry point at the very start of the laundry journey. For Henkel, this is a platform opportunity: an AI sorting assistant trained on Persil\'s formulation database could recommend the optimal Henkel product for each fabric-stain combination — turning a utility app into a product recommendation engine.\n\nThe competitive window is narrow. L\'Oréal\'s Modiface proves that owning the diagnostic moment captures downstream purchase decisions. If a competitor\'s sorting app recommends their detergent, the consumer never considers Persil.\n\nStrategic action: Develop or partner for a Henkel garment care AI app that recommends Persil/Vernel products based on fabric scan results. First-mover in laundry AI advisory captures the top-of-funnel.',
+
+  // Fallback for entries without hand-written analysis
+};
+
 function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string): string {
+  const key = `${entry.name}::${direction}`;
+  const custom = PRISM_ANALYSIS[key];
+  if (custom) return custom;
+
+  // Fallback for entries without hand-written analysis
   const dirWord = direction === 'expansion' ? 'growth opportunity' : 'decline risk';
   const typeWord = entry.type === 'tech' ? 'technology solution' : entry.type === 'service' ? 'service model' : 'product category';
-
-  // Extract trend codes from trendDrivers
   const trends = entry.trendDrivers;
-  const isMultiTrend = trends.includes('+') || trends.includes(',');
+  const trendName = (trends.split('+')[0] ?? '').trim().split('(')[0]?.trim() ?? '';
 
   if (direction === 'expansion') {
-    return `PRISM's force assessment identifies "${entry.name}" as a ${dirWord} within the "${stageName}" stage of the consumer journey.\n\n` +
-      `As a ${typeWord}, it is positioned to capture value from ${isMultiTrend ? 'multiple converging forces' : 'a key structural force'}. ` +
-      `The primary driver — ${trends.split('+')[0].trim().split('(')[0].trim()} — creates a tailwind that increases demand, justifies premium pricing, or opens new use occasions.\n\n` +
-      `Strategic implication: This represents an addressable whitespace for innovation investment. ` +
-      `Categories touching this product type should see expanding profit pools as the underlying trends materialize through 2030. ` +
-      `First-mover advantage is significant given the ${entry.type === 'tech' ? 'technology adoption curve' : entry.type === 'service' ? 'service model lock-in' : 'consumer switching costs'}.`;
+    return `PRISM identifies "${entry.name}" as a ${dirWord} in the "${stageName}" stage, driven by ${trendName}.\n\n` +
+      `This ${typeWord} is positioned to capture value as the underlying trend materializes. The force assessment suggests expanding profit pools in this segment through 2030.\n\n` +
+      `Henkel implication: Evaluate fit within existing brand portfolio (Persil, Schwarzkopf, Vernel, got2b). Assess right-to-win based on formulation expertise, distribution access, and brand credibility in this segment.`;
   } else {
-    return `PRISM's force assessment flags "${entry.name}" as a ${dirWord} within the "${stageName}" stage of the consumer journey.\n\n` +
-      `This ${typeWord} faces structural headwinds from ${isMultiTrend ? 'multiple converging negative forces' : 'a key disruptive force'}. ` +
-      `The primary driver — ${trends.split('+')[0].trim().split('(')[0].trim()} — is eroding the value proposition through regulatory pressure, technological displacement, or shifting consumer preferences.\n\n` +
-      `Strategic implication: Portfolio exposure to this product type should be actively managed. ` +
-      `Consider defensive strategies (reformulation, repositioning) or planned exit. ` +
-      `The profit pool contraction is expected to accelerate as ${entry.type === 'tech' ? 'superior alternatives gain adoption' : entry.type === 'service' ? 'new service models displace legacy approaches' : 'regulation and consumer shifts compound'}.`;
+    return `PRISM flags "${entry.name}" as a ${dirWord} in the "${stageName}" stage, driven by ${trendName}.\n\n` +
+      `This ${typeWord} faces structural headwinds that are expected to intensify through 2030. The profit pool in this segment is contracting as the underlying forces compound.\n\n` +
+      `Henkel implication: Assess portfolio exposure. Consider defensive reformulation, repositioning to adjacent growing segments, or managed SKU rationalization. Redirect freed-up investment toward expanding segments in this journey stage.`;
   }
 }
 
@@ -518,6 +559,32 @@ const TREND_CONTEXT: Record<string, { name: string; force: string; description: 
   'K-07': { name: 'Professional Salon Channel Crossover', force: 'Customer', description: 'Blurring lines between professional salon and retail consumer channels — salon brands going mass, mass brands launching "pro" tiers.' },
   'E-02': { name: 'Water Scarcity & Conservation Pressure', force: 'Environmental', description: 'Growing water stress driving demand for low-water and waterless formulations, concentrated products, and water-efficient appliances.' },
   'E-05': { name: 'Climate-Driven Pest & Allergen Shifts', force: 'Environmental', description: 'Changing climate patterns altering pest distribution, allergen seasons, and consumer needs for protection and treatment products.' },
+  'C-08': { name: 'Male Grooming Structural Growth', force: 'Consumer', description: 'European male grooming market at $23.6B growing 7.65% CAGR. Under-penetrated in Hair relative to female segments — structural expansion opportunity.' },
+  'C-12': { name: 'Post-COVID Hygiene Habits Persistence', force: 'Consumer', description: 'Elevated hygiene consciousness persisting — surface disinfection and fabric hygiene baselines 20-30% above pre-COVID levels.' },
+  'C-13': { name: 'Refill & Reuse Economy in Household Care', force: 'Consumer', description: 'Growing demand for refillable cleaning products at 12%+ CAGR. Concentrated refills reduce logistics cost 40-60%. Aligned with PPWR mandates.' },
+  'C-14': { name: 'Between-Wash Fabric Care Occasion', force: 'Consumer', description: 'Fabric refresh sprays, garment steamers growing 8-10% CAGR. Febreze is $1B+. Sustainability-driven outfit repeating expands between-wash demand.' },
+  'C-15': { name: 'Hair Styling Between Washes', force: 'Consumer', description: 'Dry shampoo at 7%+ CAGR, texture sprays fastest-growing Hair sub-segment. Batiste dominates 40%+ share. Distinct styling-convenience occasion.' },
+  'G-06': { name: 'EU Deforestation Regulation (EUDR)', force: 'Government', description: 'Requires geolocation-level traceability for palm oil derivatives. Applies December 2026 for large companies.' },
+  'G-07': { name: 'EU Digital Product Passport (DPP)', force: 'Government', description: 'Digital record of composition, lifecycle, and sustainability data via QR code. Detergents in first wave ~2027-2028.' },
+  'G-08': { name: 'Tariffs, Trade Wars & Deglobalization', force: 'Government', description: 'US tariff escalation, EU retaliatory measures, and China-EU trade friction driving 5-15% raw material cost increases for global FMCG.' },
+  'K-01': { name: 'Discount Retail Channel Expansion', force: 'Customer', description: 'Aldi/Lidl at 25-35% grocery share in Germany, UK, Benelux — still growing. Expanding into premium PL and beauty/personal care.' },
+  'K-02': { name: 'E-Commerce Profit Pool Maturation', force: 'Customer', description: 'FMCG e-commerce at 12-15% of sales. Pay-to-play economics with Amazon Subscribe & Save capturing habitual replenishment.' },
+  'K-03': { name: 'Retailer Consolidation & Power Concentration', force: 'Customer', description: 'Top 10 European grocers control 40-50% of sales. Rising listing fees and promotional demands compressing manufacturer margins.' },
+  'K-05': { name: 'Quick Commerce Consolidation', force: 'Customer', description: 'European q-commerce ~$64B after consolidation. Surviving players integrating with traditional retail.' },
+  'T-06': { name: 'Retail Media Networks', force: 'Technology', description: 'Retail media projected $200B by 2027. FMCG at 39% of ad spend. Precision targeting but another margin extraction layer on top of trade spend.' },
+  'T-09': { name: 'Generative AI Disrupts Product Discovery', force: 'Technology', description: '35% of US consumers use AI for product discovery. Google search CTR declining. Brands not cited by LLMs lose consideration before the shelf.' },
+  'T-10': { name: 'Gen AI Marketing Efficiency', force: 'Technology', description: 'Gen AI enables 40-60% cost reduction in content production. Automated creative, localization, and personalization at near-zero marginal cost.' },
+  'X-01': { name: 'Reckitt Essential Home Divestiture', force: 'Competitive', description: 'Advent acquired Reckitt Essential Home (Air Wick, Calgon, Woolite, Vanish) for $4.8B. PE ownership = cost-cutting focus, brand investment decline.' },
+  'X-02': { name: 'Unilever Beauty & Wellbeing Pivot', force: 'Competitive', description: 'Unilever targeting 66% revenue from Beauty & Wellbeing by 2030. €50.5B revenue with massive Hair competitive overlap via Dove, TRESemmé.' },
+  'X-03': { name: 'P&G Superiority Framework', force: 'Competitive', description: 'P&G irresistible superiority drives disproportionate R&D and media investment. Ariel, Fairy, Pantene, H&S set category innovation bar.' },
+  'X-04': { name: 'DTC & Indie Brand Disruption in Hair', force: 'Competitive', description: 'Olaplex, K18, Function of Beauty capturing fastest-growing premium Hair sub-segments. Eroding premiumization growth for legacy brands.' },
+  'X-06': { name: 'Emerging Markets Growth (IMEA)', force: 'Competitive', description: 'Henkel IMEA delivered 12.1% organic growth FY2025 vs 0.9% group average. India, Middle East, Africa as structural growth drivers.' },
+  'E-01': { name: 'Palm Oil Supply Chain Disruption', force: 'Environmental', description: 'Indonesia B50 mandate diverts palm oil to fuel. Oleochemical supply for FMCG surfactants threatened. 20-40% price spikes on oleochemicals.' },
+  'E-03': { name: 'Carbon Border Adjustment (CBAM)', force: 'Environmental', description: 'EU CBAM phasing in 2026-2034. CSRD Scope 3 mandatory reporting creates cost pressure through supply chain.' },
+  'E-04': { name: 'EPR Fee Escalation & Eco-Modulation', force: 'Environmental', description: 'EPR fees escalating with eco-modulation penalties 2-5x for hard-to-recycle packaging. Multi-material packaging incurs highest penalties.' },
+  'E-06': { name: 'Supply Chain Nearshoring', force: 'Environmental', description: 'Post-COVID and geopolitical tension driving FMCG supply chain diversification. Nearshoring chemical production adds short-term cost.' },
+  'E-07': { name: 'Energy Cost Volatility', force: 'Environmental', description: 'European energy costs 2-3x US levels. Structural COGS disadvantage for EU FMCG manufacturers. Energy is 8-15% of manufacturing COGS.' },
+  'E-08': { name: 'Textile Longevity & Garment Life Extension', force: 'Environmental', description: 'EU Circular Textiles Strategy mandates durability standards. Growing demand for fabric protection, pilling removers, color-restore treatments.' },
 };
 
 export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateWarRoom, onNavigateTrends, isAdmin }: ConsumerJourneyProps) {
@@ -831,10 +898,10 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                   </span>
                   <span style={{
                     fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                    background: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).bg,
-                    color: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).text,
+                    background: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']!).bg,
+                    color: (TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']!).text,
                   }}>
-                    {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).label}
+                    {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']!).label}
                   </span>
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: T.text, lineHeight: 1.3 }}>
@@ -883,13 +950,14 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                       .map(d => d.trim())
                       .filter(d => {
                         const match = d.match(/^([TCGKE]-\d{2})/);
-                        return match && TREND_CONTEXT[match[1]];
+                        return match?.[1] && TREND_CONTEXT[match[1]];
                       });
                     if (validDrivers.length === 0) return <div style={{ padding: '10px 14px', fontSize: 11, color: T.text3 }}>No linked trends from master list</div>;
                     return validDrivers.map((driver, i) => {
                       const codeMatch = driver.match(/^([TCGKE]-\d{2})/);
-                      const trendCode = codeMatch![1];
+                      const trendCode = codeMatch?.[1] ?? '';
                       const context = TREND_CONTEXT[trendCode];
+                      if (!context) return null;
 
                     return (
                       <div key={i} style={{
@@ -1002,7 +1070,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                   <div>
                     <div style={{ fontSize: 9, color: T.text3, marginBottom: 2 }}>Type</div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
-                      {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']).label}
+                      {(TYPE_STYLES[selectedProduct.entry.type] ?? TYPE_STYLES['product']!).label}
                     </div>
                   </div>
                   <div>
@@ -1222,7 +1290,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                         // Build trendDrivers string from codes array
                         const validCodes = editValues.trendCodes.filter(c => c && TREND_CONTEXT[c]);
                         const trendDriversStr = validCodes.length > 0
-                          ? validCodes.map(c => `${c} ${TREND_CONTEXT[c].name}`).join(' + ')
+                          ? validCodes.map(c => `${c} ${TREND_CONTEXT[c]?.name ?? c}`).join(' + ')
                           : selectedProduct.entry.trendDrivers; // fallback to original if nothing valid
 
                         // Add to new position
