@@ -17,7 +17,6 @@ from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
                            FORCE_MATERIALIZATION_OVERRIDES,
                            compute_materialization_schedule)
 from pulse.ingestion.models import TrendDatabase, Trend
-from pulse.causal.dag import CausalDAG
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +28,12 @@ class BayesianMonteCarloEngine:
     Key differences from v1.2:
     - Beta priors instead of triangular (learnable from data)
     - Copula-based correlation instead of flat ρ (captures tail dependence via force_correlation_matrix)
-    - Multiplicative compounding without causal propagation
+    - Multiplicative compounding across forces
     - Continuous annual paths instead of 2 discrete points
     """
 
-    def __init__(self, config: ModelConfig, causal_dag: Optional[CausalDAG] = None):
+    def __init__(self, config: ModelConfig):
         self.config = config
-        # causal_dag parameter kept for backward compatibility but not used
-        # (causal propagation removed; correlations now from force_correlation_matrix)
         self.rng = np.random.default_rng(seed=42)
 
     def run(self, db: TrendDatabase, iterations: Optional[int] = None) -> dict:
@@ -149,6 +146,7 @@ class BayesianMonteCarloEngine:
         try:
             L = cholesky(R, lower=True)
         except np.linalg.LinAlgError:
+            logger.warning("Correlation matrix not positive definite — repairing via eigenvalue decomposition")
             eigvals, eigvecs = np.linalg.eigh(R)
             eigvals = np.maximum(eigvals, 1e-6)
             R = eigvecs @ np.diag(eigvals) @ eigvecs.T
@@ -175,19 +173,15 @@ class BayesianMonteCarloEngine:
 
             # gp1_pct_affected: economic magnitude — "what fraction of the
             # category's GP1 can this trend touch at full materialization?"
-            # This is the only magnitude variable. Impact score is NOT used
-            # here — it already informed gp1_pct_affected when the trend was
-            # authored (high-impact trends get higher gp1_pct assignments).
-
-            # Direction flip: small probability that trend reverses
-            flip_prob = 0.02  # 2% chance of direction reversal
-            flip_mask = self.rng.random(n_iter) < flip_prob
-            direction_signs = np.full(n_iter, trend.direction_sign)
-            direction_signs[flip_mask] *= -1
+            # AI-determined per trend, no default — must be set when trend is created.
+            gp1 = trend.gp1_pct_affected
+            if gp1 is None or gp1 <= 0:
+                logger.warning(f"Trend '{trend.name}' has no gp1_pct_affected set, skipping")
+                continue
 
             # Final score = probability × gp1_pct_affected × direction
             # Clean separation: probability = likelihood, gp1_pct = magnitude
-            samples[:, j] = prob_01 * trend.gp1_pct_affected * direction_signs
+            samples[:, j] = prob_01 * gp1 * trend.direction_sign
 
         return samples
 
@@ -235,27 +229,12 @@ class BayesianMonteCarloEngine:
                         continue
                     exposure = trend.category_exposure.get(category, 0)
                     if exposure > 0:
-                        exposure_frac = exposure / 5.0
-
-                        # Region weighting: soft modifier
-                        region_weights = getattr(self.config, 'region_weights', {})
-                        regional_exp = getattr(trend, 'regional_exposure', {}) or {}
-                        if regional_exp and region_weights:
-                            weighted_sum = 0.0
-                            total_possible = 0.0
-                            for region, r_weight in region_weights.items():
-                                r_exp = regional_exp.get(region, 0)
-                                weighted_sum += (r_exp / 5.0) * r_weight
-                                total_possible += r_weight
-                            raw_region = weighted_sum / max(total_possible, 1e-6)
-                            region_factor = 1.0 - 0.5 * (1.0 - raw_region)
-                        else:
-                            region_factor = 1.0
+                        exposure_frac = min(exposure, 5) / 5.0  # Bounded 0.0-1.0
 
                         # Per-trend materialization fraction for this year
                         mat_frac = trend_mat_schedules[j].get(year, 1.0)
 
-                        total_score += trend_scores[j] * exposure_frac * region_factor * mat_frac
+                        total_score += trend_scores[j] * exposure_frac * mat_frac
 
                 force_score = total_score
                 force_contributions[force] = force_score * force_weight
@@ -294,27 +273,12 @@ class BayesianMonteCarloEngine:
         # force_weights: (n_forces,)
         fw = np.array([self.config.force_weights.get(f, 1.0 / n_forces) for f in force_list])
 
-        # exposure_matrix: (n_trends, n_cats) — exposure / 5.0
+        # exposure_matrix: (n_trends, n_cats) — exposure / 5.0, bounded
         exposure_matrix = np.zeros((n_trends, n_cats))
         for j, trend in enumerate(trends):
             for c_idx, cat in enumerate(categories):
                 exp = trend.category_exposure.get(cat, 0)
-                exposure_matrix[j, c_idx] = exp / 5.0 if exp > 0 else 0.0
-
-        # region_factors: (n_trends,)
-        region_weights = getattr(self.config, 'region_weights', {})
-        region_factors = np.ones(n_trends)
-        for j, trend in enumerate(trends):
-            regional_exp = getattr(trend, 'regional_exposure', {}) or {}
-            if regional_exp and region_weights:
-                weighted_sum = 0.0
-                total_possible = 0.0
-                for region, r_weight in region_weights.items():
-                    r_exp = regional_exp.get(region, 0)
-                    weighted_sum += (r_exp / 5.0) * r_weight
-                    total_possible += r_weight
-                raw_region = weighted_sum / max(total_possible, 1e-6)
-                region_factors[j] = 1.0 - 0.5 * (1.0 - raw_region)
+                exposure_matrix[j, c_idx] = min(exp, 5) / 5.0 if exp > 0 else 0.0
 
         # materialization_matrix: (n_trends, n_years)
         mat_matrix = np.ones((n_trends, n_years))
@@ -346,10 +310,9 @@ class BayesianMonteCarloEngine:
         for y_idx in range(n_years):
             # mat_y: (n_trends,) — materialization fraction for this year
             mat_y = mat_matrix[:, y_idx]
-            # region_factors: (n_trends,)
-            # effective per-trend contribution: raw_samples * mat_y * region_factors
+            # effective per-trend contribution: raw_samples * mat_y
             # shape: (n_iter, n_trends)
-            effective = raw_samples * mat_y[np.newaxis, :] * region_factors[np.newaxis, :]
+            effective = raw_samples * mat_y[np.newaxis, :]
 
             # For each force, sum contributions across its trends per category
             # force_contribution: (n_iter, n_forces, n_cats)
@@ -436,23 +399,9 @@ class BayesianMonteCarloEngine:
             for trend in trends:
                 exposure = trend.category_exposure.get(cat, 0)
                 if exposure > 0:
-                    exposure_frac = exposure / 5.0
-                    # Region weighting (same as simulation)
-                    region_weights = getattr(self.config, 'region_weights', {})
-                    regional_exp = getattr(trend, 'regional_exposure', {}) or {}
-                    if regional_exp and region_weights:
-                        weighted_sum = 0.0
-                        total_possible = 0.0
-                        for region, r_weight in region_weights.items():
-                            r_exp = regional_exp.get(region, 0)
-                            weighted_sum += (r_exp / 5.0) * r_weight
-                            total_possible += r_weight
-                        raw_region = weighted_sum / max(total_possible, 1e-6)
-                        region_factor = 1.0 - 0.5 * (1.0 - raw_region)
-                    else:
-                        region_factor = 1.0
+                    exposure_frac = min(exposure, 5) / 5.0
                     force_weight = self.config.force_weights.get(trend.force, 1.0 / len(FORCES))
-                    raw_force_sums[trend.force] += trend.normalized_score * exposure_frac * region_factor * force_weight
+                    raw_force_sums[trend.force] += trend.normalized_score * exposure_frac * force_weight
 
             # Scale to match MC median at 2030 so contributions add up
             raw_total = sum(raw_force_sums.values())

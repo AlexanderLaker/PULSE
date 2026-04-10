@@ -119,39 +119,6 @@ class TestAPISimulation:
         )
         assert response.status_code in [200, 404, 422]
 
-    def test_deterministic_endpoint_exists(self, client):
-        """Should have deterministic simulation endpoint."""
-        response = client.post(
-            "/api/v1/simulate/deterministic",
-            json={}
-        )
-        assert response.status_code in [200, 404, 422]
-
-
-class TestAPICausalDAG:
-    """Test causal DAG endpoints."""
-
-    def test_dag_endpoint_exists(self, client):
-        """Should have DAG endpoint."""
-        response = client.get("/api/v1/causal/dag")
-        assert response.status_code in [200, 404]
-
-    def test_dag_returns_graph_structure(self, client):
-        """Should return DAG as nodes/edges structure."""
-        response = client.get("/api/v1/causal/dag")
-        if response.status_code == 200:
-            data = response.json()
-            # Should have graph-like structure
-            assert isinstance(data, dict)
-
-    def test_propagate_shock_endpoint(self, client):
-        """Should have shock propagation endpoint."""
-        response = client.post(
-            "/api/v1/causal/propagate",
-            json={"shocked_force": "Government", "magnitude": 0.3}
-        )
-        assert response.status_code in [200, 404, 422]
-
 
 class TestAPIOptimization:
     """Test optimization endpoints."""
@@ -255,15 +222,6 @@ class TestAPIDataValidation:
         # Should reject unknown scenario
         assert response.status_code in [200, 400, 404, 422]
 
-    def test_shock_validates_force_name(self, client):
-        """Should validate force names."""
-        response = client.post(
-            "/api/v1/causal/propagate",
-            json={"shocked_force": "InvalidForce", "magnitude": 0.3}
-        )
-        # Should reject invalid force
-        assert response.status_code in [400, 404, 422]
-
 
 class TestAPICORS:
     """Test CORS configuration."""
@@ -291,7 +249,6 @@ class TestAPIResponseFormat:
         endpoints = [
             ("GET", "/api/v1/health"),
             ("GET", "/api/v1/config"),
-            ("GET", "/api/v1/causal/dag"),
         ]
 
         for method, endpoint in endpoints:

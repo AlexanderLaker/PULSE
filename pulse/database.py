@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from contextlib import contextmanager
 
-from pulse.ingestion.models import Trend, CausalEdge
+from pulse.ingestion.models import Trend
 
 logger = logging.getLogger(__name__)
 
@@ -706,8 +706,13 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
 
 # ── CAUSAL EDGES ────────────────────────────────────────────────────────
 
-def save_causal_edges(edges: List[CausalEdge]) -> None:
-    """Save causal DAG edges to database."""
+def save_causal_edges(edges: List[Dict[str, Any]]) -> None:
+    """Save causal DAG edges to database.
+
+    Args:
+        edges: List of dicts with keys: source_force, target_force, propagation_weight,
+               lag_years, mechanism, evidence_strength, calibrated_from_backtest
+    """
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -722,9 +727,9 @@ def save_causal_edges(edges: List[CausalEdge]) -> None:
                 ) VALUES ({ph(7)})
                 """,
                 (
-                    edge.source_force, edge.target_force, edge.propagation_weight,
-                    edge.lag_years, edge.mechanism, edge.evidence_strength,
-                    edge.calibrated_from_backtest,
+                    edge.get("source_force"), edge.get("target_force"), edge.get("propagation_weight"),
+                    edge.get("lag_years", 0), edge.get("mechanism"), edge.get("evidence_strength", "Moderate"),
+                    edge.get("calibrated_from_backtest", False),
                 ),
             )
 
@@ -732,8 +737,13 @@ def save_causal_edges(edges: List[CausalEdge]) -> None:
         logger.info(f"Saved {len(edges)} causal edges to database")
 
 
-def load_causal_edges() -> List[CausalEdge]:
-    """Load all causal DAG edges from database."""
+def load_causal_edges() -> List[Dict[str, Any]]:
+    """Load all causal DAG edges from database.
+
+    Returns:
+        List of dicts with keys: source_force, target_force, propagation_weight,
+        lag_years, mechanism, evidence_strength, calibrated_from_backtest
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -743,15 +753,7 @@ def load_causal_edges() -> List[CausalEdge]:
         """)
 
         edges = [
-            CausalEdge(
-                source_force=_row_to_dict(row)["source_force"],
-                target_force=_row_to_dict(row)["target_force"],
-                propagation_weight=_row_to_dict(row)["propagation_weight"],
-                lag_years=_row_to_dict(row)["lag_years"],
-                mechanism=_row_to_dict(row)["mechanism"],
-                evidence_strength=_row_to_dict(row)["evidence_strength"],
-                calibrated_from_backtest=_row_to_dict(row)["calibrated_from_backtest"],
-            )
+            _row_to_dict(row)
             for row in cursor.fetchall()
         ]
 

@@ -34,7 +34,7 @@ export default function RootPage() {
       <div className="auth-container">
         <div className="auth-card flex flex-col items-center justify-center">
           <div className="w-10 h-10 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
-          <p className="mt-4 text-sm text-gray-500">Loading PULSE War Room...</p>
+          <p className="mt-4 text-sm text-gray-500">Loading PULSE Profit Pool Shift Model...</p>
         </div>
       </div>
     );

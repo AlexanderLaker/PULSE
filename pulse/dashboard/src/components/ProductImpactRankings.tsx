@@ -1,6 +1,6 @@
 /**
  * ProductImpactRankings — Top 15 positive & negative product-type impacts
- * Positioned below the heatmap in the War Room overview.
+ * Positioned below the heatmap in the Profit Pool Shift Model overview.
  *
  * Derives granular product-type impact rankings by cross-referencing
  * the simulation shift matrix with trend-level category exposure and

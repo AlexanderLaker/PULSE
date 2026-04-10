@@ -1,5 +1,5 @@
 /**
- * PRISM War Room v3 — Formatting & Design Tokens
+ * PRISM Profit Pool Shift Model v3 — Formatting & Design Tokens
  * Apple × Bain × Goldman Sachs
  */
 
@@ -57,10 +57,10 @@ export const FORCE_ICONS: Record<ForceName, string> = Object.fromEntries(
 
 // ─── Category Definitions ───────────────────────────────────
 export const CATEGORIES: CategoryDefinition[] = [
-  { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Hair', color: '#FF453A' },
-  { id: 'hair_care',    name: 'Hair: Care',     short: 'Care',    group: 'Hair', color: '#FF9F0A' },
-  { id: 'hair_styling', name: 'Hair: Styling',  short: 'Styling', group: 'Hair', color: '#FFB81D' },
-  { id: 'hair_body',    name: 'Hair: Body',     short: 'Body',    group: 'Hair', color: '#85C715' },
+  { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Beauty', color: '#FF453A' },
+  { id: 'hair_care',    name: 'Hair: Care',     short: 'Care',    group: 'Beauty', color: '#FF9F0A' },
+  { id: 'hair_styling', name: 'Hair: Styling',  short: 'Styling', group: 'Beauty', color: '#FFB81D' },
+  { id: 'hair_body',    name: 'Hair: Body',     short: 'Body',    group: 'Beauty', color: '#85C715' },
   { id: 'lhc_fcn',      name: 'LHC: FCN',       short: 'FCN',     group: 'LHC',  color: '#30D158' },
   { id: 'lhc_fca',      name: 'LHC: FCA',       short: 'FCA',     group: 'LHC',  color: '#00BFA5' },
   { id: 'lhc_ffi',      name: 'LHC: FFI',       short: 'FFI',     group: 'LHC',  color: '#00B4D8' },

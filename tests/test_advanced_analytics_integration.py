@@ -24,7 +24,7 @@ def sample_database():
             name=f"Trend {i}",
             description=f"Sample trend {i}",
             direction="Expansion" if i % 2 == 0 else "Contraction",
-            impact=2 + (i % 4),
+            gp1_pct_affected=0.05 + (i % 4) * 0.05,
             probability=2 + ((i + 1) % 4),
             category_exposure={cat: (i % 5) for cat in db.categories},
             vc_exposure={step: (i % 5) for step in ["Raw Materials", "Formulation"]},

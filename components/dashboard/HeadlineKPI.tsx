@@ -1,5 +1,5 @@
 /**
- * HeadlineKPI — Top-level metric cards for the War Room.
+ * HeadlineKPI — Top-level metric cards for the Profit Pool Shift Model.
  * Apple × Bain design: 4 KPI cards showing portfolio shift, expansions, contractions, model quality.
  */
 

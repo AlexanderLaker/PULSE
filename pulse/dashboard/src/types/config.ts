@@ -17,7 +17,7 @@ export interface CategoryDefinition {
   id: string;
   name: string;
   short: string;
-  group: 'Hair' | 'LHC';
+  group: 'Beauty' | 'LHC';
   color: string;
 }
 

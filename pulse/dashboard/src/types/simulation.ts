@@ -113,25 +113,3 @@ export interface SensitivityResult {
   category?: string;
 }
 
-/** Causal DAG edge. */
-export interface CausalEdge {
-  from: ForceName;
-  to: ForceName;
-  weight: number;
-  lag: number;
-  mechanism?: string;
-  evidence_strength?: string;
-}
-
-/** Full DAG structure from GET /causal/dag. */
-export interface CausalDAG {
-  edges: CausalEdge[];
-  forces: ForceName[];
-}
-
-/** Shock propagation result from POST /causal/propagate. */
-export interface PropagationResult {
-  impacts: Record<ForceName, Record<number, number>>;
-  shocked_force: ForceName;
-  magnitude: number;
-}

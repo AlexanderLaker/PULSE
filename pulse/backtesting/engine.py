@@ -17,7 +17,6 @@ from pulse.simulation._scipy_compat import minimize_scalar
 
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import TrendDatabase
-from pulse.simulation.deterministic import DeterministicEngine
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +152,7 @@ class BacktestingEngine:
     def _backtest_single_period(self, version: str, db: TrendDatabase,
                                  actuals: dict) -> BacktestResult:
         """Run backtesting for a single historical period."""
-        engine = DeterministicEngine(self.config)
+        raise NotImplementedError("BacktestingEngine requires implementation with BayesianMonteCarloEngine")
         predicted = engine.run(db)
 
         # Get 2030 (or latest year) predictions
@@ -187,7 +186,7 @@ class BacktestingEngine:
                 if version_name not in actuals_dict:
                     continue
                 actual = actuals_dict[version_name]
-                engine = DeterministicEngine(self.config)
+                raise NotImplementedError("BacktestingEngine requires implementation with BayesianMonteCarloEngine")
                 predicted = engine.run(db)
 
                 for cat in actual:

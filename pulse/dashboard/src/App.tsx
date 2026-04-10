@@ -7,15 +7,15 @@ import AdminUsersPanel from './components/AdminUsersPanel';
 import SettingsPage from './components/SettingsPage';
 import BurgerMenu from './components/BurgerMenu';
 
-const WarRoom = lazy(() => import('./components/WarRoom'));
+const ProfitPoolShiftModel = lazy(() => import('./components/ProfitPoolShiftModel'));
 const ConsumerJourney = lazy(() => import('./components/ConsumerJourney'));
 
-type Page = 'warroom' | 'settings' | 'journey';
+type Page = 'profitpoolshiftmodel' | 'settings' | 'journey';
 
 export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
   const [showUsers, setShowUsers] = useState(false);
-  const [page, setPage] = useState<Page>('warroom');
+  const [page, setPage] = useState<Page>('profitpoolshiftmodel');
   const [trendSearch, setTrendSearch] = useState<string | undefined>(undefined);
 
   // Still checking stored token
@@ -42,7 +42,7 @@ export default function App() {
   if (page === 'settings' && isAdmin) {
     return (
       <ErrorBoundary>
-        <SettingsPage onBack={() => setPage('warroom')} />
+        <SettingsPage onBack={() => setPage('profitpoolshiftmodel')} />
       </ErrorBoundary>
     );
   }
@@ -53,10 +53,10 @@ export default function App() {
       <ErrorBoundary>
         <Suspense fallback={<FullPageSkeleton />}>
           <ConsumerJourney
-            onBack={() => { setTrendSearch(undefined); setPage('warroom'); }}
-            onNavigateWarRoom={() => { setTrendSearch(undefined); setPage('warroom'); }}
-            onNavigateTrends={() => { setTrendSearch(undefined); setPage('warroom'); }}
-            onNavigateToTrend={(search) => { setTrendSearch(search); setPage('warroom'); }}
+            onBack={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
+            onNavigateProfitPoolShiftModel={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
+            onNavigateTrends={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
+            onNavigateToTrend={(search) => { setTrendSearch(search); setPage('profitpoolshiftmodel'); }}
             isAdmin={isAdmin}
           />
         </Suspense>
@@ -73,17 +73,17 @@ export default function App() {
             onShowConfig={() => setPage('settings')}
             onShowExport={() => {
               setTrendSearch(undefined);
-              setPage('warroom');
+              setPage('profitpoolshiftmodel');
               setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-export')), 100);
             }}
             onShowDelphi={() => {
               setTrendSearch(undefined);
-              setPage('warroom');
+              setPage('profitpoolshiftmodel');
               setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-delphi')), 100);
             }}
             onShowSnapshots={() => {
               setTrendSearch(undefined);
-              setPage('warroom');
+              setPage('profitpoolshiftmodel');
               setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots')), 100);
             }}
             onChangePassword={() => {
@@ -113,11 +113,11 @@ export default function App() {
     );
   }
 
-  // Authenticated → show War Room
+  // Authenticated → show Profit Pool Shift Model
   return (
     <ErrorBoundary>
       <Suspense fallback={<FullPageSkeleton />}>
-        <WarRoom isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} initialTrendSearch={trendSearch} />
+        <ProfitPoolShiftModel isAdmin={isAdmin} onNavigateJourney={() => setPage('journey')} initialTrendSearch={trendSearch} />
       </Suspense>
 
       {/* Burger Menu — top-left */}

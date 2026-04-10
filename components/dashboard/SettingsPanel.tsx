@@ -1,6 +1,6 @@
 /**
  * SettingsPanel — Export, model configuration, and advanced options
- * Extracted from WarRoom for modularity
+ * Extracted from ProfitPoolShiftModel for modularity
  */
 
 import { useState, FC } from 'react';

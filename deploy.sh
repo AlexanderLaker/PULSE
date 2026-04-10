@@ -1,5 +1,5 @@
 #!/bin/bash
-# PULSE War Room — Deploy to Vercel
+# PULSE Profit Pool Shift Model — Deploy to Vercel
 #
 # Prerequisites:
 #   1. npm i -g vercel
@@ -11,7 +11,7 @@
 
 set -e
 
-echo "PULSE War Room — Vercel Deployment"
+echo "PULSE Profit Pool Shift Model — Vercel Deployment"
 echo "────────────────────────────────────────"
 
 # Step 1: Build latest frontend

@@ -1,4 +1,4 @@
-"""Data models for PRISM — Trend, CausalEdge, CompetitorProfile."""
+"""Data models for PRISM — Trend and TrendDatabase."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -38,7 +38,8 @@ class Trend:
     # 100% of the pool. A high-materialization trend with gp1_pct_affected=0.15
     # means: "this trend can fully materialize, but even at full force
     # it only touches 15% of the category's GP1."
-    gp1_pct_affected: float = 0.10  # default 10% — conservative baseline
+    # Must be determined by AI analysis — no default value.
+    gp1_pct_affected: Optional[float] = None
     # Materialization timing — when does the full impact arrive?
     # peak_year: the year by which 100% of the trend's impact has materialized.
     # 0 = use default (2030). Must be >= base_year and <= 2035.
@@ -68,40 +69,14 @@ class Trend:
         # trends get higher gp1_pct assignments).
         a_p, b_p = self.probability_posterior
         prob_mean = a_p / (a_p + b_p)  # Expected probability of materialization
-        self.normalized_score = prob_mean * self.gp1_pct_affected * direction_sign
+        gp1 = self.gp1_pct_affected if self.gp1_pct_affected is not None else 0.0
+        self.normalized_score = prob_mean * gp1 * direction_sign
 
     @property
     def direction_sign(self) -> int:
         return 1 if self.direction == "Expansion" else -1
 
 
-@dataclass
-class CausalEdge:
-    """A directed edge in the causal DAG between forces."""
-    source_force: str
-    target_force: str
-    propagation_weight: float = 0.3       # 0.0 to 1.0
-    lag_years: int = 0                     # 0, 1, or 2
-    mechanism: str = ""
-    evidence_strength: str = "Moderate"    # "Strong" | "Moderate" | "Weak"
-    calibrated_from_backtest: bool = False
-
-    def __post_init__(self):
-        self.propagation_weight = max(0.0, min(1.0, self.propagation_weight))
-        self.lag_years = max(0, min(2, self.lag_years))
-
-
-@dataclass
-class CompetitorProfile:
-    """Public competitive intelligence profile (no financials)."""
-    id: str
-    name: str
-    archetype: str = "balanced"           # "premium_defender" | "sustainability_leader" etc.
-    hair_exposure: float = 0.5
-    lhc_exposure: float = 0.5
-    response_speed: str = "medium"        # "fast" | "medium" | "slow"
-    typical_responses: dict = field(default_factory=dict)
-    category_exposure: dict = field(default_factory=dict)
 
 
 @dataclass

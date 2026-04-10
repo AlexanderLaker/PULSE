@@ -1,5 +1,5 @@
 /**
- * PRISM War Room — Typed API Client
+ * PRISM Profit Pool Shift Model — Typed API Client
  * Fully typed interface to the FastAPI backend.
  * Zero `any` types. Every request and response is typed.
  */
@@ -7,7 +7,6 @@
 import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
-  CausalDAG, PropagationResult,
   SensitivityResult,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
@@ -129,22 +128,6 @@ export const getSimulationStatus = (): Promise<{ stale: boolean; reason: string;
 
 export const runSimulation = (params: SimulationParams = {}): Promise<SimulationResult> =>
   request('/simulate', { method: 'POST', body: JSON.stringify(params) });
-
-export const runDeterministic = (): Promise<SimulationResult> =>
-  request('/simulate/deterministic', { method: 'POST' });
-
-// ── Causal DAG ───────────────────────────────────────────────────
-
-export const getDAG = (): Promise<CausalDAG> =>
-  request('/causal/dag');
-
-export const propagateShock = (data: {
-  shocked_force: string;
-  magnitude: number;
-  years?: number;
-}): Promise<PropagationResult> =>
-  request('/causal/propagate', { method: 'POST', body: JSON.stringify(data) });
-
 
 // ── Sensitivity ──────────────────────────────────────────────────
 

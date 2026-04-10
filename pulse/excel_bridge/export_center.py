@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class ExportCenter:
     """Generates professional PPTX, PDF, and Excel reports from PRISM Shift Matrix."""
 
-    # Color scheme — matches War Room design
+    # Color scheme — matches Profit Pool Shift Model design
     COLOR_BLUE = RGBColor(59, 130, 246)  # #3B82F6
     COLOR_EXPANSION = RGBColor(34, 197, 94)  # #22C55E (green)
     COLOR_CONTRACTION = RGBColor(239, 68, 68)  # #EF4444 (red)

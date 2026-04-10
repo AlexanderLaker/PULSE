@@ -1,7 +1,7 @@
 /**
  * DelphiPanel — Expert Elicitation UI
  * 5 tabs: Sessions Overview | Scoring Interface | Round Summary | Consensus & Results | Calibration
- * Slides in from the right as a contextual panel in the War Room
+ * Slides in from the right as a contextual panel in the Profit Pool Shift Model
  * Includes:
  * - Multi-round scoring interface with anonymized previous round distributions
  * - Calibration exercise section with accuracy feedback

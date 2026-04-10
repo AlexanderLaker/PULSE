@@ -23,20 +23,8 @@ VC_STEPS = [
 # ── Regional taxonomy ──────────────────────────────────────────────
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
-# ── Sheet names to read / skip ──────────────────────────────────────
-FORCE_SHEETS = {
-    "Consumer": "1_Consumer",
-    "Customer": "2_Customer",
-    "Technology": "3_Technology",
-    "Government": "4_Government",
-    "Environmental": "5_Environment",
-    "Competitive": "6_Competitive",
-}
-SKIP_SHEETS = {"Input", "Financials_Input", "Cover", "Dashboard", "Sensitivity",
-               "Profit Pool Comparison", "Profit Pool Map", "Financial Overview"}
-
 # ── Default model parameters ────────────────────────────────────────
-DEFAULT_ATTENUATION = 0.5          # Will be overridden by backtesting if available
+DEFAULT_ATTENUATION = 0.5          # Admin-configurable via PUT /api/v1/config
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
@@ -128,7 +116,7 @@ DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equ
 
 # ── Copula parameters ──────────────────────────────────────────────
 DEFAULT_WITHIN_FORCE_RHO = 0.3
-DEFAULT_T_COPULA_DF = 4  # Low df → heavy tails → crisis correlation
+DEFAULT_T_COPULA_DF = 8  # Moderate tails; admin-configurable via PUT /api/v1/config (range 2-30)
 DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 
 # ── Force correlation matrix (cross-force correlations for copula) ──────
@@ -142,14 +130,6 @@ DEFAULT_FORCE_CORRELATIONS = {
     "Environmental": {"Consumer": 0.20, "Customer": 0.05, "Technology": 0.15, "Government": 0.30, "Environmental": 1.0, "Competitive": 0.05},
     "Competitive": {"Consumer": 0.20, "Customer": 0.25, "Technology": 0.25, "Government": 0.05, "Environmental": 0.05, "Competitive": 1.0},
 }
-
-# ── Financial data firewall patterns ───────────────────────────────
-FINANCIAL_KEYWORDS = {"NES", "GP1", "GP2", "revenue", "sales", "profit",
-                      "EBIT", "EBITDA", "margin", "turnover", "net income"}
-FINANCIAL_CURRENCY_PATTERNS = [r"€\s*\d+", r"EUR\s+\d+", r"\d+[.,]\d+\s*M",
-                               r"\d+[.,]\d+\s*€", r"\$\s*\d+"]
-MAX_FINANCIAL_VALUE = 50  # Values > 50 in descriptions flagged as potential financials
-
 
 @dataclass
 class ModelConfig:

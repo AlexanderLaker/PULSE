@@ -1,5 +1,5 @@
 /**
- * PULSE War Room — Master Type Definitions
+ * PULSE Profit Pool Shift Model — Master Type Definitions
  * All domain types for the Profit Pool Unified Landscape Simulation Engine.
  *
  * Design principle: Types mirror the Python backend's data contracts exactly.

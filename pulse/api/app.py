@@ -1,7 +1,7 @@
-"""FastAPI application — PRISM War Room backend.
+"""FastAPI application — PRISM Profit Pool Shift Model backend.
 
 Serves simulation results, handles real-time re-simulation on score changes,
-and provides all data for the React War Room dashboard.
+and provides all data for the React Profit Pool Shift Model dashboard.
 """
 
 import json
@@ -14,8 +14,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -66,14 +66,10 @@ def _summarize_convergence(conv: dict) -> dict:
 
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES
-from pulse.ingestion.excel_reader import ExcelReader
 from pulse.ingestion.models import Trend, TrendDatabase
-from pulse.simulation.deterministic import DeterministicEngine
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 from pulse.simulation.sensitivity import SensitivityEngine
 from pulse.simulation.paths import PathAnalyzer
-from pulse.causal.dag import CausalDAG
-from pulse.game_theory.competitive import CompetitiveResponseModel
 from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
@@ -88,11 +84,8 @@ logger = logging.getLogger(__name__)
 _state = {
     "db": None,
     "config": None,
-    "dag": None,
     "mc_result": None,
-    "det_result": None,
     "allocation": None,
-    "competitive": None,
     "audit": None,
     "delphi": None,
 }
@@ -250,23 +243,14 @@ def create_app(args=None) -> FastAPI:
         async with _state_lock:
             config = _state["config"]
             db = _state["db"]
-            dag = _state["dag"]
 
             if not db:
                 return
 
-            # Deterministic
-            det = DeterministicEngine(config)
-            _state["det_result"] = det.run(db)
-
             # Bayesian MC
-            mc = BayesianMonteCarloEngine(config, dag)
+            mc = BayesianMonteCarloEngine(config)
             mc_result = mc.run(db, iterations=iterations)
             _state["mc_result"] = mc_result
-
-            # Competitive
-            comp = CompetitiveResponseModel()
-            _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
             # Allocation
             opt = AllocationOptimizer(config)
@@ -293,7 +277,6 @@ def create_app(args=None) -> FastAPI:
         async with _state_lock:
             _state["audit"] = AuditLogger()
             _state["config"] = ModelConfig()
-            _state["dag"] = CausalDAG()
 
             # Always initialize the database schema (creates all tables including session_snapshots)
             try:
@@ -307,21 +290,12 @@ def create_app(args=None) -> FastAPI:
             _state["delphi"] = DelphiProtocol()
             _state["delphi"]._ensure_tables_exist()
 
-            # Try to load V12 if input path provided
-            if args and args.input:
-                try:
-                    reader = ExcelReader(args.input)
-                    _state["db"] = reader.read()
-                except Exception as e:
-                    logger.error(f"Failed to load Excel: {e}")
-
-            # If no Excel loaded, load from database (seeds if empty)
-            if not _state["db"]:
-                try:
-                    _state["db"] = _load_trend_database()
-                    logger.info(f"Loaded {_state['db'].trend_count} trends from database")
-                except Exception as e:
-                    logger.error(f"Failed to load trends: {e}")
+            # Load from database (seeds if empty)
+            try:
+                _state["db"] = _load_trend_database()
+                logger.info(f"Loaded {_state['db'].trend_count} trends from database")
+            except Exception as e:
+                logger.error(f"Failed to load trends: {e}")
 
             # Migrate: backfill peak_year and diffusion_curve for existing trends
             if _state.get("db"):
@@ -359,19 +333,11 @@ def create_app(args=None) -> FastAPI:
             try:
                 logger.info("No persisted simulation found — auto-running initial simulation...")
                 config = _state["config"]
-                dag = _state["dag"]
                 db = _state["db"]
 
-                det = DeterministicEngine(config)
-                det_result = det.run(db)
-                _state["det_result"] = det_result
-
-                mc = BayesianMonteCarloEngine(config, dag)
+                mc = BayesianMonteCarloEngine(config)
                 mc_result = mc.run(db, iterations=config.iterations or 5000)
                 _state["mc_result"] = mc_result
-
-                comp = CompetitiveResponseModel()
-                _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
                 opt = AllocationOptimizer(config)
                 _state["allocation"] = opt.optimize(
@@ -402,7 +368,7 @@ def create_app(args=None) -> FastAPI:
             pass
 
     app = FastAPI(
-        title="PRISM War Room API",
+        title="PRISM Profit Pool Shift Model API",
         version=__version__,
         description="Profit Pool Simulation Engine — Bayesian MC + Causal DAG",
         lifespan=lifespan
@@ -466,7 +432,6 @@ def create_app(args=None) -> FastAPI:
                     # Initialize core components
                     _state["audit"] = AuditLogger()
                     _state["config"] = ModelConfig()
-                    _state["dag"] = CausalDAG()
         
                     # Initialize Delphi (uses shared database, non-critical)
                     try:
@@ -493,7 +458,7 @@ def create_app(args=None) -> FastAPI:
                             print(f"[PRISM] Failed to load trends: {e}", flush=True)
                             import traceback; traceback.print_exc()
 
-                    # Try to load latest simulation from DB so War Room fills immediately
+                    # Try to load latest simulation from DB so Profit Pool Shift Model fills immediately
                     if _state["db"] and _state["db"].trend_count > 0 and not _state.get("mc_result"):
                         try:
                             from pulse.database import load_simulation_runs
@@ -523,18 +488,11 @@ def create_app(args=None) -> FastAPI:
                                 print("[PRISM] No simulation in DB — auto-running initial simulation...", flush=True)
                                 try:
                                     config = _state["config"]
-                                    dag = _state["dag"]
                                     db = _state["db"]
 
-                                    det = DeterministicEngine(config)
-                                    _state["det_result"] = det.run(db)
-
-                                    mc_engine = BayesianMonteCarloEngine(config, dag)
+                                    mc_engine = BayesianMonteCarloEngine(config)
                                     mc_result = mc_engine.run(db, iterations=config.iterations or 5000)
                                     _state["mc_result"] = mc_result
-
-                                    comp = CompetitiveResponseModel()
-                                    _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
                                     opt = AllocationOptimizer(config)
                                     _state["allocation"] = opt.optimize(
@@ -630,11 +588,9 @@ def create_app(args=None) -> FastAPI:
             )
             steps.append(f"trend_database_count={_state['db'].trend_count}")
 
-            # Ensure config/dag are initialized (but do NOT auto-simulate)
+            # Ensure config is initialized (but do NOT auto-simulate)
             config = _state.get("config") or ModelConfig()
             _state["config"] = config
-            dag = _state.get("dag") or CausalDAG()
-            _state["dag"] = dag
             # Mark simulation as stale — admin must press Simulate
             _state["simulation_stale"] = True
             _state["stale_reason"] = "Trends re-seeded. Press Simulate to update results."
@@ -787,6 +743,76 @@ def create_app(args=None) -> FastAPI:
             "force": req.force,
             "name": req.name,
             "trend_count": db.trend_count,
+        }
+
+    @app.api_route("/api/v1/trends/revert-to-seed", methods=["GET", "POST"])
+    async def revert_trends_to_seed():
+        """Revert ALL trend probability scores back to seed_trends.py original values.
+
+        This undoes any Delphi consensus application or manual edits to probability.
+        Also resets debiasing_applied to False and score_variance to 0.
+        """
+        from pulse.seed_trends import get_report_trends
+        from pulse.database import load_trends, save_trends, log_audit
+
+        seed_trends = get_report_trends()
+        db_trends = load_trends()
+
+        seed_map = {t.id: t for t in seed_trends}
+        changes = []
+
+        for t in db_trends:
+            seed = seed_map.get(t.id)
+            if not seed:
+                continue
+            if t.probability != seed.probability or t.debiasing_applied:
+                changes.append({
+                    "id": t.id,
+                    "name": t.name,
+                    "old_probability": t.probability,
+                    "new_probability": seed.probability,
+                    "debiasing_was": t.debiasing_applied,
+                })
+                t.probability = seed.probability
+                t.debiasing_applied = False
+                t.score_variance = 0.0
+                t.scorer_count = 1
+                # Recalculate normalized_score
+                t.__post_init__()
+
+        if not changes:
+            return {"status": "no_changes", "message": "All trends already match seed values"}
+
+        try:
+            save_trends(db_trends)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to save reverted trends: {e}")
+
+        # Refresh in-memory state
+        db_trends = load_trends()
+        db = _state.get("db")
+        if db:
+            db.trends = db_trends
+            _state["simulation_stale"] = True
+            _state["stale_reason"] = f"Reverted {len(changes)} trends to seed values"
+
+        try:
+            log_audit(
+                "trends_reverted_to_seed",
+                "trend",
+                "all",
+                old_value=f"{len(changes)} trends had modified probabilities",
+                new_value="All probabilities reset to seed_trends.py",
+                reason="User requested Delphi consensus revert",
+            )
+        except Exception:
+            pass
+
+        return {
+            "status": "reverted",
+            "changes": changes,
+            "changes_count": len(changes),
+            "total_trends": len(db_trends),
         }
 
     @app.get("/api/v1/trends/{trend_id}")
@@ -1014,76 +1040,6 @@ def create_app(args=None) -> FastAPI:
             "total_count": len(db_trends),
         }
 
-    @app.post("/api/v1/trends/revert-to-seed")
-    async def revert_trends_to_seed():
-        """Revert ALL trend probability scores back to seed_trends.py original values.
-
-        This undoes any Delphi consensus application or manual edits to probability.
-        Also resets debiasing_applied to False and score_variance to 0.
-        """
-        from pulse.seed_trends import get_report_trends
-        from pulse.database import load_trends, save_trends, log_audit
-
-        seed_trends = get_report_trends()
-        db_trends = load_trends()
-
-        seed_map = {t.id: t for t in seed_trends}
-        changes = []
-
-        for t in db_trends:
-            seed = seed_map.get(t.id)
-            if not seed:
-                continue
-            if t.probability != seed.probability or t.debiasing_applied:
-                changes.append({
-                    "id": t.id,
-                    "name": t.name,
-                    "old_probability": t.probability,
-                    "new_probability": seed.probability,
-                    "debiasing_was": t.debiasing_applied,
-                })
-                t.probability = seed.probability
-                t.debiasing_applied = False
-                t.score_variance = 0.0
-                t.scorer_count = 1
-                # Recalculate normalized_score
-                t.__post_init__()
-
-        if not changes:
-            return {"status": "no_changes", "message": "All trends already match seed values"}
-
-        try:
-            save_trends(db_trends)
-        except Exception as e:
-            raise HTTPException(500, f"Failed to save reverted trends: {e}")
-
-        # Refresh in-memory state
-        db_trends = load_trends()
-        db = _state.get("db")
-        if db:
-            db.trends = db_trends
-            _state["simulation_stale"] = True
-            _state["stale_reason"] = f"Reverted {len(changes)} trends to seed values"
-
-        try:
-            log_audit(
-                "trends_reverted_to_seed",
-                "trend",
-                "all",
-                old_value=f"{len(changes)} trends had modified probabilities",
-                new_value="All probabilities reset to seed_trends.py",
-                reason="User requested Delphi consensus revert",
-            )
-        except Exception:
-            pass
-
-        return {
-            "status": "reverted",
-            "changes": changes,
-            "changes_count": len(changes),
-            "total_trends": len(db_trends),
-        }
-
     # ── Simulation Status ─────────────────────────────────────────
     @app.get("/api/v1/simulation/status")
     async def get_simulation_status():
@@ -1128,7 +1084,6 @@ def create_app(args=None) -> FastAPI:
             "iterations": mc.get("iterations", 5000),
             "model_type": mc.get("model_type", "bayesian_copula"),
             "allocation": _state.get("allocation"),
-            "competitive": _state.get("competitive"),
             "vc_decomposition": mc.get("vc_decomposition"),
         })
 
@@ -1146,21 +1101,11 @@ def create_app(args=None) -> FastAPI:
                 raise HTTPException(404, "No trends found. Add trends before simulating.")
 
             config = _state["config"]
-            dag = _state["dag"]
-
-            # Deterministic
-            det = DeterministicEngine(config)
-            det_result = det.run(db)
-            _state["det_result"] = det_result
 
             # Bayesian Monte Carlo
-            mc = BayesianMonteCarloEngine(config, dag)
+            mc = BayesianMonteCarloEngine(config)
             mc_result = mc.run(db, iterations=req.iterations)
             _state["mc_result"] = mc_result
-
-            # Competitive response
-            comp = CompetitiveResponseModel()
-            _state["competitive"] = comp.compute_all_competitive_adjustments({})
 
             # Allocation optimizer
             if req.include_allocation:
@@ -1201,33 +1146,6 @@ def create_app(args=None) -> FastAPI:
                 "vc_decomposition": mc_result.get("vc_decomposition"),
             })
 
-    @app.post("/api/v1/simulate/deterministic")
-    async def run_deterministic():
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-        det = DeterministicEngine(_state["config"])
-        result = det.run(db)
-        _state["det_result"] = result
-        return _sanitize({"shift_matrix": result})
-
-    # ── Causal DAG ──────────────────────────────────────────────────
-    @app.get("/api/v1/causal/dag")
-    async def get_dag():
-        dag = _state.get("dag")
-        if not dag:
-            return {"nodes": FORCES, "edges": []}
-        return dag.to_dict()
-
-    @app.post("/api/v1/causal/propagate")
-    async def propagate_shock(req: ShockRequest):
-        dag = _state.get("dag")
-        if not dag:
-            raise HTTPException(404, "No causal DAG")
-        result = dag.propagate_shock(req.shocked_force, req.magnitude, req.years)
-        signature = dag.get_propagation_signature(req.shocked_force)
-        return _sanitize({"propagation": result, "signature": signature})
-
     # ── Sensitivity ─────────────────────────────────────────────────
     @app.get("/api/v1/sensitivity/tornado")
     async def tornado(category: Optional[str] = None):
@@ -1240,7 +1158,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
-        se = SensitivityEngine(_state["config"], _state.get("dag"))
+        se = SensitivityEngine(_state["config"])
         return _sanitize(se.tornado_analysis(db, category))
 
     @app.post("/api/v1/sensitivity/tornado")
@@ -1254,7 +1172,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
-        se = SensitivityEngine(_state["config"], _state.get("dag"))
+        se = SensitivityEngine(_state["config"])
         return _sanitize(se.tornado_analysis(db, category))
 
     @app.get("/api/v1/sensitivity/breakeven")
@@ -1268,7 +1186,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
-        se = SensitivityEngine(_state["config"], _state.get("dag"))
+        se = SensitivityEngine(_state["config"])
         # Call a breakeven method if it exists, otherwise return a placeholder
         try:
             return _sanitize(se.breakeven_analysis(db, category))
@@ -1292,7 +1210,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
-        se = SensitivityEngine(_state["config"], _state.get("dag"))
+        se = SensitivityEngine(_state["config"])
         try:
             return _sanitize(se.breakeven_analysis(db, category))
         except (AttributeError, NotImplementedError):
@@ -1308,7 +1226,7 @@ def create_app(args=None) -> FastAPI:
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
-        se = SensitivityEngine(_state["config"], _state.get("dag"))
+        se = SensitivityEngine(_state["config"])
         return _sanitize(se.attenuation_sensitivity(db))
 
     # ── Optimizer ───────────────────────────────────────────────────
@@ -1634,7 +1552,7 @@ def create_app(args=None) -> FastAPI:
 
             out_dir = os.path.join(tempfile.gettempdir(), "pulse_exports")
             os.makedirs(out_dir, exist_ok=True)
-            out_file = os.path.join(out_dir, "PRISM_War_Room.pptx")
+            out_file = os.path.join(out_dir, "PRISM_Profit_Pool_Shift_Model.pptx")
 
             db = _state.get("db")
             trends_list = [
@@ -1665,7 +1583,7 @@ def create_app(args=None) -> FastAPI:
             return FileResponse(
                 out_file,
                 media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                filename="PRISM_War_Room.pptx",
+                filename="PRISM_Profit_Pool_Shift_Model.pptx",
             )
         except Exception as e:
             import traceback

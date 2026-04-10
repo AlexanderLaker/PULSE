@@ -396,7 +396,7 @@ Key Features:
     print("  2. Integrate with Power BI for €M application")
     print("  3. Set up scheduled monthly trend scanning")
     print("  4. Configure Azure Key Vault for API credentials")
-    print("  5. Run War Room dashboard with real simulation data")
+    print("  5. Run Profit Pool Shift Model dashboard with real simulation data")
 
 
 if __name__ == "__main__":

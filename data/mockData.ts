@@ -1,6 +1,6 @@
 /**
- * PULSE War Room — Mock Data Generation
- * All mock data generators extracted from WarRoom.tsx
+ * PULSE Profit Pool Shift Model — Mock Data Generation
+ * All mock data generators extracted from ProfitPoolShiftModel.tsx
  * Used when API is unavailable or for testing.
  *
  * Exports:

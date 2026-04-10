@@ -1,5 +1,5 @@
 /**
- * Central state hook for PULSE War Room.
+ * Central state hook for PULSE Profit Pool Shift Model.
  * Single source of truth — all components read from here.
  * Connects to real FastAPI backend with graceful fallback to mock data.
  */

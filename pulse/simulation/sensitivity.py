@@ -7,8 +7,6 @@ import numpy as np
 
 from pulse.config import ModelConfig, FORCES
 from pulse.ingestion.models import TrendDatabase
-from pulse.simulation.deterministic import DeterministicEngine
-from pulse.causal.dag import CausalDAG
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +14,8 @@ logger = logging.getLogger(__name__)
 class SensitivityEngine:
     """Interactive sensitivity analysis for the shift model."""
 
-    def __init__(self, config: ModelConfig, dag: Optional[CausalDAG] = None):
+    def __init__(self, config: ModelConfig):
         self.config = config
-        self.dag = dag
-        self.det_engine = DeterministicEngine(config)
 
     def tornado_analysis(self, db: TrendDatabase, category: Optional[str] = None) -> list:
         """
@@ -31,7 +27,7 @@ class SensitivityEngine:
 
         Returns: list of {trend_id, trend_name, force, low, high, range, base}
         """
-        base_result = self.det_engine.run(db)
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")
 
         # If category specified, focus on that; otherwise total
         def _get_metric(result):
@@ -88,7 +84,7 @@ class SensitivityEngine:
 
         Returns: {trend_id: required_score_change} for most impactful trends
         """
-        base_result = self.det_engine.run(db)
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")
         current_shift = base_result.get(category, {}).get(2030, 0.0)
 
         if abs(current_shift) < 0.001:
@@ -133,7 +129,7 @@ class SensitivityEngine:
         What happens if we remove an entire force?
         Shows which force contributes most to the overall shift.
         """
-        base_result = self.det_engine.run(db)
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")
         eliminations = {}
 
         for force in FORCES:
@@ -214,7 +210,7 @@ class SensitivityEngine:
         if not self.dag:
             return {"error": "No causal DAG configured"}
 
-        base_result = self.det_engine.run(db)  # DAG doesn't affect deterministic directly
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")  # DAG doesn't affect deterministic directly
         # This analysis is more meaningful with MC, but we approximate
         edge_importance = []
         for edge in self.dag.edges:

@@ -1,4 +1,4 @@
-"""PowerPoint export for PRISM War Room results.
+"""PowerPoint export for PRISM Profit Pool Shift Model results.
 
 Generates professional executive decks with shift matrices, trend analysis,
 and strategic recommendations. All values are percentages only.
@@ -17,7 +17,7 @@ from pulse.config import CATEGORIES, FORCES
 
 logger = logging.getLogger(__name__)
 
-# Design tokens matching React War Room
+# Design tokens matching React Profit Pool Shift Model
 COLORS = {
     "primary": RGBColor(0, 113, 227),          # #0071E3
     "accent": RGBColor(123, 97, 255),          # #7B61FF (purple)
@@ -101,7 +101,7 @@ class PowerPointExporter:
         title_frame = title_box.text_frame
         title_frame.word_wrap = True
         p = title_frame.paragraphs[0]
-        p.text = "PRISM War Room"
+        p.text = "PRISM Profit Pool Shift Model"
         p.font.size = Pt(54)
         p.font.bold = True
         p.font.color.rgb = COLORS["bg"]

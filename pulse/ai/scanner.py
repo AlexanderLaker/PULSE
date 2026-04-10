@@ -7,7 +7,6 @@ from datetime import datetime
 import asyncio
 
 from pulse.ai.provider import get_provider
-from pulse.ingestion.firewall import FinancialDataFirewall
 
 if TYPE_CHECKING:
     from pulse.ai.provider import LLMProvider
@@ -44,7 +43,6 @@ class TrendScanner:
             provider: LLM provider (uses default if not specified)
         """
         self.provider = provider or get_provider()
-        self.firewall = FinancialDataFirewall()
         self._setup_dependencies()
 
     def _setup_dependencies(self):

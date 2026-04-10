@@ -149,7 +149,7 @@ const ValueChainShiftMatrix: React.FC<ValueChainShiftMatrixProps> = ({
 
   // Group categories by division
   const categoryGroups = useMemo(() => [
-    { group: 'Hair', categories: CATEGORIES.filter(c => c.group === 'Hair') },
+    { group: 'Beauty', categories: CATEGORIES.filter(c => c.group === 'Beauty') },
     { group: 'LHC', categories: CATEGORIES.filter(c => c.group === 'LHC') },
   ], []);
 

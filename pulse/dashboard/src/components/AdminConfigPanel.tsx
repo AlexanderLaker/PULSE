@@ -242,7 +242,7 @@ const AdminConfigPanel: FC<AdminConfigPanelProps> = ({ isOpen, onClose }) => {
       setRegionWeights(normalized_region_weights);
       setAttenuationSource('admin_override');
 
-      // Notify the War Room that config changed (simulation is now stale)
+      // Notify the Profit Pool Shift Model that config changed (simulation is now stale)
       window.dispatchEvent(new CustomEvent('pulse:config-updated'));
       window.dispatchEvent(new CustomEvent('pulse:simulation-stale', { detail: { reason: 'Configuration changed' } }));
     } catch (e: any) {

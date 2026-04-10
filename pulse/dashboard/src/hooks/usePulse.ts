@@ -1,5 +1,5 @@
 /**
- * Central state hook for PRISM War Room.
+ * Central state hook for PRISM Profit Pool Shift Model.
  * Single source of truth — all components read from here.
  * Connects to real FastAPI backend. No mock data — shows empty state when backend unavailable.
  */
@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '../api/client';
 import type {
   HealthStatus, Trend, ForceSummary, SimulationResult,
-  CausalDAG, ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
+  ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
   ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
   TrendUpdate,
 } from '../types';
@@ -18,7 +18,6 @@ export interface UsePulseReturn {
   trends: Trend[];
   forces: ForceSummary[];
   simulation: SimulationResult | null;
-  dag: CausalDAG | null;
   config: ModelConfig | null;
   analytics: AnalyticsState | null;
   aiSuggestions: AISuggestion[];
@@ -40,7 +39,6 @@ export default function usePulse(): UsePulseReturn {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [forces, setForces] = useState<ForceSummary[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
-  const [dag, setDag] = useState<CausalDAG | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsState | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -58,11 +56,10 @@ export default function usePulse(): UsePulseReturn {
     setLoading(true);
     setError(null);
     try {
-      const [h, t, f, d, c] = await Promise.all([
+      const [h, t, f, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
         api.getTrends().catch((): Trend[] => []),
         api.getForces().catch((): ForceSummary[] => []),
-        api.getDAG().catch((): null => null),
         api.getConfig().catch((): null => null),
       ]);
 
@@ -82,7 +79,6 @@ export default function usePulse(): UsePulseReturn {
         setForces([]);
       }
 
-      setDag(d);
       setConfig(c);
 
       // Always try to load simulation (don't depend on has_simulation flag)
@@ -221,7 +217,7 @@ export default function usePulse(): UsePulseReturn {
   }, [backendAvailable]);
 
   return {
-    health, trends, forces, simulation, dag, config,
+    health, trends, forces, simulation, config,
     analytics, aiSuggestions, triggers,
     loading, simulating, simulationStale, staleReason,
     error, backendAvailable,

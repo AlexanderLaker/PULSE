@@ -1,5 +1,5 @@
 /**
- * PRISM War Room — Authentication Page
+ * PRISM Profit Pool Shift Model — Authentication Page
  * Professional auth flow: Sign In, Register, Forgot Password (email-based via Resend),
  * and Reset Password (via token from email link).
  */

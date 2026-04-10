@@ -1,7 +1,7 @@
 /**
  * AdminUsersPanel — Professional user management panel.
  * Full CRUD: view, search, edit roles, delete users.
- * Apple-grade white/slate design matching War Room aesthetic.
+ * Apple-grade white/slate design matching Profit Pool Shift Model aesthetic.
  */
 import { useState, useEffect, useCallback, type FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -566,7 +566,7 @@ const AdminUsersPanel: FC<AdminUsersPanelProps> = ({ isOpen, onClose, currentUse
               flexShrink: 0,
             }}>
               <span style={{ fontSize: 11, color: T.text3 }}>
-                Invite codes: PRISM-2026 · HENKEL-STRATEGY · WARROOM-ACCESS
+                Invite codes: PRISM-2026 · HENKEL-STRATEGY · PROFITPOOLSHIFTMODEL-ACCESS
               </span>
               <button
                 onClick={fetchUsers}

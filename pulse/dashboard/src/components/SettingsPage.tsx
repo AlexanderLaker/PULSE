@@ -292,7 +292,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
           {/* Category Weights */}
           <Card title="Category Weights" subtitle="How categories are weighted in portfolio-level aggregation.">
             {Object.keys(categoryWeights).filter(c => c.startsWith('Hair')).length > 0 && (
-              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: '0.5px', margin: '0 0 6px' }}>HAIR</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: '0.5px', margin: '0 0 6px' }}>BEAUTY</div>
             )}
             {Object.keys(categoryWeights).filter(c => c.startsWith('Hair')).map(c => (
               <SliderInput key={c} label={c.replace('Hair: ', '')} value={categoryWeights[c] ?? 0}

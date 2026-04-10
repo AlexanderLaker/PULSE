@@ -1,7 +1,7 @@
 /**
  * ShiftHeatmap — Category × Year shift matrix visualization.
  * Apple design: monospace data, diverging colors (green/red), subtle transitions.
- * Core War Room view showing 12 categories × 5 years of % shifts with percentiles.
+ * Core Profit Pool Shift Model view showing 12 categories × 5 years of % shifts with percentiles.
  */
 
 import { useState, useMemo, FC, MouseEvent } from 'react';

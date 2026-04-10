@@ -1,5 +1,5 @@
 /**
- * HeadlineKPI — Top-level metric cards for the War Room.
+ * HeadlineKPI — Top-level metric cards for the Profit Pool Shift Model.
  * Apple × Bain design: 4 KPI cards showing portfolio shift, expansions, contractions, model quality.
  */
 
@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import React, { useState } from 'react';
 import type { ShiftMatrix, ConvergenceDiagnostics } from '../types';
-import { T, fmtShift, shiftColorHex } from '../lib/format';
+import { T, CATEGORIES, fmtShift, shiftColorHex } from '../lib/format';
 
 interface KPICardProps {
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
@@ -182,6 +182,12 @@ export default function HeadlineKPI({
     return { median: v, p10: v, p90: v };
   }
 
+  // Helper: catId → short display name (e.g. "hair_color" → "Color", "lhc_fcn" → "FCN")
+  function catShortName(catId: string): string {
+    const found = CATEGORIES.find(c => c.id === catId);
+    return found?.short ?? catId;
+  }
+
   // Compute portfolio average shift at 2030 + top 3 expansions & contractions
   let avgShift = 0;
   let avgP10 = 0;
@@ -260,16 +266,16 @@ export default function HeadlineKPI({
                 <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>#</th>
                 <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Category</th>
                 <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Shift</th>
-                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10–p90</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10 to p90</th>
               </tr>
             </thead>
             <tbody>
               {top3Expansions.map((cat, i) => (
                 <tr key={cat.name} style={{ borderBottom: i < top3Expansions.length - 1 ? `1px solid ${T.border}` : 'none' }}>
                   <td style={{ padding: '5px 4px 5px 0', color: T.text4, fontWeight: 600 }}>{i + 1}.</td>
-                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{cat.name}</td>
+                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{catShortName(cat.name)}</td>
                   <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', fontWeight: 700, color: shiftColorHex(cat.val) }}>{fmtShift(cat.val)}</td>
-                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)} to {fmtShift(cat.p90)}</td>
                 </tr>
               ))}
             </tbody>
@@ -292,16 +298,16 @@ export default function HeadlineKPI({
                 <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>#</th>
                 <th style={{ textAlign: 'left', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Category</th>
                 <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>Shift</th>
-                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10–p90</th>
+                <th style={{ textAlign: 'right', padding: '0 0 4px 0', fontWeight: 600, color: T.text3, fontSize: 9 }}>p10 to p90</th>
               </tr>
             </thead>
             <tbody>
               {top3Contractions.map((cat, i) => (
                 <tr key={cat.name} style={{ borderBottom: i < top3Contractions.length - 1 ? `1px solid ${T.border}` : 'none' }}>
                   <td style={{ padding: '5px 4px 5px 0', color: T.text4, fontWeight: 600 }}>{i + 1}.</td>
-                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{cat.name}</td>
+                  <td style={{ padding: '5px 4px', color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{catShortName(cat.name)}</td>
                   <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', fontWeight: 700, color: shiftColorHex(cat.val) }}>{fmtShift(cat.val)}</td>
-                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)}–{fmtShift(cat.p90)}</td>
+                  <td style={{ padding: '5px 0 5px 4px', textAlign: 'right', color: T.text4 }}>{fmtShift(cat.p10)} to {fmtShift(cat.p90)}</td>
                 </tr>
               ))}
             </tbody>

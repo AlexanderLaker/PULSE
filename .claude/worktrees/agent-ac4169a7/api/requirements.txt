@@ -1,0 +1,11 @@
+# PULSE API — Vercel serverless runtime dependencies
+# Total must stay under 250MB unzipped
+# scipy (~150MB) removed — numpy fallbacks used instead
+# pandas (~60MB) removed — not needed at runtime (seed data used)
+fastapi>=0.110
+pydantic>=2.6
+numpy>=1.26
+psycopg2-binary>=2.9
+aiohttp>=3.9
+feedparser>=6.0
+requests>=2.31

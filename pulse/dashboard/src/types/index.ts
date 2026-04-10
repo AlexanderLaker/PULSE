@@ -1,5 +1,5 @@
 /**
- * PRISM War Room — Master Type Definitions
+ * PRISM Profit Pool Shift Model — Master Type Definitions
  * All domain types for the Profit Pool Risk & Intelligence Simulation Model.
  *
  * Design principle: Types mirror the Python backend's data contracts exactly.
@@ -31,15 +31,12 @@ export type Direction = 'Expansion' | 'Contraction';
 /** Confidence level assigned to a trend's evidence base. */
 export type Confidence = 'High' | 'Medium' | 'Low';
 
-/** Evidence strength for causal DAG edges. */
-export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak';
-
 /** AI provider options for the LLM abstraction layer. */
 export type AIProvider = 'claude' | 'azure' | 'ollama' | 'none';
 
 
 /** Simulation model types. */
-export type ModelType = 'deterministic' | 'bayesian_mc' | 'copula_mc';
+export type ModelType = 'bayesian_mc' | 'copula_mc';
 
 /** The 13 FMCG categories in the Henkel Consumer Brands portfolio. */
 export type CategoryId =
@@ -57,8 +54,8 @@ export type CategoryId =
   | 'lhc_ic'
   | string; // extensible for future categories
 
-/** Category group (Hair or Laundry & Home Care). */
-export type CategoryGroup = 'Hair' | 'LHC';
+/** Category group (Beauty or Laundry & Home Care). */
+export type CategoryGroup = 'Beauty' | 'LHC';
 
 /** Projection years for continuous path modeling. */
 export type ProjectionYear = 2026 | 2027 | 2028 | 2029 | 2030;

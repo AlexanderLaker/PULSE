@@ -1,6 +1,6 @@
 /**
  * OnboardingTooltips — First-time user guided tour
- * Step-by-step introduction to War Room interface
+ * Step-by-step introduction to Profit Pool Shift Model interface
  * Apple-style, light mode
  */
 

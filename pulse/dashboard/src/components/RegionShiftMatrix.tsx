@@ -134,12 +134,12 @@ const RegionShiftMatrix: React.FC<RegionShiftMatrixProps> = ({
     return result;
   }, [trends, shifts]);
 
-  // Group categories by group (Hair / LHC)
+  // Group categories by group (Beauty / LHC)
   const categoryGroups = useMemo(() => {
-    const hairCats = CATEGORIES.filter(c => c.group === 'Hair');
+    const beautyCats = CATEGORIES.filter(c => c.group === 'Beauty');
     const lhcCats = CATEGORIES.filter(c => c.group === 'LHC');
     return [
-      { group: 'Hair', categories: hairCats },
+      { group: 'Beauty', categories: beautyCats },
       { group: 'LHC', categories: lhcCats },
     ];
   }, []);

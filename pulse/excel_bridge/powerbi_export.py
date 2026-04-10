@@ -14,7 +14,6 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from pulse.config import ModelConfig, FORCES
-from pulse.ingestion.firewall import FinancialDataFirewall
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,6 @@ class PowerBIExporter:
             config: ModelConfig instance with model parameters and category names
         """
         self.config = config
-        self.firewall = FinancialDataFirewall()
         self.export_timestamp = datetime.now().isoformat()
 
     def export_shift_matrix(
@@ -70,8 +68,6 @@ class PowerBIExporter:
             force_attribution = cat_data.get("force_attribution", {})
 
             for year in self.config.path_years:
-                    year_data = path.get(year, {})
-
                 year_data = path.get(year, {})
 
                 # Build row

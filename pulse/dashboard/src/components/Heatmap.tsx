@@ -1,13 +1,13 @@
 /**
  * ShiftHeatmap — Category × Year shift matrix visualization.
  * Apple design: monospace data, diverging colors (green/red), subtle transitions.
- * Core War Room view showing 12 categories × 5 years of % shifts with percentiles.
+ * Core Profit Pool Shift Model view showing 12 categories × 5 years of % shifts with percentiles.
  */
 
 import { useState, useMemo, FC, MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ShiftMatrix, PercentileDistribution, CategoryId } from '../types';
-import { T, CATEGORIES, YEARS, fmtShift, heatColor, shiftColorHex } from '../lib/format';
+import { T, CATEGORIES, YEARS, fmtShift, heatColor, shiftColorHex, shortCat } from '../lib/format';
 
 interface HeatmapProps {
   shifts: ShiftMatrix | null;
@@ -105,7 +105,16 @@ function extractDist(path: unknown, year: number): CellDist {
 const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSelectCategory, onDoubleClickCategory }) => {
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
 
-  // Build categories list from shifts data or use defaults
+  // Build grouped categories (Beauty / LHC) like Force Matrix
+  const categoryGroups = useMemo(() => {
+    const beautyCats = CATEGORIES.filter(c => c.group === 'Beauty');
+    const lhcCats = CATEGORIES.filter(c => c.group === 'LHC');
+    return [
+      { group: 'Beauty', categories: beautyCats },
+      { group: 'LHC', categories: lhcCats },
+    ];
+  }, []);
+
   const categories = useMemo(() => {
     if (!shifts || typeof shifts !== 'object') return [];
     return Object.keys(shifts).sort();
@@ -247,7 +256,35 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
           </tr>
         </thead>
         <tbody>
-          {categories.map((catId, idx) => {
+          {categoryGroups.map(group => {
+            // Group header row
+            const groupHeader = (
+              <tr
+                key={`group-${group.group}`}
+                style={{
+                  background: T.bg1,
+                  borderBottom: `1px solid ${T.border}`,
+                }}
+              >
+                <td
+                  colSpan={YEARS.length + 2}
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: T.text3,
+                  }}
+                >
+                  {group.group}
+                </td>
+              </tr>
+            );
+
+            // Category rows within this group
+            const catRows = group.categories.map((cat, idx) => {
+            const catId = cat.id;
             const isSelected = selectedCategory === catId;
             const val2030 = extractVal(shifts[catId], 2030);
 
@@ -296,10 +333,10 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                         width: 3,
                         height: 20,
                         borderRadius: 1,
-                        background: CATEGORIES.find(c => c.id === catId)?.color || T.text3,
+                        background: cat.color || T.text3,
                       }}
                     />
-                    {catId}
+                    {cat.short}
                   </div>
                 </td>
 
@@ -579,6 +616,9 @@ const ShiftHeatmap: FC<HeatmapProps> = ({ shifts, selectedCategory = null, onSel
                 })()}
               </motion.tr>
             );
+            });
+
+            return [groupHeader, ...catRows];
           })}
         </tbody>
       </table>

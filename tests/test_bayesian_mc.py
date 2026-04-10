@@ -3,8 +3,6 @@
 import pytest
 import numpy as np
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.simulation.deterministic import DeterministicEngine
-from pulse.causal.dag import CausalDAG
 from pulse.config import CATEGORIES
 
 
@@ -65,29 +63,6 @@ class TestBayesianMCBasics:
 
 class TestBayesianMCStatistics:
     """Test statistical properties of MC results."""
-
-    def test_median_near_deterministic(self, mock_model_config, mock_trends_database):
-        """Should verify MC median is close to deterministic result."""
-        # Run deterministic
-        det_config = mock_model_config
-        det_engine = DeterministicEngine(det_config)
-        det_result = det_engine.run(mock_trends_database)
-
-        # Run MC with fixed seed
-        mc_config = mock_model_config
-        mc_config.iterations = 5000
-        mc_engine = BayesianMonteCarloEngine(mc_config)
-        mc_result = mc_engine.run(mock_trends_database)
-
-        shift_matrix = mc_result["shift_matrix"]
-
-        # Compare medians at 2030
-        for cat in CATEGORIES:
-            det_val = det_result[cat][2030]
-            mc_val = shift_matrix[cat]["path"][2030].get("p50", 0)
-            # Within 2 percentage points for 5000 iterations
-            diff = abs(det_val - mc_val)
-            assert diff < 0.02, f"{cat}: det={det_val:.4f} vs mc_median={mc_val:.4f}"
 
     def test_percentile_ordering(self, mock_model_config, mock_trends_database):
         """Should verify p10 < p25 < p50 < p75 < p90."""
@@ -171,31 +146,7 @@ class TestBayesianMCConvergence:
 
 
 class TestBayesianMCCopulaAndDAG:
-    """Test copula dependency and causal DAG integration."""
-
-    def test_mc_with_dag_produces_results(self, mock_model_config, mock_trends_database, mock_causal_dag):
-        """Should run MC with causal DAG without error."""
-        config = mock_model_config
-        config.iterations = 100
-        engine = BayesianMonteCarloEngine(config, causal_dag=mock_causal_dag)
-        result = engine.run(mock_trends_database)
-
-        assert "shift_matrix" in result
-        assert len(result["shift_matrix"]) == len(CATEGORIES)
-
-    def test_mc_returns_causal_decomposition(self, mock_model_config, mock_trends_database, mock_causal_dag):
-        """Should return causal decomposition in results."""
-        config = mock_model_config
-        config.iterations = 100
-        engine = BayesianMonteCarloEngine(config, causal_dag=mock_causal_dag)
-        result = engine.run(mock_trends_database)
-
-        assert "causal_decomposition" in result
-        decomp = result["causal_decomposition"]
-
-        # Should have decomposition for each category
-        for cat in CATEGORIES:
-            assert cat in decomp
+    """Test copula dependency integration."""
 
     def test_correlation_matrix_positive_definite(self, mock_model_config, mock_trends_database):
         """Should produce positive definite correlation matrix."""
@@ -216,24 +167,6 @@ class TestBayesianMCCopulaAndDAG:
 
         # Diagonal should be 1
         assert np.allclose(np.diag(corr_matrix), 1.0)
-
-
-class TestBayesianMCScenarios:
-    """Test scenario overrides in MC simulation."""
-
-    def test_mc_accepts_scenario_overrides(self, mock_model_config, mock_trends_database, mock_causal_dag):
-        """Should accept and apply scenario overrides."""
-        config = mock_model_config
-        config.iterations = 100
-        engine = BayesianMonteCarloEngine(config, causal_dag=mock_causal_dag)
-
-        # Shock the Government force
-        overrides = {"Government": 0.5}
-        result = engine.run(mock_trends_database, scenario_overrides=overrides)
-
-        assert "shift_matrix" in result
-        # Result should reflect the shock
-        assert len(result["shift_matrix"]) == len(CATEGORIES)
 
 
 class TestBayesianMCEdgeCases:

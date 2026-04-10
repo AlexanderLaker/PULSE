@@ -1,5 +1,5 @@
 /**
- * PRISM War Room v3 — Main Container Component
+ * PRISM Profit Pool Shift Model v3 — Main Container Component
  * Single unified view with contextual drill-down
  * Apple × Bain × Goldman Sachs aesthetic
  */
@@ -16,8 +16,6 @@ import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
 import usePulse from '../hooks/usePulse';
 import type {
   Trend,
-  CausalEdge,
-  CausalDAG,
   ShiftMatrix,
   ConvergenceDiagnostics,
   AllocationRecommendation,
@@ -46,7 +44,7 @@ import AIInsightsBar from './AIInsightsBar';
 import DelphiPanel from './DelphiPanel';
 import SessionSnapshots from './SessionSnapshots';
 import ExecutiveBriefing from './ExecutiveBriefing';
-import StrategicEvaluation from './StrategicEvaluation';
+import StrategicIntelligence from './StrategicIntelligence';
 
 // ─── Type Definitions ────────────────────────────────────────────
 
@@ -70,7 +68,6 @@ interface InitialDataResult {
   forceContributions: Record<string, ForceContribution[]>;
   trends: TrendWithSources[];
   allocation: AllocationWithRationale[];
-  dagEdges: CausalEdge[];
   convergence: ConvergenceDiagnostics;
   vcDecomposition?: Record<string, Record<string, number>> | null;
 }
@@ -128,26 +125,6 @@ function generateInitialData(): InitialDataResult {
     };
   });
 
-  // Causal DAG edges (16 edges per spec)
-  const dagEdges: CausalEdge[] = [
-    { from: 'Government', to: 'Technology', weight: 0.6, lag: 1, mechanism: 'Regulation triggers reformulation R&D spend' },
-    { from: 'Government', to: 'Customer', weight: 0.4, lag: 1, mechanism: 'Compliance costs pass through to shelf price' },
-    { from: 'Government', to: 'Environmental', weight: 0.3, lag: 0, mechanism: 'Environmental regulation codifies green trends' },
-    { from: 'Consumer', to: 'Customer', weight: 0.5, lag: 0, mechanism: 'Demand shifts force channel adaptation' },
-    { from: 'Consumer', to: 'Competitive', weight: 0.4, lag: 1, mechanism: 'Consumer preferences drive competitive positioning' },
-    { from: 'Consumer', to: 'Technology', weight: 0.3, lag: 1, mechanism: 'Consumer demand pulls innovation investment' },
-    { from: 'Technology', to: 'Consumer', weight: 0.4, lag: 1, mechanism: 'New tech enables new consumer behaviors' },
-    { from: 'Technology', to: 'Competitive', weight: 0.5, lag: 1, mechanism: 'Tech adoption creates competitive gaps' },
-    { from: 'Technology', to: 'Customer', weight: 0.3, lag: 0, mechanism: 'Tech changes channel economics' },
-    { from: 'Environmental', to: 'Government', weight: 0.6, lag: 1, mechanism: 'Environmental crises accelerate regulation' },
-    { from: 'Environmental', to: 'Consumer', weight: 0.4, lag: 0, mechanism: 'Climate awareness shifts purchase behavior' },
-    { from: 'Environmental', to: 'Technology', weight: 0.3, lag: 1, mechanism: 'Environmental pressure drives green innovation' },
-    { from: 'Customer', to: 'Competitive', weight: 0.5, lag: 0, mechanism: 'Channel power shifts competitive dynamics' },
-    { from: 'Customer', to: 'Consumer', weight: 0.3, lag: 0, mechanism: 'Channel availability shapes consumer access' },
-    { from: 'Competitive', to: 'Customer', weight: 0.4, lag: 0, mechanism: 'Competitive moves change channel bargaining' },
-    { from: 'Competitive', to: 'Consumer', weight: 0.3, lag: 1, mechanism: 'Competitive innovation shapes consumer expectations' },
-  ];
-
   const convergence: ConvergenceDiagnostics = {
     r_hat: 0,
     converged: false,
@@ -160,7 +137,6 @@ function generateInitialData(): InitialDataResult {
     forceContributions,
     trends,
     allocation,
-    dagEdges,
     convergence,
   };
 }
@@ -221,8 +197,8 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
   );
 }
 
-// ─── WarRoom Component ──────────────────────────────────────────────
-export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
+// ─── ProfitPoolShiftModel Component ──────────────────────────────────────────────
+export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
   const {
     loading, simulating, simulationStale, staleReason, error,
     simulate, simulation,
@@ -507,7 +483,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
 
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('content-disposition');
-      let filename = 'PRISM_War_Room.pptx';
+      let filename = 'PRISM_Profit_Pool_Shift_Model.pptx';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="?([^"]+)"?/);
         if (match && match[1]) filename = match[1];
@@ -623,7 +599,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
             {[
               { id: 'overview' as const, label: 'Profit Pool Analysis', icon: BarChart3 },
               { id: 'trends' as const, label: 'Trends', icon: Layers },
-              { id: 'strategic' as const, label: 'Strategic Evaluation', icon: Target },
+              { id: 'strategic' as const, label: 'Strategic Intelligence', icon: Target },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;
@@ -704,7 +680,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
             >
               <div
                 style={{
-                  ...WarRoomStyles.pill,
+                  ...ProfitPoolShiftModelStyles.pill,
                   background: T.greenDim,
                   border: `1px solid ${T.green}20`,
                   cursor: 'help',
@@ -736,7 +712,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
                 </>
               }
             >
-              <div style={{ ...WarRoomStyles.pill, background: T.border1, cursor: 'help' } as React.CSSProperties}>
+              <div style={{ ...ProfitPoolShiftModelStyles.pill, background: T.border1, cursor: 'help' } as React.CSSProperties}>
                 <Clock size={12} style={{ color: T.text3 }} />
                 <span style={{ color: T.text3, fontSize: 11, fontWeight: 600 }}>
                   {data.convergence?.iterations?.toLocaleString() || '5k'} iter
@@ -1105,11 +1081,10 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <StrategicEvaluation
+            <StrategicIntelligence
               shifts={data.shifts}
               trends={data.trends as any}
               forceContributions={data.forceContributions}
-              dagEdges={data.dagEdges}
               allocation={data.allocation as any}
               convergence={data.convergence}
               onNavigateToTrend={(search) => {
@@ -1428,7 +1403,7 @@ export default function WarRoom({ isAdmin = false, onNavigateJourney, initialTre
 }
 
 // ─── Inline Styles ─────────────────────────────────────────────────────
-const WarRoomStyles: Record<string, React.CSSProperties> = {
+const ProfitPoolShiftModelStyles: Record<string, React.CSSProperties> = {
   pill: {
     display: 'inline-flex',
     alignItems: 'center',

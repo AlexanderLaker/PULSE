@@ -1,6 +1,6 @@
 /**
  * Connection Status Indicator
- * Shows real-time backend connection status in the War Room header.
+ * Shows real-time backend connection status in the Profit Pool Shift Model header.
  * Displays: Connected (green), Reconnecting (amber), or Offline (red).
  */
 

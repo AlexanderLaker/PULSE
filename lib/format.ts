@@ -1,5 +1,5 @@
 /**
- * PULSE War Room v3 — Formatting & Design Tokens
+ * PULSE Profit Pool Shift Model v3 — Formatting & Design Tokens
  * Apple × Bain × Goldman Sachs
  */
 

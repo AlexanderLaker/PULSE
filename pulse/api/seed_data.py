@@ -8,7 +8,7 @@ This enables PRISM to run standalone without external data dependencies.
 """
 
 from datetime import datetime
-from pulse.ingestion.models import Trend, TrendDatabase, CompetitorProfile
+from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.config import FORCES, CATEGORIES, REGIONS
 
 
@@ -780,228 +780,228 @@ def create_seed_database() -> TrendDatabase:
     return db
 
 
-def get_competitor_profiles() -> list[CompetitorProfile]:
+def get_competitor_profiles() -> list[dict]:
     """
     Get detailed profiles for 12+ key competitors.
 
     Returns:
-        list[CompetitorProfile]: Competitor intelligence (public data only)
+        list[dict]: Competitor intelligence (public data only) as dicts
     """
 
     return [
-        CompetitorProfile(
-            id="pg",
-            name="Procter & Gamble",
-            archetype="premium_defender",
-            hair_exposure=0.85,
-            lhc_exposure=0.75,
-            response_speed="fast",
-            typical_responses={
+        {
+            "id": "pg",
+            "name": "Procter & Gamble",
+            "archetype": "premium_defender",
+            "hair_exposure": 0.85,
+            "lhc_exposure": 0.75,
+            "response_speed": "fast",
+            "typical_responses": {
                 "price_war": "defend_with_innovation",
                 "regulation": "lobby_and_comply_early",
                 "tech_disruption": "fast_follower",
                 "private_label": "premiumize_further",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.9, "Hair: Care": 0.95, "Hair: Styling": 0.85, "Hair: Body": 0.8,
                 "LHC: FCN": 0.7, "LHC: FCA": 0.75, "LHC: FFI": 0.6, "LHC: LAD": 0.65,
             },
-        ),
-        CompetitorProfile(
-            id="loreal",
-            name="L'Oréal",
-            archetype="innovation_leader",
-            hair_exposure=0.9,
-            lhc_exposure=0.4,
-            response_speed="fast",
-            typical_responses={
+        },
+        {
+            "id": "loreal",
+            "name": "L'Oréal",
+            "archetype": "innovation_leader",
+            "hair_exposure": 0.9,
+            "lhc_exposure": 0.4,
+            "response_speed": "fast",
+            "typical_responses": {
                 "price_war": "abandon_mass_market_gradually",
                 "regulation": "lead_compliance",
                 "tech_disruption": "acquire",
                 "private_label": "focus_premium",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.95, "Hair: Care": 0.85, "Hair: Styling": 0.8, "Hair: Body": 0.5,
                 "LHC: FCN": 0.1, "LHC: FCA": 0.1,
             },
-        ),
-        CompetitorProfile(
-            id="unilever",
-            name="Unilever",
-            archetype="sustainability_leader",
-            hair_exposure=0.7,
-            lhc_exposure=0.8,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "unilever",
+            "name": "Unilever",
+            "archetype": "sustainability_leader",
+            "hair_exposure": 0.7,
+            "lhc_exposure": 0.8,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "portfolio_rationalization",
                 "regulation": "lead_compliance",
                 "tech_disruption": "acquire",
                 "private_label": "value_tier_launch",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.6, "Hair: Care": 0.7, "Hair: Styling": 0.5, "Hair: Body": 0.6,
                 "LHC: FCN": 0.85, "LHC: FCA": 0.8, "LHC: FFI": 0.7, "LHC: LAD": 0.75,
             },
-        ),
-        CompetitorProfile(
-            id="reckitt",
-            name="Reckitt Benckiser",
-            archetype="hygiene_specialist",
-            hair_exposure=0.2,
-            lhc_exposure=0.9,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "reckitt",
+            "name": "Reckitt Benckiser",
+            "archetype": "hygiene_specialist",
+            "hair_exposure": 0.2,
+            "lhc_exposure": 0.9,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "defend_core_categories",
                 "regulation": "comply_minimum",
                 "tech_disruption": "selective_adoption",
                 "private_label": "innovation_premiumization",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.05, "Hair: Care": 0.1,
                 "LHC: FCN": 0.95, "LHC: FCA": 0.9, "LHC: HDW": 0.85,
             },
-        ),
-        CompetitorProfile(
-            id="colgate",
-            name="Colgate-Palmolive",
-            archetype="oral_and_personal_care",
-            hair_exposure=0.3,
-            lhc_exposure=0.6,
-            response_speed="slow",
-            typical_responses={
+        },
+        {
+            "id": "colgate",
+            "name": "Colgate-Palmolive",
+            "archetype": "oral_and_personal_care",
+            "hair_exposure": 0.3,
+            "lhc_exposure": 0.6,
+            "response_speed": "slow",
+            "typical_responses": {
                 "price_war": "defend_via_distribution",
                 "regulation": "comply_on_schedule",
                 "tech_disruption": "late_follower",
                 "private_label": "compete_on_price",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.15, "Hair: Care": 0.35, "Hair: Body": 0.4,
                 "LHC: FCN": 0.5, "LHC: FCA": 0.45,
             },
-        ),
-        CompetitorProfile(
-            id="beiersdorf",
-            name="Beiersdorf (Nivea, Eucerin, tesa)",
-            archetype="skincare_leader",
-            hair_exposure=0.2,
-            lhc_exposure=0.3,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "beiersdorf",
+            "name": "Beiersdorf (Nivea, Eucerin, tesa)",
+            "archetype": "skincare_leader",
+            "hair_exposure": 0.2,
+            "lhc_exposure": 0.3,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "defend_brand_positioning",
                 "regulation": "proactive_compliance",
                 "tech_disruption": "selective_partnership",
                 "private_label": "premium_positioning",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Body": 0.5,
                 "LHC: FCN": 0.2,
             },
-        ),
-        CompetitorProfile(
-            id="kao",
-            name="Kao Corporation",
-            archetype="asian_conglomerate",
-            hair_exposure=0.6,
-            lhc_exposure=0.5,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "kao",
+            "name": "Kao Corporation",
+            "archetype": "asian_conglomerate",
+            "hair_exposure": 0.6,
+            "lhc_exposure": 0.5,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "compete_with_innovation",
                 "regulation": "adapt_by_market",
                 "tech_disruption": "invest_heavily",
                 "private_label": "premium_only",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Color": 0.4, "Hair: Care": 0.65, "Hair: Styling": 0.4,
                 "LHC: FCN": 0.3, "LHC: FCA": 0.3,
             },
-        ),
-        CompetitorProfile(
-            id="haleon",
-            name="Haleon (GSK spin-out)",
-            archetype="health_and_wellness",
-            hair_exposure=0.3,
-            lhc_exposure=0.6,
-            response_speed="fast",
-            typical_responses={
+        },
+        {
+            "id": "haleon",
+            "name": "Haleon (GSK spin-out)",
+            "archetype": "health_and_wellness",
+            "hair_exposure": 0.3,
+            "lhc_exposure": 0.6,
+            "response_speed": "fast",
+            "typical_responses": {
                 "price_war": "move_upmarket",
                 "regulation": "lead_compliance",
                 "tech_disruption": "invest_in_science",
                 "private_label": "avoid",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Care": 0.4, "Hair: Body": 0.35,
                 "LHC: FCN": 0.4, "LHC: FCA": 0.35,
             },
-        ),
-        CompetitorProfile(
-            id="kenvue",
-            name="Kenvue (J&J spin-out)",
-            archetype="consumer_health_focus",
-            hair_exposure=0.25,
-            lhc_exposure=0.4,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "kenvue",
+            "name": "Kenvue (J&J spin-out)",
+            "archetype": "consumer_health_focus",
+            "hair_exposure": 0.25,
+            "lhc_exposure": 0.4,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "defend_distribution",
                 "regulation": "proactive",
                 "tech_disruption": "collaborate",
                 "private_label": "compete_on_value",
             },
-            category_exposure={
+            "category_exposure": {
                 "Hair: Body": 0.3,
                 "LHC: FCN": 0.25,
             },
-        ),
-        CompetitorProfile(
-            id="church_dwight",
-            name="Church & Dwight",
-            archetype="value_and_natural",
-            hair_exposure=0.15,
-            lhc_exposure=0.65,
-            response_speed="slow",
-            typical_responses={
+        },
+        {
+            "id": "church_dwight",
+            "name": "Church & Dwight",
+            "archetype": "value_and_natural",
+            "hair_exposure": 0.15,
+            "lhc_exposure": 0.65,
+            "response_speed": "slow",
+            "typical_responses": {
                 "price_war": "compete_on_price",
                 "regulation": "comply_on_deadline",
                 "tech_disruption": "acquire_innovation",
                 "private_label": "undercut_price",
             },
-            category_exposure={
+            "category_exposure": {
                 "LHC: FCN": 0.7, "LHC: FCA": 0.65,
             },
-        ),
-        CompetitorProfile(
-            id="clorox",
-            name="The Clorox Company",
-            archetype="cleaning_and_bleach",
-            hair_exposure=0.0,
-            lhc_exposure=0.8,
-            response_speed="medium",
-            typical_responses={
+        },
+        {
+            "id": "clorox",
+            "name": "The Clorox Company",
+            "archetype": "cleaning_and_bleach",
+            "hair_exposure": 0.0,
+            "lhc_exposure": 0.8,
+            "response_speed": "medium",
+            "typical_responses": {
                 "price_war": "defend_volume",
                 "regulation": "comply_strictly",
                 "tech_disruption": "selective_adoption",
                 "private_label": "compete_on_price",
             },
-            category_exposure={
+            "category_exposure": {
                 "LHC: FCN": 0.75, "LHC: FCA": 0.6, "LHC: HDW": 0.8,
             },
-        ),
-        CompetitorProfile(
-            id="scjohnson",
-            name="SC Johnson",
-            archetype="family_company",
-            hair_exposure=0.05,
-            lhc_exposure=0.7,
-            response_speed="slow",
-            typical_responses={
+        },
+        {
+            "id": "scjohnson",
+            "name": "SC Johnson",
+            "archetype": "family_company",
+            "hair_exposure": 0.05,
+            "lhc_exposure": 0.7,
+            "response_speed": "slow",
+            "typical_responses": {
                 "price_war": "defend_core_brands",
                 "regulation": "comply_minimum",
                 "tech_disruption": "late_follower",
                 "private_label": "compete_on_price",
             },
-            category_exposure={
+            "category_exposure": {
                 "LHC: FCN": 0.5, "LHC: HDW": 0.65,
             },
-        ),
+        },
     ]
 
 

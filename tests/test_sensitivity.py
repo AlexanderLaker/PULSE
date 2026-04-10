@@ -110,8 +110,8 @@ class TestBreakevenAnalysis:
         from pulse.ingestion.models import TrendDatabase, Trend
 
         # Create database with zero-net trends (cancel out)
-        expansion = Trend(id="exp", force="Consumer", direction="Expansion", impact=2, probability=2)
-        contraction = Trend(id="con", force="Consumer", direction="Contraction", impact=2, probability=2)
+        expansion = Trend(id="exp", force="Consumer", direction="Expansion", gp1_pct_affected=0.10, probability=2)
+        contraction = Trend(id="con", force="Consumer", direction="Contraction", gp1_pct_affected=0.10, probability=2)
 
         for cat in CATEGORIES:
             expansion.category_exposure[cat] = 2
@@ -178,14 +178,6 @@ class TestSensitivityEdgeCases:
             assert trend.probability == originals[trend.id][0]
             assert trend.gp1_pct_affected == originals[trend.id][1]
 
-    def test_sensitivity_with_dag(self, mock_model_config, mock_trends_database, mock_causal_dag):
-        """Should support sensitivity with causal DAG."""
-        engine = SensitivityEngine(mock_model_config, dag=mock_causal_dag)
-        result = engine.tornado_analysis(mock_trends_database)
-
-        # Should complete without error
-        assert isinstance(result, list)
-        assert len(result) > 0
 
 
 class TestSensitivityConsistency:
@@ -216,14 +208,14 @@ class TestSensitivityConsistency:
             id="high",
             force="Consumer",
             direction="Expansion",
-            impact=5,
+            gp1_pct_affected=0.25,
             probability=5
         )
         low_impact = Trend(
             id="low",
             force="Consumer",
             direction="Expansion",
-            impact=1,
+            gp1_pct_affected=0.05,
             probability=1
         )
 

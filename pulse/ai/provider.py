@@ -7,7 +7,6 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass
 import asyncio
 
-from pulse.ingestion.firewall import FinancialDataFirewall
 from pulse.ai.config import get_ai_config, ProviderConfig, LLMProvider as LLMProviderEnum
 
 logger = logging.getLogger(__name__)
@@ -75,7 +74,6 @@ class LLMProvider(ABC):
             config: ProviderConfig instance
         """
         self.config = config
-        self.firewall = FinancialDataFirewall()
         self.audit_logger = get_audit_logger()
         self.name = config.provider
 

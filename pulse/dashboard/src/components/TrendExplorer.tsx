@@ -221,7 +221,7 @@ interface CategoryExposureGridProps {
 
 const CategoryExposureGrid: FC<CategoryExposureGridProps> = ({ exposures, onChange, direction, isAdmin }) => {
   const grouped = {
-    'Hair': CATEGORIES.filter(c => c.group === 'Hair'),
+    'Beauty': CATEGORIES.filter(c => c.group === 'Beauty'),
     'LHC': CATEGORIES.filter(c => c.group === 'LHC'),
   };
 

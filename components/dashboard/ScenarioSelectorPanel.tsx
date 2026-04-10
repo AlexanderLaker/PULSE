@@ -1,6 +1,6 @@
 /**
  * ScenarioSelectorPanel — Scenario selection and custom scenario builder
- * Extracted from WarRoom for modularity
+ * Extracted from ProfitPoolShiftModel for modularity
  */
 
 import { FC } from 'react';

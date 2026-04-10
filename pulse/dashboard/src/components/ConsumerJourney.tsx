@@ -484,7 +484,7 @@ const TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> =
 interface ConsumerJourneyProps {
   onBack?: () => void;
   onNavigateToTrend?: (trendSearch: string) => void;
-  onNavigateWarRoom?: () => void;
+  onNavigateProfitPoolShiftModel?: () => void;
   onNavigateTrends?: () => void;
   isAdmin?: boolean;
 }
@@ -496,38 +496,228 @@ interface SelectedProduct {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PRISM Analysis — Henkel-specific hand-written analysis (Option A)
-// Key: "product_name::direction" → analysis text
-// Each entry follows: Trend Mechanism → Henkel Exposure → Scope → Action
+// PRISM Analysis — Henkel-specific consultancy-grade recommendations
+// Architecture: Stage-level brand context + smart product-to-brand routing
+// Each analysis: Trend Mechanism → Henkel Portfolio → Competitive → Action
 // ═══════════════════════════════════════════════════════════════
 
-const PRISM_ANALYSIS: Record<string, string> = {
-  // ── LHC: SORTING ──
-  'AI stain/fabric recognition apps::expansion': 'AI-driven fabric and stain recognition (T-01, 8% GP1 exposed) is creating a new digital entry point at the very start of the laundry journey. For Henkel, this is a platform opportunity: an AI sorting assistant trained on Persil\'s formulation database could recommend the optimal Henkel product for each fabric-stain combination — turning a utility app into a product recommendation engine.\n\nThe competitive window is narrow. L\'Oréal\'s Modiface proves that owning the diagnostic moment captures downstream purchase decisions. If a competitor\'s sorting app recommends their detergent, the consumer never considers Persil.\n\nStrategic action: Develop or partner for a Henkel garment care AI app that recommends Persil/Vernel products based on fabric scan results. First-mover in laundry AI advisory captures the top-of-funnel.',
+const PRISM_OVERRIDES: Record<string, string> = {};
 
-  // Fallback for entries without hand-written analysis
+interface StageCtx { henkelBrands: string; competitors: string; opportunity: string }
+
+const LHC_CTX: Record<string, StageCtx> = {
+  'Sorting': {
+    henkelBrands: 'Persil (ecosystem anchor for AI garment care advisory), Vernel (fabric protection guidance)',
+    competitors: 'P&G has no standalone AI sorting play. Samsung SmartThings integrates with Tide pods for auto-cycle selection. LG ThinQ partners with Procter brands on connected wash.',
+    opportunity: 'A Persil-branded AI garment care advisor that scans fabrics and recommends the optimal Persil/Vernel product turns sorting from a chore into a digital brand lock-in moment — whoever owns the diagnostic captures the downstream purchase decision.',
+  },
+  'Pre-Treating': {
+    henkelBrands: 'Sil (dedicated stain removal specialist — Henkel\'s under-leveraged gem in this stage), Persil (stain removal pre-treat sprays and power formulas)',
+    competitors: 'Vanish (now Advent-owned post-Reckitt $4.8B divestiture — PE ownership signals cost-cutting, not brand investment). OxiClean (Church & Dwight, US-focused). P&G has no standalone stain brand.',
+    opportunity: 'Sil is a natural innovation platform for bio-enzymatic stain science. The Reckitt Vanish divestiture to PE creates a once-in-a-decade competitive opening. Position Sil + Persil as an integrated pre-treat-to-wash system that builds basket size and demonstrates superiority over private label one-product solutions.',
+  },
+  'Loading': {
+    henkelBrands: 'Persil Discs (4-in-1 capsule with integrated dosing technology), Persil (dosing innovation across pods, gel, and powder formats)',
+    competitors: 'P&G Ariel Pods (market leader in unit-dose format globally). Unilever OMO dual-chamber capsules. Samsung and LG auto-dose systems increasingly favor branded cartridge partnerships.',
+    opportunity: 'Henkel\'s appliance OEM partnerships (Miele, Bosch, Samsung) for auto-dosing cartridges create a Nespresso-like hardware lock-in. Persil-branded auto-dose refills that slot into connected machines build recurring revenue and structural switching costs that no competitor currently matches in Europe.',
+  },
+  'Add Products': {
+    henkelBrands: 'Persil (Discs, Power Caps, gel, powder — Henkel\'s largest LHC franchise and core profit pool), Vernel (fabric softener, scent beads), Weißer Riese (value tier Germany/Austria), Spee (economy Germany), all and Purex (US mainstream and value)',
+    competitors: 'P&G Ariel/Tide (global #1 laundry by revenue). Unilever OMO and Persil UK. Church & Dwight (OxiClean, Arm & Hammer). Private label at 42% EU6 value share — the highest level ever recorded by Circana.',
+    opportunity: 'This is the core profit pool stage for Henkel LHC. Defend Persil premium via demonstrable superiority in concentrated formats and bio-chemistry. Use Weißer Riese and Spee as strategic value-tier shields preventing consumer trade-down to private label. Persil Discs 4-in-1 is the format innovation weapon — it combines detergent, softener, stain removal, and freshness in one capsule, rendering separate product purchases obsolete.',
+  },
+  'Select Wash Settings': {
+    henkelBrands: 'Persil (smart home ecosystem partner with wash-program APIs), Henkel connected laundry platform (auto-dosing integration with major washer OEMs)',
+    competitors: 'P&G Tide/Ariel has partnered with Samsung SmartThings and LG ThinQ for connected wash recommendations. Unilever is exploring connected refill models for OMO in select markets.',
+    opportunity: 'When the washing machine itself recommends Persil at the cycle-selection moment, that is invisible-to-consumer, structural-for-manufacturer brand lock-in. Henkel\'s existing OEM relationships are the foundation for owning this moment at scale before competitors lock in exclusive partnerships.',
+  },
+  'Washing Cycle': {
+    henkelBrands: 'Persil (cold-wash optimized formulas, Persil Green Power eco-range), Vernel (in-wash softening and scent). Auto-dosing cartridge refill model for connected machines.',
+    competitors: 'P&G Ariel claims cold-water efficacy leadership (Turn To 30 campaign, heavy media spend). Unilever OMO targets cold-wash with enzyme technology in Europe. Both investing aggressively.',
+    opportunity: 'Cold-wash optimization is Persil\'s next performance battleground. Persil Green Power (bio-formulation effective at 20°C) directly addresses E-07 energy cost pressure — European consumers pay 2-3x US energy prices. Winning the cold-wash efficacy claim captures the fastest-growing detergent sub-segment while aligning with sustainability positioning.',
+  },
+  'Unloading': {
+    henkelBrands: 'Vernel (freshness, anti-static, and scent care — core franchise), Persil (clean laundry freshness halo that extends beyond the wash cycle)',
+    competitors: 'P&G Lenor/Downy Unstoppables (market creator and leader in scented laundry, established the scent-bead sub-category). Unilever Comfort (traditional softener positioning).',
+    opportunity: 'Vernel needs a differentiated answer to Lenor Unstoppables that emphasizes bio-based, conscious freshness over synthetic fragrance overload — aligning with C-04 Conscious Consumption while competing in the fastest-growing fabric care sub-category. Vernel\'s European heritage and natural ingredient positioning is a credible platform for this.',
+  },
+  'Drying': {
+    henkelBrands: 'Vernel (dryer scent products and tumble dryer sheet potential), US: Snuggle (established dryer sheet expertise that could transfer to Europe). Persil (garment care ecosystem).',
+    competitors: 'P&G Bounce (dominant US dryer sheets brand). Unilever Comfort tumble dryer sheets (limited European presence). The European dryer sheet market is still nascent compared to the US — an early-mover advantage is available.',
+    opportunity: 'Heat-pump dryers are replacing vented dryers across Europe, creating an entirely new product moment. Vernel-branded scent pods or dryer sheets optimized for heat-pump temperatures represent a white-space entry with minimal competitive intensity in Europe. Henkel can transfer Snuggle\'s US dryer expertise to European Vernel.',
+  },
+  'Ironing': {
+    henkelBrands: 'Vernel (anti-wrinkle spray extension leveraging fabric care credibility), Persil (garment lifecycle system positioning)',
+    competitors: 'No major FMCG player dominates post-wash ironing chemical products. Category is fragmented across appliance brands (Philips, Rowenta steamers) and niche spray brands. This fragmentation signals opportunity for a trusted FMCG brand.',
+    opportunity: 'White space for Henkel. A spray-and-wear anti-wrinkle product under Vernel (leveraging its fabric care credibility) or Persil (leveraging its laundry authority) could create a new branded sub-category in a currently unbranded space. Low competitive intensity makes this an ideal low-risk test-and-learn market entry.',
+  },
+  'Folding & Storing': {
+    henkelBrands: 'Vernel (closet freshness and garment protection potential — natural brand extension), bio-based fabric care innovation pipeline',
+    competitors: 'SC Johnson (Raid moth protection, regional). Reckitt legacy products. The category is highly fragmented with no FMCG leader — no one has built a branded position in closet garment care.',
+    opportunity: 'Extending Vernel into closet care (scent sachets, bio-based moth protection, cedar alternatives) leverages existing fabric care brand equity at minimal incremental cost. Low-investment category extension with premium pricing potential and zero cannibalization risk to existing Vernel products.',
+  },
+  'Taking Out of Closet': {
+    henkelBrands: 'Vernel (fabric refresh is a natural extension of its freshness and scent positioning — from in-wash to all-day care), Persil (clean confidence halo)',
+    competitors: 'P&G Febreze ($1B+ global revenue, dominant in fabric and room refresh — created and owns this category). No strong European-origin challenger brand exists in fabric refresh.',
+    opportunity: 'Henkel has no Febreze competitor — this is a strategic gap in a €500M+ and growing European sub-category. A Vernel-branded fabric refresh spray extends the freshness positioning from in-wash softener to between-wash garment care, creating a new consumer moment for the brand without cannibalizing the core softener business.',
+  },
+  'Wearing': {
+    henkelBrands: 'Vernel (garment protection and textile life extension), Persil (stain guard pre-treatment, clean confidence)',
+    competitors: 'Scotchgard (3M — retreating from consumer market). P&G Febreze on-the-go. DWR spray brands are mostly outdoor/niche with no mass-market FMCG positioning.',
+    opportunity: 'Garment protection and life extension directly aligns with E-08 Textile Longevity regulation (EU Circular Textiles Strategy). Position Persil + Vernel as a complete garment lifecycle system — wash, protect, refresh, extend — increasing consumer touchpoints from one (the wash) to four, multiplying revenue per consumer by 3-4x.',
+  },
+  'Between Washes': {
+    henkelBrands: 'Vernel (strongest brand platform for between-wash fabric care — freshness equity transfers directly), Persil (halo from wash performance carries into between-wash confidence)',
+    competitors: 'P&G Febreze ($1B+ global, category creator and dominant player — effectively owns between-wash fabric care). Reckitt Air Wick (now Advent-owned post-divestiture, declining brand investment). No strong European fabric refresh challenger.',
+    opportunity: 'Between-wash fabric care is PRISM\'s highest-scoring white space (C-14 at 0.82 score, 8-10% CAGR). Henkel has zero current position in a segment that P&G built into a billion-dollar franchise. A Vernel-branded fabric refresh spray range is the single highest-ROI new product opportunity in the entire LHC portfolio — with Reckitt\'s exit under PE ownership further weakening the only potential European competitor.',
+  },
 };
+
+const HAIR_CTX: Record<string, StageCtx> = {
+  'Inspire': {
+    henkelBrands: 'Schwarzkopf (master brand with 90%+ aided recall in Europe), got2b (youth and social-first positioning), Palette and Live (color-specific inspiration), Syoss (professional credibility at accessible price)',
+    competitors: 'L\'Oréal Modiface (AR try-on market leader — established first-mover advantage in digital shade matching). P&G Pantene (influencer partnerships, heavy social spend). Unilever Dove (body-positivity content dominance). Indie brands like Olaplex and K18 dominate organic social.',
+    opportunity: 'Schwarzkopf Professional\'s salon credibility can power an AR shade-finder and hair advisor that rivals Modiface with professional-grade color precision that L\'Oréal\'s mass-market tool cannot match. got2b should own TikTok-native trend content — its youth positioning is perfectly aligned with the social commerce moment where product discovery is shifting from search to creator recommendation.',
+  },
+  'Diagnose': {
+    henkelBrands: 'Schwarzkopf Professional (salon-grade diagnostic credibility — trichological heritage), Syoss (accessible professional analysis), Schwarzkopf consumer (brand trust for diagnostic tools)',
+    competitors: 'L\'Oréal Technology Incubator (AI skin and hair diagnostics, multi-year R&D investment). P&G Head & Shoulders (scalp health messaging). DTC brands like Prose and Function of Beauty (quiz-based personalization, strong data moats).',
+    opportunity: 'Schwarzkopf Professional\'s trichological IP is an undermonetized asset. An AI hair diagnostic tool (camera-based scalp and strand analysis) branded to Schwarzkopf Professional bridges the salon-to-retail gap and captures the diagnostic moment before purchase — in beauty, whoever diagnoses the problem prescribes the solution.',
+  },
+  'Prepare': {
+    henkelBrands: 'Gliss (bond builder and treatment specialist — Gliss Kur heritage of keratin-based repair), Schwarzkopf (scalp protection pre-treatment), Syoss (pre-treatment at accessible professional price point)',
+    competitors: 'Olaplex No. 0 (bond-builder pioneer, created the category). K18 (peptide-based pre-treatment, viral growth). L\'Oréal Série Expert (salon pre-treatment, professional channel). Premium pre-treatment is the fastest-growing Hair sub-segment by growth rate.',
+    opportunity: 'Gliss has natural credibility in bond repair — it pioneered the liquid keratin positioning in European mass retail. Upgrading Gliss into a clinical-grade bond builder range (Olaplex-equivalent efficacy at mass-market accessibility) captures the premiumization wave without requiring indie-brand pricing. The Gliss brand carries both scientific credibility and mass-market distribution.',
+  },
+  'Remedy': {
+    henkelBrands: 'Schwarzkopf (scalp care authority via Professional channel heritage), Syoss (treatment-focused affordable care range), Schauma (anti-dandruff entry tier for volume play and light-buyer recruitment)',
+    competitors: 'P&G Head & Shoulders (anti-dandruff global #1 by far). L\'Oréal Serioxyl and Kérastase (hair loss premium tier). Unilever Clear (anti-dandruff leader in Asia). DTC disruption: Nioxin (established clinical), Vegamour, Nutrafol (new entrants with strong social presence).',
+    opportunity: 'Hair loss entering the consumer mainstream (C-10) is a structural category shift. Henkel can bridge salon-to-retail via Schwarzkopf Professional\'s trichological credibility — something no competitor except L\'Oréal can claim. A Schwarzkopf-branded scalp care and anti-thinning range (serum + shampoo + supplement protocol) fills the white space between clinical niche (Nioxin, $50+ price point) and commodity (Head & Shoulders, $6 price point).',
+  },
+  'Transform': {
+    henkelBrands: 'Schwarzkopf (Palette, Color Expert, Keratin Color, Perfect Mousse — Europe\'s #1 at-home color brand by value share), Live (fashion and semi-permanent color for creative expression), Syoss Color (affordable professional color), got2b (color sprays and creative temporary color)',
+    competitors: 'L\'Oréal Excellence/Préférence (premium color, heavy ad investment) and Garnier Nutrisse (mainstream). Clairol (US market). Wella (salon dominance). Private label gaining in value color tier. DTC: Madison Reed, eSalon (subscription color, personalization).',
+    opportunity: 'Color IS Schwarzkopf — this is Henkel\'s #1 Hair profit pool and must be defended as an existential priority. Innovation in bond-protecting color (evolving Keratin Color technology), professional-grade at-home color systems leveraging K-07 salon crossover ($23.4B market, 63% B2C), and format innovation (precision applicators, reduced damage formulas) protects the premium core against L\'Oréal from above and private label from below.',
+  },
+  'Lock & Finish': {
+    henkelBrands: 'got2b (styling and finishing — gels, sprays, waxes, pastes, glue), Taft (Europe\'s leading hairspray brand, strong market share in Germany/CEE), Schwarzkopf (color-lock finishing, Osis+ from Professional channel)',
+    competitors: 'L\'Oréal Elnett (premium hairspray icon, strong emotional brand equity). Unilever TRESemmé (salon-accessible styling). Indie and prestige brands (Moroccanoil, Oribe, R+Co capturing premiumization). Styling as a category is globally under-invested relative to its margin potential.',
+    opportunity: 'got2b + Taft combined gives Henkel the strongest styling portfolio in Europe. The premiumization of finishing products — from commodity hold to color-lock, bond-seal, and fragrance-finishing — is an upgrade path that increases revenue per unit without requiring new shelf facings. Osis+ salon expertise can transfer innovation credibility to the got2b and Taft consumer lines.',
+  },
+  'Maintain & Optimize': {
+    henkelBrands: 'Gliss (treatment and repair specialist — weekly masks, serums, oils), Schwarzkopf (care systems and routines), Syoss (professional-grade maintenance at accessible price), Schauma (everyday value care for light-buyer recruitment)',
+    competitors: 'P&G Pantene (daily care #1 globally, massive media investment). Unilever Dove and TRESemmé (mainstream care). L\'Oréal Elvive/Elsève (treatment positioning). Indie disruption: Olaplex No. 3-7 maintenance range, K18 mask (viral social proof).',
+    opportunity: 'Gliss can own the "treatment protocol" space — weekly intensive repair systems at mass-market price points. Multi-step care routines (shampoo → mask → serum → leave-in protectant) increase basket size 3-4x versus a single shampoo purchase. This is exactly the premiumization vector: more products per consumer, not just higher price per product.',
+  },
+  'Refresh / In-Between': {
+    henkelBrands: 'got2b (dry shampoo and texture sprays for youth segment), Taft (quick restyle and refresh for classic consumers), Schauma (value dry shampoo entry), Schwarzkopf (root retouch sprays for color maintenance between salon visits)',
+    competitors: 'Batiste (dominant dry shampoo at 40%+ global share, strong brand moat). L\'Oréal Magic Retouch (root retouch market leader). P&G Pantene dry shampoo. Unilever Dove dry shampoo (value tier).',
+    opportunity: 'Between-wash styling (C-15) is the fastest-growing Hair sub-segment at 7%+ CAGR with Batiste alone at $1B+. got2b is perfectly positioned for the youth styling-convenience occasion. Taft for the classic quick-restyle moment. Schwarzkopf root retouch competes directly with L\'Oréal Magic Retouch. Portfolio breadth across price tiers and consumer segments is a structural advantage no single competitor can match.',
+  },
+};
+
+const HAIR_STAGES = new Set(['Inspire', 'Diagnose', 'Prepare', 'Remedy', 'Transform', 'Lock & Finish', 'Maintain & Optimize', 'Refresh / In-Between']);
+
+function getProductBrands(name: string, isHair: boolean): string {
+  const n = name.toLowerCase();
+  if (isHair) {
+    if (/color|shade|dye|tint|balayage|highlight|retouch/.test(n)) return 'Schwarzkopf (Palette, Color Expert, Keratin Color, Live)';
+    if (/styling|hold|gel|wax|mousse|hairspray|finish/.test(n)) return 'got2b and Taft';
+    if (/dry shampoo|texture spray/.test(n)) return 'got2b (primary), Taft (classic segment)';
+    if (/bond|repair|treatment|mask|keratin/.test(n)) return 'Gliss (treatment specialist — Gliss Kur heritage)';
+    if (/scalp|dandruff|hair loss|thinning|anti-hair/.test(n)) return 'Schwarzkopf (scalp care via Professional trichological heritage)';
+    if (/root retouch|touch-up/.test(n)) return 'Schwarzkopf root retouch range';
+    if (/shampoo|conditioner|wash/.test(n)) return 'Schauma (value), Syoss (mid-tier professional), Schwarzkopf (premium)';
+    if (/protect|uv|heat|shield/.test(n)) return 'Gliss (protective treatments), Schwarzkopf';
+    if (/fragrance|perfume|scent/.test(n)) return 'Schwarzkopf (premium hair finishing)';
+    if (/male|men/.test(n)) return 'got2b (male styling and grooming), Schwarzkopf Men';
+    if (/subscription|programmatic/.test(n)) return 'Schwarzkopf (loyalty ecosystem), Syoss (mid-tier recurring care)';
+    if (/brow|lash/.test(n)) return 'Schwarzkopf (brand extension from hair to brow/lash)';
+    if (/salon|professional/.test(n)) return 'Schwarzkopf Professional (Igora, BlondMe, BC Bonacure)';
+    return 'Schwarzkopf (master brand)';
+  }
+  if (/stain/.test(n)) return 'Sil (dedicated stain specialist), Persil (stain removal system)';
+  if (/softener|conditioner|rinse aid|static/.test(n)) return 'Vernel (fabric conditioner and softener — Silan in CEE markets)';
+  if (/fragrance|scent|perfume|fresh|refresh|mist|odor|deodoriz/.test(n)) return 'Vernel (freshness and scent care portfolio)';
+  if (/detergent|pod|capsule|disc|powder|liquid|gel/.test(n) && !/dish/.test(n)) return 'Persil (Discs, Power Caps, gel, powder)';
+  if (/concentrated|compact|sheet|ultra/.test(n)) return 'Persil (concentrated format innovation leader)';
+  if (/dish/.test(n)) return 'Somat (automatic dishwasher), Pril (hand dishwashing)';
+  if (/toilet|bathroom/.test(n)) return 'Bref (toilet care specialist)';
+  if (/moth|pest|insect/.test(n)) return 'Vernel (garment protection extension opportunity)';
+  if (/fabric|garment|textile|wrinkle|anti-wrinkle/.test(n)) return 'Vernel (fabric care authority), Persil (garment lifecycle system)';
+  if (/auto-dos|smart|connected|iot|app/.test(n)) return 'Persil (connected laundry platform, OEM partnerships with Miele, Bosch, Samsung)';
+  if (/refill|subscription/.test(n)) return 'Persil (refill systems, eco-subscription model)';
+  if (/private label|own-brand|retailer/.test(n)) return 'Weißer Riese, Spee (Germany), all/Purex (US) — strategic value-tier defense brands';
+  if (/value|budget|discount|mid-tier|squeezed/.test(n)) return 'Weißer Riese and Spee (Germany value tier), all and Purex (US value tier) — shields against PL trade-down';
+  if (/enzyme|bio-/.test(n)) return 'Persil (bio-enzymatic formulation R&D leadership), Sil (enzyme-based stain removal)';
+  if (/microfi[bl]|filter/.test(n)) return 'Persil (sustainability innovation), appliance OEM partnerships';
+  if (/dryer|drying|tumble|bounce/.test(n)) return 'Vernel (dryer sheet and scent pod opportunity), US: Snuggle (established dryer expertise)';
+  if (/chlorine|solvent|pfc|synthetic|chemical/.test(n)) return 'Persil and Sil (reformulation required to maintain regulatory compliance)';
+  if (/bleach|whiten|brighten/.test(n)) return 'Persil (whitening claims), Weißer Riese (white laundry heritage)';
+  return 'Persil (core LHC franchise)';
+}
 
 function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string): string {
   const key = `${entry.name}::${direction}`;
-  const custom = PRISM_ANALYSIS[key];
-  if (custom) return custom;
+  const override = PRISM_OVERRIDES[key];
+  if (override) return override;
 
-  // Fallback for entries without hand-written analysis
-  const dirWord = direction === 'expansion' ? 'growth opportunity' : 'decline risk';
-  const typeWord = entry.type === 'tech' ? 'technology solution' : entry.type === 'service' ? 'service model' : 'product category';
-  const trends = entry.trendDrivers;
-  const trendName = (trends.split('+')[0] ?? '').trim().split('(')[0]?.trim() ?? '';
+  const isHair = HAIR_STAGES.has(stageName);
+  const ctx = (isHair ? HAIR_CTX : LHC_CTX)[stageName];
+  const brands = getProductBrands(entry.name, isHair);
+  const trendCodes = entry.trendDrivers.match(/[TCGKXE]-\d+/g) || [];
+  const trendNames = trendCodes
+    .map(code => { const c = TREND_CONTEXT[code]; return c ? `${c.name} (${c.force} force)` : null; })
+    .filter(Boolean);
+  const trendText = trendNames.length > 0 ? trendNames.join('; ') : entry.trendDrivers;
+  const typeWord = entry.type === 'tech' ? 'technology' : entry.type === 'service' ? 'service model' : 'product segment';
+  const iw = entry.intensity === 3 ? 'high-conviction' : entry.intensity === 2 ? 'moderate-conviction' : 'emerging-signal';
 
   if (direction === 'expansion') {
-    return `PRISM identifies "${entry.name}" as a ${dirWord} in the "${stageName}" stage, driven by ${trendName}.\n\n` +
-      `This ${typeWord} is positioned to capture value as the underlying trend materializes. The force assessment suggests expanding profit pools in this segment through 2030.\n\n` +
-      `Henkel implication: Evaluate fit within existing brand portfolio (Persil, Schwarzkopf, Vernel, got2b). Assess right-to-win based on formulation expertise, distribution access, and brand credibility in this segment.`;
-  } else {
-    return `PRISM flags "${entry.name}" as a ${dirWord} in the "${stageName}" stage, driven by ${trendName}.\n\n` +
-      `This ${typeWord} faces structural headwinds that are expected to intensify through 2030. The profit pool in this segment is contracting as the underlying forces compound.\n\n` +
-      `Henkel implication: Assess portfolio exposure. Consider defensive reformulation, repositioning to adjacent growing segments, or managed SKU rationalization. Redirect freed-up investment toward expanding segments in this journey stage.`;
+    return (
+      `**Trend Mechanism.** "${entry.name}" is a ${iw} growth vector in the ${stageName} stage, driven by: ${trendText}. ` +
+      `This ${typeWord} reflects a structural shift — not a cyclical uptick — in ${isHair ? 'consumer hair care behavior, ingredient science, and channel dynamics' : 'laundry and home care habits, sustainability regulation, and appliance technology'}. ` +
+      `PRISM projects these tailwinds to compound through 2030 as the underlying forces reinforce each other across the causal DAG.\n\n` +
+
+      `**Henkel Portfolio Position.** The relevant Henkel asset is ${brands}. ` +
+      (ctx ? `Across the ${stageName} stage, Henkel\'s brand portfolio includes ${ctx.henkelBrands}. ` : '') +
+      (brands.includes('extension') || brands.includes('opportunity') || brands.includes('Potential')
+        ? `This is currently a portfolio gap — no existing Henkel brand directly addresses this opportunity. Competitors could establish category leadership before Henkel enters. The window for a first-mover or fast-follower play is narrowing as ${isHair ? 'L\'Oréal, P&G, and indie DTC brands' : 'P&G, Unilever, and private label operators'} invest aggressively. `
+        : `Henkel has a credible right-to-win here, grounded in ${isHair ? 'Schwarzkopf\'s professional heritage, the established salon-to-retail bridge, and European market leadership in color and styling' : 'Persil\'s brand trust (90%+ awareness in core European markets), over a century of surface chemistry and formulation IP, and established appliance OEM partnerships with Miele, Bosch, and Samsung'}. `) +
+      `The ${iw} intensity rating means this warrants ${entry.intensity === 3 ? 'immediate pipeline acceleration and dedicated innovation investment within the current planning cycle' : entry.intensity === 2 ? 'active R&D scoping and launch planning on a 12-18 month horizon' : 'exploratory research and quarterly trend monitoring before committing significant resources'}.\n\n` +
+
+      `**Competitive Dynamics.** ` +
+      (ctx ? `${ctx.competitors} ` : '') +
+      `For Henkel, speed of execution is critical — the competitive window for establishing category leadership in FMCG typically closes within 18-24 months of trend inflection. ` +
+      `${isHair ? 'The premium Hair market is increasingly winner-take-most, with consumers concentrating spend on brands that demonstrate clinically validated efficacy. Second-movers in this space rarely capture more than 15-20% of the pioneer\'s share.' : 'In LHC, the battle is fought on two fronts simultaneously: innovation leadership against P&G above (Ariel, Tide), and value-tier defense against private label below (now at 42% EU6 share). Winning requires excellence on both fronts.'}\n\n` +
+
+      `**Strategic Recommendation.** ` +
+      (ctx ? ctx.opportunity + ' ' : '') +
+      `Classify this as a ${entry.intensity === 3 ? '**Tier 1 priority** — allocate innovation pipeline resources immediately, target concept validation within 3 months and lead-market launch (Germany, France, UK) within 6-12 months' : entry.intensity === 2 ? '**Tier 2 priority** — initiate consumer concept testing and R&D feasibility within the next planning cycle, targeting a 12-18 month launch window in 2-3 lead markets' : '**Tier 3 monitor item** — track competitive moves and consumer adoption signals quarterly, prepare a contingency innovation brief for rapid activation if the trend accelerates beyond current projections'}. ` +
+      `Validate consumer willingness-to-pay through rapid concept testing before scaling — the insight from testing in lead markets should inform the global rollout architecture.`
+    );
   }
+
+  return (
+    `**Structural Decline Assessment.** "${entry.name}" faces ${iw} headwinds in the ${stageName} stage, driven by: ${trendText}. ` +
+    `This is a structural contraction — not a temporary dip — reflecting ${isHair ? 'premiumization displacing commodity tiers, tighter ingredient regulation under EU Cosmetics Regulation amendments, and digital disruption of traditional purchase and discovery journeys' : 'regulatory bans on legacy chemistry (PFAS restriction, microplastics phase-out), format obsolescence as concentrated innovations displace bulky legacy products, and consumer migration toward sustainable and transparent alternatives'}. These forces are mutually reinforcing and accelerating through the causal DAG.\n\n` +
+
+    `**Henkel Exposure.** ${brands} has direct exposure to this decline vector and requires proactive management. ` +
+    (ctx ? `Within the ${stageName} stage, Henkel\'s portfolio (${ctx.henkelBrands}) faces varying degrees of risk depending on specific SKU positioning and reformulation readiness. ` : '') +
+    `The ${iw} rating indicates ${entry.intensity === 3 ? 'material P&L impact within 12-18 months if no defensive action is taken — this is an urgent priority requiring immediate portfolio review, reformulation assessment, and resource reallocation planning' : entry.intensity === 2 ? 'growing margin pressure that will compound through the 2026-2028 period — proactive repositioning is advisable before the contraction accelerates and options narrow' : 'an early warning signal with limited near-term P&L impact, but strategic monitoring is warranted to avoid being caught off-guard by sudden regulatory or competitive acceleration'}.\n\n` +
+
+    `**Competitive Context.** ` +
+    (ctx ? `${ctx.competitors} ` : 'Competitors face similar structural pressure in this segment. ') +
+    `The strategic question is whether to defend, pivot, or harvest. Competitors who exit declining segments early can redeploy resources to growth vectors; those who defend too long burn investment in a shrinking profit pool and miss the window on adjacent opportunities. ` +
+    `${isHair ? 'In Hair, the premium-value polarization means mid-tier positions are especially vulnerable — consumers either trade up to efficacy-proven premium brands (where margins justify the investment) or trade down to value alternatives and private label (where price is the only decision criterion). The squeezed middle offers the worst of both worlds.' : 'In LHC, regulatory-driven reformulation costs compound the margin pressure — brands that reformulate early gain compliance advantage and can claim "clean" positioning, but those that delay face cliff-edge obsolescence when regulation takes effect. The PFAS restriction timeline makes this concrete and urgent.'}\n\n` +
+
+    `**Defensive Action Plan.** ` +
+    `${entry.intensity === 3 ? 'Immediate portfolio review required — this is a current-year priority that should be escalated to category leadership.' : entry.intensity === 2 ? 'Initiate a structured evaluation within the next planning cycle with clear decision gates.' : 'Add to the strategic monitoring dashboard for quarterly review by the category team.'} ` +
+    `Three response options: (1) **Reformulate** — adapt the product to comply with emerging regulations and evolving consumer preferences, extending the product lifecycle by 2-3 years while maintaining shelf position and retailer relationships. ` +
+    `(2) **Pivot** — redirect marketing spend, innovation resources, and negotiated shelf space from this declining segment to adjacent growth vectors within the ${stageName} stage where Henkel has right-to-win. ` +
+    `(3) **Managed harvest** — extract remaining margin while progressively reducing investment (media, trade promotion, innovation), and redeploy the freed capital toward ${isHair ? 'premium treatment plays (Gliss bond repair), scalp care innovation (Schwarzkopf), and styling growth (got2b/Taft) that represent structurally expanding profit pools' : 'concentrated format innovation (Persil Discs), bio-enzymatic stain science (Sil), and between-wash fabric care (Vernel refresh range) that represent the highest-ROI expansion opportunities in LHC'}. ` +
+    (ctx ? `The opportunity cost of defensive inaction is significant: investment trapped in declining segments cannot fund the growth plays. For context, ${ctx.opportunity}` : '')
+  );
 }
 
 // Trend context mapping — enriched descriptions for each trend code
@@ -587,7 +777,7 @@ const TREND_CONTEXT: Record<string, { name: string; force: string; description: 
   'E-08': { name: 'Textile Longevity & Garment Life Extension', force: 'Environmental', description: 'EU Circular Textiles Strategy mandates durability standards. Growing demand for fabric protection, pilling removers, color-restore treatments.' },
 };
 
-export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateWarRoom, onNavigateTrends, isAdmin }: ConsumerJourneyProps) {
+export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateProfitPoolShiftModel, onNavigateTrends, isAdmin }: ConsumerJourneyProps) {
   const [activeTab, setActiveTab] = useState<'lhc' | 'hair'>('lhc');
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -618,7 +808,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
 
   return (
     <div style={{ fontFamily: T.sans, color: T.text, background: T.bg, minHeight: '100vh' }}>
-      {/* Header — same nav bar style as War Room */}
+      {/* Header — same nav bar style as Profit Pool Shift Model */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
@@ -645,11 +835,11 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
           <span style={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>v6.0</span>
         </div>
 
-        {/* Nav pills — War Room, Trends, Consumer Journey */}
+        {/* Nav pills — Profit Pool Shift Model, Trends, Consumer Journey */}
         <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
-          {onNavigateWarRoom && (
+          {onNavigateProfitPoolShiftModel && (
             <button
-              onClick={onNavigateWarRoom}
+              onClick={onNavigateProfitPoolShiftModel}
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 14px', borderRadius: 8,
@@ -1036,7 +1226,11 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateW
                         fontSize: 12, color: T.text, lineHeight: 1.65,
                         margin: i === 0 ? '0 0 10px' : '10px 0 0',
                       }}>
-                        {paragraph}
+                        {paragraph.split(/(\*\*[^*]+\*\*)/).map((part, j) =>
+                          part.startsWith('**') && part.endsWith('**')
+                            ? <strong key={j} style={{ fontWeight: 700, color: T.text }}>{part.slice(2, -2)}</strong>
+                            : <span key={j}>{part}</span>
+                        )}
                       </p>
                     ))}
                 </div>

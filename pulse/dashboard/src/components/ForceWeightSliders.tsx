@@ -1,6 +1,6 @@
 /**
  * ForceWeightSliders — Interactive force weight adjustment
- * Extracted from WarRoom for modularity
+ * Extracted from ProfitPoolShiftModel for modularity
  */
 
 import { useState, FC } from 'react';

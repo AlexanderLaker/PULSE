@@ -14,7 +14,6 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 from pulse.config import ModelConfig, FORCES
-from pulse.ingestion.firewall import FinancialDataFirewall
 
 logger = logging.getLogger(__name__)
 
@@ -38,23 +37,18 @@ class ShiftMatrixWriter:
 
     def __init__(self, config: ModelConfig):
         self.config = config
-        self.firewall = FinancialDataFirewall()
 
     def write(self, output_path: str, mc_result: dict,
-              deterministic_result: dict = None,
               allocation: dict = None,
-              competitive_adjustments: dict = None,
               metadata: dict = None):
         """
         Write complete PRISM output to Excel.
 
         Creates sheets:
         1. Shift Matrix — continuous paths with percentiles
-        2. Causal Decomposition — force contribution breakdown
-        3. Velocity & Triggers — path dynamics
-        4. Allocation — resource allocation recommendations
-        5. Deterministic — V12 parity comparison
-        6. Metadata — run configuration and diagnostics
+        2. Velocity & Triggers — path dynamics
+        3. Allocation — resource allocation recommendations
+        4. Metadata — run configuration and diagnostics
         """
         wb = openpyxl.Workbook()
 
@@ -68,15 +62,7 @@ class ShiftMatrixWriter:
         if allocation:
             self._write_allocation(wb, allocation)
 
-        # Sheet 4: Competitive Adjustments (if available)
-        if competitive_adjustments:
-            self._write_competitive(wb, competitive_adjustments)
-
-        # Sheet 5: Deterministic comparison
-        if deterministic_result:
-            self._write_deterministic(wb, deterministic_result)
-
-        # Sheet 6: Metadata
+        # Sheet 4: Metadata
         self._write_metadata(wb, mc_result, metadata)
 
         # Remove default sheet if extra sheets were created
@@ -226,43 +212,6 @@ class ShiftMatrixWriter:
         ws.cell(row=row, column=1, value="Expected Pool Shift").font = Font(bold=True)
         ws.cell(row=row, column=2, value=allocation.get("expected_pool_shift", 0))
         ws.cell(row=row, column=2).number_format = "0.00%"
-
-    def _write_competitive(self, wb, adjustments):
-        """Write competitive dynamics adjustments."""
-        ws = wb.create_sheet("Competitive Dynamics")
-
-        headers = ["Category", "Competitive Adjustment"]
-        for j, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=j, value=h)
-            cell.font = HEADER_FONT
-            cell.fill = HEADER_FILL
-
-        row = 2
-        for cat, adj in adjustments.items():
-            ws.cell(row=row, column=1, value=cat)
-            cell = ws.cell(row=row, column=2, value=round(adj, 6))
-            cell.number_format = "0.00%"
-            row += 1
-
-    def _write_deterministic(self, wb, det_result):
-        """Write deterministic (V12 parity) results."""
-        ws = wb.create_sheet("Deterministic (V12)")
-
-        headers = ["Category"] + [str(y) for y in self.config.path_years]
-        for j, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=j, value=h)
-            cell.font = HEADER_FONT
-            cell.fill = HEADER_FILL
-
-        row = 2
-        for cat in self.config.category_names:
-            ws.cell(row=row, column=1, value=cat)
-            year_data = det_result.get(cat, {})
-            for j, year in enumerate(self.config.path_years, 2):
-                val = year_data.get(year, 0.0)
-                cell = ws.cell(row=row, column=j, value=round(val, 6))
-                cell.number_format = "0.00%"
-            row += 1
 
     def _write_metadata(self, wb, mc_result, extra_metadata=None):
         """Write run metadata and configuration."""

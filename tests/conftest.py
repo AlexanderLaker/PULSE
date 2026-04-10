@@ -5,8 +5,7 @@ import numpy as np
 from datetime import datetime
 
 from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS
-from pulse.ingestion.models import Trend, TrendDatabase, CausalEdge
-from pulse.causal.dag import CausalDAG
+from pulse.ingestion.models import Trend, TrendDatabase
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def mock_trend() -> Trend:
         name="Test Natural Movement",
         description="Test trend about natural products",
         direction="Expansion",
-        impact=3,
+        gp1_pct_affected=0.15,
         probability=4,
         start_year=2025,
         data_source="test",
@@ -46,7 +45,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         name="Natural/Clean Beauty",
         description="Growing demand for natural products",
         direction="Expansion",
-        impact=4,
+        gp1_pct_affected=0.20,
         probability=4,
         start_year=2025,
         data_source="test",
@@ -64,7 +63,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         name="Microplastics Ban",
         description="Regulatory restrictions on microplastics",
         direction="Contraction",
-        impact=5,
+        gp1_pct_affected=0.25,
         probability=4,
         start_year=2026,
         data_source="test",
@@ -82,7 +81,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         name="AI Personalization",
         description="AI-driven personalized beauty recommendations",
         direction="Expansion",
-        impact=3,
+        gp1_pct_affected=0.12,
         probability=3,
         start_year=2026,
         data_source="test",
@@ -100,7 +99,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         name="Water Scarcity",
         description="Water stress impacts manufacturing",
         direction="Contraction",
-        impact=2,
+        gp1_pct_affected=0.08,
         probability=3,
         start_year=2027,
         data_source="test",
@@ -118,7 +117,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         name="Private Label Growth",
         description="Rising private label competition",
         direction="Contraction",
-        impact=3,
+        gp1_pct_affected=0.15,
         probability=4,
         start_year=2025,
         data_source="test",
@@ -154,13 +153,6 @@ def mock_model_config() -> ModelConfig:
         backtesting_accuracy=None,
     )
     return config
-
-
-@pytest.fixture
-def mock_causal_dag() -> CausalDAG:
-    """Create a mock CausalDAG with default edges."""
-    dag = CausalDAG()
-    return dag
 
 
 @pytest.fixture

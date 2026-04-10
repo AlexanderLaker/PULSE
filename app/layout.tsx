@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PULSE War Room',
+  title: 'PULSE Profit Pool Shift Model',
   description: 'Profit Pool Simulation Engine — Strategic FMCG Analysis',
 };
 
