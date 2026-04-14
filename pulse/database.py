@@ -5,10 +5,12 @@ Otherwise falls back to SQLite for local development.
 
 Implements all tables from the CLAUDE.md specification:
 - trends, trend_category_exposure, trend_vc_exposure
-- causal_edges, competitors, config_snapshots
-- simulation_runs, backtest_results, delphi_rounds
+- config_snapshots, simulation_runs, delphi_rounds
 - triggers, ai_suggestions, audit_log
 - users (auth), delphi_sessions, delphi_calibration
+
+NOTE: causal_edges, competitors, and backtest_results tables were removed in v2.4
+as the underlying modules (causal DAG, game theory, backtesting) were not implemented.
 
 CRITICAL: No financial data (€M values) stored anywhere.
 All monetary values are relative (percentages, weights, shifts).
@@ -247,32 +249,8 @@ def init_db() -> None:
             )
         """)
 
-        # ── Causal DAG edges ─────────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS causal_edges (
-                id {serial},
-                source_force TEXT NOT NULL,
-                target_force TEXT NOT NULL,
-                propagation_weight REAL,
-                lag_years INTEGER DEFAULT 0,
-                mechanism TEXT,
-                evidence_strength TEXT DEFAULT 'Moderate',
-                calibrated_from_backtest BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # ── Competitor profiles ──────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS competitors (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                archetype TEXT,
-                response_patterns TEXT,
-                category_exposure TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # NOTE: causal_edges and competitors tables removed in v2.4
+        # (underlying modules not implemented)
 
         # ── Model configuration snapshots ────────────────────────────
         cursor.execute(f"""
@@ -300,27 +278,28 @@ def init_db() -> None:
                 model_type TEXT,
                 config_snapshot_id INTEGER,
                 results TEXT,
-                causal_decomposition TEXT,
+                force_attribution TEXT,
                 allocation_recommendation TEXT,
                 convergence_diagnostics TEXT
             )
         """)
 
-        # ── Backtesting results ──────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS backtest_results (
-                id {serial},
-                backtest_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                historical_version TEXT,
-                prediction_year INTEGER,
-                actual_shifts TEXT,
-                predicted_shifts TEXT,
-                accuracy_score REAL,
-                calibration_params TEXT
-            )
-        """)
+        # A6: historical databases had this column named causal_decomposition.
+        # The field was never actually causal — it was always a static force
+        # attribution. Migrate idempotently so old databases keep working.
+        try:
+            cursor.execute("ALTER TABLE simulation_runs RENAME COLUMN causal_decomposition TO force_attribution")
+        except Exception:
+            pass  # column already renamed or never existed under old name
+
+        # NOTE: backtest_results table removed in v2.4
+        # (backtesting module not implemented)
 
         # ── Delphi elicitation rounds ────────────────────────────────
+        # gp1_pct_affected_score is the per-scorer estimate of the
+        # economic-scope variable (E3). It's elicited alongside the
+        # probability score so the Delphi consensus can produce both
+        # values via the same calibration-weighted process.
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS delphi_rounds (
                 id {serial},
@@ -330,11 +309,17 @@ def init_db() -> None:
                 trend_id TEXT,
                 scorer_id TEXT,
                 probability_score INTEGER,
+                gp1_pct_affected_score REAL,
                 rationale TEXT,
                 calibration_factor REAL DEFAULT 1.0,
                 bias_flags TEXT
             )
         """)
+        # Backfill column on pre-existing tables (idempotent best-effort)
+        try:
+            cursor.execute("ALTER TABLE delphi_rounds ADD COLUMN gp1_pct_affected_score REAL")
+        except Exception:
+            pass  # column already exists
 
         # ── Delphi sessions ─────────────────────────────────────────
         cursor.execute("""
@@ -463,8 +448,6 @@ def init_db() -> None:
 
         # ── Indexes ──────────────────────────────────────────────────
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_source ON causal_edges(source_force)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_causal_edges_target ON causal_edges(target_force)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
@@ -706,73 +689,27 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
 
 # ── CAUSAL EDGES ────────────────────────────────────────────────────────
 
-def save_causal_edges(edges: List[Dict[str, Any]]) -> None:
-    """Save causal DAG edges to database.
-
-    Args:
-        edges: List of dicts with keys: source_force, target_force, propagation_weight,
-               lag_years, mechanism, evidence_strength, calibrated_from_backtest
-    """
-    p = placeholder()
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM causal_edges")
-
-        for edge in edges:
-            cursor.execute(
-                f"""
-                INSERT INTO causal_edges (
-                    source_force, target_force, propagation_weight,
-                    lag_years, mechanism, evidence_strength, calibrated_from_backtest
-                ) VALUES ({ph(7)})
-                """,
-                (
-                    edge.get("source_force"), edge.get("target_force"), edge.get("propagation_weight"),
-                    edge.get("lag_years", 0), edge.get("mechanism"), edge.get("evidence_strength", "Moderate"),
-                    edge.get("calibrated_from_backtest", False),
-                ),
-            )
-
-        conn.commit()
-        logger.info(f"Saved {len(edges)} causal edges to database")
-
-
-def load_causal_edges() -> List[Dict[str, Any]]:
-    """Load all causal DAG edges from database.
-
-    Returns:
-        List of dicts with keys: source_force, target_force, propagation_weight,
-        lag_years, mechanism, evidence_strength, calibrated_from_backtest
-    """
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT source_force, target_force, propagation_weight,
-                   lag_years, mechanism, evidence_strength, calibrated_from_backtest
-            FROM causal_edges
-        """)
-
-        edges = [
-            _row_to_dict(row)
-            for row in cursor.fetchall()
-        ]
-
-        logger.info(f"Loaded {len(edges)} causal edges from database")
-        return edges
-
-
 # ── SIMULATION RUNS ────────────────────────────────────────────────────
 
 def save_simulation_run(
     iterations: int,
     model_type: str,
     results: dict,
-    causal_decomposition: Optional[dict] = None,
+    force_attribution: Optional[dict] = None,
     allocation_recommendation: Optional[dict] = None,
     convergence_diagnostics: Optional[dict] = None,
     config_snapshot_id: Optional[int] = None,
+    # A6 backward-compat alias — old callers can still pass causal_decomposition
+    causal_decomposition: Optional[dict] = None,
 ) -> int:
     """Save a simulation run result to database."""
+    # A6: accept the old kwarg name as an alias for one release cycle
+    if force_attribution is None and causal_decomposition is not None:
+        logger.warning(
+            "causal_decomposition parameter is deprecated — use force_attribution instead"
+        )
+        force_attribution = causal_decomposition
+
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -782,13 +719,13 @@ def save_simulation_run(
                 f"""
                 INSERT INTO simulation_runs (
                     iterations, model_type, results,
-                    causal_decomposition, allocation_recommendation,
+                    force_attribution, allocation_recommendation,
                     convergence_diagnostics, config_snapshot_id
                 ) VALUES ({ph(7)}) RETURNING id
                 """,
                 (
                     iterations, model_type, json.dumps(results),
-                    json.dumps(causal_decomposition) if causal_decomposition else None,
+                    json.dumps(force_attribution) if force_attribution else None,
                     json.dumps(allocation_recommendation) if allocation_recommendation else None,
                     json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
@@ -800,13 +737,13 @@ def save_simulation_run(
                 f"""
                 INSERT INTO simulation_runs (
                     iterations, model_type, results,
-                    causal_decomposition, allocation_recommendation,
+                    force_attribution, allocation_recommendation,
                     convergence_diagnostics, config_snapshot_id
                 ) VALUES ({ph(7)})
                 """,
                 (
                     iterations, model_type, json.dumps(results),
-                    json.dumps(causal_decomposition) if causal_decomposition else None,
+                    json.dumps(force_attribution) if force_attribution else None,
                     json.dumps(allocation_recommendation) if allocation_recommendation else None,
                     json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
@@ -830,7 +767,7 @@ def load_simulation_runs(
         cursor.execute(
             f"""
             SELECT id, run_date, iterations, model_type,
-                   results, causal_decomposition, allocation_recommendation,
+                   results, force_attribution, allocation_recommendation,
                    convergence_diagnostics
             FROM simulation_runs
             ORDER BY run_date DESC
@@ -863,7 +800,7 @@ def load_simulation_runs(
                 "iterations": row["iterations"],
                 "model_type": row["model_type"],
                 "results": _safe_json(row["results"]) or {},
-                "causal_decomposition": _safe_json(row.get("causal_decomposition")),
+                "force_attribution": _safe_json(row.get("force_attribution")),
                 "allocation_recommendation": _safe_json(row.get("allocation_recommendation")),
                 "convergence_diagnostics": _safe_json(row.get("convergence_diagnostics")),
             }
@@ -960,8 +897,8 @@ def get_db_stats() -> Dict[str, int]:
         cursor = conn.cursor()
 
         tables = [
-            "trends", "causal_edges", "competitors", "simulation_runs",
-            "backtest_results", "delphi_rounds", "triggers", "ai_suggestions",
+            "trends", "simulation_runs",
+            "delphi_rounds", "triggers", "ai_suggestions",
             "audit_log", "users", "delphi_sessions", "session_snapshots",
         ]
 

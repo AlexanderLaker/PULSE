@@ -10,12 +10,25 @@ import logging
 from typing import Optional
 
 import numpy as np
-from pulse.simulation._scipy_compat import cholesky, beta_ppf, t_cdf
+from scipy.linalg import cholesky
+from scipy.stats import beta as _scipy_beta, t as _scipy_t
+
+
+def beta_ppf(q, a, b):
+    """Beta inverse-CDF wrapper (kept for call-site stability)."""
+    return _scipy_beta.ppf(q, a, b)
+
+
+def t_cdf(x, df):
+    """Student-t CDF wrapper (kept for call-site stability)."""
+    return _scipy_t.cdf(x, df)
 
 from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,
                            FORCE_MATERIALIZATION_OVERRIDES,
-                           compute_materialization_schedule)
+                           compute_materialization_schedule,
+                           DEFAULT_FORCE_OVERLAP_MATRIX,
+                           DEFAULT_WITHIN_FORCE_OVERLAP)
 from pulse.ingestion.models import TrendDatabase, Trend
 
 logger = logging.getLogger(__name__)
@@ -32,9 +45,55 @@ class BayesianMonteCarloEngine:
     - Continuous annual paths instead of 2 discrete points
     """
 
-    def __init__(self, config: ModelConfig):
+    # Model semver + engine identity. Bumped whenever the result contract changes.
+    MODEL_VERSION = "2.4.0"
+    ENGINE_NAME = "bayesian_copula"
+
+    def __init__(self, config: ModelConfig, seed: int = 42):
         self.config = config
-        self.rng = np.random.default_rng(seed=42)
+        self.seed = seed
+        self.rng = np.random.default_rng(seed=seed)
+        # Integrity events: anything the engine had to repair or coerce at runtime
+        # is appended here and surfaced in the result dict for the Integrity drawer.
+        self._integrity_events: list[dict] = []
+        # Pre-compute per-force effective attenuation from overlap matrix
+        self._effective_attenuation = self._compute_effective_attenuation()
+
+    def _compute_effective_attenuation(self) -> dict:
+        """
+        Compute per-force effective attenuation from the overlap matrix.
+
+        Replaces the flat attenuation (e.g. 0.5 for all forces) with a
+        force-specific dampening that accounts for how much each force's
+        mechanism overlaps with other forces.
+
+        Formula: eff_att_i = base_attenuation × (1 - mean(overlap_ij for j ≠ i))
+
+        Example for Government (overlap: Env=0.40, Tech=0.20, Cust=0.15,
+        Con=0.10, Comp=0.05):
+          mean_overlap = (0.40 + 0.20 + 0.15 + 0.10 + 0.05) / 5 = 0.18
+          eff_att = 0.5 × (1 - 0.18) = 0.41
+
+        Returns: dict {force_name: effective_attenuation}
+        """
+        overlap = getattr(self.config, 'force_overlap_matrix', None)
+        if not overlap:
+            # Fallback to flat attenuation for backward compatibility
+            return {f: self.config.attenuation for f in FORCES}
+
+        base = self.config.attenuation
+        eff = {}
+        for force in FORCES:
+            row = overlap.get(force, {})
+            cross_overlaps = [v for f, v in row.items() if f != force and v > 0]
+            if cross_overlaps:
+                mean_overlap = sum(cross_overlaps) / len(cross_overlaps)
+            else:
+                mean_overlap = 0.0
+            eff[force] = base * (1.0 - mean_overlap)
+
+        logger.info(f"Overlap-aware attenuation: {', '.join(f'{f}={v:.3f}' for f, v in eff.items())}")
+        return eff
 
     def run(self, db: TrendDatabase, iterations: Optional[int] = None) -> dict:
         """
@@ -48,10 +107,12 @@ class BayesianMonteCarloEngine:
             dict with structure:
             {
                 "shift_matrix": {category: {year: {percentile: value}}},
-                "force_decomposition": {category: {force: contribution}},
-                "causal_decomposition": {category: {path: contribution}},
+                "force_attribution": {category: {"direct_effects": {force: contribution}}},
+                "vc_decomposition": {category: {vc_step: contribution}},
                 "convergence": {category: {"r_hat": float, "ess": int}},
-                "raw_samples": np.ndarray  # (iterations, categories, years)
+                "raw_samples": np.ndarray,  # (iterations, categories, years)
+                "model_version": str, "engine_name": str,
+                "seed": int, "integrity_events": list[dict],
             }
         """
         n_iter = iterations or self.config.iterations
@@ -62,7 +123,7 @@ class BayesianMonteCarloEngine:
         logger.info(f"Running Bayesian MC: {n_iter} iterations, "
                      f"{len(trends)} trends, {n_cats} categories, {n_years} years")
 
-        # Step 1: Build correlation matrix from causal DAG
+        # Step 1: Build correlation matrix (within-force and residual cross-force)
         corr_matrix = self._build_correlation_matrix(trends)
 
         # Step 2: Generate correlated samples using copula
@@ -111,6 +172,13 @@ class BayesianMonteCarloEngine:
         # Ensure positive definiteness
         eigvals = np.linalg.eigvalsh(R)
         if eigvals.min() < 0:
+            self._integrity_events.append({
+                "type": "correlation_pd_repair",
+                "severity": "warning",
+                "message": f"Correlation matrix was not positive-definite "
+                           f"(min eigenvalue={eigvals.min():.4f}); repaired via "
+                           f"diagonal shift + renormalization.",
+            })
             R += (abs(eigvals.min()) + 0.01) * np.eye(n)
             # Re-normalize diagonal
             d = np.sqrt(np.diag(R))
@@ -145,7 +213,14 @@ class BayesianMonteCarloEngine:
         df = self.config.t_copula_df
         try:
             L = cholesky(R, lower=True)
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):
+            self._integrity_events.append({
+                "type": "cholesky_repair",
+                "severity": "warning",
+                "message": "Cholesky decomposition failed; correlation matrix "
+                           "repaired via eigenvalue clipping (min eigenvalue "
+                           "clipped to 1e-6).",
+            })
             logger.warning("Correlation matrix not positive definite — repairing via eigenvalue decomposition")
             eigvals, eigvecs = np.linalg.eigh(R)
             eigvals = np.maximum(eigvals, 1e-6)
@@ -174,10 +249,17 @@ class BayesianMonteCarloEngine:
             # gp1_pct_affected: economic magnitude — "what fraction of the
             # category's GP1 can this trend touch at full materialization?"
             # AI-determined per trend, no default — must be set when trend is created.
+            # HARD FAIL (B3): a missing or invalid gp1_pct_affected silently
+            # dropped the trend from the simulation and degraded the correlation
+            # structure. We now refuse to run so the data-quality issue is visible.
             gp1 = trend.gp1_pct_affected
-            if gp1 is None or gp1 <= 0:
-                logger.warning(f"Trend '{trend.name}' has no gp1_pct_affected set, skipping")
-                continue
+            if gp1 is None or gp1 <= 0 or gp1 > 1.0:
+                raise ValueError(
+                    f"Trend '{trend.id}' ({trend.name}) has invalid "
+                    f"gp1_pct_affected={gp1!r}. Every trend must carry a "
+                    f"gp1_pct_affected in (0.0, 1.0] before the simulation "
+                    f"can be run. Fix the trend at ingestion time."
+                )
 
             # Final score = probability × gp1_pct_affected × direction
             # Clean separation: probability = likelihood, gp1_pct = magnitude
@@ -216,6 +298,9 @@ class BayesianMonteCarloEngine:
                     for yr in self.config.path_years
                 }
 
+        # Within-force overlap config
+        wf_overlap = getattr(self.config, 'within_force_overlap', {})
+
         # Compute year-by-year shifts with multiplicative compounding
         for y_idx, year in enumerate(self.config.path_years):
             # Build per-force contributions for this year using per-trend materialization
@@ -223,6 +308,7 @@ class BayesianMonteCarloEngine:
             for force in FORCES:
                 force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
                 total_score = 0.0
+                n_active = 0  # Trends with non-zero exposure for this category
 
                 for j, trend in enumerate(trends):
                     if trend.force != force:
@@ -235,15 +321,25 @@ class BayesianMonteCarloEngine:
                         mat_frac = trend_mat_schedules[j].get(year, 1.0)
 
                         total_score += trend_scores[j] * exposure_frac * mat_frac
+                        n_active += 1
+
+                # Within-force overlap dampening: reduce sum when multiple
+                # trends in the same force capture overlapping mechanisms.
+                # Formula: dampened = raw × (1 - overlap × (n-1)/n)
+                # With 1 trend: no dampening. With many: approaches (1 - overlap).
+                wf = wf_overlap.get(force, 0.0)
+                if n_active > 1 and wf > 0:
+                    dampen = 1.0 - wf * (n_active - 1) / n_active
+                    total_score *= dampen
 
                 force_score = total_score
                 force_contributions[force] = force_score * force_weight
 
-            # Multiplicative compounding with attenuation (no per-force materialization
-            # here — already applied per-trend above)
+            # Multiplicative compounding with overlap-aware per-force attenuation
             product = 1.0
             for force, contribution in force_contributions.items():
-                attenuated = contribution * self.config.attenuation
+                eff_att = self._effective_attenuation.get(force, self.config.attenuation)
+                attenuated = contribution * eff_att
                 product *= (1.0 + attenuated)
 
             year_shifts[y_idx] = product - 1.0
@@ -298,12 +394,38 @@ class BayesianMonteCarloEngine:
             for y_idx, yr in enumerate(self.config.path_years):
                 mat_matrix[j, y_idx] = sched.get(yr, 1.0)
 
-        attenuation = self.config.attenuation
+        # --- Overlap-aware attenuation (replaces flat self.config.attenuation) ---
+        # Per-force effective attenuation: (n_forces,)
+        eff_att = np.array([self._effective_attenuation.get(f, self.config.attenuation)
+                            for f in force_list])
+
+        # Within-force overlap: pre-compute per (force, category) dampening factors.
+        # n_active[f][c] = number of trends in force f with non-zero exposure to category c
+        # dampen[f][c] = 1 - overlap × (n_active - 1) / n_active
+        wf_overlap = getattr(self.config, 'within_force_overlap', {})
+        wf_dampen = np.ones((n_forces, n_cats))
+        for f_idx, force in enumerate(force_list):
+            mask = trend_force_idx == f_idx
+            if not mask.any():
+                continue
+            wf = wf_overlap.get(force, 0.0)
+            if wf <= 0:
+                continue
+            # Count active trends per category for this force
+            # exposure_matrix[mask, :] > 0 → (n_force_trends, n_cats) boolean
+            n_active_per_cat = (exposure_matrix[mask, :] > 0).sum(axis=0)  # (n_cats,)
+            # dampening: 1 - overlap × (n-1)/n, clipped to avoid negative
+            dampen = np.where(
+                n_active_per_cat > 1,
+                1.0 - wf * (n_active_per_cat - 1) / n_active_per_cat,
+                1.0
+            )
+            wf_dampen[f_idx, :] = np.clip(dampen, 0.1, 1.0)
 
         # --- VECTORIZED CORE ---
         # raw_samples: (n_iter, n_trends) — sampled trend scores
-        # effective_scores: (n_iter, n_trends, n_cats, n_years) — but we avoid materializing this
-        # Instead: for each year, compute force contributions, then multiplicative compounding
+        # For each year: compute force contributions with within-force dampening,
+        # then multiplicative compounding with overlap-aware per-force attenuation.
 
         shift_samples = np.zeros((n_iter, n_cats, n_years))
 
@@ -315,6 +437,7 @@ class BayesianMonteCarloEngine:
             effective = raw_samples * mat_y[np.newaxis, :]
 
             # For each force, sum contributions across its trends per category
+            # then apply within-force overlap dampening
             # force_contribution: (n_iter, n_forces, n_cats)
             force_contrib = np.zeros((n_iter, n_forces, n_cats))
             for f_idx in range(n_forces):
@@ -325,14 +448,17 @@ class BayesianMonteCarloEngine:
                 # effective[:, mask]: (n_iter, n_force_trends)
                 # exposure_matrix[mask, :]: (n_force_trends, n_cats)
                 # result: (n_iter, n_cats) — sum of trend_score * exposure for this force
-                force_contrib[:, f_idx, :] = effective[:, mask] @ exposure_matrix[mask, :]
+                raw_sum = effective[:, mask] @ exposure_matrix[mask, :]
+                # Within-force overlap dampening per category
+                force_contrib[:, f_idx, :] = raw_sum * wf_dampen[f_idx, :][np.newaxis, :]
 
             # Apply force weights
             # Weighted: (n_iter, n_forces, n_cats) * (n_forces, 1)
             weighted = force_contrib * fw[:, np.newaxis]
 
-            # Multiplicative compounding: product over forces of (1 + attenuated)
-            attenuated = weighted * attenuation
+            # Multiplicative compounding with overlap-aware per-force attenuation
+            # eff_att: (n_forces,) → broadcast to (1, n_forces, 1)
+            attenuated = weighted * eff_att[:, np.newaxis]
             # (n_iter, n_forces, n_cats) → product over axis=1 → (n_iter, n_cats)
             product = np.prod(1.0 + attenuated, axis=1)
             shift_samples[:, :, y_idx] = product - 1.0
@@ -340,13 +466,17 @@ class BayesianMonteCarloEngine:
         return shift_samples
 
     def _compile_results(self, samples: np.ndarray, db: TrendDatabase) -> dict:
-        """Compute percentiles, convergence diagnostics, decompositions."""
+        """Compute percentiles, convergence diagnostics, force attribution."""
         n_iter, n_cats, n_years = samples.shape
         percentiles = [10, 25, 50, 75, 90]
 
         shift_matrix = {}
         convergence = {}
-        causal_decomposition = {}
+        # NOTE: what used to be called "causal_decomposition" was never actually
+        # causal — it is a static force attribution scaled to match the MC median.
+        # Since the Causal DAG module and scenario engine have been removed,
+        # we are honest about what this is: a force-level attribution.
+        force_attribution = {}
 
         for c_idx, cat in enumerate(self.config.category_names):
             cat_data = samples[:, c_idx, :]
@@ -362,30 +492,46 @@ class BayesianMonteCarloEngine:
                 path[year]["mean"] = float(np.mean(year_samples))
                 path[year]["std"] = float(np.std(year_samples))
 
-            # Velocity: year-over-year change in median
-            velocity = {}
+            # D5: Velocity computed PER ITERATION first, then percentiled.
+            # The old code subtracted the median of year t from the median
+            # of year t-1, which conflates two different distributions and
+            # hides how fast individual simulation paths are actually moving.
+            # The correct quantity for early-warning triggers is the
+            # distribution of year-over-year deltas across the full sample.
             years = self.config.path_years
+            velocity = {}
             for i in range(1, len(years)):
-                velocity[years[i]] = path[years[i]]["median"] - path[years[i-1]]["median"]
+                # Per-iteration delta between adjacent years (shape: n_iter)
+                deltas = cat_data[:, i] - cat_data[:, i - 1]
+                velocity[years[i]] = {
+                    "median": float(np.percentile(deltas, 50)),
+                    "p10": float(np.percentile(deltas, 10)),
+                    "p25": float(np.percentile(deltas, 25)),
+                    "p75": float(np.percentile(deltas, 75)),
+                    "p90": float(np.percentile(deltas, 90)),
+                    "mean": float(np.mean(deltas)),
+                    "std": float(np.std(deltas)),
+                }
 
             shift_matrix[cat] = {
                 "path": path,
                 "velocity": velocity,
             }
 
-            # Convergence diagnostic: split-chain R̂ approximation
-            half = n_iter // 2
-            chain1_mean = np.mean(cat_data[:half, -1])
-            chain2_mean = np.mean(cat_data[half:, -1])
-            within_var = (np.var(cat_data[:half, -1]) + np.var(cat_data[half:, -1])) / 2
-            between_var = ((chain1_mean - chain2_mean) ** 2) / 2
-            total_var = within_var + between_var
-            r_hat = np.sqrt(total_var / max(within_var, 1e-10))
-
+            # Convergence diagnostic: single-chain split-R̂ approximation.
+            # A5: This is the ONE-CHAIN fallback — calling run_multichain()
+            # yields proper multi-chain split-R̂ + integrated-autocorrelation
+            # ESS across independent seeds. We still report this here so
+            # the single-chain path has a convergence block, but we flag
+            # it explicitly so nothing downstream presents it as rigorous.
+            cat_chain = cat_data[:, -1]
+            r_hat = self._split_rhat([cat_chain])
             convergence[cat] = {
-                "r_hat": float(r_hat),
-                "ess": int(n_iter / max(1, 1 + 2 * self._autocorr(cat_data[:, -1]))),
-                "converged": r_hat < 1.05,
+                "r_hat": float(r_hat) if np.isfinite(r_hat) else 1.0,
+                "ess": self._effective_sample_size(cat_chain),
+                "converged": bool(np.isfinite(r_hat) and r_hat < 1.05),
+                "n_chains": 1,
+                "method": "single_chain_split_rhat_approximate",
             }
 
             # Direct effects: per-force contribution to total category shift.
@@ -409,7 +555,7 @@ class BayesianMonteCarloEngine:
             mc_median = path[last_year]["median"]
             scale = mc_median / raw_total if abs(raw_total) > 1e-10 else 1.0
 
-            causal_decomposition[cat] = {
+            force_attribution[cat] = {
                 "direct_effects": {f: float(v * scale) for f, v in raw_force_sums.items()},
             }
 
@@ -464,11 +610,15 @@ class BayesianMonteCarloEngine:
         return {
             "shift_matrix": shift_matrix,
             "convergence": convergence,
-            "causal_decomposition": causal_decomposition,
+            "force_attribution": force_attribution,
             "vc_decomposition": vc_decomposition,
             "raw_samples": samples,
             "iterations": n_iter,
             "model_type": "bayesian_copula",
+            "model_version": self.MODEL_VERSION,
+            "engine_name": self.ENGINE_NAME,
+            "seed": self.seed,
+            "integrity_events": list(self._integrity_events),
         }
 
     def _autocorr(self, x: np.ndarray, lag: int = 1) -> float:
@@ -480,3 +630,223 @@ class BayesianMonteCarloEngine:
         c0 = np.sum((x - mean) ** 2) / n
         c1 = np.sum((x[lag:] - mean) * (x[:-lag] - mean)) / n
         return c1 / max(c0, 1e-10)
+
+    # ── A5: Multi-chain convergence diagnostics ─────────────────────
+    # The old split-in-half R̂ (one chain cut into two halves) can look
+    # converged even when the chain is stuck — the two halves share the
+    # same RNG and can be consistently wrong in the same way. Proper
+    # multi-chain split-R̂ (Vehtari et al. 2021) runs ≥2 independent
+    # chains from different seeds and compares between- vs. within-chain
+    # variance. Plus ESS is computed from integrated autocorrelation
+    # time (sum of positive autocorrelations) rather than just lag-1.
+
+    @staticmethod
+    def _split_rhat(chains: list) -> float:
+        """
+        Compute split-R̂ across ≥1 independent chains (Vehtari et al. 2021).
+
+        Each chain is split in half (Vehtari's "split-chain" convention);
+        those 2*m half-chains are then compared via the standard B/W/σ̂²
+        formula. Needs ≥2 independent chains for the result to be
+        informative — with a single chain we fall back to the old
+        split-in-half behaviour but the caller should flag the result.
+
+        chains: list of 1D np.ndarrays, one per chain, each of length n.
+        returns: float R̂ (1.0 = perfect mixing, >1.05 = not converged).
+        """
+        if not chains:
+            return float("nan")
+        # Truncate to equal length
+        n_min = min(len(c) for c in chains)
+        if n_min < 4:
+            return float("nan")
+        # Split each chain in half → 2m half-chains of length n_min//2
+        half = n_min // 2
+        split = []
+        for c in chains:
+            arr = np.asarray(c)[:n_min]
+            split.append(arr[:half])
+            split.append(arr[half:2 * half])
+        split = np.array(split)  # shape (2m, half)
+        m, n = split.shape
+        chain_means = split.mean(axis=1)
+        chain_vars = split.var(axis=1, ddof=1)
+        # Between-chain variance B
+        B = n * chain_means.var(ddof=1) if m > 1 else 0.0
+        # Within-chain variance W
+        W = chain_vars.mean()
+        if W <= 0:
+            return 1.0
+        # Variance estimate
+        var_hat = ((n - 1) / n) * W + B / n
+        return float(np.sqrt(var_hat / W))
+
+    @staticmethod
+    def _effective_sample_size(chain: np.ndarray, max_lag: int = 200) -> int:
+        """
+        ESS via integrated autocorrelation time (Geyer's initial positive
+        sequence). Sums autocorrelations up to the first non-positive one,
+        which is the standard way to avoid summing noise in the tail.
+        """
+        x = np.asarray(chain, dtype=float)
+        n = len(x)
+        if n < 4:
+            return n
+        x = x - x.mean()
+        var = np.dot(x, x) / n
+        if var <= 0:
+            return n
+        max_lag = min(max_lag, n - 1)
+        tau = 1.0
+        for lag in range(1, max_lag + 1):
+            rho = np.dot(x[:-lag], x[lag:]) / (n * var)
+            if rho <= 0:
+                break
+            tau += 2.0 * rho
+        return int(max(1, n / max(tau, 1.0)))
+
+    def run_multichain(self, db: TrendDatabase,
+                        n_chains: int = 3,
+                        iterations: Optional[int] = None,
+                        seeds: Optional[list] = None) -> dict:
+        """
+        A5: Run ``n_chains`` independent simulations from different seeds
+        and compute proper multi-chain split-R̂ + integrated-autocorrelation
+        ESS across them. Returns the last chain's full result enriched with
+        a ``convergence`` dict whose R̂/ESS are computed across chains and
+        a ``chain_summaries`` list for audit.
+        """
+        if n_chains < 1:
+            raise ValueError("n_chains must be >= 1")
+        if seeds is None:
+            # Deterministic, distinct seed sequence derived from self.seed
+            seeds = [int(self.seed) + i * 1000003 for i in range(n_chains)]
+        if len(seeds) != n_chains:
+            raise ValueError("len(seeds) must equal n_chains")
+
+        chain_results = []
+        per_chain_samples = []  # list of (n_iter, n_cats, n_years) arrays
+        for i, s in enumerate(seeds):
+            engine = BayesianMonteCarloEngine(self.config, seed=s)
+            r = engine.run(db, iterations=iterations)
+            chain_results.append(r)
+            per_chain_samples.append(r["raw_samples"])
+
+        # Stack and compute proper multi-chain convergence on the
+        # final-year category samples (the quantity users actually read).
+        last_idx = per_chain_samples[0].shape[2] - 1
+        convergence = {}
+        for c_idx, cat in enumerate(self.config.category_names):
+            cat_chains = [s[:, c_idx, last_idx] for s in per_chain_samples]
+            r_hat = self._split_rhat(cat_chains)
+            ess_total = sum(self._effective_sample_size(c) for c in cat_chains)
+            convergence[cat] = {
+                "r_hat": float(r_hat),
+                "ess": int(ess_total),
+                "converged": bool(np.isfinite(r_hat) and r_hat < 1.05),
+                "n_chains": n_chains,
+                "method": "multi_chain_split_rhat",
+            }
+
+        # Use the last chain's full result as the canonical output but
+        # replace its convergence block with the cross-chain one.
+        result = dict(chain_results[-1])
+        result["convergence"] = convergence
+        result["n_chains"] = n_chains
+        result["chain_seeds"] = [int(s) for s in seeds]
+        result["chain_summaries"] = [
+            {"seed": int(seeds[i]),
+             "median_2030": float(np.median(per_chain_samples[i][:, :, last_idx].sum(axis=1)))}
+            for i in range(n_chains)
+        ]
+        return result
+
+    # ── F3: Attenuation sensitivity band ────────────────────────────
+    # The attenuation factor is the single largest lever in the model
+    # (it dampens every force contribution before compounding). Rather
+    # than quote a single headline, we re-run the engine at ±30 % of
+    # the configured attenuation and attach the band to the result
+    # so the dashboard + exports can show the headline as a range.
+    def attenuation_sensitivity_band(
+        self,
+        db: TrendDatabase,
+        base_result: dict,
+        pct: float = 0.30,
+        iterations: Optional[int] = None,
+    ) -> dict:
+        """
+        Re-run the simulation at attenuation × (1 ± pct) and return a
+        band dict keyed by category with ``low`` / ``base`` / ``high``
+        median-2030 shifts plus a portfolio-level headline band.
+
+        Labels are in **attenuation-space**: ``low`` = attenuation × (1 - pct),
+        ``high`` = attenuation × (1 + pct). Because the compounding formula
+        is Π(1 + score × attenuation), a *higher* attenuation amplifies
+        whatever directional signal the trends carry — so ``high`` will
+        typically produce the larger |headline shift|. The UI should label
+        this as "attenuation flex band", not "best/worst case".
+
+        Inner runs are capped (default 2000 iters or config iters,
+        whichever is smaller) to keep the sensitivity step cheap.
+        """
+        if not (0.0 < pct < 1.0):
+            raise ValueError("pct must be in (0, 1)")
+        inner_iters = iterations if iterations is not None else min(self.config.iterations, 2000)
+
+        base_att = float(self.config.attenuation)
+        att_low = base_att * (1.0 - pct)
+        att_high = base_att * (1.0 + pct)
+
+        def _run_with_att(a: float) -> dict:
+            cfg = self.config.copy_with(attenuation=a, attenuation_source="admin_override")
+            return BayesianMonteCarloEngine(cfg, seed=self.seed).run(db, iterations=inner_iters)
+
+        low_res = _run_with_att(att_low)
+        high_res = _run_with_att(att_high)
+
+        last_year = self.config.path_years[-1]
+
+        def _headline(res: dict) -> float:
+            sm = res.get("shift_matrix", {})
+            meds = []
+            for _, cat_data in sm.items():
+                path = cat_data.get("path", {})
+                y = path.get(last_year, {})
+                if isinstance(y, dict):
+                    meds.append(y.get("median", 0.0))
+            return float(np.mean(meds)) if meds else 0.0
+
+        base_headline = _headline(base_result)
+        low_headline = _headline(low_res)
+        high_headline = _headline(high_res)
+
+        per_cat = {}
+        for cat in self.config.category_names:
+            def _m(res):
+                y = res.get("shift_matrix", {}).get(cat, {}).get("path", {}).get(last_year, {})
+                return float(y.get("median", 0.0)) if isinstance(y, dict) else 0.0
+            per_cat[cat] = {
+                "low": _m(low_res),
+                "base": _m(base_result),
+                "high": _m(high_res),
+            }
+
+        return {
+            "pct": pct,
+            "attenuation_base": base_att,
+            "attenuation_low": att_low,
+            "attenuation_high": att_high,
+            "headline": {
+                "base": base_headline,
+                "low": low_headline,
+                "high": high_headline,
+                "range": abs(low_headline - high_headline),
+            },
+            "by_category": per_cat,
+            "inner_iterations": inner_iters,
+            "note": (
+                "Band shows headline shift when the attenuation factor is "
+                f"flexed by ±{int(pct*100)}%. Labels are attenuation-space: "
+                "'low' = attenuation × (1-pct), 'high' = attenuation × (1+pct)."
+            ),
+        }

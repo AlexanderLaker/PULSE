@@ -104,7 +104,7 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-black">PULSE</span>
+            <span className="text-black">PRISM</span>
           </h1>
           <p className="text-sm text-gray-500 mt-2">Profit Pool Shift Model</p>
           <p className="text-xs text-gray-400 mt-1">
@@ -236,7 +236,7 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-          <p>PULSE Profit Pool Shift Model v2.0</p>
+          <p>PRISM Profit Pool Shift Model v2.0</p>
           <p className="mt-1">Strategic FMCG Analysis Platform</p>
         </div>
       </div>

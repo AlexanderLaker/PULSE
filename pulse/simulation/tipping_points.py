@@ -55,7 +55,12 @@ class TippingPointDetector:
 
         tipping_points = []
 
-        # First derivative (velocity) — rate of change
+        # First derivative (velocity) — rate of change.
+        # NOTE: Local list-based computation (not the dict-based helper in
+        # ``pulse.simulation.paths.PathAnalyzer.compute_velocity``). We need
+        # index-addressable sequences here for inflection-point detection via
+        # ``acceleration[i]`` lookups against ``years[i+2]``, so keeping the
+        # scalar-list shape is intentional and faster than dict lookups.
         velocity = []
         for i in range(1, len(values)):
             velocity.append(values[i] - values[i-1])

@@ -1,9 +1,11 @@
 """Advanced analytics API routes — CVaR, Sobol, Tipping Points, Reverse Stress."""
 import logging
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import numpy as np
+
+from pulse.api.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,7 @@ def get_state_snapshot() -> Dict[str, Any]:
 # ── CVaR Endpoints ─────────────────────────────────────────────────────
 
 @router.post("/cvar")
-async def compute_cvar(request: CVaRRequest):
+async def compute_cvar(request: CVaRRequest, user: dict = Depends(require_auth)):
     """
     Compute Conditional Value-at-Risk for all categories.
 
@@ -121,7 +123,7 @@ async def compute_cvar(request: CVaRRequest):
 
 
 @router.get("/cvar/by-category")
-async def get_cvar_by_category(category: Optional[str] = None, confidence: float = 0.95):
+async def get_cvar_by_category(category: Optional[str] = None, confidence: float = 0.95, user: dict = Depends(require_auth)):
     """Get CVaR for specific category or all."""
     state = get_state_snapshot()
     mc_result = state.get("mc_result")
@@ -156,7 +158,7 @@ async def get_cvar_by_category(category: Optional[str] = None, confidence: float
 # ── Sobol Sensitivity Endpoints ────────────────────────────────────────
 
 @router.post("/sobol")
-async def compute_sobol(request: SobolRequest):
+async def compute_sobol(request: SobolRequest, user: dict = Depends(require_auth)):
     """
     Compute Sobol sensitivity indices (global variance-based sensitivity).
 
@@ -187,9 +189,9 @@ async def compute_sobol(request: SobolRequest):
 
             # Create wrapper model that takes force weights and returns portfolio shift
             def force_model(weights_dict):
-                # Simulate with these force weights
-                config.force_weights = weights_dict
-                mc = BayesianMonteCarloEngine(config, state.get("dag"))
+                # Simulate with these force weights (B4: frozen — clone, don't mutate)
+                _cfg = config.copy_with(force_weights=dict(weights_dict))
+                mc = BayesianMonteCarloEngine(_cfg, state.get("dag"))
                 result = mc.run(db, iterations=analytics_iters)
                 shift_matrix = result.get("shift_matrix", {})
                 # Return portfolio shift at 2030
@@ -268,7 +270,7 @@ async def compute_sobol(request: SobolRequest):
 # ── Tipping Point Detection Endpoints ───────────────────────────────────
 
 @router.post("/tipping-points")
-async def detect_tipping_points(request: TippingPointRequest):
+async def detect_tipping_points(request: TippingPointRequest, user: dict = Depends(require_auth)):
     """
     Detect tipping points and inflection points in shift paths.
 
@@ -341,7 +343,7 @@ async def detect_tipping_points(request: TippingPointRequest):
 # ── Reverse Stress Test Endpoints ──────────────────────────────────────
 
 @router.post("/reverse-stress")
-async def reverse_stress_test(request: ReverseStressRequest):
+async def reverse_stress_test(request: ReverseStressRequest, user: dict = Depends(require_auth)):
     """
     Find minimum parameter perturbation to achieve target shift.
 
@@ -408,7 +410,7 @@ async def reverse_stress_test(request: ReverseStressRequest):
 
 
 @router.post("/reverse-stress/multi")
-async def multi_category_stress(request: MultiStressRequest):
+async def multi_category_stress(request: MultiStressRequest, user: dict = Depends(require_auth)):
     """
     Find scenario hitting multiple category targets simultaneously.
 

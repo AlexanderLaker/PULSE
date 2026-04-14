@@ -89,13 +89,11 @@ Factory Function:
 
 `ScoreCalibrator` class:
 - `async calibrate_scores(trends, market_intel) -> list[CalibrationSuggestion]`
-- `async calibrate_with_backtesting(trends, historical_data) -> list[CalibrationSuggestion]`
 - `async get_calibration_confidence(trend, current_score) -> float`
 
 **Features:**
 - Compares simulation scores against external market data
 - Detects systematic over/under-scoring
-- Uses historical backtesting accuracy to inform adjustments
 - Provides confidence levels for each adjustment
 
 **`CalibrationSuggestion` dataclass:**
@@ -131,9 +129,9 @@ Factory Function:
 - Configurable narrative style (executive, technical, detailed)
 
 ### `chat.py`
-**PulseChat — Natural Language Interface**
+**PrismChat — Natural Language Interface**
 
-`PulseChat` class:
+`PrismChat` class:
 - `async ask(question) -> str`
 - `async ask_multi_turn(questions) -> list[str]`
 - `async explain_scenario(scenario_name) -> str`
@@ -247,9 +245,9 @@ briefing = await narrator.generate_force_briefing("Consumer", trends)
 
 ### Chat Interface
 ```python
-from pulse.ai.chat import PulseChat, ChatContext
+from pulse.ai.chat import PrismChat, ChatContext
 
-chat = PulseChat()
+chat = PrismChat()
 chat.set_context(ChatContext(
     current_simulation_results=results,
     trend_data=trends,

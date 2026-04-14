@@ -150,7 +150,6 @@ def mock_model_config() -> ModelConfig:
         base_year=2025,
         path_years=[2026, 2027, 2028, 2029, 2030],
         iterations=1000,
-        backtesting_accuracy=None,
     )
     return config
 

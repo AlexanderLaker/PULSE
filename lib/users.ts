@@ -93,18 +93,18 @@ export async function initializeDefaultUser(): Promise<void> {
   const users = getUsers();
 
   if (users.length === 0) {
-    const adminEmail = process.env.PULSE_ADMIN_EMAIL;
-    const adminPassword = process.env.PULSE_ADMIN_PASSWORD;
+    const adminEmail = process.env.PRISM_ADMIN_EMAIL;
+    const adminPassword = process.env.PRISM_ADMIN_PASSWORD;
 
     if (!adminEmail || !adminPassword) {
       console.warn(
-        'No users exist and PULSE_ADMIN_EMAIL / PULSE_ADMIN_PASSWORD not set. ' +
+        'No users exist and PRISM_ADMIN_EMAIL / PRISM_ADMIN_PASSWORD not set. ' +
         'Register via the UI or set environment variables.'
       );
       return;
     }
 
-    const adminName = process.env.PULSE_ADMIN_NAME || 'Admin';
+    const adminName = process.env.PRISM_ADMIN_NAME || 'Admin';
 
     const admin: User = {
       id: randomUUID(),

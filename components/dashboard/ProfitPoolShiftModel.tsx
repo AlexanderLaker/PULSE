@@ -1,5 +1,5 @@
 /**
- * PULSE Profit Pool Shift Model v3 — Main Container Component
+ * PRISM Profit Pool Shift Model v3 — Main Container Component
  * Single unified view with contextual drill-down
  * Apple × Bain × Goldman Sachs aesthetic
  */
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '@/lib/format';
-import usePulse from '@/hooks/usePulse';
+import usePrism from '@/hooks/usePrism';
 import type {
   Trend,
   Scenario,
@@ -24,17 +24,11 @@ import type {
   AllocationRecommendation,
   ForceContribution,
   ForceName,
+  AISuggestion,
 } from '@/types';
 
-// Mock data
-import {
-  generateMockData,
-  MOCK_AI_INSIGHTS,
-  type TrendWithSources,
-  type AllocationWithRationale,
-  type AIInsight,
-  type MockDataResult,
-} from '@/data/mockData';
+// AIInsight type for footer bar (matches AISuggestion shape)
+type AIInsight = AISuggestion & { text?: string; type?: string };
 
 // Child components
 import HeadlineKPI from './HeadlineKPI';
@@ -50,13 +44,12 @@ import CategoryDetailPanel from './CategoryDetailPanel';
 import ScenarioSelectorPanel from './ScenarioSelectorPanel';
 import ForceWeightSliders from './ForceWeightSliders';
 import SettingsPanel from './SettingsPanel';
-import OnboardingTooltips from './OnboardingTooltips';
+// OnboardingTooltips removed — outdated tour steps
 import AIInsightsBar from './AIInsightsBar';
 import ConnectionStatus from './ConnectionStatus';
 import AIChatPanel from './AIChatPanel';
 
 // ─── Type Definitions ────────────────────────────────────────────
-// All types moved to @/data/mockData.ts
 
 // ─── ProductImpactAnalysis Component ────────────────────────────────
 interface ProductImpactProps {
@@ -167,7 +160,7 @@ function ProductImpactAnalysis({ shifts, trends }: ProductImpactProps) {
   );
 }
 
-// All mock data generation moved to @/data/mockData.ts
+// Data sourced from usePrism() hook — real API data only
 
 // ─── ProfitPoolShiftModel Component ──────────────────────────────────────────────
 type PanelType = 'category' | 'settings' | 'delphi' | 'scenario' | null;
@@ -177,7 +170,9 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate, connectionState, reconnect,
-  } = usePulse();
+    simulation, trends, forces, scenarios, dag, analytics,
+    aiSuggestions, triggers, health, updateTrend,
+  } = usePrism();
 
   // Responsive breakpoints
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1920);
@@ -205,21 +200,25 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [aiChatOpen, setAIChatOpen] = useState<boolean>(false);
 
-  // Mock data fallback
-  const mockData = generateMockData();
-  const data = mockData;
-  const scenarioOptions = mockData.scenarios;
+  // Real data from API via usePrism hook
+  const shifts: ShiftMatrix | null = simulation?.shifts ?? null;
+  const convergence: ConvergenceDiagnostics | undefined = simulation?.convergence;
+  const allocation = simulation?.allocation_recommendation ?? null;
+  const dagEdges: CausalEdge[] = dag?.edges ?? [];
   const forceNames = Object.keys(FORCES) as ForceName[];
-
-  // AI insights (imported from mockData)
-  const aiInsights: AIInsight[] = MOCK_AI_INSIGHTS;
+  const scenarioOptions: Scenario[] = scenarios ?? [];
+  const aiInsights: AIInsight[] = (aiSuggestions ?? []).map(s => ({
+    ...s,
+    text: s.content ?? '',
+    type: s.suggestion_type ?? 'info',
+  }));
 
   const handleSimulate = async (): Promise<void> => {
     await simulate();
   };
 
   // Loading state
-  if (loading && !data) {
+  if (loading) {
     return (
       <div style={{
         display: 'flex',
@@ -227,6 +226,8 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
         justifyContent: 'center',
         minHeight: '100vh',
         background: T.bg,
+        flexDirection: 'column',
+        gap: 16,
       } as React.CSSProperties}>
         <motion.div
           animate={{ rotate: 360 }}
@@ -234,6 +235,65 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
         >
           <RefreshCw size={32} style={{ color: T.accent }} />
         </motion.div>
+        <span style={{ fontSize: 13, color: T.text3 }}>Connecting to PRISM engine…</span>
+      </div>
+    );
+  }
+
+  // No data state — backend unavailable or no simulation run yet
+  if (!shifts || Object.keys(shifts).length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: T.bg,
+        flexDirection: 'column',
+        gap: 16,
+      } as React.CSSProperties}>
+        <AlertTriangle size={32} style={{ color: T.amber ?? '#EAB308' }} />
+        <div style={{ textAlign: 'center', maxWidth: 400 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: T.text, marginBottom: 8 }}>
+            {connectionState === 'offline' ? 'Backend Unavailable' : 'No Simulation Data'}
+          </div>
+          <div style={{ fontSize: 13, color: T.text3, lineHeight: 1.6 }}>
+            {connectionState === 'offline'
+              ? 'The PRISM engine is not reachable. Check that the backend is running and try reconnecting.'
+              : 'Run a simulation to generate shift matrix data. Click "Simulate" to start a Bayesian Monte Carlo run with 10,000 iterations.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+            {connectionState === 'offline' && (
+              <motion.button
+                onClick={reconnect}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                style={{
+                  padding: '8px 20px', borderRadius: 999, border: `1px solid ${T.border}`,
+                  background: 'transparent', color: T.text, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={13} style={{ marginRight: 6 }} />
+                Reconnect
+              </motion.button>
+            )}
+            <motion.button
+              onClick={handleSimulate}
+              disabled={simulating || connectionState === 'offline'}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                padding: '8px 20px', borderRadius: 999, border: 'none',
+                background: connectionState === 'offline' ? T.text3 : T.text, color: '#fff',
+                fontSize: 12, fontWeight: 600, cursor: connectionState === 'offline' ? 'not-allowed' : 'pointer',
+                opacity: connectionState === 'offline' ? 0.5 : 1,
+              }}
+            >
+              <Zap size={13} style={{ marginRight: 6 }} />
+              Run Simulation
+            </motion.button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -262,7 +322,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
         transition: 'grid-template-columns 0.3s cubic-bezier(0.25,0.1,0.25,1)',
       } as React.CSSProperties}
     >
-      <OnboardingTooltips isOpen={true} onComplete={() => {}} />
+      {/* OnboardingTooltips removed — outdated tour steps */}
       <AIInsightsBar insights={aiInsights} triggers={[]} isLoading={simulating} />
 
       {/* ─── STICKY HEADER ─────────────────────────────────────────────── */}
@@ -309,7 +369,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               P
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.01 } as React.CSSProperties}>
-              PULSE
+              PRISM
             </div>
             <span style={{ fontSize: 10, fontWeight: 500, color: T.text3, padding: '2px 8px', background: T.bg1, borderRadius: 999 } as React.CSSProperties}>
               v4.0
@@ -504,7 +564,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             >
               <CheckCircle2 size={12} style={{ color: T.green }} />
               <span style={{ color: T.green, fontSize: 11, fontWeight: 600 }}>
-                R̂ {data.convergence?.r_hat?.toFixed(2) || '1.03'}
+                R̂ {convergence?.r_hat?.toFixed(2) || '1.03'}
               </span>
             </div>
 
@@ -512,7 +572,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             <div style={{ ...ProfitPoolShiftModelStyles.pill, background: T.border1 } as React.CSSProperties}>
               <Clock size={12} style={{ color: T.text3 }} />
               <span style={{ color: T.text3, fontSize: 11, fontWeight: 600 }}>
-                {data.convergence?.iterations?.toLocaleString() || '5k'} iter
+                {convergence?.iterations?.toLocaleString() || '5k'} iter
               </span>
             </div>
           </div>
@@ -539,11 +599,11 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
         <span style={{ color: T.border2 }}>|</span>
         <span>Data Vintage: <strong style={{ color: T.text2 }}>March 2026</strong></span>
         <span style={{ color: T.border2 }}>|</span>
-        <span>Iterations: <strong style={{ color: T.text2 }}>{data.convergence?.iterations ? '10,000' : '—'}</strong></span>
+        <span>Iterations: <strong style={{ color: T.text2 }}>{convergence?.iterations ? '10,000' : '—'}</strong></span>
         <span style={{ color: T.border2 }}>|</span>
-        <span>Convergence: <strong style={{ color: data.convergence?.converged ? T.green : T.amber }}>{data.convergence?.converged ? `R̂ ${data.convergence.r_hat?.toFixed(2)}` : 'Pending'}</strong></span>
+        <span>Convergence: <strong style={{ color: convergence?.converged ? T.green : T.amber }}>{convergence?.converged ? `R̂ ${convergence.r_hat?.toFixed(2)}` : 'Pending'}</strong></span>
         <span style={{ color: T.border2 }}>|</span>
-        <span>Backtest Accuracy: <strong style={{ color: T.text2 }}>{data.convergence?.backtestingAccuracy ? `${(data.convergence.backtestingAccuracy * 100).toFixed(0)}%` : '—'}</strong></span>
+        <span>Model: <strong style={{ color: T.text2 }}>Bayesian MC + t-copula</strong></span>
         <span style={{ color: T.border2 }}>|</span>
         <span>Region: <strong style={{ color: T.accent }}>{selectedRegion || 'Global'}</strong></span>
       </div>
@@ -600,8 +660,8 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
           {/* Row 1: Headline KPIs */}
           <div data-onboarding="kpi" style={{ flex: '0 0 auto' }}>
             <HeadlineKPI
-              shifts={data.shifts}
-              convergence={data.convergence}
+              shifts={shifts}
+              convergence={convergence}
               selectedCategory={selectedCategory}
             />
           </div>
@@ -626,7 +686,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               }}
             >
               <ShiftHeatmap
-                shifts={data.shifts}
+                shifts={shifts}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
                 onHoverCategory={setHoveredCategory}
@@ -643,7 +703,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               }}
             >
               <PathTimeline
-                shifts={data.shifts}
+                shifts={shifts}
                 selectedCategory={selectedCategory}
               />
             </div>
@@ -659,7 +719,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             } as React.CSSProperties}
           >
             <CausalFlow
-              dag={{ edges: data.dagEdges, forces: forceNames as ForceName[] }}
+              dag={{ edges: dagEdges, forces: forceNames as ForceName[] }}
               shockedForce={shockedForce}
               onShockForce={setShockedForce}
             />
@@ -667,13 +727,13 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               selectedCategory={selectedCategory}
             />
             <AllocationChart
-              allocation={data.allocation[0] || undefined}
+              allocation={allocation ?? undefined}
             />
           </div>
 
           {/* Row 4: Product Impact Analysis */}
           <div style={{ flex: '0 0 auto' }}>
-            <ProductImpactAnalysis shifts={data.shifts} trends={data.trends} />
+            <ProductImpactAnalysis shifts={shifts} trends={trends} />
           </div>
 
           {/* Row 5: Collapsible Trends Section */}
@@ -694,7 +754,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
                 Trend Explorer
               </span>
               <span style={{ fontSize: 11, color: T.text3, marginLeft: 'auto' }}>
-                {data.trends?.length || 0} trends · {showTrends ? 'Collapse' : 'Expand'}
+                {trends?.length || 0} trends · {showTrends ? 'Collapse' : 'Expand'}
               </span>
               <motion.span
                 animate={{ rotate: showTrends ? 180 : 0 }}
@@ -714,10 +774,10 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
                   style={{ overflow: 'hidden', marginTop: 8 }}
                 >
                   <TrendExplorer
-                    data={{ trends: data.trends }}
+                    data={{ trends: trends }}
                     forceFilter={forceFilter || ''}
                     onForceFilter={setForceFilter}
-                    onUpdateTrend={() => {}}
+                    onUpdateTrend={(trendId: string, updates: any) => void updateTrend(trendId, updates)}
                   />
                 </motion.div>
               )}
@@ -804,9 +864,9 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               <CategoryDetailPanel
                 categoryId={selectedCategory || ''}
                 data={{
-                  shifts_path: data.shifts as any,
-                  force_decomposition: data.forceContributions as any,
-                  contributing_trends: { [selectedCategory || '']: data.trends },
+                  shifts_path: shifts as any,
+                  force_decomposition: simulation?.force_attribution as any,
+                  contributing_trends: { [selectedCategory || '']: trends },
                 }}
                 onClose={() => setSelectedCategory(undefined)}
               />

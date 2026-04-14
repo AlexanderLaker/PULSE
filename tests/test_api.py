@@ -2,8 +2,15 @@
 
 import pytest
 import json
-from pulse.api.app import create_app
-from fastapi.testclient import TestClient
+
+# Skip the entire file when server deps aren't installed. Keeps the
+# tests alive for any env that ships fastapi+httpx, while letting the
+# core numerical test suite run anywhere.
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
+
+from pulse.api.app import create_app  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture

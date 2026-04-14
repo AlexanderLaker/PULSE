@@ -1,5 +1,5 @@
 /**
- * PULSE — Analytics types (Amendment M).
+ * PRISM — Analytics types (Amendment M).
  * CVaR, Sobol sensitivity, tipping points, reverse stress testing.
  */
 

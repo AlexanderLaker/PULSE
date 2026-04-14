@@ -5,8 +5,9 @@ Uses the shared pulse.database module for Postgres/SQLite dual-mode persistence.
 
 import json
 import logging
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Optional
+from typing import Iterator, Optional
 
 from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, init_db
 
@@ -22,6 +23,65 @@ class AuditLogger:
             init_db()
         except Exception as e:
             logger.debug(f"AuditLogger init_db: {e}")
+
+    @contextmanager
+    def transaction(
+        self,
+        action: str,
+        entity_type: str = "",
+        entity_id: str = "",
+        old_value: str = "",
+        new_value: str = "",
+        reason: str = "",
+        user_id: str = "system",
+    ) -> Iterator:
+        """Atomically commit a domain write and its audit log entry.
+
+        Yields a database cursor inside a single transaction. The caller
+        executes their domain write(s) against the cursor; on successful
+        exit, the audit_log row is inserted and both are committed
+        together. On any exception, BOTH the domain change and the audit
+        entry are rolled back.
+
+        This eliminates the prior race where a domain write could succeed
+        while the audit log silently failed (or vice versa), leaving the
+        governance trail inconsistent with the actual database state.
+
+        Example:
+            with audit.transaction("score_change", "trend", trend_id,
+                                   old_value=str(old), new_value=str(new),
+                                   reason="Delphi round 2") as cur:
+                cur.execute(
+                    f"UPDATE trends SET probability = {ph(1)} WHERE id = {ph(1)}",
+                    (new, trend_id),
+                )
+        """
+        conn = None
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                try:
+                    yield cursor
+                    cursor.execute(
+                        f"""INSERT INTO audit_log (action, entity_type, entity_id,
+                            old_value, new_value, reason, user_id)
+                            VALUES ({ph(7)})""",
+                        (action, entity_type, entity_id,
+                         old_value, new_value, reason, user_id),
+                    )
+                    conn.commit()
+                except Exception:
+                    try:
+                        conn.rollback()
+                    except Exception as rb_err:
+                        logger.error(f"Audit transaction rollback failed: {rb_err}")
+                    raise
+        except Exception as e:
+            logger.error(
+                f"Audit transaction failed (action={action}, "
+                f"entity={entity_type}/{entity_id}): {e}"
+            )
+            raise
 
     def log(self, action: str, entity_type: str = "", entity_id: str = "",
             old_value: str = "", new_value: str = "", reason: str = "",

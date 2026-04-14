@@ -91,7 +91,6 @@ class ModelConfigValidator(BaseModel):
     iterations: int
     within_force_rho: float
     t_copula_df: int
-    backtesting_accuracy: Optional[float] = None
 
     @field_validator("attenuation")
     @classmethod
@@ -100,17 +99,17 @@ class ModelConfigValidator(BaseModel):
         if not (0.0 <= v <= 1.0):
             raise ValueError(
                 f"Attenuation must be between 0 and 1 (got {v}). "
-                f"Default is 0.5; backtested values typically 0.3-0.7"
+                f"Default is 0.5."
             )
         return v
 
     @field_validator("attenuation_source")
     @classmethod
     def validate_attenuation_source(cls, v: str) -> str:
-        """Attenuation source must be 'assumed' or 'backtested'."""
-        if v not in ("assumed", "backtested"):
+        """Attenuation source must be 'assumed' or 'admin_override'."""
+        if v not in ("assumed", "admin_override"):
             raise ValueError(
-                f"attenuation_source must be 'assumed' or 'backtested' (got '{v}')"
+                f"attenuation_source must be 'assumed' or 'admin_override' (got '{v}')"
             )
         return v
 
@@ -306,18 +305,6 @@ class ModelConfigValidator(BaseModel):
                 f"High df ≈ Gaussian copula (light tails). Typical: 2-10"
             )
 
-        return v
-
-    @field_validator("backtesting_accuracy")
-    @classmethod
-    def validate_backtesting_accuracy(cls, v: Optional[float]) -> Optional[float]:
-        """Backtesting accuracy should be in [0, 1] if provided."""
-        if v is not None:
-            if not (0.0 <= v <= 1.0):
-                raise ValueError(
-                    f"backtesting_accuracy must be in [0, 1] (got {v}). "
-                    f"Represents % of historical predictions within 80% CI"
-                )
         return v
 
     @model_validator(mode="after")

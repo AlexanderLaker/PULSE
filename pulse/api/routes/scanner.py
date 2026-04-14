@@ -24,8 +24,10 @@ import traceback
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
+
+from pulse.api.auth import require_auth, require_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scanner", tags=["scanner"])
@@ -408,7 +410,7 @@ async def _run_full_scan(
 # ═══════════════════════════════════════════════════════════════════════════
 
 @router.get("/status", response_model=ScanStatus)
-async def scan_status() -> ScanStatus:
+async def scan_status(user: dict = Depends(require_auth)) -> ScanStatus:
     """Get current scan status."""
     return ScanStatus(
         running=_scan_state["running"],
@@ -420,7 +422,7 @@ async def scan_status() -> ScanStatus:
 
 
 @router.get("/results", response_model=ScanResult)
-async def scan_results() -> ScanResult:
+async def scan_results(user: dict = Depends(require_auth)) -> ScanResult:
     """Get results from the last completed scan."""
     if not _scan_state["last_results"]:
         raise HTTPException(404, "No scan results available. Run a scan first.")
@@ -434,7 +436,7 @@ async def scan_results() -> ScanResult:
 
 
 @router.post("/run", response_model=Dict[str, Any])
-async def run_scan(req: ScanRequest = ScanRequest()) -> Dict[str, Any]:
+async def run_scan(req: ScanRequest = ScanRequest(), user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """Run strategic trend intelligence scan (Bain Senior Partner grade).
 
     Researches specific strategic questions with rigorous evidence standards.
@@ -465,6 +467,7 @@ async def run_scan(req: ScanRequest = ScanRequest()) -> Dict[str, Any]:
 async def run_scan_background(
     req: ScanRequest = ScanRequest(),
     background_tasks: BackgroundTasks = BackgroundTasks(),
+    user: dict = Depends(require_admin),
 ) -> Dict[str, str]:
     """Trigger a scan in the background (non-blocking)."""
     if _scan_state["running"]:
@@ -493,7 +496,7 @@ async def scanner_health() -> Dict[str, Any]:
 
 
 @router.post("/cancel")
-async def cancel_scan() -> Dict[str, str]:
+async def cancel_scan(user: dict = Depends(require_admin)) -> Dict[str, str]:
     """Cancel the currently running scan (if any)."""
     if not _scan_state["running"]:
         return {"status": "no scan running"}
@@ -502,7 +505,7 @@ async def cancel_scan() -> Dict[str, str]:
 
 
 @router.get("/saved-trends")
-async def get_saved_trends() -> Dict[str, Any]:
+async def get_saved_trends(user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """Load previously saved scanned trends from database."""
     try:
         from pulse.database import get_db_connection, _row_to_dict, placeholder, init_db
@@ -528,7 +531,7 @@ async def get_saved_trends() -> Dict[str, Any]:
 
 
 @router.post("/save-trends")
-async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
+async def save_scanned_trends(body: Dict[str, Any], user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """Save scanned trends to database for persistence."""
     try:
         from pulse.database import get_db_connection, placeholder, ph, init_db, USE_POSTGRES
@@ -617,7 +620,7 @@ async def save_scanned_trends(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.post("/update-trend-status")
-async def update_trend_status(body: Dict[str, Any]) -> Dict[str, str]:
+async def update_trend_status(body: Dict[str, Any], user: dict = Depends(require_admin)) -> Dict[str, str]:
     """Update the status of a scanned trend (new/reviewed/added/dismissed)."""
     try:
         from pulse.database import get_db_connection, placeholder, init_db
@@ -644,7 +647,7 @@ async def update_trend_status(body: Dict[str, Any]) -> Dict[str, str]:
 
 
 @router.delete("/trends/{trend_id}")
-async def delete_scanned_trend(trend_id: str) -> Dict[str, str]:
+async def delete_scanned_trend(trend_id: str, user: dict = Depends(require_admin)) -> Dict[str, str]:
     """Permanently delete a single scanned trend from database."""
     try:
         from pulse.database import get_db_connection, placeholder, init_db
@@ -660,7 +663,7 @@ async def delete_scanned_trend(trend_id: str) -> Dict[str, str]:
 
 
 @router.delete("/trends")
-async def delete_scanned_trends(body: Dict[str, Any] = None) -> Dict[str, Any]:
+async def delete_scanned_trends(body: Dict[str, Any] = None, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """Delete scanned trends. If body contains 'ids', delete those. Otherwise delete ALL."""
     try:
         from pulse.database import get_db_connection, placeholder, init_db
@@ -683,7 +686,7 @@ async def delete_scanned_trends(body: Dict[str, Any] = None) -> Dict[str, Any]:
 
 
 @router.get("/forces")
-async def get_force_queries() -> Dict[str, Any]:
+async def get_force_queries(user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """Get available strategic research questions by force."""
     return {
         force: [q["question"] for q in questions]

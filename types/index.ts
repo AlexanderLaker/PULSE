@@ -1,6 +1,6 @@
 /**
- * PULSE Profit Pool Shift Model — Master Type Definitions
- * All domain types for the Profit Pool Unified Landscape Simulation Engine.
+ * PRISM Profit Pool Shift Model — Master Type Definitions
+ * All domain types for the Profit Pool Risk & Intelligence Simulation Model.
  *
  * Design principle: Types mirror the Python backend's data contracts exactly.
  * Every API response has a corresponding TypeScript type.

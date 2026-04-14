@@ -27,7 +27,7 @@ const SettingsPanel: FC<SettingsPanelProps> = ({
   onPDF = () => Promise.resolve(),
   onRefresh = () => {},
   backendAvailable = true,
-  modelAccuracy = 0.73,
+  modelAccuracy = 0,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [exporting, setExporting] = useState<boolean>(false);

@@ -14,9 +14,14 @@ import asyncio
 import json
 from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
-from httpx import AsyncClient
 
-from pulse.api.routes.scanner import (
+# Skip the entire file when server deps aren't installed.
+pytest.importorskip("httpx")
+pytest.importorskip("fastapi")
+
+from httpx import AsyncClient  # noqa: E402
+
+from pulse.api.routes.scanner import (  # noqa: E402
     _scan_source,
     _run_full_scan,
     FORCE_QUERIES,

@@ -12,7 +12,7 @@ class TestBayesianMCBasics:
     def test_mc_runs_without_error(self, mock_model_config, mock_trends_database):
         """Should complete MC simulation without error."""
         config = mock_model_config
-        config.iterations = 100  # Fast run
+        config = config.copy_with(iterations=100)  # Fast run
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -22,7 +22,7 @@ class TestBayesianMCBasics:
     def test_mc_returns_all_categories(self, mock_model_config, mock_trends_database):
         """Should return results for all 13 categories."""
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -34,7 +34,7 @@ class TestBayesianMCBasics:
     def test_mc_returns_all_path_years(self, mock_model_config, mock_trends_database):
         """Should return results for all path years."""
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -47,7 +47,7 @@ class TestBayesianMCBasics:
     def test_mc_returns_all_percentiles(self, mock_model_config, mock_trends_database):
         """Should return p10, p25, p50, p75, p90 percentiles."""
         config = mock_model_config
-        config.iterations = 500
+        config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -67,7 +67,7 @@ class TestBayesianMCStatistics:
     def test_percentile_ordering(self, mock_model_config, mock_trends_database):
         """Should verify p10 < p25 < p50 < p75 < p90."""
         config = mock_model_config
-        config.iterations = 500
+        config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -89,7 +89,7 @@ class TestBayesianMCStatistics:
     def test_standard_deviation_computed(self, mock_model_config, mock_trends_database):
         """Should compute and return standard deviation."""
         config = mock_model_config
-        config.iterations = 500
+        config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -108,14 +108,12 @@ class TestBayesianMCConvergence:
     def test_more_iterations_narrows_spread(self, mock_model_config, mock_trends_database):
         """Should verify more iterations reduce percentile spread."""
         # Run with fewer iterations
-        config_100 = mock_model_config
-        config_100.iterations = 100
+        config_100 = mock_model_config.copy_with(iterations=100)
         engine_100 = BayesianMonteCarloEngine(config_100)
         result_100 = engine_100.run(mock_trends_database)
 
         # Run with more iterations
-        config_500 = mock_model_config
-        config_500.iterations = 500
+        config_500 = mock_model_config.copy_with(iterations=500)
         engine_500 = BayesianMonteCarloEngine(config_500)
         result_500 = engine_500.run(mock_trends_database)
 
@@ -133,7 +131,7 @@ class TestBayesianMCConvergence:
     def test_returns_convergence_diagnostics(self, mock_model_config, mock_trends_database):
         """Should include convergence diagnostics in result."""
         config = mock_model_config
-        config.iterations = 500
+        config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 
@@ -178,7 +176,7 @@ class TestBayesianMCEdgeCases:
         empty_db = TrendDatabase(trends=[], categories=CATEGORIES, forces=[])
 
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(empty_db)
 
@@ -191,7 +189,7 @@ class TestBayesianMCEdgeCases:
         db = TrendDatabase(trends=[mock_trend], categories=CATEGORIES, forces=["Consumer"])
 
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(db)
 
@@ -202,7 +200,7 @@ class TestBayesianMCEdgeCases:
     def test_custom_iterations_parameter(self, mock_model_config, mock_trends_database):
         """Should respect custom iterations parameter."""
         config = mock_model_config
-        config.iterations = 100  # Config default
+        config = config.copy_with(iterations=100)  # Config default
 
         engine = BayesianMonteCarloEngine(config)
 
@@ -221,7 +219,7 @@ class TestBayesianMCBayesianPriors:
     def test_mc_uses_trend_posteriors(self, mock_model_config, mock_trends_database):
         """Should use Bayesian posteriors from trends."""
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
 
         # Verify trends have posteriors
         for trend in mock_trends_database.trends:
@@ -235,7 +233,7 @@ class TestBayesianMCBayesianPriors:
     def test_raw_samples_available(self, mock_model_config, mock_trends_database):
         """Should return raw MC samples for diagnostics."""
         config = mock_model_config
-        config.iterations = 100
+        config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
         result = engine.run(mock_trends_database)
 

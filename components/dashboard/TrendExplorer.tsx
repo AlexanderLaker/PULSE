@@ -241,10 +241,10 @@ const ExpandedTrendRow: FC<ExpandedTrendRowProps> = ({ trend, onUpdateTrend, onC
                 </div>
               </div>
 
-              {/* PULSE Analysis */}
+              {/* PRISM Analysis */}
               <div>
                 <div style={{ fontSize: '10px', fontWeight: 600, marginBottom: '6px', color: T.accent, display: 'flex', alignItems: 'center', gap: '4px', letterSpacing: '0.5px' }}>
-                  <span style={{ fontSize: '12px' }}>✨</span> PULSE ANALYSIS
+                  <span style={{ fontSize: '12px' }}>✨</span> PRISM ANALYSIS
                 </div>
                 <div style={{
                   padding: '12px 14px',

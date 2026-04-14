@@ -38,8 +38,6 @@ def create_parser():
                         default="shift_matrix.xlsx")
     parser.add_argument("--iterations", type=int, default=None,
                         help="Number of Monte Carlo iterations")
-    parser.add_argument("--no-competitive", action="store_true",
-                        help="Disable competitive response modeling")
     parser.add_argument("--no-allocation", action="store_true",
                         help="Disable allocation optimization")
     parser.add_argument("--risk-aversion", type=float, default=1.0,
@@ -52,13 +50,11 @@ def create_parser():
                         help="Show audit trail")
     parser.add_argument("--ai", choices=["claude", "azure", "ollama", "none"],
                         default="none", help="AI provider (claude=Claude API, azure=Azure OpenAI, ollama=local)")
-    parser.add_argument("--export-powerbi", action="store_true",
-                        help="Export flat JSON shift matrix for Power BI")
-    parser.add_argument("--powerbi-path",
-                        help="SharePoint/OneDrive folder for Power BI auto-push")
-    parser.add_argument("--backtest", action="store_true",
-                        help="Run backtesting with historical data")
-    parser.add_argument("--history-dir", help="Directory containing historical V1-V11 files")
+    # B6: RNG seed exposure. --seed for reproducibility, --seeds for wobble.
+    parser.add_argument("--seed", type=int, default=42,
+                        help="RNG seed for reproducibility (default 42)")
+    parser.add_argument("--seeds", type=int, nargs="+", default=None,
+                        help="Run multiple seeds and report seed-wobble (e.g. --seeds 1 2 3)")
     parser.add_argument("--verbose", "-v", action="store_true")
     return parser
 
@@ -97,21 +93,60 @@ def main():
         sys.exit(1)
 
     # ── Step 2: Configure ───────────────────────────────────────────
-    config = ModelConfig()
+    # B4: ModelConfig is frozen — build via copy_with(), never mutate
+    _cfg_overrides = {}
     if db.categories:
-        config.category_names = db.categories
+        _cfg_overrides["category_names"] = db.categories
     if args.iterations:
-        config.iterations = args.iterations
+        _cfg_overrides["iterations"] = args.iterations
+    config = ModelConfig().copy_with(**_cfg_overrides) if _cfg_overrides else ModelConfig()
 
     # ── Step 3: Simulate ────────────────────────────────────────────
-    print(f"[2/5] Running Bayesian Monte Carlo ({config.iterations:,} iterations)...")
-    mc_engine = BayesianMonteCarloEngine(config)
-    mc_result = mc_engine.run(db)
+    # B6 & A5: Default to multichain (n_chains=3) for robust convergence diagnostics.
+    # If --seeds is provided (multiple seeds), run wobble analysis instead.
+    if args.seeds and len(args.seeds) > 1:
+        import numpy as _np
+        print(f"[2/5] Running Bayesian Monte Carlo across {len(args.seeds)} seeds "
+              f"({config.iterations:,} iterations each) for seed-wobble analysis...")
+        headlines = []
+        last_result = None
+        for s in args.seeds:
+            _mc = BayesianMonteCarloEngine(config, seed=s)
+            _r = _mc.run(db)
+            last_result = _r
+            sm = _r["shift_matrix"]
+            last_year = max(int(y) for cat in sm.values() for y in cat.keys())
+            headline = float(_np.mean([
+                cat[last_year]["median"] for cat in sm.values()
+                if last_year in cat and isinstance(cat[last_year], dict)
+            ]))
+            headlines.append(headline)
+            print(f"      seed={s}: headline shift {headline:+.4f}")
+        mean_h, std_h = float(_np.mean(headlines)), float(_np.std(headlines))
+        print(f"      WOBBLE: mean={mean_h:+.4f}  std={std_h:.4f}  "
+              f"min={min(headlines):+.4f}  max={max(headlines):+.4f}")
+        mc_result = last_result
+        mc_result["seed"] = args.seeds[-1]
+        mc_result["seed_wobble"] = {
+            "seeds": list(args.seeds),
+            "headline_mean": mean_h, "headline_std": std_h,
+            "headline_min": float(min(headlines)),
+            "headline_max": float(max(headlines)),
+        }
+    else:
+        # Default: use multichain with n_chains=3 for proper convergence diagnostics
+        print(f"[2/5] Running Bayesian Monte Carlo (multichain: 3 chains, "
+              f"{config.iterations:,} iterations each, seed={args.seed})...")
+        mc_engine = BayesianMonteCarloEngine(config, seed=args.seed)
+        mc_result = mc_engine.run_multichain(db, n_chains=3, iterations=config.iterations)
+        mc_result["seed"] = args.seed
+        print(f"      Multichain convergence method: {mc_result['convergence'].get(list(mc_result['convergence'].keys())[0], {}).get('method', 'unknown')}")
 
     # Convergence report
     converged = sum(1 for v in mc_result["convergence"].values() if v["converged"])
     total = len(mc_result["convergence"])
-    print(f"      Convergence: {converged}/{total} categories (R̂ < 1.05)")
+    n_chains = mc_result.get("n_chains", 1)
+    print(f"      Convergence: {converged}/{total} categories (R̂ < 1.05, n_chains={n_chains})")
 
     # ── Step 4: Optimizer ───────────────────────────────────────────
     allocation = None
@@ -121,7 +156,9 @@ def main():
         optimizer = AllocationOptimizer(config)
         allocation = optimizer.optimize(
             mc_result["shift_matrix"],
-            risk_aversion=args.risk_aversion
+            risk_aversion=args.risk_aversion,
+            raw_samples=mc_result.get("raw_samples"),
+            category_order=config.category_names,
         )
         print(f"      Sharpe proxy: {allocation.get('sharpe_proxy', 'N/A')}")
 
@@ -149,26 +186,11 @@ def main():
         mc_result,
         allocation=allocation,
         metadata={
-            "backtesting_accuracy": config.backtesting_accuracy or "N/A (no historical data)",
+            "model_version": mc_result.get("model_version", "unknown"),
+            "engine_name": mc_result.get("engine_name", "unknown"),
+            "seed": mc_result.get("seed"),
         }
     )
-
-    # ── Power BI Export ──────────────────────────────────────────
-    if args.export_powerbi:
-        print("\nExporting flat JSON for Power BI...")
-        try:
-            from pulse.excel_bridge.powerbi_export import PowerBIExporter
-            exporter = PowerBIExporter(config)
-            pbi_path = args.powerbi_path or str(Path(args.output).parent / "shift_matrix_powerbi.json")
-            exporter.export_shift_matrix(
-                mc_result=mc_result,
-                output_path=pbi_path,
-            )
-            print(f"  Power BI JSON: {pbi_path}")
-            if args.powerbi_path:
-                print(f"  Auto-pushed to: {args.powerbi_path}")
-        except Exception as e:
-            print(f"  ⚠ Power BI export failed: {e}")
 
     # Audit
     audit.log_simulation_run(config.iterations, "bayesian_mc")

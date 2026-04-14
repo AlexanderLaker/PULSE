@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Optional, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
+
+from pulse.api.auth import require_auth, require_admin
 
 
 def _sanitize(obj):
@@ -75,8 +77,6 @@ from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routes.delphi import router as delphi_router
 from pulse.api.routes.auth import router as auth_router
-# Scanner/Emerging Trends routes removed — external API scanning disabled
-# from pulse.api.routes.scanner import router as scanner_router
 
 logger = logging.getLogger(__name__)
 
@@ -127,12 +127,49 @@ class SimulationRequest(BaseModel):
     include_sensitivity: bool = False
     include_allocation: bool = True
     risk_aversion: float = Field(1.0, ge=0.1, le=10.0)
+    # B6: RNG seed control. `seed` runs once with that seed (reproducible).
+    # `seeds` runs the engine once per seed and reports seed-wobble (the
+    # spread of the headline shift across runs) so leadership can see how
+    # much of any single headline number is real signal vs RNG luck.
+    seed: Optional[int] = Field(None, ge=0, le=2**32 - 1,
+        description="RNG seed for reproducibility. If omitted and `seeds` is "
+                    "also omitted, defaults to 42.")
+    seeds: Optional[list[int]] = Field(None,
+        description="Run the engine multiple times (one per seed) and report "
+                    "seed-wobble (median + spread). For ExCo headlines.")
+    # A5: Multi-chain convergence diagnostics. Default is 3 chains for proper
+    # split-R̂ (Vehtari 2021) + integrated-autocorrelation ESS. Set to 1 for
+    # legacy single-chain mode (not recommended for production).
+    n_chains: int = Field(3, ge=1, le=8,
+        description="Number of independent MCMC chains for convergence "
+                    "diagnostics. Default 3 for rigorous split-R̂ (Vehtari 2021). "
+                    "Set to 1 for legacy single-chain mode.")
+    # F3: Attenuation sensitivity band — flex the attenuation factor by
+    # ±`attenuation_band_pct` and attach a headline band so ExCo sees
+    # the single biggest model-assumption lever as a range not a point.
+    include_attenuation_band: bool = Field(False,
+        description="If True, also run the engine at attenuation × (1 ± pct) "
+                    "and attach an 'attenuation_band' dict to the result.")
+    attenuation_band_pct: float = Field(0.30, ge=0.05, le=0.90,
+        description="Fractional flex applied to the attenuation factor for "
+                    "the sensitivity band. Default ±30%.")
 
     @field_validator("iterations")
     @classmethod
     def validate_iterations(cls, v):
         if v < 1:
             raise ValueError("iterations must be positive")
+        return v
+
+    @field_validator("seeds")
+    @classmethod
+    def validate_seeds(cls, v):
+        if v is None:
+            return v
+        if len(v) < 1 or len(v) > 10:
+            raise ValueError("seeds list must have between 1 and 10 entries")
+        if any(s < 0 or s >= 2**32 for s in v):
+            raise ValueError("each seed must be a uint32")
         return v
 
 class TrendCreate(BaseModel):
@@ -152,6 +189,10 @@ class TrendCreate(BaseModel):
     gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0, description="Fraction of category GP1 exposed (0.0-1.0)")
     peak_year: Optional[int] = Field(None, ge=2025, le=2035)
     diffusion_curve: Optional[str] = None
+    sources: Optional[list] = Field(None,
+        description="List of {title, url, source_type, tier} dicts. "
+                    "At least one source rated B- or better is required "
+                    "before the trend will pass the credibility gate.")
 
 class TrendUpdate(BaseModel):
     probability: Optional[int] = Field(None, ge=1, le=5)
@@ -238,8 +279,8 @@ def _backfill_diffusion_fields(db) -> None:
 def create_app(args=None) -> FastAPI:
     """Create and configure the FastAPI application."""
 
-    async def _run_simulation(iterations: int = 5000):
-        """Internal: run simulation and cache results (with locking)."""
+    async def _run_simulation(iterations: int = 5000, n_chains: int = 3):
+        """Internal: run simulation with multichain (default) and cache results (with locking)."""
         async with _state_lock:
             config = _state["config"]
             db = _state["db"]
@@ -247,14 +288,23 @@ def create_app(args=None) -> FastAPI:
             if not db:
                 return
 
-            # Bayesian MC
+            # A5: Default to multichain (n_chains=3) for proper convergence diagnostics
             mc = BayesianMonteCarloEngine(config)
-            mc_result = mc.run(db, iterations=iterations)
+            if n_chains > 1:
+                mc_result = mc.run_multichain(db, n_chains=n_chains, iterations=iterations)
+                logger.info(f"_run_simulation: multichain with {n_chains} chains")
+            else:
+                mc_result = mc.run(db, iterations=iterations)
+                logger.info(f"_run_simulation: single-chain mode")
             _state["mc_result"] = mc_result
 
-            # Allocation
+            # Allocation — pass MC samples so covariance is empirical, not guessed
             opt = AllocationOptimizer(config)
-            _state["allocation"] = opt.optimize(mc_result["shift_matrix"])
+            _state["allocation"] = opt.optimize(
+                mc_result["shift_matrix"],
+                raw_samples=mc_result.get("raw_samples"),
+                category_order=config.category_names,
+            )
 
             # Persist to database
             try:
@@ -263,7 +313,7 @@ def create_app(args=None) -> FastAPI:
                     iterations=iterations,
                     model_type="bayesian_copula",
                     results=mc_result.get("shift_matrix", {}),
-                    causal_decomposition=mc_result.get("causal_decomposition"),
+                    force_attribution=mc_result.get("force_attribution"),
                     allocation_recommendation=_state.get("allocation"),
                     convergence_diagnostics=mc_result.get("convergence"),
                 )
@@ -331,17 +381,21 @@ def create_app(args=None) -> FastAPI:
         # Auto-run simulation on startup if trends exist but no simulation is persisted
         if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
             try:
-                logger.info("No persisted simulation found — auto-running initial simulation...")
+                logger.info("No persisted simulation found — auto-running initial simulation (multichain)...")
                 config = _state["config"]
                 db = _state["db"]
 
+                # A5: Default to multichain (3 chains) for proper convergence diagnostics
                 mc = BayesianMonteCarloEngine(config)
-                mc_result = mc.run(db, iterations=config.iterations or 5000)
+                mc_result = mc.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                 _state["mc_result"] = mc_result
 
                 opt = AllocationOptimizer(config)
                 _state["allocation"] = opt.optimize(
-                    mc_result["shift_matrix"], risk_aversion=1.0
+                    mc_result["shift_matrix"],
+                    risk_aversion=1.0,
+                    raw_samples=mc_result.get("raw_samples"),
+                    category_order=config.category_names,
                 )
 
                 _state["simulation_stale"] = False
@@ -352,11 +406,11 @@ def create_app(args=None) -> FastAPI:
                     iterations=config.iterations or 5000,
                     model_type="bayesian_copula",
                     results=_sanitize(mc_result["shift_matrix"]),
-                    causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                    force_attribution=_sanitize(mc_result.get("force_attribution")),
                     allocation_recommendation=_sanitize(_state.get("allocation")),
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
-                logger.info("Auto-simulation completed and persisted to database")
+                logger.info(f"Auto-simulation completed (multichain, 3 chains) and persisted to database")
             except Exception as e:
                 logger.warning(f"Auto-simulation on startup failed: {e}")
 
@@ -370,7 +424,7 @@ def create_app(args=None) -> FastAPI:
     app = FastAPI(
         title="PRISM Profit Pool Shift Model API",
         version=__version__,
-        description="Profit Pool Simulation Engine — Bayesian MC + Causal DAG",
+        description="Profit Pool Simulation Engine — Bayesian MC + t-copula",
         lifespan=lifespan
     )
 
@@ -485,18 +539,22 @@ def create_app(args=None) -> FastAPI:
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
                                 # No simulation in DB — auto-run one and persist it
-                                print("[PRISM] No simulation in DB — auto-running initial simulation...", flush=True)
+                                print("[PRISM] No simulation in DB — auto-running initial simulation (multichain)...", flush=True)
                                 try:
                                     config = _state["config"]
                                     db = _state["db"]
 
+                                    # A5: Default to multichain (3 chains) for proper convergence diagnostics
                                     mc_engine = BayesianMonteCarloEngine(config)
-                                    mc_result = mc_engine.run(db, iterations=config.iterations or 5000)
+                                    mc_result = mc_engine.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                                     _state["mc_result"] = mc_result
 
                                     opt = AllocationOptimizer(config)
                                     _state["allocation"] = opt.optimize(
-                                        mc_result["shift_matrix"], risk_aversion=1.0
+                                        mc_result["shift_matrix"],
+                                        risk_aversion=1.0,
+                                        raw_samples=mc_result.get("raw_samples"),
+                                        category_order=config.category_names,
                                     )
                                     _state["simulation_stale"] = False
 
@@ -506,11 +564,11 @@ def create_app(args=None) -> FastAPI:
                                         iterations=config.iterations or 5000,
                                         model_type="bayesian_copula",
                                         results=_sanitize(mc_result["shift_matrix"]),
-                                        causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                                        force_attribution=_sanitize(mc_result.get("force_attribution")),
                                         allocation_recommendation=_sanitize(_state.get("allocation")),
                                         convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                                     )
-                                    print("[PRISM] Auto-simulation completed and persisted to database", flush=True)
+                                    print("[PRISM] Auto-simulation completed (multichain, 3 chains) and persisted to database", flush=True)
                                 except Exception as sim_err:
                                     print(f"[PRISM] Auto-simulation failed: {sim_err}", flush=True)
                                     _state["simulation_stale"] = True
@@ -559,7 +617,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Manual Seed + Simulate (for Vercel debugging) ──────────────
     @app.post("/api/v1/seed")
-    async def manual_seed():
+    async def manual_seed(user: dict = Depends(require_admin)):
         """Manually trigger seeding + simulation. Use when auto-seed fails."""
         import traceback
         steps = []
@@ -607,7 +665,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Trends ──────────────────────────────────────────────────────
     @app.get("/api/v1/trends")
-    async def list_trends(force: Optional[str] = None):
+    async def list_trends(force: Optional[str] = None, user: dict = Depends(require_auth)):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -679,7 +737,7 @@ def create_app(args=None) -> FastAPI:
         } for t in trends]
 
     @app.post("/api/v1/trends")
-    async def create_trend(req: TrendCreate):
+    async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
         """Create a new trend."""
         db = _state.get("db")
         if not db:
@@ -688,6 +746,25 @@ def create_app(args=None) -> FastAPI:
         # Validate force name
         if req.force not in FORCES:
             raise HTTPException(422, f"Invalid force: {req.force}. Must be one of {FORCES}")
+
+        # E1: source-credibility gate — refuse trends with no usable
+        # evidence base. Tier-E (social media / unverified) is allowed
+        # only as a corroborating signal alongside a B-tier-or-better
+        # source. We catch the gate error and convert to a 422 so the
+        # API caller sees a structured rejection rather than a 500.
+        from pulse.seed_trends import assert_trend_credible, TierEGateError
+        try:
+            assert_trend_credible(f"new_trend({req.name!r})", req.sources or [])
+        except TierEGateError as gate_err:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Source credibility gate failed",
+                    "reason": str(gate_err),
+                    "guidance": "Attach at least one source rated S/A/A-/B+/B/B-/C "
+                                "before the trend can be added to the model.",
+                },
+            )
 
         import uuid
         trend_id = f"{req.force.lower().replace(' ', '_')}_{uuid.uuid4().hex[:8]}"
@@ -746,7 +823,7 @@ def create_app(args=None) -> FastAPI:
         }
 
     @app.api_route("/api/v1/trends/revert-to-seed", methods=["GET", "POST"])
-    async def revert_trends_to_seed():
+    async def revert_trends_to_seed(user: dict = Depends(require_admin)):
         """Revert ALL trend probability scores back to seed_trends.py original values.
 
         This undoes any Delphi consensus application or manual edits to probability.
@@ -816,7 +893,7 @@ def create_app(args=None) -> FastAPI:
         }
 
     @app.get("/api/v1/trends/{trend_id}")
-    async def get_trend(trend_id: str):
+    async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -840,7 +917,7 @@ def create_app(args=None) -> FastAPI:
         }
 
     @app.put("/api/v1/trends/{trend_id}")
-    async def update_trend(trend_id: str, update: TrendUpdate):
+    async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(require_admin)):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -901,7 +978,7 @@ def create_app(args=None) -> FastAPI:
         return {"status": "updated", "trend_id": trend_id}
 
     @app.delete("/api/v1/trends/{trend_id}")
-    async def delete_trend(trend_id: str):
+    async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):
         """Delete a trend from the model."""
         db = _state.get("db")
         if not db:
@@ -941,7 +1018,7 @@ def create_app(args=None) -> FastAPI:
         return {"status": "deleted", "trend_id": trend_id, "trend_count": db.trend_count}
 
     @app.delete("/api/v1/trends")
-    async def delete_all_trends():
+    async def delete_all_trends(user: dict = Depends(require_admin)):
         """Delete ALL trends from the model. Use with caution."""
         db = _state.get("db")
         if not db:
@@ -977,7 +1054,7 @@ def create_app(args=None) -> FastAPI:
         return {"status": "deleted_all", "trends_deleted": count}
 
     @app.post("/api/v1/trends/sync")
-    async def sync_missing_trends():
+    async def sync_missing_trends(user: dict = Depends(require_admin)):
         """Explicitly sync missing trends from seed_trends.py into the database.
 
         Compares current DB trend IDs against seed_trends.py and inserts
@@ -1042,7 +1119,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Simulation Status ─────────────────────────────────────────
     @app.get("/api/v1/simulation/status")
-    async def get_simulation_status():
+    async def get_simulation_status(user: dict = Depends(require_auth)):
         """Check if the current simulation is stale (needs re-run)."""
         return {
             "stale": _state.get("simulation_stale", False),
@@ -1052,7 +1129,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Simulation ──────────────────────────────────────────────────
     @app.get("/api/v1/simulation")
-    async def get_simulation():
+    async def get_simulation(user: dict = Depends(require_auth)):
         """Get current cached simulation results. Falls back to DB on serverless cold start."""
         mc = _state.get("mc_result")
         if not mc:
@@ -1088,7 +1165,7 @@ def create_app(args=None) -> FastAPI:
         })
 
     @app.post("/api/v1/simulate")
-    async def run_simulation(req: SimulationRequest):
+    async def run_simulation(req: SimulationRequest, user: dict = Depends(require_admin)):
         async with _state_lock:
             # Reload trends from database so we always simulate with latest data
             try:
@@ -1102,16 +1179,82 @@ def create_app(args=None) -> FastAPI:
 
             config = _state["config"]
 
-            # Bayesian Monte Carlo
-            mc = BayesianMonteCarloEngine(config)
-            mc_result = mc.run(db, iterations=req.iterations)
+            # B6: Seed handling. Single-seed runs are reproducible; multi-seed
+            # runs expose RNG sensitivity ("seed-wobble") on the headline.
+            primary_seed = req.seed if req.seed is not None else 42
+            seed_wobble = None
+            if req.seeds and len(req.seeds) > 1:
+                import numpy as _np
+                medians_2030 = []
+                seed_runs = []
+                last_result = None
+                for s in req.seeds:
+                    _mc = BayesianMonteCarloEngine(config, seed=s)
+                    _r = _mc.run(db, iterations=req.iterations)
+                    last_result = _r
+                    sm = _r["shift_matrix"]
+                    last_year = max(int(y) for cat in sm.values() for y in cat.keys())
+                    headline = float(_np.mean([
+                        cat[last_year]["median"] for cat in sm.values()
+                        if last_year in cat and isinstance(cat[last_year], dict)
+                    ]))
+                    medians_2030.append(headline)
+                    seed_runs.append({"seed": int(s), "headline_median": headline})
+                seed_wobble = {
+                    "seeds": [int(s) for s in req.seeds],
+                    "headline_mean": float(_np.mean(medians_2030)),
+                    "headline_std": float(_np.std(medians_2030, ddof=0)),
+                    "headline_min": float(_np.min(medians_2030)),
+                    "headline_max": float(_np.max(medians_2030)),
+                    "runs": seed_runs,
+                }
+                # The "canonical" mc_result we persist is the last seed's run
+                mc_result = last_result
+                primary_seed = int(req.seeds[-1])
+                logger.info(f"Seed-wobble: mean={seed_wobble['headline_mean']:.4f} "
+                            f"std={seed_wobble['headline_std']:.4f} "
+                            f"min={seed_wobble['headline_min']:.4f} "
+                            f"max={seed_wobble['headline_max']:.4f}")
+            else:
+                # A5: Default to multichain (n_chains=3) for proper convergence diagnostics
+                # unless explicitly set to 1 (single-chain mode for backward compatibility)
+                mc = BayesianMonteCarloEngine(config, seed=primary_seed)
+                n_chains_to_use = req.n_chains if req.n_chains >= 1 else 3
+                if n_chains_to_use > 1:
+                    mc_result = mc.run_multichain(
+                        db, n_chains=n_chains_to_use, iterations=req.iterations
+                    )
+                    logger.info(f"Ran multichain simulation with {n_chains_to_use} chains")
+                else:
+                    # Backward compatibility: single-chain mode (legacy)
+                    mc_result = mc.run(db, iterations=req.iterations)
+                    logger.info(f"Ran single-chain simulation (legacy mode)")
+
+            mc_result["seed"] = primary_seed
+            if seed_wobble:
+                mc_result["seed_wobble"] = seed_wobble
+
+            # F3: attenuation sensitivity band
+            if req.include_attenuation_band:
+                try:
+                    band_engine = BayesianMonteCarloEngine(config, seed=primary_seed)
+                    mc_result["attenuation_band"] = band_engine.attenuation_sensitivity_band(
+                        db, mc_result, pct=req.attenuation_band_pct
+                    )
+                except Exception as e:
+                    logger.warning(f"Attenuation band computation failed: {e}")
+                    mc_result["attenuation_band"] = {"error": str(e)}
+
             _state["mc_result"] = mc_result
 
             # Allocation optimizer
             if req.include_allocation:
                 opt = AllocationOptimizer(config)
                 _state["allocation"] = opt.optimize(
-                    mc_result["shift_matrix"], risk_aversion=req.risk_aversion
+                    mc_result["shift_matrix"],
+                    risk_aversion=req.risk_aversion,
+                    raw_samples=mc_result.get("raw_samples"),
+                    category_order=config.category_names,
                 )
 
             _state["audit"].log_simulation_run("base", req.iterations, "bayesian_copula")
@@ -1127,7 +1270,7 @@ def create_app(args=None) -> FastAPI:
                     iterations=req.iterations,
                     model_type="bayesian_copula",
                     results=_sanitize(mc_result["shift_matrix"]),
-                    causal_decomposition=_sanitize(mc_result.get("causal_decomposition")),
+                    force_attribution=_sanitize(mc_result.get("force_attribution")),
                     allocation_recommendation=_sanitize(_state.get("allocation")),
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
@@ -1144,11 +1287,14 @@ def create_app(args=None) -> FastAPI:
                 "allocation": _state.get("allocation"),
                 "competitive": _state.get("competitive"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                "seed": mc_result.get("seed"),
+                "seed_wobble": mc_result.get("seed_wobble"),
+                "attenuation_band": mc_result.get("attenuation_band"),
             })
 
     # ── Sensitivity ─────────────────────────────────────────────────
     @app.get("/api/v1/sensitivity/tornado")
-    async def tornado(category: Optional[str] = None):
+    async def tornado(category: Optional[str] = None, user: dict = Depends(require_auth)):
         """Tornado sensitivity analysis — which trends have highest leverage."""
         db = _state.get("db")
         if not db:
@@ -1162,7 +1308,7 @@ def create_app(args=None) -> FastAPI:
         return _sanitize(se.tornado_analysis(db, category))
 
     @app.post("/api/v1/sensitivity/tornado")
-    async def tornado_post(category: Optional[str] = None):
+    async def tornado_post(category: Optional[str] = None, user: dict = Depends(require_auth)):
         """POST variant of tornado (for consistency with test expectations)."""
         db = _state.get("db")
         if not db:
@@ -1176,7 +1322,7 @@ def create_app(args=None) -> FastAPI:
         return _sanitize(se.tornado_analysis(db, category))
 
     @app.get("/api/v1/sensitivity/breakeven")
-    async def breakeven(category: Optional[str] = None):
+    async def breakeven(category: Optional[str] = None, user: dict = Depends(require_auth)):
         """Breakeven analysis — what score change makes a category neutral."""
         db = _state.get("db")
         if not db:
@@ -1200,7 +1346,7 @@ def create_app(args=None) -> FastAPI:
             }
 
     @app.post("/api/v1/sensitivity/breakeven")
-    async def breakeven_post(category: Optional[str] = None):
+    async def breakeven_post(category: Optional[str] = None, user: dict = Depends(require_auth)):
         """POST variant of breakeven."""
         db = _state.get("db")
         if not db:
@@ -1222,7 +1368,7 @@ def create_app(args=None) -> FastAPI:
             }
 
     @app.get("/api/v1/sensitivity/attenuation")
-    async def attenuation_sensitivity():
+    async def attenuation_sensitivity(user: dict = Depends(require_auth)):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -1231,25 +1377,28 @@ def create_app(args=None) -> FastAPI:
 
     # ── Optimizer ───────────────────────────────────────────────────
     @app.post("/api/v1/optimize/allocation")
-    async def optimize_allocation(req: AllocationRequest):
+    async def optimize_allocation(req: AllocationRequest, user: dict = Depends(require_auth)):
         mc = _state.get("mc_result")
         if not mc:
             raise HTTPException(404, "No simulation results")
 
         async with _state_lock:
-            opt = AllocationOptimizer(_state["config"])
+            cfg = _state["config"]
+            opt = AllocationOptimizer(cfg)
             result = opt.optimize(
                 mc["shift_matrix"],
                 risk_aversion=req.risk_aversion,
                 min_weight=req.min_weight,
                 max_weight=req.max_weight,
+                raw_samples=mc.get("raw_samples"),
+                category_order=cfg.category_names,
             )
             _state["allocation"] = result
             return _sanitize(result)
 
     # ── Config ──────────────────────────────────────────────────────
     @app.get("/api/v1/config")
-    async def get_config():
+    async def get_config(user: dict = Depends(require_auth)):
         config = _state.get("config")
         if not config:
             return {}
@@ -1265,7 +1414,6 @@ def create_app(args=None) -> FastAPI:
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
             "t_copula_df": config.t_copula_df,
-            "backtesting_accuracy": config.backtesting_accuracy,
         }
 
     class ConfigUpdate(BaseModel):
@@ -1274,7 +1422,7 @@ def create_app(args=None) -> FastAPI:
                         "force scores translate to GP1 shifts. Lower = more "
                         "conservative output. Default 0.5.")
         attenuation_source: Optional[str] = Field(None,
-            description="'assumed' | 'backtested' | 'admin_override'")
+            description="'assumed' | 'admin_override'")
         force_weights: Optional[dict] = None
         vc_weights: Optional[dict] = None
         region_weights: Optional[dict] = None
@@ -1286,36 +1434,55 @@ def create_app(args=None) -> FastAPI:
         iterations: Optional[int] = Field(None, ge=1000, le=100000)
         within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
         t_copula_df: Optional[int] = Field(None, ge=2, le=30)
+        dry_run: Optional[bool] = Field(False,
+            description="If true, validate the proposed config and return the "
+                        "diff without applying it. Useful for previewing admin "
+                        "changes before commit.")
 
     @app.put("/api/v1/config")
-    async def update_config(req: ConfigUpdate):
-        """Admin endpoint to update model configuration (e.g. attenuation)."""
+    async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
+        """Admin endpoint to update model configuration (e.g. attenuation).
+
+        Validates the *fully merged* proposed config via pydantic
+        ModelConfigValidator before applying any changes — so an invalid
+        partial update is rejected atomically rather than leaving the
+        in-memory config half-mutated.
+
+        If req.dry_run=True, the proposed config is validated and the
+        diff returned, but no state mutation, audit log, or simulation
+        invalidation occurs.
+        """
         config = _state.get("config")
         if not config:
             raise HTTPException(404, "No config loaded")
 
         audit = _state.get("audit")
         changes = {}
+        # B4: ModelConfig is frozen. Stage every update into this overrides
+        # dict — we construct a new config at the end, validate it, and
+        # only swap it into state on success. No half-mutated state ever.
+        overrides: dict = {}
 
         if req.attenuation is not None:
-            old_val = config.attenuation
-            config.attenuation = req.attenuation
-            config.attenuation_source = req.attenuation_source or "admin_override"
-            changes["attenuation"] = {"old": old_val, "new": req.attenuation}
+            changes["attenuation"] = {"old": config.attenuation, "new": req.attenuation}
+            overrides["attenuation"] = req.attenuation
+            overrides["attenuation_source"] = req.attenuation_source or "admin_override"
+            changes["attenuation_source"] = {"old": config.attenuation_source,
+                                              "new": overrides["attenuation_source"]}
 
         if req.force_weights is not None:
             total = sum(req.force_weights.values())
             if abs(total - 1.0) > 0.01:
                 raise HTTPException(400, f"Force weights must sum to 1.0, got {total}")
             changes["force_weights"] = {"old": config.force_weights, "new": req.force_weights}
-            config.force_weights = req.force_weights
+            overrides["force_weights"] = req.force_weights
 
         if req.vc_weights is not None:
             total = sum(req.vc_weights.values())
             if abs(total - 1.0) > 0.01:
                 raise HTTPException(400, f"VC weights must sum to 1.0, got {total}")
             changes["vc_weights"] = {"old": config.vc_weights, "new": req.vc_weights}
-            config.vc_weights = req.vc_weights
+            overrides["vc_weights"] = req.vc_weights
 
         if req.region_weights is not None:
             total = sum(req.region_weights.values())
@@ -1323,7 +1490,7 @@ def create_app(args=None) -> FastAPI:
                 raise HTTPException(400, f"Region weights must sum to 1.0, got {total}")
             old_rw = getattr(config, 'region_weights', {})
             changes["region_weights"] = {"old": old_rw, "new": req.region_weights}
-            config.region_weights = req.region_weights
+            overrides["region_weights"] = req.region_weights
 
         if req.category_weights is not None:
             total = sum(req.category_weights.values())
@@ -1331,7 +1498,7 @@ def create_app(args=None) -> FastAPI:
                 raise HTTPException(400, f"Category weights must sum to 1.0, got {total}")
             old_cw = getattr(config, 'category_weights', {})
             changes["category_weights"] = {"old": old_cw, "new": req.category_weights}
-            config.category_weights = req.category_weights
+            overrides["category_weights"] = req.category_weights
 
         if req.force_correlation_matrix is not None:
             # Validate: must be symmetric, diagonal 1.0, off-diagonal in [0, 1]
@@ -1360,19 +1527,73 @@ def create_app(args=None) -> FastAPI:
                         raise HTTPException(400, f"Force correlation matrix not symmetric: ({f1},{f2})={v12} but ({f2},{f1})={v21}")
             old_fcm = getattr(config, 'force_correlation_matrix', {})
             changes["force_correlation_matrix"] = {"old": old_fcm, "new": fcm}
-            config.force_correlation_matrix = fcm
+            overrides["force_correlation_matrix"] = fcm
 
         if req.iterations is not None:
             changes["iterations"] = {"old": config.iterations, "new": req.iterations}
-            config.iterations = req.iterations
+            overrides["iterations"] = req.iterations
 
         if req.within_force_rho is not None:
             changes["within_force_rho"] = {"old": config.within_force_rho, "new": req.within_force_rho}
-            config.within_force_rho = req.within_force_rho
+            overrides["within_force_rho"] = req.within_force_rho
 
         if req.t_copula_df is not None:
             changes["t_copula_df"] = {"old": config.t_copula_df, "new": req.t_copula_df}
-            config.t_copula_df = req.t_copula_df
+            overrides["t_copula_df"] = req.t_copula_df
+
+        # Build the candidate (new) config without touching the live one
+        candidate = config.copy_with(**overrides) if overrides else config
+
+        # ── Pydantic gate: validate the FULL proposed config ──────────
+        # The bespoke checks above catch field-local issues (sums, ranges)
+        # but the pydantic ModelConfigValidator enforces cross-field
+        # invariants (correct force/VC step membership, monotonic
+        # materialization, etc.) on the merged result. If this fails we
+        # still need to roll back the mutations we already wrote into
+        # `config` above — so capture originals for restore.
+        from pulse.config_validation import ModelConfigValidator
+        from pydantic import ValidationError as _PydValidationError
+
+        try:
+            ModelConfigValidator(
+                region=getattr(candidate, "region", "Global"),
+                aggregation_method=getattr(candidate, "aggregation_method", "Multiplicative"),
+                attenuation=candidate.attenuation,
+                attenuation_source=candidate.attenuation_source,
+                neutral_threshold=candidate.neutral_threshold,
+                base_year=candidate.base_year,
+                path_years=list(candidate.path_years),
+                materialization=dict(candidate.materialization),
+                force_weights=dict(candidate.force_weights),
+                vc_weights=dict(candidate.vc_weights),
+                category_names=list(candidate.category_names),
+                iterations=candidate.iterations,
+                within_force_rho=candidate.within_force_rho,
+                t_copula_df=candidate.t_copula_df,
+            )
+        except _PydValidationError as ve:
+            # No rollback needed — we never mutated the live config
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Proposed config failed validation",
+                    "issues": ve.errors(),
+                    "rolled_back": list(changes.keys()),
+                },
+            )
+
+        # ── Dry-run: validation passed but caller didn't want to commit
+        if req.dry_run:
+            return {
+                "dry_run": True,
+                "validated": True,
+                "would_update": list(changes.keys()),
+                "diff": {k: {"old": v["old"], "new": v["new"]} for k, v in changes.items()},
+            }
+
+        # Commit: swap the new config into state atomically
+        _state["config"] = candidate
+        config = candidate
 
         if audit and changes:
             audit.log("config_update", "config", "global",
@@ -1400,7 +1621,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Audit ───────────────────────────────────────────────────────
     @app.get("/api/v1/audit/log")
-    async def get_audit_log(limit: int = 50):
+    async def get_audit_log(limit: int = 50, user: dict = Depends(require_auth)):
         audit = _state.get("audit")
         if not audit:
             return []
@@ -1408,7 +1629,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Forces metadata ─────────────────────────────────────────────
     @app.get("/api/v1/forces")
-    async def get_forces():
+    async def get_forces(user: dict = Depends(require_auth)):
         db = _state.get("db")
         config = _state.get("config")
         if not db or not config:
@@ -1433,7 +1654,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Competitors metadata ────────────────────────────────────────
     @app.get("/api/v1/competitors")
-    async def get_competitors():
+    async def get_competitors(user: dict = Depends(require_auth)):
         """Get all competitor profiles."""
         try:
             from pulse.api.seed_data import get_competitor_profiles
@@ -1447,7 +1668,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(500, str(e))
 
     @app.get("/api/v1/competitors/intelligence")
-    async def get_competitive_intelligence():
+    async def get_competitive_intelligence(user: dict = Depends(require_auth)):
         """Get comprehensive competitive intelligence."""
         try:
             from pulse.api.seed_data import get_seed_competitive_intelligence
@@ -1457,7 +1678,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(500, str(e))
 
     @app.get("/api/v1/competitors/{competitor_id}")
-    async def get_competitor(competitor_id: str):
+    async def get_competitor(competitor_id: str, user: dict = Depends(require_auth)):
         """Get a single competitor's profile and intelligence."""
         try:
             from pulse.api.seed_data import get_competitor_profiles, get_seed_competitive_intelligence
@@ -1482,7 +1703,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Export endpoints ────────────────────────────────────────────
     @app.post("/api/v1/export/powerbi")
-    async def export_powerbi(path: Optional[str] = None):
+    async def export_powerbi(path: Optional[str] = None, user: dict = Depends(require_auth)):
         """Generate flat JSON shift matrix for Power BI consumption."""
         mc = _state.get("mc_result")
         if not mc:
@@ -1503,7 +1724,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(500, f"Export failed: {e}")
 
     @app.get("/api/v1/export/powerbi/status")
-    async def export_powerbi_status():
+    async def export_powerbi_status(user: dict = Depends(require_auth)):
         """Last Power BI export status."""
         import tempfile, os
         out_file = os.path.join(tempfile.gettempdir(), "pulse_exports", "shift_matrix.json")
@@ -1518,7 +1739,7 @@ def create_app(args=None) -> FastAPI:
         return {"last_export": None}
 
     @app.post("/api/v1/export/excel")
-    async def export_excel():
+    async def export_excel(user: dict = Depends(require_auth)):
         """Generate Shift Matrix Excel file."""
         mc = _state.get("mc_result")
         det = _state.get("det_result")
@@ -1537,7 +1758,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(500, f"Export failed: {e}")
 
     @app.post("/api/v1/export/pptx")
-    async def export_pptx():
+    async def export_pptx(user: dict = Depends(require_auth)):
         """Generate executive PowerPoint presentation."""
         mc = _state.get("mc_result")
         if not mc:
@@ -1577,7 +1798,6 @@ def create_app(args=None) -> FastAPI:
                 convergence=mc.get("convergence"),
                 allocation=_state.get("allocation"),
                 model_version=__version__,
-                model_accuracy=(config.backtesting_accuracy if config and config.backtesting_accuracy is not None else 0.73),
             )
 
             return FileResponse(
@@ -1593,7 +1813,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── AI Scanning (disabled — external API integrations removed) ──
     @app.post("/api/v1/ai/scan")
-    async def ai_scan():
+    async def ai_scan(user: dict = Depends(require_admin)):
         """AI trend scanning disabled — external API integrations removed."""
         return {
             "status": "disabled",
@@ -1605,13 +1825,13 @@ def create_app(args=None) -> FastAPI:
 
     # ── AI Chat endpoint ─────────────────────────────────────────
     @app.post("/api/v1/chat")
-    async def chat(req: ChatRequest):
+    async def chat(req: ChatRequest, user: dict = Depends(require_auth)):
         """Natural language query interface."""
         try:
-            from pulse.ai.chat import PulseChat
+            from pulse.ai.chat import PrismChat
             from pulse.ai.provider import get_provider
             provider = get_provider()
-            chat_engine = PulseChat(provider)
+            chat_engine = PrismChat(provider)
             context = {
                 "simulation": _state.get("mc_result"),
                 "trends": [{"id": t.id, "name": t.name, "force": t.force,
@@ -1637,7 +1857,7 @@ def create_app(args=None) -> FastAPI:
         notes: Optional[str] = None
 
     @app.get("/api/v1/snapshots")
-    async def list_snapshots():
+    async def list_snapshots(user: dict = Depends(require_auth)):
         """List all session snapshots, newest first. Never deleted."""
         try:
             from pulse.database import get_db_connection, _row_to_dict
@@ -1670,7 +1890,7 @@ def create_app(args=None) -> FastAPI:
             return []
 
     @app.post("/api/v1/snapshots")
-    async def create_snapshot(req: SnapshotCreate):
+    async def create_snapshot(req: SnapshotCreate, user: dict = Depends(require_auth)):
         """Create a new session snapshot. Snapshots are permanent — never auto-deleted."""
         import uuid
         from pulse.database import get_db_connection, placeholder, ph, _row_to_dict
@@ -1719,7 +1939,7 @@ def create_app(args=None) -> FastAPI:
             raise HTTPException(500, f"Snapshot creation failed: {str(e)}")
 
     @app.get("/api/v1/snapshots/{snapshot_id}")
-    async def get_snapshot(snapshot_id: str):
+    async def get_snapshot(snapshot_id: str, user: dict = Depends(require_auth)):
         """Get a single snapshot by ID."""
         from pulse.database import get_db_connection, placeholder, _row_to_dict
         p = placeholder()

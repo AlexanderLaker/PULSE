@@ -64,7 +64,18 @@ class PathAnalyzer:
         self.triggers: list[TriggerCondition] = []
 
     def compute_velocity(self, path: dict) -> dict:
-        """Year-over-year rate of change in median shift."""
+        """Year-over-year rate of change in median shift.
+
+        Operates on the year-keyed percentile-dict shape used across the Shift
+        Matrix pipeline (``path = {year: {"median": x, "p10": ..., ...}}``).
+        Returns a year-keyed dict of scalar deltas for trigger evaluation and
+        path-shape classification.
+
+        NOTE: A list-based numerical primitive for inflection/tipping-point
+        detection lives in ``pulse.simulation.tipping_points``. The split is
+        intentional: that code operates on flattened ``np.ndarray`` value
+        sequences so it can use ``np.argmax`` / np.diff algorithmic tools.
+        """
         years = sorted(path.keys())
         velocity = {}
         for i in range(1, len(years)):

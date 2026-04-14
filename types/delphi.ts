@@ -1,5 +1,5 @@
 /**
- * PULSE — Delphi Expert Elicitation types.
+ * PRISM — Delphi Expert Elicitation types.
  * Maps to pulse/elicitation/delphi.py and API routes.
  */
 

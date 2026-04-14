@@ -152,6 +152,8 @@ class ShiftMatrixWriter:
             cell.font = HEADER_FONT
             cell.fill = HEADER_FILL
 
+        from pulse.common.shape_compat import velocity_median as _vel_median
+
         row = 2
         for cat in self.config.category_names:
             cat_data = shift_matrix.get(cat, {})
@@ -160,7 +162,7 @@ class ShiftMatrixWriter:
             ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", bold=True)
 
             # Path shape classification (simplified)
-            vel_vals = list(velocity.values())
+            vel_vals = [_vel_median(v) for v in velocity.values()]
             if vel_vals:
                 if all(abs(v) < 0.001 for v in vel_vals):
                     shape = "flat"
@@ -175,7 +177,7 @@ class ShiftMatrixWriter:
             ws.cell(row=row, column=2, value=shape)
 
             for j, year in enumerate(self.config.path_years[1:], 3):
-                val = velocity.get(year, 0.0)
+                val = _vel_median(velocity.get(year, 0.0))
                 cell = ws.cell(row=row, column=j, value=round(val, 6))
                 cell.number_format = "0.00%"
             row += 1

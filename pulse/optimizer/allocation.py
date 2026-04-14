@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 import numpy as np
-from pulse.simulation._scipy_compat import minimize
+from scipy.optimize import minimize
 
 from pulse.config import ModelConfig, CATEGORIES
 
@@ -34,7 +34,9 @@ class AllocationOptimizer:
                  min_weight: float = 0.02,
                  max_weight: float = 0.25,
                  current_weights: Optional[dict] = None,
-                 max_turnover: float = 0.5) -> dict:
+                 max_turnover: float = 0.5,
+                 raw_samples: Optional[np.ndarray] = None,
+                 category_order: Optional[list] = None) -> dict:
         """
         Compute optimal relative allocation weights.
 
@@ -45,6 +47,14 @@ class AllocationOptimizer:
             max_weight: maximum weight per category
             current_weights: {category: current_weight} for turnover constraint
             max_turnover: maximum total reallocation allowed
+            raw_samples: np.ndarray of shape (iterations, categories, years) from MC.
+                When provided, the covariance matrix is computed empirically from
+                the final-year cross-section of the MC samples. This replaces the
+                old hard-coded "same-prefix = 0.3 correlation" heuristic, which
+                was an unjustified guess that bore no relationship to the actual
+                joint distribution of the simulated shifts.
+            category_order: list of category names matching the axis order of
+                raw_samples. Required when raw_samples is provided.
 
         Returns:
             {
@@ -53,7 +63,8 @@ class AllocationOptimizer:
                 "risk": float,
                 "sharpe_proxy": float,
                 "frontier": [{risk, return, weights}],
-                "defense_ranking": [{category, shift, rank}],  # NEW: for contraction scenarios
+                "defense_ranking": [{category, shift, rank}],
+                "covariance_source": "mc_samples" | "heuristic_fallback",
             }
         """
         categories = list(shift_matrix.keys())
@@ -97,17 +108,34 @@ class AllocationOptimizer:
         else:
             mu_relative = mu
 
-        # Build covariance matrix (diagonal + small cross-correlation)
+        # Build covariance matrix — prefer empirical covariance from the MC
+        # samples (the joint distribution the engine actually simulated).
+        # Fall back to a diagonal heuristic only when raw samples are not
+        # available (e.g. the engine was run in a mode that did not persist
+        # them). The prior behavior was to hand-code correlations based on
+        # category name prefixes ("Hair:" vs "LHC:"); that guess was never
+        # validated and did not reflect the actual simulation.
+        covariance_source = "heuristic_fallback"
         cov = np.diag(sigma ** 2)
-        for i in range(n):
-            for j in range(i + 1, n):
-                # Same business unit categories are more correlated
-                cat_i_prefix = categories[i].split(":")[0].strip()
-                cat_j_prefix = categories[j].split(":")[0].strip()
-                if cat_i_prefix == cat_j_prefix:
-                    cov[i, j] = cov[j, i] = 0.3 * sigma[i] * sigma[j]
-                else:
-                    cov[i, j] = cov[j, i] = 0.1 * sigma[i] * sigma[j]
+        if raw_samples is not None and category_order is not None:
+            try:
+                # Match covariance ordering to the categories we are optimizing
+                order_index = {c: i for i, c in enumerate(category_order)}
+                idx = [order_index[c] for c in categories]
+                # Cross-section at the final year (axis=2 is time)
+                final_slice = raw_samples[:, idx, -1]  # (iterations, n)
+                emp_cov = np.cov(final_slice, rowvar=False)
+                # Guard against degenerate / non-PD returns
+                if emp_cov.shape == (n, n) and np.all(np.isfinite(emp_cov)):
+                    # Nudge the diagonal to avoid singular matrices
+                    emp_cov = emp_cov + np.eye(n) * 1e-10
+                    cov = emp_cov
+                    covariance_source = "mc_samples"
+            except (KeyError, IndexError, ValueError) as e:
+                logger.warning(
+                    f"Could not build empirical covariance from MC samples: {e}. "
+                    f"Falling back to diagonal heuristic."
+                )
 
         # Optimization
         def neg_utility(w):
@@ -148,13 +176,7 @@ class AllocationOptimizer:
         # Compute efficient frontier
         frontier = self._compute_frontier(mu, cov, n, min_weight, max_weight, categories)
 
-        # INCREASED SENSITIVITY: Changed thresholds from ±0.02 to ±0.01
-        # This surfaces smaller but meaningful allocation differences
-        equal_weight = 1.0 / n
-        invest_more = [c for c, w in weights.items() if w > equal_weight + 0.01]
-        reduce = [c for c, w in weights.items() if w < equal_weight - 0.01]
-
-        # NEW: Defense ranking for all-contraction scenarios
+        # Defense ranking for all-contraction scenarios
         # Ranks categories from "least impacted" to "most impacted"
         # (i.e., from highest to lowest shift, where higher = less bad when negative)
         defense_ranking = [
@@ -174,10 +196,9 @@ class AllocationOptimizer:
             "sharpe_proxy": round(expected_return / max(risk, 1e-6), 4),
             "risk_aversion_used": risk_aversion,
             "frontier": frontier,
-            "invest_more": invest_more,
-            "reduce": reduce,
-            "defense_ranking": defense_ranking,  # NEW: for strategy in contraction mode
-            "all_same_sign_scenario": all_same_sign,  # Transparency flag
+            "defense_ranking": defense_ranking,
+            "all_same_sign_scenario": all_same_sign,
+            "covariance_source": covariance_source,
         }
 
     def _compute_frontier(self, mu, cov, n, min_w, max_w, categories,

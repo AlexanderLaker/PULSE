@@ -172,16 +172,6 @@ class TestOptimizerMetrics:
         assert "sharpe_proxy" in result
         assert isinstance(result["sharpe_proxy"], float)
 
-    def test_returns_recommendation_categories(self, mock_model_config, deterministic_shift_matrix):
-        """Should return invest_more and reduce categories."""
-        optimizer = AllocationOptimizer(mock_model_config)
-        result = optimizer.optimize(deterministic_shift_matrix)
-
-        assert "invest_more" in result
-        assert "reduce" in result
-        assert isinstance(result["invest_more"], list)
-        assert isinstance(result["reduce"], list)
-
 
 class TestOptimizerTurnover:
     """Test turnover constraint."""

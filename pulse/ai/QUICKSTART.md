@@ -11,7 +11,7 @@ All files created in: `/sessions/determined-blissful-fermi/mnt/Working Files/PRO
 | `config.py` | 119 | AI configuration, provider settings, security |
 | `provider.py` | 646 | LLM abstraction, Claude/Azure/Ollama, audit logging |
 | `scanner.py` | 330 | Trend scanner, RSS parsing, LLM analysis |
-| `calibrator.py` | 323 | Score validation, backtesting calibration |
+| `calibrator.py` | 323 | Score validation against external market signals |
 | `narrator.py` | 344 | Narrative generation (% only, no financial values) |
 | `chat.py` | 385 | Natural language Q&A interface |
 | **Total** | **2,154** | Complete Phase 3 AI intelligence layer |
@@ -69,9 +69,9 @@ summary = await narrator.generate_executive_summary(results)
 briefing = await narrator.generate_force_briefing("Consumer", trends)
 ```
 
-### 5. PulseChat (`chat.py`)
+### 5. PrismChat (`chat.py`)
 ```python
-chat = PulseChat()
+chat = PrismChat()
 chat.set_context(ChatContext(
     current_simulation_results=results,
     trend_data=trends,
@@ -186,7 +186,7 @@ The AI layer integrates seamlessly with existing PRISM components:
 2. Create a TrendScanner to identify market trends
 3. Run simulations and calibrate against market intel
 4. Generate executive narratives for scenarios
-5. Use PulseChat for ad-hoc analysis questions
+5. Use PrismChat for ad-hoc analysis questions
 
 ## Support
 

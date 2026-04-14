@@ -111,7 +111,7 @@ class TestAdvancedAnalyticsWorkflow:
                 "Hair: Care": -0.008 * impact,
             }
 
-        stress_result = tester.find_stress_scenario(
+        stress_result = tester.find_stress_configuration(
             stress_model,
             target_category="Hair: Color",
             target_shift=-0.15,
@@ -151,7 +151,7 @@ class TestAdvancedAnalyticsWorkflow:
             # Scale model to reach the target shift
             return {"Hair: Color": worst_case_shift * params["X"] / 3.0}
 
-        stress = tester.find_stress_scenario(
+        stress = tester.find_stress_configuration(
             model,
             target_category="Hair: Color",
             target_shift=worst_case_shift,
@@ -202,7 +202,7 @@ class TestAdvancedAnalyticsWorkflow:
         assert len(tipping) > 0  # Tipping points detected (should detect acceleration)
 
 
-class TestRealisticPulseScenario:
+class TestRealisticPrismScenario:
     """Test with realistic PRISM-like scenario."""
 
     def test_profit_pool_risk_analysis(self, sample_database):
@@ -240,7 +240,7 @@ class TestRealisticPulseScenario:
             }
 
         # Find scenario that produces the CVaR shift
-        stress = tester.find_stress_scenario(
+        stress = tester.find_stress_configuration(
             portfolio_model,
             target_category=most_risky_cat,
             target_shift=portfolio_cvar,

@@ -191,10 +191,6 @@ class EnvConfig:
         self.test_mode = (
             get_env("TEST_MODE", default="false").lower() in ("true", "1", "yes")
         )
-        self.test_excel_path = get_env(
-            "TEST_EXCEL_PATH", default="tests/data/v12_sample.xlsx"
-        )
-        self.backtest_data_dir = get_env("BACKTEST_DATA_DIR", default="data/backtest_history/")
 
     def get_llm_config(self) -> dict:
         """

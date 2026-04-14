@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { T, CATEGORIES, YEARS, FORCES } from '../lib/format';
-import usePulse from '../hooks/usePulse';
+import usePrism from '../hooks/usePrism';
 import type {
   Trend,
   ShiftMatrix,
@@ -39,7 +39,7 @@ import SegmentedControl from './SegmentedControl';
 // Extracted components
 import ForceWeightSliders from './ForceWeightSliders';
 import SettingsPanel from './SettingsPanel';
-import OnboardingTooltips from './OnboardingTooltips';
+// OnboardingTooltips removed — outdated tour steps
 import AIInsightsBar from './AIInsightsBar';
 import DelphiPanel from './DelphiPanel';
 import SessionSnapshots from './SessionSnapshots';
@@ -202,7 +202,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
   const {
     loading, simulating, simulationStale, staleReason, error,
     simulate, simulation,
-  } = usePulse();
+  } = usePrism();
 
   // Local state
   const [activeView, setActiveView] = useState<'overview' | 'trends' | 'strategic'>('overview');
@@ -254,12 +254,13 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
       newShifts[catId] = yearMap;
     }
 
-    // Build force contributions from backend causal_decomposition if available
-    const causalDecomp = simulation?.causal_decomposition;
+    // Build force contributions from backend force_attribution if available
+    // (A6: was named causal_decomposition — kept as fallback for old responses)
+    const forceAttr = simulation?.force_attribution ?? simulation?.causal_decomposition;
     let newFC: Record<string, ForceContribution[]> | undefined;
-    if (causalDecomp && typeof causalDecomp === 'object') {
+    if (forceAttr && typeof forceAttr === 'object') {
       newFC = {};
-      for (const [catKey, decomp] of Object.entries(causalDecomp)) {
+      for (const [catKey, decomp] of Object.entries(forceAttr)) {
         const catId = normCatId(catKey);
         const directEffects = (decomp as any)?.direct_effects || decomp;
         if (directEffects && typeof directEffects === 'object') {
@@ -403,7 +404,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
   const aiInsights: AIInsight[] = [];
 
   const handleSimulate = async (): Promise<void> => {
-    // Call the real backend simulation via usePulse hook
+    // Call the real backend simulation via usePrism hook
     try {
       await simulate();
     } catch (err) {
@@ -449,7 +450,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
         shifts: data.shifts,
         causal_decomposition: data.forceContributions,
         model_version: 'bayesian_copula_v1',
-        backtesting_accuracy: 0.73,
+        backtesting_accuracy: 0,
       };
       const json = JSON.stringify(payload, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
@@ -530,7 +531,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
 
   return (
     <div style={{ background: T.bg, minHeight: '100vh', fontFamily: T.sans, color: T.text } as React.CSSProperties}>
-      <OnboardingTooltips isOpen={true} onComplete={() => {}} />
+      {/* OnboardingTooltips removed — outdated tour steps */}
       <AIInsightsBar insights={aiInsights} triggers={[]} isLoading={simulating} />
       {/* ─── STICKY HEADER ─────────────────────────────────────────────── */}
       <motion.header
@@ -1354,7 +1355,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
                 onPDF={handleExportPDF}
                 onPowerPoint={handleExportPowerPoint}
                 onRefresh={handleRefresh}
-                modelAccuracy={data.convergence?.backtestingAccuracy || 0.73}
+                modelAccuracy={0}
               />
             </motion.div>
           </>

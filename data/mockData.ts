@@ -1,5 +1,5 @@
 /**
- * PULSE Profit Pool Shift Model — Mock Data Generation
+ * PRISM Profit Pool Shift Model — Mock Data Generation
  * All mock data generators extracted from ProfitPoolShiftModel.tsx
  * Used when API is unavailable or for testing.
  *
@@ -894,7 +894,7 @@ export function generateMockAllocation(): AllocationWithRationale[] {
 }
 
 /**
- * Generate causal DAG edges (16 edges per PULSE spec).
+ * Generate causal DAG edges (16 edges per PRISM spec).
  */
 export function generateMockDAGEdges(): CausalEdge[] {
   return [

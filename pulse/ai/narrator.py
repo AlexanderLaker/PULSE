@@ -34,7 +34,7 @@ class SimulationNarrator:
         self,
         simulation_result: Dict[str, Any],
         config: Optional[Dict[str, Any]] = None,
-        causal_decomposition: Optional[Dict[str, Any]] = None,
+        force_attribution: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Generate a narrative for simulation results.
@@ -42,7 +42,9 @@ class SimulationNarrator:
         Args:
             simulation_result: Results from simulation with distribution data
             config: Optional narrative configuration
-            causal_decomposition: Optional causal decomposition of effects
+            force_attribution: Optional per-category force attribution
+                (static decomposition of which forces drive which categories;
+                NOT a causal claim — the engine has no causal model)
 
         Returns:
             Executive narrative as string (no financial data)
@@ -55,9 +57,9 @@ class SimulationNarrator:
 
         # Build context ensuring no absolute values
         results_context = self._prepare_results_context(simulation_result)
-        causal_context = ""
-        if causal_decomposition:
-            causal_context = self._prepare_causal_context(causal_decomposition)
+        attribution_context = ""
+        if force_attribution:
+            attribution_context = self._prepare_attribution_context(force_attribution)
 
         system_prompt = f"""You are an executive communications specialist.
 Write a compelling, clear narrative about business simulation results and their potential impact.
@@ -68,14 +70,16 @@ CRITICAL REQUIREMENTS:
 3. Use percentile language: "25th percentile", "median outcome", "95th percentile"
 4. Style: {style}
 5. Maximum length: {max_length} words
-6. If causal decomposition provided, explain HOW forces propagate through the system
+6. If a force attribution is provided, describe WHICH forces are pulling each
+   category up or down. Do NOT claim causal mechanisms — the model is a
+   correlational decomposition, not a causal one.
 
 Focus on:
 - Market dynamics and competitive position
 - Relative performance across segments
 - Probability of different outcomes
 - Key drivers of success/risk
-- Causal mechanisms (e.g., regulation → reformulation costs → shelf price)
+- Which forces dominate which category outcomes (attribution, not causation)
 
 Write for C-level executives (CEO, CFO, CMO)."""
 
@@ -83,7 +87,7 @@ Write for C-level executives (CEO, CFO, CMO)."""
 
 SIMULATION RESULTS:
 {results_context}
-{causal_context}
+{attribution_context}
 
 Create a compelling narrative that helps executives understand the business implications."""
 
@@ -280,35 +284,29 @@ Write a strategic briefing for executives."""
 
         return "\n".join(lines)
 
-    def _prepare_causal_context(self, causal_decomposition: Dict[str, Any]) -> str:
+    def _prepare_attribution_context(self, force_attribution: Dict[str, Any]) -> str:
         """
-        Prepare causal decomposition for narrative.
+        Prepare per-category force attribution for narrative.
 
-        Shows how forces propagate through system to create impacts.
+        This is a static, scaled decomposition of which forces contribute
+        most to each category's MC median shift. It is NOT a causal model;
+        the engine has no causal DAG and makes no claims about propagation.
 
         Args:
-            causal_decomposition: Causal decomposition data
+            force_attribution: {category: {"direct_effects": {force: shift}}}
 
         Returns:
             Formatted context string
         """
-        lines = ["\nCAUSAL MECHANISMS:"]
+        lines = ["\nFORCE ATTRIBUTION (per category, scaled to MC median):"]
 
-        for category, effects in causal_decomposition.items():
+        for category, effects in force_attribution.items():
             lines.append(f"\n{category}:")
 
-            if isinstance(effects, dict):
-                if "direct_effects" in effects:
-                    lines.append("  Direct Effects:")
-                    for force, impact in effects["direct_effects"].items():
-                        direction = "+" if impact > 0 else ""
-                        lines.append(f"    {force}: {direction}{impact:.1%}")
-
-                if "propagated_effects" in effects:
-                    lines.append("  Propagated Effects (through DAG):")
-                    for path, impact in effects["propagated_effects"].items():
-                        direction = "+" if impact > 0 else ""
-                        lines.append(f"    {path}: {direction}{impact:.1%}")
+            if isinstance(effects, dict) and "direct_effects" in effects:
+                for force, impact in effects["direct_effects"].items():
+                    direction = "+" if impact > 0 else ""
+                    lines.append(f"    {force}: {direction}{impact:.1%}")
 
         return "\n".join(lines)
 
@@ -366,7 +364,7 @@ Write a strategic briefing for executives."""
             "",
             "Success in this scenario depends on:",
             "  - Accurate market assessment",
-            "  - Proactive competitive response",
+            "  - Proactive portfolio adaptation",
             "  - Flexible resource allocation",
             "",
             "Further analysis recommended before strategic commitment.",

@@ -5,8 +5,10 @@ Endpoints for managing Delphi sessions, scoring, calibration, and consensus buil
 
 import logging
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+
+from pulse.api.auth import require_auth, require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class SubmitScoreRequest(BaseModel):
     scorer_id: str
     trend_id: str
     probability_score: int
+    gp1_pct_affected_score: Optional[float] = None
     rationale: Optional[str] = ""
 
 
@@ -59,7 +62,7 @@ def get_trend_db():
 # ── Session Management Endpoints ────────────────────────────────────────
 
 @router.post("/sessions")
-async def create_session(req: CreateSessionRequest) -> Dict[str, Any]:
+async def create_session(req: CreateSessionRequest, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """
     Create a new Delphi session.
 
@@ -112,7 +115,7 @@ async def create_session(req: CreateSessionRequest) -> Dict[str, Any]:
 
 
 @router.get("/sessions")
-async def list_sessions() -> Dict[str, Any]:
+async def list_sessions(user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     List all Delphi sessions.
 
@@ -129,7 +132,7 @@ async def list_sessions() -> Dict[str, Any]:
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str) -> Dict[str, Any]:
+async def delete_session(session_id: str, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """
     Delete a Delphi session and all associated scores.
 
@@ -161,7 +164,7 @@ async def delete_session(session_id: str) -> Dict[str, Any]:
 
 
 @router.get("/sessions/{session_id}")
-async def get_session_detail(session_id: str) -> Dict[str, Any]:
+async def get_session_detail(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get detailed session information including all rounds and scores.
 
@@ -185,7 +188,7 @@ async def get_session_detail(session_id: str) -> Dict[str, Any]:
 
 
 @router.post("/sessions/{session_id}/advance")
-async def advance_round(session_id: str) -> Dict[str, Any]:
+async def advance_round(session_id: str, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """
     Advance session to next round and return anonymized distributions for sharing.
 
@@ -210,7 +213,7 @@ async def advance_round(session_id: str) -> Dict[str, Any]:
 
 
 @router.post("/sessions/{session_id}/complete")
-async def complete_session(session_id: str) -> Dict[str, Any]:
+async def complete_session(session_id: str, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """
     Finalize session and compute consensus scores.
 
@@ -235,7 +238,7 @@ async def complete_session(session_id: str) -> Dict[str, Any]:
 
 
 @router.post("/sessions/{session_id}/apply")
-async def apply_consensus(session_id: str) -> Dict[str, Any]:
+async def apply_consensus(session_id: str, user: dict = Depends(require_admin)) -> Dict[str, Any]:
     """
     Apply Delphi consensus scores back to the trend database.
 
@@ -268,7 +271,7 @@ async def apply_consensus(session_id: str) -> Dict[str, Any]:
 # ── Scoring Endpoints ────────────────────────────────────────────────────
 
 @router.post("/sessions/{session_id}/score")
-async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, Any]:
+async def submit_score(session_id: str, req: SubmitScoreRequest, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Submit a score for a trend in a session.
     Auto-creates session if it was lost due to Vercel cold start.
@@ -302,16 +305,15 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
             if not session:
                 raise HTTPException(500, "Failed to auto-create session")
 
-        from pulse.elicitation.delphi import ScoringRound
-        round_data = ScoringRound(
+        delphi.submit_score(
+            session_id=session_id,
             round_number=session["current_round"],
-            trend_id=req.trend_id,
             scorer_id=req.scorer_id,
-            probability_score=req.probability_score,
-            rationale=req.rationale,
+            trend_id=req.trend_id,
+            probability=req.probability_score,
+            rationale=req.rationale or "",
+            gp1_pct_affected=req.gp1_pct_affected_score,
         )
-
-        delphi.submit_round(round_data, session_id=session_id)
         logger.info(
             f"Recorded score from {req.scorer_id} for trend {req.trend_id} "
             f"in session {session_id}"
@@ -337,6 +339,7 @@ async def submit_score(session_id: str, req: SubmitScoreRequest) -> Dict[str, An
 async def get_session_scores(
     session_id: str,
     round_number: Optional[int] = None,
+    user: dict = Depends(require_auth),
     trend_id: Optional[str] = None,
     scorer_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -373,6 +376,7 @@ async def get_session_scores(
                     "round_number": round_data["round_number"],
                     "scorer_id": round_data["scorer_id"],
                     "probability_score": round_data["probability_score"],
+                    "gp1_pct_affected_score": round_data.get("gp1_pct_affected_score"),
                     "rationale": round_data["rationale"],
                     "calibration_factor": round_data["calibration_factor"],
                 })
@@ -388,7 +392,7 @@ async def get_session_scores(
 # ── Calibration Endpoints ──────────────────────────────────────────────
 
 @router.post("/sessions/{session_id}/calibrate")
-async def calibrate_scorer(session_id: str, req: CalibrationRequest) -> Dict[str, Any]:
+async def calibrate_scorer(session_id: str, req: CalibrationRequest, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Run calibration exercise for a scorer.
 
@@ -421,7 +425,7 @@ async def calibrate_scorer(session_id: str, req: CalibrationRequest) -> Dict[str
 
 
 @router.get("/sessions/{session_id}/calibration")
-async def get_session_calibration(session_id: str) -> Dict[str, Any]:
+async def get_session_calibration(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get calibration results for all scorers in a session.
 
@@ -458,7 +462,7 @@ async def get_session_calibration(session_id: str) -> Dict[str, Any]:
 # ── Analysis & Transparency Endpoints ──────────────────────────────────
 
 @router.get("/sessions/{session_id}/summary")
-async def get_session_summary(session_id: str) -> Dict[str, Any]:
+async def get_session_summary(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get round summary with anonymized distributions for sharing with scorers.
 
@@ -483,7 +487,7 @@ async def get_session_summary(session_id: str) -> Dict[str, Any]:
 
 
 @router.get("/sessions/{session_id}/consensus")
-async def get_consensus_scores(session_id: str) -> Dict[str, Any]:
+async def get_consensus_scores(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get current consensus scores for all trends in session.
 
@@ -516,7 +520,7 @@ async def get_consensus_scores(session_id: str) -> Dict[str, Any]:
 
 
 @router.get("/sessions/{session_id}/scorers")
-async def get_scorers_analysis(session_id: str) -> Dict[str, Any]:
+async def get_scorers_analysis(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get per-scorer analysis including calibration and bias detection.
 
@@ -573,7 +577,7 @@ _draft_store: Dict[str, Dict[str, Any]] = {}
 
 
 @router.post("/sessions/{session_id}/scores/draft")
-async def save_draft_score(session_id: str, req: DraftScoreRequest) -> Dict[str, Any]:
+async def save_draft_score(session_id: str, req: DraftScoreRequest, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Auto-save a draft score so the user can resume later.
     Stored in-memory (survives within server lifetime, not across restarts).
@@ -599,7 +603,7 @@ async def save_draft_score(session_id: str, req: DraftScoreRequest) -> Dict[str,
 
 
 @router.get("/sessions/{session_id}/scores/drafts")
-async def get_draft_scores(session_id: str, scorer_name: Optional[str] = None) -> Dict[str, Any]:
+async def get_draft_scores(session_id: str, scorer_name: Optional[str] = None, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Retrieve saved draft scores for a session so the user can resume.
     """
@@ -613,7 +617,7 @@ async def get_draft_scores(session_id: str, scorer_name: Optional[str] = None) -
 
 
 @router.get("/sessions/{session_id}/audit")
-async def get_session_audit(session_id: str) -> Dict[str, Any]:
+async def get_session_audit(session_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get full audit trail for a session.
 
@@ -660,7 +664,7 @@ async def get_session_audit(session_id: str) -> Dict[str, Any]:
 # ── Scorer-Specific View Endpoints ─────────────────────────────────────
 
 @router.get("/sessions/{session_id}/scorer/{scorer_id}/view")
-async def get_scorer_view(session_id: str, scorer_id: str) -> Dict[str, Any]:
+async def get_scorer_view(session_id: str, scorer_id: str, user: dict = Depends(require_auth)) -> Dict[str, Any]:
     """
     Get the view a scorer sees when opening the scoring interface.
 

@@ -79,6 +79,14 @@ export type VCDecomposition = Record<string, Record<string, number>>;
 export interface SimulationResult {
   shifts: ShiftMatrix;
   shift_matrix?: ShiftMatrix;
+  /**
+   * A6: renamed from causal_decomposition. Static force attribution (per
+   * category, scaled to MC median). NOT a causal claim — see narrator
+   * disclaimer. Old field name kept as alias for one release for
+   * backward compat with cached responses.
+   */
+  force_attribution?: CategoryRecord<CausalDecomposition>;
+  /** @deprecated Use force_attribution. Kept for backward compat. */
   causal_decomposition?: CategoryRecord<CausalDecomposition>;
   vc_decomposition?: VCDecomposition;
   allocation_recommendation?: AllocationRecommendation;

@@ -165,6 +165,7 @@ class SensitivityEngine:
     def weight_sensitivity(self, db: TrendDatabase,
                            force: str, weight_range: tuple = (0.05, 0.40)) -> list:
         """How does changing a force's weight affect results?"""
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")
         orig_weights = dict(self.config.force_weights)
         results = []
 
@@ -190,6 +191,7 @@ class SensitivityEngine:
     def attenuation_sensitivity(self, db: TrendDatabase,
                                 atten_range: tuple = (0.2, 0.9)) -> list:
         """How does changing the attenuation factor affect results?"""
+        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")
         orig_atten = self.config.attenuation
         results = []
 
@@ -205,23 +207,3 @@ class SensitivityEngine:
         self.config.attenuation = orig_atten
         return results
 
-    def causal_path_sensitivity(self, db: TrendDatabase) -> dict:
-        """Which DAG edges matter most? Test by removing each edge."""
-        if not self.dag:
-            return {"error": "No causal DAG configured"}
-
-        raise NotImplementedError("SensitivityEngine requires implementation with BayesianMonteCarloEngine")  # DAG doesn't affect deterministic directly
-        # This analysis is more meaningful with MC, but we approximate
-        edge_importance = []
-        for edge in self.dag.edges:
-            edge_importance.append({
-                "from": edge.source_force,
-                "to": edge.target_force,
-                "weight": edge.propagation_weight,
-                "lag": edge.lag_years,
-                "mechanism": edge.mechanism,
-                "importance": edge.propagation_weight,  # Simplified: weight as proxy
-            })
-
-        edge_importance.sort(key=lambda x: x["importance"], reverse=True)
-        return {"edges": edge_importance}

@@ -93,7 +93,6 @@ function generateSlides(
   const topRisks = getTopCategories(3, 'contraction');
   const topOps = getTopCategories(3, 'expansion');
   const dominantForce = getDominantForce();
-  const backtestAccuracy = convergence?.backtestingAccuracy || 0.73;
 
   // Compute allocation buckets from AllocationRecommendation structure
   const firstAlloc = allocation[0];
@@ -140,11 +139,11 @@ function generateSlides(
               fontWeight: 600,
             }}
           >
-            Model Accuracy: {(backtestAccuracy * 100).toFixed(0)}% (backtested)
+            Model: Bayesian MC + t-copula
           </div>
         </div>
       ),
-      notes: `Present the headline number with confidence. Emphasize backtesting accuracy. If negative, frame as strategic headwind requiring proactive response.`,
+      notes: `Present the headline number with confidence. If negative, frame as strategic headwind requiring proactive response.`,
     },
 
     // ─── Slide 2: Top Risks ───

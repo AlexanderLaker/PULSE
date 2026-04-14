@@ -1,5 +1,5 @@
 """
-PRISM seed data: 47 trends from the Trend Intelligence Report (March 2026).
+PRISM seed data: 61 trends (55 global + 6 APAC/NA regional, April 2026).
 
 This module lives inside the pulse package so it's importable on Vercel serverless.
 """
@@ -70,7 +70,7 @@ TRENDS = [
     Trend(
         id="consumer_r02", force="Consumer", sub_category="Behavioral",
         name="GLP-1 Drugs Reshape Consumer Spending Patterns",
-        description="12.4% of US adults on GLP-1 receptor agonists. Consumer spending data shows reduced impulse purchasing but increased premium self-care investment. European adoption 18-24 months behind US but accelerating.",
+        description="6-9% of US adults currently on GLP-1 receptor agonists (IQVIA/CDC 2025), with cumulative 'ever prescribed' reaching ~12%. Consumer spending data shows reduced impulse purchasing but increased premium self-care investment. European adoption 18-24 months behind US but accelerating.",
         direction="Expansion", probability=4, start_year=2025,
         # 5%: Indirect effect via spending reallocation; affects premium
         # tier only, EU adoption still early — small pool exposure
@@ -126,7 +126,7 @@ TRENDS = [
         strategic_implication="Strengthen Color portfolio around gray coverage CEP. Adapt packaging for ease of use.",
         category_exposure=cat(5,3,1,2, 2,2,1,2,2,1,1,1),
         vc_exposure=vc(1,3,1,3,1,4,3,5),
-        regional_exposure=reg(5,4,4,2),
+        regional_exposure=reg(5,4,3,2),
         data_source="Eurostat Demographic Projections 2025", source_type="analyst_report",
         confidence="High",
     ),
@@ -134,7 +134,7 @@ TRENDS = [
     Trend(
         id="consumer_r06", force="Consumer", sub_category="Macroeconomic",
         name="Cost-of-Living Squeeze and Persistent Trading Down",
-        description="70%+ of European consumers continue trading down on everyday essentials. ECB mortgage resets shave up to 1pp off consumption growth through 2030. Structural affordability squeeze beyond inflation.",
+        description="70%+ of European consumers continue trading down on everyday essentials. ECB mortgage resets shave up to 1pp off consumption growth through 2030. Structural affordability squeeze beyond inflation. High Growth markets show mixed picture: Turkey hyperinflation and Egypt pound devaluation create local affordability pressure, but Gulf markets remain resilient and India/SEA consumers are structurally trading UP.",
         direction="Contraction", probability=4, start_year=2024,
         # 22%: Broad-based macro effect; 70% of consumers trading down
         # Latest ECB data shows mortgage resets continuing through 2027
@@ -142,7 +142,7 @@ TRENDS = [
         strategic_implication="Protect price-value perception. Avoid pure price defense — innovate in value formats (concentrated, refill).",
         category_exposure=cat(3,3,3,3, 4,4,3,5,3,3,2,2),
         vc_exposure=vc(1,1,1,2,1,4,5,5),
-        regional_exposure=reg(5,3,2,4),
+        regional_exposure=reg(5,3,2,2),
         data_source="BCG/McKinsey European Consumer Surveys 2026", source_type="analyst_report",
         confidence="High",
     ),
@@ -188,9 +188,9 @@ TRENDS = [
         # only for ~20% of LHC volume that goes premium
         gp1_pct_affected=0.10,
         strategic_implication="Invest in fragrance chemistry for Persil and Vernel. Premium sensory experience justifies branded price premium vs PL.",
-        category_exposure=cat(0,0,0,1, 4,5,0,5,3,2,3,1),
+        category_exposure=cat(0,0,0,1, 4,5,0,4,1,2,3,1),
         vc_exposure=vc(4,5,2,4,1,5,3,5),
-        regional_exposure=reg(4,3,5,3),
+        regional_exposure=reg(5,3,4,3),
         data_source="Euromonitor Home Care 2025; Trade press analysis", source_type="analyst_report",
         confidence="Medium",
     ),
@@ -220,7 +220,7 @@ TRENDS = [
         # branded price premium for ~60% of that cohort
         gp1_pct_affected=0.12,
         strategic_implication="Counter with formulation transparency and ingredient storytelling. Schwarzkopf R&D depth is the defense.",
-        category_exposure=cat(3,4,4,4, 2,2,0,2,1,1,1,0),
+        category_exposure=cat(3,4,4,3, 2,2,0,2,1,1,1,0),
         vc_exposure=vc(1,3,0,2,0,5,3,5),
         regional_exposure=reg(4,5,4,2),
         data_source="Attest Gen Z Beauty Report 2025; FMCG Gurus", source_type="analyst_report",
@@ -236,7 +236,7 @@ TRENDS = [
         # GP1 exposure limited to frequency-driven volume lift
         gp1_pct_affected=0.07,
         strategic_implication="Maintain hygiene product portfolio strength. Leverage elevated demand for HSC and IC categories.",
-        category_exposure=cat(0,0,0,1, 3,2,0,1,4,1,5,4),
+        category_exposure=cat(0,0,0,1, 3,2,0,1,2,1,5,4),
         vc_exposure=vc(2,3,2,2,1,3,2,5),
         regional_exposure=reg(4,4,4,3),
         data_source="Allied Market Research Surface Disinfectant 2025", source_type="analyst_report",
@@ -251,7 +251,7 @@ TRENDS = [
     Trend(
         id="government_r01", force="Government", sub_category="Chemical Regulation",
         name="EU PFAS Universal Restriction",
-        description="EU's proposed universal restriction on ~10,000 PFAS substances. RAC adopted final opinion March 2, 2026. SEAC agreed draft opinion March 10, 2026 — 60-day public consultation open until May 25, 2026. ECHA supports broad restriction with targeted derogations. Cosmetics sector: alternatives already exist, no supply shortages. Affects surface treatments, water-repellent coatings, stain resistance. Phased 2027-2032.",
+        description="EU's proposed universal restriction on ~10,000 PFAS substances. RAC adopted final opinion March 2, 2026. SEAC agreed draft opinion March 10, 2026 — 60-day public consultation open until May 25, 2026. ECHA supports broad restriction with targeted derogations. Cosmetics sector: alternatives already exist for most restricted substances, limiting Hair portfolio exposure. LHC sector: alternatives for surface treatments, stain-resistance chemistries, and water-repellent coatings are less mature, requiring significant reformulation investment for FCN, FCA, and IC categories. Phased 2027-2032.",
         direction="Contraction", probability=4, start_year=2027,
         # 12%: Reformulation cost + temporary delisting risk for affected
         # SKUs; ~20-30% of LHC formulations contain PFAS-adjacent chemistry
@@ -273,7 +273,7 @@ TRENDS = [
         # reformulation + potential format disruption
         gp1_pct_affected=0.10,
         strategic_implication="Accelerate bio-based capsule film R&D (T-02). Persil Discs and Somat capsules are core platforms at risk.",
-        category_exposure=cat(2,3,4,3, 4,4,2,5,3,5,2,3),
+        category_exposure=cat(2,3,2,2, 4,4,2,5,3,5,2,3),
         vc_exposure=vc(4,5,4,5,2,2,2,2),
         regional_exposure=reg(5,2,2,1),
         data_source="ECHA Microplastics Restriction 2023; Phase 2 timeline", source_type="analyst_report",
@@ -416,9 +416,10 @@ TRENDS = [
         id="technology_r04", force="Technology", sub_category="Biotech",
         name="Microbiome Science for Hair and Skin",
         direction="Expansion", probability=3, start_year=2025,
-        # 4%: Nascent science, small addressable market within Care;
-        # additive pool but early-stage
-        gp1_pct_affected=0.04,
+        # 7%: Nascent but rapidly scaling ($875M, 14.6% CAGR); broader
+        # applicability across Care + Body + Scalp; P&G front-of-pack moves
+        # create competitive urgency beyond pure market sizing
+        gp1_pct_affected=0.07,
         description="Microbiome cosmetics market: $875M in 2025, 14.6% CAGR. P&G put microbiome balance front-of-pack. Scalp microbiome searches up 120%. Probiotic shampoos, postbiotic serums emerging.",
         strategic_implication="Formulation investment in microbiome-friendly actives. Care and Body are the categories.",
         category_exposure=cat(1,5,1,4, 1,2,0,1,0,0,1,0),
@@ -482,7 +483,7 @@ TRENDS = [
         # 5%: Auto-dosing affects per-cycle volume (-23%) but creates
         # platform lock-in; net GP1 effect limited to smart washer owners
         gp1_pct_affected=0.05,
-        description="Smart connected washing machine market reached $9.8B in 2024, projected $34.6B by 2033 at 14.3% CAGR (IMARC). Auto-dosing becoming standard in high-end models — cutting detergent use 23% per cycle. Henkel launched Smartwash at CES 2025: AI-enabled, cartridge-based dosing for washers and dishwashers. Hoover H-Wash 350 with Eco Doser launched Jul 2025. First-mover on dosing platform captures disproportionate value.",
+        description="Smart connected washing machine market reached $9.8B in 2024, projected $34.6B by 2033 at 14.3% CAGR (IMARC). Auto-dosing becoming standard in high-end models — cutting detergent use 23% per cycle. Henkel launched Smartwash at CES 2025: AI-enabled, cartridge-based dosing for washers and dishwashers. Hoover H-Wash 350 with Eco Doser launched Jul 2025. Net direction is Expansion for first-movers who control the dosing platform (Henkel Smartwash): platform lock-in and premium pricing more than offset per-cycle volume reduction. Followers who don't control the platform face Contraction.",
         strategic_implication="Henkel Smartwash is the most differentiated LHC play. First-mover on dosing platform captures disproportionate value.",
         category_exposure=cat(0,0,0,0, 3,4,0,5,2,4,0,0),
         vc_exposure=vc(2,5,4,4,2,3,4,4),
@@ -672,7 +673,7 @@ TRENDS = [
         strategic_implication="Monitor trigger: if TikTok Shop hair care from Chinese brands exceeds 5% in any EU market, escalate response.",
         category_exposure=cat(2,2,2,3, 2,1,1,2,1,1,1,0),
         vc_exposure=vc(0,1,0,0,0,3,3,4),
-        regional_exposure=reg(4,3,2,3),
+        regional_exposure=reg(4,3,1,3),
         data_source="TikTok Shop analytics; Temu EU expansion data", source_type="analyst_report",
         confidence="Low",
     ),
@@ -723,7 +724,7 @@ TRENDS = [
         gp1_pct_affected=0.20,
         description="Aldi/Lidl hold 25-35% grocery share in Germany, UK, Benelux — still growing. Expanding beauty/personal care shelf, launching premium PL. Every share point to discount = lower branded economics.",
         strategic_implication="Secure branded shelf space in discount with exclusive value formats. Cannot ignore 30%+ of market.",
-        category_exposure=cat(3,3,2,3, 5,4,3,5,3,4,2,2),
+        category_exposure=cat(3,3,3,3, 5,4,3,5,3,4,2,2),
         vc_exposure=vc(0,0,0,1,2,3,5,5),
         regional_exposure=reg(5,2,1,2),
         data_source="NIQ Retail Panel; Aldi/Lidl expansion data", source_type="analyst_report",
@@ -941,6 +942,123 @@ TRENDS = [
         regional_exposure=reg(4,5,3,2),
         data_source="Euromonitor Hair Styling 2025; Church & Dwight Batiste data; Spate trend data", source_type="market_report",
         confidence="Medium",
+    ),
+
+    # ═══════════════════════════════════════════════════════════════════
+    # REGIONAL EXPANSION (v2.4) — APAC + NA specific trends
+    # The original 55-trend database was EU-centric. These 6 trends
+    # address the APAC and North America exposure gap identified in
+    # the senior-partner review.
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── APAC-01: China C-Beauty Nationalism ──
+    Trend(
+        id="consumer_r16", force="Consumer", sub_category="Regional / APAC",
+        name="China C-Beauty Nationalism and Domestic Brand Preference",
+        description="Domestic Chinese beauty brands (Proya, Florasis, Perfect Diary, Winona) captured 56% of China's beauty market value in 2025, up from 38% in 2020 (Euromonitor). Guochao ('national wave') sentiment drives Gen Z consumers away from Western prestige brands. Proya surpassed L'Oréal China in skincare value share Q3 2025. Douyin/Tmall algorithms favor domestic brands with cultural storytelling. Hair care following the same trajectory — Adolph and Spes taking share from international brands.",
+        direction="Contraction", probability=5, start_year=2023,
+        # 15%: China is ~5-8% of Henkel's global Hair GP1; nationalism
+        # affects the premium/prestige segment most directly, but
+        # Schwarzkopf China is sub-scale vs L'Oréal — 15% reflects
+        # actual Henkel exposure, not theoretical market disruption
+        gp1_pct_affected=0.15,
+        strategic_implication="Schwarzkopf China strategy must pivot to either (a) acquire a rising domestic brand or (b) hyper-localize with Chinese R&D, Chinese brand ambassadors, and Guochao-compatible storytelling. Do not compete on 'German heritage' alone.",
+        category_exposure=cat(4,5,3,3, 1,1,0,1,0,0,0,0),
+        vc_exposure=vc(2,3,2,2,3,5,5,5),
+        regional_exposure=reg(1,1,5,4),
+        data_source="Euromonitor China Beauty 2025; Daxue Consulting C-Beauty Report; McKinsey China Consumer Report 2025",
+        source_type="analyst_report",
+        confidence="High",
+    ),
+
+    # ── APAC-02: India Premium Affordability ──
+    Trend(
+        id="consumer_r17", force="Consumer", sub_category="Regional / APAC",
+        name="India Premium Affordability and Middle-Class Expansion",
+        description="India's beauty & personal care market reached $30B in 2025, growing at 11% CAGR — fastest among top-10 markets (Statista, Redseer). 'Affordable premium' is the dominant growth tier: Indian consumers willing to trade up from mass but still price-sensitive vs. Western premium. Nykaa scaled to 22% share of online BPC. Honasa (Mamaearth) IPO'd at $1.2B. Small-pack sachets (Rs 5-20) remain critical for rural penetration but urban middle class drives value growth. LHC growing at 8% CAGR driven by urbanization and washing machine penetration (still only 14% of households).",
+        direction="Expansion", probability=5, start_year=2024,
+        # 15%: India is structural growth pool; affordable-premium tier
+        # expansion creates new GP1 pools that didn't exist
+        gp1_pct_affected=0.15,
+        strategic_implication="Double down on India with locally-engineered affordable-premium SKUs. Schwarzkopf Gliss and Persil Liquid must have India-specific price architecture and pack sizes. Consider acquiring a digital-native D2C brand (Mamaearth adjacency).",
+        category_exposure=cat(4,5,3,4, 4,4,3,4,2,2,2,3),
+        vc_exposure=vc(3,4,4,4,3,5,4,5),
+        regional_exposure=reg(0,0,3,5),
+        data_source="Redseer India BPC Report 2025; Statista India Beauty Outlook; Nykaa Annual Report FY2025; Honasa IPO prospectus",
+        source_type="analyst_report",
+        confidence="High",
+    ),
+
+    # ── NA-01: US Retail Media Networks ──
+    Trend(
+        id="customer_r08", force="Customer", sub_category="Regional / NA Channel",
+        name="US Retail Media Networks Reshape Brand-Customer Economics",
+        description="Amazon Ads, Walmart Connect, Target Roundel, Kroger Precision Marketing and Costco's ad network collectively captured $55B in US retail media ad spend in 2025 (Insider Intelligence), up from $38B in 2023. Retailers now demand 8-12% of brand net revenue redirected to their media networks as condition of premium shelf/search placement. Effectively a new trade-spend tax. Brands losing pricing power because search ranking on Amazon is pay-to-play. Schwarzkopf and Persil US face margin compression from this reallocation.",
+        direction="Contraction", probability=5, start_year=2024,
+        # 18%: Affects US trade spend architecture directly; 8-12% of
+        # revenue shift converts to meaningful GP1 erosion
+        gp1_pct_affected=0.18,
+        strategic_implication="Reframe US trade investment: retail media is non-negotiable for visibility but ROAS must be measured ruthlessly. Negotiate joint business plans that include media guarantees, not just slotting. Build first-party data capability to reduce dependency.",
+        category_exposure=cat(3,3,3,3, 4,4,3,4,3,3,3,3),
+        vc_exposure=vc(0,0,0,0,2,5,4,4),
+        regional_exposure=reg(2,5,2,1),
+        data_source="Insider Intelligence Retail Media Forecast 2025; Amazon Q4 2025 advertising revenue disclosure; Walmart Connect investor day Nov 2025",
+        source_type="analyst_report",
+        confidence="High",
+    ),
+
+    # ── NA-02: US Tariffs / Reshoring ──
+    Trend(
+        id="government_r09", force="Government", sub_category="Regional / NA Trade",
+        name="US Tariffs and Reshoring Pressure on Imported FMCG Inputs",
+        description="Trump administration Section 301 tariff expansion (effective Feb 2026) imposes 25-60% duties on Chinese-origin surfactants, fragrance components, packaging, and formulated goods. Mexico/Canada USMCA review creates uncertainty for nearshored production. Reckitt, P&G, and Unilever have announced Q1 2026 supplier diversification programs. For Henkel: Düsseldorf-formulated LHC exports to US and Hair Care shipped from Culver City face cost pressure on imported ingredients. Estimated 3-5% COGS inflation on affected SKUs before mitigation.",
+        direction="Contraction", probability=5, start_year=2026,
+        # 12%: Affects COGS on US-sold SKUs with imported content;
+        # mitigation via reformulation and supplier swap possible
+        gp1_pct_affected=0.12,
+        strategic_implication="Accelerate US supply-chain footprint review. Identify top-20 tariff-exposed SKUs and run reformulation/relocation scenarios. Use scale to negotiate with US-domestic surfactant suppliers (Stepan, Pilot Chemical). Consider whether Culver City capacity should expand.",
+        category_exposure=cat(3,3,3,3, 4,4,3,4,4,4,3,3),
+        vc_exposure=vc(5,3,4,4,5,1,1,2),
+        regional_exposure=reg(1,5,2,1),
+        data_source="USTR Section 301 Notice Feb 2026; P&G Q2 FY2026 earnings call; Reckitt FY2025 results; BCG Tariff Impact Analysis CPG 2026",
+        source_type="regulation",
+        confidence="High",
+    ),
+
+    # ── APAC-03: K-Beauty / J-Beauty Export Wave ──
+    Trend(
+        id="competitive_r08", force="Competitive", sub_category="Regional / APAC Exports",
+        name="K-Beauty and J-Beauty Export Wave into NA and EU Hair Care",
+        description="Korean and Japanese hair care brands (Mise en Scène, Ryo, Kérastase-rival Shiseido Tsubaki, Milbon) captured 4.2% of US premium hair care in 2025, up from 1.1% in 2022. Amazon 'K-Beauty Hair' search volume +180% YoY. Sephora added dedicated K-Beauty hair sections in 340 US doors and expanding into EU stores. Scalp-first, ampoule-format, and fermentation-based formulations differentiate against legacy Western brands. Amorepacific acquired Rusk (US professional hair) Q4 2025 for $620M as distribution platform. EU penetration accelerating: Innisfree, Mise en Scène expanding in Germany, France, and UK prestige retail.",
+        direction="Contraction", probability=4, start_year=2024,
+        # 10%: Premium Hair tier exposure in NA specifically; EU
+        # penetration accelerating but still behind NA
+        gp1_pct_affected=0.10,
+        strategic_implication="Schwarzkopf Professional must close the innovation gap on scalp-first and ampoule formats. Consider OEM partnership with Korean formulator or acquisition of a K-Beauty hair indie. Defend Sephora shelf through superior storytelling, not just heritage claims.",
+        category_exposure=cat(3,5,4,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(3,5,3,3,3,5,4,5),
+        regional_exposure=reg(4,5,2,2),
+        data_source="Circana US Prestige Beauty 2025; Amorepacific Q4 2025 disclosure; Sephora buyer interviews via Beauty Independent; Mintel K-Beauty Global 2025",
+        source_type="analyst_report",
+        confidence="Medium",
+    ),
+
+    # ── NA-03: US Hispanic/Latino Demographic Share ──
+    Trend(
+        id="consumer_r18", force="Consumer", sub_category="Regional / NA Demographics",
+        name="US Hispanic/Latino Consumers Drive Hair and LHC Category Growth",
+        description="Hispanic/Latino Americans are 19.5% of US population (Census 2025) and drive disproportionate hair care spending — 34% of US premium hair care value (NielsenIQ Multicultural 2025). Textured hair, curl care, and multi-step routines are core occasions. LHC: Hispanic households average 6.2 loads/week vs. 4.8 non-Hispanic, and over-index on fabric softener and premium scent. Brand loyalty higher than non-Hispanic consumers but requires authentic Spanish-language marketing and textured-hair portfolio. Currently underserved by legacy Henkel NA brand portfolio.",
+        direction="Expansion", probability=5, start_year=2024,
+        # 14%: Represents a specific growth pool in US; well-defined
+        # behavioral patterns and higher category spend
+        gp1_pct_affected=0.14,
+        strategic_implication="Build Hispanic/Latino go-to-market capability: textured-hair Schwarzkopf range, Spanish-language creative, Hispanic retailer partnerships (Vallarta, Northgate). LHC: Persil needs a 'Fresca Intensa' fragrance positioning. Hire Hispanic marketing leadership.",
+        category_exposure=cat(4,5,4,3, 4,5,2,4,3,3,2,2),
+        vc_exposure=vc(1,2,1,2,3,5,5,4),
+        regional_exposure=reg(0,5,0,1),
+        data_source="US Census Bureau ACS 2025; NielsenIQ Multicultural Consumer Report 2025; Circana US Hair Care Ethnic Segments 2025",
+        source_type="government_data",
+        confidence="High",
     ),
 ]
 
@@ -1293,14 +1411,108 @@ SOURCE_URLS = {
         {"title": "Spate: Dry Shampoo and Texture Spray Search Trends", "url": "https://www.spate.nyc/", "source_type": "data_tool", "tier": "B+"},
         {"title": "Mintel: Hair Styling and Finishing Products 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
     ],
+
+    # ═══ REGIONAL EXPANSION (v2.4) — APAC + NA ═══
+    "consumer_r16": [  # China C-Beauty Nationalism
+        {"title": "Euromonitor: Beauty and Personal Care in China 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-china/report", "source_type": "market_report", "tier": "A"},
+        {"title": "McKinsey China Consumer Report 2025", "url": "https://www.mckinsey.com/cn/our-insights/our-insights/2025-mckinsey-china-consumer-report", "source_type": "research_report", "tier": "A"},
+        {"title": "Daxue Consulting: C-Beauty vs Western Beauty in China", "url": "https://daxueconsulting.com/c-beauty-china/", "source_type": "market_report", "tier": "B+"},
+        {"title": "Jing Daily: Proya Surpasses L'Oréal in China Skincare", "url": "https://jingdaily.com/", "source_type": "trade_press", "tier": "B"},
+    ],
+    "consumer_r17": [  # India Premium Affordability
+        {"title": "Redseer: India Beauty & Personal Care Market Report 2025", "url": "https://redseer.com/reports/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Euromonitor: Beauty and Personal Care in India 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-india/report", "source_type": "market_report", "tier": "A"},
+        {"title": "Nykaa FY2025 Annual Report", "url": "https://www.nykaa.com/investor-relations", "source_type": "annual_report", "tier": "B-"},
+        {"title": "BCG India: The $200B Consumer Opportunity", "url": "https://www.bcg.com/industries/consumer-products", "source_type": "research_report", "tier": "A"},
+    ],
+    "customer_r08": [  # US Retail Media Networks
+        {"title": "eMarketer/Insider Intelligence: US Retail Media Ad Spend Forecast 2025-2027", "url": "https://www.emarketer.com/content/us-retail-media-advertising-forecast-2025", "source_type": "market_report", "tier": "A"},
+        {"title": "Amazon Q4 2025 Earnings — Advertising Services Disclosure", "url": "https://ir.aboutamazon.com/", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Walmart Connect: 2025 Advertiser Day Presentation", "url": "https://www.walmartconnect.com/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Boston Consulting Group: Retail Media Next Frontier", "url": "https://www.bcg.com/publications/2024/retail-media-the-next-frontier", "source_type": "research_report", "tier": "A"},
+    ],
+    "government_r09": [  # US Tariffs and Reshoring
+        {"title": "USTR: Section 301 China Tariff Actions 2026", "url": "https://ustr.gov/issue-areas/enforcement/section-301-investigations", "source_type": "regulation", "tier": "S"},
+        {"title": "US International Trade Commission: Cosmetics and Detergent Imports Tariff Schedule", "url": "https://hts.usitc.gov/", "source_type": "government_data", "tier": "S"},
+        {"title": "BCG: CPG Tariff Impact Analysis 2026", "url": "https://www.bcg.com/industries/consumer-products", "source_type": "research_report", "tier": "A"},
+        {"title": "P&G Q2 FY2026 Earnings Call — Tariff Exposure Discussion", "url": "https://us.pg.com/investor-relations/", "source_type": "earnings_report", "tier": "B-"},
+    ],
+    "competitive_r08": [  # K-Beauty / J-Beauty Export Wave
+        {"title": "Circana: US Prestige Beauty Hair Care 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Mintel: K-Beauty Global Report 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Amorepacific Q4 2025 Earnings — Rusk Acquisition Disclosure", "url": "https://www.apgroup.com/int/en/ir/ir.html", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Beauty Independent: K-Beauty Hair Enters US Mass Premium", "url": "https://www.beautyindependent.com/", "source_type": "trade_press", "tier": "B"},
+    ],
+    "consumer_r18": [  # US Hispanic/Latino Consumers
+        {"title": "US Census Bureau: American Community Survey 2025", "url": "https://www.census.gov/programs-surveys/acs/", "source_type": "government_data", "tier": "S"},
+        {"title": "NielsenIQ: US Multicultural Consumer Report 2025", "url": "https://nielseniq.com/global/en/insights/analysis/2025/", "source_type": "market_report", "tier": "A"},
+        {"title": "Circana: US Hair Care — Ethnic Segment Analysis 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Collage Group: Hispanic/Latino Consumer CultureRate", "url": "https://www.collagegroup.com/", "source_type": "research_report", "tier": "B+"},
+    ],
 }
 
 
+# ── Source credibility gate (E1) ────────────────────────────────────
+# Tier ladder: S > A > A- > B+ > B > B- > C > D > E
+# E = social media / unverified — explicitly a "weak signal only" tier.
+# A trend whose evidence base is *exclusively* tier-E (or has no sources
+# at all) is not strong enough to drive a probability/gp1 score. The
+# scoring layer must refuse it until at least one B-or-better source
+# corroborates the signal.
+WEAK_TIERS = {"E", "D"}
+ACCEPTABLE_TIERS = {"S", "A", "A-", "B+", "B", "B-", "C"}
+
+
+class TierEGateError(ValueError):
+    """Raised when a trend's source credibility is too weak to score."""
+
+
+def assert_trend_credible(trend_id: str, sources: list) -> None:
+    """Hard gate: refuse to score a trend with no usable sources.
+
+    Rules:
+      - At least one source must be present.
+      - At least one source must be in ACCEPTABLE_TIERS (B- or better,
+        plus C for low-but-not-weak signals).
+      - Trends with only D/E sources are rejected — they need
+        corroboration before they earn a probability score.
+
+    Raises:
+        TierEGateError if the gate fails. Callers should not catch this
+        silently — a failing gate is a data-quality bug, not a runtime
+        condition to recover from.
+    """
+    if not sources:
+        raise TierEGateError(
+            f"Trend '{trend_id}' has no sources attached. Cannot score "
+            f"a trend with zero evidence base."
+        )
+
+    tiers = [str(s.get("tier", "")).strip() for s in sources if isinstance(s, dict)]
+    strong = [t for t in tiers if t in ACCEPTABLE_TIERS]
+
+    if not strong:
+        raise TierEGateError(
+            f"Trend '{trend_id}' has only weak-signal sources "
+            f"(tiers={tiers}). At least one source rated B- or better "
+            f"is required before this trend can be scored. Tier E "
+            f"(social media / unverified) is permitted only as a "
+            f"corroborating signal alongside a B-tier-or-higher source."
+        )
+
+
 def get_report_trends():
-    """Return the list of 47 report trends with source URLs attached."""
+    """Return the list of 47 report trends with source URLs attached.
+
+    Applies the E1 source-credibility gate to every trend before
+    returning. A trend with no sources, or only D/E-tier sources,
+    raises TierEGateError — refusing to seed the database with a
+    trend whose evidence is too weak to support scoring.
+    """
     trends = list(TRENDS)
     for t in trends:
         t.sources = SOURCE_URLS.get(t.id, [])
+        assert_trend_credible(t.id, t.sources)
     return trends
 
 

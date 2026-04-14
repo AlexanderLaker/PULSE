@@ -1,7 +1,7 @@
 """Export Center — generates PPTX, PDF, and Excel reports from Shift Matrix.
 
 All outputs use percentage values only — never €M.
-Professional formatting with causal explanations and methodology.
+Professional formatting with force attribution and methodology.
 """
 
 import logging
@@ -23,6 +23,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+from pulse.common.shape_compat import velocity_median
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +185,9 @@ class ExportCenter:
 
         story.append(Spacer(1, 0.1*inch))
 
-        # Causal narrative
-        story.append(Paragraph("<b>Causal Narrative:</b>", heading_style))
-        narrative = self._generate_causal_narrative(shift_matrix)
+        # Force attribution narrative
+        story.append(Paragraph("<b>Force Attribution Narrative:</b>", heading_style))
+        narrative = self._generate_force_narrative(shift_matrix)
         story.append(Paragraph(narrative, styles['Normal']))
         story.append(Spacer(1, 0.2*inch))
 
@@ -210,8 +212,8 @@ class ExportCenter:
 
         # Confidence note
         story.append(Paragraph(
-            f"<i><b>Confidence:</b> {shift_matrix.get('backtesting_accuracy', 'N/A')} accuracy "
-            f"from Phase 0 backtesting (v1-v11 prediction validation)</i>",
+            f"<i><b>Engine:</b> {shift_matrix.get('engine_name', 'bayesian_copula')} "
+            f"(version {shift_matrix.get('model_version', 'n/a')})</i>",
             styles['Normal']
         ))
 
@@ -230,8 +232,8 @@ class ExportCenter:
         1. Shift Matrix — continuous paths with all percentiles
         2. Application Template — user enters their GP1, formulas auto-calculate
         3. Allocation Recommendations — relative investment weights
-        4. Causal Decomposition — force decomposition per category
-        5. Methodology — backtesting accuracy and model parameters
+        4. Force Attribution — per-category decomposition by force
+        5. Methodology — engine version and model parameters
 
         Args:
             shift_matrix: Full Shift Matrix with paths and metadata
@@ -258,10 +260,10 @@ class ExportCenter:
         if allocation:
             self._create_allocation_sheet(wb, allocation)
 
-        # Sheet 4: Causal Decomposition
-        causal = shift_matrix.get("causal_decomposition", {})
-        if causal:
-            self._create_causal_sheet(wb, causal)
+        # Sheet 4: Force Attribution (per category, scaled to MC median)
+        attribution = shift_matrix.get("force_attribution") or shift_matrix.get("causal_decomposition", {})
+        if attribution:
+            self._create_force_attribution_sheet(wb, attribution)
 
         # Sheet 5: Methodology
         self._create_methodology_sheet(wb, shift_matrix)
@@ -342,7 +344,7 @@ class ExportCenter:
         confidence_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.8), Inches(9), Inches(1))
         confidence_frame = confidence_box.text_frame
         p = confidence_frame.paragraphs[0]
-        p.text = f"Model Accuracy: {shift_matrix.get('backtesting_accuracy', 'N/A')}"
+        p.text = f"Engine: {shift_matrix.get('engine_name', 'bayesian_copula')} · v{shift_matrix.get('model_version', 'n/a')}"
         p.font.size = Pt(14)
         p.font.color.rgb = self.COLOR_LIGHT_TEXT
 
@@ -503,17 +505,17 @@ class ExportCenter:
 
         # Methodology text
         methodology = f"""
-Model: {shift_matrix.get('model_version', 'Bayesian Copula v1')}
+Engine: {shift_matrix.get('engine_name', 'bayesian_copula')}
+Model Version: {shift_matrix.get('model_version', 'n/a')}
+Seed: {shift_matrix.get('seed', 'n/a')}
 Confidence: {shift_matrix.get('confidence', '80% CI')}
-Backtesting Accuracy: {shift_matrix.get('backtesting_accuracy', 'N/A')}
 
 Key Features:
-• Bayesian hierarchical models with empirically calibrated priors
+• Bayesian sampling with Beta posteriors over trend probabilities
 • Copula-based dependency structures capturing tail risk
-• Causal DAG propagation modeling force interactions
+• Force attribution per category (static, scaled to MC median)
 • Continuous paths with velocity tracking (2026-2030)
-• Early-warning triggers for strategic response
-• Game-theoretic competitive response modeling
+• Reproducible: fixed RNG seed; integrity events surface any runtime repairs
 
 Security:
 • All outputs contain ONLY percentage shifts
@@ -532,16 +534,16 @@ Security:
 
     # ==================== PDF HELPERS ====================
 
-    def _generate_causal_narrative(self, shift_matrix: Dict[str, Any]) -> str:
-        """Generate a causal narrative explaining the shift drivers.
+    def _generate_force_narrative(self, shift_matrix: Dict[str, Any]) -> str:
+        """Generate a force narrative explaining the shift drivers.
 
         Args:
-            shift_matrix: Full Shift Matrix with causal decomposition
+            shift_matrix: Full Shift Matrix with force attribution
 
         Returns:
-            Narrative string explaining the causal mechanism
+            Narrative string explaining the force mechanism
         """
-        causal = shift_matrix.get("causal_decomposition", {})
+        causal = shift_matrix.get("force_attribution") or shift_matrix.get("causal_decomposition", {})
         if not causal:
             return "Shifts driven by composite market forces across Consumer, Customer, Technology, Government, Environmental, and Competitive channels."
 
@@ -627,7 +629,7 @@ Security:
                         year_data.get("p25", 0.0),
                         year_data.get("p75", 0.0),
                         year_data.get("p90", 0.0),
-                        velocity.get(year, 0.0),
+                        velocity_median(velocity.get(year)),
                     ])
 
         # Format data cells
@@ -732,11 +734,11 @@ Security:
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['C'].width = 35
 
-    def _create_causal_sheet(self, wb: openpyxl.Workbook, causal: Dict[str, Any]) -> None:
-        """Create Causal Decomposition sheet."""
-        ws = wb.create_sheet("Causal Decomposition")
+    def _create_force_attribution_sheet(self, wb: openpyxl.Workbook, causal: Dict[str, Any]) -> None:
+        """Create Force Attribution sheet."""
+        ws = wb.create_sheet("Force Attribution")
 
-        ws['A1'] = "Causal Decomposition — Force Attribution"
+        ws['A1'] = "Force Attribution"
         ws['A1'].font = Font(bold=True, size=12)
 
         headers = ["Category", "Effect Type", "Source Force", "Path", "Contribution (%)"]
@@ -777,7 +779,7 @@ Security:
         ws.column_dimensions['E'].width = 15
 
     def _create_methodology_sheet(self, wb: openpyxl.Workbook, shift_matrix: Dict[str, Any]) -> None:
-        """Create Methodology sheet with model info and backtesting results."""
+        """Create Methodology sheet with model info."""
         ws = wb.create_sheet("Methodology")
 
         ws['A1'] = "PRISM Model — Methodology & Confidence"
@@ -796,8 +798,12 @@ Security:
         ws[f'B{row}'] = shift_matrix.get("confidence", "80% CI")
         row += 1
 
-        ws[f'A{row}'] = "Backtesting Accuracy:"
-        ws[f'B{row}'] = shift_matrix.get("backtesting_accuracy", "N/A")
+        ws[f'A{row}'] = "Engine:"
+        ws[f'B{row}'] = shift_matrix.get("engine_name", "bayesian_copula")
+        row += 1
+
+        ws[f'A{row}'] = "Seed:"
+        ws[f'B{row}'] = shift_matrix.get("seed", "n/a")
         row += 2
 
         ws[f'A{row}'] = "Key Features:"
@@ -805,14 +811,14 @@ Security:
         row += 1
 
         features = [
-            "• Bayesian hierarchical models with empirically calibrated priors",
+            "• Bayesian sampling with Beta posteriors over trend probabilities",
             "• Copula-based dependency structures (Gaussian + t-copula tails)",
-            "• Causal DAG propagation modeling force interactions",
+            "• Force attribution per category (static, scaled to MC median)",
             "• Continuous paths (2026-2030) with annual granularity",
             "• Velocity tracking and early-warning triggers",
-            "• Game-theoretic competitive response modeling",
             "• Monte Carlo simulation (10,000-50,000 iterations)",
-            "• Gelman-Rubin convergence diagnostics (R̂ < 1.05)",
+            "• Split-chain R̂ convergence diagnostics",
+            "• Empirical covariance from MC samples in the allocation optimizer",
         ]
 
         for feature in features:

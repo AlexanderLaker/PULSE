@@ -1,5 +1,5 @@
 /**
- * PULSE Profit Pool Shift Model — Typed API Client
+ * PRISM Profit Pool Shift Model — Typed API Client
  * Fully typed interface to the FastAPI backend.
  * Zero `any` types. Every request and response is typed.
  */

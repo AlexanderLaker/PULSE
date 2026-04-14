@@ -57,7 +57,6 @@ class PowerPointExporter:
         convergence: Optional[Dict[str, Any]] = None,
         allocation: Optional[Dict[str, Any]] = None,
         model_version: str = "v3.0",
-        model_accuracy: float = 0.73,
     ) -> str:
         """
         Generate complete PowerPoint presentation.
@@ -69,7 +68,6 @@ class PowerPointExporter:
             convergence: Monte Carlo convergence diagnostics
             allocation: Allocation recommendations {category: weight}
             model_version: Model version string
-            model_accuracy: Backtesting accuracy (0-1)
 
         Returns:
             Path to generated file
@@ -78,7 +76,7 @@ class PowerPointExporter:
 
         # Build slides
         self._add_title_slide(model_version)
-        self._add_executive_summary_slide(shifts, trends, model_accuracy)
+        self._add_executive_summary_slide(shifts, trends)
         self._add_shift_heatmap_slide(shifts)
         self._add_top_trends_slide(trends)
         self._add_strategic_implications_slide(shifts, allocation)
@@ -129,7 +127,7 @@ class PowerPointExporter:
         p.alignment = PP_ALIGN.CENTER
 
     def _add_executive_summary_slide(
-        self, shifts: Dict[str, Any], trends: List[Dict[str, Any]], model_accuracy: float
+        self, shifts: Dict[str, Any], trends: List[Dict[str, Any]]
     ):
         """Slide 2: Executive summary with key metrics."""
         slide = self.prs.slides.add_slide(self.prs.slide_layouts[6])
@@ -167,9 +165,13 @@ class PowerPointExporter:
 
         # Metrics grid (2x2)
         y_start = 1.2
+        # Count expansion vs contraction
+        expansion_count = sum(1 for _, v in median_shifts if v > 0)
+        contraction_count = sum(1 for _, v in median_shifts if v < 0)
+
         metrics = [
             ("Net Pool Shift", f"{net_shift:+.1%}", COLORS["primary"]),
-            ("Model Accuracy", f"{model_accuracy:.0%}", COLORS["success"]),
+            ("Categories Tracked", f"{len(median_shifts)}", COLORS["success"]),
             (
                 "Top Expansion",
                 f"{top_expansion[0]}: {top_expansion[1]:+.1%}" if top_expansion else "—",
@@ -204,8 +206,11 @@ class PowerPointExporter:
             insights.append(f"• Highest growth opportunity: {top_expansion[0]} ({top_expansion[1]:+.1%})")
         if top_contraction:
             insights.append(f"• Largest headwind: {top_contraction[0]} ({top_contraction[1]:+.1%})")
-        if model_accuracy >= 0.7:
-            insights.append(f"• Model shows strong backtested accuracy ({model_accuracy:.0%})")
+        if expansion_count or contraction_count:
+            insights.append(
+                f"• {expansion_count} expanding categories vs "
+                f"{contraction_count} contracting"
+            )
 
         for insight in insights[:2]:
             p = insights_frame.add_paragraph()

@@ -1,5 +1,5 @@
 /**
- * PULSE — Trend data types.
+ * PRISM — Trend data types.
  * Maps to pulse/ingestion/models.py Trend dataclass.
  */
 

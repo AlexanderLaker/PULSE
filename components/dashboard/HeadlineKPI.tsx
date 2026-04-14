@@ -186,8 +186,7 @@ export default function HeadlineKPI({
   }
 
   const hasConverged = convergence?.converged ?? false;
-  const rHat = convergence?.r_hat?.toFixed(2) ?? '1.03';
-  const backtestAccuracy = convergence?.backtestingAccuracy ?? 0.73;
+  const rHat = convergence?.r_hat != null ? convergence.r_hat.toFixed(2) : '—';
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
@@ -253,7 +252,7 @@ export default function HeadlineKPI({
         icon={CheckCircle2}
         label="Model Quality"
         value={hasConverged ? 'Converged' : 'Running'}
-        detail={`R̂ ${rHat} · ${fmtPct(backtestAccuracy)} accurate`}
+        detail={`R̂ ${rHat} · ${hasConverged ? 'Bayesian copula' : 'Awaiting simulation'}`}
         color={hasConverged ? T.green : T.amber}
         bgIcon={hasConverged ? T.greenDim : T.amberDim}
         delay={0.24}

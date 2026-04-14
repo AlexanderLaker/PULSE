@@ -41,7 +41,7 @@ module.exports = {
           error:     '#FF3B30',
           info:      '#0071E3',
         },
-        // PULSE semantic
+        // PRISM semantic
         expansion:   '#30D158',
         contraction: '#FF453A',
         causal:      '#7B61FF',

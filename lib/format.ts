@@ -1,5 +1,5 @@
 /**
- * PULSE Profit Pool Shift Model v3 — Formatting & Design Tokens
+ * PRISM Profit Pool Shift Model v3 — Formatting & Design Tokens
  * Apple × Bain × Goldman Sachs
  */
 

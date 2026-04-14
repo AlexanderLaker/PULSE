@@ -1,5 +1,5 @@
 /**
- * PULSE — Simulation & Shift Matrix types.
+ * PRISM — Simulation & Shift Matrix types.
  * Maps to the core Shift Matrix output contract (CLAUDE.md §2).
  */
 
@@ -74,6 +74,8 @@ export interface ConvergenceDiagnostics {
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
+  force_attribution?: CategoryRecord<CausalDecomposition>;
+  /** @deprecated Use force_attribution. Kept for backward compat. */
   causal_decomposition?: CategoryRecord<CausalDecomposition>;
   allocation_recommendation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;

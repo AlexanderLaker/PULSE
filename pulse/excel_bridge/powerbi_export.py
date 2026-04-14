@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from pulse.config import ModelConfig, FORCES
+from pulse.common.shape_compat import velocity_median as _velocity_median
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class PowerBIExporter:
                     "shift_median": self._safe_round(year_data.get("median", 0.0)),
                     "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
                     "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
-                    "velocity": self._safe_round(velocity.get(year, 0.0)),
+                    "velocity": self._safe_round(_velocity_median(velocity.get(year, 0.0))),
                 }
 
                 # Add force attribution as separate columns for flat structure
@@ -151,7 +152,7 @@ class PowerBIExporter:
                     "shift_median": self._safe_round(year_data.get("median", 0.0)),
                     "shift_p75": self._safe_round(year_data.get("p75", 0.0)),
                     "shift_p90": self._safe_round(year_data.get("p90", 0.0)),
-                    "velocity": self._safe_round(velocity.get(year, 0.0)),
+                    "velocity": self._safe_round(_velocity_median(velocity.get(year, 0.0))),
                 }
 
                 # Add force attribution columns

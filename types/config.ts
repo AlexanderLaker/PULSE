@@ -1,5 +1,5 @@
 /**
- * PULSE — Configuration types.
+ * PRISM — Configuration types.
  * Maps to ModelConfig and application settings.
  */
 

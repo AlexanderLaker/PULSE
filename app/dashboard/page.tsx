@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * PULSE Dashboard Page
+ * PRISM Dashboard Page
  *
  * Main entry point for the Profit Pool Shift Model.
  * Handles authentication, error boundaries, and component composition.
@@ -87,7 +87,7 @@ export default function DashboardPage() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">P</span>
             </div>
-            <h1 className="text-lg font-semibold text-content-primary">PULSE Profit Pool Shift Model</h1>
+            <h1 className="text-lg font-semibold text-content-primary">PRISM Profit Pool Shift Model</h1>
           </div>
 
           <div className="flex items-center gap-6">

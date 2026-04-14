@@ -295,7 +295,7 @@ class ReverseStressTester:
         results = []
 
         for target in target_range:
-            stress_result = self.find_stress_scenario(
+            stress_result = self.find_stress_configuration(
                 model_func, target_category, target, param_names, param_bounds
             )
 

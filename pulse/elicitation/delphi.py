@@ -26,11 +26,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ScoringRound:
-    """A single round of Delphi scoring (probability only — gp1_pct_affected is set separately)."""
+    """A single round of Delphi scoring.
+
+    Captures both elicitation dimensions (E3):
+    - probability_score (1-5): likelihood the trend materializes
+    - gp1_pct_affected_score (0.0-1.0): economic scope estimate
+
+    gp1_pct_affected_score is optional — if a scorer only votes on
+    probability, the trend's existing gp1_pct_affected stays put.
+    """
     round_number: int
     trend_id: str
     scorer_id: str
     probability_score: int
+    gp1_pct_affected_score: Optional[float] = None
     rationale: str = ""
     calibration_factor: float = 1.0
     bias_flags: list = field(default_factory=list)
@@ -41,6 +50,7 @@ class CalibrationExercise:
     """A historical question used to calibrate scorer accuracy."""
     question: str
     known_outcome_probability: int
+    known_outcome_gp1_pct: Optional[float] = None
     scorer_responses: dict = field(default_factory=dict)
 
 
@@ -131,24 +141,24 @@ class DelphiProtocol:
         return [
             CalibrationExercise(
                 question="In 2020, how would you have scored 'E-commerce acceleration' "
-                         "(impact & probability)?",
-                known_outcome_impact=4,
+                         "(probability 1-5, gp1_pct_affected 0.0-1.0)?",
                 known_outcome_probability=5,
+                known_outcome_gp1_pct=0.18,
             ),
             CalibrationExercise(
                 question="In 2019, how would you have scored 'Private label growth in retailers'?",
-                known_outcome_impact=3,
                 known_outcome_probability=4,
+                known_outcome_gp1_pct=0.22,
             ),
             CalibrationExercise(
                 question="In 2018, how would you have scored 'Sustainability regulation tightening'?",
-                known_outcome_impact=2,
                 known_outcome_probability=3,
+                known_outcome_gp1_pct=0.10,
             ),
             CalibrationExercise(
                 question="In 2021, how would you have scored 'Direct-to-consumer channel disruption'?",
-                known_outcome_impact=3,
                 known_outcome_probability=4,
+                known_outcome_gp1_pct=0.12,
             ),
         ]
 
@@ -188,16 +198,26 @@ class DelphiProtocol:
         }
 
     def submit_score(self, session_id: str, round_number: int, scorer_id: str,
-                     trend_id: str, probability: int, rationale: str = "") -> Dict[str, Any]:
-        """Submit a probability score from a scorer for a trend in a round."""
+                     trend_id: str, probability: int, rationale: str = "",
+                     gp1_pct_affected: Optional[float] = None) -> Dict[str, Any]:
+        """Submit a probability + (optional) gp1_pct_affected score for a trend.
+
+        E3: scorers can now elicit the economic-scope variable alongside
+        the probability variable. Both flow through the same calibration
+        and bias-detection machinery.
+        """
         if not (1 <= probability <= 5):
             return {"error": "Probability must be between 1 and 5"}
+
+        if gp1_pct_affected is not None and not (0.0 <= gp1_pct_affected <= 1.0):
+            return {"error": "gp1_pct_affected must be between 0.0 and 1.0"}
 
         score = ScoringRound(
             round_number=round_number,
             trend_id=trend_id,
             scorer_id=scorer_id,
             probability_score=probability,
+            gp1_pct_affected_score=gp1_pct_affected,
             rationale=rationale,
             calibration_factor=self.scorer_calibration.get(scorer_id, 1.0),
         )
@@ -225,13 +245,13 @@ class DelphiProtocol:
                     f"""
                     INSERT INTO delphi_rounds (
                         session_id, round_number, trend_id, scorer_id,
-                        probability_score, rationale,
+                        probability_score, gp1_pct_affected_score, rationale,
                         calibration_factor, bias_flags
-                    ) VALUES ({ph(8)})
+                    ) VALUES ({ph(9)})
                     """,
                     (
                         session_id, round_number, trend_id, scorer_id,
-                        probability, rationale,
+                        probability, gp1_pct_affected, rationale,
                         score.calibration_factor, json.dumps(score.bias_flags),
                     ),
                 )
@@ -258,7 +278,8 @@ class DelphiProtocol:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""
-                    SELECT trend_id, scorer_id, probability_score, calibration_factor
+                    SELECT trend_id, scorer_id, probability_score,
+                           gp1_pct_affected_score, calibration_factor
                     FROM delphi_rounds
                     WHERE session_id = {p} AND round_number = {p}
                     ORDER BY trend_id, scorer_id
@@ -274,6 +295,7 @@ class DelphiProtocol:
                     scores_by_trend[trend_id].append({
                         "scorer_id": row["scorer_id"],
                         "probability": row["probability_score"],
+                        "gp1_pct_affected": row.get("gp1_pct_affected_score"),
                         "calibration_factor": row["calibration_factor"]
                     })
         except Exception as e:
@@ -297,6 +319,9 @@ class DelphiProtocol:
             return {
                 "probability": 3,
                 "probability_raw": 3.0,
+                "gp1_pct_affected": None,
+                "gp1_pct_affected_variance": 0.0,
+                "gp1_scorer_count": 0,
                 "variance": 0.0, "reliability_alpha": 0.0,
                 "confidence": "Low", "scorers": 0,
             }
@@ -312,12 +337,30 @@ class DelphiProtocol:
         prob_scores = [r.probability_score for r in relevant]
         variance = float(np.var(prob_scores)) if prob_scores else 0.0
 
+        # E3: aggregate gp1_pct_affected from any scorers who supplied it
+        gp1_relevant = [(r, w) for r, w in zip(relevant, weights)
+                        if r.gp1_pct_affected_score is not None]
+        if gp1_relevant:
+            gp1_total_w = sum(w for _, w in gp1_relevant) or 1.0
+            w_gp1 = sum(r.gp1_pct_affected_score * w for r, w in gp1_relevant) / gp1_total_w
+            gp1_values = [r.gp1_pct_affected_score for r, _ in gp1_relevant]
+            gp1_variance = float(np.var(gp1_values))
+            gp1_consensus = round(max(0.0, min(1.0, w_gp1)), 4)
+            gp1_scorer_count = len(gp1_relevant)
+        else:
+            gp1_consensus = None
+            gp1_variance = 0.0
+            gp1_scorer_count = 0
+
         alpha = self.inter_rater_reliability(trend_id)
         confidence = "High" if alpha > 0.8 else "Medium" if alpha > 0.67 else "Low"
 
         return {
             "probability": round(w_prob),
             "probability_raw": round(w_prob, 2),
+            "gp1_pct_affected": gp1_consensus,
+            "gp1_pct_affected_variance": round(gp1_variance, 6),
+            "gp1_scorer_count": gp1_scorer_count,
             "variance": round(variance, 2),
             "reliability_alpha": alpha,
             "confidence": confidence,
@@ -557,6 +600,7 @@ class DelphiProtocol:
                         "round_number": row["round_number"],
                         "scorer_id": row["scorer_id"],
                         "probability_score": row["probability_score"],
+                        "gp1_pct_affected_score": row.get("gp1_pct_affected_score"),
                         "rationale": row.get("rationale", ""),
                         "calibration_factor": row.get("calibration_factor", 1.0),
                         "bias_flags": json.loads(row["bias_flags"]) if row.get("bias_flags") else [],
@@ -745,7 +789,10 @@ class DelphiProtocol:
                     trend = trend_db.get_trend_by_id(trend_id)
                     if trend:
                         old_prob = trend.probability
+                        old_gp1 = getattr(trend, "gp1_pct_affected", None)
                         trend.probability = consensus["probability"]
+                        if consensus.get("gp1_pct_affected") is not None:
+                            trend.gp1_pct_affected = consensus["gp1_pct_affected"]
                         trend.scorer_count = consensus["scorers"]
                         trend.score_variance = consensus["variance"]
                         trend.debiasing_applied = True
@@ -753,29 +800,49 @@ class DelphiProtocol:
 
                         log_audit(
                             "UPDATE", "trend", trend_id,
-                            old_value=f"prob={old_prob}",
-                            new_value=f"prob={consensus['probability']}",
+                            old_value=f"prob={old_prob}, gp1={old_gp1}",
+                            new_value=(
+                                f"prob={consensus['probability']}, "
+                                f"gp1={consensus.get('gp1_pct_affected')}"
+                            ),
                             reason=f"Delphi consensus (session {session_id})",
                             user_id="delphi_protocol",
                         )
 
                         applied[trend_id] = {
                             "probability": consensus["probability"],
+                            "gp1_pct_affected": consensus.get("gp1_pct_affected"),
                             "reliability_alpha": consensus["reliability_alpha"],
                         }
 
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 for trend_id, update in applied.items():
-                    cursor.execute(
-                        f"""
-                        UPDATE trends
-                        SET impact = {p}, probability = {p}, debiasing_applied = {p}, updated_at = {p}
-                        WHERE id = {p}
-                        """,
-                        (update["impact"], update["probability"], True,
-                         datetime.utcnow().isoformat(), trend_id),
-                    )
+                    if update.get("gp1_pct_affected") is not None:
+                        cursor.execute(
+                            f"""
+                            UPDATE trends
+                            SET probability = {p},
+                                gp1_pct_affected = {p},
+                                debiasing_applied = {p},
+                                updated_at = {p}
+                            WHERE id = {p}
+                            """,
+                            (update["probability"], update["gp1_pct_affected"],
+                             True, datetime.utcnow().isoformat(), trend_id),
+                        )
+                    else:
+                        cursor.execute(
+                            f"""
+                            UPDATE trends
+                            SET probability = {p},
+                                debiasing_applied = {p},
+                                updated_at = {p}
+                            WHERE id = {p}
+                            """,
+                            (update["probability"], True,
+                             datetime.utcnow().isoformat(), trend_id),
+                        )
                 conn.commit()
 
             return {"status": "success", "applied": applied}
@@ -802,7 +869,8 @@ class DelphiProtocol:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"""
-                    SELECT trend_id, probability_score, calibration_factor
+                    SELECT trend_id, probability_score,
+                           gp1_pct_affected_score, calibration_factor
                     FROM delphi_rounds
                     WHERE session_id = {p} AND round_number = {p}
                     ORDER BY trend_id
@@ -815,13 +883,16 @@ class DelphiProtocol:
                     row = _row_to_dict(raw_row)
                     trend_id = row["trend_id"]
                     if trend_id not in distributions:
-                        distributions[trend_id] = {"probability": []}
+                        distributions[trend_id] = {"probability": [], "gp1": []}
                     distributions[trend_id]["probability"].append(row["probability_score"])
+                    gp1 = row.get("gp1_pct_affected_score")
+                    if gp1 is not None:
+                        distributions[trend_id]["gp1"].append(gp1)
 
                 summary = {}
                 for trend_id, scores in distributions.items():
                     prob_scores = scores["probability"]
-                    summary[trend_id] = {
+                    entry = {
                         "probability": {
                             "median": int(np.median(prob_scores)),
                             "mean": round(float(np.mean(prob_scores)), 2),
@@ -831,6 +902,17 @@ class DelphiProtocol:
                             "count": len(prob_scores),
                         },
                     }
+                    gp1_scores = scores["gp1"]
+                    if gp1_scores:
+                        entry["gp1_pct_affected"] = {
+                            "median": round(float(np.median(gp1_scores)), 4),
+                            "mean": round(float(np.mean(gp1_scores)), 4),
+                            "std": round(float(np.std(gp1_scores)), 4),
+                            "min": round(float(np.min(gp1_scores)), 4),
+                            "max": round(float(np.max(gp1_scores)), 4),
+                            "count": len(gp1_scores),
+                        }
+                    summary[trend_id] = entry
 
                 return {
                     "session_id": session_id,

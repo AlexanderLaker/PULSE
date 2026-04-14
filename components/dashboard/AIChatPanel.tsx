@@ -1,5 +1,5 @@
 /**
- * AIChatPanel — Natural language chat interface for querying PULSE model.
+ * AIChatPanel — Natural language chat interface for querying PRISM model.
  * Bottom bar slide-up panel. Apple design.
  */
 
@@ -24,7 +24,7 @@ const AIChatPanel: FC<AIChatPanelProps> = ({ isOpen, onClose, onSendMessage }) =
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: 'Welcome to PULSE AI. Ask me about shift projections, force decomposition, allocation recommendations, or scenario comparisons. I work with relative shifts only — no absolute financials.',
+      content: 'Welcome to PRISM AI. Ask me about shift projections, force decomposition, allocation recommendations, or scenario comparisons. I work with relative shifts only — no absolute financials.',
       timestamp: new Date(),
     },
   ]);
@@ -100,7 +100,7 @@ const AIChatPanel: FC<AIChatPanelProps> = ({ isOpen, onClose, onSendMessage }) =
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <MessageCircle size={16} color={T.accent} />
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#1D1D1F' }}>PULSE AI Chat</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#1D1D1F' }}>PRISM AI Chat</span>
             </div>
             <button
               onClick={onClose}

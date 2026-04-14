@@ -7,13 +7,13 @@ Main Classes:
 - TrendScanner: Multi-source news/trend detection with LLM classification
 - ScoreCalibrator: Bias detection and calibration against market signals
 - SimulationNarrator: Executive narrative generation with causal explanations
-- PulseChat: Natural language interface with rule-based fallback mode
+- PrismChat: Natural language interface with rule-based fallback mode
 """
 
 from pulse.ai.scanner import TrendScanner, TrendSuggestion
 from pulse.ai.calibrator import ScoreCalibrator, CalibrationSuggestion
 from pulse.ai.narrator import SimulationNarrator
-from pulse.ai.chat import PulseChat, ChatContext
+from pulse.ai.chat import PrismChat, ChatContext
 
 # Backward compatibility alias
 ScenarioNarrator = SimulationNarrator
@@ -41,7 +41,7 @@ __all__ = [
     "CalibrationSuggestion",
     "SimulationNarrator",
     "ScenarioNarrator",  # Backward compatibility alias
-    "PulseChat",
+    "PrismChat",
     "ChatContext",
     "get_ai_config",
     "set_ai_config",
