@@ -7,7 +7,7 @@
 ## 1. EXECUTIVE SUMMARY
 
 ### What This Is
-PRISM is an **AI-augmented profit pool simulation engine** that transforms a static Excel-based strategic force assessment (currently V12) into a living, probabilistic, AI-enhanced strategic decision platform. It is deployed as a **Vercel-hosted Next.js web application** backed by a **Python FastAPI simulation engine**, with dual-mode data persistence (PostgreSQL in production, SQLite locally).
+PRISM is an **AI-augmented profit pool simulation engine** that transforms a static Excel-based strategic force assessment into a living, probabilistic, AI-enhanced strategic decision platform. It is deployed as a **Vercel-hosted Next.js web application** backed by a **Python FastAPI simulation engine**, with dual-mode data persistence (PostgreSQL in production, SQLite locally).
 
 ### The Core Innovation
 PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2030). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
@@ -263,7 +263,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - April 2026 market intelligence snapshot
 
 **config.py** — Model configuration (PRODUCTION)
-- 6 forces, 12 categories, 8 VC steps, 4 regions
+- 6 forces, 12 categories (Hair: Color, Care, Styling, Body; LHC: FCN=Fabric Cleaning, FCA=Fabric Care, FFI=Fabric Finisher, LAD=Laundry Additives, HDW=Hand Dish Wash, ADW=Automatic Dish Wash, HSC=Hard Surface Cleaner, IC=Insect Control), 8 VC steps, 4 regions
 - Default parameters: attenuation=0.5, iterations=10K, base_year=2025, path_years=[2026-2030]
 - 5 MECE diffusion curve types with materialization schedule computation
 - Force-specific materialization overrides (legacy fallback)
@@ -581,7 +581,6 @@ POST /trends                          → Add new trend
 
 # Simulation
 POST /simulate                        → Run Bayesian MC with continuous paths
-POST /simulate/deterministic          → V12-matching deterministic mode
 
 # Analytics
 POST /analytics/cvar                  → Conditional Value-at-Risk
@@ -650,8 +649,8 @@ npm install
 npm run dev                                # Next.js at :3000
 
 # CLI
-python -m pulse --input "v12.xlsx" --output "shift_matrix.xlsx"
-python -m pulse --input "v12.xlsx" --iterations 50000
+python -m pulse --output "shift_matrix.xlsx"
+python -m pulse --iterations 50000
 python -m pulse --seed 42                  # Reproducible run
 python -m pulse --serve --ai claude        # With AI layer
 python -m pulse --serve --ai azure         # Azure OpenAI
@@ -681,14 +680,27 @@ python -m pulse --serve --ai none          # No AI
 
 **Force colors:** Consumer=#3B82F6, Customer=#8B5CF6, Technology=#06B6D4, Government=#F59E0B, Environmental=#22C55E, Competitive=#EF4444
 
-**Category colors (Hair):** Color=#F87171, Care=#FB923C, Styling=#FBBF24, Body=#A3E635
-**Category colors (LHC):** FCN=#34D399, FCA=#2DD4BF, FFI=#22D3EE, LAD=#60A5FA, HDW=#818CF8, ADW=#A78BFA, HSC=#C084FC, IC=#E879F9
+**Category colors & brand mapping (Hair):**
+- Color=#F87171 — Hair Color (Schwarzkopf Keratin Color, got2b Color, Palette, Igora, BlondMe, Diadem)
+- Care=#FB923C — Hair Care (Schwarzkopf, Gliss, Schauma, Syoss, Olaplex, Joico, Kenra, Alterna)
+- Styling=#FBBF24 — Hair Styling (got2b, Taft, Schwarzkopf, Osis+, Sexy Hair)
+- Body=#A3E635 — Body Care (Fa, Dial, Barnängen, La Toja)
+
+**Category colors & brand mapping (LHC):**
+- FCN=#34D399 — Fabric Cleaning / Laundry Detergent (Persil, All, Purex, Weißer Riese, Dixan, Le Chat, Sun)
+- FCA=#2DD4BF — Fabric Care / Specialty Delicates (Perwoll)
+- FFI=#22D3EE — Fabric Finisher / Softener (Vernel, Silan, Snuggle, Purex Softener)
+- LAD=#60A5FA — Laundry Additives (Snuggle Scent Boosters, Purex Fragrance Boosters, Purex Dryer Sheets)
+- HDW=#818CF8 — Hand Dish Wash (Pril, Pur, Nelsen)
+- ADW=#A78BFA — Automatic Dish Wash (Somat, Pril Automatic, Top Shelf)
+- HSC=#C084FC — Hard Surface Cleaner (Bref, WC Frisch, Sonasol, Blue Star, Soft Scrub, DAC)
+- IC=#E879F9 — Insect Control (Catch, Home Mat & Home Keeper)
 
 ---
 
 ## 10. TESTING
 
-### Test Suite (`tests/`, 12 files)
+### Test Suite (`tests/`, 11 files)
 ```
 conftest.py                          # Pytest fixtures
 test_bayesian_mc.py                  # MC engine convergence, copula behavior
@@ -700,12 +712,8 @@ test_optimizer.py                    # Allocation optimizer constraints
 test_api.py                          # FastAPI endpoint integration
 test_scanner_routes.py               # AI scanner API routes
 test_properties.py                   # Hypothesis property-based tests
-test_golden_pipeline.py              # Golden reference validation (shift_matrix_v12_reference.json)
 test_advanced_analytics_integration.py  # End-to-end analytics pipeline
 ```
-
-### Golden Reference
-`tests/golden/shift_matrix_v12_reference.json` — deterministic reference output for regression testing.
 
 ---
 
@@ -871,7 +879,7 @@ PROFIT_POOL_ENGINE/
 │       ├── vite.config.ts
 │       └── dist/                      # Built assets
 │
-├── tests/                             # Python test suite (12 files)
+├── tests/                             # Python test suite (11 files)
 │   ├── conftest.py
 │   ├── test_bayesian_mc.py
 │   ├── test_cvar.py
@@ -882,10 +890,7 @@ PROFIT_POOL_ENGINE/
 │   ├── test_api.py
 │   ├── test_scanner_routes.py
 │   ├── test_properties.py
-│   ├── test_golden_pipeline.py
-│   ├── test_advanced_analytics_integration.py
-│   └── golden/
-│       └── shift_matrix_v12_reference.json
+│   └── test_advanced_analytics_integration.py
 │
 ├── assets/                            # Static images
 ├── public/                            # Built frontend assets
@@ -969,7 +974,7 @@ Tornado analysis, breakeven analysis, force elimination, weight sensitivity, and
 - [x] Auth system with JWT + role-based access
 - [x] Advanced analytics (CVaR, Sobol, reverse stress, tipping points) working
 - [x] Professional Excel/PPTX/Power BI export
-- [x] 12 test files with golden reference validation
+- [x] 11 test files covering simulation, analytics, API, and properties
 
 ### Target (Next Milestones)
 - [ ] Implement sensitivity.py (tornado, breakeven, force elimination)

@@ -91,7 +91,7 @@
 | Brand | Core Regions | Note |
 |---|---|---|
 | **Renuzit** | USA | US-only air freshener. Out of current journey scope. |
-| **Dial, Right Guard, Tone, Pure & Natural** | USA | US body wash / bar soap / deodorant, acquired 2004. Out of current Laundry/Hair journey scope unless explicitly added. |
+| **Dial, Tone** | USA | US body wash / bar soap / deodorant, acquired 2004. Part of Body Care category (Hair: Body). |
 
 ---
 

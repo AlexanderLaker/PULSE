@@ -10,18 +10,13 @@ import logging
 from typing import Optional
 
 import numpy as np
-from scipy.linalg import cholesky
-from scipy.stats import beta as _scipy_beta, t as _scipy_t
 
-
-def beta_ppf(q, a, b):
-    """Beta inverse-CDF wrapper (kept for call-site stability)."""
-    return _scipy_beta.ppf(q, a, b)
-
-
-def t_cdf(x, df):
-    """Student-t CDF wrapper (kept for call-site stability)."""
-    return _scipy_t.cdf(x, df)
+# Use scipy-compat layer so the engine works on Vercel serverless (no scipy)
+from pulse.simulation._scipy_compat import (
+    cholesky,
+    beta_ppf,
+    t_cdf,
+)
 
 from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,

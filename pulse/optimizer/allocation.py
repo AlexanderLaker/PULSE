@@ -11,7 +11,9 @@ import logging
 from typing import Optional
 
 import numpy as np
-from scipy.optimize import minimize
+
+# Use scipy-compat layer so the optimizer works on Vercel serverless (no scipy)
+from pulse.simulation._scipy_compat import minimize
 
 from pulse.config import ModelConfig, CATEGORIES
 

@@ -1,5 +1,13 @@
-"""Auth API routes — registration, login, profile, user management, password reset."""
+"""Auth API routes — registration, login, profile, user management, password reset.
 
+IMPORTANT: The app uses BaseHTTPMiddleware (LazyInitMiddleware) which requires
+async def handlers. However, the auth functions call synchronous psycopg2 code
+that blocks. Using `asyncio.to_thread()` bridges both requirements:
+- Handlers stay async (compatible with BaseHTTPMiddleware)
+- Blocking DB calls run in a separate thread (compatible with psycopg2)
+"""
+
+import asyncio
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,31 +27,31 @@ router = APIRouter(tags=["auth"])
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(req: RegisterRequest):
     """Register a new user account."""
-    return register_user(req)
+    return await asyncio.to_thread(register_user, req)
 
 
 @router.post("/auth/login", response_model=AuthResponse)
 async def login(req: LoginRequest):
     """Login and receive JWT token."""
-    return login_user(req)
+    return await asyncio.to_thread(login_user, req)
 
 
 @router.post("/auth/request-reset")
 async def request_reset(req: RequestResetRequest):
     """Step 1: Send a password reset link to the user's email via Resend."""
-    return request_password_reset(req)
+    return await asyncio.to_thread(request_password_reset, req)
 
 
 @router.post("/auth/confirm-reset")
 async def confirm_reset(req: ConfirmResetRequest):
     """Step 2: Verify reset token and set new password."""
-    return confirm_password_reset(req)
+    return await asyncio.to_thread(confirm_password_reset, req)
 
 
 @router.post("/auth/reset-password")
 async def reset_pw(req: ResetPasswordRequest):
     """Legacy direct reset (backwards compat)."""
-    return reset_password(req)
+    return await asyncio.to_thread(reset_password, req)
 
 
 @router.get("/auth/me", response_model=Optional[UserResponse])
@@ -63,13 +71,13 @@ async def get_profile(user: Optional[dict] = Depends(get_current_user)):
 @router.get("/auth/users", response_model=list[UserResponse])
 async def list_users(user: dict = Depends(require_admin)):
     """List all users (admin only)."""
-    return get_all_users()
+    return await asyncio.to_thread(get_all_users)
 
 
 @router.put("/auth/users/{user_id}", response_model=UserResponse)
 async def update_user_route(user_id: str, req: UpdateProfileRequest, admin: dict = Depends(require_admin)):
     """Update a user's profile (admin only)."""
-    return update_user(user_id, req)
+    return await asyncio.to_thread(update_user, user_id, req)
 
 
 @router.delete("/auth/users/{user_id}")
@@ -77,4 +85,4 @@ async def delete_user_route(user_id: str, admin: dict = Depends(require_admin)):
     """Delete a user (admin only). Cannot delete yourself."""
     if admin.get("sub") == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-    return delete_user(user_id)
+    return await asyncio.to_thread(delete_user, user_id)
