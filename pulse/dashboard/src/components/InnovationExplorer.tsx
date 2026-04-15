@@ -8,9 +8,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, TrendingUp, Clock, Target } from 'lucide-react';
+import { ArrowRight, Sparkles, TrendingUp, Clock, Target, BarChart3, Layers, Route, Zap } from 'lucide-react';
 import { INNOVATIONS, INNOVATION_CATEGORIES, getFilteredInnovations, getTypeColor } from '../lib/innovations';
 import type { Innovation } from '../lib/innovations';
+import { T } from '../lib/format';
 import InnovationProductImage from './InnovationProductImage';
 import InnovationDeepDive from './InnovationDeepDive';
 
@@ -35,9 +36,11 @@ const S = {
 interface InnovationExplorerProps {
   onNavigateToTrend?: (trendCode: string) => void;
   onNavigateToConsumerJourney?: (stage: string) => void;
+  onNavigateProfitPoolShiftModel?: () => void;
+  onNavigateTrends?: () => void;
 }
 
-export default function InnovationExplorer({ onNavigateToTrend, onNavigateToConsumerJourney }: InnovationExplorerProps) {
+export default function InnovationExplorer({ onNavigateToTrend, onNavigateToConsumerJourney, onNavigateProfitPoolShiftModel, onNavigateTrends }: InnovationExplorerProps) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedInnovation, setSelectedInnovation] = useState<Innovation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,6 +91,102 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
       background: S.bg,
       fontFamily: S.bodyFont,
     }}>
+      {/* ─── TOP NAV BAR — matching other pages ─────────────── */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(20px)',
+        borderBottom: `1px solid ${T.border}`,
+        padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 12,
+        fontFamily: T.sans,
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
+          <div style={{
+            width: 28, height: 28,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginLeft: 36,
+          }}>
+            <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="50,5 95,85 5,85" fill="#1a1a2e" />
+              <polygon points="50,5 72,85 50,70 28,85" fill="#2d2d44" />
+              <polygon points="50,5 72,85 50,70" fill="#3a3a55" />
+              <line x1="50" y1="5" x2="50" y2="70" stroke="#6366f1" strokeWidth="1.5" opacity="0.5" />
+              <line x1="50" y1="70" x2="28" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+              <line x1="50" y1="70" x2="72" y2="85" stroke="#6366f1" strokeWidth="1" opacity="0.3" />
+            </svg>
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>PRISM Profit Pool Analysis</span>
+          <span style={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>v6.0</span>
+        </div>
+
+        {/* Nav pills — Profit Pool Analysis, Trends, Consumer Journey, Innovation Explorer */}
+        <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+          {onNavigateProfitPoolShiftModel && (
+            <button
+              onClick={onNavigateProfitPoolShiftModel}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 14px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: 'transparent',
+                color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: T.sans, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <BarChart3 size={13} />
+              Profit Pool Analysis
+            </button>
+          )}
+          {onNavigateTrends && (
+            <button
+              onClick={onNavigateTrends}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 14px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: 'transparent',
+                color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: T.sans, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <Layers size={13} />
+              Trends
+            </button>
+          )}
+          {onNavigateToConsumerJourney && (
+            <button
+              onClick={() => onNavigateToConsumerJourney('')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 14px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: 'transparent',
+                color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: T.sans, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <Route size={13} />
+              Consumer Journey
+            </button>
+          )}
+          <button
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 14px', borderRadius: 8,
+              border: 'none', background: T.accent,
+              color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'default',
+              fontFamily: T.sans,
+            }}
+          >
+            <Zap size={13} />
+            Innovation Explorer
+          </button>
+        </div>
+      </div>
+
       {/* ─── EDITORIAL HEADER ─────────────────────────────────── */}
       <header style={{
         padding: '48px 48px 0',
@@ -137,17 +236,6 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
             }}>
               Innovation Portfolio
             </h1>
-            <p style={{
-              fontFamily: S.bodyFont,
-              fontSize: 17,
-              color: S.onSurfaceVariant,
-              maxWidth: 640,
-              lineHeight: 1.6,
-              marginTop: 12,
-              margin: '12px 0 0',
-            }}>
-              16 strategic product innovation concepts derived from PRISM&apos;s 61-trend database, Consumer Journey Blueprint, and category-brand mapping. Each concept represents a significant strategic move designed to shift profit pools over a 3–5 year horizon.
-            </p>
           </div>
 
           {/* Search */}

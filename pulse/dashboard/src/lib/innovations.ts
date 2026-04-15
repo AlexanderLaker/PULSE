@@ -106,10 +106,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 95, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'C-07', name: 'Scalp Care Emerges as Standalone Category', direction: 'Expansion', rationale: 'Direct — this IS the white spot response' },
@@ -156,10 +156,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 88, rating: 'HIGH' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Japan/Korea', readiness: 'HIGH' },
-      { region: 'IMEA', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'C-10', name: 'Hair Loss and Thinning Treatments Enter Consumer Mainstream', direction: 'Expansion', rationale: 'Direct white spot response — $3B+ market' },
@@ -207,10 +207,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 94, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'T-03', name: 'Concentrated and Solid Formats Innovation', direction: 'Expansion', rationale: 'Core format innovation trend' },
@@ -258,10 +258,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 92, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
-      { region: 'IMEA', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'C-14', name: 'Between-Wash Fabric Care as Standalone Occasion', direction: 'Expansion', rationale: 'Direct white spot fill — #1 priority' },
@@ -308,10 +308,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 90, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'MEDIUM' },
-      { region: 'Asia (Korea/Japan)', readiness: 'HIGH' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'T-08', name: 'Connected Appliances and Auto-Dosing Transform Detergent Economics', direction: 'Expansion', rationale: 'Core trend — existential for laundry P&L' },
@@ -358,10 +358,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 96, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
-      { region: 'CEE', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'HIGH' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'E-08', name: 'Textile Longevity and Garment Life Extension Economy', direction: 'Expansion', rationale: 'Core positioning — garment longevity' },
@@ -408,10 +408,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 78, rating: 'STRONG' },
     ],
     regionalReadiness: [
+      { region: 'Europe', readiness: 'HIGH' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'Europe (DACH)', readiness: 'HIGH' },
-      { region: 'UK', readiness: 'HIGH' },
-      { region: 'IMEA', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'C-08', name: 'Male Grooming Structural Growth', direction: 'Expansion', rationale: 'Direct white spot response' },
@@ -458,10 +458,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 92, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'HIGH' },
-      { region: 'Western Europe', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'HIGH' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'Asia (Korea/Japan)', readiness: 'HIGH' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'T-07', name: 'AI-Powered Personalization at Scale', direction: 'Expansion', rationale: 'Core innovation platform — AI is the product' },
@@ -508,10 +508,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 94, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'G-03', name: 'EU Cosmetics & Chemical Regulation', direction: 'Contraction', rationale: 'Regulatory first-mover advantage' },
@@ -557,10 +557,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 92, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Western Europe', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'HIGH' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'T-04', name: 'Microbiome and Biotech Science for Hair', direction: 'Expansion', rationale: 'Biotech protein platform' },
@@ -606,10 +606,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 80, rating: 'HIGH' },
     ],
     regionalReadiness: [
-      { region: 'Southern Europe', readiness: 'OPTIMAL' },
-      { region: 'Europe (DACH)', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'E-01', name: 'Climate Change Reshapes Seasonal Categories', direction: 'Expansion', rationale: 'Core driver — extended pest seasons' },
@@ -655,10 +655,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 94, rating: 'EXCEPTIONAL' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'HIGH' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'K-07', name: 'Professional Salon to Consumer Crossover', direction: 'Expansion', rationale: 'Core strategy — salon credibility to retail' },
@@ -704,10 +704,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 88, rating: 'HIGH' },
     ],
     regionalReadiness: [
-      { region: 'India', readiness: 'OPTIMAL' },
-      { region: 'Sub-Saharan Africa', readiness: 'HIGH' },
-      { region: 'Southeast Asia', readiness: 'HIGH' },
-      { region: 'Latin America', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'MEDIUM' },
+      { region: 'North America', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'OPTIMAL' },
+      { region: 'Asia', readiness: 'HIGH' },
     ],
     trendConnections: [
       { code: 'C-12', name: 'Emerging Market Middle Class Expansion', direction: 'Expansion', rationale: 'Structural demand growth' },
@@ -753,10 +753,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 82, rating: 'HIGH' },
     ],
     regionalReadiness: [
+      { region: 'Europe', readiness: 'HIGH' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'Europe (DACH)', readiness: 'HIGH' },
-      { region: 'UK', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'C-06', name: 'Reduced Wash Frequency', direction: 'Expansion', rationale: 'Core driver — less washing = more day-2 occasions' },
@@ -802,10 +802,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 84, rating: 'HIGH' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'HIGH' },
       { region: 'North America', readiness: 'OPTIMAL' },
-      { region: 'UK', readiness: 'HIGH' },
-      { region: 'Asia-Pacific', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'MEDIUM' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'C-09', name: 'Fragrance Premiumization in Home Care', direction: 'Expansion', rationale: 'Core positioning — premium fragrance' },
@@ -851,10 +851,10 @@ export const INNOVATIONS: Innovation[] = [
       { label: 'Strategic Fit', score: 86, rating: 'HIGH' },
     ],
     regionalReadiness: [
-      { region: 'Europe (DACH)', readiness: 'OPTIMAL' },
-      { region: 'Western Europe', readiness: 'HIGH' },
-      { region: 'UK', readiness: 'HIGH' },
+      { region: 'Europe', readiness: 'OPTIMAL' },
       { region: 'North America', readiness: 'MEDIUM' },
+      { region: 'High Growth', readiness: 'HIGH' },
+      { region: 'Asia', readiness: 'MEDIUM' },
     ],
     trendConnections: [
       { code: 'C-13', name: 'Refill and Reuse Economy', direction: 'Expansion', rationale: 'Core trend — owning the refill infrastructure' },

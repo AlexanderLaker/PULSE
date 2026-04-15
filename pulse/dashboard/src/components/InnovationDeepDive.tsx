@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowUpRight, ExternalLink, Star, Globe, TrendingUp, TrendingDown, Beaker, ShieldCheck, BarChart3 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ExternalLink, Star, Globe, TrendingUp, TrendingDown, Beaker, BarChart3 } from 'lucide-react';
 import type { Innovation } from '../lib/innovations';
 import { getTypeColor } from '../lib/innovations';
 import InnovationProductImage from './InnovationProductImage';
@@ -706,55 +706,6 @@ export default function InnovationDeepDive({
               </div>
             </div>
 
-            {/* CTA Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                style={{
-                  padding: '14px 24px',
-                  borderRadius: 14,
-                  border: 'none',
-                  background: `linear-gradient(180deg, ${S.primary} 0%, ${S.primaryDim} 100%)`,
-                  color: 'white',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  fontFamily: S.bodyFont,
-                  cursor: 'pointer',
-                  boxShadow: `0 8px 24px rgba(0,93,181,0.2)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                <ShieldCheck size={16} />
-                Schedule Internal Review
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02, background: `${S.primary}08` }}
-                whileTap={{ scale: 0.98 }}
-                onClick={onBack}
-                style={{
-                  padding: '14px 24px',
-                  borderRadius: 14,
-                  border: `2px solid ${S.primary}`,
-                  background: 'transparent',
-                  color: S.primary,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  fontFamily: S.bodyFont,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                <ArrowLeft size={16} />
-                Back to Portfolio
-              </motion.button>
-            </div>
           </div>
         </aside>
       </div>

@@ -122,6 +122,8 @@ export default function App() {
           <InnovationExplorer
             onNavigateToTrend={(search: string) => { setTrendSearch(search); setPage('profitpoolshiftmodel'); }}
             onNavigateToConsumerJourney={() => setPage('journey')}
+            onNavigateProfitPoolShiftModel={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
+            onNavigateTrends={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
           />
         </Suspense>
         {/* Burger Menu */}
