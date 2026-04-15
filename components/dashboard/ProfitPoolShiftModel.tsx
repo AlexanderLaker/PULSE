@@ -17,8 +17,6 @@ import usePrism from '@/hooks/usePrism';
 import type {
   Trend,
   Scenario,
-  CausalEdge,
-  CausalDAG,
   ShiftMatrix,
   ConvergenceDiagnostics,
   AllocationRecommendation,
@@ -34,7 +32,6 @@ type AIInsight = AISuggestion & { text?: string; type?: string };
 import HeadlineKPI from './HeadlineKPI';
 import ShiftHeatmap from './Heatmap';
 import PathTimeline from './PathTimeline';
-import CausalFlow from './CausalFlow';
 import ForceWaterfall from './ForceWaterfall';
 import AllocationChart from './AllocationChart';
 import TrendExplorer from './TrendExplorer';
@@ -170,7 +167,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
     simulate, connectionState, reconnect,
-    simulation, trends, forces, scenarios, dag, analytics,
+    simulation, trends, forces, scenarios, analytics,
     aiSuggestions, triggers, health, updateTrend,
   } = usePrism();
 
@@ -190,7 +187,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
   const [showTrends, setShowTrends] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-  const [shockedForce, setShockedForce] = useState<ForceName | null>(null);
   const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
   const [selectedRegion, setSelectedRegion] = useState<string>('Global');
   const [presentationMode, setPresentationMode] = useState(false);
@@ -204,7 +200,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
   const shifts: ShiftMatrix | null = simulation?.shifts ?? null;
   const convergence: ConvergenceDiagnostics | undefined = simulation?.convergence;
   const allocation = simulation?.allocation_recommendation ?? null;
-  const dagEdges: CausalEdge[] = dag?.edges ?? [];
   const forceNames = Object.keys(FORCES) as ForceName[];
   const scenarioOptions: Scenario[] = scenarios ?? [];
   const aiInsights: AIInsight[] = (aiSuggestions ?? []).map(s => ({
@@ -709,20 +704,15 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             </div>
           </div>
 
-          {/* Row 3: Causal + Forces + Allocation (Responsive Grid) */}
+          {/* Row 3: Forces + Allocation (Responsive Grid) */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: isIPad ? '1fr' : isLaptop ? '1fr 1fr' : '1.1fr 0.9fr 1fr',
+              gridTemplateColumns: isIPad ? '1fr' : '1fr 1fr',
               gap: 24,
               flex: '0 0 auto',
             } as React.CSSProperties}
           >
-            <CausalFlow
-              dag={{ edges: dagEdges, forces: forceNames as ForceName[] }}
-              shockedForce={shockedForce}
-              onShockForce={setShockedForce}
-            />
             <ForceWaterfall
               selectedCategory={selectedCategory}
             />

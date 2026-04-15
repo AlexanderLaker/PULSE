@@ -44,7 +44,6 @@ module.exports = {
         // PRISM semantic
         expansion:   '#30D158',
         contraction: '#FF453A',
-        causal:      '#7B61FF',
         gold:        '#D4A847',
       },
       fontFamily: {

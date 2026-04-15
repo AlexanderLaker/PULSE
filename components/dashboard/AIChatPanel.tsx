@@ -51,7 +51,7 @@ const AIChatPanel: FC<AIChatPanelProps> = ({ isOpen, onClose, onSendMessage }) =
       } else {
         // Fallback mock response
         await new Promise(r => setTimeout(r, 800));
-        response = `Analysis based on current simulation: ${userMsg.content.includes('shift') ? 'The portfolio shows a net negative shift driven primarily by Government and Environmental forces propagating through the causal DAG.' : 'I can help with shift projections, force analysis, allocation recommendations, and scenario comparisons. What would you like to know?'}`;
+        response = `Analysis based on current simulation: ${userMsg.content.includes('shift') ? 'The portfolio shows a net negative shift driven primarily by Government and Environmental forces propagating through the simulation model.' : 'I can help with shift projections, force analysis, allocation recommendations, and scenario comparisons. What would you like to know?'}`;
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: response, timestamp: new Date() }]);

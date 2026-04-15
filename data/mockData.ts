@@ -8,7 +8,6 @@
  * - generateMockTrends() → Trend[]
  * - generateMockScenarios() → Scenario[]
  * - generateMockAllocation() → AllocationRecommendation[]
- * - generateMockDAGEdges() → CausalEdge[]
  * - generateMockConvergence() → ConvergenceDiagnostics
  * - MOCK_AI_INSIGHTS → AIInsight[]
  * - generateMockForceContributions() → ForceContribution[]
@@ -18,7 +17,6 @@
 import type {
   Trend,
   Scenario,
-  CausalEdge,
   ConvergenceDiagnostics,
   ShiftMatrix,
   ForceContribution,
@@ -66,7 +64,6 @@ export interface MockDataResult {
   trends: TrendWithSources[];
   scenarios: Scenario[];
   allocation: AllocationWithRationale[];
-  dagEdges: CausalEdge[];
   convergence: ConvergenceDiagnostics;
 }
 
@@ -849,7 +846,7 @@ export function generateMockScenarios(): Scenario[] {
     {
       id: 'base',
       name: 'Base Case',
-      description: 'Current scores, causal DAG active',
+      description: 'Current scores, simulation active',
     },
     {
       id: 'green',
@@ -891,126 +888,6 @@ export function generateMockAllocation(): AllocationWithRationale[] {
   });
 
   return allocation;
-}
-
-/**
- * Generate causal DAG edges (16 edges per PRISM spec).
- */
-export function generateMockDAGEdges(): CausalEdge[] {
-  return [
-    {
-      from: 'Government',
-      to: 'Technology',
-      weight: 0.6,
-      lag: 1,
-      mechanism: 'Regulation triggers reformulation R&D spend',
-    },
-    {
-      from: 'Government',
-      to: 'Customer',
-      weight: 0.4,
-      lag: 1,
-      mechanism: 'Compliance costs pass through to shelf price',
-    },
-    {
-      from: 'Government',
-      to: 'Environmental',
-      weight: 0.3,
-      lag: 0,
-      mechanism: 'Environmental regulation codifies green trends',
-    },
-    {
-      from: 'Consumer',
-      to: 'Customer',
-      weight: 0.5,
-      lag: 0,
-      mechanism: 'Demand shifts force channel adaptation',
-    },
-    {
-      from: 'Consumer',
-      to: 'Competitive',
-      weight: 0.4,
-      lag: 1,
-      mechanism: 'Consumer preferences drive competitive positioning',
-    },
-    {
-      from: 'Consumer',
-      to: 'Technology',
-      weight: 0.3,
-      lag: 1,
-      mechanism: 'Consumer demand pulls innovation investment',
-    },
-    {
-      from: 'Technology',
-      to: 'Consumer',
-      weight: 0.4,
-      lag: 1,
-      mechanism: 'New tech enables new consumer behaviors',
-    },
-    {
-      from: 'Technology',
-      to: 'Competitive',
-      weight: 0.5,
-      lag: 1,
-      mechanism: 'Tech adoption creates competitive gaps',
-    },
-    {
-      from: 'Technology',
-      to: 'Customer',
-      weight: 0.3,
-      lag: 0,
-      mechanism: 'Tech changes channel economics',
-    },
-    {
-      from: 'Environmental',
-      to: 'Government',
-      weight: 0.6,
-      lag: 1,
-      mechanism: 'Environmental crises accelerate regulation',
-    },
-    {
-      from: 'Environmental',
-      to: 'Consumer',
-      weight: 0.4,
-      lag: 0,
-      mechanism: 'Climate awareness shifts purchase behavior',
-    },
-    {
-      from: 'Environmental',
-      to: 'Technology',
-      weight: 0.3,
-      lag: 1,
-      mechanism: 'Environmental pressure drives green innovation',
-    },
-    {
-      from: 'Customer',
-      to: 'Competitive',
-      weight: 0.5,
-      lag: 0,
-      mechanism: 'Channel power shifts competitive dynamics',
-    },
-    {
-      from: 'Customer',
-      to: 'Consumer',
-      weight: 0.3,
-      lag: 0,
-      mechanism: 'Channel availability shapes consumer access',
-    },
-    {
-      from: 'Competitive',
-      to: 'Customer',
-      weight: 0.4,
-      lag: 0,
-      mechanism: 'Competitive moves change channel bargaining',
-    },
-    {
-      from: 'Competitive',
-      to: 'Consumer',
-      weight: 0.3,
-      lag: 1,
-      mechanism: 'Competitive innovation shapes consumer expectations',
-    },
-  ];
 }
 
 /**
@@ -1056,7 +933,6 @@ export function generateMockData(): MockDataResult {
     trends: generateMockTrends(),
     scenarios: generateMockScenarios(),
     allocation: generateMockAllocation(),
-    dagEdges: generateMockDAGEdges(),
     convergence: generateMockConvergence(),
   };
 }

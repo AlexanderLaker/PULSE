@@ -271,7 +271,7 @@ function generateSlides(
           </div>
         </div>
       ),
-      notes: `Walk through the causal DAG. Show how one shock (regulation) ripples through the system. Emphasize time lags (year 1 vs. year 2+ effects).`,
+      notes: `Walk through the force interdependencies. Show how one shock (regulation) ripples through the system. Emphasize time lags (year 1 vs. year 2+ effects).`,
     },
 
     // ─── Slide 5: Recommendations ───

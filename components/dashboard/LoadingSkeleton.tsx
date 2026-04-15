@@ -254,28 +254,6 @@ export function PanelSkeleton() {
 }
 
 /**
- * Causal Flow Skeleton
- */
-export function CausalFlowSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  return (
-    <div style={containerStyle}>
-      <SkeletonBase width={140} height={14} />
-      <SkeletonBase width="100%" height={280} borderRadius={50} />
-    </div>
-  );
-}
-
-/**
  * Allocation Chart Skeleton
  */
 export function AllocationSkeleton() {

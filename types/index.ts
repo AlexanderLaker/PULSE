@@ -31,9 +31,6 @@ export type Direction = 'Expansion' | 'Contraction';
 /** Confidence level assigned to a trend's evidence base. */
 export type Confidence = 'High' | 'Medium' | 'Low';
 
-/** Evidence strength for causal DAG edges. */
-export type EvidenceStrength = 'Strong' | 'Moderate' | 'Weak';
-
 /** AI provider options for the LLM abstraction layer. */
 export type AIProvider = 'claude' | 'azure' | 'ollama' | 'none';
 

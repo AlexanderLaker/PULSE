@@ -46,10 +46,9 @@ export interface TriggerStatus {
   fired_date?: string;
 }
 
-/** Causal decomposition: how forces drive category shifts. */
-export interface CausalDecomposition {
+/** Force attribution: how forces drive category shifts. */
+export interface ForceAttribution {
   direct_effects?: Record<string, number>;
-  propagated_effects?: Record<string, number>;
 }
 
 /** Allocation recommendation from the optimizer. */
@@ -74,9 +73,7 @@ export interface ConvergenceDiagnostics {
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
-  force_attribution?: CategoryRecord<CausalDecomposition>;
-  /** @deprecated Use force_attribution. Kept for backward compat. */
-  causal_decomposition?: CategoryRecord<CausalDecomposition>;
+  force_attribution?: CategoryRecord<ForceAttribution>;
   allocation_recommendation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;
   scenario?: ScenarioId;
@@ -118,25 +115,3 @@ export interface SensitivityResult {
   category?: string;
 }
 
-/** Causal DAG edge. */
-export interface CausalEdge {
-  from: ForceName;
-  to: ForceName;
-  weight: number;
-  lag: number;
-  mechanism?: string;
-  evidence_strength?: string;
-}
-
-/** Full DAG structure from GET /causal/dag. */
-export interface CausalDAG {
-  edges: CausalEdge[];
-  forces: ForceName[];
-}
-
-/** Shock propagation result from POST /causal/propagate. */
-export interface PropagationResult {
-  impacts: Record<ForceName, Record<number, number>>;
-  shocked_force: ForceName;
-  magnitude: number;
-}

@@ -255,8 +255,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
     }
 
     // Build force contributions from backend force_attribution if available
-    // (A6: was named causal_decomposition — kept as fallback for old responses)
-    const forceAttr = simulation?.force_attribution ?? simulation?.causal_decomposition;
+    const forceAttr = simulation?.force_attribution;
     let newFC: Record<string, ForceContribution[]> | undefined;
     if (forceAttr && typeof forceAttr === 'object') {
       newFC = {};
@@ -448,7 +447,7 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
       const payload = {
         generated: new Date().toISOString(),
         shifts: data.shifts,
-        causal_decomposition: data.forceContributions,
+        force_attribution: data.forceContributions,
         model_version: 'bayesian_copula_v1',
         backtesting_accuracy: 0,
       };
@@ -600,7 +599,6 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
             {[
               { id: 'overview' as const, label: 'Profit Pool Analysis', icon: BarChart3 },
               { id: 'trends' as const, label: 'Trends', icon: Layers },
-              { id: 'strategic' as const, label: 'Strategic Intelligence', icon: Target },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;

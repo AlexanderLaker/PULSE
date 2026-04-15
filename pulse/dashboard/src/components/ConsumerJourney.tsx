@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { BarChart3, Layers, Route } from 'lucide-react';
 import { T } from '../lib/format';
 
 // ═══════════════════════════════════════════════════════════════
@@ -677,7 +678,7 @@ function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'co
     return (
       `**Trend Mechanism.** "${entry.name}" is a ${iw} growth vector in the ${stageName} stage, driven by: ${trendText}. ` +
       `This ${typeWord} reflects a structural shift — not a cyclical uptick — in ${isHair ? 'consumer hair care behavior, ingredient science, and channel dynamics' : 'laundry and home care habits, sustainability regulation, and appliance technology'}. ` +
-      `PRISM projects these tailwinds to compound through 2030 as the underlying forces reinforce each other across the causal DAG.\n\n` +
+      `PRISM projects these tailwinds to compound through 2030 as the underlying forces reinforce each other across the model.\n\n` +
 
       `**Henkel Portfolio Position.** The relevant Henkel asset is ${brands}. ` +
       (ctx ? `Across the ${stageName} stage, Henkel\'s brand portfolio includes ${ctx.henkelBrands}. ` : '') +
@@ -700,7 +701,7 @@ function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'co
 
   return (
     `**Structural Decline Assessment.** "${entry.name}" faces ${iw} headwinds in the ${stageName} stage, driven by: ${trendText}. ` +
-    `This is a structural contraction — not a temporary dip — reflecting ${isHair ? 'premiumization displacing commodity tiers, tighter ingredient regulation under EU Cosmetics Regulation amendments, and digital disruption of traditional purchase and discovery journeys' : 'regulatory bans on legacy chemistry (PFAS restriction, microplastics phase-out), format obsolescence as concentrated innovations displace bulky legacy products, and consumer migration toward sustainable and transparent alternatives'}. These forces are mutually reinforcing and accelerating through the causal DAG.\n\n` +
+    `This is a structural contraction — not a temporary dip — reflecting ${isHair ? 'premiumization displacing commodity tiers, tighter ingredient regulation under EU Cosmetics Regulation amendments, and digital disruption of traditional purchase and discovery journeys' : 'regulatory bans on legacy chemistry (PFAS restriction, microplastics phase-out), format obsolescence as concentrated innovations displace bulky legacy products, and consumer migration toward sustainable and transparent alternatives'}. These forces are mutually reinforcing and accelerating through the simulation model.\n\n` +
 
     `**Henkel Exposure.** ${brands} has direct exposure to this decline vector and requires proactive management. ` +
     (ctx ? `Within the ${stageName} stage, Henkel\'s portfolio (${ctx.henkelBrands}) faces varying degrees of risk depending on specific SKU positioning and reformulation readiness. ` : '') +
@@ -850,7 +851,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              <BarChart3 size={13} />
               Profit Pool Analysis
             </button>
           )}
@@ -867,7 +868,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <Layers size={13} />
               Trends
             </button>
           )}
@@ -880,7 +881,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               fontFamily: T.sans,
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49"/></svg>
+            <Route size={13} />
             Consumer Journey
           </button>
         </div>

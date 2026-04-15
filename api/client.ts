@@ -7,7 +7,6 @@
 import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
-  CausalDAG, PropagationResult,
   Scenario,
   SensitivityResult,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
@@ -80,18 +79,6 @@ export const runSimulation = (params: SimulationParams = {}): Promise<Simulation
 
 export const runDeterministic = (): Promise<SimulationResult> =>
   request('/simulate/deterministic', { method: 'POST' });
-
-// ── Causal DAG ───────────────────────────────────────────────────
-
-export const getDAG = (): Promise<CausalDAG> =>
-  request('/causal/dag');
-
-export const propagateShock = (data: {
-  shocked_force: string;
-  magnitude: number;
-  years?: number;
-}): Promise<PropagationResult> =>
-  request('/causal/propagate', { method: 'POST', body: JSON.stringify(data) });
 
 // ── Scenarios ────────────────────────────────────────────────────
 

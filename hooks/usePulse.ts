@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '@/api/client';
 import type {
   HealthStatus, Trend, ForceSummary, SimulationResult, Scenario,
-  CausalDAG, ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
+  ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
   ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
   TrendUpdate,
 } from '@/types';
@@ -37,7 +37,6 @@ function generateMockSimulation(): SimulationResult {
 
   return {
     shifts: mock,
-    causal_decomposition: {},
     allocation_recommendation: {},
     convergence: { converged: true, r_hat: 1.03, backtestingAccuracy: 0.73 }
   };
@@ -50,7 +49,6 @@ export interface UsePulseReturn {
   forces: ForceSummary[];
   simulation: SimulationResult | null;
   scenarios: Scenario[];
-  dag: CausalDAG | null;
   config: ModelConfig | null;
   analytics: AnalyticsState | null;
   aiSuggestions: AISuggestion[];
@@ -75,7 +73,6 @@ export default function usePulse(): UsePulseReturn {
   const [forces, setForces] = useState<ForceSummary[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [dag, setDag] = useState<CausalDAG | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsState | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
@@ -143,12 +140,11 @@ export default function usePulse(): UsePulseReturn {
     setError(null);
     setConnectionState('reconnecting');
     try {
-      const [h, t, f, sc, d, c] = await Promise.all([
+      const [h, t, f, sc, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
         api.getTrends().catch((): Trend[] => []),
         api.getForces().catch((): ForceSummary[] => []),
         api.getScenarios().catch((): Scenario[] => []),
-        api.getDAG().catch((): null => null),
         api.getConfig().catch((): null => null),
       ]);
 
@@ -170,7 +166,6 @@ export default function usePulse(): UsePulseReturn {
       }
 
       setScenarios(Array.isArray(sc) ? sc : []);
-      setDag(d);
       setConfig(c);
 
       // Load simulation if available
@@ -279,7 +274,7 @@ export default function usePulse(): UsePulseReturn {
   }, [loadAll]);
 
   return {
-    health, trends, forces, simulation, scenarios, dag, config,
+    health, trends, forces, simulation, scenarios, config,
     analytics, aiSuggestions, triggers,
     loading, simulating, error, backendAvailable, connectionState,
     activeScenario, setActiveScenario,

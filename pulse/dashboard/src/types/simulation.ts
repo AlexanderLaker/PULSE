@@ -46,10 +46,9 @@ export interface TriggerStatus {
   fired_date?: string;
 }
 
-/** Causal decomposition: how forces drive category shifts. */
-export interface CausalDecomposition {
+/** Force attribution: how forces drive category shifts. */
+export interface ForceAttribution {
   direct_effects?: Record<string, number>;
-  propagated_effects?: Record<string, number>;
 }
 
 /** Allocation recommendation from the optimizer. */
@@ -80,14 +79,10 @@ export interface SimulationResult {
   shifts: ShiftMatrix;
   shift_matrix?: ShiftMatrix;
   /**
-   * A6: renamed from causal_decomposition. Static force attribution (per
-   * category, scaled to MC median). NOT a causal claim — see narrator
-   * disclaimer. Old field name kept as alias for one release for
-   * backward compat with cached responses.
+   * Static force attribution (per category, scaled to MC median).
+   * NOT a causal claim — see narrator disclaimer.
    */
-  force_attribution?: CategoryRecord<CausalDecomposition>;
-  /** @deprecated Use force_attribution. Kept for backward compat. */
-  causal_decomposition?: CategoryRecord<CausalDecomposition>;
+  force_attribution?: CategoryRecord<ForceAttribution>;
   vc_decomposition?: VCDecomposition;
   allocation_recommendation?: AllocationRecommendation;
   allocation?: AllocationRecommendation;
