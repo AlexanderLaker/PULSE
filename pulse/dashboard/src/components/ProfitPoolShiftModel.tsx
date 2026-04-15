@@ -600,7 +600,6 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
             {[
               { id: 'overview' as const, label: 'Profit Pool Analysis', icon: BarChart3 },
               { id: 'trends' as const, label: 'Trends', icon: Layers },
-              { id: 'strategic' as const, label: 'Strategic Intelligence', icon: Target },
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;

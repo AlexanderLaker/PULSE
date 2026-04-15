@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { BarChart3, Layers, Route } from 'lucide-react';
 import { T } from '../lib/format';
 
 // ═══════════════════════════════════════════════════════════════
@@ -850,7 +851,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              <BarChart3 size={13} />
               Profit Pool Analysis
             </button>
           )}
@@ -867,7 +868,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <Layers size={13} />
               Trends
             </button>
           )}
@@ -880,7 +881,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
               fontFamily: T.sans,
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49"/></svg>
+            <Route size={13} />
             Consumer Journey
           </button>
         </div>
