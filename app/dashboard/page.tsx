@@ -5,14 +5,31 @@
  *
  * Main entry point for the Profit Pool Shift Model.
  * Handles authentication, error boundaries, and component composition.
+ * Tab navigation: Profit Pool Analysis | Trends | Consumer Journey | Innovation Explorer
  */
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, BarChart3, TrendingUp, Users, Lightbulb } from 'lucide-react';
 import ProfitPoolShiftModel from '@/components/dashboard/ProfitPoolShiftModel';
+import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
+
+type DashboardTab = 'profit-pool' | 'trends' | 'consumer-journey' | 'innovation-explorer';
+
+interface TabDef {
+  id: DashboardTab;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const TABS: TabDef[] = [
+  { id: 'profit-pool', label: 'Profit Pool Analysis', icon: <BarChart3 className="w-4 h-4" /> },
+  { id: 'trends', label: 'Trends', icon: <TrendingUp className="w-4 h-4" /> },
+  { id: 'consumer-journey', label: 'Consumer Journey', icon: <Users className="w-4 h-4" /> },
+  { id: 'innovation-explorer', label: 'Innovation Explorer', icon: <Lightbulb className="w-4 h-4" /> },
+];
 
 interface AuthCheck {
   authenticated: boolean;
@@ -28,6 +45,7 @@ export default function DashboardPage() {
   const [authCheck, setAuthCheck] = useState<AuthCheck | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool');
 
   // Check authentication on mount
   useEffect(() => {
@@ -82,12 +100,35 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-surface-primary">
       {/* Top Navigation Bar */}
       <nav className="sticky top-0 z-40 border-b border-border bg-surface-primary/95 backdrop-blur supports-[backdrop-filter]:bg-surface-primary/60">
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">P</span>
             </div>
-            <h1 className="text-lg font-semibold text-content-primary">PRISM Profit Pool Shift Model</h1>
+            <h1 className="text-lg font-semibold text-content-primary">PRISM</h1>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex items-center gap-1">
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                    ${isActive
+                      ? 'bg-content-primary text-white shadow-sm'
+                      : 'text-content-secondary hover:bg-surface-tertiary hover:text-content-primary'
+                    }
+                  `}
+                >
+                  {tab.icon}
+                  <span className="hidden lg:inline">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-6">
@@ -115,10 +156,24 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content — Tab-Switched */}
       <div className="relative">
         <ErrorBoundary>
-          <ProfitPoolShiftModel />
+          {activeTab === 'profit-pool' && <ProfitPoolShiftModel />}
+          {activeTab === 'trends' && <ProfitPoolShiftModel />}
+          {activeTab === 'consumer-journey' && <ProfitPoolShiftModel />}
+          {activeTab === 'innovation-explorer' && (
+            <InnovationExplorer
+              onNavigateToTrend={(code) => {
+                // Navigate to trends tab and filter by trend code
+                setActiveTab('trends');
+              }}
+              onNavigateToConsumerJourney={(stage) => {
+                // Navigate to consumer journey tab
+                setActiveTab('consumer-journey');
+              }}
+            />
+          )}
         </ErrorBoundary>
       </div>
     </div>
