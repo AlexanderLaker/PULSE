@@ -621,8 +621,6 @@ const CategoryDeepDive: FC<CategoryDeepDiveProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 10,
-                    maxHeight: 320,
-                    overflowY: 'auto',
                   }}
                 >
                   {relatedTrends.slice(0, 6).map(trend => {
@@ -695,9 +693,8 @@ const CategoryDeepDive: FC<CategoryDeepDiveProps> = ({
                             </div>
                           </div>
                         </div>
-                        <div style={{ color: T.text3, lineHeight: 1.3 }}>
-                          {trend.strategic_implication ||
-                            trend.description?.slice(0, 60)}
+                        <div style={{ color: T.text3, lineHeight: 1.5 }}>
+                          {trend.strategic_implication || trend.description}
                         </div>
                       </motion.div>
                     );
