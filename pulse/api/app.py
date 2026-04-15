@@ -69,14 +69,20 @@ def _summarize_convergence(conv: dict) -> dict:
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import Trend, TrendDatabase
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.simulation.sensitivity import SensitivityEngine
-from pulse.simulation.paths import PathAnalyzer
-from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routes.delphi import router as delphi_router
 from pulse.api.routes.auth import router as auth_router
+
+# ── Lazy imports for scipy-dependent modules ─────────────────────
+# These are NOT imported at module load time so that the Vercel
+# serverless bundle (which excludes scipy to stay under 250 MB) can
+# still serve auth / health / trend endpoints without crashing on
+# cold start.  Import them inside the functions that need them:
+#   from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+#   from pulse.simulation.sensitivity import SensitivityEngine
+#   from pulse.simulation.paths import PathAnalyzer
+#   from pulse.optimizer.allocation import AllocationOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +295,8 @@ def create_app(args=None) -> FastAPI:
                 return
 
             # A5: Default to multichain (n_chains=3) for proper convergence diagnostics
+            from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+            from pulse.optimizer.allocation import AllocationOptimizer
             mc = BayesianMonteCarloEngine(config)
             if n_chains > 1:
                 mc_result = mc.run_multichain(db, n_chains=n_chains, iterations=iterations)
@@ -386,6 +394,8 @@ def create_app(args=None) -> FastAPI:
                 db = _state["db"]
 
                 # A5: Default to multichain (3 chains) for proper convergence diagnostics
+                from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+                from pulse.optimizer.allocation import AllocationOptimizer
                 mc = BayesianMonteCarloEngine(config)
                 mc_result = mc.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                 _state["mc_result"] = mc_result
@@ -545,6 +555,8 @@ def create_app(args=None) -> FastAPI:
                                     db = _state["db"]
 
                                     # A5: Default to multichain (3 chains) for proper convergence diagnostics
+                                    from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+                                    from pulse.optimizer.allocation import AllocationOptimizer
                                     mc_engine = BayesianMonteCarloEngine(config)
                                     mc_result = mc_engine.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                                     _state["mc_result"] = mc_result
@@ -1183,6 +1195,8 @@ def create_app(args=None) -> FastAPI:
             # runs expose RNG sensitivity ("seed-wobble") on the headline.
             primary_seed = req.seed if req.seed is not None else 42
             seed_wobble = None
+            from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+            from pulse.optimizer.allocation import AllocationOptimizer
             if req.seeds and len(req.seeds) > 1:
                 import numpy as _np
                 medians_2030 = []
@@ -1304,6 +1318,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
+        from pulse.simulation.sensitivity import SensitivityEngine
         se = SensitivityEngine(_state["config"])
         return _sanitize(se.tornado_analysis(db, category))
 
@@ -1318,6 +1333,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
+        from pulse.simulation.sensitivity import SensitivityEngine
         se = SensitivityEngine(_state["config"])
         return _sanitize(se.tornado_analysis(db, category))
 
@@ -1332,6 +1348,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
+        from pulse.simulation.sensitivity import SensitivityEngine
         se = SensitivityEngine(_state["config"])
         # Call a breakeven method if it exists, otherwise return a placeholder
         try:
@@ -1356,6 +1373,7 @@ def create_app(args=None) -> FastAPI:
         if category and category not in CATEGORIES:
             raise HTTPException(422, f"Invalid category: {category}")
 
+        from pulse.simulation.sensitivity import SensitivityEngine
         se = SensitivityEngine(_state["config"])
         try:
             return _sanitize(se.breakeven_analysis(db, category))
@@ -1372,6 +1390,7 @@ def create_app(args=None) -> FastAPI:
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
+        from pulse.simulation.sensitivity import SensitivityEngine
         se = SensitivityEngine(_state["config"])
         return _sanitize(se.attenuation_sensitivity(db))
 
@@ -1384,6 +1403,7 @@ def create_app(args=None) -> FastAPI:
 
         async with _state_lock:
             cfg = _state["config"]
+            from pulse.optimizer.allocation import AllocationOptimizer
             opt = AllocationOptimizer(cfg)
             result = opt.optimize(
                 mc["shift_matrix"],
