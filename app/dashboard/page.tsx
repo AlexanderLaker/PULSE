@@ -98,9 +98,10 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-surface-primary">
-      {/* Top Navigation Bar */}
-      <nav className="sticky top-0 z-40 border-b border-border bg-surface-primary/95 backdrop-blur supports-[backdrop-filter]:bg-surface-primary/60">
-        <div className="px-6 py-3 flex items-center justify-between">
+      {/* Top Navigation Bar — prime navigation, fully opaque so it never
+          inherits colours from the tab content below it */}
+      <nav className="sticky top-0 z-50 border-b border-border bg-surface-primary">
+        <div className="px-6 py-3 flex items-center justify-between max-w-[1440px] mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">P</span>

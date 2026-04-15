@@ -88,41 +88,17 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
       background: S.bg,
       fontFamily: S.bodyFont,
     }}>
-      {/* ─── EDITORIAL HEADER ─────────────────────────────────── */}
+      {/* ─── EDITORIAL HEADER ───────────────────────────────────
+          NOTE: No logo / breadcrumb rendered here — the prime nav
+          in app/dashboard/page.tsx already shows the PRISM brand
+          and the active "Innovation Explorer" tab. Rendering another
+          "PRISM Strategy Intelligence / Innovation Explorer" breadcrumb
+          on top made the header appear to change between tabs. */}
       <header style={{
-        padding: '48px 48px 0',
+        padding: '32px 48px 0',
         maxWidth: 1440,
         margin: '0 auto',
       }}>
-        {/* Breadcrumb */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 24,
-        }}>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            color: S.primary,
-            fontFamily: S.headlineFont,
-          }}>
-            PRISM Strategy Intelligence
-          </span>
-          <span style={{ color: S.secondary, fontSize: 11 }}>/</span>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: 1,
-            textTransform: 'uppercase',
-            color: S.secondary,
-          }}>
-            Innovation Explorer
-          </span>
-        </div>
-
         {/* Hero Title */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 40, marginBottom: 16 }}>
           <div style={{ flex: 1 }}>
