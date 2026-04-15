@@ -1,10 +1,37 @@
 /**
- * PRISM Innovation Explorer — Product Stock Photos
- * Professional Unsplash stock photos mapped to each innovation concept.
- * Gradient backdrop shows during load and as fallback if image fails.
+ * PRISM Innovation Explorer — Topical Editorial Illustrations
+ * Each innovation gets a large, topically-accurate Lucide icon composition
+ * rendered on a branded gradient backdrop. No external image dependencies,
+ * guaranteed to match each concept's subject matter.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
+import {
+  FlaskConical,
+  Droplets,
+  Sparkles,
+  Layers,
+  Shirt,
+  SprayCan,
+  Wind,
+  Cpu,
+  Zap,
+  ShieldCheck,
+  User,
+  Palette,
+  Utensils,
+  Dna,
+  Bug,
+  Link2,
+  Globe,
+  Package,
+  Sun,
+  Leaf,
+  Recycle,
+  Container,
+  Scissors,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface ProductImageProps {
   innovationId: string;
@@ -13,93 +40,191 @@ interface ProductImageProps {
   size?: 'card' | 'hero';
 }
 
-// Curated Unsplash stock photos — topical, editorial quality.
-// Format: https://images.unsplash.com/photo-{id}?w=1200&auto=format&fit=crop&q=70
-const stockPhotos: Record<string, string> = {
+// Each innovation maps to a topically-accurate primary icon + secondary accent icon.
+// These icons were chosen to match the exact product concept described in innovations.ts.
+const iconMap: Record<string, { primary: LucideIcon; accent: LucideIcon; label: string }> = {
   // inn_01 — Microbiome-Powered Scalp Care System
-  'inn_01': 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1200&auto=format&fit=crop&q=70',
+  inn_01: { primary: FlaskConical, accent: Droplets, label: 'Scalp Science' },
   // inn_02 — Anti-Thinning Hair Density Platform
-  'inn_02': 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=1200&auto=format&fit=crop&q=70',
+  inn_02: { primary: Sparkles, accent: Scissors, label: 'Hair Density' },
   // inn_03 — Bio-Logic Concentrated Laundry Sheets
-  'inn_03': 'https://images.unsplash.com/photo-1545173168-9f1947eebb7f?w=1200&auto=format&fit=crop&q=70',
+  inn_03: { primary: Layers, accent: Shirt, label: 'Laundry Sheets' },
   // inn_04 — Premium Fabric Refresh Ecosystem
-  'inn_04': 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=1200&auto=format&fit=crop&q=70',
-  // inn_05 — Smart Auto-Dosing Laundry Cartridge
-  'inn_05': 'https://images.unsplash.com/photo-1610557892470-55d9e80c0bce?w=1200&auto=format&fit=crop&q=70',
+  inn_04: { primary: SprayCan, accent: Wind, label: 'Fabric Refresh' },
+  // inn_05 — Smart Auto-Dosing Laundry Cartridge System
+  inn_05: { primary: Cpu, accent: Zap, label: 'Smart Cartridge' },
   // inn_06 — Garment Lifetime Protection Platform
-  'inn_06': 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1200&auto=format&fit=crop&q=70',
+  inn_06: { primary: Shirt, accent: ShieldCheck, label: 'Garment Care' },
   // inn_07 — Premium Men's Grooming Ecosystem
-  'inn_07': 'https://images.unsplash.com/photo-1621607512214-68297480165e?w=1200&auto=format&fit=crop&q=70',
+  inn_07: { primary: User, accent: Sparkles, label: "Men's Grooming" },
   // inn_08 — AI-Personalized Home Hair Color Platform
-  'inn_08': 'https://images.unsplash.com/photo-1560869713-7d0a29430803?w=1200&auto=format&fit=crop&q=70',
+  inn_08: { primary: Palette, accent: Sparkles, label: 'AI Color' },
   // inn_09 — PFAS-Free Premium Dish Care System
-  'inn_09': 'https://images.unsplash.com/photo-1584947897558-4e06f2a7b8e1?w=1200&auto=format&fit=crop&q=70',
+  inn_09: { primary: Utensils, accent: Droplets, label: 'Dish Care' },
   // inn_10 — Biotech-Powered Hair Repair System
-  'inn_10': 'https://images.unsplash.com/photo-1526045478516-99145907023c?w=1200&auto=format&fit=crop&q=70',
+  inn_10: { primary: Dna, accent: FlaskConical, label: 'Biotech Repair' },
   // inn_11 — Climate-Adaptive Insect Defense System
-  'inn_11': 'https://images.unsplash.com/photo-1589133301875-d8db3f1ea1f4?w=1200&auto=format&fit=crop&q=70',
+  inn_11: { primary: Bug, accent: ShieldCheck, label: 'Insect Defense' },
   // inn_12 — Professional-to-Consumer Bond Repair
-  'inn_12': 'https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=1200&auto=format&fit=crop&q=70',
-  // inn_13 — Emerging Markets Affordable Innovation
-  'inn_13': 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=1200&auto=format&fit=crop&q=70',
+  inn_12: { primary: Link2, accent: Sparkles, label: 'Bond Repair' },
+  // inn_13 — Emerging Markets Affordable Innovation System
+  inn_13: { primary: Package, accent: Globe, label: 'Sachet Economy' },
   // inn_14 — Day-2 Hair Revival System
-  'inn_14': 'https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=1200&auto=format&fit=crop&q=70',
-  // inn_15 — Premium Aromatherapy Home Care
-  'inn_15': 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?w=1200&auto=format&fit=crop&q=70',
+  inn_14: { primary: Sun, accent: Wind, label: 'Day-2 Revival' },
+  // inn_15 — Premium Aromatherapy Home Care Collection
+  inn_15: { primary: Leaf, accent: Droplets, label: 'Aromatherapy' },
   // inn_16 — Circular Refill Station Network
-  'inn_16': 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=1200&auto=format&fit=crop&q=70',
+  inn_16: { primary: Recycle, accent: Container, label: 'Refill Station' },
 };
 
-export default function InnovationProductImage({ innovationId, gradient, accent, size = 'card' }: ProductImageProps) {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const photoUrl = stockPhotos[innovationId];
+export default function InnovationProductImage({
+  innovationId,
+  gradient,
+  accent,
+  size = 'card',
+}: ProductImageProps) {
+  const config = iconMap[innovationId] || iconMap.inn_01;
+  const PrimaryIcon = config.primary;
+  const AccentIcon = config.accent;
+
+  const primarySize = size === 'hero' ? 200 : 120;
+  const accentSize = size === 'hero' ? 110 : 64;
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: gradient,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {/* Stock photo */}
-      {photoUrl && !imgError && (
-        <img
-          src={photoUrl}
-          alt=""
-          loading="lazy"
-          onLoad={() => setImgLoaded(true)}
-          onError={() => setImgError(true)}
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: gradient,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Editorial diagonal pattern */}
+      <svg
+        width="100%"
+        height="100%"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.12,
+          pointerEvents: 'none',
+        }}
+      >
+        <defs>
+          <pattern
+            id={`diag-${innovationId}`}
+            width="24"
+            height="24"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <line x1="0" y1="0" x2="0" y2="24" stroke="#ffffff" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#diag-${innovationId})`} />
+      </svg>
+
+      {/* Soft radial glow behind primary icon */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: primarySize * 2.2,
+          height: primarySize * 2.2,
+          background: `radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 65%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Accent icon — offset, decorative */}
+      <div
+        style={{
+          position: 'absolute',
+          top: size === 'hero' ? '22%' : '18%',
+          right: size === 'hero' ? '18%' : '14%',
+          opacity: 0.32,
+          transform: 'rotate(-8deg)',
+          pointerEvents: 'none',
+        }}
+      >
+        <AccentIcon
+          size={accentSize}
+          strokeWidth={1.4}
+          color="#ffffff"
+        />
+      </div>
+
+      {/* Primary icon — centered, hero element */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          filter: `drop-shadow(0 8px 24px ${accent}99)`,
+        }}
+      >
+        <PrimaryIcon
+          size={primarySize}
+          strokeWidth={1.2}
+          color="#ffffff"
           style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: imgLoaded ? 1 : 0,
-            transition: 'opacity 0.6s ease-out',
+            opacity: 0.96,
           }}
         />
+      </div>
+
+      {/* Bottom label — editorial caption */}
+      {size === 'hero' && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: 32,
+            zIndex: 3,
+            fontFamily: "'Manrope', 'Inter', sans-serif",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.82)',
+            padding: '6px 12px',
+            background: 'rgba(0,0,0,0.24)',
+            borderRadius: 999,
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          {config.label}
+        </div>
       )}
+
       {/* Editorial color overlay — brand-tinted wash */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: `linear-gradient(135deg, ${accent}55 0%, ${accent}22 40%, rgba(0,0,0,0.25) 100%)`,
-        mixBlendMode: 'multiply',
-        pointerEvents: 'none',
-      }} />
-      {/* Subtle grain / vignette */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.25) 100%)',
-        pointerEvents: 'none',
-      }} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `linear-gradient(135deg, ${accent}22 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.18) 100%)`,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Subtle vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,0.28) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
     </div>
   );
 }

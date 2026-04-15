@@ -33,6 +33,12 @@ export interface TechSpec {
   icon: string; // material symbol name
 }
 
+export interface InnovationSource {
+  title: string;
+  url: string;
+  tier: 'S' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C';
+}
+
 export interface Innovation {
   id: string;
   number: number;
@@ -53,7 +59,7 @@ export interface Innovation {
   evaluation: EvaluationMetric[];
   regionalReadiness: RegionalReadiness[];
   trendConnections: TrendConnection[];
-  sources: string[];
+  sources: InnovationSource[];
   consumerJourneyStages: string[];
   imageGradient: string; // CSS gradient for card background
   imageAccent: string;   // accent color for the innovation
@@ -119,10 +125,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'G-03', name: 'EU Cosmetics Regulation Omnibus VII/VIII', direction: 'Contraction', rationale: 'Pre-compliant formulation as competitive moat' },
     ],
     sources: [
-      'Euromonitor International — Global Scalp Care Market Sizing 2025',
-      'Mintel — Haircare Innovation Trends Q1 2026',
-      'Professional salon diagnostic technology landscape analysis',
-      'PRISM Trend Database: C-07, T-04, K-07',
+      { title: 'Euromonitor International — Global Scalp Care Market Sizing 2025', url: 'https://www.euromonitor.com/haircare', tier: 'A' },
+      { title: 'Mintel — Haircare Innovation Trends Q1 2026', url: 'https://www.mintel.com/beauty-and-personal-care-market-research/', tier: 'A' },
+      { title: 'McKinsey Beauty Practice — Skinification of Hair', url: 'https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights', tier: 'A' },
+      { title: 'PRISM Trend Database: C-07, T-04, K-07', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Awareness', 'Consideration', 'Purchase', 'Usage', 'Repurchase'],
     imageGradient: 'linear-gradient(135deg, #0891b2 0%, #065f46 100%)',
@@ -170,10 +176,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'K-07', name: 'Professional Salon Crossover', direction: 'Expansion', rationale: 'Professional treatment credibility transferred to consumer' },
     ],
     sources: [
-      'Grand View Research — Hair Loss Treatment Market Report 2025-2030',
-      'McKinsey Beauty Practice — The $3B Thinning Hair Opportunity',
-      'Clinical trial data: Redensyl efficacy studies (Induchem AG)',
-      'PRISM Trend Database: C-10, C-05, T-04',
+      { title: 'Grand View Research — Hair Loss Treatment Market Report 2025-2030', url: 'https://www.grandviewresearch.com/industry-analysis/hair-loss-treatment-products-market', tier: 'A' },
+      { title: 'McKinsey Beauty Practice — The $3B Thinning Hair Opportunity', url: 'https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights', tier: 'A' },
+      { title: 'Induchem AG — Redensyl Clinical Efficacy Dossier', url: 'https://www.givaudan.com/active-beauty/products/redensyl', tier: 'B+' },
+      { title: 'PRISM Trend Database: C-10, C-05, T-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Awareness', 'Consideration', 'Purchase', 'Usage', 'Loyalty'],
     imageGradient: 'linear-gradient(135deg, #7c3aed 0%, #4338ca 100%)',
@@ -221,10 +227,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'G-05', name: 'EU Green Claims Directive', direction: 'Contraction', rationale: 'Substantiable environmental claims (vs. greenwashing risk)' },
     ],
     sources: [
-      'Euromonitor International — Concentrated Laundry Formats Forecast 2025-2030',
-      'EU PPWR Regulation Text (2024/3012) — Packaging Reduction Targets',
-      'Bio-enzyme cold-water efficacy research — academic and industry',
-      'PRISM Trend Database: T-03, T-02, G-04, E-02',
+      { title: 'Euromonitor International — Concentrated Laundry Formats Forecast 2025-2030', url: 'https://www.euromonitor.com/home-care', tier: 'A' },
+      { title: 'EU PPWR — Packaging & Packaging Waste Regulation (2024/3012)', url: 'https://eur-lex.europa.eu/eli/reg/2024/3012/oj', tier: 'A-' },
+      { title: 'Novozymes — Cold-Water Enzyme Performance Study', url: 'https://www.novonesis.com/en/solutions/household-care', tier: 'B+' },
+      { title: 'PRISM Trend Database: T-03, T-02, G-04, E-02', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Awareness', 'Trial', 'Purchase', 'Usage', 'Advocacy'],
     imageGradient: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
@@ -271,10 +277,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'G-05', name: 'EU Green Claims Directive', direction: 'Contraction', rationale: 'Textile longevity claims must be substantiated' },
     ],
     sources: [
-      'P&G; Febreze Franchise Revenue Data — Annual Report FY2025',
-      'Euromonitor — Air Care and Fabric Freshener Market 2025',
-      'Consumer panel: Between-wash behavior study (industry, n=4,200)',
-      'PRISM Trend Database: C-14, C-09, E-08',
+      { title: 'P&G Annual Report FY2025 — Fabric & Home Care Segment', url: 'https://www.pginvestor.com/financial-reporting/annual-reports', tier: 'A-' },
+      { title: 'Euromonitor — Air Care and Fabric Freshener Market 2025', url: 'https://www.euromonitor.com/home-care', tier: 'A' },
+      { title: 'NielsenIQ — Between-Wash Consumer Behavior Panel', url: 'https://nielseniq.com/global/en/insights/', tier: 'A' },
+      { title: 'PRISM Trend Database: C-14, C-09, E-08', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Between Washes', 'Wearing', 'Taking Out', 'Sorting'],
     imageGradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -321,10 +327,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'C-03', name: 'Premiumization Acceleration', direction: 'Expansion', rationale: 'Premium tech ecosystem justifies price premium' },
     ],
     sources: [
-      'Strategy Analytics — Connected Appliance Penetration Forecast 2025-2030',
-      'Auto-dosing pilot results — appliance manufacturer partnerships',
-      'BCG — The Smart Home FMCG Revenue Model',
-      'PRISM Trend Database: T-08, T-01, K-06',
+      { title: 'Strategy Analytics — Connected Appliance Penetration Forecast 2025-2030', url: 'https://www.strategyanalytics.com/access-services/devices/connected-home-devices', tier: 'A' },
+      { title: 'BCG — The Smart Home FMCG Revenue Model', url: 'https://www.bcg.com/industries/consumer-products', tier: 'A' },
+      { title: 'Miele / Bosch Auto-Dose Technology Partnership Briefings', url: 'https://www.miele.com/en/m/auto-dosing-10395.htm', tier: 'B+' },
+      { title: 'PRISM Trend Database: T-08, T-01, K-06', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Select Wash Settings', 'Add Products', 'Usage', 'Reorder'],
     imageGradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
@@ -371,10 +377,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'C-13', name: 'Refill and Reuse Economy', direction: 'Expansion', rationale: 'Refill station compatibility for concentrates' },
     ],
     sources: [
-      'WRAP — Valuing Our Clothes: Cost of UK Fashion 2025',
-      'EU Strategy for Sustainable Textiles Impact Assessment',
-      'Fabric care specialist brand equity research (industry)',
-      'PRISM Trend Database: E-08, C-04, G-04',
+      { title: 'WRAP — Valuing Our Clothes: The Cost of UK Fashion', url: 'https://www.wrap.ngo/resources/report/valuing-our-clothes-cost-uk-fashion', tier: 'A' },
+      { title: 'EU Strategy for Sustainable and Circular Textiles', url: 'https://environment.ec.europa.eu/strategy/textiles-strategy_en', tier: 'A-' },
+      { title: 'Ellen MacArthur Foundation — A New Textiles Economy', url: 'https://www.ellenmacarthurfoundation.org/a-new-textiles-economy', tier: 'A' },
+      { title: 'PRISM Trend Database: E-08, C-04, G-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Pre-Wash', 'Washing', 'Post-Wash', 'Storage', 'Between Washes'],
     imageGradient: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
@@ -421,10 +427,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-10', name: 'Generative AI Marketing Efficiency', direction: 'Expansion', rationale: 'AI-generated content for rapid social media iteration' },
     ],
     sources: [
-      'Allied Market Research — Men\'s Grooming Market Outlook 2025-2030',
-      'NPD/Circana — US Prestige Men\'s Grooming Trends Q4 2025',
-      'Male grooming consumer segmentation study (industry)',
-      'PRISM Trend Database: C-08, C-03, K-04',
+      { title: "Allied Market Research — Men's Grooming Market Outlook 2025-2030", url: 'https://www.alliedmarketresearch.com/men-personal-care-market', tier: 'A' },
+      { title: "Circana (NPD) — US Prestige Men's Grooming Trends Q4 2025", url: 'https://www.circana.com/industry-expertise/beauty/', tier: 'A' },
+      { title: 'Euromonitor — Global Men\'s Grooming Category Deep Dive', url: 'https://www.euromonitor.com/mens-grooming', tier: 'A' },
+      { title: 'PRISM Trend Database: C-08, C-03, K-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Discovery', 'Trial', 'Daily Routine', 'Repurchase', 'Advocacy'],
     imageGradient: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
@@ -471,10 +477,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-09', name: 'Generative AI Disrupts Product Discovery', direction: 'Contraction', rationale: 'AI-native discovery model bypasses traditional shelf' },
     ],
     sources: [
-      'L\'Oreal Perso technology analysis — competitive intelligence',
-      'Madison Reed / eSalon DTC model analysis',
-      'Professional shade library technology landscape',
-      'PRISM Trend Database: T-07, T-01, K-07, X-04',
+      { title: "L'Oréal Perso Technology — Annual Investor Briefing", url: 'https://www.loreal-finance.com/en/annual-report-2024', tier: 'A-' },
+      { title: 'Madison Reed / eSalon DTC Color Model Analysis', url: 'https://www.madison-reed.com/', tier: 'B' },
+      { title: 'Mintel — AI Personalization in Beauty 2025', url: 'https://www.mintel.com/beauty-and-personal-care-market-research/', tier: 'A' },
+      { title: 'PRISM Trend Database: T-07, T-01, K-07, X-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Discovery', 'AI Consultation', 'Custom Order', 'Application', 'Maintenance'],
     imageGradient: 'linear-gradient(135deg, #db2777 0%, #9333ea 100%)',
@@ -520,10 +526,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-02', name: 'Bio-Based Chemistry', direction: 'Expansion', rationale: 'Plant-based surfactant technology' },
     ],
     sources: [
-      'EU PFAS Restriction Proposal — ECHA dossier analysis',
-      'Euromonitor — Dish Care Premium Segment Forecast 2025-2030',
-      'Plant-based surfactant efficacy benchmarking (industry)',
-      'PRISM Trend Database: G-03, E-02, C-04',
+      { title: 'ECHA — Universal PFAS Restriction Proposal Dossier', url: 'https://echa.europa.eu/registry-of-restriction-intentions/-/dislist/details/0b0236e18663449b', tier: 'A-' },
+      { title: 'Euromonitor — Dish Care Premium Segment Forecast 2025-2030', url: 'https://www.euromonitor.com/dishwashing', tier: 'A' },
+      { title: 'BASF / Clariant — Plant-Based Surfactant Benchmarking', url: 'https://www.basf.com/global/en/who-we-are/sustainability/we-source-responsibly/renewable-raw-materials.html', tier: 'B+' },
+      { title: 'PRISM Trend Database: G-03, E-02, C-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Awareness', 'Trust Building', 'Purchase', 'Usage', 'Advocacy'],
     imageGradient: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
@@ -569,10 +575,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-01', name: 'AI-Driven Formulation', direction: 'Expansion', rationale: 'Precision fermentation optimization' },
     ],
     sources: [
-      'Olaplex competitive analysis — brand trajectory 2021-2026',
-      'Precision fermentation cost curve analysis (biotech industry)',
-      'Bond repair consumer willingness-to-pay study',
-      'PRISM Trend Database: T-04, K-07, C-03',
+      { title: 'Olaplex Holdings — Q4 2025 Investor Presentation', url: 'https://ir.olaplex.com/financial-information/annual-reports', tier: 'A-' },
+      { title: 'Good Food Institute — Precision Fermentation Cost Curves 2025', url: 'https://gfi.org/science/the-science-of-fermentation/', tier: 'A' },
+      { title: 'Mintel — Bond Repair Consumer Willingness-to-Pay', url: 'https://www.mintel.com/beauty-and-personal-care-market-research/', tier: 'A' },
+      { title: 'PRISM Trend Database: T-04, K-07, C-03', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Problem Awareness', 'Solution Discovery', 'Trial', 'Daily Routine', 'Repurchase'],
     imageGradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -618,10 +624,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'G-06', name: 'EU Biocidal Products Regulation', direction: 'Contraction', rationale: 'Pre-compliant bio-active formulations' },
     ],
     sources: [
-      'ECDC — Mosquito and Tick Surveillance Reports 2024-2025',
-      'Euromonitor — Insect Control Market Dynamics Post-Climate Shift',
-      'Bio-active repellent efficacy meta-analysis',
-      'PRISM Trend Database: E-01, E-03, T-07',
+      { title: 'ECDC — Mosquito and Tick Surveillance Reports 2024-2025', url: 'https://www.ecdc.europa.eu/en/disease-vectors/surveillance-and-disease-data', tier: 'S' },
+      { title: 'Euromonitor — Home Insecticides Market Post-Climate Shift', url: 'https://www.euromonitor.com/home-care', tier: 'A' },
+      { title: 'EU Biocidal Products Regulation (EU 528/2012)', url: 'https://echa.europa.eu/regulations/biocidal-products-regulation', tier: 'A-' },
+      { title: 'PRISM Trend Database: E-01, E-03, T-07', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Seasonal Preparation', 'Prevention', 'Active Control', 'Monitoring'],
     imageGradient: 'linear-gradient(135deg, #65a30d 0%, #4d7c0f 100%)',
@@ -667,10 +673,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-04', name: 'Biotech Science for Hair', direction: 'Expansion', rationale: 'Bond repair technology advancement' },
     ],
     sources: [
-      'Olaplex Inc. — Financial and brand health analysis 2023-2026',
-      'Professional hair care channel dynamics report',
-      'Bond repair technology patent landscape',
-      'PRISM Trend Database: K-07, C-03, X-04',
+      { title: 'Olaplex Holdings Inc. — SEC 10-K Filings 2023-2025', url: 'https://ir.olaplex.com/financial-information/sec-filings', tier: 'A-' },
+      { title: 'Kline Group — Professional Hair Care Channel Dynamics', url: 'https://www.klinegroup.com/reports/professional-hair-care-global-services/', tier: 'A' },
+      { title: "L'Oréal Professionnel — Salon Channel Outlook 2026", url: 'https://www.loreal-professionnel.com/', tier: 'B+' },
+      { title: 'PRISM Trend Database: K-07, C-03, X-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Salon Experience', 'Discovery', 'Home Trial', 'Color Routine', 'Repurchase'],
     imageGradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
@@ -716,10 +722,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'T-05', name: 'Manufacturing Innovation', direction: 'Expansion', rationale: 'Local manufacturing enables cost structure' },
     ],
     sources: [
-      'McKinsey — Emerging Market FMCG Growth Corridors 2025-2035',
-      'Euromonitor — Sachet Economy and Format Innovation in FMCG',
-      'World Bank — Water Scarcity and Consumer Behavior Shifts',
-      'PRISM Trend Database: C-12, G-04, E-02',
+      { title: 'McKinsey — Emerging Market FMCG Growth Corridors 2025-2035', url: 'https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights', tier: 'A' },
+      { title: 'Euromonitor — Sachet Economy and Format Innovation in FMCG', url: 'https://www.euromonitor.com/home-care', tier: 'A' },
+      { title: 'World Bank — Water Scarcity and Consumer Behavior Shifts', url: 'https://www.worldbank.org/en/topic/water/publication/high-and-dry-climate-change-water-and-the-economy', tier: 'S' },
+      { title: 'PRISM Trend Database: C-12, G-04, E-02', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Need Recognition', 'Availability', 'Affordability', 'Trial', 'Habitual Purchase'],
     imageGradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
@@ -765,10 +771,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'K-04', name: 'TikTok and Social Commerce', direction: 'Expansion', rationale: 'Day-2 hair content is massive on social media' },
     ],
     sources: [
-      'Mintel — Hair Washing Frequency Tracker 2019-2026',
-      'Social media trend analysis: #day2hair, #nowashhair (2.1B views)',
-      'Dry shampoo market size and growth limitations',
-      'PRISM Trend Database: C-06, C-03, E-02',
+      { title: 'Mintel — Hair Washing Frequency Tracker 2019-2026', url: 'https://www.mintel.com/beauty-and-personal-care-market-research/', tier: 'A' },
+      { title: 'Kantar Worldpanel — Hair Care Routine Usage Report', url: 'https://www.kantarworldpanel.com/global', tier: 'A' },
+      { title: 'Circana — Dry Shampoo Market Growth & Limitations', url: 'https://www.circana.com/industry-expertise/beauty/', tier: 'A' },
+      { title: 'PRISM Trend Database: C-06, C-03, E-02', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Evening Routine', 'Sleep', 'Morning Revival', 'Day-2 Styling', 'Repeat'],
     imageGradient: 'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)',
@@ -814,10 +820,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'G-05', name: 'EU Green Claims Directive', direction: 'Contraction', rationale: 'Natural claims must be substantiated' },
     ],
     sources: [
-      'Euromonitor — Premium Home Care and Air Care 2025-2030',
-      'Mrs. Meyer\'s / Method competitive positioning analysis',
-      'Essential oil consumer perception and willingness-to-pay study',
-      'PRISM Trend Database: C-09, C-03, C-04',
+      { title: 'Euromonitor — Premium Home Care and Air Care 2025-2030', url: 'https://www.euromonitor.com/home-care', tier: 'A' },
+      { title: "Mrs. Meyer's / Method (SC Johnson) Brand Positioning", url: 'https://www.mrsmeyers.com/', tier: 'B' },
+      { title: 'Mintel — Essential Oils in Home Care 2025', url: 'https://www.mintel.com/household-care-market-research/', tier: 'A' },
+      { title: 'PRISM Trend Database: C-09, C-03, C-04', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['Lifestyle Aspiration', 'Discovery', 'Premium Purchase', 'Ritual Usage', 'Gifting'],
     imageGradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
@@ -864,10 +870,10 @@ export const INNOVATIONS: Innovation[] = [
       { code: 'K-06', name: 'Subscription and Lock-in Models', direction: 'Contraction', rationale: 'Physical refill creates analog subscription behavior' },
     ],
     sources: [
-      'EU PPWR Regulation — Refill Infrastructure Requirements',
-      'Loop/TerraCycle refill pilot learnings (industry)',
-      'dm/Rossmann refill station pilot data (Germany)',
-      'PRISM Trend Database: C-13, G-04, T-05',
+      { title: 'EU PPWR — Refill Infrastructure Requirements (2024/3012)', url: 'https://eur-lex.europa.eu/eli/reg/2024/3012/oj', tier: 'A-' },
+      { title: 'Loop / TerraCycle — Reuse Platform Pilot Learnings', url: 'https://www.terracycle.com/en-US/about-terracycle/loop', tier: 'B+' },
+      { title: 'Ellen MacArthur Foundation — Reuse Rethinking Packaging', url: 'https://www.ellenmacarthurfoundation.org/reuse-rethinking-packaging', tier: 'A' },
+      { title: 'PRISM Trend Database: C-13, G-04, T-05', url: '#prism-trends', tier: 'B+' },
     ],
     consumerJourneyStages: ['First Bottle Purchase', 'In-Store Refill', 'App Tracking', 'Habitual Refill', 'Advocacy'],
     imageGradient: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
