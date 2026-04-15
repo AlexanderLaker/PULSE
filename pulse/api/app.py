@@ -911,12 +911,40 @@ def create_app(args=None) -> FastAPI:
         Unlike revert-to-seed (which only resets probability), this replaces
         every field: descriptions, gp1_pct_affected, exposures, etc.
         Used after updating seed_trends.py in the codebase.
+
+        Also deletes orphaned trends whose IDs are no longer in seed_trends.py
+        (e.g. retired trends like consumer_r12 and customer_r05 in v3.1).
         """
         from pulse.seed_trends import get_report_trends
-        from pulse.database import load_trends, save_trends, log_audit
+        from pulse.database import (
+            load_trends, save_trends, log_audit,
+            get_db_connection, placeholder,
+        )
 
         seed_trends = get_report_trends()
-        old_count = len(load_trends())
+        old_trends = load_trends()
+        old_count = len(old_trends)
+
+        # Compute orphan IDs — trends in DB that are NOT in the new seed list
+        seed_ids = {t.id for t in seed_trends}
+        db_ids = {t.id for t in old_trends}
+        orphan_ids = sorted(db_ids - seed_ids)
+
+        # Delete orphans from all related tables before upserting the new seed
+        if orphan_ids:
+            p = placeholder()
+            try:
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    for oid in orphan_ids:
+                        cursor.execute(f"DELETE FROM trend_sources WHERE trend_id = {p}", (oid,))
+                        cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (oid,))
+                        cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (oid,))
+                        cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (oid,))
+                        cursor.execute(f"DELETE FROM trends WHERE id = {p}", (oid,))
+                    conn.commit()
+            except Exception as e:
+                raise HTTPException(500, f"Failed to delete orphaned trends: {e}")
 
         try:
             save_trends(seed_trends)
@@ -936,7 +964,7 @@ def create_app(args=None) -> FastAPI:
                 "trends_full_reseed",
                 "trend",
                 "all",
-                old_value=f"{old_count} trends replaced",
+                old_value=f"{old_count} trends replaced (orphans removed: {orphan_ids})",
                 new_value=f"{len(db_trends)} trends from seed_trends.py",
                 reason="Full reseed — descriptions, parameters, exposures all refreshed",
             )
@@ -947,6 +975,8 @@ def create_app(args=None) -> FastAPI:
             "status": "reseeded",
             "old_count": old_count,
             "new_count": len(db_trends),
+            "orphans_deleted": orphan_ids,
+            "orphans_deleted_count": len(orphan_ids),
             "message": f"All {len(db_trends)} trends replaced from seed_trends.py",
         }
 
