@@ -677,7 +677,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Trends ──────────────────────────────────────────────────────
     @app.get("/api/v1/trends")
-    async def list_trends(force: Optional[str] = None, user: dict = Depends(require_auth)):
+    async def list_trends(force: Optional[str] = None):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -905,7 +905,7 @@ def create_app(args=None) -> FastAPI:
         }
 
     @app.get("/api/v1/trends/{trend_id}")
-    async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
+    async def get_trend(trend_id: str):
         db = _state.get("db")
         if not db:
             raise HTTPException(404, "No model loaded")
@@ -1131,7 +1131,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Simulation Status ─────────────────────────────────────────
     @app.get("/api/v1/simulation/status")
-    async def get_simulation_status(user: dict = Depends(require_auth)):
+    async def get_simulation_status():
         """Check if the current simulation is stale (needs re-run)."""
         return {
             "stale": _state.get("simulation_stale", False),
@@ -1141,7 +1141,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Simulation ──────────────────────────────────────────────────
     @app.get("/api/v1/simulation")
-    async def get_simulation(user: dict = Depends(require_auth)):
+    async def get_simulation():
         """Get current cached simulation results. Falls back to DB on serverless cold start."""
         mc = _state.get("mc_result")
         if not mc:
@@ -1418,7 +1418,7 @@ def create_app(args=None) -> FastAPI:
 
     # ── Config ──────────────────────────────────────────────────────
     @app.get("/api/v1/config")
-    async def get_config(user: dict = Depends(require_auth)):
+    async def get_config():
         config = _state.get("config")
         if not config:
             return {}
