@@ -70,7 +70,7 @@ TRENDS = [
     Trend(
         id="consumer_r02", force="Consumer", sub_category="Behavioral",
         name="GLP-1 Drugs Reshape Consumer Spending Patterns",
-        description="12.4% of US adults have been prescribed GLP-1s (IQVIA 2025, up from 6-9%), reducing grocery spend 5.3% but boosting beauty/personal care spending. For HCB Hair: GLP-1-related hair thinning (a documented side effect) creates demand for volumizing/thickening products — a Schwarzkopf Care opportunity. EU adoption remains 18-24 months behind. LHC impact negligible.",
+        description="12.4% of US adults have been prescribed GLP-1s (IQVIA 2025), reducing grocery spend 5.3% but boosting beauty/personal care spending. For HCB Hair: GLP-1-related hair thinning (a documented side effect) creates demand for volumizing/thickening products — a Schwarzkopf Care opportunity. EU adoption remains 18-24 months behind. LHC impact negligible.",
         direction="Expansion", probability=4, start_year=2025,
         # 4%: Indirect effect via spending reallocation; EU adoption still
         # early — Henkel European-weighted GP1 sees limited near-term impact
@@ -88,8 +88,8 @@ TRENDS = [
         name="Premiumization Acceleration in Hair Care",
         description="Premium hair care growing 2-3x mass rate confirmed. Henkel Consumer Brands FY2025: 0.3% organic growth overall (price positive, volume slightly negative). L'Oréal Professional Products +15% in 2025, Kérastase double-digit, demonstrating premium ceiling not reached. Schwarzkopf Professional-to-consumer crossover is highest-ROI premiumization path. Gliss repositioning toward affordable prestige is the mid-tier play.",
         direction="Expansion", probability=5, start_year=2024,
-        # 20%: Premium tier is ~25-30% of Hair GP1 and growing faster
-        # than modeled; L'Oréal Prof +15% proves ceiling is higher
+        # 20%: Premium tier is ~25-30% of Hair GP1 and accelerating;
+        # L'Oréal Prof +15% proves ceiling is higher
         gp1_pct_affected=0.20,
         strategic_implication="Invest disproportionately in Schwarzkopf premiumization. Salon-to-retail crossover is the fastest white space.",
         category_exposure=cat(4,5,4,3, 0,0,0,0,0,0,0,0),
@@ -150,10 +150,10 @@ TRENDS = [
     Trend(
         id="consumer_r07", force="Consumer", sub_category="Category Creation",
         name="Scalp Care Emerges as Standalone Category",
-        description="Scalp care category grew 19% YoY in H1 2025 — significantly faster than previously modeled. Market valued at $88.2B (2025), 7.0% CAGR to $150.5B by 2033. Skinification now hitting mass retail (2026). P&G microbiome on front-of-pack, Dove Scalp + Hair Therapy launched. Henkel has no dedicated scalp care consumer line — this is the single largest category white space in Hair. Schwarzkopf Professional dermatological expertise (Seborin heritage) is an underexploited asset.",
+        description="Scalp care category grew 19% YoY in H1 2025. Market valued at $88.2B (2025), 7.0% CAGR to $150.5B by 2033. Skinification now hitting mass retail (2026). P&G microbiome on front-of-pack, Dove Scalp + Hair Therapy launched. Henkel has no dedicated scalp care consumer line — this is the single largest category white space in Hair. Schwarzkopf Professional dermatological expertise (Seborin heritage) is an underexploited asset.",
         direction="Expansion", probability=5, start_year=2025,
-        # 8%: Scalp care grew 19% in H1 2025, significantly faster than
-        # modeled; mass retail arrival of skinification expands addressable market
+        # 8%: Scalp care grew 19% in H1 2025; mass retail arrival of
+        # skinification expands addressable market
         gp1_pct_affected=0.08,
         strategic_implication="Launch Schwarzkopf scalp care line leveraging professional expertise. New profit pool, not cannibalization.",
         category_exposure=cat(2,5,1,2, 0,0,0,0,0,0,0,0),
@@ -231,7 +231,7 @@ TRENDS = [
     Trend(
         id="consumer_r12", force="Consumer", sub_category="Behavioral",
         name="Post-COVID Hygiene Habits Persistence in Home Care",
-        description="Post-COVID hygiene elevation normalizing faster than projected. 20-30% uplift has moderated to 10-15% by early 2026 as consumers revert to pre-pandemic cleaning frequency. HCB LHC: Bref and surface cleaner portfolio saw volume declines in H2 2025 consistent with normalization. HSC and IC categories cannot rely on COVID-era demand as structural growth driver. Residual benefit is consumer awareness, not elevated purchase frequency.",
+        description="Post-COVID hygiene elevation normalizing. The initial 20-30% uplift has moderated to 10-15% by early 2026 as consumers revert to pre-pandemic cleaning frequency. HCB LHC: Bref and surface cleaner portfolio saw volume declines in H2 2025 consistent with normalization. HSC and IC categories cannot rely on COVID-era demand as structural growth driver. Residual benefit is consumer awareness, not elevated purchase frequency.",
         direction="Expansion", probability=3, start_year=2022,
         # 5%: Post-COVID hygiene habits normalizing; 20-30% uplift moderated
         # to 10-15% — original assessment overestimated persistence
@@ -253,7 +253,7 @@ TRENDS = [
     Trend(
         id="government_r01", force="Government", sub_category="Chemical Regulation",
         name="EU PFAS Universal Restriction",
-        description="PFAS restriction accelerating: as of January 1, 2026, cosmetic products containing PFAS already prohibited in EU. ECHA aims to complete scientific evaluation by end of 2026. Second public consultation expected March 2026 covering 14 use sectors. Hair portfolio exposure lower than originally assessed (most formulations already PFAS-free). LHC is the real risk — surface treatment chemistries, stain-resistance, and water-repellent coatings in FCN, FCA, and IC require reformulation. Henkel AI formulation capability (T-01) can turn this into competitive moat. Phased 2027-2032.",
+        description="PFAS restriction accelerating: as of January 1, 2026, cosmetic products containing PFAS already prohibited in EU. ECHA aims to complete scientific evaluation by end of 2026. Second public consultation expected March 2026 covering 14 use sectors. Hair portfolio exposure is limited (most formulations already PFAS-free). LHC is the real risk — surface treatment chemistries, stain-resistance, and water-repellent coatings in FCN, FCA, and IC require reformulation. Henkel AI formulation capability (T-01) can turn this into competitive moat. Phased 2027-2032.",
         direction="Contraction", probability=5, start_year=2027,
         # 12%: Cosmetics PFAS ban already effective Jan 2026 — no longer
         # proposal but active regulation. LHC reformulation cost substantial
@@ -349,7 +349,7 @@ TRENDS = [
     Trend(
         id="government_r07", force="Government", sub_category="Digital Compliance",
         name="EU Digital Product Passport (DPP)",
-        description="PPWR mandates digital identifiers (QR codes) from 2027. Intersects with PPWR (G-04) and Green Claims (G-05), creating digital compliance triple stack. IT investment larger than originally modeled — Henkel needs PIM system upgrade across 50,000+ SKUs. Henkel advantage: scale amortizes fixed IT cost over larger SKU base. Strategic opportunity: use DPP as consumer engagement tool (scan-to-learn about ingredients, sustainability).",
+        description="PPWR mandates digital identifiers (QR codes) from 2027. Intersects with PPWR (G-04) and Green Claims (G-05), creating digital compliance triple stack. IT investment is substantial — Henkel needs PIM system upgrade across 50,000+ SKUs. Henkel advantage: scale amortizes fixed IT cost over larger SKU base. Strategic opportunity: use DPP as consumer engagement tool (scan-to-learn about ingredients, sustainability).",
         direction="Contraction", probability=4, start_year=2027,
         # 3%: Triple regulatory overlap (PPWR + Green Claims + DPP)
         # creates compounding IT cost across 50,000+ SKUs
@@ -390,7 +390,7 @@ TRENDS = [
         # 10%: Turns regulatory compliance cost into margin advantage;
         # affects raw material cost (~25% of COGS) for reformulated products
         gp1_pct_affected=0.10,
-        description="Bio-based chemistry progressing faster than expected. Novozymes/dsm-firmenich enzyme scaling on track. Persil cold-wash enzyme platform is most mature bio-chemistry play in Henkel portfolio — directly addresses consumer (C-04 cleanical), government (G-01 PFAS, G-02 microplastics), and environmental (E-02 water scarcity) trends simultaneously. Single highest-value technology investment for LHC. PFAS restriction (G-01) accelerates from nice-to-have to must-have. Cost parity 2028-2029 achievable.",
+        description="Bio-based chemistry progressing rapidly. Novozymes/dsm-firmenich enzyme scaling on track. Persil cold-wash enzyme platform is most mature bio-chemistry play in Henkel portfolio — directly addresses consumer (C-04 cleanical), government (G-01 PFAS, G-02 microplastics), and environmental (E-02 water scarcity) trends simultaneously. Single highest-value technology investment for LHC. PFAS restriction (G-01) accelerates from nice-to-have to must-have. Cost parity 2028-2029 achievable.",
         strategic_implication="The Persil cold-wash enzyme platform is the LHC proof point. First-mover turns regulatory cost into competitive advantage.",
         category_exposure=cat(2,3,2,3, 4,4,3,5,3,4,4,4),
         vc_exposure=vc(5,5,3,2,3,3,2,3),
@@ -423,7 +423,7 @@ TRENDS = [
         # 8%: Scalp care grew 19% in H1 2025; multiple competitor launches
         # (Dove Scalp + Hair Therapy, P&G front-of-pack) accelerate timeline
         gp1_pct_affected=0.08,
-        description="Microbiome market growing faster than modeled (14.6% CAGR, scalp care 19% in H1 2025). P&G front-of-pack branding confirmed. Dove Scalp + Hair Therapy launched. Intersects with C-07 (Scalp Care) — microbiome science is technology platform for scalp care products. Schwarzkopf Professional has dermatological expertise (Seborin, Bonacure) but not translated to consumer microbiome positioning. L'Oréal created Beauty Tech hub in India for AI-powered solutions. Move now or lose position.",
+        description="Microbiome market accelerating (14.6% CAGR, scalp care 19% in H1 2025). P&G front-of-pack branding confirmed. Dove Scalp + Hair Therapy launched. Intersects with C-07 (Scalp Care) — microbiome science is technology platform for scalp care products. Schwarzkopf Professional has dermatological expertise (Seborin, Bonacure) but not translated to consumer microbiome positioning. L'Oréal created Beauty Tech hub in India for AI-powered solutions. Move now or lose position.",
         strategic_implication="Formulation investment in microbiome-friendly actives. Care and Body are the categories.",
         category_exposure=cat(1,5,1,4, 1,2,0,1,0,0,1,0),
         vc_exposure=vc(4,5,3,2,2,4,3,4),
@@ -455,7 +455,7 @@ TRENDS = [
         # 14%: 17.8% YoY growth exceeds original projections;
         # structural margin tax accelerating across all channels
         gp1_pct_affected=0.14,
-        description="Retail media growing faster than projected: US alone $58.8B in 2025, $69.3B forecast 2026 (+17.8% YoY). Amazon 79.7% share, Walmart 8.0%, capturing 89% of incremental spend. Structural margin tax — retailers extract 8-12% of brand net revenue for visibility. From Byron Sharp: over-indexing erodes long-term Mental Availability (brand memory) in favor of short-term Physical Availability (search ranking). Gen AI marketing efficiency (T-10) partially offsets cost.",
+        description="Retail media surging: US alone $58.8B in 2025, $69.3B forecast 2026 (+17.8% YoY). Amazon 79.7% share, Walmart 8.0%, capturing 89% of incremental spend. Structural margin tax — retailers extract 8-12% of brand net revenue for visibility. From Byron Sharp: over-indexing erodes long-term Mental Availability (brand memory) in favor of short-term Physical Availability (search ranking). Gen AI marketing efficiency (T-10) partially offsets cost.",
         strategic_implication="From Byron Sharp perspective: over-indexing on retail media erodes long-term Mental Availability. Balance is critical.",
         category_exposure=cat(3,3,3,3, 3,3,3,3,3,3,2,2),
         vc_exposure=vc(0,0,0,0,0,5,5,4),
