@@ -313,23 +313,30 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
              "trust"
              "main"
              "footer"`,
-        height: '100vh',
+        // Subtract the outer page nav (~56px) so the internal layout
+        // fits cleanly below the prime navigation without overflow.
+        height: 'calc(100vh - 56px)',
         transition: 'grid-template-columns 0.3s cubic-bezier(0.25,0.1,0.25,1)',
       } as React.CSSProperties}
     >
       {/* OnboardingTooltips removed — outdated tour steps */}
       <AIInsightsBar insights={aiInsights} triggers={[]} isLoading={simulating} />
 
-      {/* ─── STICKY HEADER ─────────────────────────────────────────────── */}
+      {/* ─── ACTION TOOLBAR ─────────────────────────────────────────────
+          NOTE: This is a secondary toolbar, NOT a primary nav. The prime
+          navigation (PRISM logo + tabs + user) lives in app/dashboard/page.tsx
+          and is sticky at the top. We intentionally omit any logo/branding
+          here to avoid competing with the outer nav. */}
       <motion.header
         initial={{ y: -52 }}
         animate={{ y: 0 }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="nav-glass"
         style={{
           gridArea: 'header',
           height: 52,
-          zIndex: 100,
+          zIndex: 10,
+          background: T.bg,
+          borderBottom: `1px solid ${T.border}`,
         } as React.CSSProperties}
       >
         <div
@@ -345,32 +352,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             margin: '0 auto',
           } as React.CSSProperties}
         >
-          {/* Logo & Version */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 } as React.CSSProperties}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: T.text,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: 14,
-                color: '#fff',
-              } as React.CSSProperties}
-            >
-              P
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.01 } as React.CSSProperties}>
-              PRISM
-            </div>
-            <span style={{ fontSize: 10, fontWeight: 500, color: T.text3, padding: '2px 8px', background: T.bg1, borderRadius: 999 } as React.CSSProperties}>
-              v4.0
-            </span>
-          </div>
-
           {/* Primary Action Buttons — Simulate, Scenario, Export, Briefing */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 } as React.CSSProperties}>
             {/* Simulate Button — primary action pill */}
