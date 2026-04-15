@@ -198,7 +198,7 @@ function SimTooltip({ children, content }: { children: React.ReactNode; content:
 }
 
 // ─── ProfitPoolShiftModel Component ──────────────────────────────────────────────
-export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourney, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; initialTrendSearch?: string }): React.ReactNode {
+export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourney, onNavigateInnovation, initialTrendSearch }: { isAdmin?: boolean; onNavigateJourney?: () => void; onNavigateInnovation?: () => void; initialTrendSearch?: string }): React.ReactNode {
   const {
     loading, simulating, simulationStale, staleReason, error,
     simulate, simulation,
@@ -651,6 +651,31 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
               >
                 <Route size={14} />
                 Consumer Journey
+              </motion.button>
+            )}
+            {/* Innovation Explorer — navigates to separate page */}
+            {onNavigateInnovation && (
+              <motion.button
+                onClick={onNavigateInnovation}
+                whileHover={{ background: T.bg3 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                  background: 'transparent',
+                  color: T.text2,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                } as React.CSSProperties}
+              >
+                <Zap size={14} />
+                Innovation Explorer
               </motion.button>
             )}
           </div>
