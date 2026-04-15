@@ -412,8 +412,6 @@ const ProductImpactDetail: FC<ProductImpactDetailProps> = ({
                     </div>
                     <p style={{
                       fontSize: 12, color: T.text3, lineHeight: 1.55, margin: 0,
-                      display: '-webkit-box', WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
                     }}>
                       {trend.description}
                     </p>

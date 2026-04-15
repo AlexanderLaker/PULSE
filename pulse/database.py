@@ -288,8 +288,14 @@ def init_db() -> None:
         # The field was never actually causal — it was always a static force
         # attribution. Migrate idempotently so old databases keep working.
         try:
+            if POSTGRES_URL:
+                cursor.execute("SAVEPOINT sp_rename_col")
             cursor.execute("ALTER TABLE simulation_runs RENAME COLUMN causal_decomposition TO force_attribution")
+            if POSTGRES_URL:
+                cursor.execute("RELEASE SAVEPOINT sp_rename_col")
         except Exception:
+            if POSTGRES_URL:
+                cursor.execute("ROLLBACK TO SAVEPOINT sp_rename_col")
             pass  # column already renamed or never existed under old name
 
         # NOTE: backtest_results table removed in v2.4
@@ -317,8 +323,14 @@ def init_db() -> None:
         """)
         # Backfill column on pre-existing tables (idempotent best-effort)
         try:
+            if POSTGRES_URL:
+                cursor.execute("SAVEPOINT sp_delphi_col")
             cursor.execute("ALTER TABLE delphi_rounds ADD COLUMN gp1_pct_affected_score REAL")
+            if POSTGRES_URL:
+                cursor.execute("RELEASE SAVEPOINT sp_delphi_col")
         except Exception:
+            if POSTGRES_URL:
+                cursor.execute("ROLLBACK TO SAVEPOINT sp_delphi_col")
             pass  # column already exists
 
         # ── Delphi sessions ─────────────────────────────────────────
