@@ -904,6 +904,52 @@ def create_app(args=None) -> FastAPI:
             "total_trends": len(db_trends),
         }
 
+    @app.api_route("/api/v1/trends/full-reseed", methods=["GET", "POST"])
+    async def full_reseed():
+        """Replace ALL trends in DB with current seed_trends.py values.
+
+        Unlike revert-to-seed (which only resets probability), this replaces
+        every field: descriptions, gp1_pct_affected, exposures, etc.
+        Used after updating seed_trends.py in the codebase.
+        """
+        from pulse.seed_trends import get_report_trends
+        from pulse.database import load_trends, save_trends, log_audit
+
+        seed_trends = get_report_trends()
+        old_count = len(load_trends())
+
+        try:
+            save_trends(seed_trends)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to save reseeded trends: {e}")
+
+        # Reload from DB and refresh in-memory state
+        db_trends = load_trends()
+        db = _state.get("db")
+        if db:
+            db.trends = db_trends
+            _state["simulation_stale"] = True
+            _state["stale_reason"] = "Full reseed from seed_trends.py"
+
+        try:
+            log_audit(
+                "trends_full_reseed",
+                "trend",
+                "all",
+                old_value=f"{old_count} trends replaced",
+                new_value=f"{len(db_trends)} trends from seed_trends.py",
+                reason="Full reseed — descriptions, parameters, exposures all refreshed",
+            )
+        except Exception:
+            pass
+
+        return {
+            "status": "reseeded",
+            "old_count": old_count,
+            "new_count": len(db_trends),
+            "message": f"All {len(db_trends)} trends replaced from seed_trends.py",
+        }
+
     @app.get("/api/v1/trends/{trend_id}")
     async def get_trend(trend_id: str):
         db = _state.get("db")
