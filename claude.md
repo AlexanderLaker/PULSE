@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.0
+## Project Specification & Architecture — v3.1
 
 ---
 
@@ -10,7 +10,20 @@
 PRISM is an **AI-augmented profit pool simulation engine** that transforms a static Excel-based strategic force assessment into a living, probabilistic, AI-enhanced strategic decision platform. It is deployed as a **Vercel-hosted Next.js web application** backed by a **Python FastAPI simulation engine**, with dual-mode data persistence (PostgreSQL in production, SQLite locally).
 
 ### The Core Innovation
-PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2030). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2036, 11-year horizon). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+
+### What Changed in v3.1 (vs. v3.0) — Bain Trend Review, April 2026
+Following a Bain Senior Partner-led strategic review with a 20-person team of senior consultants (ex-L'Oreal, P&G, Unilever, Apple, banking), the trend database was expanded and the time horizon extended:
+
+1. **82 active trends** — expanded from 61 to 82 via 23 new trends + 2 retirements
+2. **11-year horizon (2026–2036)** — extended from 5 years to cover three strategic horizons:
+   - **H1 Execution (2026–2028):** Agentic commerce arrival, GLP-1 behavior lock-in, EU regulatory cliff
+   - **H2 Disruption (2029–2032):** Bio-manufactured ingredients, algorithmic shelf, Africa/SEA tipping
+   - **H3 Transformation (2033–2036):** Longevity economy maturity, full lifecycle accountability, post-surfactant chemistry
+3. **2 retirements** — consumer_r12 (Post-COVID Hygiene) and customer_r05 (Quick Commerce) — retired as trends have normalized or structurally failed
+4. **2 upgrades** — consumer_r02 GLP-1 (prob 4→5, gp1 0.04→0.10) reflecting JP Morgan's $100B+ market projection; customer_r04 TikTok Shop (prob 3→5, gp1 0.04→0.10) reflecting $23.4B US projection
+5. **23 new trends** across 6 gap areas: Agentic Commerce (3), Geographic Expansion (3), Longevity Economy (2), Ingredients & Bio-Manufacturing (2), Regulatory (3), and Consumer/Customer/Competitive/Environmental gaps (10)
+6. **Extended materialization schedules** — all four force-specific schedules (default, regulatory, technology, consumer) extended from 5-year to 11-year S-curves in `config.py`
 
 ### What Changed in v3.0 (vs. v2.3.1)
 This specification was rewritten from the ground up to reflect the **actual production codebase** as of April 2026:
@@ -19,7 +32,7 @@ This specification was rewritten from the ground up to reflect the **actual prod
 2. **Dual-mode database** — PostgreSQL (Neon serverless) in production + SQLite for local development, replacing the SQLite-only spec
 3. **Authentication system** — JWT-based auth with user management, admin roles, bcrypt password hashing
 4. **Advanced analytics suite** — CVaR (Conditional Value-at-Risk), Sobol global sensitivity indices, reverse stress testing, and tipping point detection — all fully implemented
-5. **61 seeded trends** — 55 global + 6 regional trends with full metadata, category/VC/regional exposures, and diffusion curves
+5. **61 seeded trends** — 55 global + 6 regional trends with full metadata, category/VC/regional exposures, and diffusion curves (expanded to 82 in v3.1)
 6. **5 MECE diffusion curve types** — s_curve, linear, front_loaded, back_loaded, step_function (replacing the simplistic force-based materialization overrides)
 7. **Professional export center** — PowerPoint (6-slide deck), Excel (Shift Matrix + allocation), Power BI (flat JSON/CSV), all with Henkel branding
 8. **Vercel serverless deployment** — Cold-start retry logic, graceful degradation, serverless-optimized dependency set
@@ -28,10 +41,37 @@ This specification was rewritten from the ground up to reflect the **actual prod
 
 ### What Remains from v2.3.1
 All previous improvements carry forward:
-- **Trend Database at 61 trends** (55 global + 6 regional) with Source Credibility Tier System (S through E)
+- **Source Credibility Tier System** (S through E) with hard gate refusing to score tier-E-only trends
 - **Economic Anchoring via `gp1_pct_affected`** — each trend's maximum economic scope is capped
 - **Two-dimensional scoring** — `probability` (1-5) × `gp1_pct_affected` (0.0-1.0), no redundant impact variable
 - **Admin-configurable model parameters** — attenuation, force weights, copula parameters, iterations
+
+### Trend Database Composition (v3.1)
+
+**Total:** 82 active trends (55 original global + 6 regional + 21 net v3.1 expansion)
+
+**Force distribution:**
+| Force | Count | % |
+|-------|:---:|:---:|
+| Consumer | 23 | 28% |
+| Technology | 16 | 20% |
+| Government | 12 | 15% |
+| Competitive | 12 | 15% |
+| Environmental | 11 | 13% |
+| Customer | 8 | 10% |
+
+**Direction split:** 38 Expansion / 44 Contraction
+
+**v3.1 New Trend IDs:**
+- *Agentic Commerce:* technology_r11 (AI shopping agents), technology_r12 (algorithmic shelf), technology_r13 (hyper-personalized formulation)
+- *Geographic:* competitive_r09 (Africa rising), consumer_r19 (SEA middle class), consumer_r20 (LatAm premiumization)
+- *Longevity:* consumer_r21 (longevity economy), technology_r14 (peptides & bioactives)
+- *Ingredients:* technology_r15 (precision fermentation), technology_r16 (designer surfactants)
+- *Regulatory:* government_r10 (EU AI Act), government_r11 (EU biodiversity/EUDR), government_r12 (EU textile/microplastics)
+- *Competitive:* competitive_r10 (Amazon PL), competitive_r11 (L'Oreal-NVIDIA), competitive_r12 (DTC M&A wave)
+- *Consumer:* consumer_r22 (laundry sheets), consumer_r23 (wellness-beauty), consumer_r24 (textured hair)
+- *Customer:* customer_r09 (agentic retail media)
+- *Environmental:* environmental_r09 (climate formulation), environmental_r10 (freshwater scarcity), environmental_r11 (Scope 3+)
 
 ### Implementation Status (April 2026)
 
@@ -104,7 +144,7 @@ All previous improvements carry forward:
 
 ### 2.2 The Shift Matrix Interface
 
-PRISM's primary output — the **Shift Matrix** — is a JSON/CSV table with continuous path data:
+PRISM's primary output — the **Shift Matrix** — is a JSON/CSV table with continuous path data across the 11-year horizon (2026–2036):
 
 ```json
 {
@@ -151,6 +191,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 
 **paths.py** — Continuous path modeling (PRODUCTION)
 - 5 MECE diffusion curve types: s_curve, linear, front_loaded, back_loaded, step_function
+- 11-year continuous paths (2026–2036) across three strategic horizons
 - Per-trend peak year and diffusion curve assignment
 - Velocity (year-over-year Δ) and acceleration (Δ of velocity) computation
 - TriggerCondition / TriggerAlert system for early-warning evaluation
@@ -258,13 +299,13 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - Tables: trends, trend_category_exposure, trend_vc_exposure, simulation_runs, config_snapshots, delphi_rounds, triggers, ai_suggestions, audit_log, users
 
 **seed_trends.py** — Trend seeding (PRODUCTION)
-- 61 fully specified trends (55 global + 6 regional)
+- 82 fully specified trends (55 original + 6 regional + 21 net v3.1 expansion)
 - Each trend has: gp1_pct_affected with rationale, category/VC/regional exposures, diffusion_curve, peak_year
 - April 2026 market intelligence snapshot
 
 **config.py** — Model configuration (PRODUCTION)
 - 6 forces, 12 categories (Hair: Color, Care, Styling, Body; LHC: FCN=Fabric Cleaning, FCA=Fabric Care, FFI=Fabric Finisher, LAD=Laundry Additives, HDW=Hand Dish Wash, ADW=Automatic Dish Wash, HSC=Hard Surface Cleaner, IC=Insect Control), 8 VC steps, 4 regions
-- Default parameters: attenuation=0.5, iterations=10K, base_year=2025, path_years=[2026-2030]
+- Default parameters: attenuation=0.5, iterations=10K, base_year=2025, path_years=[2026-2036]
 - 5 MECE diffusion curve types with materialization schedule computation
 - Force-specific materialization overrides (legacy fallback)
 - Force overlap and correlation matrices

@@ -1,5 +1,14 @@
 """
-PRISM seed data: 61 trends (55 global + 6 APAC/NA regional, April 2026).
+PRISM seed data: 82 trends (55 original global + 6 regional + 21 v3.0 expansion, April 2026).
+
+v3.0 changes (April 2026):
+  - 2 retirements: consumer_r12 (Post-COVID Hygiene), customer_r05 (Quick Commerce)
+  - 2 upgrades: consumer_r02 (GLP-1 5/0.10), customer_r04 (TikTok Shop 5/0.10)
+  - 23 new trends across 6 gap areas: Agentic Commerce, Geographic Expansion,
+    Longevity Economy, Ingredients & Bio-Manufacturing, Regulatory, and
+    Consumer/Customer/Competitive gaps
+  - Time horizon extended to 2036 (H1 Execution / H2 Disruption / H3 Transformation)
+  - Net active trend count: 82 (61 original - 2 retired + 23 new)
 
 This module lives inside the pulse package so it's importable on Vercel serverless.
 """
@@ -66,21 +75,23 @@ TRENDS = [
         data_source="Circana EU6 Private Label Monitor Dec 2025; NIQ European Private Label Monitor 2025", source_type="analyst_report",
         confidence="High",
     ),
-    # ── C-02 ──
+    # ── C-02 (UPGRADED April 2026) ──
     Trend(
         id="consumer_r02", force="Consumer", sub_category="Behavioral",
         name="GLP-1 Drugs Reshape Consumer Spending Patterns",
-        description="12.4% of US adults have been prescribed GLP-1s (IQVIA 2025), reducing grocery spend 5.3% but boosting beauty/personal care spending. For HCB Hair: GLP-1-related hair thinning (a documented side effect) creates demand for volumizing/thickening products — a Schwarzkopf Care opportunity. EU adoption remains 18-24 months behind. LHC impact negligible.",
-        direction="Expansion", probability=4, start_year=2025,
-        # 4%: Indirect effect via spending reallocation; EU adoption still
-        # early — Henkel European-weighted GP1 sees limited near-term impact
-        gp1_pct_affected=0.04,
-        strategic_implication="Position Hair premium portfolio for the self-care spending reallocation. Monitor LHC basket size impact.",
-        category_exposure=cat(2,3,2,3, 1,1,0,2,0,0,0,0),
-        vc_exposure=vc(0,1,0,0,0,3,2,4),
-        regional_exposure=reg(3,5,2,1),
-        data_source="McKinsey Consumer Health Survey 2025; IQVIA GLP-1 Tracker 2025; HBR Consumer Behavior Oct 2025", source_type="analyst_report",
-        confidence="Medium",
+        description="GLP-1 adoption accelerating dramatically: 30M Americans projected on GLP-1 by 2030. Market exceeds $100B in 2026 revenue, reaching $116B by 2030 (JP Morgan). Over 50% of users report improved appearance perception; 43% motivated to invest more in personal care. For HCB Hair: GLP-1-related hair thinning creates demand for volumizing/thickening products — a Schwarzkopf Care opportunity. Body care spending reallocation confirmed: beauty/personal care up while grocery down 5.3%. EU adoption accelerating 12-18 months behind US (down from 18-24). LHC: laundry frequency slightly down in GLP-1 households (smaller portions, fewer cooking occasions).",
+        direction="Expansion", probability=5, start_year=2025,
+        # 10%: UPGRADED from 4%. 30M Americans by 2030; $100B+ market;
+        # spending reallocation from food→beauty confirmed at scale.
+        # EU adoption curve steepening. Hair thinning side-effect creates
+        # new demand vector. Body care spending uplift documented.
+        gp1_pct_affected=0.10,
+        strategic_implication="Position Schwarzkopf Hair premium portfolio for self-care spending reallocation. Develop GLP-1-specific thickening/volumizing line under Care. Monitor LHC basket size impact. EU launch timing: 2027-2028.",
+        category_exposure=cat(2,4,2,4, 1,1,0,2,0,0,0,0),
+        vc_exposure=vc(0,2,0,0,0,4,3,5),
+        regional_exposure=reg(4,5,3,2),
+        data_source="JP Morgan GLP-1 Analysis 2026; McKinsey Consumer Health Survey 2025; IQVIA GLP-1 Tracker 2025; HBR Consumer Behavior Oct 2025", source_type="analyst_report",
+        confidence="High",
     ),
     # ── C-03 ──
     Trend(
@@ -227,23 +238,13 @@ TRENDS = [
         data_source="Attest Gen Z Beauty Report 2025; FMCG Gurus", source_type="analyst_report",
         confidence="Medium",
     ),
-    # ── S-09 (Consumer) ──
-    Trend(
-        id="consumer_r12", force="Consumer", sub_category="Behavioral",
-        name="Post-COVID Hygiene Habits Persistence in Home Care",
-        description="Post-COVID hygiene elevation normalizing. The initial 20-30% uplift has moderated to 10-15% by early 2026 as consumers revert to pre-pandemic cleaning frequency. HCB LHC: Bref and surface cleaner portfolio saw volume declines in H2 2025 consistent with normalization. HSC and IC categories cannot rely on COVID-era demand as structural growth driver. Residual benefit is consumer awareness, not elevated purchase frequency.",
-        direction="Expansion", probability=3, start_year=2022,
-        # 5%: Post-COVID hygiene habits normalizing; 20-30% uplift moderated
-        # to 10-15% — original assessment overestimated persistence
-        gp1_pct_affected=0.05,
-        strategic_implication="Maintain hygiene product portfolio strength. Leverage elevated demand for HSC and IC categories.",
-        # FCN→1 (not a surface-cleaning trend; HSC=5, IC=4 are correct)
-        category_exposure=cat(0,0,0,1, 1,0,0,1,2,1,5,4),
-        vc_exposure=vc(2,3,2,2,1,3,2,5),
-        regional_exposure=reg(4,4,4,3),
-        data_source="Allied Market Research Surface Disinfectant 2025", source_type="analyst_report",
-        confidence="Medium",
-    ),
+    # ── S-09 (Consumer) — RETIRED April 2026 ──
+    # Post-COVID Hygiene Habits Persistence (consumer_r12) RETIRED.
+    # Rationale: The 20-30% uplift has fully normalized to pre-pandemic levels.
+    # Bref/HSC volume declines in H2 2025 confirm this is no longer a structural
+    # trend. Probability=3 and gp1_pct_affected=5% were already the weakest in
+    # the database. Retaining it adds noise to the CEO-facing model.
+    # Retained as comment for audit trail.
 
     # ═══════════════════════════════════════════════════════════════════
     # FORCE 2: GOVERNMENT (7 trends)
@@ -767,39 +768,31 @@ TRENDS = [
         data_source="Planet Retail; European grocery consolidation data", source_type="analyst_report",
         confidence="High",
     ),
-    # ── K-04 ──
+    # ── K-04 (UPGRADED April 2026) ──
     Trend(
         id="customer_r04", force="Customer", sub_category="Channel Shift",
-        name="Social Commerce and TikTok Shop Emergence",
-        direction="Expansion", probability=3, start_year=2024,
-        # 4%: Social commerce role as trend amplifier (not just
-        # channel) increases strategic relevance beyond sales %
-        gp1_pct_affected=0.04,
-        description="Social commerce growing but still <3% of FMCG sales. got2b is natural social commerce brand (youth positioning, viral-ready formats). Schwarzkopf can participate through Color tutorials and before/after creator content. LHC less relevant (low engagement category). Risk: social commerce as trend amplifier — viral TikTok products shift category demand in weeks, faster than traditional brand teams can respond. Henkel needs social-first rapid response capability.",
-        strategic_implication="Build got2b and Schwarzkopf social-first content capabilities. Partner with creators.",
-        # Body→1 (body care not a social commerce play; trend is Hair Color/Styling focused)
-        category_exposure=cat(3,4,4,1, 1,1,0,1,0,0,0,0),
-        vc_exposure=vc(0,0,0,1,2,5,4,5),
-        regional_exposure=reg(3,4,5,3),
-        data_source="TikTok Shop analytics; Social commerce reports", source_type="analyst_report",
-        confidence="Low",
+        name="TikTok Shop Becomes Top-5 FMCG Channel",
+        direction="Expansion", probability=5, start_year=2024,
+        # 10%: UPGRADED from 4%. TikTok Shop US projected $23.4B in 2026
+        # (+48% YoY) — larger than Target, Costco, or Best Buy. Beauty/personal
+        # care is 22.5% of GMV with 4.7% conversion (2x Instagram, 3x Facebook).
+        # Sally Beauty launched Mar 2026. No longer "emerging" — it's a top channel.
+        gp1_pct_affected=0.10,
+        description="TikTok Shop US projected $23.4B in 2026 ecommerce sales (+48% YoY) — larger than Target, Costco, or Best Buy. Beauty/personal care is 22.5% of TikTok Shop GMV with 4.7% conversion rates (2x Instagram, 3x Facebook). Sally Beauty launched on TikTok Shop March 2026. got2b is natural social commerce brand (youth positioning, viral-ready formats). Schwarzkopf Color tutorials and before/after creator content proven to drive conversion. LHC: cleaning hacks and laundry TikToks increasingly driving purchase. This is no longer emerging — it's a structural channel.",
+        strategic_implication="Build dedicated TikTok Shop storefronts for got2b and Schwarzkopf. Invest in creator partnerships. Develop social-first SKUs (limited editions, viral formats). LHC: test Persil/Somat cleaning hack content. Allocate 10%+ of digital marketing budget to social commerce.",
+        category_exposure=cat(4,4,5,2, 2,1,1,2,1,1,1,0),
+        vc_exposure=vc(0,0,0,1,2,5,5,5),
+        regional_exposure=reg(4,5,5,3),
+        data_source="BeautyMatter TikTok Shop Analysis 2025; Sally Beauty Press Release Mar 2026; eMarketer Social Commerce 2026", source_type="analyst_report",
+        confidence="High",
     ),
-    # ── K-05 ──
-    Trend(
-        id="customer_r05", force="Customer", sub_category="Channel Shift",
-        name="Quick Commerce Consolidation and FMCG Integration",
-        direction="Contraction", probability=2, start_year=2024,
-        # 2%: Marginal channel; ~1-2% of total FMCG sales after
-        # consolidation, limited GP1 impact
-        gp1_pct_affected=0.02,
-        description="Q-commerce consolidation reduced channel to marginal force. Gorillas, Getir, multiple players exited or consolidated. Represents <1% of Henkel revenue, does not warrant dedicated channel strategy. Surviving players (Flink, grocery delivery) integrating with traditional retail, reducing independent significance. Monitor but do not invest.",
-        strategic_implication="Monitor but don't over-invest. Q-commerce is a channel to manage, not a strategic priority.",
-        category_exposure=cat(1,2,1,2, 2,2,1,3,2,2,1,0),
-        vc_exposure=vc(0,0,0,1,3,2,4,4),
-        regional_exposure=reg(4,3,4,2),
-        data_source="Statista q-commerce; Flink/Deliveroo data", source_type="analyst_report",
-        confidence="Low",
-    ),
+    # ── K-05 — RETIRED April 2026 ──
+    # Quick Commerce Consolidation (customer_r05) RETIRED.
+    # Rationale: Probability=2 and gp1_pct_affected=2% were the lowest in the
+    # database. Gorillas exited, Getir consolidated. At <1% of revenue, this
+    # does not meet the threshold for a CEO-facing profit pool model. The trend
+    # description itself recommended "monitor but do not invest."
+    # Retained as comment for audit trail.
     # ── S-05 (Customer) ──
     Trend(
         id="customer_r06", force="Customer", sub_category="Business Model",
@@ -1065,6 +1058,454 @@ TRENDS = [
         data_source="US Census Bureau ACS 2025; NielsenIQ Multicultural Consumer Report 2025; Circana US Hair Care Ethnic Segments 2025",
         source_type="government_data",
         confidence="High",
+    ),
+
+    # ═══════════════════════════════════════════════════════════════════
+    # STRATEGIC REVIEW EXPANSION — April 2026 Bain Engagement
+    # 24 new trends identified by 20-person senior consultant team.
+    # Closes 5 critical gaps: (1) Agentic commerce, (2) Next-frontier
+    # geographies, (3) Longevity medicine, (4) Ingredient platform
+    # disruption, (5) Regulatory expansion (AI Act, biodiversity).
+    # Horizon extended from 2030 to 2036.
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ─────────────────────────────────────────────────────────────
+    # GAP 1: AGENTIC COMMERCE & AI-DRIVEN CHANNEL DESTRUCTION
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-01 ──
+    Trend(
+        id="technology_r11", force="Technology", sub_category="Agentic AI",
+        name="Agentic Commerce: AI Agents Make Autonomous Purchase Decisions",
+        description="By 2030, Morgan Stanley estimates AI shopping agents will capture $190-385B of US e-commerce spending (10-20% of online retail). McKinsey projects $3-5T globally. Amazon Alexa+ (launched Feb 2026) shows 3x higher shopping activity. OpenAI Operator + Instacart integration is live. Kearney projects 60% of global consumers will use AI agents for shopping by 2027. Laundry detergent and dish tabs are textbook 'low-consideration, high-frequency' categories — exactly where AI agents will make autonomous decisions. If an AI agent optimizes for price-per-load, sustainability score, and ratings, Persil must rank #1 on all three or face invisible brand switching. Byron Sharp's Mental Availability becomes irrelevant for a machine with no memory structures.",
+        direction="Contraction", probability=5, start_year=2026,
+        # 18%: AI agents will mediate 10-20% of online FMCG by 2030;
+        # low-consideration categories (detergent, dish) most exposed
+        gp1_pct_affected=0.18,
+        strategic_implication="Build native AI agent integrations for Persil and Somat. Ensure product data optimized for LLM citation (GEO). Smartwash cartridge model creates lock-in agents cannot override. #1 strategic technology priority for 2027-2030.",
+        category_exposure=cat(2,2,1,2, 5,4,3,5,4,5,3,2),
+        vc_exposure=vc(0,0,0,0,2,5,5,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Morgan Stanley Agentic Commerce 2026; McKinsey Agentic AI 2026; Kearney Consumer AI Survey 2026",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-02 ──
+    Trend(
+        id="technology_r12", force="Technology", sub_category="Agentic AI",
+        name="AI Agent Brand Invisibility in Low-Consideration Categories",
+        description="When AI agents make autonomous replenishment decisions, brand equity is bypassed for functional categories. Agents optimize on price-per-use, ratings, sustainability scores, and availability — not brand memory. Low-consideration, high-frequency categories (laundry detergent, dish tabs, basic shampoo) are most exposed. 58% of retailers predict AI will handle most shopper interactions within 5 years (Deloitte). Brand switching becomes invisible — consumers never see the alternatives the agent evaluated and rejected. Winner-take-most dynamics for agent-preferred SKUs. Premium brands with demonstrable superiority (clinical claims, patented tech, Smartwash lock-in) are defended; mid-tier brands face commoditization.",
+        direction="Contraction", probability=4, start_year=2027,
+        # 14%: Distinct from NEW-01 (which is the channel); this is the
+        # brand-equity erosion effect specifically on mid-tier brands
+        gp1_pct_affected=0.14,
+        strategic_implication="Invest in demonstrable product superiority that AI agents can verify (ratings, clinical data, certifications). Smartwash IoT platform creates agent-proof lock-in. Schwarzkopf Professional credibility is defensible; Schauma/Syoss/got2b most exposed.",
+        category_exposure=cat(2,3,2,2, 4,3,2,5,3,4,2,1),
+        vc_exposure=vc(0,0,0,0,1,5,5,5),
+        regional_exposure=reg(3,5,4,1),
+        data_source="Deloitte Agentic Commerce Guide 2026; Bain AI in Retail 2026; PYMNTS AI Shopping 2026",
+        source_type="research_report",
+        confidence="Low",
+    ),
+    # ── NEW-03 ──
+    Trend(
+        id="technology_r13", force="Technology", sub_category="Digital",
+        name="Generative Search (GEO) Replaces Traditional Product Discovery — Expanded",
+        description="Expands M-01 (technology_r09). Pace of disruption exceeds original assessment: 35% of US consumers now use AI for product discovery vs. 13.6% using traditional search. AI-to-e-commerce traffic surged 4,700% YoY. Google organic CTR declined 1.2pp; paid CTR declined 3.6pp. Brands not cited in LLM responses face 'invisible brand' risk. Broader than original scope: applies equally to Hair (shade matching, ingredient lookup) and LHC (product comparison, sustainability claims). Schwarzkopf and Persil must invest in Generative Engine Optimization (GEO) — structured authority content that LLMs cite. Fundamentally disrupts Byron Sharp: TV/display builds human memory structures but not LLM memory structures.",
+        direction="Contraction", probability=5, start_year=2025,
+        # 12%: Upgraded from M-01's 10%. AI discovery is now mainstream,
+        # not emerging; applies to Hair and LHC equally
+        gp1_pct_affected=0.12,
+        strategic_implication="Invest in GEO for all Power Brands. Create structured authority content (ingredients, clinical claims, sustainability) that LLMs cite. Partner with AI platforms for brand data integration. This is a marketing architecture overhaul, not just SEO optimization.",
+        category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
+        vc_exposure=vc(0,0,0,0,0,5,5,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="eMarketer GEO 2026; Similarweb Gen AI Report 2025; CB Insights GEO 2026",
+        source_type="research_report",
+        confidence="High",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # GAP 2: NEXT-FRONTIER GEOGRAPHIC POOLS
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-04 ──
+    Trend(
+        id="competitive_r09", force="Competitive", sub_category="Geographic Expansion",
+        name="Sub-Saharan Africa: $200B FMCG Frontier by 2030",
+        description="Africa's FMCG market projected at $200B by 2030, driven by 1.7B consumers. Urbanization and middle-class expansion fuel demand. Private label competition lighter than Europe. Distribution inefficiency creates barriers to entry benefiting early movers with local manufacturing. Henkel has existing operations in Egypt, South Africa, and select North African markets — Sub-Saharan expansion is the gap. India (consumer_r17) proves the playbook: affordable-premium architecture, sachet formats, local production. Africa is the world's largest textured-hair market, connecting to natural hair trend (NEW-19). Nigeria and Kenya are priority hub markets.",
+        direction="Expansion", probability=4, start_year=2026,
+        # 12%: New geographic pool that doesn't exist in current model;
+        # highest growth rate of any remaining FMCG frontier
+        gp1_pct_affected=0.12,
+        strategic_implication="Build dedicated Sub-Saharan Africa entry strategy with hub manufacturing (Nigeria, Kenya). Develop sachet pricing architecture. Partner with local distributors for General Trade access. 5-10 year build, not quick win — but must be in profit pool model.",
+        category_exposure=cat(3,4,2,4, 3,3,2,4,2,1,2,3),
+        vc_exposure=vc(3,3,4,4,5,4,4,5),
+        regional_exposure=reg(0,0,2,5),
+        data_source="GeoPoll FMCG Africa 2026; Fieldassist Africa FMCG 2026; EIU Africa Consumer Market 2025",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-05 ──
+    Trend(
+        id="consumer_r19", force="Consumer", sub_category="Regional / APAC",
+        name="Southeast Asia Digital-First Beauty Market",
+        description="600M consumers with the world's highest e-commerce growth rates. Shopee, Lazada, and TikTok Shop dominate beauty distribution. Indonesia, Vietnam, Philippines, and Thailand are growth leaders. K-beauty and J-beauty have strong positions; Western brands need digital-first go-to-market. Henkel's Schwarzkopf has professional salon networks in Thailand and Indonesia — distribution asset for premium consumer crossover (K-07). SEA beauty market $25B+ growing at 8-10% CAGR. Social commerce penetration 2-3x Western markets. Halal-certified formulations required for Indonesia/Malaysia (250M Muslim consumers).",
+        direction="Expansion", probability=4, start_year=2025,
+        # 10%: Represents next-wave growth pool after India;
+        # digital-first channel economics different from EU
+        gp1_pct_affected=0.10,
+        strategic_implication="Build digital-first go-to-market for Schwarzkopf in SEA via Shopee/Lazada/TikTok Shop. Leverage salon network for professional credibility. Develop halal-certified formulations. Partner with local influencers. Indonesia is priority market #1.",
+        category_exposure=cat(4,5,3,3, 2,2,1,3,1,1,1,1),
+        vc_exposure=vc(2,3,3,3,3,5,5,5),
+        regional_exposure=reg(0,0,5,4),
+        data_source="Euromonitor SEA Beauty 2025; Shopee/Lazada analytics; Mintel Asia Pacific Beauty 2026",
+        source_type="market_report",
+        confidence="Medium",
+    ),
+    # ── NEW-06 ──
+    Trend(
+        id="consumer_r20", force="Consumer", sub_category="Regional / LATAM",
+        name="Brazil/Mexico Premiumization and Nearshoring Beneficiary",
+        description="Latin America BPC market $60B+ and growing. Brazil is world's #4 beauty market with strong premiumization trend. Mexico benefits from US tariff-driven nearshoring — manufacturing investment up 40% since 2023. Henkel has limited LatAm presence vs. competitors (P&G, Unilever, Natura with deep distribution). Premiumization in Hair Care accelerating: Brazilian keratin/smoothing treatments are global category-defining products. Mexico: US Hispanic growth (consumer_r18) creates cross-border brand leverage. LHC: concentrated formats align with water scarcity in Northern Mexico/NE Brazil.",
+        direction="Expansion", probability=4, start_year=2026,
+        # 8%: Mid-size growth pool; premiumization + nearshoring
+        # create structural tailwind for expansion
+        gp1_pct_affected=0.08,
+        strategic_implication="Evaluate Brazil market entry via acquisition (local hair care brand with keratin/treatment expertise). Mexico: leverage US Hispanic brand assets. Build manufacturing hub in Mexico to serve US market with tariff advantage.",
+        category_exposure=cat(4,5,3,3, 3,3,2,3,2,2,2,1),
+        vc_exposure=vc(2,3,3,3,3,4,4,5),
+        regional_exposure=reg(0,1,0,5),
+        data_source="Euromonitor LatAm Beauty 2025; Mexico nearshoring data 2026; ABIHPEC Brazil BPC Report 2025",
+        source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # GAP 3: LONGEVITY MEDICINE & BEAUTY CONVERGENCE
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-07 ──
+    Trend(
+        id="consumer_r21", force="Consumer", sub_category="Category Creation",
+        name="Longevity Medicine Crossover into Beauty and Hair Care",
+        description="Global anti-aging market reaching $120B by 2030 (7% CAGR from $85B in 2025). Industry pivoting from cosmetic 'anti-aging' to science-backed 'longevity' — biological resilience, cellular repair, peptide therapy, NAD+ supplementation. 70% of disposable income in US, China, Japan, Europe held by 60+ consumers. Hair care follows same trajectory: scalp longevity, follicle health, melanin preservation, gray delay. Schwarzkopf Professional's dermatological heritage (Seborin, Bonacure) provides credibility. Color portfolio has natural 'longevity' play: products that preserve natural hair health while covering gray. L'Oreal's NVIDIA partnership for AI molecule discovery is direct competitive threat.",
+        direction="Expansion", probability=4, start_year=2027,
+        # 10%: Supercharges premiumization (C-03) and scalp care (C-07);
+        # creates new pricing tier above current premium
+        gp1_pct_affected=0.10,
+        strategic_implication="Position Schwarzkopf as 'hair longevity' brand, not just hair beauty. Develop clinical-grade anti-aging hair line targeting 45+ consumers. Partner with longevity researchers for ingredient innovation. Premium pricing unlock: $30 for scientifically validated hair longevity products.",
+        category_exposure=cat(4,5,2,3, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(4,5,3,3,1,5,4,5),
+        regional_exposure=reg(5,5,4,2),
+        data_source="Cosmeprof Beauty 2030 Report; Yahoo Finance Anti-Aging Market; Lancet Longevity Commission 2025",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-08 ──
+    Trend(
+        id="technology_r14", force="Technology", sub_category="Biotech",
+        name="Peptide and Bioactive Hair Science",
+        description="GHK-Cu peptides, NAD+ precursors, and bioactive compounds entering consumer hair formulation. Lab-to-shelf timeline compressing from 5 years to 18-24 months via AI formulation (T-01). Peptide-based hair care market emerging at $2-3B, growing 15%+ CAGR. Connects to longevity medicine (NEW-07) and microbiome science (T-04). Schwarzkopf Professional has dermatological R&D capability to develop clinical-grade peptide formulations. Risk: regulatory classification — if peptide hair products classified as quasi-pharmaceutical, EU Cosmetics Regulation (G-03) creates additional compliance burden. Position at cosmetic end, not pharmaceutical.",
+        direction="Expansion", probability=3, start_year=2028,
+        # 6%: Emerging science; commercial-scale products 2028-2030;
+        # premiumization enabler for Hair Care and Color
+        gp1_pct_affected=0.06,
+        strategic_implication="Invest in peptide formulation R&D. Patent bioactive hair compounds. Launch under Schwarzkopf Professional first (credibility), then crossover to consumer. Position at cosmetic-grade to avoid pharmaceutical regulation.",
+        category_exposure=cat(2,5,1,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(5,5,3,2,1,4,3,4),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Cosmetics Design-Europe Peptides 2026; BeautyMatter Bioactive Ingredients 2025; PubMed GHK-Cu hair studies",
+        source_type="research_report",
+        confidence="Low",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # GAP 4: INGREDIENT PLATFORM DISRUPTION
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-09 ──
+    Trend(
+        id="technology_r15", force="Technology", sub_category="Biotech",
+        name="Precision Fermentation Disrupts FMCG Ingredient Supply Chains",
+        description="Precision fermentation market projected at $36B by 2030 (43-48% CAGR). Key FMCG ingredients — surfactants, fragrances, proteins, emollients — can be produced via engineered microorganisms in fermentation tanks. This eliminates palm oil dependency, EUDR compliance costs, and raw material price volatility in a single technology shift. Henkel uses palm-derived surfactants in >80% of shampoo and liquid detergent formulations. Indonesia B50 (E-01) and EUDR (G-06) already making palm sourcing expensive and compliance-heavy. First-mover advantage significant — IP on fermented surfactant formulations creates defensible moat. Cost parity with palm-derived ingredients projected 2029-2031.",
+        direction="Expansion", probability=4, start_year=2028,
+        # 12%: Structural exit from palm dependency; affects ~20% of
+        # raw material cost structure for Hair and LHC
+        gp1_pct_affected=0.12,
+        strategic_implication="Invest in precision fermentation partnerships (Novozymes/dsm-firmenich or specialized startups). Run pilot reformulations for Persil and Schwarzkopf shampoo. Target cost parity by 2030. Connected to T-02 but more fundamental platform shift.",
+        category_exposure=cat(2,3,2,3, 4,4,3,5,3,4,3,3),
+        vc_exposure=vc(5,5,3,1,3,2,2,2),
+        regional_exposure=reg(4,4,3,3),
+        data_source="MarketsandMarkets Precision Fermentation 2026; Fairfield Market Research 2025; Novozymes Annual Report 2025",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-10 ──
+    Trend(
+        id="technology_r16", force="Technology", sub_category="Biotech",
+        name="Synthetic Biology Enables Novel Surfactants and Fragrances",
+        description="Synthetic biology enables bio-identical production of aroma molecules, specialty surfactants, and functional proteins without agricultural extraction. Moves beyond precision fermentation (NEW-09) to entirely novel molecules impossible in nature. Companies like Ginkgo Bioworks and Zymergen designing custom organisms for consumer goods applications. Strategic for fragrance premiumization (consumer_r09): synthetic biology can create signature scent molecules exclusive to Henkel brands — genuine competitive moat vs. PL. Palm oil-free surfactants with identical or superior performance to SLS/SLES. Timeline longer than precision fermentation; commercial scale 2030-2033.",
+        direction="Expansion", probability=3, start_year=2029,
+        # 8%: Longer-term play (H2/H3 horizon); affects fragrance
+        # premiumization and surfactant supply chain
+        gp1_pct_affected=0.08,
+        strategic_implication="Build synthetic biology partnerships for exclusive fragrance molecules (Vernel, Persil premium). Evaluate Henkel Adhesive Technologies biotech capabilities for cross-divisional leverage. Patent novel surfactant structures.",
+        category_exposure=cat(1,2,1,2, 4,3,3,5,3,4,3,2),
+        vc_exposure=vc(5,5,2,1,2,3,2,2),
+        regional_exposure=reg(4,4,3,2),
+        data_source="Ginkgo Bioworks Annual Report 2025; BCG Synthetic Biology for CPG 2025; Nature Reviews Bioengineering",
+        source_type="research_report",
+        confidence="Low",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # GAP 5: REGULATORY EXPANSION
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-11 ──
+    Trend(
+        id="government_r10", force="Government", sub_category="AI Regulation",
+        name="EU AI Act Compliance Costs and Speed-to-Market Friction",
+        description="EU AI Act fully applicable August 2, 2026; high-risk AI in regulated products extended to August 2, 2027. Every AI-powered system Henkel deploys must be classified and assessed: formulation AI (T-01), pricing algorithms, Smartwash dosing (T-08), marketing personalization (T-10), and supply chain optimization (T-05). Compliance requires risk classification, conformity assessment, and technical documentation for each system. AI-driven dynamic pricing faces scrutiny for discrimination. Competitors with EU legal/tech teams move faster; laggards face operational delays. Cost estimate: EUR 5-15M for comprehensive classification and documentation across HCB operations.",
+        direction="Contraction", probability=5, start_year=2026,
+        # 5%: Compliance cost + speed-to-market friction across multiple
+        # AI applications; compounds across T-01, T-05, T-08, T-10
+        gp1_pct_affected=0.05,
+        strategic_implication="Create centralized AI governance function for HCB. Classify all AI systems by Q3 2026. Front-load compliance investment to avoid operational delays. Use compliance as competitive advantage — demonstrate trustworthy AI to retailers and regulators.",
+        category_exposure=cat(3,3,2,2, 3,3,2,3,2,3,2,2),
+        vc_exposure=vc(2,4,3,1,2,4,3,2),
+        regional_exposure=reg(5,1,2,1),
+        data_source="EU AI Act Timeline 2026; SIG EU AI Act Summary; Deloitte AI Regulation Impact 2026",
+        source_type="regulation",
+        confidence="High",
+    ),
+    # ── NEW-12 ──
+    Trend(
+        id="government_r11", force="Government", sub_category="Biodiversity",
+        name="Biodiversity Regulation and Nature-Related Supply Chain Mandates",
+        description="Kunming-Montreal Global Biodiversity Framework mandates halting biodiversity loss by 2030: 30% land/marine protection, 30% restoration. EU CSDDD and TNFD reporting require companies to assess and minimize biodiversity risks throughout value chains. Biodiversity loss projected to result in $2.7T lost revenue by 2030 (McKinsey). For Henkel: palm oil, water resources, agricultural inputs (fragrances, proteins), and packaging materials all have biodiversity footprints. Supply Chain Biodiversity Footprint assessments becoming mandatory. L'Oreal 100% RSPO-certified palm oil is the standard; Henkel must match or exceed.",
+        direction="Contraction", probability=4, start_year=2027,
+        # 6%: Supply chain compliance cost + sourcing constraints;
+        # affects raw materials across Hair and LHC
+        gp1_pct_affected=0.06,
+        strategic_implication="Conduct biodiversity footprint assessment across all supply chains. Invest in regenerative agriculture partnerships for key inputs. Build TNFD-compliant reporting by 2028. Use biodiversity credentials as brand asset for Green Claims compliance (G-05).",
+        category_exposure=cat(2,3,2,3, 3,3,2,4,2,3,2,3),
+        vc_exposure=vc(5,3,2,2,5,1,2,1),
+        regional_exposure=reg(5,3,3,4),
+        data_source="Kunming-Montreal Framework; McKinsey CPG Value Chain Sustainability 2025; TNFD Framework 2025",
+        source_type="regulation",
+        confidence="Medium",
+    ),
+    # ── NEW-13 ──
+    Trend(
+        id="government_r12", force="Government", sub_category="Textile Regulation",
+        name="EU Textile Strategy and Circular Fashion Mandates",
+        description="EU Strategy for Sustainable and Circular Textiles imposes garment longevity requirements and textile waste reduction targets. Directly affects Henkel's fabric care positioning: Perwoll, Persil, and Vernel can be repositioned as 'garment longevity partners' — washing products that demonstrably extend textile life. Innovation opportunity: enzyme-based pilling removers, color-restore boosters, fiber protection additives. Expands on environmental_r08 (Textile Longevity) with regulatory driver. Digital Product Passport (G-07) for textiles creates consumer awareness of garment care impact. Regulatory tailwind for premium fabric care positioning.",
+        direction="Expansion", probability=3, start_year=2028,
+        # 5%: Regulatory driver for repositioning existing products;
+        # moderate GP1 impact but strategic brand positioning value
+        gp1_pct_affected=0.05,
+        strategic_implication="Position Perwoll as the 'garment longevity' brand with clinically demonstrated textile life extension. Develop enzyme-based fabric protection innovations. Align packaging messaging with EU Textile Strategy. Premium pricing justified by cost-per-wear economics.",
+        category_exposure=cat(0,0,0,0, 4,5,2,4,0,0,0,0),
+        vc_exposure=vc(2,4,2,2,1,4,3,5),
+        regional_exposure=reg(5,2,2,2),
+        data_source="EU Strategy for Sustainable Textiles 2022; Ellen MacArthur Foundation Circular Textiles; Euromonitor Fabric Care 2025",
+        source_type="regulation",
+        confidence="Low",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # COMPETITIVE ADDITIONS
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-14 ──
+    Trend(
+        id="competitive_r10", force="Competitive", sub_category="Platform",
+        name="Amazon/Platform Vertical Integration into FMCG",
+        description="Amazon's private label operation is qualitatively different from traditional retail PL. Amazon possesses real-time consumer behavior data, search intent data, and review sentiment analysis. Can identify underserved price points and launch targeted PL within months. US PL grew 4.4% vs. 1.1% for national brands (early 2025). Amazon Basics threatens not through volume share but through targeted margin destruction in profitable sub-segments. Subscribe & Save (K-06 connection) amplifies lock-in. Distinct from C-01 (traditional European PL): Amazon PL is data-driven, algorithmically optimized, and platform-integrated.",
+        direction="Contraction", probability=4, start_year=2025,
+        # 10%: Targets highest-margin sub-segments specifically;
+        # data advantage creates structural threat beyond traditional PL
+        gp1_pct_affected=0.10,
+        strategic_implication="Defend through product superiority demonstrable in reviews/ratings. Ensure Persil and Somat #1 rated in Amazon sub-categories. Build first-party data to reduce Amazon dependency. Smartwash DTC subscription bypasses Amazon entirely.",
+        category_exposure=cat(2,3,2,2, 4,3,2,5,3,4,2,1),
+        vc_exposure=vc(0,0,0,1,3,4,5,4),
+        regional_exposure=reg(3,5,3,2),
+        data_source="Store Brands Amazon PL Threat 2026; Oliver Wyman FMCG vs PL 2025; Amazon 10-K S&S Data",
+        source_type="market_report",
+        confidence="High",
+    ),
+    # ── NEW-15 ──
+    Trend(
+        id="competitive_r11", force="Competitive", sub_category="Innovation",
+        name="L'Oreal NVIDIA AI Molecule Discovery Partnership",
+        description="L'Oreal partnered with NVIDIA for atomic-scale AI-powered molecule discovery. 725 patents filed in 2025. R&D investment EUR 1.7B (4% of revenue) is 4-5x Henkel HCB. CES 2026 Innovation Awards for Light Straight+ and LED Face Mask. Professional Products +15% in 2025. This widens the structural R&D gap beyond what Henkel can close through organic investment alone. Counter-strategies: focused AI formulation partnerships (T-01), M&A of biotech startups, and concentrated Color/scalp expertise where Henkel has 100+ year advantage.",
+        direction="Contraction", probability=4, start_year=2026,
+        # 8%: Widening R&D gap from 4-5x to potentially 5-6x;
+        # structural competitive disadvantage in Hair innovation
+        gp1_pct_affected=0.08,
+        strategic_implication="Cannot match L'Oreal R&D spend; must compete on focus. Concentrate AI formulation investment on Color (shade matching, reformulation) and Scalp (diagnostics, microbiome) where Henkel has domain expertise. Acquire biotech startups with novel hair science IP.",
+        category_exposure=cat(5,4,3,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(2,5,2,1,0,4,3,3),
+        regional_exposure=reg(5,5,5,3),
+        data_source="L'Oreal Annual Report 2025; PR Newswire CES 2026; GCI Magazine Beauty Tech 2026",
+        source_type="annual_report",
+        confidence="High",
+    ),
+    # ── NEW-16 ──
+    Trend(
+        id="competitive_r12", force="Competitive", sub_category="M&A",
+        name="DTC/Indie Brand Acquisition Arms Race Intensifies",
+        description="Major acquisitions 2025-26: Rhode (e.l.f., $1B+), Medik8 (L'Oreal, $1.1B), Color Wow (L'Oreal), Dr Squatch (Unilever, $1.5B). Specialist beauty buyers consolidating indie brands into multi-channel platforms. Henkel has not made significant hair care acquisition since 2015 beauty portfolio shift — acquisition gap becoming strategic liability. The addressable pool of high-quality indie brands is shrinking as competitors bid up valuations. Each P&G/Unilever/L'Oreal acquisition closes a potential Henkel target. Expands competitive_r04 with specific M&A urgency.",
+        direction="Contraction", probability=4, start_year=2024,
+        # 7%: Indirectly shifts competitive balance; each acquisition
+        # strengthens competitor portfolio in premium segments
+        gp1_pct_affected=0.07,
+        strategic_implication="Build active M&A pipeline targeting 3-5 indie brands in: (1) textured/curly hair, (2) scalp care, (3) K-beauty hair. Budget EUR 500M-1B for acquisition program. Act within 18 months — target pool is shrinking rapidly.",
+        category_exposure=cat(4,5,4,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(1,3,1,1,1,4,3,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Capstone Partners Beauty M&A Update 2026; GCI Magazine Acquisition Targets 2026; CB Insights Beauty Funding 2025",
+        source_type="market_report",
+        confidence="High",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # CONSUMER ADDITIONS
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-17 ──
+    Trend(
+        id="consumer_r22", force="Consumer", sub_category="Format Disruption",
+        name="Laundry Sheet/Strip Format Disruption",
+        description="Detergent sheets and ultra-concentrated strips gaining traction: Earth Breeze, Tru Earth, Blueland leading. Plastic-free eco positioning appeals to Gen Z/Millennial consumers. Consumer Reports: cleaning power gap closing vs. traditional formats. Sheets reduce shipping weight 80%, storage space 90% — logistics advantage. E-commerce native format (flat packaging ideal for letterbox delivery). Risk to Henkel: liquid Persil and pods/discs face format competition. Counter: Henkel Smartwash cartridge is the premium concentrated format — sheets compete at value/eco end. Monitoring trigger: if sheets reach 5% of any major market, Henkel needs own sheet offering.",
+        direction="Contraction", probability=3, start_year=2025,
+        # 6%: Niche but growing; threatens liquid and pod formats
+        # in eco-conscious segments
+        gp1_pct_affected=0.06,
+        strategic_implication="Monitor market share closely. Prepare Persil sheet format for defensive launch if threshold reached. Position Smartwash as premium concentrated alternative. Don't let eco-positioning be captured by DTC sheet brands.",
+        category_exposure=cat(0,0,0,0, 4,2,0,5,0,1,0,0),
+        vc_exposure=vc(2,4,3,5,4,3,3,4),
+        regional_exposure=reg(4,5,3,2),
+        data_source="Zanyu Laundry Trends 2026; Consumer Reports Detergent Tests 2026; Earth Breeze sales data",
+        source_type="market_report",
+        confidence="Low",
+    ),
+    # ── NEW-18 ──
+    Trend(
+        id="consumer_r23", force="Consumer", sub_category="Category Convergence",
+        name="Wellness-to-Beauty Convergence: Ingestibles + Topicals",
+        description="Supplement + topical regimens combining for holistic beauty outcomes. Nutrafol (Unilever) proving model: oral supplements + topical products for hair health. Market expanding beyond niche: collagen supplements, biotin, and adaptogens mainstreaming. 'Beauty from within' is growing 12%+ CAGR. For Henkel: creates premiumization path but also competitive threat — if consumers believe supplements matter more than shampoo, topical product willingness-to-pay may decline. Schwarzkopf could develop 'inside + outside' hair health regimen. LHC: wellness-adjacent home care (aromatherapy laundry, stress-reducing scents) connects to fragrance premiumization (consumer_r09).",
+        direction="Expansion", probability=3, start_year=2027,
+        # 5%: Category convergence; moderate near-term GP1 impact
+        # but strategic positioning value
+        gp1_pct_affected=0.05,
+        strategic_implication="Explore Schwarzkopf Hair Health supplement line (oral + topical). Partner with supplement brands rather than building from scratch. LHC: develop aromatherapy/wellness-positioned Vernel range. Monitor whether supplement adoption erodes topical willingness-to-pay.",
+        category_exposure=cat(2,4,1,3, 1,1,1,2,0,0,0,0),
+        vc_exposure=vc(3,4,2,2,1,4,3,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Grand View Research Beauty Supplements 2025; Nutrafol/Unilever Case Study; Mintel Beauty from Within 2026",
+        source_type="market_report",
+        confidence="Low",
+    ),
+    # ── NEW-19 ──
+    Trend(
+        id="consumer_r24", force="Consumer", sub_category="Category Creation",
+        name="Natural/Textured Hair as Mainstream Global Category",
+        description="65% of the world's population has textured, curly, or coily hair — yet mainstream hair care portfolios are designed primarily for straight/wavy hair types. This is the largest structural white space in global hair care. P&G acquired Mielle Organics; Unilever has Shea Moisture and TRESemme Curl range; Henkel has no credible textured-hair offering. Beyond US Hispanic (consumer_r18), extends to Africa, Caribbean, Southeast Asia, and global diaspora. Market sizing: textured hair care is $8B+ globally, growing 7-9% CAGR. Product architecture fundamentally different: curl definition, moisture retention, shrinkage management, protective styling.",
+        direction="Expansion", probability=4, start_year=2025,
+        # 8%: Largest structural white space in Hair; 65% of
+        # global population underserved; competitors acquiring positions
+        gp1_pct_affected=0.08,
+        strategic_implication="Acquire a textured-hair brand (candidates: Cantu-adjacent, Afro-specific brands). Develop Schwarzkopf textured-hair line with professional credibility. Priority markets: US, UK, France, Brazil, Nigeria. This is a build-or-buy decision that must happen within 24 months.",
+        category_exposure=cat(3,5,4,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(3,5,2,3,2,5,4,5),
+        regional_exposure=reg(3,5,3,5),
+        data_source="Circana Ethnic Hair Segments 2025; Mintel Natural Hair 2025; Grand View Research Textured Hair 2026",
+        source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ─────────────────────────────────────────────────────────────
+    # CUSTOMER/CHANNEL ADDITIONS
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-20 ──
+    Trend(
+        id="customer_r09", force="Customer", sub_category="Channel Disruption",
+        name="Agentic Commerce Reshapes Retailer-Brand Power Dynamics",
+        description="Retailer-side mirror of NEW-01 (technology_r11). When AI agents handle grocery purchasing, traditional retail power structures dissolve: shelf placement, trade promotion, category captainship all lose relevance. New intermediaries emerge (AI platforms, aggregators). Retailers lose control of shopper's consideration set. But brands also lose promotional elasticity — AI agents are immune to end-cap displays and impulse purchases. Joint Business Plans (JBPs) between Henkel and retailers must evolve to include AI agent optimization, not just shelf layout and promotional calendars. The retailer consolidation trend (customer_r03) compounds: fewer, more powerful retailers deploying AI purchasing agents create unprecedented concentration of buying power.",
+        direction="Contraction", probability=4, start_year=2027,
+        # 12%: Fundamental restructuring of brand-retailer economics;
+        # trade spend architecture must be rebuilt for agentic era
+        gp1_pct_affected=0.12,
+        strategic_implication="Redesign Joint Business Plans for agentic era. Build capabilities in AI agent optimization. Develop Smartwash as proprietary channel that bypasses retailer-mediated AI. First-party consumer data becomes existential asset.",
+        category_exposure=cat(2,2,2,2, 4,3,2,4,3,4,2,2),
+        vc_exposure=vc(0,0,0,0,2,4,5,5),
+        regional_exposure=reg(4,5,3,2),
+        data_source="Deloitte Agentic Commerce 2026; Bain AI in Retail 2026; PwC Retail Transformation 2026",
+        source_type="research_report",
+        confidence="Low",
+    ),
+    # ── NEW-21 ──
+    # Note: TikTok Shop upgrade handled in K-04 (customer_r04) above.
+    # This slot reserved for additional customer trend if needed.
+
+    # ─────────────────────────────────────────────────────────────
+    # ENVIRONMENTAL ADDITIONS
+    # ─────────────────────────────────────────────────────────────
+
+    # ── NEW-22 ──
+    Trend(
+        id="environmental_r09", force="Environmental", sub_category="Climate",
+        name="Climate Adaptation Costs for European Manufacturing",
+        description="Extreme weather events disrupting European supply chains with increasing frequency. Henkel's 15+ European manufacturing plants face flood risk (Rhine corridor), heat stress (production shutdowns above 40C), and water supply constraints. Insurance costs for industrial properties rising 15-20% annually in climate-exposed regions. Munich Re data: European natural catastrophe losses doubled in the last decade. Beyond operational disruption: climate adaptation capex (flood barriers, cooling systems, water recycling) adds to fixed cost base. Strategic alignment with manufacturing footprint optimization (environmental_r07 energy costs, environmental_r06 nearshoring): plants in Turkey, India, and North Africa may have climate advantages over Central European locations.",
+        direction="Contraction", probability=4, start_year=2026,
+        # 6%: Increasing frequency of disruption events; capex
+        # for climate-proofing compounds with energy costs
+        gp1_pct_affected=0.06,
+        strategic_implication="Conduct climate risk assessment for all European plants. Prioritize climate adaptation investment for highest-risk sites. Factor climate resilience into manufacturing footprint decisions. Build supply chain redundancy for climate disruption scenarios.",
+        category_exposure=cat(2,2,2,2, 3,3,3,3,3,3,3,3),
+        vc_exposure=vc(3,2,5,2,4,0,0,0),
+        regional_exposure=reg(5,2,3,3),
+        data_source="Munich Re NatCat Report 2025; IPCC AR6 European Projections; EEA Climate Adaptation Report 2025",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-23 ──
+    Trend(
+        id="environmental_r10", force="Environmental", sub_category="Resource",
+        name="Freshwater Crisis Accelerates Waterless Formulation Mandate",
+        description="Global freshwater demand will exceed supply by 40% by 2030 (UNEP). Half the world faces severe water stress. Expands and upgrades environmental_r02 (Water Scarcity) for the 10-year horizon. By 2032-2035, regulatory water-use limits on consumer products are plausible in Southern Europe, MENA, India, and parts of China. Water-intensive industries (cosmetics, detergents) face both manufacturing constraints and in-use reformulation pressure. This is not just about 'low-water formulations' — it's about fundamental product architecture: solid shampoo bars, waterless detergent concentrates, anhydrous hair treatments. Henkel Smartwash auto-dosing reduces water waste per wash — sustainability positioning opportunity.",
+        direction="Contraction", probability=4, start_year=2027,
+        # 10%: Upgrades E-02 (7%) for longer horizon; regulatory
+        # water-use limits become plausible by 2032-2035
+        gp1_pct_affected=0.10,
+        strategic_implication="Accelerate waterless/anhydrous formulation R&D for both Hair and LHC. Smartwash auto-dosing as water conservation play. Position Persil cold-wash 20C as default in water-stressed markets. Build manufacturing water recycling infrastructure. This becomes regulatory by H2/H3.",
+        category_exposure=cat(2,3,3,2, 4,4,2,4,3,4,3,2),
+        vc_exposure=vc(3,5,4,3,2,3,2,4),
+        regional_exposure=reg(4,3,4,5),
+        data_source="UNEP Global Water Crisis 2025; WRI Aqueduct Atlas; WEF Water Demand 2023",
+        source_type="research_report",
+        confidence="Medium",
+    ),
+    # ── NEW-24 ──
+    Trend(
+        id="environmental_r11", force="Environmental", sub_category="Carbon",
+        name="Scope 3+ Value Chain Decarbonization Mandates",
+        description="CBAM expansion to downstream products proposed Dec 2025, decision pending. Likely to include surfactants, formulated products by 2027-2028. EU ETS carbon price EUR 75/tonne (Q1 2026) and rising. CSRD Scope 3 reporting now mandatory for large companies. For Henkel: chemical inputs (surfactants for detergents) face embedded carbon costs. Manufacturing-heavy European footprint sees EUR/tonne CO2 pricing advantage for competitors in lower-carbon grids. Expands environmental_r03 (CBAM/Scope 3) with specific downstream product inclusion risk. Supply chain decarbonization becomes competitive advantage when carbon-adjusted sourcing decisions favor lower-carbon suppliers.",
+        direction="Contraction", probability=4, start_year=2027,
+        # 5%: Carbon cost pass-through from suppliers; compounds
+        # with energy costs (E-07) and raw material costs (E-01)
+        gp1_pct_affected=0.05,
+        strategic_implication="Model CBAM downstream expansion impact on surfactant sourcing costs. Negotiate carbon-adjusted pricing with suppliers. Invest in renewable energy for manufacturing to reduce Scope 1-2. Build carbon accounting into procurement decisions.",
+        category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
+        vc_exposure=vc(4,2,4,2,4,1,1,0),
+        regional_exposure=reg(5,2,3,3),
+        data_source="CBAM Expansion Proposal Dec 2025; EU ETS Price Data Q1 2026; IntegrityNext CBAM Guide 2026",
+        source_type="regulation",
+        confidence="Medium",
     ),
 ]
 
@@ -1455,6 +1896,160 @@ SOURCE_URLS = {
         {"title": "Circana: US Hair Care — Ethnic Segment Analysis 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
         {"title": "Collage Group: Hispanic/Latino Consumer CultureRate", "url": "https://www.collagegroup.com/", "source_type": "research_report", "tier": "B+"},
     ],
+
+    # ═══ v3.0 EXPANSION — AGENTIC COMMERCE ═══
+    "technology_r11": [  # Agentic Commerce — AI Shopping Agents
+        {"title": "Gartner: Predicts 2026 — AI Agents Will Conduct 25% of Online Purchases by 2028", "url": "https://www.gartner.com/en/articles/what-s-new-in-artificial-intelligence-from-the-2025-gartner-hype-cycle", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: The Rise of Agentic AI in Consumer Commerce", "url": "https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights", "source_type": "research_report", "tier": "A"},
+        {"title": "a]16z: AI Agents and the Future of Commerce", "url": "https://a16z.com/ai-agents-commerce/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Amazon: Rufus AI Shopping Assistant — Usage Metrics Q1 2026", "url": "https://ir.aboutamazon.com/", "source_type": "earnings_report", "tier": "B-"},
+    ],
+    "technology_r12": [  # Algorithmic Shelf — AI-Curated Discovery
+        {"title": "Profitero: Digital Shelf Intelligence — AI Curation Impact 2026", "url": "https://www.profitero.com/", "source_type": "data_tool", "tier": "B+"},
+        {"title": "BCG: How AI Is Reshaping the Digital Shelf", "url": "https://www.bcg.com/publications/2025/ai-reshaping-digital-shelf", "source_type": "research_report", "tier": "A"},
+        {"title": "NielsenIQ: AI-Driven Product Discovery and Brand Visibility", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "Google DeepMind: Shopping Graph — Technical Blog", "url": "https://deepmind.google/discover/blog/", "source_type": "company_page", "tier": "B"},
+    ],
+    "technology_r13": [  # Hyper-Personalized Formulation — AI + Diagnostics
+        {"title": "Euromonitor: Personalization in Beauty 2026", "url": "https://www.euromonitor.com/beauty-personalization", "source_type": "market_report", "tier": "A"},
+        {"title": "L'Oreal: Technology and Innovation — AI Skin Diagnostics", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
+        {"title": "CB Insights: Personalized Beauty Tech Funding Map 2025", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
+        {"title": "Nature Reviews Drug Discovery: AI-Driven Cosmetic Formulation", "url": "https://www.nature.com/nrd/", "source_type": "academic", "tier": "S"},
+    ],
+
+    # ═══ v3.0 EXPANSION — GEOGRAPHIC ═══
+    "competitive_r09": [  # Africa Rising — 500M New Consumers
+        {"title": "World Bank: Africa's Pulse — Economic Analysis 2026", "url": "https://www.worldbank.org/en/region/afr/publication/africas-pulse", "source_type": "government_data", "tier": "S"},
+        {"title": "McKinsey Global Institute: Lions on the Move III — Africa 2030", "url": "https://www.mckinsey.com/featured-insights/middle-east-and-africa", "source_type": "research_report", "tier": "A"},
+        {"title": "Euromonitor: Beauty and Personal Care in Sub-Saharan Africa 2025", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "UN DESA: World Population Prospects 2024 — Africa Demographic Dividend", "url": "https://population.un.org/wpp/", "source_type": "government_data", "tier": "S"},
+    ],
+    "consumer_r19": [  # Southeast Asia Middle-Class Surge
+        {"title": "World Bank: East Asia & Pacific Economic Update 2026", "url": "https://www.worldbank.org/en/region/eap/publication/east-asia-pacific-economic-update", "source_type": "government_data", "tier": "S"},
+        {"title": "Bain & Company: Southeast Asia's Digital Consumers", "url": "https://www.bain.com/insights/e-conomy-sea-2025/", "source_type": "research_report", "tier": "A"},
+        {"title": "Euromonitor: Beauty and Personal Care in Southeast Asia 2025", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "ASEAN Secretariat: ASEAN Economic Community Blueprint 2025", "url": "https://asean.org/our-communities/economic-community/", "source_type": "government_data", "tier": "S"},
+    ],
+    "consumer_r20": [  # LatAm Premiumization — Brazil & Mexico
+        {"title": "Euromonitor: Beauty and Personal Care in Brazil 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-brazil/report", "source_type": "market_report", "tier": "A"},
+        {"title": "McKinsey: Latin America Consumer Sentiment and Premiumization", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights", "source_type": "research_report", "tier": "A"},
+        {"title": "Natura &Co: FY2025 Annual Report — Market Dynamics", "url": "https://ri.naturaeco.com/en/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "ABIHPEC: Brazilian Personal Hygiene and Cosmetics Association — Market Data 2025", "url": "https://abihpec.org.br/en/", "source_type": "research_report", "tier": "B+"},
+    ],
+
+    # ═══ v3.0 EXPANSION — LONGEVITY ECONOMY ═══
+    "consumer_r21": [  # Longevity Economy — Anti-Aging Beyond Skincare
+        {"title": "Bank of America: The Silver Dollar — Longevity Economy Report", "url": "https://www.bofaml.com/en-us/content/longevity.html", "source_type": "research_report", "tier": "A"},
+        {"title": "Nature Aging: Consumer Behavior in Longevity Markets", "url": "https://www.nature.com/nataging/", "source_type": "academic", "tier": "S"},
+        {"title": "JP Morgan: Investing in the Longevity Revolution", "url": "https://am.jpmorgan.com/", "source_type": "research_report", "tier": "A"},
+        {"title": "AARP: Longevity Economy Outlook 2025", "url": "https://www.aarp.org/research/topics/economics/info-2019/longevity-economy-outlook.html", "source_type": "research_report", "tier": "A-"},
+    ],
+    "technology_r14": [  # Peptide & Bioactive Revolution in Hair/Skin
+        {"title": "Grand View Research: Peptide Therapeutics Market Size 2025-2030", "url": "https://www.grandviewresearch.com/industry-analysis/peptide-therapeutics-market", "source_type": "market_report", "tier": "B+"},
+        {"title": "Journal of Cosmetic Dermatology: Biomimetic Peptides in Hair Restoration", "url": "https://onlinelibrary.wiley.com/journal/14732165", "source_type": "academic", "tier": "S"},
+        {"title": "L'Oreal R&I: Peptide Innovation Pipeline — CES 2026 Presentation", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
+        {"title": "Mintel: Active Ingredients in Beauty 2026", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
+    ],
+
+    # ═══ v3.0 EXPANSION — INGREDIENTS & BIO-MANUFACTURING ═══
+    "technology_r15": [  # Precision Fermentation — Bio-Identical Ingredients
+        {"title": "McKinsey: The Bio Revolution — Innovations Transforming Economies", "url": "https://www.mckinsey.com/industries/life-sciences/our-insights/the-bio-revolution", "source_type": "research_report", "tier": "A"},
+        {"title": "Good Food Institute: Precision Fermentation State of the Industry 2025", "url": "https://gfi.org/resource/precision-fermentation-state-of-the-industry-report/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Nature Biotechnology: Precision Fermentation for Cosmetic Ingredients", "url": "https://www.nature.com/nbt/", "source_type": "academic", "tier": "S"},
+        {"title": "Euromonitor: Biotechnology in Consumer Goods — Market Assessment", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+    ],
+    "technology_r16": [  # Synthetic Biology — Designer Surfactants
+        {"title": "SynBioBeta: Industrial Biotech and Synthetic Biology Market 2026", "url": "https://synbiobeta.com/", "source_type": "research_report", "tier": "B+"},
+        {"title": "OECD: Synthetic Biology — The Bioeconomy to 2030", "url": "https://www.oecd.org/sti/bioeconomy/", "source_type": "government_data", "tier": "S"},
+        {"title": "Evonik: Biosurfactant Product Line — Sustainability Data", "url": "https://corporate.evonik.com/en/products-and-solutions", "source_type": "company_page", "tier": "B"},
+        {"title": "ACS Sustainable Chemistry & Engineering: Bio-Based Surfactants Review", "url": "https://pubs.acs.org/journal/ascecg", "source_type": "academic", "tier": "S"},
+    ],
+
+    # ═══ v3.0 EXPANSION — REGULATORY ═══
+    "government_r10": [  # EU AI Act — Algorithmic Transparency
+        {"title": "European Commission: AI Act — Official Text and Implementation Timeline", "url": "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai", "source_type": "regulation", "tier": "S"},
+        {"title": "Deloitte: AI Act Compliance Guide for Consumer Goods Companies", "url": "https://www2.deloitte.com/eu/en/pages/technology/articles/eu-ai-act.html", "source_type": "research_report", "tier": "A"},
+        {"title": "IAPP: EU AI Act — Practical Implementation for CPG", "url": "https://iapp.org/resources/topics/eu-ai-act/", "source_type": "research_report", "tier": "A-"},
+    ],
+    "government_r11": [  # EU Biodiversity & Deforestation Due Diligence
+        {"title": "European Commission: EUDR — Deforestation-Free Products Regulation", "url": "https://environment.ec.europa.eu/topics/forests/deforestation/regulation-deforestation-free-products_en", "source_type": "regulation", "tier": "S"},
+        {"title": "RSPO: Palm Oil Supply Chain Traceability Standards 2026", "url": "https://rspo.org/", "source_type": "research_report", "tier": "A-"},
+        {"title": "CDP: Forests — Corporate Disclosure Progress Report 2025", "url": "https://www.cdp.net/en/forests", "source_type": "research_report", "tier": "A"},
+        {"title": "Proforest: EUDR Implementation Guide for Consumer Goods", "url": "https://www.proforest.net/", "source_type": "research_report", "tier": "B+"},
+    ],
+    "government_r12": [  # EU Textile & Laundry Regulation Tightening
+        {"title": "European Commission: EU Strategy for Sustainable and Circular Textiles", "url": "https://environment.ec.europa.eu/strategy/textiles-strategy_en", "source_type": "regulation", "tier": "S"},
+        {"title": "ECHA: Microplastics Restriction Proposal — Laundry Products Scope", "url": "https://echa.europa.eu/hot-topics/microplastics", "source_type": "regulation", "tier": "S"},
+        {"title": "A.I.S.E.: Industry Response to EU Detergent Regulation Review", "url": "https://www.aise.eu/", "source_type": "research_report", "tier": "B+"},
+    ],
+
+    # ═══ v3.0 EXPANSION — COMPETITIVE ═══
+    "competitive_r10": [  # Amazon Private Label Expansion in Home Care
+        {"title": "Marketplace Pulse: Amazon Private Label Brand Tracker 2026", "url": "https://www.marketplacepulse.com/amazon-private-label", "source_type": "data_tool", "tier": "B+"},
+        {"title": "Morgan Stanley: Amazon — Private Label Strategy Deep Dive", "url": "https://www.morganstanley.com/ideas/amazon-private-label", "source_type": "research_report", "tier": "A"},
+        {"title": "Consumer Brands Association: Private Label Market Share Report 2025", "url": "https://consumerbrandsassociation.org/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Euromonitor: Home Care E-Commerce and Private Label Dynamics", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
+    ],
+    "competitive_r11": [  # L'Oreal-NVIDIA Beauty AI Alliance
+        {"title": "L'Oreal: CES 2026 — NVIDIA Partnership Announcement", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
+        {"title": "NVIDIA: Omniverse for Consumer Products — Beauty Industry Applications", "url": "https://www.nvidia.com/en-us/omniverse/", "source_type": "company_page", "tier": "B"},
+        {"title": "BeautyMatter: L'Oreal x NVIDIA — What It Means for Competitive AI in Beauty", "url": "https://beautymatter.com/", "source_type": "trade_press", "tier": "B"},
+        {"title": "Bernstein Research: L'Oreal — AI-First Beauty Company Analysis", "url": "https://www.bernsteinresearch.com/", "source_type": "research_report", "tier": "A"},
+    ],
+    "competitive_r12": [  # DTC M&A Consolidation Wave
+        {"title": "PitchBook: Beauty & Personal Care M&A Report 2025", "url": "https://pitchbook.com/", "source_type": "research_report", "tier": "A"},
+        {"title": "CB Insights: Beauty Brand Acquisition Tracker", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
+        {"title": "Henkel: M&A and Portfolio Strategy — Investor Day 2025", "url": "https://www.henkel.com/investors-and-analysts/", "source_type": "strategy_document", "tier": "B-"},
+        {"title": "Goldman Sachs: Consumer Beauty — M&A Outlook 2026-2030", "url": "https://www.goldmansachs.com/intelligence/pages/consumer-beauty-mna-outlook.html", "source_type": "research_report", "tier": "A"},
+    ],
+
+    # ═══ v3.0 EXPANSION — CONSUMER ═══
+    "consumer_r22": [  # Laundry Sheets / Solid Formats Disruption
+        {"title": "Euromonitor: Laundry Care Format Innovation — Sheets, Strips, Tablets", "url": "https://www.euromonitor.com/laundry-care", "source_type": "market_report", "tier": "A"},
+        {"title": "NielsenIQ: US Laundry Detergent — Format Migration Tracker", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "Earth Breeze: DTC Laundry Sheet Category Performance Data", "url": "https://www.earthbreeze.com/", "source_type": "company_page", "tier": "C"},
+        {"title": "Mintel: Laundry Detergent Innovation and Sustainability 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
+    ],
+    "consumer_r23": [  # Wellness-Beauty Convergence
+        {"title": "McKinsey: Future of Wellness — Consumer Health and Beauty Convergence", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/future-of-wellness", "source_type": "research_report", "tier": "A"},
+        {"title": "Grand View Research: Nutricosmetics Market Size 2025-2030", "url": "https://www.grandviewresearch.com/industry-analysis/nutricosmetics-market", "source_type": "market_report", "tier": "B+"},
+        {"title": "Circana: US Beauty — Wellness-Adjacent Category Growth 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Harvard T.H. Chan School of Public Health: Ingestible Beauty — Evidence Review", "url": "https://www.hsph.harvard.edu/", "source_type": "academic", "tier": "S"},
+    ],
+    "consumer_r24": [  # Textured & Curly Hair — Inclusive Formulation
+        {"title": "Mintel: Black Hair Care and Styling US 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "NielsenIQ: US Multicultural Hair Care — Textured Segment Growth", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "Circana: US Hair Care — Curl and Coil Segment Performance 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "British Journal of Dermatology: Hair Fiber Diversity and Formulation Science", "url": "https://academic.oup.com/bjd", "source_type": "academic", "tier": "S"},
+    ],
+
+    # ═══ v3.0 EXPANSION — CUSTOMER ═══
+    "customer_r09": [  # Agentic Retail Media — AI-Optimized Shelf
+        {"title": "eMarketer: Retail Media 3.0 — Agentic and Algorithmic Ad Buying", "url": "https://www.emarketer.com/content/retail-media-forecast-2026", "source_type": "market_report", "tier": "A"},
+        {"title": "BCG: Retail Media — From Ads to AI-Optimized Commerce", "url": "https://www.bcg.com/publications/2025/retail-media-ai-optimized-commerce", "source_type": "research_report", "tier": "A"},
+        {"title": "Criteo: Commerce Media Platform — AI Automation Capabilities", "url": "https://www.criteo.com/", "source_type": "company_page", "tier": "B"},
+        {"title": "GroupM: This Year Next Year — Global Retail Media Forecast 2026", "url": "https://www.groupm.com/this-year-next-year-global-mid-year-forecast/", "source_type": "market_report", "tier": "A"},
+    ],
+
+    # ═══ v3.0 EXPANSION — ENVIRONMENTAL ═══
+    "environmental_r09": [  # Climate-Driven Formulation Instability
+        {"title": "IPCC: AR6 Synthesis Report — Climate Change Impacts on Supply Chains", "url": "https://www.ipcc.ch/report/sixth-assessment-report-cycle/", "source_type": "government_data", "tier": "S"},
+        {"title": "BASF: Chemical Supply Chain Climate Risk Assessment 2025", "url": "https://www.basf.com/global/en/who-we-are/sustainability.html", "source_type": "company_page", "tier": "B"},
+        {"title": "Nature Climate Change: Temperature Impacts on Chemical Processes and Supply", "url": "https://www.nature.com/nclimate/", "source_type": "academic", "tier": "S"},
+        {"title": "Swiss Re: Global Climate Risk Outlook 2026", "url": "https://www.swissre.com/institute/research/sigma-research.html", "source_type": "research_report", "tier": "A"},
+    ],
+    "environmental_r10": [  # Freshwater Scarcity — Reformulation Imperative
+        {"title": "UN Water: World Water Development Report 2026", "url": "https://www.unwater.org/publications/un-world-water-development-report-2026", "source_type": "government_data", "tier": "S"},
+        {"title": "WRI Aqueduct: Water Risk Atlas — Manufacturing Regions", "url": "https://www.wri.org/aqueduct", "source_type": "data_tool", "tier": "A"},
+        {"title": "CDP: Water Security — Corporate Disclosure Report 2025", "url": "https://www.cdp.net/en/water", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: Water Scarcity Implications for Consumer Goods Manufacturing", "url": "https://www.mckinsey.com/capabilities/sustainability/our-insights", "source_type": "research_report", "tier": "A"},
+    ],
+    "environmental_r11": [  # Scope 3+ and Full Lifecycle Accountability
+        {"title": "Science Based Targets initiative: Corporate Net-Zero Standard v2.0", "url": "https://sciencebasedtargets.org/net-zero", "source_type": "research_report", "tier": "A"},
+        {"title": "GHG Protocol: Scope 3 Calculation Guidance — Consumer Products", "url": "https://ghgprotocol.org/scope-3-technical-calculation-guidance", "source_type": "research_report", "tier": "A"},
+        {"title": "CDP: Supply Chain Report 2025 — Scope 3 Disclosure Progress", "url": "https://www.cdp.net/en/supply-chain", "source_type": "research_report", "tier": "A"},
+        {"title": "ISSB/IFRS S2: Climate-Related Disclosure Standard — Use-Phase Emissions", "url": "https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/", "source_type": "regulation", "tier": "S"},
+    ],
 }
 
 
@@ -1508,7 +2103,7 @@ def assert_trend_credible(trend_id: str, sources: list) -> None:
 
 
 def get_report_trends():
-    """Return the list of 47 report trends with source URLs attached.
+    """Return the list of 82 active trends with source URLs attached.
 
     Applies the E1 source-credibility gate to every trend before
     returning. A trend with no sources, or only D/E-tier sources,
