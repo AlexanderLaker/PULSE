@@ -81,6 +81,7 @@ export default function InnovationDeepDive({
         <div style={{ position: 'absolute', inset: 0 }}>
           <InnovationProductImage
             innovationId={innovation.id}
+            innovationNumber={innovation.number}
             gradient={innovation.imageGradient}
             accent={innovation.imageAccent}
             size="hero"
