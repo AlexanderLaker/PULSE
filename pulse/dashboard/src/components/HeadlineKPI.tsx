@@ -200,7 +200,10 @@ export default function HeadlineKPI({
   if (shifts && typeof shifts === 'object') {
     Object.entries(shifts).forEach(([catId, pathData]) => {
       const pathObj = typeof pathData === 'object' && pathData !== null ? pathData : { 2030: pathData };
-      const dist = getDist(pathObj[2030]);
+      // Use last available year dynamically (v3.1: 2026-2036)
+      const yearKeys = Object.keys(pathObj).map(Number).filter(n => n >= 2026 && n <= 2036).sort((a, b) => b - a);
+      const lastYearKey = yearKeys[0] || 2030;
+      const dist = getDist((pathObj as any)[lastYearKey]);
 
       avgShift += dist.median;
       avgP10 += dist.p10;
