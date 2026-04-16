@@ -1,161 +1,110 @@
 /**
- * PRISM Innovation Explorer — Cinematic Product Photography Map
+ * PRISM Innovation Explorer — Curated Stock Photography Map
  *
- * Each of the 43 innovation concepts gets a description-specific, cinematic
- * editorial photograph via Pollinations.ai Flux model. Every URL is
- * deterministic (stable seed) so repeated loads return the same image.
+ * Each of the 43 innovation concepts is mapped to a hand-picked, high-quality
+ * Unsplash stock photo that visually represents the product concept.
+ * Images load instantly from Unsplash's global CDN (no generation delay).
  *
- * Photography direction: McKinsey / Bain deck-grade visual quality.
- * Each prompt is engineered as a professional stock photographer's brief —
- * product-centric, editorially lit, brand-agnostic consumer goods aesthetic.
+ * Photo selection criteria:
+ *   - Product-centric, editorially lit, premium consumer goods aesthetic
+ *   - No text, no visible logos, no brand names
+ *   - Matches the category and consumer need of each innovation
  *
- * Style anchor (shared across all 43):
- *   "cinematic editorial product photography, photorealistic high-end
- *    commercial stock photo, soft diffused natural lighting, shallow depth
- *    of field, clean minimalist composition, consumer goods premium aesthetic,
- *    no text, no logos, no watermarks, no brand names, 8K quality"
+ * Unsplash license: free for commercial use, no attribution required in apps.
+ * Docs: https://unsplash.com/documentation#dynamically-resizable-images
  */
-
-const STYLE_ANCHOR =
-  'cinematic editorial product photography, photorealistic high-end commercial stock photo, soft diffused natural lighting, shallow depth of field, clean minimalist composition, consumer goods premium aesthetic, no text, no logos, no watermarks, no brand names, 8K quality';
 
 /**
- * Per-innovation subject prompts. Each describes the specific product
- * concept as a stock photographer's scene brief.
+ * Direct Unsplash photo URLs per innovation.
+ * Format: base URL + query params for responsive sizing.
  */
-const innovationPrompts: Record<string, string> = {
+const innovationPhotos: Record<string, string> = {
   // ── Original v3.0 portfolio (inn_01–inn_16) ────────────────────────────
-  inn_01:
-    'extreme close-up macro shot of a luxury scalp care serum dropper releasing a single golden droplet onto a healthy glowing scalp with visible hair parting, clinical glass bottle on white marble surface, spa bathroom environment with soft morning light through frosted glass',
-  inn_02:
-    'beauty editorial portrait of a confident woman with voluminous thick healthy hair caught mid-motion, a sleek clinical hair density serum bottle in sharp focus in the foreground on a minimalist vanity, warm directional studio lighting, shallow depth of field',
-  inn_03:
-    'overhead flat-lay of thin white concentrated laundry sheets fanned out artfully on a bed of fresh eucalyptus leaves beside perfectly folded crisp white linen, kraft paper packaging, bright clean kitchen counter, natural morning sunlight streaming in',
-  inn_04:
-    'elegant amber glass fabric refresh mist bottle with a fine spray halo captured mid-spritz beside a neatly folded cashmere sweater and silk blouse on a walnut shelf, warm golden hour light in a luxury walk-in closet',
-  inn_05:
-    'close-up of a sleek white auto-dosing laundry cartridge being inserted into a premium modern washing machine, glowing LED status indicator, clean contemporary laundry room with concrete and wood finishes, cool blue ambient light',
-  inn_06:
-    'premium wool overcoat hanging on a wooden hanger in a bright minimalist closet beside a row of garment care products including mist bottle and fiber repair cream on a marble shelf, warm natural gallery lighting, fashion editorial style',
-  inn_07:
-    'top-down masculine grooming flat-lay on dark veined marble: matte clay tin, beard oil in amber glass, face moisturizer tube, safety razor, charcoal soap bar, arranged with geometric precision, moody dramatic editorial lighting with deep shadows',
-  inn_08:
-    'woman looking at herself in a salon mirror while a stylist holds up a tablet showing AI-generated hair color simulation overlaid on her reflection, professional color tubes and mixing bowls on the trolley, bright modern salon interior with large windows',
-  inn_09:
-    'premium plant-based dishwashing gel in a frosted glass pump bottle beside sparkling crystal wine glasses and white ceramic plates on a bright Scandinavian kitchen counter, fresh herb sprigs, crisp natural daylight, clean food photography aesthetic',
-  inn_10:
-    'scientific close-up of a clear biotech hair repair ampoule being cracked open with visible luminous serum inside, held by a gloved hand with a stainless steel lab fermentation vessel softly blurred in the background, cool blue-white laboratory lighting',
-  inn_11:
-    'modern minimalist plug-in insect repellent device on a sun-dappled Mediterranean terrace table at golden hour, olive branches and citronella candles in the background, warm summer evening atmosphere with bokeh fairy lights',
-  inn_12:
-    'professional salon scene: stylist applying a bond-repair treatment to wet sectioned hair using a precision brush, amber treatment bottle prominently displayed on the styling trolley, soft diffused light from large salon windows, editorial beauty photography',
-  inn_13:
-    'vibrant street-level product display of colorful single-use sachets of shampoo and detergent hanging on clips at an open-air marketplace stall in a warm tropical setting, golden hour light, authentic everyday consumer moment',
-  inn_14:
-    'young woman running fingers through tousled textured second-day hair in soft morning bedroom light, a hair refresh mist bottle on the nightstand beside fresh flowers, warm intimate editorial beauty photography with natural window light',
-  inn_15:
-    'three elegant amber glass home care spray bottles with botanical labels arranged on a sunlit marble bathroom vanity beside eucalyptus branches, lavender bundles, and a rolled white towel, wellness spa atmosphere, luxury lifestyle editorial',
-  inn_16:
-    'modern in-store refill station with sleek brushed-metal dispensers filling reusable premium aluminum bottles, bright clean retail environment with warm wood accents, a customer hand reaching for a bottle, aspirational sustainability editorial',
+  inn_01: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop', // scalp care / hair serum closeup
+  inn_02: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop', // voluminous healthy hair
+  inn_03: 'https://images.unsplash.com/photo-1610557892470-55d9e80c0eb7?auto=format&fit=crop', // clean laundry / white linens
+  inn_04: 'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop', // fabric / clothing care
+  inn_05: 'https://images.unsplash.com/photo-1626806819282-2c1dc01a5e0c?auto=format&fit=crop', // modern washing machine
+  inn_06: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop', // premium garments / closet
+  inn_07: 'https://images.unsplash.com/photo-1581182800629-7d90925ad072?auto=format&fit=crop', // men's grooming products
+  inn_08: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop', // salon / hair color
+  inn_09: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop', // dishwashing / clean kitchen
+  inn_10: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop', // laboratory / biotech serum
+  inn_11: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop', // Mediterranean terrace / outdoor
+  inn_12: 'https://images.unsplash.com/photo-1522337094846-8a818192de1f?auto=format&fit=crop', // salon treatment / professional hair
+  inn_13: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop', // marketplace / consumer goods display
+  inn_14: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop', // woman natural hair refresh
+  inn_15: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop', // home care / botanical products
+  inn_16: 'https://images.unsplash.com/photo-1604187351574-c75ca79f5807?auto=format&fit=crop', // refill station / sustainability
 
   // ── v3.1 additions — Hair: Color (inn_17–inn_18) ───────────────────────
-  inn_17:
-    'portrait of a radiant woman in her early fifties with vibrant rich-toned professionally colored hair, a premium hair color tube and developer bottle artfully placed on a marble vanity in the foreground, luxury salon-at-home setting, warm flattering light',
-  inn_18:
-    'split composition: left half shows a woman taking a selfie with a phone-mounted color analysis device, right half shows a robotic countertop dispenser mixing a custom hair color formula, futuristic clean salon interior, bright diffused lighting',
+  inn_17: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop', // hair color / vibrant
+  inn_18: 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop', // AI / technology salon
 
   // ── Hair: Care (inn_19–inn_24) ─────────────────────────────────────────
-  inn_19:
-    'close-up beauty portrait of a Black woman with beautifully defined natural 4C coils, glistening with a curl-defining cream, a range of textured-hair care products in earth-toned packaging arranged on a warm wooden shelf behind her, rich golden editorial light',
-  inn_20:
-    'wellness-lifestyle shot of a woman in a bright modern bathroom holding a clinical hair recovery shampoo bottle, her reflection showing healthy regrowth, supplement capsules on the counter, clean aspirational health-beauty editorial',
-  inn_21:
-    'macro close-up of a luminous amber peptide serum ampoule with a single drop forming at the dropper tip, set against a blurred background of precision fermentation laboratory equipment, dramatic rim lighting, scientific beauty editorial',
-  inn_22:
-    'lifestyle flat-lay of a wellness hair ritual: botanical shampoo bottle, supplement capsule jar, a smartphone showing a biomarker tracking dashboard, fresh turmeric root and green tea leaves on a light linen surface, bright overhead natural light',
-  inn_23:
-    'elegant silver-haired woman in her late forties with glossy healthy hair applying a luxury treatment serum in a bright serene bathroom, premium glass bottles with minimalist design on the vanity, soft warm directional light, editorial beauty portrait',
-  inn_24:
-    'artful still-life of solid shampoo bars in earthy tones arranged on a wet concrete slab with tropical monstera leaves, a splash of water mid-freeze, a premium aluminum storage tin beside them, bright clean waterless beauty editorial',
+  inn_19: 'https://images.unsplash.com/photo-1595959183082-7b570b7e1e2b?auto=format&fit=crop', // natural textured hair / curls
+  inn_20: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop', // clinical wellness / recovery
+  inn_21: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop', // science lab / peptide serum
+  inn_22: 'https://images.unsplash.com/photo-1505576399279-0d54f31f743f?auto=format&fit=crop', // wellness lifestyle / supplements
+  inn_23: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop', // mature woman / silver hair luxury
+  inn_24: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop', // solid bars / natural beauty
 
   // ── Hair: Styling (inn_25–inn_26) ──────────────────────────────────────
-  inn_25:
-    'gen-z teenager with bold creatively styled hair in a colorful bedroom setup, ring light illuminating their face as they film a tutorial on their phone, styling products arranged on the desk, vibrant youthful energy, social-media-native editorial',
-  inn_26:
-    'clean product photography of a premium hair styling can with a minimalist metallic label on a white marble shelf beside a subscription delivery box with tissue paper, sharp commercial pack-shot lighting, modern bathroom setting',
+  inn_25: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop', // social media / content creation
+  inn_26: 'https://images.unsplash.com/photo-1585747860302-f3ca0cdbe1d4?auto=format&fit=crop', // hair styling products
 
   // ── Hair: Body (inn_27–inn_28) ─────────────────────────────────────────
-  inn_27:
-    'lifestyle shot of a fit woman applying a firming peptide body lotion to her arms in front of a full-length mirror in a bright modern bathroom, athleisure wear, clinical-yet-warm wellness aesthetic, natural morning light streaming in',
-  inn_28:
-    'a young woman in a sunlit tropical bathroom applying body lotion surrounded by lush green plants and teak wood accents, local botanical ingredients like coconut and turmeric visible on the counter, warm Southeast Asian lifestyle editorial',
+  inn_27: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop', // body care / fitness wellness
+  inn_28: 'https://images.unsplash.com/photo-1540555700478-4be289fbec6a?auto=format&fit=crop', // tropical / botanical body care
 
   // ── LHC: FCN — Fabric Cleaning (inn_29–inn_31) ─────────────────────────
-  inn_29:
-    'striking split composition: a white concentrated detergent bottle in the foreground with lush green fern leaves wrapped around it, and industrial bio-fermentation tanks gleaming in soft focus behind, sustainability-meets-science editorial, cool natural light',
-  inn_30:
-    'a sleek premium laundry subscription box being opened on a modern kitchen counter, concentrated detergent pods visible inside with a QR code on the inner lid, smart washing machine control panel glowing in the background, lifestyle tech editorial',
-  inn_31:
-    'premium laundry detergent bottle on a clean white laundry room shelf with wind turbines visible through a large window beyond rolling green hills, carbon-neutral badge visible concept, crisp sustainability editorial with natural daylight',
+  inn_29: 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop', // green chemistry / sustainability
+  inn_30: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop', // subscription box / smart home
+  inn_31: 'https://images.unsplash.com/photo-1473773508845-188df298d2d1?auto=format&fit=crop', // renewable energy / carbon neutral
 
   // ── LHC: FCA — Fabric Care (inn_32) ────────────────────────────────────
-  inn_32:
-    'luxury silk blouse hanging on a premium wooden hanger with a visible digital QR textile-passport tag, beside a specialty fabric care bottle on a bright minimalist shelf, soft natural window light, circular fashion editorial aesthetic',
+  inn_32: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?auto=format&fit=crop', // premium textiles / garment care
 
   // ── LHC: FFI — Fabric Finisher (inn_33) ────────────────────────────────
-  inn_33:
-    'stack of ultra-fluffy pristine white towels in a sunlit linen closet with dried lavender sprigs laid across the top, an elegant frosted-glass fabric softener bottle beside them, warm diffused golden light, premium home lifestyle editorial',
+  inn_33: 'https://images.unsplash.com/photo-1629140727571-9b5c6f6267b4?auto=format&fit=crop', // fluffy towels / softener
 
   // ── LHC: LAD — Laundry Additives (inn_34–inn_35) ───────────────────────
-  inn_34:
-    'extreme close-up of cashmere sweater fibers being gently protected, a premium jar of fiber-repair laundry booster beside a neatly folded cashmere stack in jewel tones, soft studio lighting, textile-science-meets-luxury editorial',
-  inn_35:
-    'serene bedroom scene with crisp white bed linens, a scent-booster pouch resting on a plump pillow beside dried lavender stalks, warm golden evening light, sleep-wellness lifestyle editorial photography',
+  inn_34: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop', // cashmere / premium knitwear
+  inn_35: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop', // bedroom / lavender / sleep
 
   // ── LHC: HDW — Hand Dish Wash (inn_36) ─────────────────────────────────
-  inn_36:
-    'elegant cylindrical hand dishwashing gel pump bottle in matte ceramic finish beside soft hands gently rinsing a glass plate under running water, bright Scandinavian kitchen, skincare-inspired premium product photography with warm natural light',
+  inn_36: 'https://images.unsplash.com/photo-1585837146751-a27e99e3e866?auto=format&fit=crop', // hand dishwashing / kitchen
 
   // ── LHC: ADW — Automatic Dish Wash (inn_37) ────────────────────────────
-  inn_37:
-    'close-up of a smart dishwasher detergent cartridge with a glowing status LED being docked into a premium built-in dishwasher in a modern kitchen, companion app visible on a smartphone nearby, sleek IoT-tech editorial, cool blue accent lighting',
+  inn_37: 'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?auto=format&fit=crop', // modern dishwasher / smart kitchen
 
   // ── LHC: HSC — Hard Surface Care (inn_38–inn_39) ───────────────────────
-  inn_38:
-    'bright eco-friendly toilet care bottle with botanical design on a clean white bathroom shelf, view through the window showing a wildflower garden with bees, natural daylight, biodiversity-positive home care editorial',
-  inn_39:
-    'colorful single-use cleaning sachets arranged on a warm wooden kitchen counter in a bright modern home, a woman wiping a surface in the background, affordable everyday household care moment, warm golden afternoon light',
+  inn_38: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop', // eco / garden / biodiversity
+  inn_39: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop', // bright kitchen / surface cleaning
 
   // ── Cross-Category (inn_40–inn_43) ─────────────────────────────────────
-  inn_40:
-    'vibrant open-air marketplace in a warm climate with a consumer goods stall displaying colorful sachets and bottles of shampoo, detergent, and body care products, authentic shopping moment, rich golden-hour editorial photography',
-  inn_41:
-    'young woman in a stylish modern apartment filming a beauty tutorial with ring light and phone tripod, consumer care products artfully arranged on the desk, live-shopping social commerce aesthetic, bright warm lifestyle editorial',
-  inn_42:
-    'portrait of a woman with sleek glossy keratin-treated hair flowing in a warm breeze, premium hair care products in the foreground on a salon counter, warm sunset light, professional salon-quality beauty editorial',
-  inn_43:
-    'futuristic holographic AI shopping interface floating over a retail shelf filled with consumer goods products, cool blue tech atmosphere with warm product shelf lighting, agentic commerce concept editorial, cinematic depth of field',
+  inn_40: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop', // emerging market / consumer goods stall
+  inn_41: 'https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop', // social commerce / influencer
+  inn_42: 'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop', // glossy premium hair
+  inn_43: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop', // AI / futuristic tech
 };
 
 /**
- * Build a deterministic Pollinations Flux URL for a given innovation.
- * Seed = innovation number → stable image per innovation across reloads.
+ * Get a fast-loading Unsplash photo URL for a given innovation.
+ * Returns a responsive URL with width/height/quality parameters.
  */
 export function getInnovationImageUrl(
   innovationId: string,
-  seed: number,
+  _seed: number,
   size: 'card' | 'hero' = 'card'
 ): string | null {
-  const subject = innovationPrompts[innovationId];
-  if (!subject) return null;
+  const baseUrl = innovationPhotos[innovationId];
+  if (!baseUrl) return null;
 
-  const width = size === 'hero' ? 1600 : 1200;
-  const height = size === 'hero' ? 1000 : 900;
-  const prompt = `${subject}, ${STYLE_ANCHOR}`;
-  const encoded = encodeURIComponent(prompt);
+  const w = size === 'hero' ? 1600 : 800;
+  const h = size === 'hero' ? 1000 : 600;
 
-  // Pollinations Flux — free, no auth, deterministic with stable seed.
-  return `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
+  return `${baseUrl}&w=${w}&h=${h}&q=80`;
 }
 
-export { innovationPrompts };
+export { innovationPhotos as innovationPrompts };
