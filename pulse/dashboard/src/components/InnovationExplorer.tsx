@@ -6,12 +6,13 @@
 
 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, TrendingUp, Clock, Target, BarChart3, Layers, Route, Zap } from 'lucide-react';
 import { INNOVATIONS, INNOVATION_CATEGORIES, getFilteredInnovations, getTypeColor } from '../lib/innovations';
 import type { Innovation } from '../lib/innovations';
 import { T } from '../lib/format';
+import { getInnovationImageUrl } from '../lib/innovationImages';
 import InnovationProductImage from './InnovationProductImage';
 import InnovationDeepDive from './InnovationDeepDive';
 
@@ -58,6 +59,25 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
     }
     return innovations;
   }, [activeCategory, searchQuery]);
+
+  // Preload first 6 images via <link rel="preload"> for fast paint
+  useEffect(() => {
+    const first6 = filteredInnovations.slice(0, 6);
+    const links: HTMLLinkElement[] = [];
+    first6.forEach((inn) => {
+      const seed = inn.number || parseInt(inn.id.replace(/\D/g, ''), 10) || 1;
+      const url = getInnovationImageUrl(inn.id, seed, 'card');
+      if (url) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = url;
+        document.head.appendChild(link);
+        links.push(link);
+      }
+    });
+    return () => { links.forEach(l => l.remove()); };
+  }, [filteredInnovations]);
 
   // Return deep dive if innovation is selected
   if (selectedInnovation) {
@@ -415,6 +435,7 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
                       gradient={innovation.imageGradient}
                       accent={innovation.imageAccent}
                       size={cardSize === 'hero' ? 'hero' : 'card'}
+                      eager={index < 6}
                     />
                   </div>
 

@@ -1,143 +1,140 @@
 /**
- * PRISM Innovation Explorer — Cinematic Photography Map
+ * PRISM Innovation Explorer — Cinematic Product Photography Map
  *
  * Each of the 43 innovation concepts gets a description-specific, cinematic
- * editorial photograph. We use Pollinations.ai's free image generation
- * endpoint with the Flux model — every URL is deterministic (stable seed)
- * so repeated loads return the same image.
+ * editorial photograph via Pollinations.ai Flux model. Every URL is
+ * deterministic (stable seed) so repeated loads return the same image.
  *
- * The prompts are engineered per innovation to capture:
- *   • The actual product subject (not the header word)
- *   • The category visual signature (hair, laundry, dish, surface, etc.)
- *   • The consumer moment described in `consumerNeed`
- *   • A consistent cinematic style anchor for portfolio coherence
+ * Photography direction: McKinsey / Bain deck-grade visual quality.
+ * Each prompt is engineered as a professional stock photographer's brief —
+ * product-centric, editorially lit, brand-agnostic consumer goods aesthetic.
  *
  * Style anchor (shared across all 43):
- *   "cinematic editorial photography, realistic high-end commercial stock
- *    photo, soft natural lighting, shallow depth of field, Henkel premium
- *    brand aesthetic, photorealistic, no text, no watermark"
+ *   "cinematic editorial product photography, photorealistic high-end
+ *    commercial stock photo, soft diffused natural lighting, shallow depth
+ *    of field, clean minimalist composition, consumer goods premium aesthetic,
+ *    no text, no logos, no watermarks, no brand names, 8K quality"
  */
 
 const STYLE_ANCHOR =
-  'cinematic editorial photography, realistic high-end commercial stock photo, soft natural lighting, shallow depth of field, photorealistic, no text, no watermark, premium brand aesthetic';
+  'cinematic editorial product photography, photorealistic high-end commercial stock photo, soft diffused natural lighting, shallow depth of field, clean minimalist composition, consumer goods premium aesthetic, no text, no logos, no watermarks, no brand names, 8K quality';
 
 /**
- * Per-innovation subject prompts. Each one describes the specific product
- * concept, not just the category. Rewrite carefully if the innovation's
- * `consumerNeed` changes.
+ * Per-innovation subject prompts. Each describes the specific product
+ * concept as a stock photographer's scene brief.
  */
 const innovationPrompts: Record<string, string> = {
   // ── Original v3.0 portfolio (inn_01–inn_16) ────────────────────────────
   inn_01:
-    'macro close-up of a luxury scalp serum dropper releasing a single droplet onto a healthy parting of glossy dark hair, minimalist marble bathroom surface, spa lighting',
+    'extreme close-up macro shot of a luxury scalp care serum dropper releasing a single golden droplet onto a healthy glowing scalp with visible hair parting, clinical glass bottle on white marble surface, spa bathroom environment with soft morning light through frosted glass',
   inn_02:
-    'cinematic beauty shot of a woman with dense thick shiny hair flowing, a glass vial of anti-thinning peptide serum in the foreground, clinical luxury editorial',
+    'beauty editorial portrait of a confident woman with voluminous thick healthy hair caught mid-motion, a sleek clinical hair density serum bottle in sharp focus in the foreground on a minimalist vanity, warm directional studio lighting, shallow depth of field',
   inn_03:
-    'concentrated laundry detergent sheets fanned out on fresh green leaves beside folded white linen, biodegradable kraft paper box, morning kitchen light',
+    'overhead flat-lay of thin white concentrated laundry sheets fanned out artfully on a bed of fresh eucalyptus leaves beside perfectly folded crisp white linen, kraft paper packaging, bright clean kitchen counter, natural morning sunlight streaming in',
   inn_04:
-    'amber glass luxury fabric refresher mist bottle beside a neatly folded cashmere sweater and white shirt, soft natural window light, hotel-suite bedroom',
+    'elegant amber glass fabric refresh mist bottle with a fine spray halo captured mid-spritz beside a neatly folded cashmere sweater and silk blouse on a walnut shelf, warm golden hour light in a luxury walk-in closet',
   inn_05:
-    'smart IoT dishwasher cartridge docked into a sleek modern built-in dishwasher, LED indicator glow, companion smartphone app on marble counter',
+    'close-up of a sleek white auto-dosing laundry cartridge being inserted into a premium modern washing machine, glowing LED status indicator, clean contemporary laundry room with concrete and wood finishes, cool blue ambient light',
   inn_06:
-    'premium wool overcoat hanging in a luxury walk-in wardrobe with a garment-care mist bottle on a walnut shelf, warm gallery lighting',
+    'premium wool overcoat hanging on a wooden hanger in a bright minimalist closet beside a row of garment care products including mist bottle and fiber repair cream on a marble shelf, warm natural gallery lighting, fashion editorial style',
   inn_07:
-    "masculine grooming lineup on dark veined marble: beard oil, matte face cream, solid cologne and razor, dark moody editorial top-down shot",
+    'top-down masculine grooming flat-lay on dark veined marble: matte clay tin, beard oil in amber glass, face moisturizer tube, safety razor, charcoal soap bar, arranged with geometric precision, moody dramatic editorial lighting with deep shadows',
   inn_08:
-    'a colorist holding a professional hair-color swatch ring next to a tablet showing AI hair analysis, modern luxury salon interior, soft window light',
+    'woman looking at herself in a salon mirror while a stylist holds up a tablet showing AI-generated hair color simulation overlaid on her reflection, professional color tubes and mixing bowls on the trolley, bright modern salon interior with large windows',
   inn_09:
-    'premium dishwashing gel pump bottle beside crystal wine glasses and clean white plates, fresh herbs, bright Scandinavian kitchen',
+    'premium plant-based dishwashing gel in a frosted glass pump bottle beside sparkling crystal wine glasses and white ceramic plates on a bright Scandinavian kitchen counter, fresh herb sprigs, crisp natural daylight, clean food photography aesthetic',
   inn_10:
-    'biotech recombinant keratin ampoule in a gloved hand in front of a gleaming stainless-steel fermentation tank, cool blue laboratory atmosphere',
+    'scientific close-up of a clear biotech hair repair ampoule being cracked open with visible luminous serum inside, held by a gloved hand with a stainless steel lab fermentation vessel softly blurred in the background, cool blue-white laboratory lighting',
   inn_11:
-    'modern plug-in insect repellent device on a Mediterranean terrace at dusk, olive leaves and citronella, warm summer evening glow',
+    'modern minimalist plug-in insect repellent device on a sun-dappled Mediterranean terrace table at golden hour, olive branches and citronella candles in the background, warm summer evening atmosphere with bokeh fairy lights',
   inn_12:
-    'professional colorist applying a bond-repair treatment on wet hair in a high-end salon chair, amber bottle of bond builder on the trolley',
+    'professional salon scene: stylist applying a bond-repair treatment to wet sectioned hair using a precision brush, amber treatment bottle prominently displayed on the styling trolley, soft diffused light from large salon windows, editorial beauty photography',
   inn_13:
-    'neatly arranged single-use sachets of laundry detergent and shampoo on a wooden marketplace stall in a vibrant Mumbai street, warm golden-hour light',
+    'vibrant street-level product display of colorful single-use sachets of shampoo and detergent hanging on clips at an open-air marketplace stall in a warm tropical setting, golden hour light, authentic everyday consumer moment',
   inn_14:
-    'woman running her fingers through tousled second-day hair in natural morning bedroom light, refresh mist bottle on the nightstand, editorial beauty',
+    'young woman running fingers through tousled textured second-day hair in soft morning bedroom light, a hair refresh mist bottle on the nightstand beside fresh flowers, warm intimate editorial beauty photography with natural window light',
   inn_15:
-    'aromatherapy home-care trio: amber glass spray bottles with eucalyptus sprigs and lavender bundles on a sunlit spa-like bathroom vanity',
+    'three elegant amber glass home care spray bottles with botanical labels arranged on a sunlit marble bathroom vanity beside eucalyptus branches, lavender bundles, and a rolled white towel, wellness spa atmosphere, luxury lifestyle editorial',
   inn_16:
-    'in-store refill station in a modern premium drugstore: reusable aluminium bottles being filled from sleek dispensers, bright retail editorial',
+    'modern in-store refill station with sleek brushed-metal dispensers filling reusable premium aluminum bottles, bright clean retail environment with warm wood accents, a customer hand reaching for a bottle, aspirational sustainability editorial',
 
   // ── v3.1 additions — Hair: Color (inn_17–inn_18) ───────────────────────
   inn_17:
-    'portrait of a confident stylish woman in her fifties with vibrant rich-colored hair, Schwarzkopf-style professional color tube in the foreground, luxury salon editorial',
+    'portrait of a radiant woman in her early fifties with vibrant rich-toned professionally colored hair, a premium hair color tube and developer bottle artfully placed on a marble vanity in the foreground, luxury salon-at-home setting, warm flattering light',
   inn_18:
-    'salon colorist with a tablet running AI hair diagnostics next to a client in the chair, blond highlights in progress, clean minimal premium salon',
+    'split composition: left half shows a woman taking a selfie with a phone-mounted color analysis device, right half shows a robotic countertop dispenser mixing a custom hair color formula, futuristic clean salon interior, bright diffused lighting',
 
   // ── Hair: Care (inn_19–inn_24) ─────────────────────────────────────────
   inn_19:
-    'close-up portrait of a Black woman with beautifully defined natural 4C coily hair, a rich curl-defining cream jar in the foreground, editorial beauty shot',
+    'close-up beauty portrait of a Black woman with beautifully defined natural 4C coils, glistening with a curl-defining cream, a range of textured-hair care products in earth-toned packaging arranged on a warm wooden shelf behind her, rich golden editorial light',
   inn_20:
-    "a slim woman post-weight-loss holding a premium hair recovery shampoo bottle in a bright modern bathroom, wellness editorial atmosphere",
+    'wellness-lifestyle shot of a woman in a bright modern bathroom holding a clinical hair recovery shampoo bottle, her reflection showing healthy regrowth, supplement capsules on the counter, clean aspirational health-beauty editorial',
   inn_21:
-    'single amber glass peptide ampoule with dropper on a laboratory stainless surface, vial label blank, professional bioactive serum editorial',
+    'macro close-up of a luminous amber peptide serum ampoule with a single drop forming at the dropper tip, set against a blurred background of precision fermentation laboratory equipment, dramatic rim lighting, scientific beauty editorial',
   inn_22:
-    'a woman in yoga wear in a minimalist wellness studio holding a botanical shampoo bottle, live plants, soft daylight, wellness-beauty editorial',
+    'lifestyle flat-lay of a wellness hair ritual: botanical shampoo bottle, supplement capsule jar, a smartphone showing a biomarker tracking dashboard, fresh turmeric root and green tea leaves on a light linen surface, bright overhead natural light',
   inn_23:
-    'elegant silver-haired woman in her late forties with glossy healthy hair, applying a luxury longevity hair treatment in a serene bathroom',
+    'elegant silver-haired woman in her late forties with glossy healthy hair applying a luxury treatment serum in a bright serene bathroom, premium glass bottles with minimalist design on the vanity, soft warm directional light, editorial beauty portrait',
   inn_24:
-    'solid shampoo bars arranged on a concrete slab with tropical monstera leaves and a splash of water, waterless beauty editorial still-life',
+    'artful still-life of solid shampoo bars in earthy tones arranged on a wet concrete slab with tropical monstera leaves, a splash of water mid-freeze, a premium aluminum storage tin beside them, bright clean waterless beauty editorial',
 
   // ── Hair: Styling (inn_25–inn_26) ──────────────────────────────────────
   inn_25:
-    'gen-z teenager with bold styled hair filming a TikTok tutorial with ring light in a colorful bedroom, styling can in hand, vibrant youth culture editorial',
+    'gen-z teenager with bold creatively styled hair in a colorful bedroom setup, ring light illuminating their face as they film a tutorial on their phone, styling products arranged on the desk, vibrant youthful energy, social-media-native editorial',
   inn_26:
-    'cinematic pack shot of a premium hair-styling can on a minimalist modern bathroom shelf beside a subscription cardboard box, sharp product photography',
+    'clean product photography of a premium hair styling can with a minimalist metallic label on a white marble shelf beside a subscription delivery box with tissue paper, sharp commercial pack-shot lighting, modern bathroom setting',
 
   // ── Hair: Body (inn_27–inn_28) ─────────────────────────────────────────
   inn_27:
-    'woman applying firming body lotion to her arms in front of a mirror after a workout, athleisure aesthetic, post-GLP-1 wellness editorial',
+    'lifestyle shot of a fit woman applying a firming peptide body lotion to her arms in front of a full-length mirror in a bright modern bathroom, athleisure wear, clinical-yet-warm wellness aesthetic, natural morning light streaming in',
   inn_28:
-    'a young hijabi Southeast Asian woman applying a halal-certified body lotion in a sunlit tropical Jakarta bathroom, plants and teak accents',
+    'a young woman in a sunlit tropical bathroom applying body lotion surrounded by lush green plants and teak wood accents, local botanical ingredients like coconut and turmeric visible on the counter, warm Southeast Asian lifestyle editorial',
 
   // ── LHC: FCN — Fabric Cleaning (inn_29–inn_31) ─────────────────────────
   inn_29:
-    'white laundry detergent bottle in the foreground with stainless bio-fermentation tanks and lush rainforest canopy behind, palm-free sustainability editorial',
+    'striking split composition: a white concentrated detergent bottle in the foreground with lush green fern leaves wrapped around it, and industrial bio-fermentation tanks gleaming in soft focus behind, sustainability-meets-science editorial, cool natural light',
   inn_30:
-    'a premium laundry subscription box delivered on the doorstep of a minimalist modern home, warm morning light, lifestyle editorial',
+    'a sleek premium laundry subscription box being opened on a modern kitchen counter, concentrated detergent pods visible inside with a QR code on the inner lid, smart washing machine control panel glowing in the background, lifestyle tech editorial',
   inn_31:
-    'laundry detergent bottle on a laundry-room shelf with wind turbines visible through a large window, clean carbon-neutral editorial',
+    'premium laundry detergent bottle on a clean white laundry room shelf with wind turbines visible through a large window beyond rolling green hills, carbon-neutral badge visible concept, crisp sustainability editorial with natural daylight',
 
   // ── LHC: FCA — Fabric Care (inn_32) ────────────────────────────────────
   inn_32:
-    'a luxury silk blouse hanging on a designer clothing rail with a digital textile-passport QR tag, circular fashion editorial, soft natural light',
+    'luxury silk blouse hanging on a premium wooden hanger with a visible digital QR textile-passport tag, beside a specialty fabric care bottle on a bright minimalist shelf, soft natural window light, circular fashion editorial aesthetic',
 
   // ── LHC: FFI — Fabric Finisher (inn_33) ────────────────────────────────
   inn_33:
-    'ultra-fluffy folded white towels stacked in a sunlit linen room with a lavender sprig and an elegant fabric softener bottle, premium home editorial',
+    'stack of ultra-fluffy pristine white towels in a sunlit linen closet with dried lavender sprigs laid across the top, an elegant frosted-glass fabric softener bottle beside them, warm diffused golden light, premium home lifestyle editorial',
 
   // ── LHC: LAD — Laundry Additives (inn_34–inn_35) ───────────────────────
   inn_34:
-    'close-up of cashmere fibers being gently repaired, a sleek jar of fiber-repair laundry booster beside a folded cashmere sweater, textile science editorial',
+    'extreme close-up of cashmere sweater fibers being gently protected, a premium jar of fiber-repair laundry booster beside a neatly folded cashmere stack in jewel tones, soft studio lighting, textile-science-meets-luxury editorial',
   inn_35:
-    'pristine bedroom with crisp white linen sheets, a bundle of fresh lavender and an elegant scent-booster pouch on the pillow, sleep-wellness editorial',
+    'serene bedroom scene with crisp white bed linens, a scent-booster pouch resting on a plump pillow beside dried lavender stalks, warm golden evening light, sleep-wellness lifestyle editorial photography',
 
   // ── LHC: HDW — Hand Dish Wash (inn_36) ─────────────────────────────────
   inn_36:
-    'dermatologist-style gentle hand dishwashing gel pump bottle beside soft hands rinsing a glass plate under running water, clean skincare-inspired editorial',
+    'elegant cylindrical hand dishwashing gel pump bottle in matte ceramic finish beside soft hands gently rinsing a glass plate under running water, bright Scandinavian kitchen, skincare-inspired premium product photography with warm natural light',
 
   // ── LHC: ADW — Automatic Dish Wash (inn_37) ────────────────────────────
   inn_37:
-    'sleek smart dishwasher cartridge docked into a premium built-in dishwasher in a modern German kitchen, glowing status LED, IoT editorial',
+    'close-up of a smart dishwasher detergent cartridge with a glowing status LED being docked into a premium built-in dishwasher in a modern kitchen, companion app visible on a smartphone nearby, sleek IoT-tech editorial, cool blue accent lighting',
 
   // ── LHC: HSC — Hard Surface Care (inn_38–inn_39) ───────────────────────
   inn_38:
-    'an eco-friendly toilet care bottle on a bathroom shelf with bees and wildflowers visible through a window to a pollinator garden, biodiversity editorial',
+    'bright eco-friendly toilet care bottle with botanical design on a clean white bathroom shelf, view through the window showing a wildflower garden with bees, natural daylight, biodiversity-positive home care editorial',
   inn_39:
-    'a Nigerian family kitchen in Lagos with modern multi-purpose sachet cleaners on the counter, warm golden afternoon light, African home editorial',
+    'colorful single-use cleaning sachets arranged on a warm wooden kitchen counter in a bright modern home, a woman wiping a surface in the background, affordable everyday household care moment, warm golden afternoon light',
 
   // ── Cross-Category (inn_40–inn_43) ─────────────────────────────────────
   inn_40:
-    'vibrant Sub-Saharan African open-air marketplace with a branded consumer-goods stall displaying sachets of shampoo and detergent, golden-hour editorial',
+    'vibrant open-air marketplace in a warm climate with a consumer goods stall displaying colorful sachets and bottles of shampoo, detergent, and body care products, authentic shopping moment, rich golden-hour editorial photography',
   inn_41:
-    'a young Indonesian woman filming a beauty tutorial on her phone in a stylish Jakarta apartment with ring light and skincare products, live-shopping editorial',
+    'young woman in a stylish modern apartment filming a beauty tutorial with ring light and phone tripod, consumer care products artfully arranged on the desk, live-shopping social commerce aesthetic, bright warm lifestyle editorial',
   inn_42:
-    'Brazilian woman with silky straight post-keratin hair flowing in the wind on a Rio beach at sunset, premium hair-care bottle in hand, editorial beauty',
+    'portrait of a woman with sleek glossy keratin-treated hair flowing in a warm breeze, premium hair care products in the foreground on a salon counter, warm sunset light, professional salon-quality beauty editorial',
   inn_43:
-    'a holographic AI shopping agent interface hovering over a retail shelf of consumer goods, futuristic agentic commerce editorial, cool blue tech atmosphere',
+    'futuristic holographic AI shopping interface floating over a retail shelf filled with consumer goods products, cool blue tech atmosphere with warm product shelf lighting, agentic commerce concept editorial, cinematic depth of field',
 };
 
 /**

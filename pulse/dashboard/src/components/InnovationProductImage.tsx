@@ -17,6 +17,7 @@ interface ProductImageProps {
   gradient: string;
   accent: string;
   size?: 'card' | 'hero';
+  eager?: boolean; // Load immediately instead of lazy
 }
 
 export default function InnovationProductImage({
@@ -25,6 +26,7 @@ export default function InnovationProductImage({
   gradient,
   accent,
   size = 'card',
+  eager = false,
 }: ProductImageProps) {
   const seed =
     typeof innovationNumber === 'number'
@@ -49,7 +51,8 @@ export default function InnovationProductImage({
         <img
           src={url}
           alt=""
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : 'auto'}
           decoding="async"
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
