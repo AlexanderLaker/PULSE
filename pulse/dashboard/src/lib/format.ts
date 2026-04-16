@@ -71,7 +71,7 @@ export const CATEGORIES: CategoryDefinition[] = [
   { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#FF00FF' },
 ];
 
-export const YEARS: number[] = [2026, 2027, 2028, 2029, 2030];
+export const YEARS: number[] = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036];
 
 // ─── Formatting Functions ───────────────────────────────────
 

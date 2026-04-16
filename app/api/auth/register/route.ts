@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { findUserByEmail, createUser } from '@/lib/db';
 import { createToken, createRefreshToken, hashPassword } from '@/lib/auth';
 
+const ACCESS_KEYWORD = process.env.PRISM_ACCESS_KEYWORD || 'PRISM2026';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, name, password } = body;
+    const { email, name, password, keyword } = body;
+
+    // Validate keyword first
+    if (!keyword || keyword.trim() !== ACCESS_KEYWORD) {
+      return NextResponse.json(
+        { error: 'Invalid access keyword.' },
+        { status: 403 }
+      );
+    }
 
     // Validate input
     if (!email || !name || !password) {
@@ -24,10 +34,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate password length
-    if (password.length < 6) {
+    // Validate password length (8 chars minimum)
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
+        { error: 'Password must be at least 8 characters' },
         { status: 400 }
       );
     }

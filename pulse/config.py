@@ -24,7 +24,14 @@ VC_STEPS = [
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
 # ── Default model parameters ────────────────────────────────────────
+# DEFAULT_ATTENUATION is the BASE attenuation before per-force calibration.
+# The effective attenuation per force is computed as:
+#     eff_att_i = DEFAULT_ATTENUATION × (1 − mean(O[i][j] for j ≠ i))
+# where O is the calibrated DEFAULT_FORCE_OVERLAP_MATRIX below. As of v3.1
+# the overlap matrix is calibrated (not assumed) — the base stays at 0.5
+# but the PER-FORCE attenuation is data-driven. See attenuation_source.
 DEFAULT_ATTENUATION = 0.5          # Admin-configurable via PUT /api/v1/config
+DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.1_april2026"  # was "assumed"
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
@@ -185,23 +192,46 @@ DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 #   Other pairs: ≤0.10 (largely independent mechanisms)
 
 DEFAULT_FORCE_OVERLAP_MATRIX = {
-    # ── Calibrated from 61-trend review (April 2026) ──
-    # Each cell O[i][j] = fraction of force i's signal already captured by force j.
-    # Asymmetric: "Government captures 40% of Environmental" ≠ reverse.
+    # ── CALIBRATED from 82-trend empirical analysis (April 2026, v3.1) ──
+    # Methodology: excess-overlap-above-baseline + force-size asymmetry + mechanism adjustment
     #
-    # Key overlap clusters identified:
-    #   Gov↔Env (0.40/0.38): PFAS↔palm oil, PPWR↔EPR, EUDR↔palm, tariffs↔nearshoring
-    #   Consumer↔Comp (0.25/0.20): PL=competitor, Gen Z dupe=indie brands, C-beauty=Chinese brands
-    #   Gov→Tech (0.25): 5 of 9 Gov trends directly trigger Tech responses (reformulation R&D)
-    #   Consumer↔Cust (0.20/0.25): PL↔discount, cost-of-living↔channel shift, dupe↔TikTok
-    #   Tech↔Comp (0.20/0.25): AI formulation = L'Oreal tech-beauty = competitive weapon
-    #   Env→Tech (0.15): palm oil→bio-chemistry, water scarcity→concentrated formats
-    "Consumer":      {"Consumer": 0.0, "Customer": 0.20, "Technology": 0.10, "Government": 0.10, "Environmental": 0.20, "Competitive": 0.25},
-    "Customer":      {"Consumer": 0.25, "Customer": 0.0, "Technology": 0.10, "Government": 0.10, "Environmental": 0.05, "Competitive": 0.25},
-    "Technology":    {"Consumer": 0.10, "Customer": 0.10, "Technology": 0.0, "Government": 0.15, "Environmental": 0.15, "Competitive": 0.20},
-    "Government":    {"Consumer": 0.10, "Customer": 0.15, "Technology": 0.25, "Government": 0.0, "Environmental": 0.40, "Competitive": 0.05},
-    "Environmental": {"Consumer": 0.25, "Customer": 0.05, "Technology": 0.15, "Government": 0.38, "Environmental": 0.0, "Competitive": 0.05},
-    "Competitive":   {"Consumer": 0.20, "Customer": 0.20, "Technology": 0.25, "Government": 0.05, "Environmental": 0.05, "Competitive": 0.0},
+    # Step 1 (empirical): Computed mean pairwise weighted Jaccard between each
+    #   pair of trends across every cross-force combination in the 82-trend db.
+    #   Converted to "excess overlap": max(0, mean_J - J₀) / (1 - J₀) where
+    #   J₀ = 0.485 is the random-pair baseline across all trends. This removes
+    #   the structural-overlap floor (baseline FMCG scorecell similarity) and
+    #   isolates the signal.
+    # Step 2 (asymmetry): Multiplied by sqrt(n_j / n_i) capped at 1.5× to
+    #   reflect that a narrow force is more likely "covered" by a broad one.
+    # Step 3 (mechanism): Additive adjustment ±0.05-0.10 per cell based on
+    #   documented FMCG causal couplings (see mechanism notes inline below).
+    #
+    # Top calibrated couplings (from 0 to 0.432):
+    #   Environmental→Government  0.432  (PFAS, PPWR, EUDR, DPP: regulatory+ESG)
+    #   Government→Environmental  0.405  (same, reverse direction)
+    #   Government→Technology     0.367  (regulation triggers reformulation R&D)
+    #   Customer→Government       0.300  (retailer compliance burden scales w/ reg)
+    #   Customer→Technology       0.266  (retail media / agentic = customer tech)
+    #   Environmental→Technology  0.266  (supply constraints drive bio-chem)
+    #   Technology→Government     0.237  (AI Act, DPP digital mandates)
+    #   Customer→Government       0.200  (PPWR, CSRD impact retailers)
+    #   Technology→Customer       0.183  (digital commerce infrastructure)
+    #
+    # Consumer and Competitive rows ≈ 0 for most cells because Consumer has 23
+    # highly diverse trends (including 6 geo-regional trends that are structurally
+    # unlike all other forces) and Competitive has 12 competitor-specific trends
+    # that are each mechanistically independent. Only mechanism-coupling floors
+    # preserve non-zero values: Consumer→Competitive (0.08) via dupe↔indie, and
+    # a handful of small cross-links.
+    #
+    # See also: attenuation_source = "calibrated_v3.1_april2026"
+    # Exported matrix: data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet)
+    "Consumer":      {"Consumer": 0.0,  "Customer": 0.050, "Technology": 0.000, "Government": 0.000, "Environmental": 0.050, "Competitive": 0.080},
+    "Customer":      {"Consumer": 0.000, "Customer": 0.0,  "Technology": 0.266, "Government": 0.300, "Environmental": 0.163, "Competitive": 0.090},
+    "Technology":    {"Consumer": 0.000, "Customer": 0.183, "Technology": 0.0,  "Government": 0.237, "Environmental": 0.148, "Competitive": 0.080},
+    "Government":    {"Consumer": 0.000, "Customer": 0.200, "Technology": 0.367, "Government": 0.0,  "Environmental": 0.405, "Competitive": 0.000},
+    "Environmental": {"Consumer": 0.050, "Customer": 0.118, "Technology": 0.266, "Government": 0.432, "Environmental": 0.0,  "Competitive": 0.000},
+    "Competitive":   {"Consumer": 0.050, "Customer": 0.087, "Technology": 0.000, "Government": 0.000, "Environmental": 0.000, "Competitive": 0.0},
 }
 
 # ── Within-Force Overlap ───────────────────────────────────────────
@@ -231,31 +261,44 @@ DEFAULT_FORCE_OVERLAP_MATRIX = {
 #   Competitive 0.15: competitor-specific trends are more independent
 
 DEFAULT_WITHIN_FORCE_OVERLAP = {
-    # ── Calibrated from 61-trend pair analysis (April 2026) ──
-    # Each value = fraction of mechanism overlap among trends within the same force.
-    # Higher = more trends measure the same underlying phenomenon.
+    # ── CALIBRATED from 82-trend empirical analysis (April 2026, v3.1) ──
+    # Methodology: mean pairwise weighted Jaccard over 12-category exposure
+    # vectors WITHIN each force, converted to excess-overlap above the
+    # 82-trend random-pair baseline J₀ = 0.485, then adjusted ±0.03-0.05
+    # for mechanism-cluster density vs. diversity.
     #
-    # Consumer 0.22: C-01 PL↔C-06 Cost-of-Living (trading down), C-03 Premium↔C-09
-    #   Fragrance Premium, C-04 Conscious↔C-13 Refill, C-11 Dupe↔C-01 PL.
-    #   But 6 regional trends (C-16 to C-18) are geographically independent → dilutes.
-    # Government 0.35: G-01/G-02/G-03 are EU chemical reg cluster (Green Deal),
-    #   G-08/G-09 nearly identical (tariffs, different geographies), G-04/G-05/G-07
-    #   sustainability compliance cluster. Highest within-force overlap.
-    # Environmental 0.32: E-01 Palm↔E-06 Nearshoring (supply chain), E-03 Carbon↔E-04
-    #   EPR (compliance costs), E-02 Water↔E-05 Climate (climate-driven),
-    #   E-06↔E-07 (European manufacturing cost). Tightly interconnected.
-    # Technology 0.20: T-01/T-05/T-07/T-09/T-10 form heavy AI cluster (5 of 10 trends).
-    #   T-06 Retail Media↔T-09 Gen AI overlap. Higher than initial estimate.
-    # Customer 0.22: K-01 Discount↔K-03 Consolidation (retailer power), K-02/K-04/K-05/K-06
-    #   digital channel cluster, K-08 US Retail Media overlaps both.
-    # Competitive 0.15: Competitor-specific trends (Reckitt, Unilever, P&G, L'Oreal)
-    #   are genuinely independent strategies. X-04 DTC↔X-05 Chinese brands moderate.
-    "Consumer": 0.22,
-    "Customer": 0.22,
-    "Technology": 0.20,
-    "Government": 0.35,
-    "Environmental": 0.32,
-    "Competitive": 0.15,
+    # Empirical signal per force (raw mean J → excess → final):
+    #   Government     0.678 → 0.376 → 0.426   [8 of 12 trends from EU Green Deal]
+    #   Environmental  0.597 → 0.219 → 0.269   [tight climate→water→palm→energy web]
+    #   Technology     0.579 → 0.182 → 0.232   [AI cluster (8) + bio-chem cluster (5)]
+    #   Customer       0.566 → 0.157 → 0.157   [channel power cluster + digital cluster]
+    #   Consumer       0.387 → 0.000 → 0.100   [23 diverse trends, floor-clamped]
+    #   Competitive    0.455 → 0.000 → 0.100   [competitor-specific independent; floor]
+    #
+    # Rationale for top-of-range Government (0.426):
+    #   government_r01-r07 + r10-r12 all stem from European Green Deal: PFAS, micro-
+    #   plastics, Omnibus VII/VIII, PPWR, Green Claims, EUDR, DPP, AI Act, biodiv,
+    #   textile circularity. Shared regulatory DNA = genuine mechanism redundancy.
+    #
+    # Rationale for floor-clamped Consumer (0.100):
+    #   23 trends span premiumization (r03, r09, r21), sustainability (r04, r13),
+    #   demographics (r05, r08, r24), occasions (r07, r14, r15), geographic (r17-
+    #   r20), value trading (r01, r06, r11, r22). Mean J = 0.387, same as baseline.
+    #   Empirical signal of excess = 0, clamped at 0.10 to preserve light dampening.
+    #
+    # Rationale for floor-clamped Competitive (0.100):
+    #   competitive_r01-r12 are each about a DIFFERENT competitor (Reckitt, P&G,
+    #   Unilever, L'Oreal, K-beauty, C-beauty, Chinese brands, Amazon, DTC wave,
+    #   NVIDIA partnership, IMEA growth divergence). Genuinely independent
+    #   strategies, no mechanism redundancy. Empirical excess = 0.
+    #
+    # See also: data/Attenuation_Calibration.xlsx (Within-Force_Overlap sheet)
+    "Consumer":      0.100,  # was 0.22 | empirical excess 0.00, floor-clamped
+    "Customer":      0.157,  # was 0.22 | empirical excess 0.16
+    "Technology":    0.232,  # was 0.20 | empirical excess 0.18 + mech +0.05
+    "Government":    0.426,  # was 0.35 | empirical excess 0.38 + mech +0.05 (top)
+    "Environmental": 0.269,  # was 0.32 | empirical excess 0.22 + mech +0.05
+    "Competitive":   0.100,  # was 0.15 | empirical excess 0.00, floor-clamped
 }
 
 # ── Force correlation matrix (cross-force correlations for copula) ──────
@@ -284,7 +327,7 @@ class ModelConfig:
     region: str = "Global"
     aggregation_method: str = "Multiplicative"
     attenuation: float = DEFAULT_ATTENUATION
-    attenuation_source: str = "assumed"  # "assumed" | "backtested"
+    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "assumed" | "calibrated_v3.1_april2026" | "backtested"
     neutral_threshold: float = DEFAULT_NEUTRAL_THRESHOLD
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))

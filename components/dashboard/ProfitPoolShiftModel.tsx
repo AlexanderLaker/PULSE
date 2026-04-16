@@ -403,63 +403,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
               <AlertTriangle size={16} />
             </motion.button>
 
-            {/* Export Button */}
-            <motion.button
-              data-onboarding="export"
-              onClick={() => setActiveModal('export')}
-              whileHover={{ background: T.bg1, borderColor: 'rgba(0,0,0,0.12)' }}
-              whileTap={{ scale: 0.95 }}
-              className="btn-icon"
-              title="Export Results"
-            >
-              <Download size={16} />
-            </motion.button>
-
-            {/* Briefing / Presentation Mode Button */}
-            <motion.button
-              onClick={() => setActiveModal('briefing')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 10,
-                border: `1px solid ${presentationMode ? T.accent : 'rgba(0,0,0,0.08)'}`,
-                background: presentationMode ? `${T.accent}15` : 'transparent',
-                color: presentationMode ? T.accent : T.text2,
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
-              } as React.CSSProperties}
-              title="Briefing Mode"
-            >
-              <Presentation size={16} />
-            </motion.button>
-
-            {/* AI Chat Button */}
-            <motion.button
-              onClick={() => setAIChatOpen(!aiChatOpen)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 10,
-                border: `1px solid ${aiChatOpen ? T.accent : 'rgba(0,0,0,0.08)'}`,
-                background: aiChatOpen ? `${T.accent}15` : 'transparent',
-                color: aiChatOpen ? T.accent : T.text2,
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.25,0.1,0.25,1)',
-              } as React.CSSProperties}
-              title="AI Chat"
-            >
-              <MessageCircle size={16} />
-            </motion.button>
           </div>
 
           {/* Region Selector */}
@@ -886,26 +829,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
           ))}
         </div>
 
-        {/* Right: Export Button */}
-        <div style={{ display: 'flex', gap: 8 } as React.CSSProperties}>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              padding: '8px 20px',
-              borderRadius: 999,
-              border: 'none',
-              background: T.text,
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.25,0.1,0.25,1)',
-            } as React.CSSProperties}
-          >
-            Export Results
-          </motion.button>
-        </div>
       </motion.footer>
 
       {/* AI Chat Panel (Bottom slide-up) */}

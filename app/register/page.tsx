@@ -7,6 +7,7 @@ import Link from 'next/link';
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
+    keyword: '',
     name: '',
     email: '',
     password: '',
@@ -18,6 +19,12 @@ export default function RegisterPage() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+
+    if (!formData.keyword.trim()) {
+      errors.keyword = 'Access keyword is required';
+    } else if (formData.keyword.trim() !== 'PRISM2026') {
+      errors.keyword = 'Invalid access keyword';
+    }
 
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
@@ -31,8 +38,8 @@ export default function RegisterPage() {
 
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
     }
 
     if (!formData.confirmPassword) {
@@ -76,6 +83,7 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          keyword: formData.keyword.trim(),
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -114,6 +122,27 @@ export default function RegisterPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Access Keyword */}
+          <div>
+            <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-2">
+              Access Keyword
+            </label>
+            <input
+              id="keyword"
+              type="password"
+              name="keyword"
+              className={`input ${validationErrors.keyword ? 'border-red-300 focus:ring-red-100' : ''}`}
+              placeholder="Enter keyword"
+              value={formData.keyword}
+              onChange={handleChange}
+              disabled={isLoading}
+              autoComplete="off"
+            />
+            {validationErrors.keyword && (
+              <p className="text-sm text-red-600 mt-1.5">{validationErrors.keyword}</p>
+            )}
+          </div>
+
           {/* Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -124,7 +153,7 @@ export default function RegisterPage() {
               type="text"
               name="name"
               className={`input ${validationErrors.name ? 'border-red-300 focus:ring-red-100' : ''}`}
-              placeholder="John Doe"
+              placeholder="Jane Smith"
               value={formData.name}
               onChange={handleChange}
               disabled={isLoading}
@@ -172,6 +201,7 @@ export default function RegisterPage() {
             {validationErrors.password && (
               <p className="text-sm text-red-600 mt-1.5">{validationErrors.password}</p>
             )}
+            <p className="text-xs text-gray-400 mt-1.5">Minimum 8 characters</p>
           </div>
 
           {/* Confirm Password */}
@@ -197,7 +227,7 @@ export default function RegisterPage() {
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3 mt-4">
-              <span className="text-red-600 text-lg leading-none mt-0.5">⚠</span>
+              <span className="text-red-600 text-lg leading-none mt-0.5">!</span>
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -236,7 +266,7 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-          <p>PRISM Profit Pool Shift Model v2.0</p>
+          <p>PRISM Profit Pool Shift Model v3.1</p>
           <p className="mt-1">Strategic FMCG Analysis Platform</p>
         </div>
       </div>

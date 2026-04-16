@@ -70,7 +70,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -97,11 +97,21 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    // Validate keyword on both login and register
+    if (!keyword.trim()) {
+      setLocalError('Access keyword is required.');
+      return;
+    }
+    if (keyword.trim() !== 'PRISM2026') {
+      setLocalError('Invalid access keyword.');
+      return;
+    }
+    setLocalError(null);
     try {
       if (mode === 'login') {
         await onLogin(email, password);
       } else if (mode === 'register') {
-        await onRegister(email, password, name, inviteCode);
+        await onRegister(email, password, name, keyword.trim());
       }
     } catch {
       // error is handled by useAuth hook
@@ -149,8 +159,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
       setLocalError('Passwords do not match.');
       return;
     }
-    if (newPassword.length < 6) {
-      setLocalError('Password must be at least 6 characters.');
+    if (newPassword.length < 8) {
+      setLocalError('Password must be at least 8 characters.');
       return;
     }
     setLocalLoading(true);
@@ -377,7 +387,7 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                   Set new password
                 </h2>
                 <p style={{ fontSize: 13, color: T.text2, margin: '0 0 20px', lineHeight: 1.5 }}>
-                  Your new password must be at least 6 characters long.
+                  Your new password must be at least 8 characters long.
                 </p>
                 <form onSubmit={handleResetWithToken}>
                   <label style={labelStyle}>New password</label>
@@ -415,8 +425,8 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
 
                   <button
                     type="submit"
-                    disabled={isLoading || newPassword.length < 6 || newPassword !== confirmPassword}
-                    style={submitStyle(isLoading || newPassword.length < 6 || newPassword !== confirmPassword)}
+                    disabled={isLoading || newPassword.length < 8 || newPassword !== confirmPassword}
+                    style={submitStyle(isLoading || newPassword.length < 8 || newPassword !== confirmPassword)}
                   >
                     {isLoading ? (
                       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -457,6 +467,20 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                 </div>
 
                 <form onSubmit={handleSubmit}>
+                  {/* Access Keyword — shown on both login and register */}
+                  <label style={labelStyle}>Access Keyword</label>
+                  <input
+                    type="password"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    placeholder="Enter keyword"
+                    required
+                    autoComplete="off"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                  />
+
                   <AnimatePresence mode="wait">
                     {mode === 'register' && (
                       <motion.div
@@ -473,17 +497,6 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Your full name"
-                          required
-                          style={inputStyle}
-                          onFocus={handleInputFocus}
-                          onBlur={handleInputBlur}
-                        />
-                        <label style={labelStyle}>Invite Code</label>
-                        <input
-                          type="text"
-                          value={inviteCode}
-                          onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                          placeholder="PRISM-2026"
                           required
                           style={inputStyle}
                           onFocus={handleInputFocus}
@@ -574,7 +587,7 @@ function PasswordInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required
-        minLength={6}
+        minLength={8}
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         style={{ ...inputStyle, paddingRight: 44 }}

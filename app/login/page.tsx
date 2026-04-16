@@ -8,19 +8,31 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Client-side keyword validation
+    if (!keyword.trim()) {
+      setError('Access keyword is required.');
+      return;
+    }
+    if (keyword.trim() !== 'PRISM2026') {
+      setError('Invalid access keyword.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, keyword: keyword.trim() }),
       });
 
       const data = await response.json();
@@ -55,6 +67,24 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Access Keyword */}
+          <div>
+            <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-2">
+              Access Keyword
+            </label>
+            <input
+              id="keyword"
+              type="password"
+              className="input"
+              placeholder="Enter keyword"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="off"
+            />
+          </div>
+
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -87,12 +117,20 @@ export default function LoginPage() {
               required
               disabled={isLoading}
             />
+            <div className="flex justify-end mt-2">
+              <Link
+                href="/forgot-password"
+                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3">
-              <span className="text-red-600 text-lg leading-none mt-0.5">⚠</span>
+              <span className="text-red-600 text-lg leading-none mt-0.5">!</span>
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -123,7 +161,7 @@ export default function LoginPage() {
 
         {/* Sign Up Link */}
         <div className="text-center text-sm text-gray-600">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
             Create one
           </Link>
@@ -131,7 +169,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-          <p>PRISM Profit Pool Shift Model v2.0</p>
+          <p>PRISM Profit Pool Shift Model v3.1</p>
           <p className="mt-1">Strategic FMCG Analysis Platform</p>
         </div>
       </div>

@@ -15,7 +15,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { BarChart3, Layers, Route } from 'lucide-react';
+import { BarChart3, Layers, Route, Zap } from 'lucide-react';
 import { T } from '../lib/format';
 
 // ═══════════════════════════════════════════════════════════════
@@ -487,6 +487,7 @@ interface ConsumerJourneyProps {
   onNavigateToTrend?: (trendSearch: string) => void;
   onNavigateProfitPoolShiftModel?: () => void;
   onNavigateTrends?: () => void;
+  onNavigateInnovation?: () => void;
   isAdmin?: boolean;
 }
 
@@ -778,7 +779,7 @@ const TREND_CONTEXT: Record<string, { name: string; force: string; description: 
   'E-08': { name: 'Textile Longevity & Garment Life Extension', force: 'Environmental', description: 'EU Circular Textiles Strategy mandates durability standards. Growing demand for fabric protection, pilling removers, color-restore treatments.' },
 };
 
-export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateProfitPoolShiftModel, onNavigateTrends, isAdmin }: ConsumerJourneyProps) {
+export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateProfitPoolShiftModel, onNavigateTrends, onNavigateInnovation, isAdmin }: ConsumerJourneyProps) {
   const [activeTab, setActiveTab] = useState<'lhc' | 'hair'>('lhc');
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -836,7 +837,7 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
           <span style={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>v6.0</span>
         </div>
 
-        {/* Nav pills — Profit Pool Shift Model, Trends, Consumer Journey */}
+        {/* Nav pills — Profit Pool Analysis, Trends, Consumer Journey, Innovation Explorer */}
         <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
           {onNavigateProfitPoolShiftModel && (
             <button
@@ -884,10 +885,29 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
             <Route size={13} />
             Consumer Journey
           </button>
+          {onNavigateInnovation && (
+            <button
+              onClick={onNavigateInnovation}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 14px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: 'transparent',
+                color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: T.sans, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = T.bg1; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <Zap size={13} />
+              Innovation Explorer
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* LHC / Hair toggle — left of spacer */}
-        <div style={{ display: 'flex', gap: 2, background: T.bg1, borderRadius: 8, padding: 2, marginLeft: 12, marginRight: 'auto' }}>
+      {/* Title area with LHC / Hair toggle */}
+      <div style={{ padding: '20px 24px 8px', maxWidth: 1600, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 2, background: T.bg1, borderRadius: 8, padding: 2 }}>
           {(['lhc', 'hair'] as const).map(tab => (
             <button
               key={tab}
@@ -905,12 +925,10 @@ export default function ConsumerJourney({ onBack, onNavigateToTrend, onNavigateP
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Title area */}
-      <div style={{ padding: '20px 24px 8px', maxWidth: 1600, margin: '0 auto' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.3 }}>{title}</h2>
-        <p style={{ fontSize: 12, color: T.text3, margin: '4px 0 0' }}>{subtitle}</p>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: -0.3 }}>{title}</h2>
+          <p style={{ fontSize: 12, color: T.text3, margin: '4px 0 0' }}>{subtitle}</p>
+        </div>
       </div>
 
       {/* Legend */}

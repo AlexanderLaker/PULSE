@@ -34,8 +34,10 @@ JWT_SECRET = os.environ.get("PRISM_JWT_SECRET", "prism-dev-secret-change-in-prod
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
 
-# Invite codes — required to register. Admin can create new ones.
-INVITE_CODES = set(os.environ.get("PRISM_INVITE_CODES", "PRISM-2026,HENKEL-STRATEGY,PROFITPOOLSHIFTMODEL-ACCESS").split(","))
+# Access keyword — required to register. Configurable via env var.
+ACCESS_KEYWORD = os.environ.get("PRISM_ACCESS_KEYWORD", "PRISM2026")
+# Legacy invite codes — kept for backwards compat, plus keyword
+INVITE_CODES = set(os.environ.get("PRISM_INVITE_CODES", "PRISM-2026,HENKEL-STRATEGY,PROFITPOOLSHIFTMODEL-ACCESS,PRISM2026").split(","))
 
 # Admin emails — these users are automatically assigned admin role on registration
 ADMIN_EMAILS = set(

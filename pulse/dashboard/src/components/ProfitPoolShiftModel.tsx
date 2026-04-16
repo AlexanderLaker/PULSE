@@ -361,14 +361,17 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
         sums[force] += gp1Shift * (Math.max(0, Math.min(5, catExp)) / 5);
       });
 
-      // Scale proportionally to match MC 2030 total (if available)
+      // Scale proportionally to match MC terminal-year total (if available)
       const rawTotal = Object.values(sums).reduce((a, b) => a + b, 0);
       const catShift = data.shifts?.[cat.id];
       let mcTotal = 0;
       if (catShift) {
         const p = catShift as any;
-        if (p[2030]) {
-          const v = p[2030];
+        // Find last available year dynamically (v3.1: 2026-2036)
+        const yearKeys = Object.keys(p).map(Number).filter(n => n >= 2026 && n <= 2036).sort((a, b) => b - a);
+        const lastYear = yearKeys[0];
+        if (lastYear && p[lastYear]) {
+          const v = p[lastYear];
           mcTotal = typeof v === 'object' ? (v.median ?? v.p50 ?? 0) : (typeof v === 'number' ? v : 0);
         }
       }

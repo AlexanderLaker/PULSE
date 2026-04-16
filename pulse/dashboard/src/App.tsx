@@ -58,6 +58,7 @@ export default function App() {
             onNavigateProfitPoolShiftModel={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
             onNavigateTrends={() => { setTrendSearch(undefined); setPage('profitpoolshiftmodel'); }}
             onNavigateToTrend={(search) => { setTrendSearch(search); setPage('profitpoolshiftmodel'); }}
+            onNavigateInnovation={() => setPage('innovation')}
             isAdmin={isAdmin}
           />
         </Suspense>

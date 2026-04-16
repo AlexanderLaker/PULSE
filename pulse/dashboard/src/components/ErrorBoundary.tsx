@@ -157,8 +157,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               We encountered an unexpected error. Please try again or contact support if the problem persists.
             </p>
 
-            {/* Error Details (in development) */}
-            {import.meta.env.DEV && this.state.error && (
+            {/* Error Details — temporarily shown in production for debugging */}
+            {this.state.error && (
               <div style={errorDetailsStyle}>
                 <p style={errorMessageStyle}>
                   {this.state.error.toString()}
