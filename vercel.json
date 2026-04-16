@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "",
+  "buildCommand": "node -e \"const fs=require('fs');const keep=new Set(['index-Bl6wboiN.js','format-wXiyqZgn.js','ProfitPoolShiftModel-DQyIYPCd.js','InnovationExplorer-ByZUc9yF.js','ConsumerJourney-BC0sJPKf.js','route-BIE4m4Ja.js','zap-BKfeWzVJ.js','index-3jeqryb4.css']);const dir='public/assets';fs.readdirSync(dir).forEach(f=>{if(!keep.has(f)){fs.unlinkSync(dir+'/'+f);console.log('Removed stale:',f)}});console.log('Kept',keep.size,'assets');\"",
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api/index.py" },
