@@ -97,14 +97,16 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Validate keyword on both login and register
-    if (!keyword.trim()) {
-      setLocalError('Access keyword is required.');
-      return;
-    }
-    if (keyword.trim() !== 'PRISM2026') {
-      setLocalError('Invalid access keyword.');
-      return;
+    // Validate keyword only on register
+    if (mode === 'register') {
+      if (!keyword.trim()) {
+        setLocalError('Access keyword is required.');
+        return;
+      }
+      if (keyword.trim() !== 'PRISM2026') {
+        setLocalError('Invalid access keyword.');
+        return;
+      }
     }
     setLocalError(null);
     try {
@@ -467,20 +469,6 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                  {/* Access Keyword — shown on both login and register */}
-                  <label style={labelStyle}>Access Keyword</label>
-                  <input
-                    type="password"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="Enter keyword"
-                    required
-                    autoComplete="off"
-                    style={inputStyle}
-                    onFocus={handleInputFocus}
-                    onBlur={handleInputBlur}
-                  />
-
                   <AnimatePresence mode="wait">
                     {mode === 'register' && (
                       <motion.div
@@ -491,6 +479,20 @@ export default function AuthPage({ onLogin, onRegister, error, loading, onClearE
                         transition={{ duration: 0.2 }}
                         style={{ overflow: 'hidden' }}
                       >
+                        {/* Access Keyword — register only */}
+                        <label style={labelStyle}>Access Keyword</label>
+                        <input
+                          type="password"
+                          value={keyword}
+                          onChange={(e) => setKeyword(e.target.value)}
+                          placeholder="Enter keyword"
+                          required
+                          autoComplete="off"
+                          style={inputStyle}
+                          onFocus={handleInputFocus}
+                          onBlur={handleInputBlur}
+                        />
+
                         <label style={labelStyle}>Name</label>
                         <input
                           type="text"
