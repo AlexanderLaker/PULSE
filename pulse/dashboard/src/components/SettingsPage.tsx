@@ -139,6 +139,22 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
     }));
   };
 
+  /* ── Attenuation overlap matrix helpers ────────────────────── */
+  // Off-diagonal: cross-force overlap (row → col). Asymmetric by design.
+  const handleOverlapChange = (row: ForceName, col: ForceName, value: number) => {
+    if (row === col) return; // diagonal handled separately
+    const clamped = Math.max(0, Math.min(0.45, value));
+    setForceOverlapMatrix(prev => ({
+      ...prev,
+      [row]: { ...(prev[row] || {}), [col]: clamped },
+    }));
+  };
+  // Diagonal: within-force cohesion (scalar per force).
+  const handleWithinForceChange = (force: ForceName, value: number) => {
+    const clamped = Math.max(0, Math.min(0.5, value));
+    setWithinForceOverlap(prev => ({ ...prev, [force]: clamped }));
+  };
+
   /* ── Save ───────────────────────────────────────────────────── */
   const handleSave = async () => {
     setSaving(true);
@@ -148,8 +164,6 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const payload: any = {
-        attenuation: +attenuation.toFixed(4),
-        attenuation_source: attenuationSource,
         force_weights: normalize(forceWeights),
         vc_weights: normalize(vcWeights),
         region_weights: normalize(regionWeights),
@@ -160,6 +174,12 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       };
       if (Object.keys(correlationMatrix).length > 0) {
         payload.force_correlation_matrix = correlationMatrix;
+      }
+      if (Object.keys(forceOverlapMatrix).length > 0) {
+        payload.force_overlap_matrix = forceOverlapMatrix;
+      }
+      if (Object.keys(withinForceOverlap).length > 0) {
+        payload.within_force_overlap = withinForceOverlap;
       }
 
       const res = await fetch('/api/v1/config', { method: 'PUT', headers, body: JSON.stringify(payload) });
@@ -256,27 +276,8 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
         {/* ── Left Column ────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Attenuation */}
-          <Card title="Attenuation Factor" subtitle="Base signal dampener — scaled per force by the calibrated overlap matrices below.">
-            <SliderInput label="Base Attenuation (multiplicative decay)" value={attenuation} onChange={setAttenuation} min={0.05} max={1.0} step={0.05} />
-            <SelectInput label="Source" value={attenuationSource}
-              onChange={setAttenuationSource}
-              options={[
-                { value: 'assumed', label: 'Assumed (default 0.5)' },
-                { value: 'calibrated_v3.1_april2026', label: 'Calibrated (v3.1 — April 2026, 82 trends)' },
-                { value: 'backtested', label: 'Backtested (calibrated from history)' },
-                { value: 'admin_override', label: 'Admin Override' },
-              ]}
-            />
-            <Hint>
-              <strong style={{ color: T.text2 }}>What this does:</strong> Attenuation dampens the raw force signal to prevent double-counting when multiple trends capture overlapping phenomena (e.g., eight Government trends all trace to the EU Green Deal). The base value (0.5) is uniformly applied and then scaled per-force by 1 − mean cross-force overlap, so forces that are more coupled to others are dampened more.
-              <br /><br />
-              <strong style={{ color: T.text2 }}>Suggested ranges:</strong> 0.2–0.5 = conservative, 0.7–1.0 = aggressive.
-            </Hint>
-          </Card>
-
-          {/* Calibrated Attenuation Matrices — read-only */}
-          <Card title="Attenuation Calibration (v3.1)" subtitle="Empirically calibrated from 82-trend Bain review, April 2026. Read-only — regenerate with compute_attenuation_v3.py.">
+          {/* Attenuation Matrix — calibrated values, editable inline */}
+          <Card title="Attenuation Matrix" subtitle="Diagonal = within-force cohesion. Off-diagonal = cross-force overlap. Edit any cell to override.">
             <div style={{
               display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12,
               padding: '6px 10px', borderRadius: 8,
@@ -288,36 +289,16 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
               </span>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.text3, letterSpacing: 0.5, textTransform: 'uppercase', margin: '0 0 8px' }}>
-              Within-Force Overlap
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
-              {FORCES.map(f => {
-                const v = withinForceOverlap[f] ?? 0;
-                const pct = Math.min(100, (v / 0.5) * 100); // scale 0..0.5 → 0..100%
-                return (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 90, fontSize: 12, fontWeight: 600, color: FORCE_COLORS[f] }}>{f}</div>
-                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: FORCE_COLORS[f], borderRadius: 3 }} />
-                    </div>
-                    <div style={{ width: 52, textAlign: 'right', fontSize: 12, fontWeight: 600, fontFamily: T.mono, color: T.text2 }}>
-                      {v.toFixed(3)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.text3, letterSpacing: 0.5, textTransform: 'uppercase', margin: '4px 0 8px' }}>
-              Cross-Force Overlap Matrix (row → column)
-            </div>
-            <ReadOnlyOverlapMatrix matrix={forceOverlapMatrix} forces={FORCES} />
+            <OverlapMatrixEditor
+              matrix={forceOverlapMatrix}
+              diagonal={withinForceOverlap}
+              forces={FORCES}
+              onCellChange={handleOverlapChange}
+              onDiagonalChange={handleWithinForceChange}
+            />
 
             <Hint>
-              <strong style={{ color: T.text2 }}>How to read the matrix:</strong> Each cell shows how much the <em>row force</em>'s signal overlaps with the <em>column force</em>'s signal. Higher values (darker) mean more shared mechanism — e.g., Environmental→Government is 0.43 because PFAS/PPWR/EUDR trends are simultaneously environmental and regulatory. Diagonal is N/A (within-force is the scalar above). Asymmetric because narrow forces get their signal "covered" by broad forces more than vice versa.
-              <br /><br />
-              <strong style={{ color: T.text2 }}>Methodology:</strong> Weighted Jaccard similarity on 12-category exposure vectors, excess-over-baseline transform (J₀ = 0.485), force-size asymmetry (√(n_j/n_i) capped at 1.5×), mechanism-cluster adjustment (±0.03 to ±0.10). Values clamped to [0, 0.45].
+              <strong style={{ color: T.text2 }}>What this does:</strong> Attenuation dampens the raw force signal to prevent double-counting when multiple trends capture the same phenomenon (e.g., Environmental and Government trends both covering PFAS). Each off-diagonal cell is the share of the <em>row force</em>'s signal that overlaps with the <em>column force</em>'s signal; the diagonal is within-force cohesion. Together these scale the effective attenuation per force by <em>1 − mean cross-force overlap</em>.
             </Hint>
           </Card>
 
@@ -646,23 +627,25 @@ const CorrelationMatrixEditor: FC<{
   );
 };
 
-/* ── Read-Only Overlap Matrix (calibrated attenuation) ─────────── */
-const ReadOnlyOverlapMatrix: FC<{
+/* ── Attenuation Overlap Matrix Editor (same shape as Force Correlation) ─ */
+const OverlapMatrixEditor: FC<{
   matrix: Record<string, Record<string, number>>;
+  diagonal: Record<string, number>;
   forces: ForceName[];
-}> = ({ matrix, forces }) => {
-  // Color scale: 0 → neutral, up to 0.45 cap
+  onCellChange: (row: ForceName, col: ForceName, value: number) => void;
+  onDiagonalChange: (force: ForceName, value: number) => void;
+}> = ({ matrix, diagonal, forces, onCellChange, onDiagonalChange }) => {
+  // Color scale mirrors CorrelationMatrixEditor but in gold/accent
   const cellBg = (val: number, isDiag: boolean) => {
-    if (isDiag) return 'rgba(148, 163, 184, 0.10)';
+    if (isDiag) {
+      const t = Math.min(1, val / 0.5);
+      return `rgba(0, 113, 227, ${0.04 + t * 0.18})`;
+    }
     const t = Math.min(1, val / 0.45);
-    return `rgba(212, 168, 71, ${0.04 + t * 0.35})`;
-  };
-  const cellColor = (val: number, isDiag: boolean) => {
-    if (isDiag) return T.text3;
-    return val >= 0.2 ? T.accent : T.text2;
+    return `rgba(212, 168, 71, ${0.04 + t * 0.30})`;
   };
 
-  const cellSize = 58;
+  const cellSize = 64;
   const labelW = 48;
 
   return (
@@ -693,17 +676,43 @@ const ReadOnlyOverlapMatrix: FC<{
             </div>
             {forces.map((col, ci) => {
               const isDiag = ri === ci;
-              const val = isDiag ? 0 : (matrix[row]?.[col] ?? 0);
+              const val = isDiag
+                ? (diagonal[row] ?? 0)
+                : (matrix[row]?.[col] ?? 0);
               return (
                 <div key={col} style={{
-                  width: cellSize, height: 32,
+                  width: cellSize, height: 36,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: cellBg(val, isDiag),
-                  color: cellColor(val, isDiag),
                   borderRadius: 6, margin: 1,
-                  fontSize: 12, fontWeight: 600, fontFamily: T.mono,
+                  border: isDiag ? `1px solid rgba(0, 113, 227, 0.2)` : `1px solid transparent`,
+                  transition: 'all 0.15s',
                 }}>
-                  {isDiag ? '—' : val.toFixed(3)}
+                  <input
+                    type="number"
+                    value={val.toFixed(3)}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value);
+                      if (isNaN(v)) return;
+                      if (isDiag) onDiagonalChange(row, v);
+                      else onCellChange(row, col, v);
+                    }}
+                    min={0}
+                    max={isDiag ? 0.5 : 0.45}
+                    step={0.01}
+                    style={{
+                      width: 56, padding: '3px 4px',
+                      background: 'transparent', border: 'none',
+                      color: isDiag
+                        ? T.accent
+                        : (val >= 0.2 ? T.accent : T.text2),
+                      fontSize: 12, fontWeight: 500, fontFamily: T.mono,
+                      textAlign: 'center', outline: 'none',
+                      borderRadius: 4,
+                    }}
+                    onFocus={e => { e.target.style.background = 'rgba(0, 113, 227, 0.06)'; }}
+                    onBlur={e => { e.target.style.background = 'transparent'; }}
+                  />
                 </div>
               );
             })}

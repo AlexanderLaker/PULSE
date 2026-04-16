@@ -1529,6 +1529,14 @@ def create_app(args=None) -> FastAPI:
             description="6×6 force correlation matrix for copula. "
                         "Each force maps to a dict with all 6 forces. "
                         "Diagonal must be 1.0, off-diagonal in [0,1].")
+        force_overlap_matrix: Optional[dict] = Field(None,
+            description="6×6 cross-force overlap matrix for attenuation. "
+                        "Asymmetric by design (narrow forces are 'covered' by "
+                        "broad forces more than vice versa). Off-diagonal in "
+                        "[0, 0.45].")
+        within_force_overlap: Optional[dict] = Field(None,
+            description="Per-force within-force cohesion scalar. "
+                        "Dict mapping each of the 6 forces to a float in [0, 0.5].")
         iterations: Optional[int] = Field(None, ge=1000, le=100000)
         within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
         t_copula_df: Optional[int] = Field(None, ge=2, le=30)
@@ -1627,6 +1635,41 @@ def create_app(args=None) -> FastAPI:
             changes["force_correlation_matrix"] = {"old": old_fcm, "new": fcm}
             overrides["force_correlation_matrix"] = fcm
 
+        if req.force_overlap_matrix is not None:
+            fom = req.force_overlap_matrix
+            forces = ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"]
+            for f in forces:
+                if f not in fom:
+                    raise HTTPException(400, f"Force overlap matrix missing force '{f}'")
+                row = fom[f]
+                if not isinstance(row, dict):
+                    raise HTTPException(400, f"Force overlap matrix row '{f}' must be a dict")
+                for other_f, val in row.items():
+                    if other_f == f:
+                        continue  # diagonal sent separately in within_force_overlap
+                    if not isinstance(val, (int, float)):
+                        raise HTTPException(400, f"Force overlap ({f},{other_f}) must be numeric")
+                    if val < 0 or val > 0.45:
+                        raise HTTPException(400, f"Force overlap ({f},{other_f}) must be in [0, 0.45], got {val}")
+            old_fom = getattr(config, 'force_overlap_matrix', {})
+            changes["force_overlap_matrix"] = {"old": old_fom, "new": fom}
+            overrides["force_overlap_matrix"] = fom
+
+        if req.within_force_overlap is not None:
+            wfo = req.within_force_overlap
+            forces = ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"]
+            for f in forces:
+                if f not in wfo:
+                    raise HTTPException(400, f"Within-force overlap missing force '{f}'")
+                val = wfo[f]
+                if not isinstance(val, (int, float)):
+                    raise HTTPException(400, f"Within-force overlap '{f}' must be numeric")
+                if val < 0 or val > 0.5:
+                    raise HTTPException(400, f"Within-force overlap '{f}' must be in [0, 0.5], got {val}")
+            old_wfo = getattr(config, 'within_force_overlap', {})
+            changes["within_force_overlap"] = {"old": old_wfo, "new": wfo}
+            overrides["within_force_overlap"] = wfo
+
         if req.iterations is not None:
             changes["iterations"] = {"old": config.iterations, "new": req.iterations}
             overrides["iterations"] = req.iterations
@@ -1712,6 +1755,8 @@ def create_app(args=None) -> FastAPI:
             "region_weights": getattr(config, 'region_weights', {}),
             "category_weights": getattr(config, 'category_weights', {}),
             "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
+            "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
+            "within_force_overlap": getattr(config, 'within_force_overlap', {}),
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
             "t_copula_df": config.t_copula_df,
