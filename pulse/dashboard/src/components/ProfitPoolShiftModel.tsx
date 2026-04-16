@@ -787,27 +787,6 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
               </SimTooltip>
             )}
 
-            {/* Executive Briefing Button */}
-            <motion.button
-              onClick={() => setShowBriefing(true)}
-              whileHover={{ background: T.bg3 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: 'transparent',
-                color: T.text2,
-                cursor: 'pointer',
-              } as React.CSSProperties}
-              title="Executive Briefing"
-            >
-              <Presentation size={16} />
-            </motion.button>
           </div>
         </div>
       </motion.header>
@@ -1296,25 +1275,6 @@ export default function ProfitPoolShiftModel({ isAdmin = false, onNavigateJourne
           ))}
         </div>
 
-        {/* Right: Export Button */}
-        <div style={{ display: 'flex', gap: 8 } as React.CSSProperties}>
-          <motion.button
-            onClick={() => setShowSettings(true)}
-            whileHover={{ scale: 1.02 }}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              border: `1px solid ${T.accent}40`,
-              background: T.accent,
-              color: '#000',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            } as React.CSSProperties}
-          >
-            Export Results
-          </motion.button>
-        </div>
       </motion.footer>
 
       {/* Delphi Panel */}

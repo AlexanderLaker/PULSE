@@ -213,51 +213,8 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
         maxWidth: 1440,
         margin: '0 auto',
       }}>
-        {/* Breadcrumb */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 24,
-        }}>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            color: S.primary,
-            fontFamily: S.headlineFont,
-          }}>
-            PRISM Strategy Intelligence
-          </span>
-          <span style={{ color: S.secondary, fontSize: 11 }}>/</span>
-          <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: 1,
-            textTransform: 'uppercase',
-            color: S.secondary,
-          }}>
-            Innovation Explorer
-          </span>
-        </div>
-
-        {/* Hero Title */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 40, marginBottom: 16 }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontFamily: S.headlineFont,
-              fontWeight: 800,
-              fontSize: 44,
-              letterSpacing: -1.5,
-              color: S.onBg,
-              lineHeight: 1.1,
-              margin: 0,
-            }}>
-              Innovation Portfolio
-            </h1>
-          </div>
-
+        {/* Hero: Search only (breadcrumb + Innovation Portfolio title removed per request) */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 40, marginBottom: 16 }}>
           {/* Search */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={S.secondary} strokeWidth="2" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}>

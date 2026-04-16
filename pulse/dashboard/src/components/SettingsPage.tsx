@@ -78,6 +78,9 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
     }
   );
   const [correlationMatrix, setCorrelationMatrix] = useState<Record<string, Record<string, number>>>({});
+  /* Calibrated attenuation overlap — read-only display from backend */
+  const [forceOverlapMatrix, setForceOverlapMatrix] = useState<Record<string, Record<string, number>>>({});
+  const [withinForceOverlap, setWithinForceOverlap] = useState<Record<string, number>>({});
 
   /* ── Toast auto-dismiss ────────────────────────────────────── */
   useEffect(() => {
@@ -107,6 +110,8 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       if (data.iterations != null) setIterations(data.iterations);
       if (data.category_weights) setCategoryWeights(data.category_weights);
       if (data.force_correlation_matrix) setCorrelationMatrix(data.force_correlation_matrix);
+      if (data.force_overlap_matrix) setForceOverlapMatrix(data.force_overlap_matrix);
+      if (data.within_force_overlap) setWithinForceOverlap(data.within_force_overlap);
     } catch (e: any) {
       setToast({ msg: e.message || 'Failed to load config', type: 'error' });
     } finally {
@@ -252,17 +257,68 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Attenuation */}
-          <Card title="Attenuation Factor">
-            <SliderInput label="Attenuation (multiplicative decay)" value={attenuation} onChange={setAttenuation} min={0.05} max={1.0} step={0.05} />
+          <Card title="Attenuation Factor" subtitle="Base signal dampener — scaled per force by the calibrated overlap matrices below.">
+            <SliderInput label="Base Attenuation (multiplicative decay)" value={attenuation} onChange={setAttenuation} min={0.05} max={1.0} step={0.05} />
             <SelectInput label="Source" value={attenuationSource}
               onChange={setAttenuationSource}
               options={[
                 { value: 'assumed', label: 'Assumed (default 0.5)' },
-                { value: 'backtested', label: 'Backtested (calibrated)' },
+                { value: 'calibrated_v3.1_april2026', label: 'Calibrated (v3.1 — April 2026, 82 trends)' },
+                { value: 'backtested', label: 'Backtested (calibrated from history)' },
                 { value: 'admin_override', label: 'Admin Override' },
               ]}
             />
-            <Hint>Controls multiplicative decay. Lower (0.2–0.5) = conservative, higher (0.7–1.0) = aggressive.</Hint>
+            <Hint>
+              <strong style={{ color: T.text2 }}>What this does:</strong> Attenuation dampens the raw force signal to prevent double-counting when multiple trends capture overlapping phenomena (e.g., eight Government trends all trace to the EU Green Deal). The base value (0.5) is uniformly applied and then scaled per-force by 1 − mean cross-force overlap, so forces that are more coupled to others are dampened more.
+              <br /><br />
+              <strong style={{ color: T.text2 }}>Suggested ranges:</strong> 0.2–0.5 = conservative, 0.7–1.0 = aggressive.
+            </Hint>
+          </Card>
+
+          {/* Calibrated Attenuation Matrices — read-only */}
+          <Card title="Attenuation Calibration (v3.1)" subtitle="Empirically calibrated from 82-trend Bain review, April 2026. Read-only — regenerate with compute_attenuation_v3.py.">
+            <div style={{
+              display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12,
+              padding: '6px 10px', borderRadius: 8,
+              background: 'rgba(212, 168, 71, 0.08)', border: `1px solid ${T.border}`,
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: T.accent, textTransform: 'uppercase' }}>Source</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.text2, fontFamily: T.mono }}>
+                {attenuationSource}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.text3, letterSpacing: 0.5, textTransform: 'uppercase', margin: '0 0 8px' }}>
+              Within-Force Overlap
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+              {FORCES.map(f => {
+                const v = withinForceOverlap[f] ?? 0;
+                const pct = Math.min(100, (v / 0.5) * 100); // scale 0..0.5 → 0..100%
+                return (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 90, fontSize: 12, fontWeight: 600, color: FORCE_COLORS[f] }}>{f}</div>
+                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: FORCE_COLORS[f], borderRadius: 3 }} />
+                    </div>
+                    <div style={{ width: 52, textAlign: 'right', fontSize: 12, fontWeight: 600, fontFamily: T.mono, color: T.text2 }}>
+                      {v.toFixed(3)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.text3, letterSpacing: 0.5, textTransform: 'uppercase', margin: '4px 0 8px' }}>
+              Cross-Force Overlap Matrix (row → column)
+            </div>
+            <ReadOnlyOverlapMatrix matrix={forceOverlapMatrix} forces={FORCES} />
+
+            <Hint>
+              <strong style={{ color: T.text2 }}>How to read the matrix:</strong> Each cell shows how much the <em>row force</em>'s signal overlaps with the <em>column force</em>'s signal. Higher values (darker) mean more shared mechanism — e.g., Environmental→Government is 0.43 because PFAS/PPWR/EUDR trends are simultaneously environmental and regulatory. Diagonal is N/A (within-force is the scalar above). Asymmetric because narrow forces get their signal "covered" by broad forces more than vice versa.
+              <br /><br />
+              <strong style={{ color: T.text2 }}>Methodology:</strong> Weighted Jaccard similarity on 12-category exposure vectors, excess-over-baseline transform (J₀ = 0.485), force-size asymmetry (√(n_j/n_i) capped at 1.5×), mechanism-cluster adjustment (±0.03 to ±0.10). Values clamped to [0, 0.45].
+            </Hint>
           </Card>
 
           {/* Force Weights */}
@@ -580,6 +636,74 @@ const CorrelationMatrixEditor: FC<{
                       onBlur={e => { e.target.style.background = 'transparent'; }}
                     />
                   )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ── Read-Only Overlap Matrix (calibrated attenuation) ─────────── */
+const ReadOnlyOverlapMatrix: FC<{
+  matrix: Record<string, Record<string, number>>;
+  forces: ForceName[];
+}> = ({ matrix, forces }) => {
+  // Color scale: 0 → neutral, up to 0.45 cap
+  const cellBg = (val: number, isDiag: boolean) => {
+    if (isDiag) return 'rgba(148, 163, 184, 0.10)';
+    const t = Math.min(1, val / 0.45);
+    return `rgba(212, 168, 71, ${0.04 + t * 0.35})`;
+  };
+  const cellColor = (val: number, isDiag: boolean) => {
+    if (isDiag) return T.text3;
+    return val >= 0.2 ? T.accent : T.text2;
+  };
+
+  const cellSize = 58;
+  const labelW = 48;
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'inline-block', minWidth: 'fit-content' }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', marginLeft: labelW, marginBottom: 4 }}>
+          {forces.map(f => (
+            <div key={f} style={{
+              width: cellSize, textAlign: 'center',
+              fontSize: 11, fontWeight: 700, color: FORCE_COLORS[f],
+              letterSpacing: '-0.02em',
+            }}>
+              {FORCE_SHORT[f]}
+            </div>
+          ))}
+        </div>
+
+        {/* Matrix rows */}
+        {forces.map((row, ri) => (
+          <div key={row} style={{ display: 'flex', alignItems: 'center', marginBottom: 2 }}>
+            <div style={{
+              width: labelW, fontSize: 11, fontWeight: 700,
+              color: FORCE_COLORS[row], textAlign: 'right', paddingRight: 8,
+              letterSpacing: '-0.02em',
+            }}>
+              {FORCE_SHORT[row]}
+            </div>
+            {forces.map((col, ci) => {
+              const isDiag = ri === ci;
+              const val = isDiag ? 0 : (matrix[row]?.[col] ?? 0);
+              return (
+                <div key={col} style={{
+                  width: cellSize, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: cellBg(val, isDiag),
+                  color: cellColor(val, isDiag),
+                  borderRadius: 6, margin: 1,
+                  fontSize: 12, fontWeight: 600, fontFamily: T.mono,
+                }}>
+                  {isDiag ? '—' : val.toFixed(3)}
                 </div>
               );
             })}

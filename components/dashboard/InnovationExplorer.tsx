@@ -99,33 +99,8 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
         maxWidth: 1440,
         margin: '0 auto',
       }}>
-        {/* Hero Title */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 40, marginBottom: 16 }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontFamily: S.headlineFont,
-              fontWeight: 800,
-              fontSize: 44,
-              letterSpacing: -1.5,
-              color: S.onBg,
-              lineHeight: 1.1,
-              margin: 0,
-            }}>
-              Innovation Portfolio
-            </h1>
-            <p style={{
-              fontFamily: S.bodyFont,
-              fontSize: 17,
-              color: S.onSurfaceVariant,
-              maxWidth: 640,
-              lineHeight: 1.6,
-              marginTop: 12,
-              margin: '12px 0 0',
-            }}>
-              43 strategic product innovation concepts derived from PRISM&apos;s 82-trend database (v3.1 Bain extension), Consumer Journey Blueprint, and category-brand mapping. Each concept represents a significant strategic move designed to shift profit pools across H1 Execution, H2 Disruption, and H3 Transformation — the full 2026–2036 horizon.
-            </p>
-          </div>
-
+        {/* Hero: Search only (Innovation Portfolio title + subhead removed per request) */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: 40, marginBottom: 16 }}>
           {/* Search */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={S.secondary} strokeWidth="2" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}>

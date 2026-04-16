@@ -1506,6 +1506,8 @@ def create_app(args=None) -> FastAPI:
             "region_weights": getattr(config, 'region_weights', {}),
             "category_weights": getattr(config, 'category_weights', {}),
             "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
+            "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
+            "within_force_overlap": getattr(config, 'within_force_overlap', {}),
             "path_years": config.path_years,
             "iterations": config.iterations,
             "within_force_rho": config.within_force_rho,
