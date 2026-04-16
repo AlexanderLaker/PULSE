@@ -122,7 +122,7 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
               marginTop: 12,
               margin: '12px 0 0',
             }}>
-              16 strategic product innovation concepts derived from PRISM&apos;s 61-trend database, Consumer Journey Blueprint, and category-brand mapping. Each concept represents a significant strategic move designed to shift profit pools over a 3–5 year horizon.
+              43 strategic product innovation concepts derived from PRISM&apos;s 82-trend database (v3.1 Bain extension), Consumer Journey Blueprint, and category-brand mapping. Each concept represents a significant strategic move designed to shift profit pools across H1 Execution, H2 Disruption, and H3 Transformation — the full 2026–2036 horizon.
             </p>
           </div>
 
@@ -166,10 +166,10 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
           borderBottom: 'none',
         }}>
           {[
-            { label: 'Total Concepts', value: '16', icon: <Sparkles size={14} /> },
-            { label: 'Tier 1 Priority', value: '14', icon: <Target size={14} /> },
-            { label: 'Avg. Market Score', value: '84%', icon: <TrendingUp size={14} /> },
-            { label: 'Horizon', value: '2027–2030', icon: <Clock size={14} /> },
+            { label: 'Total Concepts', value: '43', icon: <Sparkles size={14} /> },
+            { label: 'Tier 1 Priority', value: '31', icon: <Target size={14} /> },
+            { label: 'Avg. Market Score', value: '83%', icon: <TrendingUp size={14} /> },
+            { label: 'Horizon', value: '2026–2036', icon: <Clock size={14} /> },
           ].map(stat => (
             <div key={stat.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
@@ -299,6 +299,7 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
                   <div style={{ position: 'absolute', inset: 0 }}>
                     <InnovationProductImage
                       innovationId={innovation.id}
+                      innovationNumber={innovation.number}
                       gradient={innovation.imageGradient}
                       accent={innovation.imageAccent}
                       size={cardSize === 'hero' ? 'hero' : 'card'}

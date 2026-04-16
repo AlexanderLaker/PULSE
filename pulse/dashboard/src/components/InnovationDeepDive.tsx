@@ -33,6 +33,17 @@ const S = {
   bodyFont: "'Inter', -apple-system, system-ui, sans-serif",
 };
 
+// Source credibility tier colors — mirrors StrategicIntelligence.tsx
+const TIER_COLORS: Record<string, { color: string; bg: string }> = {
+  'S':  { color: '#15803d', bg: 'rgba(34,197,94,0.12)' },
+  'A':  { color: '#005db5', bg: 'rgba(0,93,181,0.10)' },
+  'A-': { color: '#005db5', bg: 'rgba(0,93,181,0.08)' },
+  'B+': { color: '#7c3aed', bg: 'rgba(124,58,237,0.10)' },
+  'B':  { color: '#526074', bg: 'rgba(82,96,116,0.10)' },
+  'B-': { color: '#64748b', bg: 'rgba(100,116,139,0.10)' },
+  'C':  { color: '#94a3b8', bg: 'rgba(148,163,184,0.10)' },
+};
+
 interface InnovationDeepDiveProps {
   innovation: Innovation;
   onBack: () => void;
@@ -81,6 +92,7 @@ export default function InnovationDeepDive({
         <div style={{ position: 'absolute', inset: 0 }}>
           <InnovationProductImage
             innovationId={innovation.id}
+            innovationNumber={innovation.number}
             gradient={innovation.imageGradient}
             accent={innovation.imageAccent}
             size="hero"
@@ -485,20 +497,65 @@ export default function InnovationDeepDive({
               gridTemplateColumns: '1fr 1fr',
               gap: 10,
             }}>
-              {innovation.sources.map((source, i) => (
-                <div key={i} style={{
-                  padding: 16,
-                  background: S.surface,
-                  borderRadius: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 1px 4px rgba(0,52,94,0.03)',
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: S.secondary, lineHeight: 1.4 }}>{source}</span>
-                  <ExternalLink size={14} style={{ color: S.outline, flexShrink: 0, marginLeft: 8, opacity: 0.5 }} />
-                </div>
-              ))}
+              {innovation.sources.map((source, i) => {
+                const tierInfo = TIER_COLORS[source.tier] || TIER_COLORS['B'];
+                const isInternal = source.url.startsWith('#');
+                return (
+                  <a
+                    key={i}
+                    href={source.url}
+                    target={isInternal ? undefined : '_blank'}
+                    rel={isInternal ? undefined : 'noopener noreferrer'}
+                    style={{
+                      padding: 16,
+                      background: S.surface,
+                      borderRadius: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      boxShadow: '0 1px 4px rgba(0,52,94,0.03)',
+                      textDecoration: 'none',
+                      border: '1px solid transparent',
+                      transition: 'all 0.15s ease',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = S.outline;
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,52,94,0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'transparent';
+                      e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,52,94,0.03)';
+                    }}
+                  >
+                    <span style={{
+                      flexShrink: 0,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: tierInfo.color,
+                      background: tierInfo.bg,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      letterSpacing: '0.03em',
+                      fontFamily: S.headlineFont,
+                      minWidth: 22,
+                      textAlign: 'center',
+                    }}>
+                      {source.tier}
+                    </span>
+                    <span style={{
+                      flex: 1,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: S.secondary,
+                      lineHeight: 1.4,
+                    }}>
+                      {source.title}
+                    </span>
+                    <ExternalLink size={14} style={{ color: S.outline, flexShrink: 0, opacity: 0.6 }} />
+                  </a>
+                );
+              })}
             </div>
           </section>
         </div>
