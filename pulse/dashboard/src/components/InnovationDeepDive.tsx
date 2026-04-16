@@ -497,15 +497,19 @@ export default function InnovationDeepDive({
               gridTemplateColumns: '1fr 1fr',
               gap: 10,
             }}>
-              {innovation.sources.map((source, i) => {
-                const tierInfo = TIER_COLORS[source.tier] || TIER_COLORS['B'];
-                const isInternal = source.url.startsWith('#');
+              {innovation.sources.map((source: any, i: number) => {
+                // Support both structured {title,url,tier} objects and plain strings
+                const isStructured = typeof source === 'object' && source !== null;
+                const title = isStructured ? source.title : source;
+                const url = isStructured ? source.url : '#';
+                const tier = isStructured ? source.tier : 'B';
+                const tierInfo = TIER_COLORS[tier] || TIER_COLORS['B'];
+                const isInternal = url.startsWith('#');
+                const El = isInternal ? 'div' : 'a';
                 return (
-                  <a
+                  <El
                     key={i}
-                    href={source.url}
-                    target={isInternal ? undefined : '_blank'}
-                    rel={isInternal ? undefined : 'noopener noreferrer'}
+                    {...(isInternal ? {} : { href: url, target: '_blank', rel: 'noopener noreferrer' })}
                     style={{
                       padding: 16,
                       background: S.surface,
@@ -517,13 +521,13 @@ export default function InnovationDeepDive({
                       textDecoration: 'none',
                       border: '1px solid transparent',
                       transition: 'all 0.15s ease',
-                      cursor: 'pointer',
+                      cursor: isInternal ? 'default' : 'pointer',
                     }}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={(e: any) => {
                       e.currentTarget.style.borderColor = S.outline;
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,52,94,0.08)';
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={(e: any) => {
                       e.currentTarget.style.borderColor = 'transparent';
                       e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,52,94,0.03)';
                     }}
@@ -541,7 +545,7 @@ export default function InnovationDeepDive({
                       minWidth: 22,
                       textAlign: 'center',
                     }}>
-                      {source.tier}
+                      {tier}
                     </span>
                     <span style={{
                       flex: 1,
@@ -550,10 +554,10 @@ export default function InnovationDeepDive({
                       color: S.secondary,
                       lineHeight: 1.4,
                     }}>
-                      {source.title}
+                      {title}
                     </span>
-                    <ExternalLink size={14} style={{ color: S.outline, flexShrink: 0, opacity: 0.6 }} />
-                  </a>
+                    {!isInternal && <ExternalLink size={14} style={{ color: S.outline, flexShrink: 0, opacity: 0.6 }} />}
+                  </El>
                 );
               })}
             </div>
