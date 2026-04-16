@@ -43,7 +43,7 @@ const photos = {
   inn_23: 'photo-1580618672591-eb180b1a973f',
   inn_24: 'photo-1596755389378-c31d21fd1273',
   inn_25: 'photo-1611162617213-7d7a39e9b1d7',
-  inn_26: 'photo-1522338242992-e1a54024b5f7', // hair products / bottles on shelf
+  inn_26: 'photo-1560066984-138dadb4c035', // hair styling / salon (shared with inn_08)
   inn_27: 'photo-1571019613454-1cb2f99b2d8b',
   inn_28: 'photo-1507525428034-b723cf961d3e', // tropical beach / coconut / body care
   inn_29: 'photo-1532996122724-e3c354a0b15b',
@@ -73,7 +73,7 @@ const fallbackShortIds = {
   inn_04: 'dlxLGIy-2VU',   // assorted clothes in wooden hangers
   inn_19: '5WCPqt0QAK8',   // woman with curly hair on city street
   inn_22: 'D37STEwmyqY',   // person holding supplement bottle
-  inn_26: 'YtnvPDSZub0',   // hair products on table
+  // inn_26: removed — primary ID now uses known-working photo
   inn_28: 'ys3xn1HwSm8',   // woman at tropical beach
   inn_36: 'hQOHDAibf6A',   // person washing fork in kitchen
 };
@@ -134,7 +134,7 @@ async function downloadImage(id, photoPath) {
     inn_04: 'clothes+hangers+wardrobe',
     inn_19: 'curly+natural+hair+woman',
     inn_22: 'wellness+supplements+beauty',
-    inn_26: 'hair+products+cosmetics',
+    // inn_26: removed — primary ID now uses known-working photo
     inn_28: 'tropical+coconut+skincare',
     inn_36: 'washing+dishes+kitchen',
   };
