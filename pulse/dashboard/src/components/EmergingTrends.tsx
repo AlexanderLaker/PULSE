@@ -891,7 +891,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
         gap: '6px',
       }}>
         <Sparkles size={10} style={{ color: T.accent }} />
-        AI-powered strategic research across 6 forces — Consumer · Government · Technology · Environmental · Competitive · Customer — with Bain Senior Partner-grade rigor
+        AI-powered strategic research across 6 forces — Consumer · Government · Technology · Environmental · Competitive · Customer — with senior-partner-grade rigor
       </div>
 
       {/* Filters + Select All */}
@@ -1082,7 +1082,7 @@ const EmergingTrends: FC<EmergingTrendsProps> = ({ onAddTrend, userRole = 'viewe
             fontSize: '12px',
           }}>
             {isScanning
-              ? 'AI is researching strategic questions across all 6 forces with Bain-grade rigor...'
+              ? 'AI is researching strategic questions across all 6 forces with senior-partner-grade rigor...'
               : emergingTrends.length === 0
                 ? 'No emerging trends yet. Click "Run Strategic Scan" to discover new trends using AI-powered strategic research.'
                 : 'No trends match the current filter.'}

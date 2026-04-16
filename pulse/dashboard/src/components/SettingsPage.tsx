@@ -1,9 +1,9 @@
 /**
  * SettingsPage — Full-page PRISM model configuration editor.
  *
- * Replaces the slide-over AdminConfigPanel with a dedicated full-page layout.
+ * Full-page layout for all runtime model parameters.
  * Contains:
- *   - Attenuation factor
+ *   - Attenuation matrix (editable 6×6 overlap)
  *   - Force weights
  *   - Value chain weights
  *   - Region weights
