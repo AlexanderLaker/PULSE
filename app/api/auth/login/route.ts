@@ -2,20 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { findUserByEmail } from '@/lib/db';
 import { createToken, createRefreshToken, verifyPassword } from '@/lib/auth';
 
-const ACCESS_KEYWORD = process.env.PRISM_ACCESS_KEYWORD || 'PRISM2026';
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, keyword } = body;
-
-    // Validate keyword first
-    if (!keyword || keyword.trim() !== ACCESS_KEYWORD) {
-      return NextResponse.json(
-        { error: 'Invalid access keyword.' },
-        { status: 403 }
-      );
-    }
+    const { email, password } = body;
 
     // Validate input
     if (!email || !password) {

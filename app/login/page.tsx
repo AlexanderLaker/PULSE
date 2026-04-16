@@ -8,31 +8,19 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [keyword, setKeyword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    // Client-side keyword validation
-    if (!keyword.trim()) {
-      setError('Access keyword is required.');
-      return;
-    }
-    if (keyword.trim() !== 'PRISM2026') {
-      setError('Invalid access keyword.');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, keyword: keyword.trim() }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
@@ -67,24 +55,6 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Access Keyword */}
-          <div>
-            <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-2">
-              Access Keyword
-            </label>
-            <input
-              id="keyword"
-              type="password"
-              className="input"
-              placeholder="Enter keyword"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              required
-              disabled={isLoading}
-              autoComplete="off"
-            />
-          </div>
-
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
