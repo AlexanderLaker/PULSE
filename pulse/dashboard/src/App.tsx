@@ -10,8 +10,9 @@ import BurgerMenu from './components/BurgerMenu';
 const ProfitPoolShiftModel = lazy(() => import('./components/ProfitPoolShiftModel'));
 const ConsumerJourney = lazy(() => import('./components/ConsumerJourney'));
 const InnovationExplorer = lazy(() => import('./components/InnovationExplorer'));
+const Trends2 = lazy(() => import('./components/Trends2'));
 
-type Page = 'profitpoolshiftmodel' | 'settings' | 'journey' | 'innovation';
+type Page = 'profitpoolshiftmodel' | 'settings' | 'journey' | 'innovation' | 'trends2';
 
 export default function App() {
   const { user, loading, error, isAuthenticated, login, register, logout, clearError } = useAuth();
@@ -88,6 +89,7 @@ export default function App() {
               setPage('profitpoolshiftmodel');
               setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots')), 100);
             }}
+            onShowTrends2={() => { setTrendSearch(undefined); setPage('trends2'); }}
             onChangePassword={() => {
               const newPw = window.prompt('Enter new password (min 6 characters):');
               if (newPw && newPw.length >= 6) {
@@ -153,6 +155,64 @@ export default function App() {
               setPage('profitpoolshiftmodel');
               setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots')), 100);
             }}
+            onShowTrends2={() => { setTrendSearch(undefined); setPage('trends2'); }}
+            onChangePassword={() => {
+              const newPw = window.prompt('Enter new password (min 6 characters):');
+              if (newPw && newPw.length >= 6) {
+                const token = localStorage.getItem('pulse_token');
+                fetch('/api/v1/auth/change-password', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                  body: JSON.stringify({ new_password: newPw }),
+                })
+                  .then(r => r.ok ? alert('Password changed successfully.') : alert('Failed to change password.'))
+                  .catch(() => alert('Failed to change password.'));
+              } else if (newPw !== null) {
+                alert('Password must be at least 6 characters.');
+              }
+            }}
+          />
+        </div>
+        {isAdmin && (
+          <AdminUsersPanel isOpen={showUsers} onClose={() => setShowUsers(false)} currentUserId={user?.id} />
+        )}
+      </ErrorBoundary>
+    );
+  }
+
+  // Trends 2 — editorial view, full-screen
+  if (page === 'trends2') {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<FullPageSkeleton />}>
+          <Trends2 onBack={() => setPage('profitpoolshiftmodel')} />
+        </Suspense>
+        <div style={{
+          position: 'fixed', top: 12, left: 16, zIndex: 9999,
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          <BurgerMenu
+            user={user}
+            isAdmin={isAdmin}
+            onLogout={logout}
+            onShowUsers={() => setShowUsers(true)}
+            onShowConfig={() => setPage('settings')}
+            onShowExport={() => {
+              setPage('profitpoolshiftmodel');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-export')), 100);
+            }}
+            onShowDelphi={() => {
+              setPage('profitpoolshiftmodel');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-delphi')), 100);
+            }}
+            onShowSnapshots={() => {
+              setPage('profitpoolshiftmodel');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots')), 100);
+            }}
+            onShowTrends2={() => setPage('trends2')}
             onChangePassword={() => {
               const newPw = window.prompt('Enter new password (min 6 characters):');
               if (newPw && newPw.length >= 6) {
@@ -207,6 +267,7 @@ export default function App() {
           onShowSnapshots={() => {
             window.dispatchEvent(new CustomEvent('pulse:toggle-snapshots'));
           }}
+          onShowTrends2={() => setPage('trends2')}
           onChangePassword={() => {
             const newPw = window.prompt('Enter new password (min 6 characters):');
             if (newPw && newPw.length >= 6) {

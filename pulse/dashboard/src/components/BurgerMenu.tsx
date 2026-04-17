@@ -9,6 +9,7 @@ import {
   Lock,
   LogOut,
   Shield,
+  Sparkles,
 } from 'lucide-react';
 
 interface BurgerMenuProps {
@@ -21,6 +22,7 @@ interface BurgerMenuProps {
   onShowDelphi: () => void;
   onShowSnapshots: () => void;
   onChangePassword: () => void;
+  onShowTrends2?: () => void;
 }
 
 export const BurgerMenu: React.FC<BurgerMenuProps> = ({
@@ -33,6 +35,7 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
   onShowDelphi,
   onShowSnapshots,
   onChangePassword,
+  onShowTrends2,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -160,6 +163,13 @@ export const BurgerMenu: React.FC<BurgerMenuProps> = ({
             )}
 
             {/* General Items */}
+            {onShowTrends2 && (
+              <MenuItem
+                icon={Sparkles}
+                label="Trends 2 (Editorial)"
+                onClick={() => handleMenuItemClick(onShowTrends2)}
+              />
+            )}
             <MenuItem
               icon={Download}
               label="Export Center"
