@@ -441,20 +441,19 @@ const ExpandedPanel: FC<{
     (trend.regional_exposure ?? {}) as Record<string, number>
   );
 
-  const commit = (updates: Partial<Trend>) => {
-    if (!isAdmin) return;
-    updateTrend(trend.id, updates).catch(() => { /* handled by hook */ });
-  };
-
   const handleSave = () => {
     if (!isAdmin) return;
     const updates: Partial<Trend> = {
       description: editDesc,
       strategic_implication: editImpl,
+      gp1_pct_affected: gp1Pct,
+      probability,
+      peak_year: peakYear,
+      diffusion_curve: diffusion,
       category_exposure: catExp as Record<CategoryId, number>,
       vc_exposure: vcExp,
       regional_exposure: regExp,
-    };
+    } as Partial<Trend>;
     updateTrend(trend.id, updates).catch(() => { /* handled by hook */ });
     setIsEditing(false);
   };
@@ -462,6 +461,10 @@ const ExpandedPanel: FC<{
   const handleCancel = () => {
     setEditDesc(trend.description || '');
     setEditImpl(trend.strategic_implication || '');
+    setGp1Pct(trend.gp1_pct_affected ?? 0.10);
+    setProbability(trend.probability ?? 3);
+    setPeakYear((trend as Trend & { peak_year?: number }).peak_year ?? 2030);
+    setDiffusion((trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve');
     setCatExp((trend.category_exposure ?? {}) as Record<string, number>);
     setVcExp((trend.vc_exposure ?? {}) as Record<string, number>);
     setRegExp((trend.regional_exposure ?? {}) as Record<string, number>);
@@ -638,6 +641,7 @@ const ExpandedPanel: FC<{
                   What fraction of a category's GP1 can this trend realistically affect at full
                   materialization? A 5/5 probability trend with {Math.round(gp1Pct * 100)}% GP1 affected means:
                   maximum-severity trend, but only touches {Math.round(gp1Pct * 100)}% of the pool.
+                  {isAdmin && !isEditing && ' Click Edit to adjust.'}
                   {!isAdmin && ' (Admin only)'}
                 </>
               }
@@ -646,16 +650,15 @@ const ExpandedPanel: FC<{
                 <input
                   type="range" min={1} max={50} step={1}
                   value={Math.round(gp1Pct * 100)}
-                  disabled={!isAdmin}
+                  disabled={!(isAdmin && isEditing)}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10) / 100;
                     setGp1Pct(v);
-                    commit({ gp1_pct_affected: v } as Partial<Trend>);
                   }}
                   style={{
                     flex: 1, height: 4, accentColor: S.primary,
-                    cursor: isAdmin ? 'pointer' : 'not-allowed',
-                    opacity: isAdmin ? 1 : 0.6,
+                    cursor: isAdmin && isEditing ? 'pointer' : 'not-allowed',
+                    opacity: isAdmin && isEditing ? 1 : 0.6,
                   }}
                 />
                 <div style={{
@@ -680,6 +683,7 @@ const ExpandedPanel: FC<{
                 <>
                   Likelihood this trend materialises at the stated severity.
                   Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.
+                  {isAdmin && !isEditing && ' Click Edit to adjust.'}
                   {!isAdmin && ' (Admin only)'}
                 </>
               }
@@ -688,12 +692,9 @@ const ExpandedPanel: FC<{
                 <DotBar
                   value={probability}
                   color={S.primary}
-                  editable={isAdmin}
+                  editable={isAdmin && isEditing}
                   size={14}
-                  onChange={(v) => {
-                    setProbability(v);
-                    commit({ probability: v } as Partial<Trend>);
-                  }}
+                  onChange={(v) => setProbability(v)}
                 />
                 <div style={{
                   padding: '6px 12px', borderRadius: 8,
@@ -721,19 +722,16 @@ const ExpandedPanel: FC<{
                   </div>
                   <select
                     value={peakYear}
-                    disabled={!isAdmin}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setPeakYear(v);
-                      commit({ peak_year: v } as Partial<Trend>);
-                    }}
+                    disabled={!(isAdmin && isEditing)}
+                    onChange={(e) => setPeakYear(parseInt(e.target.value, 10))}
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
                       fontSize: 13, fontWeight: 600, color: S.onSurface,
                       backgroundColor: S.surface,
                       border: `1px solid ${S.cardBorder}`,
                       outline: 'none',
-                      cursor: isAdmin ? 'pointer' : 'not-allowed',
+                      cursor: isAdmin && isEditing ? 'pointer' : 'not-allowed',
+                      opacity: isAdmin && isEditing ? 1 : 0.8,
                     }}
                   >
                     {PEAK_YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -750,19 +748,16 @@ const ExpandedPanel: FC<{
                   </div>
                   <select
                     value={diffusion}
-                    disabled={!isAdmin}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setDiffusion(v);
-                      commit({ diffusion_curve: v } as Partial<Trend>);
-                    }}
+                    disabled={!(isAdmin && isEditing)}
+                    onChange={(e) => setDiffusion(e.target.value)}
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
                       fontSize: 13, fontWeight: 600, color: S.onSurface,
                       backgroundColor: S.surface,
                       border: `1px solid ${S.cardBorder}`,
                       outline: 'none',
-                      cursor: isAdmin ? 'pointer' : 'not-allowed',
+                      cursor: isAdmin && isEditing ? 'pointer' : 'not-allowed',
+                      opacity: isAdmin && isEditing ? 1 : 0.8,
                     }}
                   >
                     {DIFFUSION_OPTIONS.map(d => (
