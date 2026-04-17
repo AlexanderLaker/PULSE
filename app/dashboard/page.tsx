@@ -7,7 +7,7 @@
  * Handles authentication, error boundaries, and component composition.
  *
  * Tab navigation (constant across all pages):
- *   Profit Pool Analysis | Trends | Trends 2 | Consumer Journey | Innovation Explorer
+ *   Profit Pool Analysis | Profit Pool Analysis 2 | Trends | Trends 2 | Consumer Journey | Innovation Explorer
  *
  * The top navigation has been redesigned in the "Editorial Intelligence" style
  * (see stitch_fmcg_trend_navigator-3/DESIGN.md) — a softer, magazine-inspired
@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Search, Settings } from 'lucide-react';
 import ProfitPoolShiftModel from '@/components/dashboard/ProfitPoolShiftModel';
+import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import Trends2 from '@/components/dashboard/Trends2';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
@@ -25,6 +26,7 @@ import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
 type DashboardTab =
   | 'profit-pool'
+  | 'profit-pool-2'
   | 'trends'
   | 'trends-2'
   | 'consumer-journey'
@@ -37,6 +39,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'profit-pool',         label: 'Profit Pool Analysis' },
+  { id: 'profit-pool-2',       label: 'Profit Pool Analysis 2' },
   { id: 'trends',              label: 'Trends' },
   { id: 'trends-2',            label: 'Trends 2' },
   { id: 'consumer-journey',    label: 'Consumer Journey' },
@@ -217,6 +220,7 @@ export default function DashboardPage() {
       <div className="relative">
         <ErrorBoundary>
           {activeTab === 'profit-pool' && <ProfitPoolShiftModel />}
+          {activeTab === 'profit-pool-2' && <ProfitPoolAnalysis2 />}
           {activeTab === 'trends' && <ProfitPoolShiftModel />}
           {activeTab === 'trends-2' && <Trends2 />}
           {activeTab === 'consumer-journey' && <ProfitPoolShiftModel />}
