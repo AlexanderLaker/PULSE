@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "node scripts/download-images.mjs",
-  "outputDirectory": "public",
+  "buildCommand": "node scripts/download-images.mjs && next build",
+  "framework": "nextjs",
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api/index.py" },
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/api/py/(.*)", "destination": "/api/index.py" }
   ],
   "functions": {
     "api/index.py": {

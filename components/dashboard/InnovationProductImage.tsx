@@ -17,6 +17,13 @@ interface ProductImageProps {
   gradient: string;
   accent: string;
   size?: 'card' | 'hero';
+  /**
+   * When true, the image is loaded eagerly with high fetch priority.
+   * Set this for above-the-fold cards (the hero + first row of the bento
+   * grid) so they paint immediately instead of waiting for the browser's
+   * lazy-load heuristic.
+   */
+  priority?: boolean;
 }
 
 export default function InnovationProductImage({
@@ -25,6 +32,7 @@ export default function InnovationProductImage({
   gradient,
   accent,
   size = 'card',
+  priority = false,
 }: ProductImageProps) {
   const seed =
     typeof innovationNumber === 'number'
@@ -49,8 +57,13 @@ export default function InnovationProductImage({
         <img
           src={url}
           alt=""
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
           decoding="async"
+          // Elevates above-the-fold images so they start downloading
+          // during the initial navigation instead of after layout.
+          // Supported by Chrome/Edge/Safari; ignored elsewhere.
+          // Spread-cast to sidestep React TS-type drift across versions.
+          {...({ fetchpriority: priority ? 'high' : 'auto' } as Record<string, string>)}
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
           style={{

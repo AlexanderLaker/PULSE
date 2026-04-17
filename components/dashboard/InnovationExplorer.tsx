@@ -270,7 +270,11 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
                   whileHover={{ scale: 1.01, boxShadow: '0 32px 64px rgba(0,52,94,0.12)' }}
                   className="group"
                 >
-                  {/* Product Image Background */}
+                  {/* Product Image Background
+                      Above-the-fold cards (hero + first row of the bento
+                      grid, i.e. the first 6 items) get priority loading so
+                      they start downloading during the initial navigation
+                      and the page paints instantly on return visits. */}
                   <div style={{ position: 'absolute', inset: 0 }}>
                     <InnovationProductImage
                       innovationId={innovation.id}
@@ -278,6 +282,7 @@ export default function InnovationExplorer({ onNavigateToTrend, onNavigateToCons
                       gradient={innovation.imageGradient}
                       accent={innovation.imageAccent}
                       size={cardSize === 'hero' ? 'hero' : 'card'}
+                      priority={index < 6}
                     />
                   </div>
 
