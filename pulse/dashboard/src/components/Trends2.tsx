@@ -22,9 +22,9 @@ import React, { useMemo, useState, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
-  Leaf, Swords, Sparkles, ArrowLeft, ChevronDown, BarChart3, Clock,
-  Globe, Newspaper, FileText, AlertTriangle, ExternalLink, MapPin,
-  Layers, Zap, Pencil, Check, X as XIcon,
+  Leaf, Swords, Sparkles, ArrowLeft, ChevronDown, ChevronUp, ChevronsUpDown,
+  BarChart3, Clock, Globe, Newspaper, FileText, AlertTriangle, ExternalLink,
+  MapPin, Layers, Zap, Pencil, Check, X as XIcon,
 } from 'lucide-react';
 import usePrism from '../hooks/usePrism';
 import { CATEGORIES, fmtPct, fmtShift, shortCat } from '../lib/format';
@@ -837,15 +837,30 @@ interface Trends2Props {
   isAdmin?: boolean;
 }
 
+type SortKey = 'name' | 'direction' | 'probability' | 'gp1_pct_affected' | 'gp1_shift';
+type SortDir = 'asc' | 'desc';
+
 const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
   const { trends, loading, backendAvailable, updateTrend } = usePrism();
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      // Text columns default to ascending, numerical columns default to descending.
+      setSortDir(key === 'name' || key === 'direction' ? 'asc' : 'desc');
+    }
+  };
 
   const filtered = useMemo<Trend[]>(() => {
     const q = search.trim().toLowerCase();
-    return (trends || []).filter((t) => {
+    const rows = (trends || []).filter((t) => {
       if (categoryFilter !== 'all') {
         const exposure = t.category_exposure?.[categoryFilter as CategoryId] ?? 0;
         if (exposure <= 0) return false;
@@ -857,7 +872,22 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
         t.force.toLowerCase().includes(q)
       );
     });
-  }, [trends, categoryFilter, search]);
+
+    if (!sortKey) return rows;
+
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const compare = (a: Trend, b: Trend): number => {
+      if (sortKey === 'name')       return a.name.localeCompare(b.name) * dir;
+      if (sortKey === 'direction')  return a.direction.localeCompare(b.direction) * dir;
+      const av = (a as Trend & Record<string, unknown>)[sortKey];
+      const bv = (b as Trend & Record<string, unknown>)[sortKey];
+      const an = typeof av === 'number' ? av : Number.NEGATIVE_INFINITY;
+      const bn = typeof bv === 'number' ? bv : Number.NEGATIVE_INFINITY;
+      if (an === bn) return 0;
+      return (an < bn ? -1 : 1) * dir;
+    };
+    return [...rows].sort(compare);
+  }, [trends, categoryFilter, search, sortKey, sortDir]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}>
@@ -958,11 +988,11 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
             fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em',
             backgroundColor: S.primaryContainer, color: S.onPrimaryContainer,
           }}>
-            <span>Trend</span>
-            <span>Direction</span>
-            <span>Probability</span>
-            <span style={{ textAlign: 'right' }}>GP1 % Affected</span>
-            <span style={{ textAlign: 'right' }}>Shift</span>
+            <SortHeader label="Trend"           sortKey="name"             current={sortKey} dir={sortDir} onSort={handleSort} />
+            <SortHeader label="Direction"       sortKey="direction"        current={sortKey} dir={sortDir} onSort={handleSort} />
+            <SortHeader label="Probability"     sortKey="probability"      current={sortKey} dir={sortDir} onSort={handleSort} />
+            <SortHeader label="GP1 % Affected"  sortKey="gp1_pct_affected" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+            <SortHeader label="Shift"           sortKey="gp1_shift"        current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
             <span />
           </div>
 
@@ -995,6 +1025,42 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
         </motion.div>
       </main>
     </div>
+  );
+};
+
+// ─── Sortable column header ──────────────────────────────────────────
+const SortHeader: FC<{
+  label: string;
+  sortKey: SortKey;
+  current: SortKey | null;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  align?: 'left' | 'right';
+}> = ({ label, sortKey, current, dir, onSort, align = 'left' }) => {
+  const active = current === sortKey;
+  const Icon = !active ? ChevronsUpDown : dir === 'asc' ? ChevronUp : ChevronDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        width: '100%',
+        padding: 0, border: 'none', background: 'transparent',
+        color: 'inherit',
+        fontSize: 'inherit', fontWeight: 'inherit',
+        letterSpacing: 'inherit', textTransform: 'inherit',
+        cursor: 'pointer',
+        opacity: active ? 1 : 0.85,
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = active ? '1' : '0.85'; }}
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <span>{label}</span>
+      <Icon size={13} strokeWidth={active ? 2.75 : 2} />
+    </button>
   );
 };
 
