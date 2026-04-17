@@ -2,18 +2,20 @@
  * Trends 2 — Editorial Intelligence View (Vite dashboard)
  *
  * Alternative visualisation for the trends page, inspired by the Stitch
- * "Digital Curator" design language (see stitch_fmcg_trend_navigator-3/DESIGN.md):
- *   • Maritime blue palette with tonal layering (no 1px borders)
- *   • Manrope headlines + Inter body pairing
- *   • Pill category filter chips, dot-probability bar, pill direction badges
- *   • Editorial "insight rail" accent on section headers
+ * "Digital Curator" design language. Now with click-to-expand rows that
+ * mirror the exact information and editable controls from the original
+ * Trend page's ExpandedTrendRow — restyled with a calm, paper-white
+ * layout where each section sits in its own boxed card for legibility.
  *
- * Functionality mirrors the original TrendExplorer expandable row:
- *   — click a row to reveal description, PRISM analysis, sources with tier
- *     badges, GP1 % Affected rationale, materialization timing, and
- *     category / value-chain / regional exposure grids.
+ * Editable fields (wired to usePrism.updateTrend, admin-only):
+ *   • GP1 % Affected — range slider (1–50 %)
+ *   • Probability — 1–5 dot selector
+ *   • Peak Year — 2026–2035 select
+ *   • Diffusion Curve — s_curve / linear / front_loaded / back_loaded / step_function
  *
- * Data is wired to real trends from usePrism — no mock content.
+ * Exposures (Category, Value Chain, Region) match the Trend page 1:1:
+ *   • Categories grouped Beauty / LHC, short labels (Color, Care, FCN…)
+ *   • Same VC_STEPS and REGIONS as TrendExplorer
  */
 
 import React, { useMemo, useState, FC } from 'react';
@@ -22,10 +24,10 @@ import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
   Leaf, Swords, Sparkles, ArrowLeft, ChevronDown, BarChart3, Clock,
   Globe, Newspaper, FileText, AlertTriangle, ExternalLink, MapPin,
-  Layers, Zap,
+  Layers, Zap, Pencil, Check, X as XIcon,
 } from 'lucide-react';
 import usePrism from '../hooks/usePrism';
-import { CATEGORIES, fmtPct, fmtShift } from '../lib/format';
+import { CATEGORIES, fmtPct, fmtShift, shortCat } from '../lib/format';
 import type { Trend, ForceName, CategoryId } from '../types';
 
 // ─── Editorial Palette ────────────────────────────────────────────────
@@ -50,6 +52,9 @@ const S = {
   error:              '#9f403d',
   errorContainer:     '#fe8983',
   onErrorContainer:   '#752121',
+  cardBorder:         'rgba(0, 52, 94, 0.10)',
+  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
+  mutedText:          '#64748B',
 };
 
 const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -99,21 +104,18 @@ const SOURCE_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
   Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
 };
 
-// ─── Diffusion curve descriptions ────────────────────────────────────
-const DIFFUSION_DESCRIPTIONS: Record<string, string> = {
-  s_curve:       'Logistic — slow start, fast middle, plateau.',
-  linear:        'Steady, constant rate of materialization.',
-  front_loaded:  'Fast early impact, flattens over time (√t).',
-  back_loaded:   'Slow start, accelerates late (t²).',
-  step_function: 'Near-zero until ~80%, then sudden jump.',
-};
+// ─── Diffusion curve metadata ─────────────────────────────────────────
+const DIFFUSION_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: 's_curve',       label: 'S-Curve',       description: 'Logistic — slow start, fast middle, plateau.' },
+  { value: 'linear',        label: 'Linear',        description: 'Steady, constant rate of materialization.' },
+  { value: 'front_loaded',  label: 'Front-Loaded',  description: 'Fast early impact, flattens over time (√t).' },
+  { value: 'back_loaded',   label: 'Back-Loaded',   description: 'Slow start, accelerates late (t²).' },
+  { value: 'step_function', label: 'Step Function', description: 'Near-zero until ~80%, then sudden jump.' },
+];
 
-const DIFFUSION_LABELS: Record<string, string> = {
-  s_curve: 'S-Curve', linear: 'Linear', front_loaded: 'Front-Loaded',
-  back_loaded: 'Back-Loaded', step_function: 'Step Function',
-};
+const PEAK_YEAR_OPTIONS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
 
-// ─── VC + Region label tables ────────────────────────────────────────
+// ─── VC + Region label tables (match TrendExplorer 1:1) ───────────────
 const VC_STEPS = [
   { id: 'raw_materials',  label: 'Raw Materials' },
   { id: 'formulation',    label: 'Formulation' },
@@ -134,18 +136,41 @@ const REGIONS = [
 
 // ─── Small presentational components ─────────────────────────────────
 
-const DotBar: FC<{ value: number; max?: number; color?: string }> = ({ value, max = 5, color = S.primary }) => (
-  <div style={{ display: 'flex', gap: 6 }} aria-label={`Value ${value} of ${max}`}>
-    {Array.from({ length: max }).map((_, i) => (
-      <span
-        key={i}
-        style={{
-          display: 'inline-block',
-          width: 10, height: 10, borderRadius: 999,
-          backgroundColor: i < value ? color : S.surfaceHigh,
-        }}
-      />
-    ))}
+const DotBar: FC<{
+  value: number;
+  max?: number;
+  color?: string;
+  editable?: boolean;
+  onChange?: (v: number) => void;
+  size?: number;
+}> = ({ value, max = 5, color = S.primary, editable = false, onChange, size = 10 }) => (
+  <div style={{ display: 'inline-flex', gap: 6 }} role={editable ? 'radiogroup' : undefined}>
+    {Array.from({ length: max }).map((_, i) => {
+      const filled = i < value;
+      const handle = editable && onChange
+        ? (e: React.SyntheticEvent) => { e.stopPropagation(); onChange(i + 1); }
+        : undefined;
+      return (
+        <span
+          key={i}
+          onClick={handle}
+          role={editable ? 'radio' : undefined}
+          aria-checked={editable ? filled : undefined}
+          tabIndex={editable ? 0 : -1}
+          onKeyDown={editable ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange?.(i + 1); }
+          } : undefined}
+          style={{
+            display: 'inline-block',
+            width: size, height: size, borderRadius: 999,
+            backgroundColor: filled ? color : S.surfaceHigh,
+            cursor: editable ? 'pointer' : 'default',
+            transition: 'background-color 140ms, transform 140ms',
+            outline: 'none',
+          }}
+        />
+      );
+    })}
   </div>
 );
 
@@ -166,97 +191,45 @@ const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ directi
   );
 };
 
-const InsightLabel: FC<{ icon?: React.ComponentType<{ size?: number }>; children: React.ReactNode }> = ({ icon: Icon, children }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: 8,
-    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-    letterSpacing: '0.16em', color: S.onSurfaceVariant,
-    marginBottom: 12,
-  }}>
-    {Icon && (
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 22, height: 22, borderRadius: 6,
-        backgroundColor: S.surfaceHigh, color: S.primary,
-      }}>
-        <Icon size={12} />
-      </span>
-    )}
-    {children}
-  </div>
-);
-
-const StatTile: FC<{
-  label: string;
-  value: React.ReactNode;
-  sublabel?: string;
-  accent?: string;
-}> = ({ label, value, sublabel, accent = S.primary }) => (
-  <div style={{
-    flex: 1, minWidth: 0,
-    padding: '18px 20px', borderRadius: 16,
-    backgroundColor: S.surfaceLow,
-  }}>
-    <div style={{
-      fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-      letterSpacing: '0.14em', color: S.onSurfaceVariant,
-      marginBottom: 8,
-    }}>
-      {label}
-    </div>
-    <div style={{
-      fontFamily: HEADLINE_FONT, color: accent,
-      fontSize: '1.6rem', fontWeight: 800, lineHeight: 1,
-      letterSpacing: '-0.02em',
-    }}>
-      {value}
-    </div>
-    {sublabel && (
-      <div style={{ marginTop: 8, fontSize: 12, color: S.onSurfaceVariant, lineHeight: 1.45 }}>
-        {sublabel}
-      </div>
-    )}
-  </div>
-);
-
-// ─── Exposure row (for categories, VC, regions) ──────────────────────
-const ExposureRow: FC<{ label: string; value: number; color?: string; max?: number }> = ({ label, value, color, max = 5 }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '10px 14px', borderRadius: 10,
-    backgroundColor: value > 0 ? S.surface : 'transparent',
-    boxShadow: value > 0 ? `inset 0 0 0 1px ${S.surfaceLow}` : 'none',
-  }}>
-    <div style={{ fontSize: 13, fontWeight: 600, color: value > 0 ? S.onSurface : S.onSurfaceVariant }}>
-      {label}
-    </div>
-    <DotBar value={value} color={color ?? S.primary} max={max} />
-  </div>
-);
-
-const ExposureBlock: FC<{
+const SectionCard: FC<{
   title: string;
-  icon: React.ComponentType<{ size?: number }>;
-  items: { id: string; label: string }[];
-  values: Record<string, number>;
-  color: string;
-}> = ({ title, icon, items, values, color }) => (
-  <div>
-    <InsightLabel icon={icon}>{title}</InsightLabel>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {items.map((it) => (
-        <ExposureRow
-          key={it.id}
-          label={it.label}
-          value={values[it.id] ?? 0}
-          color={color}
-        />
-      ))}
-    </div>
-  </div>
+  icon?: React.ComponentType<{ size?: number }>;
+  accent?: string;
+  children: React.ReactNode;
+  footnote?: React.ReactNode;
+}> = ({ title, icon: Icon, accent = S.primary, children, footnote }) => (
+  <section style={{
+    backgroundColor: S.surface,
+    borderRadius: 14,
+    border: `1px solid ${S.cardBorder}`,
+    boxShadow: '0 1px 2px rgba(0, 52, 94, 0.03)',
+    padding: 20,
+    display: 'flex', flexDirection: 'column', gap: 12,
+  }}>
+    <header style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+      letterSpacing: '0.16em', color: S.onSurfaceVariant,
+    }}>
+      {Icon && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, borderRadius: 6,
+          backgroundColor: `${accent}14`, color: accent,
+        }}>
+          <Icon size={12} />
+        </span>
+      )}
+      <span>{title}</span>
+    </header>
+    <div>{children}</div>
+    {footnote && (
+      <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5 }}>{footnote}</div>
+    )}
+  </section>
 );
 
-// ─── Sources list ────────────────────────────────────────────────────
+// ─── Source item ─────────────────────────────────────────────────────
 type TrendSource = { title?: string; url?: string; data?: string; tier?: string };
 
 const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
@@ -269,32 +242,39 @@ const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
       href={src.url || '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
       style={{
         display: 'grid',
         gridTemplateColumns: 'auto 1fr auto',
         alignItems: 'center', columnGap: 12, rowGap: 4,
-        padding: '12px 16px', borderRadius: 12,
+        padding: '10px 12px', borderRadius: 10,
         backgroundColor: S.surface,
-        boxShadow: `inset 0 0 0 1px ${S.surfaceLow}`,
+        border: `1px solid ${S.cardBorder}`,
         textDecoration: 'none',
-        transition: 'background-color 160ms, transform 160ms',
+        transition: 'background-color 160ms, border-color 160ms',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = S.surfaceLow; }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = S.surface; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = S.surfaceLow;
+        e.currentTarget.style.borderColor = S.cardBorderStrong;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = S.surface;
+        e.currentTarget.style.borderColor = S.cardBorder;
+      }}
     >
       <span style={{
-        width: 32, height: 32, borderRadius: 8,
-        backgroundColor: S.surfaceHigh, color: S.primary,
+        width: 28, height: 28, borderRadius: 8,
+        backgroundColor: S.surfaceLow, color: S.primary,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon size={15} />
+        <Icon size={14} />
       </span>
 
       <div style={{ minWidth: 0 }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.12em', color: S.onSurfaceVariant,
+          letterSpacing: '0.12em', color: S.mutedText,
           marginBottom: 2,
         }}>
           <span>{apiName}</span>
@@ -306,6 +286,7 @@ const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
                 backgroundColor: `${tierCfg.color}20`,
                 color: tierCfg.color,
                 fontSize: 10, fontWeight: 800, letterSpacing: 0,
+                border: `1px solid ${tierCfg.color}40`,
               }}
             >
               {tierCfg.label}
@@ -322,27 +303,172 @@ const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
         {src.data && (
           <div style={{
             gridColumn: '2 / span 2',
-            marginTop: 4, fontSize: 12, color: S.onSurfaceVariant, lineHeight: 1.5,
+            marginTop: 4, fontSize: 12, color: S.mutedText, lineHeight: 1.5,
           }}>
             {src.data}
           </div>
         )}
       </div>
 
-      <ExternalLink size={14} color={S.onSurfaceVariant} />
+      <ExternalLink size={14} color={S.mutedText} />
     </a>
   );
 };
 
+// ─── Category Exposure Grid (grouped Beauty / LHC) ────────────────────
+const CategoryExposureGrid: FC<{
+  values: Record<string, number>;
+  editable: boolean;
+  onChange: (catId: string, v: number) => void;
+}> = ({ values, editable, onChange }) => {
+  const grouped = {
+    'Beauty': CATEGORIES.filter(c => c.group === 'Beauty'),
+    'LHC':    CATEGORIES.filter(c => c.group === 'LHC'),
+  };
+
+  return (
+    <div style={{
+      borderRadius: 10, overflow: 'hidden',
+      border: `1px solid ${S.cardBorder}`,
+      backgroundColor: S.surface,
+    }}>
+      {Object.entries(grouped).map(([group, cats], gi) => (
+        <React.Fragment key={group}>
+          <div style={{
+            padding: '3px 10px', fontSize: 9, fontWeight: 800,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: S.onSurfaceVariant, backgroundColor: S.surfaceLow,
+            borderTop: gi > 0 ? `1px solid ${S.cardBorder}` : 'none',
+          }}>
+            {group}
+          </div>
+          {cats.map((c, idx) => (
+            <div
+              key={c.id}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '4px 10px', minHeight: 26,
+                borderTop: idx > 0 ? `1px solid ${S.cardBorder}` : 'none',
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 600, color: S.onSurface, minWidth: 80 }}>
+                {shortCat(c.name)}
+              </span>
+              <DotBar
+                value={values[c.id] ?? 0}
+                color={c.color || S.primary}
+                editable={editable}
+                size={9}
+                onChange={(v) => onChange(c.id, v)}
+              />
+            </div>
+          ))}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+// ─── Value-chain / Region Exposure Grid (flat) ───────────────────────
+const FlatExposureGrid: FC<{
+  items: { id: string; label: string }[];
+  values: Record<string, number>;
+  color: string;
+  editable: boolean;
+  onChange: (id: string, v: number) => void;
+}> = ({ items, values, color, editable, onChange }) => (
+  <div style={{
+    borderRadius: 10, overflow: 'hidden',
+    border: `1px solid ${S.cardBorder}`,
+    backgroundColor: S.surface,
+  }}>
+    {items.map((it, idx) => (
+      <div
+        key={it.id}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '4px 10px', minHeight: 26,
+          borderTop: idx > 0 ? `1px solid ${S.cardBorder}` : 'none',
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 600, color: S.onSurface, minWidth: 100 }}>
+          {it.label}
+        </span>
+        <DotBar
+          value={values[it.id] ?? 0}
+          color={color}
+          editable={editable}
+          size={9}
+          onChange={(v) => onChange(it.id, v)}
+        />
+      </div>
+    ))}
+  </div>
+);
+
 // ─── Expanded Panel ──────────────────────────────────────────────────
-const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
-  const gp1Pct     = trend.gp1_pct_affected;
-  const shift      = trend.gp1_shift;
-  const peakYear   = (trend as Trend & { peak_year?: number }).peak_year ?? 2030;
-  const diffusion  = (trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve';
+const ExpandedPanel: FC<{
+  trend: Trend;
+  isAdmin: boolean;
+  updateTrend: (id: string, updates: Partial<Trend>) => Promise<void>;
+}> = ({ trend, isAdmin, updateTrend }) => {
   const sources    = (trend as Trend & { sources?: TrendSource[] }).sources ?? [];
   const confidence = trend.confidence;
   const dataSource = trend.data_source;
+
+  // Edit mode — gates description / PRISM analysis / exposures for explicit Save
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Local editable state — syncs to backend live for GP1/Probability/Peak/Diffusion,
+  // and on Save for description/implication/exposures.
+  const [gp1Pct, setGp1Pct]           = useState<number>(trend.gp1_pct_affected ?? 0.10);
+  const [probability, setProbability] = useState<number>(trend.probability ?? 3);
+  const [peakYear, setPeakYear]       = useState<number>(
+    (trend as Trend & { peak_year?: number }).peak_year ?? 2030
+  );
+  const [diffusion, setDiffusion]     = useState<string>(
+    (trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve'
+  );
+  const [editDesc, setEditDesc]       = useState<string>(trend.description || '');
+  const [editImpl, setEditImpl]       = useState<string>(trend.strategic_implication || '');
+  const [catExp, setCatExp]           = useState<Record<string, number>>(
+    (trend.category_exposure ?? {}) as Record<string, number>
+  );
+  const [vcExp, setVcExp]             = useState<Record<string, number>>(
+    (trend.vc_exposure ?? {}) as Record<string, number>
+  );
+  const [regExp, setRegExp]           = useState<Record<string, number>>(
+    (trend.regional_exposure ?? {}) as Record<string, number>
+  );
+
+  const commit = (updates: Partial<Trend>) => {
+    if (!isAdmin) return;
+    updateTrend(trend.id, updates).catch(() => { /* handled by hook */ });
+  };
+
+  const handleSave = () => {
+    if (!isAdmin) return;
+    const updates: Partial<Trend> = {
+      description: editDesc,
+      strategic_implication: editImpl,
+      category_exposure: catExp as Record<CategoryId, number>,
+      vc_exposure: vcExp,
+      regional_exposure: regExp,
+    };
+    updateTrend(trend.id, updates).catch(() => { /* handled by hook */ });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditDesc(trend.description || '');
+    setEditImpl(trend.strategic_implication || '');
+    setCatExp((trend.category_exposure ?? {}) as Record<string, number>);
+    setVcExp((trend.vc_exposure ?? {}) as Record<string, number>);
+    setRegExp((trend.regional_exposure ?? {}) as Record<string, number>);
+    setIsEditing(false);
+  };
+
+  const diffusionMeta = DIFFUSION_OPTIONS.find(d => d.value === diffusion) ?? DIFFUSION_OPTIONS[0];
 
   return (
     <motion.div
@@ -352,23 +478,21 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       style={{ overflow: 'hidden' }}
     >
-      <div style={{
-        padding: '32px 32px 40px',
-        background: `linear-gradient(180deg, ${S.surfaceLow} 0%, ${S.surface} 100%)`,
-      }}>
-        {/* Meta row — direction, probability, category touchpoints, confidence */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          padding: '28px 32px 36px',
+          backgroundColor: S.surface,
+          borderTop: `1px solid ${S.cardBorder}`,
+        }}
+      >
+        {/* Meta row + Edit toggle */}
         <div style={{
           display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
-          marginBottom: 28,
+          marginBottom: 24,
         }}>
           <DirectionPill direction={trend.direction} />
-          <MetaChip
-            label={`Probability ${trend.probability}/5`}
-            icon={Zap}
-          />
-          {confidence && (
-            <MetaChip label={`Confidence · ${confidence}`} />
-          )}
+          {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
           {trend.ai_suggested && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -381,131 +505,316 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
               <Sparkles size={12} /> AI Suggested
             </span>
           )}
-          {dataSource && (
-            <MetaChip label={dataSource} />
-          )}
+          {dataSource && <MetaChip label={dataSource} />}
+
+          {/* Edit / Save / Cancel — admin only */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {!isAdmin && (
+              <span style={{ fontSize: 11, color: S.mutedText, fontStyle: 'italic', alignSelf: 'center' }}>
+                Editing is admin-only.
+              </span>
+            )}
+            {isAdmin && !isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 600,
+                  backgroundColor: S.primaryContainer, color: S.onPrimaryContainer,
+                  border: 'none', cursor: 'pointer',
+                }}
+              >
+                <Pencil size={12} /> Edit
+              </button>
+            )}
+            {isAdmin && isEditing && (
+              <>
+                <button
+                  onClick={handleCancel}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 999,
+                    fontSize: 12, fontWeight: 600,
+                    backgroundColor: S.surfaceLow, color: S.onSurfaceVariant,
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  <XIcon size={12} /> Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 999,
+                    fontSize: 12, fontWeight: 700,
+                    backgroundColor: S.primary, color: '#fff',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  <Check size={12} /> Save
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Two-column layout */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
-          gap: 48,
+          gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+          gap: 20,
+          alignItems: 'start',
         }}>
-          {/* ─── LEFT — narrative ────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            {/* Description */}
-            <section>
-              <InsightLabel icon={FileText}>Description</InsightLabel>
-              <p style={{
-                margin: 0, fontSize: 16, lineHeight: 1.6,
-                color: S.onSurface, fontWeight: 400,
-              }}>
-                {trend.description || <em style={{ color: S.onSurfaceVariant }}>No description documented.</em>}
-              </p>
-            </section>
+          {/* ─── LEFT column ────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <SectionCard title="Description" icon={FileText}>
+              {isEditing ? (
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '10px 12px', fontSize: 14, lineHeight: 1.6,
+                    color: S.onSurface, backgroundColor: S.surfaceLow,
+                    border: `1px solid ${S.cardBorderStrong}`, borderRadius: 8,
+                    resize: 'vertical', outline: 'none',
+                    fontFamily: BODY_FONT,
+                  }}
+                />
+              ) : (
+                <p style={{
+                  margin: 0, fontSize: 14, lineHeight: 1.6, color: S.onSurface,
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {editDesc || trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
+                </p>
+              )}
+            </SectionCard>
 
-            {/* PRISM Analysis */}
-            <section>
-              <InsightLabel icon={Sparkles}>PRISM Analysis</InsightLabel>
-              <blockquote style={{
-                margin: 0,
-                padding: '16px 20px',
-                borderRadius: 14,
-                borderLeft: `4px solid ${S.primary}`,
-                backgroundColor: S.surfaceLow,
-                fontFamily: HEADLINE_FONT,
-                fontSize: 15, lineHeight: 1.55,
-                color: S.onSurface,
-                fontWeight: 500,
-                fontStyle: 'normal',
-              }}>
-                {trend.strategic_implication || (
-                  <span style={{ color: S.onSurfaceVariant, fontWeight: 400, fontStyle: 'italic' }}>
-                    No strategic implication documented.
-                  </span>
-                )}
-              </blockquote>
-            </section>
+            <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
+              {isEditing ? (
+                <textarea
+                  value={editImpl}
+                  onChange={(e) => setEditImpl(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
+                    color: S.onSurface, backgroundColor: S.surfaceLow,
+                    border: `1px solid ${S.cardBorderStrong}`, borderRadius: 8,
+                    resize: 'vertical', outline: 'none',
+                    fontFamily: BODY_FONT,
+                  }}
+                />
+              ) : (
+                <blockquote style={{
+                  margin: 0,
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  borderLeft: `3px solid ${S.primary}`,
+                  backgroundColor: S.surfaceLow,
+                  fontSize: 14, lineHeight: 1.55,
+                  color: S.onSurface,
+                  fontStyle: 'normal',
+                  fontWeight: 500,
+                }}>
+                  {editImpl || trend.strategic_implication || (
+                    <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>
+                      No strategic implication documented.
+                    </span>
+                  )}
+                </blockquote>
+              )}
+            </SectionCard>
+
+            {/* GP1 % Affected — slider */}
+            <SectionCard
+              title="GP1 % Affected — Economic Anchoring"
+              icon={BarChart3}
+              footnote={
+                <>
+                  What fraction of a category's GP1 can this trend realistically affect at full
+                  materialization? A 5/5 probability trend with {Math.round(gp1Pct * 100)}% GP1 affected means:
+                  maximum-severity trend, but only touches {Math.round(gp1Pct * 100)}% of the pool.
+                  {!isAdmin && ' (Admin only)'}
+                </>
+              }
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <input
+                  type="range" min={1} max={50} step={1}
+                  value={Math.round(gp1Pct * 100)}
+                  disabled={!isAdmin}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10) / 100;
+                    setGp1Pct(v);
+                    commit({ gp1_pct_affected: v } as Partial<Trend>);
+                  }}
+                  style={{
+                    flex: 1, height: 4, accentColor: S.primary,
+                    cursor: isAdmin ? 'pointer' : 'not-allowed',
+                    opacity: isAdmin ? 1 : 0.6,
+                  }}
+                />
+                <div style={{
+                  minWidth: 64,
+                  padding: '6px 12px', borderRadius: 8,
+                  backgroundColor: S.surfaceLow,
+                  border: `1px solid ${S.cardBorder}`,
+                  textAlign: 'center',
+                  fontFamily: HEADLINE_FONT,
+                  fontWeight: 800, fontSize: 15, color: S.primary,
+                }}>
+                  {Math.round(gp1Pct * 100)}%
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Probability — editable dot selector */}
+            <SectionCard
+              title="Probability"
+              icon={Zap}
+              footnote={
+                <>
+                  Likelihood this trend materialises at the stated severity.
+                  Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.
+                  {!isAdmin && ' (Admin only)'}
+                </>
+              }
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+                <DotBar
+                  value={probability}
+                  color={S.primary}
+                  editable={isAdmin}
+                  size={14}
+                  onChange={(v) => {
+                    setProbability(v);
+                    commit({ probability: v } as Partial<Trend>);
+                  }}
+                />
+                <div style={{
+                  padding: '6px 12px', borderRadius: 8,
+                  backgroundColor: S.surfaceLow,
+                  border: `1px solid ${S.cardBorder}`,
+                  fontFamily: HEADLINE_FONT,
+                  fontWeight: 800, fontSize: 15, color: S.primary,
+                }}>
+                  {probability} / 5
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Materialization Timing — Peak Year + Diffusion */}
+            <SectionCard
+              title="Materialization Timing"
+              icon={Clock}
+              footnote="When does this trend reach full impact, and how does it build over time?"
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                {/* Peak Year */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
+                    Peak Year
+                  </div>
+                  <select
+                    value={peakYear}
+                    disabled={!isAdmin}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setPeakYear(v);
+                      commit({ peak_year: v } as Partial<Trend>);
+                    }}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      fontSize: 13, fontWeight: 600, color: S.onSurface,
+                      backgroundColor: S.surface,
+                      border: `1px solid ${S.cardBorder}`,
+                      outline: 'none',
+                      cursor: isAdmin ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {PEAK_YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
+                    Year when 100% of impact materializes
+                  </div>
+                </div>
+
+                {/* Diffusion Curve */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
+                    Diffusion Curve
+                  </div>
+                  <select
+                    value={diffusion}
+                    disabled={!isAdmin}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setDiffusion(v);
+                      commit({ diffusion_curve: v } as Partial<Trend>);
+                    }}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      fontSize: 13, fontWeight: 600, color: S.onSurface,
+                      backgroundColor: S.surface,
+                      border: `1px solid ${S.cardBorder}`,
+                      outline: 'none',
+                      cursor: isAdmin ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {DIFFUSION_OPTIONS.map(d => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
+                    {diffusionMeta.description}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
 
             {/* Sources */}
             {sources.length > 0 && (
-              <section>
-                <InsightLabel icon={Newspaper}>
-                  Sources &nbsp;·&nbsp; {sources.length}
-                </InsightLabel>
+              <SectionCard title={`Sources · ${sources.length}`} icon={Newspaper}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {sources.map((src, i) => (
-                    <SourceItem key={i} src={src} />
-                  ))}
+                  {sources.map((src, i) => <SourceItem key={i} src={src} />)}
                 </div>
-              </section>
+              </SectionCard>
             )}
           </div>
 
-          {/* ─── RIGHT — metrics & exposure ──────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            {/* GP1 + Shift + Timing stat band */}
-            <section>
-              <InsightLabel icon={BarChart3}>Economic Anchoring</InsightLabel>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <StatTile
-                  label="GP1 % Affected"
-                  value={gp1Pct != null ? fmtPct(gp1Pct) : '—'}
-                  sublabel="Maximum fraction of category GP1 this trend can touch at full materialization."
-                />
-                <StatTile
-                  label="Projected Shift"
-                  value={shift != null ? fmtShift(shift) : '—'}
-                  sublabel="Expected aggregate direction on the profit pool."
-                  accent={shift != null && shift < 0 ? S.error : S.primary}
-                />
-              </div>
-            </section>
+          {/* ─── RIGHT column — exposure grids ─────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 16 }}>
+            <SectionCard title="Category Exposure" icon={Layers}>
+              <CategoryExposureGrid
+                values={catExp}
+                editable={isAdmin && isEditing}
+                onChange={(id, v) => setCatExp({ ...catExp, [id]: v })}
+              />
+            </SectionCard>
 
-            {/* Materialization Timing */}
-            <section>
-              <InsightLabel icon={Clock}>Materialization Timing</InsightLabel>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <StatTile
-                  label="Peak Year"
-                  value={peakYear}
-                  sublabel="Year when 100% of impact is realized."
-                />
-                <StatTile
-                  label="Diffusion Curve"
-                  value={DIFFUSION_LABELS[diffusion] ?? diffusion}
-                  sublabel={DIFFUSION_DESCRIPTIONS[diffusion] ?? ''}
-                />
-              </div>
-            </section>
+            <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+              <FlatExposureGrid
+                items={VC_STEPS}
+                values={vcExp}
+                color={S.onTertiaryContainer}
+                editable={isAdmin && isEditing}
+                onChange={(id, v) => setVcExp({ ...vcExp, [id]: v })}
+              />
+            </SectionCard>
 
-            {/* Category Exposure */}
-            <ExposureBlock
-              title="Category Exposure"
-              icon={Layers}
-              items={CATEGORIES.map((c) => ({ id: c.id, label: c.name }))}
-              values={(trend.category_exposure ?? {}) as Record<string, number>}
-              color={S.primary}
-            />
-
-            {/* Value Chain Exposure */}
-            <ExposureBlock
-              title="Value Chain Exposure"
-              icon={Cpu}
-              items={VC_STEPS}
-              values={(trend.vc_exposure ?? {}) as Record<string, number>}
-              color={S.onTertiaryContainer}
-            />
-
-            {/* Regional Exposure */}
-            <ExposureBlock
-              title="Regional Exposure"
-              icon={MapPin}
-              items={REGIONS}
-              values={(trend.regional_exposure ?? {}) as Record<string, number>}
-              color={S.onSecondaryContainer}
-            />
+            <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+              <FlatExposureGrid
+                items={REGIONS}
+                values={regExp}
+                color={S.onSecondaryContainer}
+                editable={isAdmin && isEditing}
+                onChange={(id, v) => setRegExp({ ...regExp, [id]: v })}
+              />
+            </SectionCard>
           </div>
         </div>
       </div>
@@ -530,10 +839,11 @@ const MetaChip: FC<{ label: string; icon?: React.ComponentType<{ size?: number }
 // ─── Page ────────────────────────────────────────────────────────────
 interface Trends2Props {
   onBack?: () => void;
+  isAdmin?: boolean;
 }
 
-const Trends2: FC<Trends2Props> = ({ onBack }) => {
-  const { trends, loading, backendAvailable } = usePrism();
+const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
+  const { trends, loading, backendAvailable, updateTrend } = usePrism();
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -642,15 +952,16 @@ const Trends2: FC<Trends2Props> = ({ onBack }) => {
           style={{
             borderRadius: 20, overflow: 'hidden', backgroundColor: S.surface,
             boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+            border: `1px solid ${S.cardBorder}`,
           }}
         >
-          {/* Column header */}
+          {/* Column header — maritime blue surface (the sole headline-blue band) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr 32px',
             alignItems: 'center', padding: '20px 32px',
             fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em',
-            backgroundColor: S.surfaceLow, color: S.onSurfaceVariant,
+            backgroundColor: S.primaryContainer, color: S.onPrimaryContainer,
           }}>
             <span>Trend</span>
             <span>Direction</span>
@@ -675,7 +986,13 @@ const Trends2: FC<Trends2Props> = ({ onBack }) => {
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedId(isExpanded ? null : (t.id ?? String(idx)))}
                   />
-                  {isExpanded && <ExpandedPanel trend={t} />}
+                  {isExpanded && (
+                    <ExpandedPanel
+                      trend={t}
+                      isAdmin={isAdmin}
+                      updateTrend={updateTrend as (id: string, u: Partial<Trend>) => Promise<void>}
+                    />
+                  )}
                 </React.Fragment>
               );
             })}
@@ -727,7 +1044,6 @@ const TrendRow: FC<{
         border: 'none', textAlign: 'left',
         cursor: 'pointer',
         transition: 'background-color 180ms',
-        // Tonal divider instead of 1px border, per DESIGN.md "No-Line Rule"
         boxShadow: isLast ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}`,
       }}
       onMouseEnter={(e) => {
