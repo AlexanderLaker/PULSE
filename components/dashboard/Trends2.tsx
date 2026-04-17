@@ -24,6 +24,7 @@ import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
   Leaf, Swords, Sparkles, ChevronDown,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
 import type { Trend, ForceName, CategoryId } from '@/types';
@@ -72,7 +73,7 @@ const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sa
 const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 // Force → icon + tonal container mapping (editorial palette)
-const FORCE_TILE: Record<ForceName, { Icon: FC<{ size?: number; strokeWidth?: number }>; bg: string; fg: string }> = {
+const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }> = {
   Consumer:      { Icon: Users,    bg: S.primaryContainer,   fg: S.primary },
   Customer:      { Icon: Store,    bg: S.secondaryContainer, fg: S.onSecondaryContainer },
   Technology:    { Icon: Cpu,      bg: S.tertiaryContainer,  fg: S.onTertiaryContainer },
