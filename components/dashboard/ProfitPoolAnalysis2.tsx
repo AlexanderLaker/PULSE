@@ -1233,7 +1233,7 @@ const ProfitPoolAnalysis2: FC = () => {
                     >
                       <div style={{ padding: '0 28px 28px', borderTop: `1px solid ${S.surfaceLow}` }}>
                         <TrendExplorer
-                          data={{ trends: trends }}
+                          data={{ trends: trends as any }}
                           forceFilter={forceFilter || ''}
                           onForceFilter={setForceFilter}
                           onUpdateTrend={(trendId: string, updates: any) =>
