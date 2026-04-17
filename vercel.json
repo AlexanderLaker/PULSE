@@ -2,7 +2,6 @@
   "version": 2,
   "buildCommand": "node scripts/download-images.mjs && next build",
   "framework": "nextjs",
-  "outputDirectory": ".next",
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api/index.py" },
     { "source": "/api/py/(.*)", "destination": "/api/index.py" }
