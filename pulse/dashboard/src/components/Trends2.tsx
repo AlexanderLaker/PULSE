@@ -888,42 +888,42 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}>
-      <main style={{ maxWidth: 1440, margin: '0 auto', padding: '40px 32px 40px 72px' }}>
+      <main style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 32px 24px 72px' }}>
         {/* Back button */}
         {onBack && (
           <button
             onClick={onBack}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', marginBottom: 24,
+              padding: '4px 12px', marginBottom: 14,
               borderRadius: 999, border: 'none',
               backgroundColor: S.surfaceLow, color: S.primary,
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}
           >
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={13} /> Back
           </button>
         )}
 
         {/* Editorial header with insight rail */}
-        <header style={{ marginBottom: 32, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 32 }}>
-          <div style={{ paddingLeft: 20, borderLeft: `4px solid ${S.primary}` }}>
+        <header style={{ marginBottom: 18, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
+          <div style={{ paddingLeft: 16, borderLeft: `4px solid ${S.primary}` }}>
             <div style={{
-              fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-              letterSpacing: '0.18em', color: S.onSurfaceVariant, marginBottom: 8,
+              fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+              letterSpacing: '0.18em', color: S.onSurfaceVariant, marginBottom: 4,
             }}>
               Trend Intelligence · Editorial View
             </div>
             <h1 style={{
               fontFamily: HEADLINE_FONT, color: S.onBg,
-              fontSize: '2.5rem', lineHeight: 1.1, fontWeight: 800,
+              fontSize: '1.85rem', lineHeight: 1.1, fontWeight: 800,
               letterSpacing: '-0.02em', margin: 0,
             }}>
               The Forces Shaping FMCG
             </h1>
             <p style={{
-              marginTop: 8, maxWidth: 640, fontSize: 15,
-              color: S.onSurfaceVariant, lineHeight: 1.55,
+              marginTop: 4, maxWidth: 640, fontSize: 13,
+              color: S.onSurfaceVariant, lineHeight: 1.45,
             }}>
               A curated lens on the {trends?.length ?? 0} signals driving
               profit-pool reallocation across categories through 2036.
@@ -942,8 +942,8 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search trends…"
               style={{
-                width: '100%', padding: '10px 16px 10px 42px',
-                borderRadius: 999, fontSize: 14,
+                width: '100%', padding: '8px 16px 8px 40px',
+                borderRadius: 999, fontSize: 13,
                 backgroundColor: S.surfaceLow, color: S.onSurface,
                 border: 'none', outline: 'none',
               }}
@@ -952,8 +952,8 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
         </header>
 
         {/* Force filter chips */}
-        <section style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
+        <section style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             <ForceFilterChip
               label="All Forces"
               Icon={Zap}
@@ -991,9 +991,9 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
           {/* Column header — maritime blue surface (the sole headline-blue band) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr 32px',
-            alignItems: 'center', padding: '20px 32px',
-            fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em',
+            gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr 28px',
+            alignItems: 'center', padding: '10px 24px',
+            fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em',
             backgroundColor: S.primaryContainer, color: S.onPrimaryContainer,
           }}>
             <SortHeader label="Trend"           sortKey="name"             current={sortKey} dir={sortDir} onSort={handleSort} />
@@ -1084,9 +1084,9 @@ const ForceFilterChip: FC<{
     onClick={onClick}
     style={{
       flexShrink: 0,
-      display: 'inline-flex', alignItems: 'center', gap: 8,
-      padding: '8px 16px 8px 12px', borderRadius: 999,
-      fontSize: 13, fontWeight: 600, letterSpacing: '0.01em',
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px 5px 10px', borderRadius: 999,
+      fontSize: 12, fontWeight: 600, letterSpacing: '0.01em',
       border: 'none', cursor: 'pointer',
       transition: 'background-color 180ms, color 180ms, box-shadow 180ms',
       backgroundColor: active ? activeBg : S.surfaceLow,
@@ -1106,7 +1106,7 @@ const ForceFilterChip: FC<{
       }
     }}
   >
-    <Icon size={14} strokeWidth={2} />
+    <Icon size={13} strokeWidth={2} />
     <span>{label}</span>
   </button>
 );
@@ -1130,8 +1130,8 @@ const TrendRow: FC<{
       aria-expanded={isExpanded}
       style={{
         display: 'grid', width: '100%',
-        gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr 32px',
-        alignItems: 'center', padding: '24px 32px',
+        gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr 28px',
+        alignItems: 'center', padding: '10px 24px',
         backgroundColor: isExpanded ? S.surfaceLow : S.surface,
         border: 'none', textAlign: 'left',
         cursor: 'pointer',
@@ -1145,24 +1145,24 @@ const TrendRow: FC<{
         if (!isExpanded) (e.currentTarget as HTMLButtonElement).style.backgroundColor = S.surface;
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <div style={{
-          width: 44, height: 44, flexShrink: 0, borderRadius: 12,
+          width: 30, height: 30, flexShrink: 0, borderRadius: 8,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           backgroundColor: tile.bg, color: tile.fg,
         }}>
-          <Icon size={20} strokeWidth={2} />
+          <Icon size={15} strokeWidth={2} />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{
             fontFamily: HEADLINE_FONT, color: S.onSurface,
-            fontWeight: 700, fontSize: 15,
+            fontWeight: 700, fontSize: 13, lineHeight: 1.3,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {trend.name}
           </div>
           <div style={{
-            color: S.onSurfaceVariant, fontSize: 13,
+            color: S.onSurfaceVariant, fontSize: 11.5, lineHeight: 1.3,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {trend.description || trend.strategic_implication || `${trend.force} signal`}
@@ -1174,13 +1174,13 @@ const TrendRow: FC<{
       <div><DotBar value={Math.round(trend.probability ?? 0)} /></div>
 
       <div style={{ textAlign: 'right' }}>
-        <span style={{ fontFamily: HEADLINE_FONT, color: S.onSurface, fontWeight: 800, fontSize: '1.15rem' }}>
+        <span style={{ fontFamily: HEADLINE_FONT, color: S.onSurface, fontWeight: 800, fontSize: '0.95rem' }}>
           {gp1 != null ? fmtPct(gp1) : '—'}
         </span>
       </div>
 
       <div style={{ textAlign: 'right' }}>
-        <span style={{ fontWeight: 700, fontSize: 14,
+        <span style={{ fontWeight: 700, fontSize: 12.5,
           color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
         }}>
           {shift != null ? fmtShift(shift) : '—'}
@@ -1191,14 +1191,14 @@ const TrendRow: FC<{
         aria-hidden
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 28, height: 28, borderRadius: 999,
+          width: 22, height: 22, borderRadius: 999,
           color: S.primary,
           backgroundColor: isExpanded ? S.primaryContainer : 'transparent',
           transition: 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms',
           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
         }}
       >
-        <ChevronDown size={16} strokeWidth={2.5} />
+        <ChevronDown size={14} strokeWidth={2.5} />
       </span>
     </button>
   );
