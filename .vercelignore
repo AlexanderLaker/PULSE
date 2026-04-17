@@ -3,7 +3,8 @@ node_modules
 __pycache__
 *.pyc
 tests/
-data/
+data/*.db
+data/prism.db
 .git
 *.xlsx
 *.db
