@@ -842,7 +842,7 @@ type SortDir = 'asc' | 'desc';
 
 const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
   const { trends, loading, backendAvailable, updateTrend } = usePrism();
-  const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
+  const [forceFilter, setForceFilter] = useState<ForceName | 'All'>('All');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -861,10 +861,7 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
   const filtered = useMemo<Trend[]>(() => {
     const q = search.trim().toLowerCase();
     const rows = (trends || []).filter((t) => {
-      if (categoryFilter !== 'all') {
-        const exposure = t.category_exposure?.[categoryFilter as CategoryId] ?? 0;
-        if (exposure <= 0) return false;
-      }
+      if (forceFilter !== 'All' && t.force !== forceFilter) return false;
       if (!q) return true;
       return (
         t.name.toLowerCase().includes(q) ||
@@ -887,7 +884,7 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
       return (an < bn ? -1 : 1) * dir;
     };
     return [...rows].sort(compare);
-  }, [trends, categoryFilter, search, sortKey, sortDir]);
+  }, [trends, forceFilter, search, sortKey, sortDir]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}>
@@ -954,18 +951,29 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
           </div>
         </header>
 
-        {/* Category filter chips */}
+        {/* Force filter chips */}
         <section style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
-            <FilterChip label="All" active={categoryFilter === 'all'} onClick={() => setCategoryFilter('all')} />
-            {CATEGORIES.map((c) => (
-              <FilterChip
-                key={c.id}
-                label={c.short}
-                active={categoryFilter === c.id}
-                onClick={() => setCategoryFilter(c.id as CategoryId)}
-              />
-            ))}
+            <ForceFilterChip
+              label="All Forces"
+              Icon={Zap}
+              active={forceFilter === 'All'}
+              activeBg={S.primary}
+              onClick={() => setForceFilter('All')}
+            />
+            {(Object.keys(FORCE_TILE) as ForceName[]).map((force) => {
+              const tile = FORCE_TILE[force];
+              return (
+                <ForceFilterChip
+                  key={force}
+                  label={force}
+                  Icon={tile.Icon}
+                  active={forceFilter === force}
+                  activeBg={tile.fg}
+                  onClick={() => setForceFilter(force)}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -1064,19 +1072,42 @@ const SortHeader: FC<{
   );
 };
 
-// ─── Filter chips ────────────────────────────────────────────────────
-const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+// ─── Force filter chip (Lucide icon + label) ─────────────────────────
+const ForceFilterChip: FC<{
+  label: string;
+  Icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  active: boolean;
+  activeBg: string;
+  onClick: () => void;
+}> = ({ label, Icon, active, activeBg, onClick }) => (
   <button
     onClick={onClick}
     style={{
-      flexShrink: 0, padding: '8px 20px', borderRadius: 999,
-      fontSize: 14, fontWeight: 600,
-      border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-      backgroundColor: active ? S.primaryContainer : S.surfaceLow,
-      color:           active ? S.onPrimaryContainer : S.onSurfaceVariant,
+      flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', gap: 8,
+      padding: '8px 16px 8px 12px', borderRadius: 999,
+      fontSize: 13, fontWeight: 600, letterSpacing: '0.01em',
+      border: 'none', cursor: 'pointer',
+      transition: 'background-color 180ms, color 180ms, box-shadow 180ms',
+      backgroundColor: active ? activeBg : S.surfaceLow,
+      color:           active ? '#fff'    : S.onSurfaceVariant,
+      boxShadow: active ? '0 1px 2px rgba(0, 52, 94, 0.10)' : 'none',
+    }}
+    onMouseEnter={(e) => {
+      if (!active) {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = S.surfaceContainer;
+        (e.currentTarget as HTMLButtonElement).style.color           = S.onSurface;
+      }
+    }}
+    onMouseLeave={(e) => {
+      if (!active) {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = S.surfaceLow;
+        (e.currentTarget as HTMLButtonElement).style.color           = S.onSurfaceVariant;
+      }
     }}
   >
-    {label}
+    <Icon size={14} strokeWidth={2} />
+    <span>{label}</span>
   </button>
 );
 
