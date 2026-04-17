@@ -1,9 +1,20 @@
 import { jwtVerify, SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'pulse-dev-secret-key-min-32-chars-long-2026'
-);
+// JWT_SECRET is required. Fail loud at module load if missing or too short —
+// a hardcoded fallback (as existed previously) lets anyone with the repo forge
+// tokens whenever the env var is missing in production. Minimum 32 chars.
+const JWT_SECRET_RAW = process.env.JWT_SECRET;
+if (!JWT_SECRET_RAW) {
+  throw new Error(
+    "JWT_SECRET environment variable is required. " +
+    "Generate one with: node -e \"console.log(require('crypto').randomBytes(64).toString('base64url'))\""
+  );
+}
+if (JWT_SECRET_RAW.length < 32) {
+  throw new Error('JWT_SECRET is too short — must be at least 32 characters.');
+}
+const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_RAW);
 
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';

@@ -30,7 +30,19 @@ from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, ini
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────
-JWT_SECRET = os.environ.get("PRISM_JWT_SECRET", "prism-dev-secret-change-in-production-2026")
+# PRISM_JWT_SECRET is required. Fail loud at import time if missing or too short —
+# a hardcoded fallback here (as existed previously) lets anyone with the repo forge
+# tokens if the env var is ever missing in production. Minimum 32 chars.
+JWT_SECRET = os.environ.get("PRISM_JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "PRISM_JWT_SECRET environment variable is required. "
+        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+    )
+if len(JWT_SECRET) < 32:
+    raise RuntimeError(
+        "PRISM_JWT_SECRET is too short — must be at least 32 characters."
+    )
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
 
@@ -189,55 +201,54 @@ def ensure_auth_tables():
 
 
 def _seed_default_users(conn):
-    """Seed default users (for fresh database or Vercel cold starts)."""
+    """Seed a bootstrap admin user on a fresh database.
+
+    No credentials are hardcoded. To bootstrap a fresh deployment set BOTH:
+        PRISM_BOOTSTRAP_ADMIN_EMAIL
+        PRISM_BOOTSTRAP_ADMIN_PASSWORD  (min 12 chars)
+    If either is missing, no user is created and the first person to register
+    whose email is in ADMIN_EMAILS will be auto-elevated to admin.
+    """
     p = placeholder()
     now = datetime.utcnow().isoformat()
-    default_users = [
-        {
-            "id": "seed-admin-001",
-            "name": "Admin",
-            "email": "laker.alexander@gmail.com",
-            "password": "awseawse",
-            "role": "admin",
-        },
-        {
-            "id": "seed-admin-002",
-            "name": "Admin",
-            "email": "admin@prism.app",
-            "password": "prism2026",
-            "role": "admin",
-        },
-        {
-            "id": "seed-admin-003",
-            "name": "Alexander Laker",
-            "email": "alexander.laker@gmx.com",
-            "password": "awseawse",
-            "role": "admin",
-        },
-    ]
+
+    bootstrap_email = (os.environ.get("PRISM_BOOTSTRAP_ADMIN_EMAIL") or "").strip().lower()
+    bootstrap_password = os.environ.get("PRISM_BOOTSTRAP_ADMIN_PASSWORD") or ""
 
     cursor = conn.cursor()
-    for u in default_users:
-        pw_hash, pw_salt = _hash_password(u["password"])
-        try:
-            # Use ON CONFLICT for Postgres, OR IGNORE for SQLite
-            from pulse.database import USE_POSTGRES
-            if USE_POSTGRES:
-                cursor.execute(
-                    f"""INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at)
-                        VALUES ({ph(7)}) ON CONFLICT (id) DO NOTHING""",
-                    (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
-                )
-            else:
-                cursor.execute(
-                    f"""INSERT OR IGNORE INTO users (id, name, email, password_hash, password_salt, role, created_at)
-                        VALUES ({ph(7)})""",
-                    (u["id"], u["name"], u["email"], pw_hash, pw_salt, u["role"], now),
-                )
-        except Exception as e:
-            logger.debug(f"Seed user {u['email']}: {e}")
 
-    # Ensure all ADMIN_EMAILS are upgraded to admin role (even if they registered earlier as viewer)
+    if bootstrap_email and bootstrap_password:
+        if len(bootstrap_password) < 12:
+            logger.warning(
+                "PRISM_BOOTSTRAP_ADMIN_PASSWORD too short (<12 chars) — skipping bootstrap."
+            )
+        else:
+            pw_hash, pw_salt = _hash_password(bootstrap_password)
+            try:
+                from pulse.database import USE_POSTGRES
+                user_id = str(uuid.uuid4())
+                if USE_POSTGRES:
+                    cursor.execute(
+                        f"""INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at)
+                            VALUES ({ph(7)}) ON CONFLICT (email) DO NOTHING""",
+                        (user_id, "Admin", bootstrap_email, pw_hash, pw_salt, "admin", now),
+                    )
+                else:
+                    cursor.execute(
+                        f"""INSERT OR IGNORE INTO users (id, name, email, password_hash, password_salt, role, created_at)
+                            VALUES ({ph(7)})""",
+                        (user_id, "Admin", bootstrap_email, pw_hash, pw_salt, "admin", now),
+                    )
+                logger.info("Seeded bootstrap admin user: %s", bootstrap_email)
+            except Exception as e:
+                logger.warning("Bootstrap admin seed failed: %s", e)
+    else:
+        logger.info(
+            "No users present and no bootstrap env vars set — first registrant "
+            "matching ADMIN_EMAILS will be auto-elevated to admin."
+        )
+
+    # Ensure anyone already in ADMIN_EMAILS gets admin role on subsequent cold starts.
     for admin_email in ADMIN_EMAILS:
         try:
             cursor.execute(
@@ -248,7 +259,6 @@ def _seed_default_users(conn):
             logger.debug(f"Admin upgrade for {admin_email}: {e}")
 
     conn.commit()
-    logger.info("Seeded %d default users", len(default_users))
 
 
 # ── Auth Functions ───────────────────────────────────────────────
@@ -351,7 +361,9 @@ def login_user(req: LoginRequest) -> AuthResponse:
 
 
 # ── Resend Email Integration ─────────────────────────────────────
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_EtpzJRr3_Pfqj4AdH3fogdekDeBuSBbdZ")
+# RESEND_API_KEY must be set via environment; no fallback. If empty,
+# _send_reset_email() logs a warning and returns False (feature disabled).
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 # NOTE: onboarding@resend.dev is Resend's test sender — it can ONLY deliver
 # to the Resend account owner's email. To send to any user, set RESEND_FROM_EMAIL
@@ -377,9 +389,21 @@ def _get_app_url() -> str:
 
 
 def _send_reset_email(to_email: str, reset_token: str) -> bool:
-    """Send password reset email via Resend."""
+    """Send password reset email via Resend.
+
+    Returns False (and logs a warning) if RESEND_API_KEY is not configured,
+    so the password-reset endpoint can degrade gracefully rather than leak
+    a hardcoded production key.
+    """
     import urllib.request
     import urllib.error
+
+    if not RESEND_API_KEY:
+        logger.warning(
+            "RESEND_API_KEY not set — password reset emails are disabled. "
+            "Configure RESEND_API_KEY in the environment to enable."
+        )
+        return False
 
     app_url = _get_app_url()
     reset_link = f"{app_url}#reset={reset_token}"

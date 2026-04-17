@@ -1,6 +1,7 @@
 """Natural language chat interface to PRISM simulation engine."""
 
 import logging
+import re
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime
@@ -319,12 +320,60 @@ If asked about something not in the context, say so clearly."""
         """
         Check if a question is safe to answer.
 
+        Blocks questions that request absolute financial figures (€M, $M,
+        actual revenue/profit/EBIT/margin numbers), per the PRISM spec:
+        the model must only deal in relative shifts, never absolute values.
+
         Args:
             question: Question text
 
         Returns:
-            Always True (validation disabled)
+            True if safe to answer, False if the question is requesting
+            absolute financial data.
         """
+        if not question:
+            return True
+
+        q = question.lower()
+
+        # Explicit currency-amount patterns
+        currency_patterns = [
+            r"€\s*\d",           # "€50"
+            r"\$\s*\d",          # "$50"
+            r"\d+\s*(?:m|b)(?:illion)?\s*(?:€|\$|eur|usd)",
+            r"(?:€|\$|eur|usd)\s*\d+\s*(?:m|b)",
+        ]
+        for pat in currency_patterns:
+            if re.search(pat, q):
+                return False
+
+        # Phrases that indicate a request for absolute figures, not relative shifts
+        absolute_value_phrases = [
+            "how much revenue",
+            "how much profit",
+            "actual revenue",
+            "actual profit",
+            "absolute revenue",
+            "absolute profit",
+            "absolute ebit",
+            "absolute margin",
+            "in euros",
+            "in dollars",
+            "in eur",
+            "in usd",
+            "total revenue",
+            "total profit",
+            "total ebit",
+            "€m figures",
+            "$m figures",
+            "revenue in €",
+            "revenue in $",
+            "profit in €",
+            "profit in $",
+        ]
+        if any(phrase in q for phrase in absolute_value_phrases):
+            return False
+
         return True
 
     async def get_analysis_summary(self) -> str:

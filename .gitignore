@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 # Office app lock files
 .~lock.*#
 ~$*
+
+# Vercel env upload helper — never commit
+.env.vercel-upload*
