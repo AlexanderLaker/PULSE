@@ -198,7 +198,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
 
   // Real data from API via usePrism hook
   const shifts: ShiftMatrix | null = simulation?.shifts ?? null;
-  const convergence: ConvergenceDiagnostics | undefined = simulation?.convergence;
+  const convergence: ConvergenceDiagnostics | null = simulation?.convergence ?? null;
   const allocation = simulation?.allocation_recommendation ?? null;
   const forceNames = Object.keys(FORCES) as ForceName[];
   const scenarioOptions: Scenario[] = scenarios ?? [];
@@ -320,7 +320,14 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
       } as React.CSSProperties}
     >
       {/* OnboardingTooltips removed — outdated tour steps */}
-      <AIInsightsBar insights={aiInsights} triggers={[]} isLoading={simulating} />
+      <AIInsightsBar
+        insights={aiInsights.map(i => ({
+          title: i.type ?? i.suggestion_type ?? 'Insight',
+          description: i.text ?? i.content ?? '',
+        }))}
+        triggers={[]}
+        isLoading={simulating}
+      />
 
       {/* ─── ACTION TOOLBAR ─────────────────────────────────────────────
           NOTE: This is a secondary toolbar, NOT a primary nav. The prime
@@ -688,7 +695,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
                   style={{ overflow: 'hidden', marginTop: 8 }}
                 >
                   <TrendExplorer
-                    data={{ trends: trends }}
+                    data={{ trends: trends as any }}
                     forceFilter={forceFilter || ''}
                     onForceFilter={setForceFilter}
                     onUpdateTrend={(trendId: string, updates: any) => void updateTrend(trendId, updates)}
