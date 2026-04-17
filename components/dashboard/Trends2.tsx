@@ -19,14 +19,28 @@
 'use client';
 
 import React, { useMemo, useState, FC } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
-  Leaf, Swords, Sparkles,
+  Leaf, Swords, Sparkles, ChevronDown,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import { CATEGORIES, fmtPct, fmtShift } from '@/lib/format';
+import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
 import type { Trend, ForceName, CategoryId } from '@/types';
+
+// ─── Value-chain steps — 1:1 mirror of TrendExplorer.tsx ─────────
+// IMPORTANT: ids and order must match TrendExplorer's ValueChainExposureGrid
+// exactly so exposure values (0–5) line up with the same step for every trend.
+const VC_STEPS: Array<{ id: string; label: string }> = [
+  { id: 'raw_materials', label: 'Raw Materials' },
+  { id: 'formulation',   label: 'Formulation' },
+  { id: 'packaging',     label: 'Packaging' },
+  { id: 'manufacturing', label: 'Manufacturing' },
+  { id: 'logistics',     label: 'Logistics' },
+  { id: 'marketing',     label: 'Marketing' },
+  { id: 'trade',         label: 'Trade' },
+  { id: 'after_sales',   label: 'After-Sales' },
+];
 
 // ─── Editorial design tokens (from DESIGN.md) ────────────────────
 const S = {
@@ -80,6 +94,99 @@ const DotBar: FC<{ value: number }> = ({ value }) => (
   </div>
 );
 
+// ─── Small read-only dot bar for exposure scales (0–5) ────────────
+// Mirrors TrendExplorer's <DotBar size="xs" /> density, but tinted to fit
+// the editorial palette and without the editable click handlers.
+interface ExposureDotsProps {
+  value: number;
+  tone?: 'emerald' | 'purple';
+}
+const ExposureDots: FC<ExposureDotsProps> = ({ value, tone = 'emerald' }) => {
+  // Editorial tone tokens; kept inline so they're colocated with usage.
+  const FILLED = tone === 'emerald' ? S.primary : S.onTertiaryContainer;
+  const EMPTY  = S.surfaceHigh;
+  return (
+    <div className="flex gap-1" aria-label={`Exposure ${value} of 5`}>
+      {[1, 2, 3, 4, 5].map((d) => (
+        <span
+          key={d}
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: d <= value ? FILLED : EMPTY, opacity: d <= value ? 1 : 0.55 }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// ─── Category Exposure Grid (read-only, 1:1 with TrendExplorer) ───
+// Groups categories into Hair / LHC just like TrendExplorer does, so
+// the exposure readout is identical across both pages.
+const CategoryExposureGrid: FC<{ exposures: Partial<Record<CategoryId, number>> }> = ({ exposures }) => {
+  const grouped = {
+    Hair: CATEGORIES.filter((c) => c.group === 'Hair'),
+    LHC:  CATEGORIES.filter((c) => c.group === 'LHC'),
+  };
+  return (
+    <div className="space-y-4">
+      <div
+        className="text-[11px] font-bold uppercase tracking-[0.15em]"
+        style={{ color: S.onSurfaceVariant }}
+      >
+        Category Exposure (0–5)
+      </div>
+      {Object.entries(grouped).map(([group, cats]) => (
+        <div key={group}>
+          <div
+            className="text-[10px] font-semibold mb-2"
+            style={{ color: S.onSurfaceVariant, letterSpacing: '0.08em' }}
+          >
+            {group.toUpperCase()}
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {cats.map((cat) => (
+              <div key={cat.id} className="flex flex-col items-center gap-1.5">
+                <ExposureDots value={exposures?.[cat.id as CategoryId] ?? 0} tone="emerald" />
+                <div
+                  className="text-[10px] font-medium text-center"
+                  style={{ color: S.onSurface }}
+                >
+                  {shortCat(cat.name)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Value-chain Exposure Grid (read-only, 1:1 with TrendExplorer) ─
+// Same 8 steps in the same order as TrendExplorer's ValueChainExposureGrid.
+const ValueChainExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposures }) => (
+  <div className="space-y-4">
+    <div
+      className="text-[11px] font-bold uppercase tracking-[0.15em]"
+      style={{ color: S.onSurfaceVariant }}
+    >
+      Value Chain Exposure (0–5)
+    </div>
+    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      {VC_STEPS.map((step) => (
+        <div key={step.id} className="flex flex-col gap-1.5">
+          <div
+            className="text-[11px] font-medium"
+            style={{ color: S.onSurface }}
+          >
+            {step.label}
+          </div>
+          <ExposureDots value={exposures?.[step.id] ?? 0} tone="purple" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // ─── Direction pill ────────────────────────────────────────────────
 const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ direction }) => {
   const isExp = direction === 'Expansion';
@@ -103,6 +210,8 @@ const Trends2: FC = () => {
   const { trends, loading, backendAvailable } = usePrism();
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
   const [search, setSearch] = useState('');
+  // Which trend row is currently expanded to show category + VC exposure.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = useMemo<Trend[]>(() => {
     const q = search.trim().toLowerCase();
@@ -236,9 +345,19 @@ const Trends2: FC = () => {
             {!loading && backendAvailable && filtered.length === 0 && (
               <EmptyRow text="No trends match the current filter." icon={<Sparkles size={20} />} />
             )}
-            {filtered.map((t, idx) => (
-              <TrendRow key={t.id ?? idx} trend={t} isLast={idx === filtered.length - 1} />
-            ))}
+            {filtered.map((t, idx) => {
+              const key = t.id ?? String(idx);
+              const expanded = expandedId === key;
+              return (
+                <TrendRow
+                  key={key}
+                  trend={t}
+                  isLast={idx === filtered.length - 1}
+                  expanded={expanded}
+                  onToggle={() => setExpandedId(expanded ? null : key)}
+                />
+              );
+            })}
           </div>
         </motion.div>
       </main>
@@ -261,73 +380,121 @@ const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = 
 );
 
 // ─── Trend row ─────────────────────────────────────────────────────
-const TrendRow: FC<{ trend: Trend; isLast: boolean }> = ({ trend, isLast }) => {
+interface TrendRowProps {
+  trend: Trend;
+  isLast: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
   const tile = FORCE_TILE[trend.force] ?? FORCE_TILE.Consumer;
   const { Icon } = tile;
   const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   const shift = trend.gp1_shift;
 
+  // Pull the exact same fields TrendExplorer reads — preserves 1:1 parity.
+  const catExposure: Partial<Record<CategoryId, number>> = trend.category_exposure ?? {};
+  const vcExposure: Record<string, number> = (trend.vc_exposure ?? {}) as Record<string, number>;
+
   return (
-    <div
-      className="grid items-center px-8 py-6 transition-colors hover:bg-opacity-70"
-      style={{
-        gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
-        // Tonal layering instead of 1px divider, per DESIGN.md "No-Line Rule"
-        backgroundColor: S.surface,
-        boxShadow: isLast ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}`,
-      }}
-    >
-      {/* Trend identity */}
-      <div className="flex items-center gap-4 min-w-0">
-        <div
-          className="w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: tile.bg, color: tile.fg }}
-        >
-          <Icon size={20} strokeWidth={2} />
-        </div>
-        <div className="min-w-0">
+    <div style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
+      {/* Header row — click to toggle the exposure detail panel */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="w-full grid items-center px-8 py-6 text-left transition-colors"
+        style={{
+          gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
+          backgroundColor: expanded ? S.surfaceLow : S.surface,
+          cursor: 'pointer',
+          border: 'none',
+        }}
+      >
+        {/* Trend identity */}
+        <div className="flex items-center gap-4 min-w-0">
           <div
-            className="font-bold text-[15px] truncate"
-            style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
+            className="w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: tile.bg, color: tile.fg }}
           >
-            {trend.name}
+            <Icon size={20} strokeWidth={2} />
           </div>
-          <div
-            className="text-[13px] truncate"
-            style={{ color: S.onSurfaceVariant }}
-          >
-            {trend.description || trend.strategic_implication || `${trend.force} signal`}
+          <div className="min-w-0">
+            <div
+              className="font-bold text-[15px] truncate flex items-center gap-2"
+              style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
+            >
+              {trend.name}
+              <ChevronDown
+                size={14}
+                style={{
+                  color: S.onSurfaceVariant,
+                  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 180ms ease',
+                }}
+              />
+            </div>
+            <div
+              className="text-[13px] truncate"
+              style={{ color: S.onSurfaceVariant }}
+            >
+              {trend.description || trend.strategic_implication || `${trend.force} signal`}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Direction */}
-      <div><DirectionPill direction={trend.direction} /></div>
+        {/* Direction */}
+        <div><DirectionPill direction={trend.direction} /></div>
 
-      {/* Probability */}
-      <div><DotBar value={Math.round(trend.probability ?? 0)} /></div>
+        {/* Probability */}
+        <div><DotBar value={Math.round(trend.probability ?? 0)} /></div>
 
-      {/* GP1 % */}
-      <div className="text-right">
-        <span
-          className="font-extrabold"
-          style={{ fontFamily: HEADLINE_FONT, color: S.onSurface, fontSize: '1.15rem' }}
-        >
-          {gp1 != null ? fmtPct(gp1) : '—'}
-        </span>
-      </div>
+        {/* GP1 % */}
+        <div className="text-right">
+          <span
+            className="font-extrabold"
+            style={{ fontFamily: HEADLINE_FONT, color: S.onSurface, fontSize: '1.15rem' }}
+          >
+            {gp1 != null ? fmtPct(gp1) : '—'}
+          </span>
+        </div>
 
-      {/* Shift */}
-      <div className="text-right">
-        <span
-          className="font-bold text-[14px]"
-          style={{
-            color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
-          }}
-        >
-          {shift != null ? fmtShift(shift) : '—'}
-        </span>
-      </div>
+        {/* Shift */}
+        <div className="text-right">
+          <span
+            className="font-bold text-[14px]"
+            style={{
+              color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
+            }}
+          >
+            {shift != null ? fmtShift(shift) : '—'}
+          </span>
+        </div>
+      </button>
+
+      {/* Expanded exposure panel — 1:1 port of TrendExplorer's
+          CategoryExposureGrid + ValueChainExposureGrid */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="panel"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
+          >
+            <div
+              className="px-8 py-7 grid gap-10"
+              style={{ gridTemplateColumns: '1fr 1fr' }}
+            >
+              <CategoryExposureGrid exposures={catExposure} />
+              <ValueChainExposureGrid exposures={vcExposure} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
