@@ -19,3 +19,6 @@ tsconfig.tsbuildinfo
 
 # Vercel env upload helper — never commit
 .env.vercel-upload*
+
+# Deploy token for Cowork / sandbox auto-push — never commit
+.env.deploy

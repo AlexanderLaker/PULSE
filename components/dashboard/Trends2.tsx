@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
   Leaf, Swords, Sparkles, ChevronDown,
+  FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
+  Globe, ExternalLink, AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -42,6 +44,45 @@ const VC_STEPS: Array<{ id: string; label: string }> = [
   { id: 'trade',         label: 'Trade' },
   { id: 'after_sales',   label: 'After-Sales' },
 ];
+
+// ─── Regions — mirror of TrendExplorer / Vite Trends2 ────────────
+const REGIONS: Array<{ id: string; label: string }> = [
+  { id: 'Europe',        label: 'Europe' },
+  { id: 'North America', label: 'North America' },
+  { id: 'Asia',          label: 'Asia' },
+  { id: 'High Growth',   label: 'High Growth' },
+];
+
+// ─── Diffusion curve metadata ────────────────────────────────────
+const DIFFUSION_LABELS: Record<string, { label: string; description: string }> = {
+  s_curve:       { label: 'S-Curve',       description: 'Logistic — slow start, fast middle, plateau.' },
+  linear:        { label: 'Linear',        description: 'Steady, constant rate of materialization.' },
+  front_loaded:  { label: 'Front-Loaded',  description: 'Fast early impact, flattens over time (√t).' },
+  back_loaded:   { label: 'Back-Loaded',   description: 'Slow start, accelerates late (t²).' },
+  step_function: { label: 'Step Function', description: 'Near-zero until ~80%, then sudden jump.' },
+};
+
+// ─── Source classification (read-only display) ──────────────────
+function classifySource(url: string): string {
+  const u = (url || '').toLowerCase();
+  if (u.includes('eur-lex') || u.includes('europa.eu')) return 'EUR-Lex';
+  if (u.includes('echa')) return 'ECHA';
+  if (u.includes('sec.gov') || u.includes('edgar')) return 'SEC EDGAR';
+  if (u.includes('trends.google')) return 'Google Trends';
+  if (u.includes('reddit')) return 'Reddit';
+  if (u.includes('youtube')) return 'YouTube';
+  if (u.includes('scholar') || u.includes('doi.org') || u.includes('nature.com') || u.includes('pubmed')) return 'Semantic Scholar';
+  if (u.includes('gdelt')) return 'GDELT';
+  if (u.includes('mckinsey') || u.includes('bain') || u.includes('bcg')) return 'Consulting';
+  if (u.includes('cosmetics') || u.includes('happi') || u.includes('retaildetail') || u.includes('grocery') || u.includes('packaging')) return 'Trade Press';
+  return 'Press';
+}
+
+const SOURCE_ICON: Record<string, LucideIcon> = {
+  GDELT: Globe, 'Google Trends': TrendingUp, ECHA: AlertTriangle, 'EUR-Lex': FileText,
+  'SEC EDGAR': BarChart3, Reddit: Globe, YouTube: Globe, 'Semantic Scholar': FileText,
+  Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
+};
 
 // ─── Editorial design tokens (from DESIGN.md) ────────────────────
 const S = {
@@ -67,6 +108,9 @@ const S = {
   onErrorContainer:   '#752121',
   outline:            '#477dbb',
   outlineVariant:     '#81b5f6',
+  cardBorder:         'rgba(0, 52, 94, 0.10)',
+  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
+  mutedText:          '#64748B',
 };
 
 const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -129,12 +173,6 @@ const CategoryExposureGrid: FC<{ exposures: Partial<Record<CategoryId, number>> 
   };
   return (
     <div className="space-y-4">
-      <div
-        className="text-[11px] font-bold uppercase tracking-[0.15em]"
-        style={{ color: S.onSurfaceVariant }}
-      >
-        Category Exposure (0–5)
-      </div>
       {Object.entries(grouped).map(([group, cats]) => (
         <div key={group}>
           <div
@@ -166,12 +204,6 @@ const CategoryExposureGrid: FC<{ exposures: Partial<Record<CategoryId, number>> 
 // Same 8 steps in the same order as TrendExplorer's ValueChainExposureGrid.
 const ValueChainExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposures }) => (
   <div className="space-y-4">
-    <div
-      className="text-[11px] font-bold uppercase tracking-[0.15em]"
-      style={{ color: S.onSurfaceVariant }}
-    >
-      Value Chain Exposure (0–5)
-    </div>
     <div className="grid grid-cols-2 gap-x-6 gap-y-3">
       {VC_STEPS.map((step) => (
         <div key={step.id} className="flex flex-col gap-1.5">
@@ -205,6 +237,123 @@ const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ directi
     </span>
   );
 };
+
+// ─── Section Card — boxed card for each sub-section in the expanded panel ─
+interface SectionCardProps {
+  title: string;
+  icon: LucideIcon;
+  accent?: string;
+  footnote?: React.ReactNode;
+  children: React.ReactNode;
+}
+const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, children }) => (
+  <div style={{
+    backgroundColor: S.surface,
+    border: `1px solid ${S.cardBorder}`,
+    borderRadius: 12,
+    padding: '14px 16px 16px',
+  }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+    }}>
+      <span style={{
+        width: 26, height: 26, borderRadius: 8,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: S.surfaceLow,
+        color: accent ?? S.onSurfaceVariant,
+      }}>
+        <Icon size={14} strokeWidth={2.25} />
+      </span>
+      <div style={{
+        fontFamily: HEADLINE_FONT,
+        fontSize: 12, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: S.onSurface,
+      }}>
+        {title}
+      </div>
+    </div>
+    {children}
+    {footnote && (
+      <div style={{
+        marginTop: 10, fontSize: 11, lineHeight: 1.5, color: S.mutedText,
+      }}>
+        {footnote}
+      </div>
+    )}
+  </div>
+);
+
+// ─── Meta chip (direction/confidence/data-source pill) ─────────────
+const MetaChip: FC<{ label: string }> = ({ label }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center',
+    padding: '4px 12px', borderRadius: 999,
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+    backgroundColor: S.surfaceLow,
+    color: S.onSurfaceVariant,
+    textTransform: 'uppercase',
+  }}>
+    {label}
+  </span>
+);
+
+// ─── Source item ──────────────────────────────────────────────────
+const SourceItem: FC<{ src: { title: string; url: string; data?: string } }> = ({ src }) => {
+  const cls = classifySource(src.url);
+  const Icon = SOURCE_ICON[cls] ?? Newspaper;
+  return (
+    <a
+      href={src.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start',
+        padding: '10px 12px',
+        backgroundColor: S.surfaceLow,
+        borderRadius: 10,
+        textDecoration: 'none',
+        color: 'inherit',
+      }}
+    >
+      <span style={{
+        flexShrink: 0, width: 28, height: 28, borderRadius: 8,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: S.surface, color: S.primary,
+      }}>
+        <Icon size={14} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display: 'block', fontSize: 13, fontWeight: 600,
+          color: S.onSurface, lineHeight: 1.35,
+        }}>
+          {src.title}
+        </span>
+        <span style={{
+          display: 'block', fontSize: 11, color: S.mutedText, marginTop: 2,
+        }}>
+          {cls}{src.data ? ` · ${src.data}` : ''}
+        </span>
+      </span>
+      <ExternalLink size={12} style={{ color: S.mutedText, marginTop: 4 }} />
+    </a>
+  );
+};
+
+// ─── Regional Exposure Grid (read-only, mirrors VC grid) ──────────
+const RegionExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposures }) => (
+  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+    {REGIONS.map((r) => (
+      <div key={r.id} className="flex flex-col gap-1.5">
+        <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
+          {r.label}
+        </div>
+        <ExposureDots value={exposures?.[r.id] ?? 0} tone="emerald" />
+      </div>
+    ))}
+  </div>
+);
 
 // ─── Main component ────────────────────────────────────────────────
 const Trends2: FC = () => {
@@ -474,8 +623,9 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
         </div>
       </button>
 
-      {/* Expanded exposure panel — 1:1 port of TrendExplorer's
-          CategoryExposureGrid + ValueChainExposureGrid */}
+      {/* Expanded detail panel — read-only port of Vite Trends2 ExpandedPanel.
+          Two-column layout: Description / PRISM Analysis / GP1% / Probability /
+          Materialization / Sources on the left, exposure grids on the right. */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -483,19 +633,223 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
-            <div
-              className="px-8 py-7 grid gap-10"
-              style={{ gridTemplateColumns: '1fr 1fr' }}
-            >
-              <CategoryExposureGrid exposures={catExposure} />
-              <ValueChainExposureGrid exposures={vcExposure} />
-            </div>
+            <ExpandedPanel trend={trend} />
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+};
+
+// ─── Expanded detail panel ─────────────────────────────────────────
+const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
+  const gp1Pct      = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10;
+  const probability = trend.probability ?? 0;
+  const peakYear    = (trend as Trend & { peak_year?: number }).peak_year ?? 2030;
+  const diffusion   = (trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve';
+  const sources     = trend.sources ?? [];
+  const confidence  = trend.confidence;
+  const dataSource  = trend.data_source;
+  const catExp      = (trend.category_exposure ?? {}) as Partial<Record<CategoryId, number>>;
+  const vcExp       = (trend.vc_exposure ?? {}) as Record<string, number>;
+  const regExp      = ((trend as Trend & { regional_exposure?: Record<string, number> }).regional_exposure ?? {}) as Record<string, number>;
+  const diffusionMeta = DIFFUSION_LABELS[diffusion] ?? DIFFUSION_LABELS.s_curve;
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        padding: '28px 32px 36px',
+        backgroundColor: S.surface,
+        borderTop: `1px solid ${S.cardBorder}`,
+      }}
+    >
+      {/* Meta row: Direction + Confidence + AI badge + Data source */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+        marginBottom: 24,
+      }}>
+        <DirectionPill direction={trend.direction} />
+        {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
+        {trend.ai_suggested && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 12px', borderRadius: 999,
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+            backgroundColor: S.tertiaryContainer,
+            color: S.onTertiaryContainer,
+            textTransform: 'uppercase',
+          }}>
+            <Sparkles size={12} /> AI Suggested
+          </span>
+        )}
+        {dataSource && <MetaChip label={dataSource} />}
+      </div>
+
+      {/* Two-column layout */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+        gap: 20,
+        alignItems: 'start',
+      }}>
+        {/* LEFT column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SectionCard title="Description" icon={FileText}>
+            <p style={{
+              margin: 0, fontSize: 14, lineHeight: 1.6, color: S.onSurface,
+              whiteSpace: 'pre-wrap',
+            }}>
+              {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
+            </p>
+          </SectionCard>
+
+          <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
+            <blockquote style={{
+              margin: 0,
+              padding: '12px 16px',
+              borderRadius: 10,
+              borderLeft: `3px solid ${S.primary}`,
+              backgroundColor: S.surfaceLow,
+              fontSize: 14, lineHeight: 1.55,
+              color: S.onSurface,
+              fontStyle: 'normal',
+              fontWeight: 500,
+            }}>
+              {trend.strategic_implication || (
+                <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>
+                  No strategic implication documented.
+                </span>
+              )}
+            </blockquote>
+          </SectionCard>
+
+          <SectionCard
+            title="GP1 % Affected — Economic Anchoring"
+            icon={BarChart3}
+            footnote={
+              <>
+                What fraction of a category's GP1 can this trend realistically affect at full
+                materialization? A 5/5 probability trend with {Math.round(gp1Pct * 100)}% GP1 affected
+                means: maximum-severity trend, but only touches {Math.round(gp1Pct * 100)}% of the pool.
+              </>
+            }
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                flex: 1, height: 6, borderRadius: 4,
+                backgroundColor: S.surfaceHigh, position: 'relative',
+              }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  width: `${Math.min(100, Math.round(gp1Pct * 100 * 2))}%`,
+                  backgroundColor: S.primary, borderRadius: 4,
+                }} />
+              </div>
+              <div style={{
+                minWidth: 64,
+                padding: '6px 12px', borderRadius: 8,
+                backgroundColor: S.surfaceLow,
+                border: `1px solid ${S.cardBorder}`,
+                textAlign: 'center',
+                fontFamily: HEADLINE_FONT,
+                fontWeight: 800, fontSize: 15, color: S.primary,
+              }}>
+                {Math.round(gp1Pct * 100)}%
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Probability"
+            icon={Zap}
+            footnote={
+              <>Likelihood this trend materialises at the stated severity.
+              Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.</>
+            }
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+              <DotBar value={Math.round(probability)} />
+              <div style={{
+                padding: '6px 12px', borderRadius: 8,
+                backgroundColor: S.surfaceLow,
+                border: `1px solid ${S.cardBorder}`,
+                fontFamily: HEADLINE_FONT,
+                fontWeight: 800, fontSize: 15, color: S.primary,
+              }}>
+                {Math.round(probability)} / 5
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Materialization Timing"
+            icon={Clock}
+            footnote="When does this trend reach full impact, and how does it build over time?"
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
+                  Peak Year
+                </div>
+                <div style={{
+                  padding: '8px 10px', borderRadius: 8,
+                  fontSize: 13, fontWeight: 700, color: S.onSurface,
+                  backgroundColor: S.surfaceLow,
+                  border: `1px solid ${S.cardBorder}`,
+                }}>
+                  {peakYear}
+                </div>
+                <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
+                  Year when 100% of impact materializes
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
+                  Diffusion Curve
+                </div>
+                <div style={{
+                  padding: '8px 10px', borderRadius: 8,
+                  fontSize: 13, fontWeight: 700, color: S.onSurface,
+                  backgroundColor: S.surfaceLow,
+                  border: `1px solid ${S.cardBorder}`,
+                }}>
+                  {diffusionMeta.label}
+                </div>
+                <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
+                  {diffusionMeta.description}
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          {sources.length > 0 && (
+            <SectionCard title={`Sources · ${sources.length}`} icon={Newspaper}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sources.map((src, i) => <SourceItem key={i} src={src} />)}
+              </div>
+            </SectionCard>
+          )}
+        </div>
+
+        {/* RIGHT column — exposure grids */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SectionCard title="Category Exposure" icon={Layers}>
+            <CategoryExposureGrid exposures={catExp} />
+          </SectionCard>
+
+          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+            <ValueChainExposureGrid exposures={vcExp} />
+          </SectionCard>
+
+          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+            <RegionExposureGrid exposures={regExp} />
+          </SectionCard>
+        </div>
+      </div>
     </div>
   );
 };
