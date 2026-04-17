@@ -43,11 +43,13 @@ export async function verifyPassword(
  */
 export async function createToken(
   userId: string,
-  email: string
+  email: string,
+  role: string = 'viewer'
 ): Promise<string> {
   const token = await new SignJWT({
     userId,
     email,
+    role,
     type: 'access',
   })
     .setProtectedHeader({ alg: 'HS256' })
@@ -63,11 +65,13 @@ export async function createToken(
  */
 export async function createRefreshToken(
   userId: string,
-  email: string
+  email: string,
+  role: string = 'viewer'
 ): Promise<string> {
   const token = await new SignJWT({
     userId,
     email,
+    role,
     type: 'refresh',
   })
     .setProtectedHeader({ alg: 'HS256' })
@@ -87,6 +91,7 @@ export async function verifyToken(
 ): Promise<{
   userId: string;
   email: string;
+  role: string;
   type?: string;
   expiresAt?: number;
   warningActive?: boolean;
@@ -101,6 +106,7 @@ export async function verifyToken(
     return {
       userId: verified.payload.userId as string,
       email: verified.payload.email as string,
+      role: (verified.payload.role as string) ?? 'viewer',
       type: (verified.payload.type as string) || 'access',
       expiresAt: exp,
       warningActive: remainingSeconds <= warningThreshold && remainingSeconds > 0,

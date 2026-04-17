@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken, createToken, createRefreshToken } from '@/lib/auth';
+import { findUserByEmail } from '@/lib/db';
 
 export async function POST() {
   try {
@@ -22,10 +23,18 @@ export async function POST() {
       );
     }
 
+    // Resolve role: prefer payload (new tokens carry `role`); fall back to DB
+    // for legacy refresh tokens issued before the role field was added.
+    let role = payload.role;
+    if (!role) {
+      const user = await findUserByEmail(payload.email);
+      role = user?.role ?? 'viewer';
+    }
+
     // Issue new access token
-    const newAccessToken = await createToken(payload.userId, payload.email);
+    const newAccessToken = await createToken(payload.userId, payload.email, role);
     // Optionally rotate refresh token
-    const newRefreshToken = await createRefreshToken(payload.userId, payload.email);
+    const newRefreshToken = await createRefreshToken(payload.userId, payload.email, role);
 
     const response = NextResponse.json({
       success: true,

@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     const user = await createUser(email, hashedPw, name);
 
     // Create tokens
-    const token = await createToken(user.id, user.email);
-    const refreshToken = await createRefreshToken(user.id, user.email);
+    const token = await createToken(user.id, user.email, user.role);
+    const refreshToken = await createRefreshToken(user.id, user.email, user.role);
 
     // Create response with cookie
     const response = NextResponse.json(

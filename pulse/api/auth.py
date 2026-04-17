@@ -21,7 +21,7 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import datetime
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -621,11 +621,28 @@ def delete_user(user_id: str) -> dict:
 
 
 # ── FastAPI Dependencies ─────────────────────────────────────────
-async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
-    """Extract current user from JWT token. Returns None if no token provided."""
-    if not credentials:
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    pulse_token: Optional[str] = Cookie(None, alias="pulse-token"),
+) -> Optional[dict]:
+    """Extract current user from JWT.
+
+    Accepts EITHER:
+    - Authorization: Bearer <token> header (for API clients, curl, tests)
+    - pulse-token httpOnly cookie (for the Next.js web frontend)
+
+    Returns None if neither is present. Raises 401 if token is invalid/expired.
+    """
+    token: Optional[str] = None
+    if credentials:
+        token = credentials.credentials
+    elif pulse_token:
+        token = pulse_token
+
+    if not token:
         return None
-    payload = _verify_jwt(credentials.credentials)
+
+    payload = _verify_jwt(token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

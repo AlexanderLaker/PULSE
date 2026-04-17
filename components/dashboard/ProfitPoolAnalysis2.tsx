@@ -660,6 +660,20 @@ const ProfitPoolAnalysis2: FC = () => {
               ? 'The PRISM engine is not reachable. Check that the backend is running and try reconnecting.'
               : 'Run a Bayesian Monte Carlo simulation with 10,000 iterations to generate the shift matrix across 12 categories and 11 years.'}
           </p>
+          {error && (
+            <div style={{
+              padding: 12,
+              marginBottom: 16,
+              borderRadius: 8,
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#EF4444',
+              fontSize: 12,
+              textAlign: 'left',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+            }}>
+              {error}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             {isOffline && (
               <PillButton onClick={reconnect} variant="tonal" icon={<RefreshCw size={14} />}>
