@@ -1,62 +1,61 @@
 /**
- * Profit Pool Analysis 2 — Editorial Intelligence View
+ * Profit Pool Analysis 2 — Editorial Shift Matrix View
  *
- * Alternative visualisation for the Profit Pool Analysis page, harmonised
- * with the "Digital Curator" design language established in Trends 2 and
- * Innovation Explorer (maritime blue palette, Manrope headlines, tonal
- * layering, pill-shaped controls, insight-rail accent header).
+ * A lean, focused view of the Shift Matrix with four lenses:
+ *   • Time Path     — category × year, from simulation shifts
+ *   • Force         — category × 6 forces, derived from trend exposures
+ *   • Value Chain   — category × 8 value-chain steps
+ *   • Region        — category × 4 regions
  *
- * Design principles applied:
- *   • Maritime blue palette with tonal layering (no 1px borders)
- *   • Manrope headlines + Inter body pairing
- *   • Pill-shaped scenario chips, action buttons, filter controls
- *   • Portfolio stats bar (icon tile + value + label) — Innovation Explorer
- *   • Editorial "insight rail" accent on the page header
- *   • Rounded 2xl cards with soft ambient shadows
- *   • Glassmorphism footer for AI insights
+ * Styled to match the Trends 2 + Trend Explorer "Digital Curator" design
+ * language: maritime blue palette, Manrope headlines + Inter body, tonal
+ * layering (no 1px borders), rounded cards, pill controls, soft shadows.
  *
- * Functional parity with ProfitPoolShiftModel.tsx — preserves all data
- * surfaces (KPIs, heatmap, path timeline, force waterfall, allocation,
- * product impact, trend explorer, category drill-down) and all interactions
- * (simulate, scenario switch, region filter, category select, reconnect,
- * AI chat). Reuses the existing data-viz child components so behaviour and
- * numerical outputs are identical to the original page.
+ * All data is real and comes from the usePrism hook. No mock fallback.
  */
 
 'use client';
 
-import React, { useState, useEffect, useMemo, FC } from 'react';
+import React, { useMemo, useState, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Zap, CheckCircle2, Clock, Layers, Activity, Gauge, Target,
-  Brain, AlertTriangle, RefreshCw, TrendingUp, TrendingDown,
-  ChevronDown, Sparkles, X, Globe, Cpu, Users, Store, Landmark,
-  Leaf, Swords, BarChart3, LineChart, Network, Compass,
+  Calendar, Layers, Globe2, Zap, Play, Loader2, AlertTriangle,
+  ChevronRight, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-
-import { CATEGORIES, FORCES, fmtShift, fmtPct } from '@/lib/format';
 import usePrism from '@/hooks/usePrism';
+import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
 import type {
-  Trend,
-  Scenario,
-  ShiftMatrix,
-  ForceName,
-  AISuggestion,
+  Trend, ForceName, CategoryId, Scenario,
+  PercentileDistribution, ShiftPath,
 } from '@/types';
 
-// Reused child components (same functionality as the original page) ─────
-import HeadlineKPI from './HeadlineKPI';
-import ShiftHeatmap from './Heatmap';
-import PathTimeline from './PathTimeline';
-import ForceWaterfall from './ForceWaterfall';
-import AllocationChart from './AllocationChart';
-import TrendExplorer from './TrendExplorer';
-import CategoryDetailPanel from './CategoryDetailPanel';
-import ConnectionStatus from './ConnectionStatus';
-import AIChatPanel from './AIChatPanel';
+// ─── Value-chain steps — mirror of Trends2 / TrendExplorer ──────
+const VC_STEPS: Array<{ id: string; label: string }> = [
+  { id: 'raw_materials', label: 'Raw Materials' },
+  { id: 'formulation',   label: 'Formulation' },
+  { id: 'packaging',     label: 'Packaging' },
+  { id: 'manufacturing', label: 'Manufacturing' },
+  { id: 'logistics',     label: 'Logistics' },
+  { id: 'marketing',     label: 'Marketing' },
+  { id: 'trade',         label: 'Trade' },
+  { id: 'after_sales',   label: 'After-Sales' },
+];
 
-// ─── Editorial design tokens (mirrors Trends2 / DESIGN.md palette) ──────
+// ─── Regions ─────────────────────────────────────────────────────
+const REGIONS: Array<{ id: string; label: string }> = [
+  { id: 'Europe',        label: 'Europe' },
+  { id: 'North America', label: 'North America' },
+  { id: 'Asia',          label: 'Asia' },
+  { id: 'High Growth',   label: 'High Growth' },
+];
+
+// ─── Forces ──────────────────────────────────────────────────────
+const FORCE_NAMES: ForceName[] = [
+  'Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive',
+];
+
+// ─── Editorial design tokens — identical to Trends2 ──────────────
 const S = {
   bg:                 '#f8f9ff',
   surface:            '#ffffff',
@@ -67,7 +66,6 @@ const S = {
   primary:            '#005db5',
   primaryDim:         '#0052a0',
   primaryContainer:   '#d6e3ff',
-  onPrimary:          '#ffffff',
   onPrimaryContainer: '#00519e',
   onBg:               '#00345e',
   onSurface:          '#00345e',
@@ -76,1517 +74,659 @@ const S = {
   onSecondaryContainer:'#455367',
   tertiaryContainer:  '#dae2fd',
   onTertiaryContainer:'#4a5167',
-  success:            '#2e7d4e',
-  successContainer:   '#c7eccf',
-  onSuccessContainer: '#0d4723',
-  warning:            '#8f5d0b',
-  warningContainer:   '#ffe0a8',
-  onWarningContainer: '#4f2c00',
   error:              '#9f403d',
   errorContainer:     '#fe8983',
   onErrorContainer:   '#752121',
   outline:            '#477dbb',
   outlineVariant:     '#81b5f6',
-  secondary:          '#526074',
+  cardBorder:         'rgba(0, 52, 94, 0.10)',
+  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
+  mutedText:          '#64748B',
 };
 
 const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const MONO_FONT     = "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace";
 
-// Force → editorial icon + tonal container mapping (re-used from Trends2)
-const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }> = {
-  Consumer:      { Icon: Users,    bg: S.primaryContainer,   fg: S.primary },
-  Customer:      { Icon: Store,    bg: S.secondaryContainer, fg: S.onSecondaryContainer },
-  Technology:    { Icon: Cpu,      bg: S.tertiaryContainer,  fg: S.onTertiaryContainer },
-  Government:    { Icon: Landmark, bg: S.surfaceHighest,     fg: S.onSurface },
-  Environmental: { Icon: Leaf,     bg: S.surfaceHigh,        fg: S.primary },
-  Competitive:   { Icon: Swords,   bg: S.surfaceContainer,   fg: S.primaryDim },
+// ─── View mode ───────────────────────────────────────────────────
+type ViewMode = 'time' | 'force' | 'vc' | 'region';
+
+const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
+  time:   { label: 'Time Path',   description: 'Shifts by projection year',       Icon: Calendar },
+  force:  { label: 'Force',       description: 'Contribution by strategic force', Icon: Zap },
+  vc:     { label: 'Value Chain', description: 'Exposure along the value chain',  Icon: Layers },
+  region: { label: 'Region',      description: 'Impact across regional markets',  Icon: Globe2 },
 };
 
-type AIInsight = AISuggestion & { text?: string; type?: string };
+// ─── Helpers ─────────────────────────────────────────────────────
+const clamp = (x: number, lo = 0, hi = 5): number => Math.max(lo, Math.min(hi, x));
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Small presentational primitives
-// ═══════════════════════════════════════════════════════════════════════
+/** Extract median from a ShiftPath entry (may be number or PercentileDistribution). */
+function extractMedian(v: PercentileDistribution | number | undefined): number | null {
+  if (v == null) return null;
+  if (typeof v === 'number') return v;
+  return v.median ?? null;
+}
 
-/** Section card — surface with soft ambient shadow, rounded 2xl, no border */
-const SectionCard: FC<{
+/** Get the median shift for a category at a given year. */
+function getYearShift(shifts: Record<string, ShiftPath> | undefined, catId: string, year: number): number | null {
+  if (!shifts) return null;
+  const path = shifts[catId];
+  if (!path) return null;
+  return extractMedian(path[year]);
+}
+
+/** Compute force contribution for a category, derived from trend exposures. */
+function computeForceContribution(catId: string, trends: Trend[]): Record<ForceName, number> {
+  const out: Record<ForceName, number> = {
+    Consumer: 0, Customer: 0, Technology: 0,
+    Government: 0, Environmental: 0, Competitive: 0,
+  };
+  trends.forEach((t) => {
+    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
+    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    if (catExp <= 0 || base === 0) return;
+    out[t.force] += base * catExp;
+  });
+  return out;
+}
+
+/** Compute VC contribution for a category, derived from trend category × VC exposures. */
+function computeVCContribution(catId: string, trends: Trend[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  VC_STEPS.forEach((s) => { out[s.id] = 0; });
+  trends.forEach((t) => {
+    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
+    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    if (catExp <= 0 || base === 0) return;
+    VC_STEPS.forEach((step) => {
+      const vcExp = clamp((t.vc_exposure as Record<string, number> | undefined)?.[step.id] ?? 0) / 5;
+      if (vcExp <= 0) return;
+      out[step.id] += base * catExp * vcExp;
+    });
+  });
+  return out;
+}
+
+/** Compute regional contribution for a category, derived from category × region exposures. */
+function computeRegionContribution(catId: string, trends: Trend[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  REGIONS.forEach((r) => { out[r.id] = 0; });
+  trends.forEach((t) => {
+    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
+    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    if (catExp <= 0 || base === 0) return;
+    // regional_exposure is present in seed data but not in the Next.js Trend type yet.
+    const regionalExposure = ((t as unknown) as { regional_exposure?: Record<string, number> }).regional_exposure ?? {};
+    REGIONS.forEach((r) => {
+      const regExp = clamp(regionalExposure[r.id] ?? 0) / 5;
+      if (regExp <= 0) return;
+      out[r.id] += base * catExp * regExp;
+    });
+  });
+  return out;
+}
+
+/** Heatmap cell color — maritime-blue diverging palette (editorial). */
+function heatFill(v: number | null): string {
+  if (v == null || !isFinite(v)) return S.surfaceLow;
+  const mag = Math.min(Math.abs(v) / 0.05, 1);
+  if (Math.abs(v) < 0.0005) return S.surfaceLow;
+  if (v > 0) {
+    // Positive → primary blue
+    const a = 0.12 + mag * 0.62;
+    return `rgba(0, 93, 181, ${a.toFixed(2)})`;
+  }
+  // Negative → muted coral / error tone
+  const a = 0.14 + mag * 0.58;
+  return `rgba(159, 64, 61, ${a.toFixed(2)})`;
+}
+
+function heatTextColor(v: number | null): string {
+  if (v == null || !isFinite(v)) return S.onSurfaceVariant;
+  const mag = Math.min(Math.abs(v) / 0.05, 1);
+  if (mag > 0.45) return '#ffffff';
+  return v > 0 ? S.onPrimaryContainer : S.onErrorContainer;
+}
+
+// ─── UI Primitives ───────────────────────────────────────────────
+const PillButton: FC<{
+  active: boolean;
+  onClick: () => void;
   children: React.ReactNode;
-  padding?: number | string;
-  style?: React.CSSProperties;
-}> = ({ children, padding = 24, style }) => (
-  <div
+  icon?: LucideIcon;
+}> = ({ active, onClick, children, icon: Icon }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-all"
     style={{
-      backgroundColor: S.surface,
-      borderRadius: 24,
-      padding,
-      boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
-      ...style,
+      backgroundColor: active ? S.primary : S.surfaceLow,
+      color: active ? '#ffffff' : S.onSurfaceVariant,
+      boxShadow: active ? '0 4px 16px -6px rgba(0, 93, 181, 0.45)' : 'none',
+      fontFamily: BODY_FONT,
+      border: 'none',
+      cursor: 'pointer',
     }}
   >
+    {Icon && <Icon size={14} strokeWidth={2.3} />}
     {children}
-  </div>
+  </button>
 );
 
-/** Section header with eyebrow + title */
-const SectionHeader: FC<{
-  eyebrow?: string;
-  title: string;
+const ScenarioPill: FC<{
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}> = ({ active, onClick, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all"
+    style={{
+      backgroundColor: active ? S.primaryContainer : S.surface,
+      color: active ? S.onPrimaryContainer : S.mutedText,
+      border: active ? 'none' : `1px solid ${S.cardBorder}`,
+      fontFamily: BODY_FONT,
+      cursor: 'pointer',
+      letterSpacing: '0.02em',
+    }}
+  >
+    {label}
+  </button>
+);
+
+// ─── Matrix Table Component ──────────────────────────────────────
+interface MatrixProps {
+  columns: Array<{ id: string; label: string }>;
+  rows: Array<{ id: string; label: string; group?: string }>;
+  /** Row-major data: rows[rowId][colId] = shift */
+  data: Record<string, Record<string, number | null>>;
   subtitle?: string;
-  right?: React.ReactNode;
-}> = ({ eyebrow, title, subtitle, right }) => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 16,
-    marginBottom: 20,
-  }}>
-    <div>
-      {eyebrow && (
-        <div style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: S.onSurfaceVariant,
-          textTransform: 'uppercase',
-          letterSpacing: '0.15em',
-          marginBottom: 6,
-        }}>
-          {eyebrow}
-        </div>
-      )}
-      <h2 style={{
-        fontFamily: HEADLINE_FONT,
-        fontWeight: 800,
-        fontSize: 22,
-        color: S.onBg,
-        letterSpacing: '-0.01em',
-        margin: 0,
-        lineHeight: 1.15,
-      }}>
-        {title}
-      </h2>
+  emptyMessage?: string;
+}
+
+const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }) => {
+  // Group rows by group (Hair / LHC) for subtle sectioning
+  const grouped = useMemo(() => {
+    const map: Record<string, typeof rows> = {};
+    rows.forEach((r) => {
+      const g = r.group ?? 'All';
+      if (!map[g]) map[g] = [];
+      map[g].push(r);
+    });
+    return map;
+  }, [rows]);
+
+  const hasAnyData = rows.some((r) => columns.some((c) => (data[r.id]?.[c.id] ?? null) !== null));
+
+  if (!hasAnyData && emptyMessage) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-20 px-8 text-center rounded-2xl"
+        style={{ backgroundColor: S.surfaceLow, color: S.mutedText }}
+      >
+        <Sparkles size={24} style={{ color: S.primary, opacity: 0.6 }} />
+        <p className="mt-3 text-[14px] font-medium" style={{ color: S.onSurface, fontFamily: BODY_FONT }}>
+          {emptyMessage}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        backgroundColor: S.surface,
+        boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+      }}
+    >
       {subtitle && (
-        <div style={{
-          fontSize: 13,
-          color: S.onSurfaceVariant,
-          marginTop: 4,
-          lineHeight: 1.5,
-        }}>
+        <div
+          className="px-6 py-4"
+          style={{
+            backgroundColor: S.surfaceLow,
+            color: S.onSurfaceVariant,
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            fontFamily: HEADLINE_FONT,
+          }}
+        >
           {subtitle}
         </div>
       )}
-    </div>
-    {right && <div>{right}</div>}
-  </div>
-);
 
-/** Editorial pill button — primary or tonal */
-const PillButton: FC<{
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'tonal' | 'ghost';
-  icon?: React.ReactNode;
-  title?: string;
-}> = ({ children, onClick, disabled, variant = 'tonal', icon, title }) => {
-  const palette = variant === 'primary'
-    ? { bg: S.primary, fg: S.onPrimary, hover: S.primaryDim }
-    : variant === 'ghost'
-      ? { bg: 'transparent', fg: S.onSurfaceVariant, hover: S.surfaceLow }
-      : { bg: S.surfaceLow, fg: S.onPrimaryContainer, hover: S.surfaceContainer };
-
-  return (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      whileHover={disabled ? {} : { scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.97 }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 18px',
-        borderRadius: 999,
-        border: 'none',
-        background: palette.bg,
-        color: palette.fg,
-        fontSize: 13,
-        fontWeight: 600,
-        fontFamily: BODY_FONT,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        transition: 'all 0.25s ease',
-      }}
-    >
-      {icon}
-      {children}
-    </motion.button>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Product Impact (editorial re-skin) — benefiting / declining split
-// ═══════════════════════════════════════════════════════════════════════
-
-interface ProductImpactProps {
-  shifts: ShiftMatrix | null;
-  trends: Trend[];
-}
-
-const ProductImpactAnalysis: FC<ProductImpactProps> = ({ shifts, trends }) => {
-  const { benefiting, declining, expansionTrends, contractionTrends } = useMemo(() => {
-    if (!shifts || Object.keys(shifts).length === 0) {
-      return { benefiting: [], declining: [], expansionTrends: [], contractionTrends: [] };
-    }
-
-    const categoryImpacts = Object.entries(shifts).map(([catId, pathData]) => {
-      const pathObj = typeof pathData === 'object' && pathData !== null ? pathData as Record<string, unknown> : { 2030: pathData };
-      const val2030Entry = (pathObj as Record<string, unknown>)[2030];
-      const val2030 =
-        typeof val2030Entry === 'object' && val2030Entry !== null && 'median' in val2030Entry
-          ? (val2030Entry as { median: number }).median
-          : (typeof val2030Entry === 'number' ? val2030Entry : 0);
-      const catDef = CATEGORIES.find(c => c.id === catId);
-      return {
-        id: catId,
-        name: catDef?.name || catId,
-        shift: val2030 as number,
-        group: catDef?.group || '',
-      };
-    });
-
-    const sorted = [...categoryImpacts].sort((a, b) => b.shift - a.shift);
-
-    return {
-      benefiting: sorted.filter(c => c.shift > 0).slice(0, 3),
-      declining: [...sorted].reverse().filter(c => c.shift < 0).slice(0, 3),
-      expansionTrends: trends
-        .filter(t => t.direction === 'Expansion')
-        .sort((a, b) => ((b.impact || 0) * (b.probability || 0)) - ((a.impact || 0) * (a.probability || 0)))
-        .slice(0, 3),
-      contractionTrends: trends
-        .filter(t => t.direction === 'Contraction')
-        .sort((a, b) => ((b.impact || 0) * (b.probability || 0)) - ((a.impact || 0) * (a.probability || 0)))
-        .slice(0, 3),
-    };
-  }, [shifts, trends]);
-
-  if (!shifts || Object.keys(shifts).length === 0) return null;
-
-  const renderPanel = (
-    title: string,
-    eyebrow: string,
-    Icon: LucideIcon,
-    tone: 'positive' | 'negative',
-    categories: Array<{ id: string; name: string; shift: number }>,
-    driverTrends: Trend[],
-    driverLabel: string,
-  ) => {
-    const palette = tone === 'positive'
-      ? { ringBg: S.successContainer, ringFg: S.success, chipFg: S.onSuccessContainer, driverBg: S.surfaceLow, driverFg: S.success }
-      : { ringBg: S.errorContainer, ringFg: S.error, chipFg: S.onErrorContainer, driverBg: S.surfaceLow, driverFg: S.error };
-
-    return (
-      <SectionCard padding={28}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            background: palette.ringBg,
-            color: palette.ringFg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <Icon size={20} />
-          </div>
-          <div>
-            <div style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: S.onSurfaceVariant,
-            }}>
-              {eyebrow}
-            </div>
-            <div style={{
-              fontFamily: HEADLINE_FONT,
-              fontSize: 17,
-              fontWeight: 800,
-              color: S.onBg,
-              lineHeight: 1.2,
-            }}>
-              {title}
-            </div>
-          </div>
-        </div>
-
-        {categories.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {categories.map(cat => (
-              <div
-                key={cat.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: S.surfaceLow,
-                  borderRadius: 12,
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 600, color: S.onBg }}>{cat.name}</span>
-                <span style={{
-                  fontFamily: MONO_FONT,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: palette.ringFg,
-                }}>
-                  {fmtShift(cat.shift)}
-                </span>
-              </div>
-            ))}
-            {driverTrends.length > 0 && (
-              <div style={{
-                marginTop: 10,
-                padding: '14px 16px',
-                background: S.surfaceLow,
-                borderRadius: 12,
-                borderLeft: `3px solid ${palette.ringFg}`,
-              }}>
-                <div style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: palette.ringFg,
-                  marginBottom: 8,
-                }}>
-                  {driverLabel}
-                </div>
-                {driverTrends.map(t => (
-                  <div key={t.id} style={{
-                    fontSize: 11,
-                    color: S.onSurfaceVariant,
-                    lineHeight: 1.55,
-                    marginBottom: 3,
-                  }}>
-                    • <strong style={{ color: S.onBg }}>{t.name}</strong>{' '}
-                    <span style={{ color: S.outline }}>({t.force}, {t.impact}×{t.probability})</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: S.onSurfaceVariant, padding: '12px 0' }}>
-            {tone === 'positive' ? 'No expanding categories detected.' : 'No contracting categories detected.'}
-          </div>
-        )}
-      </SectionCard>
-    );
-  };
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-      {renderPanel(
-        'Growth Opportunities & Innovation Needs',
-        'AI Insight',
-        TrendingUp,
-        'positive',
-        benefiting,
-        expansionTrends,
-        'Innovation Drivers',
-      )}
-      {renderPanel(
-        'Highest Negative Impact',
-        'AI Insight',
-        TrendingDown,
-        'negative',
-        declining,
-        contractionTrends,
-        'Risk Drivers',
-      )}
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Editorial AI Insights Footer Bar
-// ═══════════════════════════════════════════════════════════════════════
-
-const InsightsFooter: FC<{ insights: AIInsight[] }> = ({ insights }) => {
-  if (insights.length === 0) return null;
-  return (
-    <div
-      style={{
-        position: 'sticky',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 -8px 40px rgba(0, 52, 94, 0.06)',
-        padding: '14px 48px',
-        zIndex: 30,
-      }}
-    >
-      <div style={{
-        maxWidth: 1440,
-        margin: '0 auto',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexWrap: 'wrap',
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 11,
-          fontWeight: 700,
-          color: S.onSurfaceVariant,
-          textTransform: 'uppercase',
-          letterSpacing: '0.12em',
-        }}>
-          <Sparkles size={13} style={{ color: S.primary }} />
-          AI Intelligence
-        </div>
-        {insights.slice(0, 4).map(insight => (
-          <motion.button
-            key={insight.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              borderRadius: 999,
-              border: 'none',
-              background: insight.type === 'trigger' ? S.warningContainer : S.primaryContainer,
-              color: insight.type === 'trigger' ? S.onWarningContainer : S.onPrimaryContainer,
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: BODY_FONT,
-              cursor: 'pointer',
-            }}
-          >
-            <Brain size={12} />
-            <span style={{
-              maxWidth: 360,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {insight.text}
-            </span>
-          </motion.button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Main page component
-// ═══════════════════════════════════════════════════════════════════════
-
-const ProfitPoolAnalysis2: FC = () => {
-  const {
-    loading, simulating, error, activeScenario, setActiveScenario,
-    simulate, connectionState, reconnect,
-    simulation, trends, scenarios,
-    aiSuggestions, updateTrend,
-  } = usePrism();
-
-  // ── Responsive breakpoints ──────────────────────────────────────
-  const [windowWidth, setWindowWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1440,
-  );
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isIPad = windowWidth <= 1024;
-
-  // ── Local UI state ──────────────────────────────────────────────
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
-  const [, setHoveredCategory] = useState<string | null>(null);
-  const [forceFilter, setForceFilter] = useState<string | undefined>(undefined);
-  const [selectedRegion, setSelectedRegion] = useState<string>('Global');
-  const [showTrends, setShowTrends] = useState<boolean>(false);
-  const [aiChatOpen, setAIChatOpen] = useState<boolean>(false);
-
-  // ── Derived data ────────────────────────────────────────────────
-  const shifts: ShiftMatrix | null = simulation?.shifts ?? null;
-  const convergence = simulation?.convergence;
-  const allocation = simulation?.allocation_recommendation ?? null;
-  const scenarioOptions: Scenario[] = scenarios ?? [];
-  const aiInsights: AIInsight[] = (aiSuggestions ?? []).map(s => ({
-    ...s,
-    text: s.content ?? '',
-    type: s.suggestion_type ?? 'info',
-  }));
-
-  // Portfolio stats (editorial stats bar)
-  const portfolioStats = useMemo(() => {
-    if (!shifts || Object.keys(shifts).length === 0) {
-      return {
-        netShift: 0,
-        catsPositive: 0,
-        catsNegative: 0,
-        confidence: convergence?.r_hat,
-      };
-    }
-    let total = 0;
-    let pos = 0;
-    let neg = 0;
-    Object.values(shifts).forEach((pathData) => {
-      const pathObj = typeof pathData === 'object' && pathData !== null ? pathData as Record<string, unknown> : { 2030: pathData };
-      const entry = (pathObj as Record<string, unknown>)[2030];
-      const val = typeof entry === 'object' && entry !== null && 'median' in entry
-        ? (entry as { median: number }).median
-        : (typeof entry === 'number' ? entry : 0);
-      total += val;
-      if (val > 0) pos += 1;
-      if (val < 0) neg += 1;
-    });
-    const n = Object.keys(shifts).length;
-    return {
-      netShift: n > 0 ? total / n : 0,
-      catsPositive: pos,
-      catsNegative: neg,
-      confidence: convergence?.r_hat,
-    };
-  }, [shifts, convergence]);
-
-  const handleSimulate = async (): Promise<void> => { await simulate(); };
-
-  // ═══════════════════════════════════════════════════════════════
-  //  Loading state — editorial spinner
-  // ═══════════════════════════════════════════════════════════════
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: S.bg,
-        fontFamily: BODY_FONT,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-      }}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
-          style={{ color: S.primary }}
-        >
-          <RefreshCw size={36} />
-        </motion.div>
-        <div style={{ fontSize: 13, color: S.onSurfaceVariant, fontWeight: 600 }}>
-          Connecting to PRISM engine…
-        </div>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  Empty state — no shifts / backend offline
-  // ═══════════════════════════════════════════════════════════════
-  if (!shifts || Object.keys(shifts).length === 0) {
-    const isOffline = connectionState === 'offline';
-    return (
-      <div style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: S.bg,
-        fontFamily: BODY_FONT,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 48,
-      }}>
-        <SectionCard padding={40} style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
-          <div style={{
-            width: 56,
-            height: 56,
-            borderRadius: 16,
-            margin: '0 auto 20px',
-            background: isOffline ? S.warningContainer : S.primaryContainer,
-            color: isOffline ? S.warning : S.primary,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            {isOffline ? <AlertTriangle size={26} /> : <Sparkles size={26} />}
-          </div>
-          <div style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            color: S.onSurfaceVariant,
-            marginBottom: 8,
-          }}>
-            {isOffline ? 'Connection Required' : 'Ready to Simulate'}
-          </div>
-          <h2 style={{
-            fontFamily: HEADLINE_FONT,
-            fontSize: 24,
-            fontWeight: 800,
-            color: S.onBg,
-            letterSpacing: '-0.01em',
-            marginBottom: 10,
-          }}>
-            {isOffline ? 'Backend Unavailable' : 'No Simulation Data'}
-          </h2>
-          <p style={{
-            fontSize: 14,
-            color: S.onSurfaceVariant,
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}>
-            {isOffline
-              ? 'The PRISM engine is not reachable. Check that the backend is running and try reconnecting.'
-              : 'Run a Bayesian Monte Carlo simulation with 10,000 iterations to generate the shift matrix across 12 categories and 11 years.'}
-          </p>
-          {error && (
-            <div style={{
-              padding: 12,
-              marginBottom: 16,
-              borderRadius: 8,
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#EF4444',
-              fontSize: 12,
-              textAlign: 'left',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-            }}>
-              {error}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            {isOffline && (
-              <PillButton onClick={reconnect} variant="tonal" icon={<RefreshCw size={14} />}>
-                Reconnect
-              </PillButton>
-            )}
-            <PillButton
-              onClick={handleSimulate}
-              disabled={simulating || isOffline}
-              variant="primary"
-              icon={<Zap size={14} />}
-            >
-              {simulating ? 'Simulating…' : 'Run Simulation'}
-            </PillButton>
-          </div>
-        </SectionCard>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  Main layout
-  // ═══════════════════════════════════════════════════════════════
-  const panelOpen = selectedCategory !== undefined;
-
-  return (
-    <div
-      style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: S.bg,
-        color: S.onBg,
-        fontFamily: BODY_FONT,
-      }}
-    >
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: panelOpen && !isIPad ? '1fr 420px' : '1fr',
-        transition: 'grid-template-columns 0.3s cubic-bezier(0.25,0.1,0.25,1)',
-      }}>
-        {/* ═════════════════════════════════════════════════════════════
-            LEFT / MAIN COLUMN
-            ═════════════════════════════════════════════════════════════ */}
-        <div style={{ minWidth: 0 }}>
-          <main style={{
-            maxWidth: 1440,
-            margin: '0 auto',
-            padding: '40px 48px 120px',
-          }}>
-            {/* ─── EDITORIAL HEADER ────────────────────────────── */}
-            <header style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 32,
-              marginBottom: 32,
-            }}>
-              <div
-                style={{
-                  paddingLeft: 20,
-                  borderLeft: `4px solid ${S.primary}`,
-                  flex: 1,
-                }}
-              >
-                <div style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: S.onSurfaceVariant,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.18em',
-                  marginBottom: 8,
-                }}>
-                  Strategic Intelligence · Editorial View
-                </div>
-                <h1 style={{
-                  fontFamily: HEADLINE_FONT,
-                  fontWeight: 800,
-                  letterSpacing: '-0.02em',
-                  fontSize: 40,
-                  color: S.onBg,
-                  lineHeight: 1.05,
-                  margin: 0,
-                }}>
-                  Profit Pool Shift Model
-                </h1>
-                <p style={{
-                  marginTop: 10,
-                  maxWidth: 640,
-                  fontSize: 15,
-                  color: S.onSurfaceVariant,
-                  lineHeight: 1.55,
-                }}>
-                  A probabilistic view of how the {Object.keys(shifts).length} Hair &amp; LHC categories
-                  will reallocate through 2030 — driven by {trends?.length ?? 0} signals across
-                  six forces, modelled with Bayesian Monte Carlo and copula dependencies.
-                </p>
-              </div>
-
-              {/* Connection + Convergence quick-read */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                minWidth: 220,
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  borderRadius: 999,
-                  background: S.surfaceLow,
-                }}>
-                  <ConnectionStatus state={connectionState} onReconnect={reconnect} />
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  borderRadius: 999,
-                  background: convergence?.converged ? S.successContainer : S.warningContainer,
-                }}>
-                  <CheckCircle2 size={14} style={{ color: convergence?.converged ? S.success : S.warning }} />
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: convergence?.converged ? S.onSuccessContainer : S.onWarningContainer,
-                    fontFamily: MONO_FONT,
-                  }}>
-                    R̂ {convergence?.r_hat?.toFixed(3) ?? '1.030'} ·{' '}
-                    {(convergence?.iterations ?? 10000).toLocaleString()} iter
-                  </span>
-                </div>
-              </div>
-            </header>
-
-            {/* ─── PORTFOLIO STATS BAR ──────────────────────────── */}
-            <section style={{
-              display: 'flex',
-              gap: 28,
-              flexWrap: 'wrap',
-              marginBottom: 28,
-              padding: '18px 28px',
-              background: S.surface,
-              borderRadius: 20,
-              boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
-            }}>
-              <StatTile
-                Icon={Activity}
-                label="Net Shift · 2030"
-                value={fmtShift(portfolioStats.netShift)}
-                tint={portfolioStats.netShift >= 0 ? 'positive' : 'negative'}
-              />
-              <StatDivider />
-              <StatTile
-                Icon={TrendingUp}
-                label="Categories Expanding"
-                value={`${portfolioStats.catsPositive}/${Object.keys(shifts).length}`}
-                tint="neutral"
-              />
-              <StatDivider />
-              <StatTile
-                Icon={TrendingDown}
-                label="Categories Contracting"
-                value={`${portfolioStats.catsNegative}/${Object.keys(shifts).length}`}
-                tint="neutral"
-              />
-              <StatDivider />
-              <StatTile
-                Icon={Gauge}
-                label="Convergence R̂"
-                value={convergence?.r_hat?.toFixed(3) ?? '1.030'}
-                tint="neutral"
-              />
-              <StatDivider />
-              <StatTile
-                Icon={Layers}
-                label="Active Trends"
-                value={String(trends?.length ?? 0)}
-                tint="neutral"
-              />
-              <StatDivider />
-              <StatTile
-                Icon={Clock}
-                label="Horizon"
-                value="2026–2036"
-                tint="neutral"
-              />
-            </section>
-
-            {/* ─── ACTION ROW · Simulate + Scenarios + Region ─── */}
-            <section style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              flexWrap: 'wrap',
-              marginBottom: 28,
-            }}>
-              <PillButton
-                onClick={handleSimulate}
-                disabled={simulating}
-                variant="primary"
-                icon={<Zap size={14} />}
-              >
-                {simulating ? 'Simulating…' : 'Run Simulation'}
-              </PillButton>
-
-              <div style={{ width: 1, height: 22, background: S.outlineVariant, opacity: 0.4 }} />
-
-              {/* Scenario chips */}
-              <div style={{
-                display: 'flex',
-                gap: 6,
-                flexWrap: 'wrap',
-              }}>
-                {scenarioOptions.slice(0, 5).map(scenario => {
-                  const id = scenario.id || scenario.name || '';
-                  const isActive = activeScenario === id;
-                  return (
-                    <motion.button
-                      key={id}
-                      onClick={() => setActiveScenario(id)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.97 }}
-                      style={{
-                        padding: '7px 16px',
-                        borderRadius: 999,
-                        border: 'none',
-                        background: isActive ? S.primary : S.primaryContainer,
-                        color: isActive ? S.onPrimary : S.onPrimaryContainer,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        fontFamily: BODY_FONT,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.25s ease',
-                      }}
-                    >
-                      {scenario.name || scenario.id}
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              {/* Region selector pill */}
-              <div style={{
-                marginLeft: 'auto',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '6px 10px 6px 14px',
-                borderRadius: 999,
-                background: S.surfaceLow,
-              }}>
-                <Globe size={14} style={{ color: S.onSurfaceVariant }} />
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: S.onSurfaceVariant,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                }}>
-                  Region
-                </span>
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => setSelectedRegion(e.target.value)}
-                  style={{
-                    padding: '4px 28px 4px 8px',
-                    borderRadius: 999,
-                    border: 'none',
-                    background: 'transparent',
-                    color: S.onBg,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    fontFamily: BODY_FONT,
-                    cursor: 'pointer',
-                    outline: 'none',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2326619d' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 8px center',
-                  }}
-                >
-                  <option value="Global">Global (Total)</option>
-                  <option value="Europe">Europe</option>
-                  <option value="North America">North America</option>
-                  <option value="Asia Pacific">Asia Pacific</option>
-                  <option value="Latin America">Latin America</option>
-                  <option value="Middle East & Africa">Middle East &amp; Africa</option>
-                  <option value="Emerging Markets">Emerging Markets</option>
-                </select>
-              </div>
-            </section>
-
-            {/* ─── TRUST / METADATA STRIP ────────────────────── */}
-            <section style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 18,
-              padding: '12px 20px',
-              marginBottom: 32,
-              background: S.surfaceLow,
-              borderRadius: 14,
-              fontSize: 11,
-              fontFamily: MONO_FONT,
-              color: S.onSurfaceVariant,
-              flexWrap: 'wrap',
-            }}>
-              <MetaItem label="Model" value="Bayesian MC v2.4" />
-              <MetaDivider />
-              <MetaItem label="Copula" value="Gaussian + t-tails" />
-              <MetaDivider />
-              <MetaItem label="Data Vintage" value="March 2026" />
-              <MetaDivider />
-              <MetaItem label="Iterations" value={(convergence?.iterations ?? 10000).toLocaleString()} />
-              <MetaDivider />
-              <MetaItem
-                label="Convergence"
-                value={convergence?.converged ? `R̂ ${convergence.r_hat?.toFixed(3)}` : 'Pending'}
-                valueColor={convergence?.converged ? S.success : S.warning}
-              />
-              <MetaDivider />
-              <MetaItem label="Region" value={selectedRegion} valueColor={S.primary} />
-            </section>
-
-            {/* ─── ERROR BANNER ───────────────────────────────── */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{
-                  padding: '14px 18px',
-                  borderRadius: 16,
-                  background: S.errorContainer,
-                  color: S.onErrorContainer,
-                  fontSize: 13,
-                  marginBottom: 24,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  fontWeight: 600,
-                }}
-              >
-                <AlertTriangle size={16} />
-                {error}
-              </motion.div>
-            )}
-
-            {/* ═════ ROW 1 · Headline KPIs ═════════════════════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
-              style={{ marginBottom: 28 }}
-            >
-              <SectionCard padding={28}>
-                <SectionHeader
-                  eyebrow="Headline Metrics"
-                  title="Portfolio Snapshot"
-                  subtitle="Aggregate shift, expansion leader, contraction risk and convergence health at a glance."
-                />
-                <HeadlineKPI
-                  shifts={shifts}
-                  convergence={convergence ?? null}
-                  selectedCategory={selectedCategory}
-                />
-              </SectionCard>
-            </motion.section>
-
-            {/* ═════ ROW 2 · Heatmap + Path Timeline ═════════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.05 }}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isIPad ? '1fr' : '1.15fr 1fr',
-                gap: 20,
-                marginBottom: 28,
-              }}
-            >
-              <SectionCard padding={28}>
-                <SectionHeader
-                  eyebrow="Spatial View"
-                  title="Force × Category Heatmap"
-                  subtitle="Per-category shift intensity across the 2026–2030 horizon. Click a category to drill down."
-                  right={<HeaderIcon Icon={Network} />}
-                />
-                <div style={{ minHeight: 320 }}>
-                  <ShiftHeatmap
-                    shifts={shifts}
-                    selectedCategory={selectedCategory}
-                    onSelectCategory={setSelectedCategory}
-                    onHoverCategory={setHoveredCategory}
-                  />
-                </div>
-              </SectionCard>
-
-              <SectionCard padding={28}>
-                <SectionHeader
-                  eyebrow="Temporal View"
-                  title="Continuous Path Timeline"
-                  subtitle="Year-over-year shift trajectories with p10–p90 confidence bands."
-                  right={<HeaderIcon Icon={LineChart} />}
-                />
-                <div style={{ minHeight: 320 }}>
-                  <PathTimeline shifts={shifts} selectedCategory={selectedCategory} />
-                </div>
-              </SectionCard>
-            </motion.section>
-
-            {/* ═════ ROW 3 · Force Waterfall + Allocation ═════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.1 }}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isIPad ? '1fr' : '1fr 1fr',
-                gap: 20,
-                marginBottom: 28,
-              }}
-            >
-              <SectionCard padding={28}>
-                <SectionHeader
-                  eyebrow="Attribution"
-                  title="Force Contribution Waterfall"
-                  subtitle="Which of the six forces drives the most signal into the portfolio?"
-                  right={<HeaderIcon Icon={BarChart3} />}
-                />
-                <ForceLegend />
-                <div style={{ marginTop: 8 }}>
-                  <ForceWaterfall selectedCategory={selectedCategory} />
-                </div>
-              </SectionCard>
-
-              <SectionCard padding={28}>
-                <SectionHeader
-                  eyebrow="Allocation"
-                  title="Recommended Category Weights"
-                  subtitle="Mean-variance optimiser · risk-adjusted allocation vs. current mix."
-                  right={<HeaderIcon Icon={Target} />}
-                />
-                <AllocationChart allocation={allocation ?? undefined} />
-              </SectionCard>
-            </motion.section>
-
-            {/* ═════ ROW 4 · Product Impact ══════════════════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.15 }}
-              style={{ marginBottom: 28 }}
-            >
-              <div style={{ marginBottom: 20 }}>
-                <div style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: S.onSurfaceVariant,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.15em',
-                  marginBottom: 6,
-                }}>
-                  AI Product Intelligence
-                </div>
-                <h2 style={{
-                  fontFamily: HEADLINE_FONT,
-                  fontWeight: 800,
-                  fontSize: 22,
-                  color: S.onBg,
-                  letterSpacing: '-0.01em',
-                  margin: 0,
-                  lineHeight: 1.15,
-                }}>
-                  Where the pool is moving
-                </h2>
-                <div style={{
-                  fontSize: 13,
-                  color: S.onSurfaceVariant,
-                  marginTop: 4,
-                  lineHeight: 1.5,
-                }}>
-                  The top three categories gaining and losing share, with the trend signals driving each side.
-                </div>
-              </div>
-              <ProductImpactAnalysis shifts={shifts} trends={trends} />
-            </motion.section>
-
-            {/* ═════ ROW 5 · Trend Explorer (collapsible) ════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.2 }}
-              style={{ marginBottom: 28 }}
-            >
-              <SectionCard padding={0}>
-                <button
-                  onClick={() => setShowTrends(v => !v)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    padding: '22px 28px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontFamily: BODY_FONT,
-                  }}
-                >
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    background: S.primaryContainer,
-                    color: S.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <Compass size={20} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: '0.15em',
-                      textTransform: 'uppercase',
-                      color: S.onSurfaceVariant,
-                      marginBottom: 3,
-                    }}>
-                      Deep Dive
-                    </div>
-                    <div style={{
-                      fontFamily: HEADLINE_FONT,
-                      fontSize: 18,
-                      fontWeight: 800,
-                      color: S.onBg,
-                      lineHeight: 1.2,
-                    }}>
-                      Trend Explorer
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: S.onSurfaceVariant,
-                    marginRight: 12,
-                  }}>
-                    {trends?.length || 0} trends · {showTrends ? 'Collapse' : 'Expand'}
-                  </div>
-                  <motion.div
-                    animate={{ rotate: showTrends ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ color: S.onSurfaceVariant }}
-                  >
-                    <ChevronDown size={20} />
-                  </motion.div>
-                </button>
-                <AnimatePresence>
-                  {showTrends && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <div style={{ padding: '0 28px 28px', borderTop: `1px solid ${S.surfaceLow}` }}>
-                        <TrendExplorer
-                          data={{ trends: trends as any }}
-                          forceFilter={forceFilter || ''}
-                          onForceFilter={setForceFilter}
-                          onUpdateTrend={(trendId: string, updates: any) =>
-                            void updateTrend(trendId, updates)
-                          }
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </SectionCard>
-            </motion.section>
-
-            {/* ═════ AI ASSISTANT CTA ═════════════════════════ */}
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.25 }}
-            >
-              <SectionCard padding={28} style={{
-                background: `linear-gradient(135deg, ${S.primaryContainer} 0%, ${S.surface} 100%)`,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-                  <div style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 16,
-                    background: S.primary,
-                    color: S.onPrimary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <Brain size={24} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 260 }}>
-                    <div style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: '0.15em',
-                      textTransform: 'uppercase',
-                      color: S.onSurfaceVariant,
-                      marginBottom: 4,
-                    }}>
-                      Conversational Intelligence
-                    </div>
-                    <div style={{
-                      fontFamily: HEADLINE_FONT,
-                      fontSize: 18,
-                      fontWeight: 800,
-                      color: S.onBg,
-                      lineHeight: 1.2,
-                      marginBottom: 4,
-                    }}>
-                      Ask PRISM about the Shift Matrix
-                    </div>
-                    <div style={{ fontSize: 13, color: S.onSurfaceVariant, lineHeight: 1.5 }}>
-                      Natural-language queries on scenario comparisons, force attributions, and allocation logic.
-                    </div>
-                  </div>
-                  <PillButton
-                    onClick={() => setAIChatOpen(true)}
-                    variant="primary"
-                    icon={<Sparkles size={14} />}
-                  >
-                    Open AI Chat
-                  </PillButton>
-                </div>
-              </SectionCard>
-            </motion.section>
-          </main>
-        </div>
-
-        {/* ═════════════════════════════════════════════════════════════
-            RIGHT COLUMN · Category Detail Panel (when selected)
-            ═════════════════════════════════════════════════════════════ */}
-        <AnimatePresence>
-          {panelOpen && !isIPad && (
-            <motion.aside
-              initial={{ x: 420, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 420, opacity: 0 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              style={{
-                background: `linear-gradient(180deg, ${S.surface} 0%, ${S.surfaceLow} 100%)`,
-                borderLeft: `1px solid ${S.surfaceHigh}`,
-                padding: 24,
-                position: 'relative',
-                minHeight: '100vh',
-              }}
-            >
-              <motion.button
-                onClick={() => setSelectedCategory(undefined)}
-                whileHover={{ background: S.surfaceContainer }}
-                style={{
-                  position: 'absolute',
-                  top: 16,
-                  right: 16,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: S.surfaceLow,
-                  color: S.onSurfaceVariant,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  zIndex: 10,
-                }}
-                aria-label="Close panel"
-              >
-                <X size={16} />
-              </motion.button>
-              <CategoryDetailPanel
-                categoryId={selectedCategory || ''}
-                data={{
-                  shifts_path: shifts as any,
-                  force_decomposition: simulation?.force_attribution as any,
-                  contributing_trends: { [selectedCategory || '']: trends },
-                }}
-                onClose={() => setSelectedCategory(undefined)}
-              />
-            </motion.aside>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* ─── Mobile/tablet backdrop for category panel ─────── */}
-      <AnimatePresence>
-        {panelOpen && isIPad && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedCategory(undefined)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 52, 94, 0.35)',
-              backdropFilter: 'blur(6px)',
-              zIndex: 40,
-            }}
-          >
-            <motion.aside
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              onClick={e => e.stopPropagation()}
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                maxHeight: '90vh',
-                background: S.surface,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: 24,
-                overflowY: 'auto',
-              }}
-            >
-              <motion.button
-                onClick={() => setSelectedCategory(undefined)}
-                style={{
-                  position: 'absolute',
-                  top: 16,
-                  right: 16,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: S.surfaceLow,
-                  color: S.onSurfaceVariant,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  zIndex: 10,
-                }}
-                aria-label="Close panel"
-              >
-                <X size={16} />
-              </motion.button>
-              <CategoryDetailPanel
-                categoryId={selectedCategory || ''}
-                data={{
-                  shifts_path: shifts as any,
-                  force_decomposition: simulation?.force_attribution as any,
-                  contributing_trends: { [selectedCategory || '']: trends },
-                }}
-                onClose={() => setSelectedCategory(undefined)}
-              />
-            </motion.aside>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Sticky AI Insights Footer ───────────────────── */}
-      <InsightsFooter insights={aiInsights} />
-
-      {/* ─── AI Chat Panel (bottom slide-up) ─────────────── */}
-      <AIChatPanel
-        isOpen={aiChatOpen}
-        onClose={() => setAIChatOpen(false)}
-        onSendMessage={async (message) => {
-          return `Analysis: ${
-            message.includes('shift')
-              ? 'The portfolio shows a net negative shift driven primarily by Government and Environmental forces.'
-              : 'I can help with shift projections, force analysis, allocation recommendations, and scenario comparisons.'
-          }`;
-        }}
-      />
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Small helpers
-// ═══════════════════════════════════════════════════════════════════════
-
-const StatTile: FC<{
-  Icon: LucideIcon;
-  label: string;
-  value: string;
-  tint: 'positive' | 'negative' | 'neutral';
-}> = ({ Icon, label, value, tint }) => {
-  const ring = tint === 'positive'
-    ? { bg: S.successContainer, fg: S.success }
-    : tint === 'negative'
-      ? { bg: S.errorContainer, fg: S.error }
-      : { bg: S.primaryContainer, fg: S.primary };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        background: ring.bg,
-        color: ring.fg,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Icon size={16} />
-      </div>
-      <div>
-        <div style={{
-          fontFamily: HEADLINE_FONT,
-          fontSize: 18,
-          fontWeight: 800,
-          color: S.onBg,
-          lineHeight: 1.1,
-        }}>
-          {value}
-        </div>
-        <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: S.onSurfaceVariant,
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          marginTop: 2,
-        }}>
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const StatDivider: FC = () => (
-  <div style={{ width: 1, alignSelf: 'stretch', background: S.surfaceHigh, opacity: 0.5 }} />
-);
-
-const MetaItem: FC<{ label: string; value: string; valueColor?: string }> = ({
-  label, value, valueColor,
-}) => (
-  <span>
-    {label}:{' '}
-    <strong style={{ color: valueColor || S.onBg, fontWeight: 700 }}>
-      {value}
-    </strong>
-  </span>
-);
-
-const MetaDivider: FC = () => (
-  <span style={{ color: S.outlineVariant, opacity: 0.6 }}>·</span>
-);
-
-const HeaderIcon: FC<{ Icon: LucideIcon }> = ({ Icon }) => (
-  <div style={{
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    background: S.surfaceLow,
-    color: S.primary,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }}>
-    <Icon size={18} />
-  </div>
-);
-
-/** Compact force legend — tonal chips echoing the heatmap attribution */
-const ForceLegend: FC = () => (
-  <div style={{
-    display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',
-    marginBottom: 14,
-  }}>
-    {(Object.keys(FORCES) as ForceName[]).map(force => {
-      const tile = FORCE_TILE[force] ?? FORCE_TILE.Consumer;
-      const { Icon } = tile;
-      return (
-        <div
-          key={force}
+      <div className="overflow-x-auto">
+        <table
+          className="w-full"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 999,
-            background: tile.bg,
-            color: tile.fg,
-            fontSize: 11,
-            fontWeight: 600,
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            fontFamily: BODY_FONT,
           }}
         >
-          <Icon size={11} strokeWidth={2.5} />
-          {force}
+          <thead>
+            <tr>
+              <th
+                className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-[0.12em] sticky left-0 z-10"
+                style={{
+                  backgroundColor: S.surface,
+                  color: S.onSurfaceVariant,
+                  minWidth: 180,
+                }}
+              >
+                Category
+              </th>
+              {columns.map((col) => (
+                <th
+                  key={col.id}
+                  className="px-3 py-4 text-[11px] font-bold uppercase tracking-[0.08em] text-center"
+                  style={{ color: S.onSurfaceVariant, minWidth: 96 }}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(grouped).map(([groupName, groupRows], gIdx) => (
+              <React.Fragment key={groupName}>
+                {groupName !== 'All' && (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em]"
+                      style={{
+                        backgroundColor: gIdx === 0 ? S.surfaceLow : S.surfaceContainer,
+                        color: S.onSurfaceVariant,
+                        fontFamily: HEADLINE_FONT,
+                      }}
+                    >
+                      {groupName}
+                    </td>
+                  </tr>
+                )}
+                {groupRows.map((row) => (
+                  <tr key={row.id}>
+                    <td
+                      className="px-6 py-3 text-[13px] font-semibold sticky left-0 z-10"
+                      style={{
+                        backgroundColor: S.surface,
+                        color: S.onSurface,
+                        fontFamily: BODY_FONT,
+                      }}
+                    >
+                      {row.label}
+                    </td>
+                    {columns.map((col) => {
+                      const v = data[row.id]?.[col.id] ?? null;
+                      return (
+                        <td
+                          key={col.id}
+                          className="px-3 py-3 text-center text-[13px] tabular-nums"
+                          style={{
+                            backgroundColor: heatFill(v),
+                            color: heatTextColor(v),
+                            fontWeight: v != null && Math.abs(v) > 0.02 ? 700 : 600,
+                            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                            transition: 'background-color 0.25s ease',
+                          }}
+                          title={v != null ? `${row.label} · ${col.label}: ${fmtShift(v, 2)}` : undefined}
+                        >
+                          {v == null ? '—' : fmtShift(v, 1)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div
+        className="flex items-center justify-between px-6 py-4 flex-wrap gap-3"
+        style={{ backgroundColor: S.surfaceLow, color: S.mutedText, fontSize: 11 }}
+      >
+        <span style={{ fontFamily: BODY_FONT }}>
+          Signed percentages. Positive → profit-pool expansion. Negative → contraction.
+        </span>
+        <div className="flex items-center gap-3">
+          <span>−5%</span>
+          <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.72)' }} />
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.34)' }} />
+            <div style={{ flex: 0.2, background: S.surfaceLow }} />
+            <div style={{ flex: 1, background: 'rgba(0, 93, 181, 0.34)' }} />
+            <div style={{ flex: 1, background: 'rgba(0, 93, 181, 0.72)' }} />
+          </div>
+          <span>+5%</span>
         </div>
-      );
-    })}
-  </div>
-);
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Component ──────────────────────────────────────────────
+const ProfitPoolAnalysis2: FC = () => {
+  const {
+    simulation, trends, scenarios,
+    loading, simulating, error, backendAvailable,
+    activeScenario, setActiveScenario, simulate, reconnect,
+  } = usePrism();
+
+  const [view, setView] = useState<ViewMode>('time');
+
+  // ─── Build matrix data ────────────────────────────────────────
+  const matrixData = useMemo(() => {
+    const rows = CATEGORIES.map((c) => ({ id: c.id, label: c.name, group: c.group }));
+
+    if (view === 'time') {
+      const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
+      const data: Record<string, Record<string, number | null>> = {};
+      rows.forEach((r) => {
+        data[r.id] = {};
+        YEARS.forEach((y) => {
+          data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, y);
+        });
+      });
+      return { columns, rows, data };
+    }
+
+    if (view === 'force') {
+      const columns = FORCE_NAMES.map((f) => ({ id: f, label: f }));
+      const data: Record<string, Record<string, number | null>> = {};
+      rows.forEach((r) => {
+        const contrib = computeForceContribution(r.id, trends ?? []);
+        data[r.id] = {};
+        FORCE_NAMES.forEach((f) => { data[r.id][f] = contrib[f] ?? null; });
+      });
+      return { columns, rows, data };
+    }
+
+    if (view === 'vc') {
+      const columns = VC_STEPS;
+      const data: Record<string, Record<string, number | null>> = {};
+      rows.forEach((r) => {
+        const contrib = computeVCContribution(r.id, trends ?? []);
+        data[r.id] = {};
+        VC_STEPS.forEach((s) => { data[r.id][s.id] = contrib[s.id] ?? null; });
+      });
+      return { columns, rows, data };
+    }
+
+    // region
+    const columns = REGIONS;
+    const data: Record<string, Record<string, number | null>> = {};
+    rows.forEach((r) => {
+      const contrib = computeRegionContribution(r.id, trends ?? []);
+      data[r.id] = {};
+      REGIONS.forEach((rg) => { data[r.id][rg.id] = contrib[rg.id] ?? null; });
+    });
+    return { columns, rows, data };
+  }, [view, simulation, trends]);
+
+  const scenarioList: Scenario[] = scenarios ?? [];
+  const meta = VIEW_META[view];
+  const MetaIcon = meta.Icon;
+
+  // ─── Empty / error banners ────────────────────────────────────
+  const showBackendOffline = !loading && !backendAvailable;
+  const needsSimulation = view === 'time' && !simulation;
+
+  return (
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
+    >
+      <main className="max-w-[1440px] mx-auto px-8 py-10">
+        {/* ── Editorial Header ─────────────────────────────────── */}
+        <header className="mb-8 flex items-start justify-between gap-8 flex-wrap">
+          <div
+            className="pl-5"
+            style={{ borderLeft: `4px solid ${S.primary}` }}
+          >
+            <div
+              className="text-xs font-semibold uppercase tracking-[0.18em] mb-2"
+              style={{ color: S.onSurfaceVariant }}
+            >
+              Profit Pool Analysis · Shift Matrix
+            </div>
+            <h1
+              className="font-extrabold tracking-tight"
+              style={{
+                fontFamily: HEADLINE_FONT,
+                color: S.onBg,
+                fontSize: '2.5rem',
+                lineHeight: 1.1,
+              }}
+            >
+              The Shift Matrix, Four Lenses
+            </h1>
+            <p
+              className="mt-2 max-w-2xl text-[15px]"
+              style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
+            >
+              How the 12 Henkel Consumer Brands categories are projected to move —
+              read the same underlying data across time, strategic force,
+              value-chain step, and regional market.
+            </p>
+          </div>
+
+          {/* Simulate button */}
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={() => { void simulate(); }}
+              disabled={simulating || !backendAvailable}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all"
+              style={{
+                backgroundColor: simulating || !backendAvailable ? S.surfaceHigh : S.primary,
+                color: simulating || !backendAvailable ? S.mutedText : '#ffffff',
+                cursor: simulating || !backendAvailable ? 'not-allowed' : 'pointer',
+                border: 'none',
+                boxShadow: !simulating && backendAvailable ? '0 6px 18px -6px rgba(0, 93, 181, 0.45)' : 'none',
+                fontFamily: BODY_FONT,
+              }}
+            >
+              {simulating ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Running simulation…
+                </>
+              ) : (
+                <>
+                  <Play size={14} strokeWidth={2.3} />
+                  Run simulation
+                </>
+              )}
+            </button>
+            {simulation?.generated && (
+              <span style={{ color: S.mutedText, fontSize: 11 }}>
+                Last run · {new Date(simulation.generated).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </header>
+
+        {/* ── Error / offline banners ──────────────────────────── */}
+        <AnimatePresence>
+          {showBackendOffline && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mb-6 flex items-center justify-between gap-4 px-5 py-4 rounded-2xl"
+              style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer }}
+            >
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={18} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  Backend unavailable. The matrix is empty until the simulation engine reconnects.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { void reconnect(); }}
+                className="px-4 py-1.5 rounded-full text-[12px] font-semibold"
+                style={{ backgroundColor: S.onErrorContainer, color: S.errorContainer, border: 'none', cursor: 'pointer' }}
+              >
+                Reconnect
+              </button>
+            </motion.div>
+          )}
+          {error && backendAvailable && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mb-6 px-5 py-4 rounded-2xl"
+              style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, fontSize: 13, fontWeight: 600 }}
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Scenario row ─────────────────────────────────────── */}
+        {scenarioList.length > 0 && (
+          <section className="mb-6">
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
+              style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}
+            >
+              Scenario
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {scenarioList.map((s) => (
+                <ScenarioPill
+                  key={s.id}
+                  active={activeScenario === s.id}
+                  onClick={() => setActiveScenario(s.id)}
+                  label={s.name}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── View toggle ─────────────────────────────────────── */}
+        <section className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(VIEW_META) as ViewMode[]).map((v) => (
+              <PillButton
+                key={v}
+                active={view === v}
+                onClick={() => setView(v)}
+                icon={VIEW_META[v].Icon}
+              >
+                {VIEW_META[v].label}
+              </PillButton>
+            ))}
+          </div>
+          <div
+            className="flex items-center gap-2 text-[12px]"
+            style={{ color: S.mutedText }}
+          >
+            <MetaIcon size={14} style={{ color: S.primary }} />
+            <span>{meta.description}</span>
+          </div>
+        </section>
+
+        {/* ── Matrix ──────────────────────────────────────────── */}
+        <motion.section
+          key={view}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          {loading ? (
+            <div
+              className="flex items-center justify-center py-24 rounded-2xl"
+              style={{ backgroundColor: S.surface, color: S.mutedText }}
+            >
+              <Loader2 size={20} className="animate-spin" style={{ color: S.primary }} />
+              <span className="ml-3 text-[14px]">Loading shift matrix…</span>
+            </div>
+          ) : needsSimulation ? (
+            <div
+              className="flex flex-col items-center justify-center py-20 px-8 text-center rounded-2xl"
+              style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)' }}
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                style={{ backgroundColor: S.primaryContainer, color: S.primary }}
+              >
+                <Play size={22} />
+              </div>
+              <h3
+                className="text-[20px] font-extrabold mb-2"
+                style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
+              >
+                No simulation yet
+              </h3>
+              <p
+                className="max-w-md text-[14px] mb-5"
+                style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
+              >
+                Run the simulation to populate the Time Path view.
+                Force, Value Chain and Region lenses are already
+                populated from the trend database.
+              </p>
+              <button
+                type="button"
+                onClick={() => { void simulate(); }}
+                disabled={!backendAvailable || simulating}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold"
+                style={{
+                  backgroundColor: S.primary,
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: backendAvailable ? 'pointer' : 'not-allowed',
+                  fontFamily: BODY_FONT,
+                }}
+              >
+                <Play size={14} strokeWidth={2.3} />
+                Run simulation
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <Matrix
+              columns={matrixData.columns}
+              rows={matrixData.rows}
+              data={matrixData.data}
+              subtitle={meta.label + ' · ' + meta.description}
+              emptyMessage={
+                view === 'time'
+                  ? 'Simulation result contains no shift data for these years.'
+                  : 'Trend database has no exposure data to compute this view.'
+              }
+            />
+          )}
+        </motion.section>
+
+        {/* ── Footer note ─────────────────────────────────────── */}
+        <footer
+          className="mt-8 text-[12px]"
+          style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}
+        >
+          <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
+          Time Path values are median shifts from the Bayesian Monte Carlo engine (10K+ iterations,
+          Gaussian copula dependencies). Force, Value Chain and Region views are computed from the
+          trend database as{' '}
+          <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+            gp1_shift × category_exposure × dimension_exposure
+          </code>
+          {' '}(each 0–5 scale normalised to 0–1).
+        </footer>
+      </main>
+    </div>
+  );
+};
 
 export default ProfitPoolAnalysis2;

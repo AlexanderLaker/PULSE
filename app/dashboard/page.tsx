@@ -21,6 +21,7 @@ import ProfitPoolShiftModel from '@/components/dashboard/ProfitPoolShiftModel';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import Trends2 from '@/components/dashboard/Trends2';
+import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
@@ -223,7 +224,13 @@ export default function DashboardPage() {
           {activeTab === 'profit-pool-2' && <ProfitPoolAnalysis2 />}
           {activeTab === 'trends' && <ProfitPoolShiftModel />}
           {activeTab === 'trends-2' && <Trends2 />}
-          {activeTab === 'consumer-journey' && <ProfitPoolShiftModel />}
+          {activeTab === 'consumer-journey' && (
+            <ConsumerJourney
+              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool')}
+              onNavigateTrends={() => setActiveTab('trends')}
+              onNavigateInnovation={() => setActiveTab('innovation-explorer')}
+            />
+          )}
           {activeTab === 'innovation-explorer' && (
             <InnovationExplorer
               onNavigateToTrend={() => setActiveTab('trends')}
