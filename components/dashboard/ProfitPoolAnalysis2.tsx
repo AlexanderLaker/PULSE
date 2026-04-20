@@ -26,20 +26,23 @@ import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
 import type {
-  Trend, ForceName, CategoryId, Scenario,
+  Trend, ForceName, Scenario,
   PercentileDistribution, ShiftPath,
 } from '@/types';
 
-// ─── Value-chain steps — mirror of Trends2 / TrendExplorer ──────
+// ─── Value-chain steps — must match backend VC_KEYS in pulse/config.py ──
+// Keys are the display-string form used by the Python engine and seed_trends.
+// (Frontend Trends2 uses snake_case locally, but for real data we go to the
+// source of truth: the backend keys.)
 const VC_STEPS: Array<{ id: string; label: string }> = [
-  { id: 'raw_materials', label: 'Raw Materials' },
-  { id: 'formulation',   label: 'Formulation' },
-  { id: 'packaging',     label: 'Packaging' },
-  { id: 'manufacturing', label: 'Manufacturing' },
-  { id: 'logistics',     label: 'Logistics' },
-  { id: 'marketing',     label: 'Marketing' },
-  { id: 'trade',         label: 'Trade' },
-  { id: 'after_sales',   label: 'After-Sales' },
+  { id: 'Raw Materials', label: 'Raw Materials' },
+  { id: 'Formulation',   label: 'Formulation' },
+  { id: 'Manufacturing', label: 'Manufacturing' },
+  { id: 'Packaging',     label: 'Packaging' },
+  { id: 'Supply Chain',  label: 'Supply Chain' },
+  { id: 'Marketing',     label: 'Marketing' },
+  { id: 'Commercial',    label: 'Commercial' },
+  { id: 'Consumer',      label: 'Consumer' },
 ];
 
 // ─── Regions ─────────────────────────────────────────────────────
@@ -107,23 +110,43 @@ function extractMedian(v: PercentileDistribution | number | undefined): number |
   return v.median ?? null;
 }
 
-/** Get the median shift for a category at a given year. */
-function getYearShift(shifts: Record<string, ShiftPath> | undefined, catId: string, year: number): number | null {
+/** Get the median shift for a category at a given year.
+ *  Tolerates both backend display keys ("Hair: Color") and snake_case IDs
+ *  ("hair_color"), and tolerates both numeric (2030) and string ("2030")
+ *  year keys in the shift path. */
+function getYearShift(
+  shifts: Record<string, ShiftPath> | undefined,
+  catKey: string,
+  catFallbackId: string,
+  year: number,
+): number | null {
   if (!shifts) return null;
-  const path = shifts[catId];
+  const path = shifts[catKey] ?? shifts[catFallbackId];
   if (!path) return null;
-  return extractMedian(path[year]);
+  const v = (path as Record<string | number, unknown>)[year]
+         ?? (path as Record<string | number, unknown>)[String(year)];
+  return extractMedian(v as PercentileDistribution | number | undefined);
 }
 
-/** Compute force contribution for a category, derived from trend exposures. */
-function computeForceContribution(catId: string, trends: Trend[]): Record<ForceName, number> {
+/** Read a category-exposure value — tolerates both backend display keys
+ *  ("Hair: Color") and the snake_case CategoryId ("hair_color"). */
+function readCatExposure(t: Trend, key: string, fallbackId?: string): number {
+  const ce = (t.category_exposure as Record<string, number> | undefined) ?? {};
+  if (typeof ce[key] === 'number') return ce[key]!;
+  if (fallbackId && typeof ce[fallbackId] === 'number') return ce[fallbackId]!;
+  return 0;
+}
+
+/** Compute force contribution for a category, derived from trend exposures.
+ *  `catKey` is the backend category display name (e.g., "Hair: Color"). */
+function computeForceContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<ForceName, number> {
   const out: Record<ForceName, number> = {
     Consumer: 0, Customer: 0, Technology: 0,
     Government: 0, Environmental: 0, Competitive: 0,
   };
   trends.forEach((t) => {
     const base = (t.gp1_shift ?? t.normalized_score ?? 0);
-    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
     if (catExp <= 0 || base === 0) return;
     out[t.force] += base * catExp;
   });
@@ -131,29 +154,30 @@ function computeForceContribution(catId: string, trends: Trend[]): Record<ForceN
 }
 
 /** Compute VC contribution for a category, derived from trend category × VC exposures. */
-function computeVCContribution(catId: string, trends: Trend[]): Record<string, number> {
+function computeVCContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<string, number> {
   const out: Record<string, number> = {};
   VC_STEPS.forEach((s) => { out[s.id] = 0; });
   trends.forEach((t) => {
     const base = (t.gp1_shift ?? t.normalized_score ?? 0);
-    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
     if (catExp <= 0 || base === 0) return;
+    const vcExp = (t.vc_exposure as Record<string, number> | undefined) ?? {};
     VC_STEPS.forEach((step) => {
-      const vcExp = clamp((t.vc_exposure as Record<string, number> | undefined)?.[step.id] ?? 0) / 5;
-      if (vcExp <= 0) return;
-      out[step.id] += base * catExp * vcExp;
+      const e = clamp(vcExp[step.id] ?? 0) / 5;
+      if (e <= 0) return;
+      out[step.id] += base * catExp * e;
     });
   });
   return out;
 }
 
 /** Compute regional contribution for a category, derived from category × region exposures. */
-function computeRegionContribution(catId: string, trends: Trend[]): Record<string, number> {
+function computeRegionContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<string, number> {
   const out: Record<string, number> = {};
   REGIONS.forEach((r) => { out[r.id] = 0; });
   trends.forEach((t) => {
     const base = (t.gp1_shift ?? t.normalized_score ?? 0);
-    const catExp = clamp(t.category_exposure?.[catId as CategoryId] ?? 0) / 5;
+    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
     if (catExp <= 0 || base === 0) return;
     // regional_exposure is present in seed data but not in the Next.js Trend type yet.
     const regionalExposure = ((t as unknown) as { regional_exposure?: Record<string, number> }).regional_exposure ?? {};
@@ -422,8 +446,17 @@ const ProfitPoolAnalysis2: FC = () => {
   const [view, setView] = useState<ViewMode>('time');
 
   // ─── Build matrix data ────────────────────────────────────────
+  // rows use cat.name as the id so lookups against the backend (which keys
+  // shift_matrix and category_exposure by display names like "Hair: Color")
+  // just work. `fallbackId` is the frontend snake_case id, kept so we stay
+  // resilient if the API ever normalizes to snake_case.
   const matrixData = useMemo(() => {
-    const rows = CATEGORIES.map((c) => ({ id: c.id, label: c.name, group: c.group }));
+    const rows = CATEGORIES.map((c) => ({
+      id: c.name,
+      label: c.name,
+      group: c.group,
+      fallbackId: c.id,
+    }));
 
     if (view === 'time') {
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
@@ -431,7 +464,7 @@ const ProfitPoolAnalysis2: FC = () => {
       rows.forEach((r) => {
         data[r.id] = {};
         YEARS.forEach((y) => {
-          data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, y);
+          data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, r.fallbackId, y);
         });
       });
       return { columns, rows, data };
@@ -441,7 +474,7 @@ const ProfitPoolAnalysis2: FC = () => {
       const columns = FORCE_NAMES.map((f) => ({ id: f, label: f }));
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
-        const contrib = computeForceContribution(r.id, trends ?? []);
+        const contrib = computeForceContribution(r.id, r.fallbackId, trends ?? []);
         data[r.id] = {};
         FORCE_NAMES.forEach((f) => { data[r.id][f] = contrib[f] ?? null; });
       });
@@ -452,7 +485,7 @@ const ProfitPoolAnalysis2: FC = () => {
       const columns = VC_STEPS;
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
-        const contrib = computeVCContribution(r.id, trends ?? []);
+        const contrib = computeVCContribution(r.id, r.fallbackId, trends ?? []);
         data[r.id] = {};
         VC_STEPS.forEach((s) => { data[r.id][s.id] = contrib[s.id] ?? null; });
       });
@@ -463,7 +496,7 @@ const ProfitPoolAnalysis2: FC = () => {
     const columns = REGIONS;
     const data: Record<string, Record<string, number | null>> = {};
     rows.forEach((r) => {
-      const contrib = computeRegionContribution(r.id, trends ?? []);
+      const contrib = computeRegionContribution(r.id, r.fallbackId, trends ?? []);
       data[r.id] = {};
       REGIONS.forEach((rg) => { data[r.id][rg.id] = contrib[rg.id] ?? null; });
     });
