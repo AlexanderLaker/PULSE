@@ -25,6 +25,13 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
+import {
+  BASE_ATTENUATION,
+  ATTENUATION_SOURCE,
+  effectiveAttenuation,
+  withinForceDampening,
+  materializationAt,
+} from '@/lib/calibration';
 import type {
   Trend, ForceName, Scenario,
   PercentileDistribution, ShiftPath,
@@ -137,79 +144,189 @@ function readCatExposure(t: Trend, key: string, fallbackId?: string): number {
   return 0;
 }
 
-/** Compute force contribution for a category, derived from trend exposures.
- *  `catKey` is the backend category display name (e.g., "Hair: Color"). */
-function computeForceContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<ForceName, number> {
-  const out: Record<ForceName, number> = {
+/** Effective per-trend severity at the terminal year:
+ *     normalized_score × materialization(trend, terminalYear)
+ *
+ *  `normalized_score` = E[prob_mean] × gp1_pct_affected × direction_sign
+ *  comes from the Bayesian trend model (see pulse/ingestion/models.py).
+ *  `gp1_shift` is the API-returned alias — either field may arrive.
+ *  The materialization factor is the trend's own diffusion curve at the
+ *  given year (s_curve / front_loaded / …), with a force-specific legacy
+ *  fallback when a trend doesn't carry diffusion metadata. */
+function trendSeverityAt(t: Trend, year: number): number {
+  const raw = t.gp1_shift ?? t.normalized_score ?? 0;
+  if (raw === 0) return 0;
+  return raw * materializationAt(t, year);
+}
+
+/** Compute the pre-calibration contribution of each trend to a category,
+ *  keyed by Force. Each trend belongs to exactly one force. We also
+ *  track n_active per force so we can apply within-force overlap
+ *  dampening downstream. */
+function computeForceContributionRaw(
+  catKey: string, catFallbackId: string, trends: Trend[], year: number,
+): { sums: Record<ForceName, number>; counts: Record<ForceName, number> } {
+  const sums: Record<ForceName, number> = {
+    Consumer: 0, Customer: 0, Technology: 0,
+    Government: 0, Environmental: 0, Competitive: 0,
+  };
+  const counts: Record<ForceName, number> = {
     Consumer: 0, Customer: 0, Technology: 0,
     Government: 0, Environmental: 0, Competitive: 0,
   };
   trends.forEach((t) => {
-    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
     const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
-    if (catExp <= 0 || base === 0) return;
-    out[t.force] += base * catExp;
+    if (catExp <= 0) return;
+    const severity = trendSeverityAt(t, year);
+    if (severity === 0) return;
+    sums[t.force] += severity * catExp;
+    counts[t.force] += 1;
+  });
+  return { sums, counts };
+}
+
+/** Apply the calibrated per-force pipeline:
+ *   1. Within-force overlap dampening (n_active-aware).
+ *   2. Per-force effective attenuation from the overlap matrix.
+ *  Returns one value per force. */
+function applyForcePipeline(
+  sums: Record<ForceName, number>,
+  counts: Record<ForceName, number>,
+): Record<ForceName, number> {
+  const out: Record<ForceName, number> = {
+    Consumer: 0, Customer: 0, Technology: 0,
+    Government: 0, Environmental: 0, Competitive: 0,
+  };
+  (Object.keys(sums) as ForceName[]).forEach((f) => {
+    const dampened = sums[f] * withinForceDampening(f, counts[f]);
+    out[f] = dampened * effectiveAttenuation(f);
   });
   return out;
 }
 
-/** Compute VC contribution for a category, derived from trend category × VC exposures. */
-function computeVCContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  VC_STEPS.forEach((s) => { out[s.id] = 0; });
+/** Distribute each trend's category impact (severity × catExp) proportionally
+ *  across a set of dimension keys, using the trend's dimension-exposure
+ *  vector as weights. Each trend's distributed impact is first multiplied
+ *  by its force's own effective attenuation, and aggregated alongside
+ *  a per-force active count so within-force dampening can be applied
+ *  after proportional distribution. A trend with vc_exposure
+ *  {Raw:4, Marketing:3} gives 4/7 of its impact to Raw Materials and
+ *  3/7 to Marketing. */
+function computeDimContributionRaw(
+  catKey: string, catFallbackId: string,
+  trends: Trend[],
+  dimKeys: string[],
+  getExpMap: (t: Trend) => Record<string, number>,
+  year: number,
+): { sums: Record<string, number>; perForceSums: Record<string, Record<ForceName, number>>; perForceCounts: Record<string, Record<ForceName, number>> } {
+  const sums: Record<string, number> = {};
+  const perForceSums: Record<string, Record<ForceName, number>> = {};
+  const perForceCounts: Record<string, Record<ForceName, number>> = {};
+  const emptyForceMap = (): Record<ForceName, number> => ({
+    Consumer: 0, Customer: 0, Technology: 0,
+    Government: 0, Environmental: 0, Competitive: 0,
+  });
+  dimKeys.forEach((k) => {
+    sums[k] = 0;
+    perForceSums[k] = emptyForceMap();
+    perForceCounts[k] = emptyForceMap();
+  });
   trends.forEach((t) => {
-    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
     const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
-    if (catExp <= 0 || base === 0) return;
-    const vcExp = (t.vc_exposure as Record<string, number> | undefined) ?? {};
-    VC_STEPS.forEach((step) => {
-      const e = clamp(vcExp[step.id] ?? 0) / 5;
+    if (catExp <= 0) return;
+    const severity = trendSeverityAt(t, year);
+    if (severity === 0) return;
+    const expMap = getExpMap(t) ?? {};
+    let totalExp = 0;
+    dimKeys.forEach((k) => {
+      const e = clamp(expMap[k] ?? 0);
+      if (e > 0) totalExp += e;
+    });
+    if (totalExp <= 0) return;
+    const trendContribution = severity * catExp;
+    dimKeys.forEach((k) => {
+      const e = clamp(expMap[k] ?? 0);
       if (e <= 0) return;
-      out[step.id] += base * catExp * e;
+      const share = trendContribution * (e / totalExp);
+      sums[k]! += share;
+      perForceSums[k]![t.force] += share;
+      perForceCounts[k]![t.force] += 1;
     });
   });
-  return out;
+  return { sums, perForceSums, perForceCounts };
 }
 
-/** Compute regional contribution for a category, derived from category × region exposures. */
-function computeRegionContribution(catKey: string, catFallbackId: string, trends: Trend[]): Record<string, number> {
+/** Apply within-force dampening and per-force attenuation to each
+ *  dimension cell. A cell receives contributions from multiple forces;
+ *  we dampen and attenuate each force slice separately, then sum them. */
+function applyDimPipeline(
+  perForceSums: Record<string, Record<ForceName, number>>,
+  perForceCounts: Record<string, Record<ForceName, number>>,
+): Record<string, number> {
   const out: Record<string, number> = {};
-  REGIONS.forEach((r) => { out[r.id] = 0; });
-  trends.forEach((t) => {
-    const base = (t.gp1_shift ?? t.normalized_score ?? 0);
-    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
-    if (catExp <= 0 || base === 0) return;
-    // regional_exposure is present in seed data but not in the Next.js Trend type yet.
-    const regionalExposure = ((t as unknown) as { regional_exposure?: Record<string, number> }).regional_exposure ?? {};
-    REGIONS.forEach((r) => {
-      const regExp = clamp(regionalExposure[r.id] ?? 0) / 5;
-      if (regExp <= 0) return;
-      out[r.id] += base * catExp * regExp;
+  Object.keys(perForceSums).forEach((k) => {
+    let total = 0;
+    (Object.keys(perForceSums[k]!) as ForceName[]).forEach((f) => {
+      const raw = perForceSums[k]![f];
+      if (raw === 0) return;
+      const n = perForceCounts[k]![f];
+      total += raw * withinForceDampening(f, n) * effectiveAttenuation(f);
     });
+    out[k] = total;
   });
   return out;
 }
 
-/** Heatmap cell color — maritime-blue diverging palette (editorial). */
+/** Anchor the calibrated contributions to the simulation's terminal-year
+ *  shift when available. The calibrated chain already produces figures
+ *  in the same units as the Bayesian MC output; anchoring simply
+ *  reconciles residual mismatch so the lenses add up to the Time Path
+ *  end-state exactly. If no simulation is available we leave the
+ *  calibrated values as-is — no flat fallback multiplier. */
+function anchorToSimulation(
+  calibrated: Record<string, number>,
+  terminalShift: number | null,
+): Record<string, number> {
+  const signedTotal = Object.values(calibrated).reduce((s, x) => s + x, 0);
+  if (terminalShift == null || !isFinite(terminalShift) || Math.abs(signedTotal) < 1e-9) {
+    return calibrated;
+  }
+  // Anchor only if both point the same direction; a sign flip would
+  // mean the trend-level decomposition and the full MC disagree, and
+  // silently inverting the decomposition would be misleading.
+  if (Math.sign(signedTotal) !== Math.sign(terminalShift)) {
+    return calibrated;
+  }
+  const factor = terminalShift / signedTotal;
+  const out: Record<string, number> = {};
+  Object.entries(calibrated).forEach(([k, v]) => { out[k] = v * factor; });
+  return out;
+}
+
+/** Heatmap cell color — signed diverging palette.
+ *  Green (#22C55E / rgba(34,197,94)) = expansion, Red (#EF4444 /
+ *  rgba(239,68,68)) = contraction — matches the PRISM design-system
+ *  tokens from CLAUDE.md (--expansion / --contraction). */
 function heatFill(v: number | null): string {
   if (v == null || !isFinite(v)) return S.surfaceLow;
-  const mag = Math.min(Math.abs(v) / 0.05, 1);
   if (Math.abs(v) < 0.0005) return S.surfaceLow;
+  const mag = Math.min(Math.abs(v) / 0.05, 1);
   if (v > 0) {
-    // Positive → primary blue
-    const a = 0.12 + mag * 0.62;
-    return `rgba(0, 93, 181, ${a.toFixed(2)})`;
+    // Positive → expansion green
+    const a = 0.14 + mag * 0.62;
+    return `rgba(34, 197, 94, ${a.toFixed(2)})`;
   }
-  // Negative → muted coral / error tone
-  const a = 0.14 + mag * 0.58;
-  return `rgba(159, 64, 61, ${a.toFixed(2)})`;
+  // Negative → contraction red
+  const a = 0.14 + mag * 0.62;
+  return `rgba(239, 68, 68, ${a.toFixed(2)})`;
 }
 
 function heatTextColor(v: number | null): string {
   if (v == null || !isFinite(v)) return S.onSurfaceVariant;
   const mag = Math.min(Math.abs(v) / 0.05, 1);
   if (mag > 0.45) return '#ffffff';
-  return v > 0 ? S.onPrimaryContainer : S.onErrorContainer;
+  // Deep green / deep red for readable low-intensity tints
+  return v > 0 ? '#14532d' : '#7f1d1d';
 }
 
 // ─── UI Primitives ───────────────────────────────────────────────
@@ -422,11 +539,11 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
         <div className="flex items-center gap-3">
           <span>−5%</span>
           <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.72)' }} />
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.34)' }} />
+            <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.36)' }} />
             <div style={{ flex: 0.2, background: S.surfaceLow }} />
-            <div style={{ flex: 1, background: 'rgba(0, 93, 181, 0.34)' }} />
-            <div style={{ flex: 1, background: 'rgba(0, 93, 181, 0.72)' }} />
+            <div style={{ flex: 1, background: 'rgba(34, 197, 94, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(34, 197, 94, 0.76)' }} />
           </div>
           <span>+5%</span>
         </div>
@@ -458,6 +575,10 @@ const ProfitPoolAnalysis2: FC = () => {
       fallbackId: c.id,
     }));
 
+    const trendList = trends ?? [];
+    // Terminal year for anchoring derived views to the simulation.
+    const terminalYear = YEARS[YEARS.length - 1]!;
+
     if (view === 'time') {
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
       const data: Record<string, Record<string, number | null>> = {};
@@ -474,31 +595,55 @@ const ProfitPoolAnalysis2: FC = () => {
       const columns = FORCE_NAMES.map((f) => ({ id: f, label: f }));
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
-        const contrib = computeForceContribution(r.id, r.fallbackId, trends ?? []);
+        const { sums, counts } = computeForceContributionRaw(
+          r.id, r.fallbackId, trendList, terminalYear,
+        );
+        const calibrated = applyForcePipeline(sums, counts);
+        const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
+        const anchored = anchorToSimulation(
+          calibrated as unknown as Record<string, number>,
+          anchor,
+        );
         data[r.id] = {};
-        FORCE_NAMES.forEach((f) => { data[r.id][f] = contrib[f] ?? null; });
+        FORCE_NAMES.forEach((f) => { data[r.id][f] = anchored[f] ?? null; });
       });
       return { columns, rows, data };
     }
 
     if (view === 'vc') {
       const columns = VC_STEPS;
+      const dimKeys = VC_STEPS.map((s) => s.id);
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
-        const contrib = computeVCContribution(r.id, r.fallbackId, trends ?? []);
+        const { perForceSums, perForceCounts } = computeDimContributionRaw(
+          r.id, r.fallbackId, trendList, dimKeys,
+          (t) => (t.vc_exposure as Record<string, number> | undefined) ?? {},
+          terminalYear,
+        );
+        const calibrated = applyDimPipeline(perForceSums, perForceCounts);
+        const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
+        const anchored = anchorToSimulation(calibrated, anchor);
         data[r.id] = {};
-        VC_STEPS.forEach((s) => { data[r.id][s.id] = contrib[s.id] ?? null; });
+        VC_STEPS.forEach((s) => { data[r.id][s.id] = anchored[s.id] ?? null; });
       });
       return { columns, rows, data };
     }
 
     // region
     const columns = REGIONS;
+    const dimKeys = REGIONS.map((r) => r.id);
     const data: Record<string, Record<string, number | null>> = {};
     rows.forEach((r) => {
-      const contrib = computeRegionContribution(r.id, r.fallbackId, trends ?? []);
+      const { perForceSums, perForceCounts } = computeDimContributionRaw(
+        r.id, r.fallbackId, trendList, dimKeys,
+        (t) => (t.regional_exposure as Record<string, number> | undefined) ?? {},
+        terminalYear,
+      );
+      const calibrated = applyDimPipeline(perForceSums, perForceCounts);
+      const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
+      const anchored = anchorToSimulation(calibrated, anchor);
       data[r.id] = {};
-      REGIONS.forEach((rg) => { data[r.id][rg.id] = contrib[rg.id] ?? null; });
+      REGIONS.forEach((rg) => { data[r.id][rg.id] = anchored[rg.id] ?? null; });
     });
     return { columns, rows, data };
   }, [view, simulation, trends]);
@@ -750,12 +895,16 @@ const ProfitPoolAnalysis2: FC = () => {
         >
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           Time Path values are median shifts from the Bayesian Monte Carlo engine (10K+ iterations,
-          Gaussian copula dependencies). Force, Value Chain and Region views are computed from the
-          trend database as{' '}
-          <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-            gp1_shift × category_exposure × dimension_exposure
-          </code>
-          {' '}(each 0–5 scale normalised to 0–1).
+          Gaussian copula dependencies). Force, Value Chain and Region views decompose each
+          category's {YEARS[YEARS.length - 1]} shift through the calibrated attenuation chain
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{ATTENUATION_SOURCE}</code>):
+          per trend, <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>normalized_score × materialization(diffusion_curve, peak_year) × category_exposure</code>,
+          distributed proportionally across the dimension's exposure weights, dampened by each
+          force's within-force overlap, attenuated by the per-force effective attenuation
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>base {BASE_ATTENUATION.toFixed(2)} × (1 − mean cross-force overlap)</code>),
+          and anchored to the simulation's terminal-year shift when available. No flat
+          multipliers — every dampening factor is empirically calibrated from the 82-trend
+          April 2026 analysis.
         </footer>
       </main>
     </div>
