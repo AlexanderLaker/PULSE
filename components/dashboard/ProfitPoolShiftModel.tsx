@@ -198,7 +198,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
 
   // Real data from API via usePrism hook
   const shifts: ShiftMatrix | null = simulation?.shifts ?? null;
-  const convergence: ConvergenceDiagnostics | undefined = simulation?.convergence;
+  const convergence: ConvergenceDiagnostics | null = simulation?.convergence ?? null;
   const allocation = simulation?.allocation_recommendation ?? null;
   const forceNames = Object.keys(FORCES) as ForceName[];
   const scenarioOptions: Scenario[] = scenarios ?? [];
