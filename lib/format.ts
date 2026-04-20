@@ -71,7 +71,15 @@ export const CATEGORIES: CategoryDefinition[] = [
   { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#FF00FF' },
 ];
 
-export const YEARS: number[] = [2026, 2027, 2028, 2029, 2030];
+// v3.1 11-year strategic horizon (2026–2036), mirroring backend
+// pulse/config.py::DEFAULT_PATH_YEARS. Keep in sync — a short horizon
+// here truncates the S-curve materialization (default peaks at 2030 only
+// ~62% of full impact) and makes the Bayesian MC output look flat in
+// the Time Path view.
+export const YEARS: number[] = [
+  2026, 2027, 2028, 2029, 2030,
+  2031, 2032, 2033, 2034, 2035, 2036,
+];
 
 // ─── Formatting Functions ───────────────────────────────────
 
