@@ -71,14 +71,65 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
 
 // ── Simulation ───────────────────────────────────────────────────
 
-export const getSimulation = (): Promise<SimulationResult> =>
-  request('/simulation');
+/**
+ * Normalize the backend simulation payload to the shape the frontend expects.
+ *
+ * Backend response shape (FastAPI):
+ *   {
+ *     shift_matrix: { [cat]: { path: { [year]: {p10,p25,median,p75,p90,mean,std} }, velocity: {...} } },
+ *     convergence: {...},
+ *     allocation: {...},            // weights + frontier + defense_ranking
+ *     force_attribution?: {...},
+ *     iterations, model_type, ...
+ *   }
+ *
+ * Frontend type `SimulationResult` expects:
+ *   {
+ *     shifts: { [cat]: { [year]: PercentileDistribution } },    // flat, no `.path`
+ *     allocation_recommendation: {...},
+ *     convergence: {...},
+ *     force_attribution: {...}
+ *   }
+ *
+ * This normalizer accepts either shape (idempotent).
+ */
+function normalizeSimulation(raw: unknown): SimulationResult {
+  const r = (raw ?? {}) as Record<string, unknown>;
 
-export const runSimulation = (params: SimulationParams = {}): Promise<SimulationResult> =>
-  request('/simulate', { method: 'POST', body: JSON.stringify(params) });
+  // shifts: prefer `shifts` if already normalized, else unwrap `shift_matrix[cat].path`
+  let shifts = r.shifts as Record<string, unknown> | undefined;
+  if (!shifts && r.shift_matrix && typeof r.shift_matrix === 'object') {
+    const matrix = r.shift_matrix as Record<string, unknown>;
+    shifts = {};
+    for (const [cat, val] of Object.entries(matrix)) {
+      if (val && typeof val === 'object') {
+        const v = val as Record<string, unknown>;
+        // Unwrap `.path` if present; otherwise assume it's already a year-map
+        shifts[cat] = (v.path && typeof v.path === 'object') ? v.path : v;
+      }
+    }
+  }
 
-export const runDeterministic = (): Promise<SimulationResult> =>
-  request('/simulate/deterministic', { method: 'POST' });
+  // allocation: prefer `allocation_recommendation`, else use `allocation`
+  const allocation = (r.allocation_recommendation ?? r.allocation) as unknown;
+
+  return {
+    ...(r as Partial<SimulationResult>),
+    shifts: (shifts ?? {}) as SimulationResult['shifts'],
+    allocation_recommendation: allocation as SimulationResult['allocation_recommendation'],
+    convergence: r.convergence as SimulationResult['convergence'],
+    force_attribution: r.force_attribution as SimulationResult['force_attribution'],
+  } as SimulationResult;
+}
+
+export const getSimulation = async (): Promise<SimulationResult> =>
+  normalizeSimulation(await request<unknown>('/simulation'));
+
+export const runSimulation = async (params: SimulationParams = {}): Promise<SimulationResult> =>
+  normalizeSimulation(await request<unknown>('/simulate', { method: 'POST', body: JSON.stringify(params) }));
+
+export const runDeterministic = async (): Promise<SimulationResult> =>
+  normalizeSimulation(await request<unknown>('/simulate/deterministic', { method: 'POST' }));
 
 // ── Scenarios ────────────────────────────────────────────────────
 
