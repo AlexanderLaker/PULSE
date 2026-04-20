@@ -580,12 +580,51 @@ const ProfitPoolAnalysis2: FC = () => {
     const terminalYear = YEARS[YEARS.length - 1]!;
 
     if (view === 'time') {
+      // Time Path uses the same calibrated per-force pipeline as the other
+      // lenses, evaluated at each year with that year's materialization
+      // fraction. Because materialization schedules are monotone
+      // non-decreasing on [0, 1], the resulting per-year shift is
+      // cumulative by construction — shift[2036] captures the full
+      // trend impact, shift[2026] only the fraction that has
+      // materialized by then.
+      //
+      // When the simulation is available we anchor the TERMINAL-year
+      // calibrated total to the simulation's terminal median, then
+      // apply the same anchor factor uniformly across years. This keeps
+      // the monotone shape of the calibrated path while rescaling it to
+      // agree with the Bayesian MC at 2036. If the sim's terminal shift
+      // flips sign relative to the calibrated total, we leave the
+      // calibrated path as-is (silent sign flip would be misleading).
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
+        const perYear: Record<number, number> = {};
+        YEARS.forEach((y) => {
+          const { sums, counts } = computeForceContributionRaw(
+            r.id, r.fallbackId, trendList, y,
+          );
+          const calibrated = applyForcePipeline(sums, counts);
+          perYear[y] = (Object.values(calibrated) as number[])
+            .reduce((s, x) => s + x, 0);
+        });
+
+        const terminalCalibrated = perYear[terminalYear] ?? 0;
+        const terminalSim = getYearShift(
+          simulation?.shifts, r.id, r.fallbackId, terminalYear,
+        );
+        let scale = 1;
+        if (
+          terminalSim != null &&
+          isFinite(terminalSim) &&
+          Math.abs(terminalCalibrated) > 1e-9 &&
+          Math.sign(terminalCalibrated) === Math.sign(terminalSim)
+        ) {
+          scale = terminalSim / terminalCalibrated;
+        }
+
         data[r.id] = {};
         YEARS.forEach((y) => {
-          data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, r.fallbackId, y);
+          data[r.id][String(y)] = perYear[y] != null ? perYear[y]! * scale : null;
         });
       });
       return { columns, rows, data };
@@ -654,7 +693,11 @@ const ProfitPoolAnalysis2: FC = () => {
 
   // ─── Empty / error banners ────────────────────────────────────
   const showBackendOffline = !loading && !backendAvailable;
-  const needsSimulation = view === 'time' && !simulation;
+  // All four lenses now render from the trend database via the calibrated
+  // pipeline (Time Path evaluates it per year). The simulation is used
+  // only as a terminal-year anchor when available — no longer a hard
+  // requirement for Time Path to render.
+  const needsSimulation = false;
 
   return (
     <div
@@ -879,11 +922,7 @@ const ProfitPoolAnalysis2: FC = () => {
               rows={matrixData.rows}
               data={matrixData.data}
               subtitle={meta.label + ' · ' + meta.description}
-              emptyMessage={
-                view === 'time'
-                  ? 'Simulation result contains no shift data for these years.'
-                  : 'Trend database has no exposure data to compute this view.'
-              }
+              emptyMessage={'Trend database has no exposure data to compute this view.'}
             />
           )}
         </motion.section>
@@ -894,17 +933,17 @@ const ProfitPoolAnalysis2: FC = () => {
           style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}
         >
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
-          Time Path values are median shifts from the Bayesian Monte Carlo engine (10K+ iterations,
-          Gaussian copula dependencies). Force, Value Chain and Region views decompose each
-          category's {YEARS[YEARS.length - 1]} shift through the calibrated attenuation chain
+          All four lenses share the same calibrated attenuation chain
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{ATTENUATION_SOURCE}</code>):
           per trend, <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>normalized_score × materialization(diffusion_curve, peak_year) × category_exposure</code>,
-          distributed proportionally across the dimension's exposure weights, dampened by each
-          force's within-force overlap, attenuated by the per-force effective attenuation
-          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>base {BASE_ATTENUATION.toFixed(2)} × (1 − mean cross-force overlap)</code>),
-          and anchored to the simulation's terminal-year shift when available. No flat
-          multipliers — every dampening factor is empirically calibrated from the 82-trend
-          April 2026 analysis.
+          dampened by each force's within-force overlap and attenuated by the per-force effective attenuation
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>base {BASE_ATTENUATION.toFixed(2)} × (1 − mean cross-force overlap)</code>).
+          Time Path evaluates the chain at each year, so the path is cumulative by construction —
+          materialization grows monotonically from 2026 to {YEARS[YEARS.length - 1]}, producing a
+          monotone shift trajectory anchored to the Bayesian MC terminal median when a simulation
+          is available. Force, Value Chain and Region views decompose the {YEARS[YEARS.length - 1]} end-state
+          through the dimension's exposure weights. No flat multipliers — every dampening factor is
+          empirically calibrated from the 82-trend April 2026 analysis.
         </footer>
       </main>
     </div>
