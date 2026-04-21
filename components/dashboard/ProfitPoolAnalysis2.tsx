@@ -2,16 +2,23 @@
  * Profit Pool Analysis 2 — Editorial Shift Matrix View
  *
  * A lean, focused view of the Shift Matrix with four lenses:
- *   • Time Path     — category × year, from simulation shifts
- *   • Force         — category × 6 forces, derived from trend exposures
- *   • Value Chain   — category × 8 value-chain steps
- *   • Region        — category × 4 regions
+ *   • Time Path     — category × year (MC median shifts)
+ *   • Force         — category × 6 forces, at a selected year
+ *   • Value Chain   — category × 8 value-chain steps, at a selected year
+ *   • Region        — category × 4 regions, at a selected year
  *
- * Styled to match the Trends 2 + Trend Explorer "Digital Curator" design
- * language: maritime blue palette, Manrope headlines + Inter body, tonal
- * layering (no 1px borders), rounded cards, pill controls, soft shadows.
+ * v3.1 change: the Force / VC / Region decompositions are NO LONGER
+ * synthesized in the frontend from trend exposures. They are produced by
+ * the backend (bayesian_mc v2.5+) per year and arrive on the
+ * `simulation.decompositions` + `simulation.totals` blocks. By construction
+ * each lens's row total equals the MC median shift for that (cat, year),
+ * which is also the row total of the other two lenses — so the three
+ * lenses reconcile to the same per-category per-year shift. The column
+ * totals aggregate across categories to the same grand total per year.
  *
- * All data is real and comes from the usePrism hook. No mock fallback.
+ * All data is real. No frontend calibration chain, no flat multipliers,
+ * no anchoring: the numbers you see here are literally the numbers the
+ * simulation engine wrote to the DB.
  */
 
 'use client';
@@ -20,27 +27,17 @@ import React, { useMemo, useState, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Play, Loader2, AlertTriangle,
-  ChevronRight, Sparkles,
+  ChevronRight, Sparkles, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
-import {
-  BASE_ATTENUATION,
-  ATTENUATION_SOURCE,
-  effectiveAttenuation,
-  withinForceDampening,
-  materializationAt,
-} from '@/lib/calibration';
 import type {
-  Trend, ForceName, Scenario,
+  ForceName, Scenario,
   PercentileDistribution, ShiftPath,
 } from '@/types';
 
-// ─── Value-chain steps — must match backend VC_KEYS in pulse/config.py ──
-// Keys are the display-string form used by the Python engine and seed_trends.
-// (Frontend Trends2 uses snake_case locally, but for real data we go to the
-// source of truth: the backend keys.)
+// ─── Value-chain steps — must match backend VC_STEPS in pulse/config.py ──
 const VC_STEPS: Array<{ id: string; label: string }> = [
   { id: 'Raw Materials', label: 'Raw Materials' },
   { id: 'Formulation',   label: 'Formulation' },
@@ -101,14 +98,13 @@ const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 type ViewMode = 'time' | 'force' | 'vc' | 'region';
 
 const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
-  time:   { label: 'Time Path',   description: 'Shifts by projection year',       Icon: Calendar },
-  force:  { label: 'Force',       description: 'Contribution by strategic force', Icon: Zap },
-  vc:     { label: 'Value Chain', description: 'Exposure along the value chain',  Icon: Layers },
-  region: { label: 'Region',      description: 'Impact across regional markets',  Icon: Globe2 },
+  time:   { label: 'Time Path',   description: 'MC median shifts 2026→2036, cumulative vs 2025', Icon: Calendar },
+  force:  { label: 'Force',       description: 'Force decomposition at the selected year',       Icon: Zap },
+  vc:     { label: 'Value Chain', description: 'Value-chain decomposition at the selected year', Icon: Layers },
+  region: { label: 'Region',      description: 'Regional decomposition at the selected year',    Icon: Globe2 },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
-const clamp = (x: number, lo = 0, hi = 5): number => Math.max(lo, Math.min(hi, x));
 
 /** Extract median from a ShiftPath entry (may be number or PercentileDistribution). */
 function extractMedian(v: PercentileDistribution | number | undefined): number | null {
@@ -135,188 +131,16 @@ function getYearShift(
   return extractMedian(v as PercentileDistribution | number | undefined);
 }
 
-/** Read a category-exposure value — tolerates both backend display keys
- *  ("Hair: Color") and the snake_case CategoryId ("hair_color"). */
-function readCatExposure(t: Trend, key: string, fallbackId?: string): number {
-  const ce = (t.category_exposure as Record<string, number> | undefined) ?? {};
-  if (typeof ce[key] === 'number') return ce[key]!;
-  if (fallbackId && typeof ce[fallbackId] === 'number') return ce[fallbackId]!;
-  return 0;
-}
-
-/** Effective per-trend severity at the terminal year:
- *     normalized_score × materialization(trend, terminalYear)
- *
- *  `normalized_score` = E[prob_mean] × gp1_pct_affected × direction_sign
- *  comes from the Bayesian trend model (see pulse/ingestion/models.py).
- *  `gp1_shift` is the API-returned alias — either field may arrive.
- *  The materialization factor is the trend's own diffusion curve at the
- *  given year (s_curve / front_loaded / …), with a force-specific legacy
- *  fallback when a trend doesn't carry diffusion metadata. */
-function trendSeverityAt(t: Trend, year: number): number {
-  const raw = t.gp1_shift ?? t.normalized_score ?? 0;
-  if (raw === 0) return 0;
-  return raw * materializationAt(t, year);
-}
-
-/** Compute the pre-calibration contribution of each trend to a category,
- *  keyed by Force. Each trend belongs to exactly one force. We also
- *  track n_active per force so we can apply within-force overlap
- *  dampening downstream. */
-function computeForceContributionRaw(
-  catKey: string, catFallbackId: string, trends: Trend[], year: number,
-): { sums: Record<ForceName, number>; counts: Record<ForceName, number> } {
-  const sums: Record<ForceName, number> = {
-    Consumer: 0, Customer: 0, Technology: 0,
-    Government: 0, Environmental: 0, Competitive: 0,
-  };
-  const counts: Record<ForceName, number> = {
-    Consumer: 0, Customer: 0, Technology: 0,
-    Government: 0, Environmental: 0, Competitive: 0,
-  };
-  trends.forEach((t) => {
-    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
-    if (catExp <= 0) return;
-    const severity = trendSeverityAt(t, year);
-    if (severity === 0) return;
-    sums[t.force] += severity * catExp;
-    counts[t.force] += 1;
-  });
-  return { sums, counts };
-}
-
-/** Apply the calibrated per-force pipeline:
- *   1. Within-force overlap dampening (n_active-aware).
- *   2. Per-force effective attenuation from the overlap matrix.
- *  Returns one value per force. */
-function applyForcePipeline(
-  sums: Record<ForceName, number>,
-  counts: Record<ForceName, number>,
-): Record<ForceName, number> {
-  const out: Record<ForceName, number> = {
-    Consumer: 0, Customer: 0, Technology: 0,
-    Government: 0, Environmental: 0, Competitive: 0,
-  };
-  (Object.keys(sums) as ForceName[]).forEach((f) => {
-    const dampened = sums[f] * withinForceDampening(f, counts[f]);
-    out[f] = dampened * effectiveAttenuation(f);
-  });
-  return out;
-}
-
-/** Distribute each trend's category impact (severity × catExp) proportionally
- *  across a set of dimension keys, using the trend's dimension-exposure
- *  vector as weights. Each trend's distributed impact is first multiplied
- *  by its force's own effective attenuation, and aggregated alongside
- *  a per-force active count so within-force dampening can be applied
- *  after proportional distribution. A trend with vc_exposure
- *  {Raw:4, Marketing:3} gives 4/7 of its impact to Raw Materials and
- *  3/7 to Marketing. */
-function computeDimContributionRaw(
-  catKey: string, catFallbackId: string,
-  trends: Trend[],
-  dimKeys: string[],
-  getExpMap: (t: Trend) => Record<string, number>,
-  year: number,
-): { sums: Record<string, number>; perForceSums: Record<string, Record<ForceName, number>>; perForceCounts: Record<string, Record<ForceName, number>> } {
-  const sums: Record<string, number> = {};
-  const perForceSums: Record<string, Record<ForceName, number>> = {};
-  const perForceCounts: Record<string, Record<ForceName, number>> = {};
-  const emptyForceMap = (): Record<ForceName, number> => ({
-    Consumer: 0, Customer: 0, Technology: 0,
-    Government: 0, Environmental: 0, Competitive: 0,
-  });
-  dimKeys.forEach((k) => {
-    sums[k] = 0;
-    perForceSums[k] = emptyForceMap();
-    perForceCounts[k] = emptyForceMap();
-  });
-  trends.forEach((t) => {
-    const catExp = clamp(readCatExposure(t, catKey, catFallbackId)) / 5;
-    if (catExp <= 0) return;
-    const severity = trendSeverityAt(t, year);
-    if (severity === 0) return;
-    const expMap = getExpMap(t) ?? {};
-    let totalExp = 0;
-    dimKeys.forEach((k) => {
-      const e = clamp(expMap[k] ?? 0);
-      if (e > 0) totalExp += e;
-    });
-    if (totalExp <= 0) return;
-    const trendContribution = severity * catExp;
-    dimKeys.forEach((k) => {
-      const e = clamp(expMap[k] ?? 0);
-      if (e <= 0) return;
-      const share = trendContribution * (e / totalExp);
-      sums[k]! += share;
-      perForceSums[k]![t.force] += share;
-      perForceCounts[k]![t.force] += 1;
-    });
-  });
-  return { sums, perForceSums, perForceCounts };
-}
-
-/** Apply within-force dampening and per-force attenuation to each
- *  dimension cell. A cell receives contributions from multiple forces;
- *  we dampen and attenuate each force slice separately, then sum them. */
-function applyDimPipeline(
-  perForceSums: Record<string, Record<ForceName, number>>,
-  perForceCounts: Record<string, Record<ForceName, number>>,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  Object.keys(perForceSums).forEach((k) => {
-    let total = 0;
-    (Object.keys(perForceSums[k]!) as ForceName[]).forEach((f) => {
-      const raw = perForceSums[k]![f];
-      if (raw === 0) return;
-      const n = perForceCounts[k]![f];
-      total += raw * withinForceDampening(f, n) * effectiveAttenuation(f);
-    });
-    out[k] = total;
-  });
-  return out;
-}
-
-/** Anchor the calibrated contributions to the simulation's terminal-year
- *  shift when available. The calibrated chain already produces figures
- *  in the same units as the Bayesian MC output; anchoring simply
- *  reconciles residual mismatch so the lenses add up to the Time Path
- *  end-state exactly. If no simulation is available we leave the
- *  calibrated values as-is — no flat fallback multiplier. */
-function anchorToSimulation(
-  calibrated: Record<string, number>,
-  terminalShift: number | null,
-): Record<string, number> {
-  const signedTotal = Object.values(calibrated).reduce((s, x) => s + x, 0);
-  if (terminalShift == null || !isFinite(terminalShift) || Math.abs(signedTotal) < 1e-9) {
-    return calibrated;
-  }
-  // Anchor only if both point the same direction; a sign flip would
-  // mean the trend-level decomposition and the full MC disagree, and
-  // silently inverting the decomposition would be misleading.
-  if (Math.sign(signedTotal) !== Math.sign(terminalShift)) {
-    return calibrated;
-  }
-  const factor = terminalShift / signedTotal;
-  const out: Record<string, number> = {};
-  Object.entries(calibrated).forEach(([k, v]) => { out[k] = v * factor; });
-  return out;
-}
-
 /** Heatmap cell color — signed diverging palette.
- *  Green (#22C55E / rgba(34,197,94)) = expansion, Red (#EF4444 /
- *  rgba(239,68,68)) = contraction — matches the PRISM design-system
- *  tokens from CLAUDE.md (--expansion / --contraction). */
+ *  Green (#22C55E) = expansion, Red (#EF4444) = contraction. */
 function heatFill(v: number | null): string {
   if (v == null || !isFinite(v)) return S.surfaceLow;
   if (Math.abs(v) < 0.0005) return S.surfaceLow;
   const mag = Math.min(Math.abs(v) / 0.05, 1);
   if (v > 0) {
-    // Positive → expansion green
     const a = 0.14 + mag * 0.62;
     return `rgba(34, 197, 94, ${a.toFixed(2)})`;
   }
-  // Negative → contraction red
   const a = 0.14 + mag * 0.62;
   return `rgba(239, 68, 68, ${a.toFixed(2)})`;
 }
@@ -325,7 +149,6 @@ function heatTextColor(v: number | null): string {
   if (v == null || !isFinite(v)) return S.onSurfaceVariant;
   const mag = Math.min(Math.abs(v) / 0.05, 1);
   if (mag > 0.45) return '#ffffff';
-  // Deep green / deep red for readable low-intensity tints
   return v > 0 ? '#14532d' : '#7f1d1d';
 }
 
@@ -384,9 +207,20 @@ interface MatrixProps {
   data: Record<string, Record<string, number | null>>;
   subtitle?: string;
   emptyMessage?: string;
+  /** Optional: per-row totals (sums across the dimension axis). */
+  rowTotals?: Record<string, number | null>;
+  /** Optional: per-column totals (sums across categories). */
+  colTotals?: Record<string, number | null>;
+  /** Optional: grand total cell at bottom-right. */
+  grandTotal?: number | null;
+  /** Whether to render row-total column and column-total row. */
+  showTotals?: boolean;
 }
 
-const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }) => {
+const Matrix: FC<MatrixProps> = ({
+  columns, rows, data, subtitle, emptyMessage,
+  rowTotals, colTotals, grandTotal, showTotals = false,
+}) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
     const map: Record<string, typeof rows> = {};
@@ -413,6 +247,8 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
       </div>
     );
   }
+
+  const totalColSpan = columns.length + (showTotals ? 1 : 0) + 1; // +1 for Category column
 
   return (
     <div
@@ -469,6 +305,19 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
                   {col.label}
                 </th>
               ))}
+              {showTotals && (
+                <th
+                  className="px-3 py-4 text-[11px] font-bold uppercase tracking-[0.12em] text-center"
+                  style={{
+                    color: S.onSurface,
+                    minWidth: 104,
+                    backgroundColor: S.surfaceContainer,
+                    borderLeft: `2px solid ${S.cardBorderStrong}`,
+                  }}
+                >
+                  Total
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -477,7 +326,7 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
                 {groupName !== 'All' && (
                   <tr>
                     <td
-                      colSpan={columns.length + 1}
+                      colSpan={totalColSpan}
                       className="px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em]"
                       style={{
                         backgroundColor: gIdx === 0 ? S.surfaceLow : S.surfaceContainer,
@@ -520,10 +369,77 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
                         </td>
                       );
                     })}
+                    {showTotals && (() => {
+                      const rt = rowTotals?.[row.id] ?? null;
+                      return (
+                        <td
+                          className="px-3 py-3 text-center text-[13px] tabular-nums"
+                          style={{
+                            backgroundColor: heatFill(rt),
+                            color: heatTextColor(rt),
+                            fontWeight: 700,
+                            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                            borderLeft: `2px solid ${S.cardBorderStrong}`,
+                            transition: 'background-color 0.25s ease',
+                          }}
+                          title={rt != null ? `${row.label} — row total (MC median): ${fmtShift(rt, 2)}` : undefined}
+                        >
+                          {rt == null ? '—' : fmtShift(rt, 1)}
+                        </td>
+                      );
+                    })()}
                   </tr>
                 ))}
               </React.Fragment>
             ))}
+            {showTotals && (
+              <tr>
+                <td
+                  className="px-6 py-3 text-[11px] font-bold uppercase tracking-[0.12em] sticky left-0 z-10"
+                  style={{
+                    backgroundColor: S.surfaceContainer,
+                    color: S.onSurface,
+                    fontFamily: HEADLINE_FONT,
+                    borderTop: `2px solid ${S.cardBorderStrong}`,
+                  }}
+                >
+                  Total
+                </td>
+                {columns.map((col) => {
+                  const ct = colTotals?.[col.id] ?? null;
+                  return (
+                    <td
+                      key={col.id}
+                      className="px-3 py-3 text-center text-[13px] tabular-nums"
+                      style={{
+                        backgroundColor: heatFill(ct),
+                        color: heatTextColor(ct),
+                        fontWeight: 700,
+                        fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                        borderTop: `2px solid ${S.cardBorderStrong}`,
+                      }}
+                      title={ct != null ? `${col.label} — column total: ${fmtShift(ct, 2)}` : undefined}
+                    >
+                      {ct == null ? '—' : fmtShift(ct, 1)}
+                    </td>
+                  );
+                })}
+                <td
+                  className="px-3 py-3 text-center text-[13px] tabular-nums"
+                  style={{
+                    backgroundColor: heatFill(grandTotal ?? null),
+                    color: heatTextColor(grandTotal ?? null),
+                    fontWeight: 800,
+                    fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                    borderLeft: `2px solid ${S.cardBorderStrong}`,
+                    borderTop: `2px solid ${S.cardBorderStrong}`,
+                  }}
+                  title={grandTotal != null ? `Grand total: ${fmtShift(grandTotal, 2)}` : undefined}
+                >
+                  {grandTotal == null ? '—' : fmtShift(grandTotal, 1)}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -535,6 +451,7 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
       >
         <span style={{ fontFamily: BODY_FONT }}>
           Signed percentages. Positive → profit-pool expansion. Negative → contraction.
+          {showTotals && ' Row totals equal the MC median shift per category (identical across the three lenses by construction).'}
         </span>
         <div className="flex items-center gap-3">
           <span>−5%</span>
@@ -552,21 +469,89 @@ const Matrix: FC<MatrixProps> = ({ columns, rows, data, subtitle, emptyMessage }
   );
 };
 
+// ─── Peak-Stress Tooltip ─────────────────────────────────────────
+const PeakStressTooltip: FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="inline-flex items-center gap-1.5 text-[11px] font-semibold"
+        style={{
+          color: S.onPrimaryContainer,
+          backgroundColor: S.primaryContainer,
+          border: 'none',
+          padding: '4px 10px',
+          borderRadius: 999,
+          cursor: 'help',
+          fontFamily: BODY_FONT,
+        }}
+        aria-label="Why is peak stress not always in the final year?"
+      >
+        <Info size={12} strokeWidth={2.3} />
+        Why aren&apos;t the worst years at the end?
+      </button>
+      {open && (
+        <div
+          className="absolute top-full right-0 mt-2 z-20 rounded-xl p-4 shadow-lg"
+          style={{
+            backgroundColor: S.surface,
+            border: `1px solid ${S.cardBorderStrong}`,
+            boxShadow: '0 12px 40px -8px rgba(0, 52, 94, 0.22)',
+            maxWidth: 360,
+            fontSize: 12,
+            lineHeight: 1.55,
+            color: S.onSurface,
+            fontFamily: BODY_FONT,
+          }}
+        >
+          <div
+            className="text-[11px] font-bold uppercase tracking-[0.12em] mb-2"
+            style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}
+          >
+            Peak stress is not always terminal
+          </div>
+          <p className="mb-2">
+            Each trend has its own diffusion curve (<em>s_curve, linear, front-loaded,
+            back-loaded, step-function</em>) and its own peak year. The 82 v3.1 trends
+            are spread across 2027–2035 peak years and five curve shapes.
+          </p>
+          <p className="mb-2">
+            That means the category grand total can be <strong>non-monotonic</strong>:
+            front-loaded consumer shifts and step-function regulation compound hardest
+            mid-horizon (H1→H2), while later-maturing longevity and biotech trends
+            only pick up in H3 — sometimes in the opposite direction, partially
+            offsetting the stress.
+          </p>
+          <p className="mb-0" style={{ color: S.onSurfaceVariant }}>
+            Read a cell as the <strong>cumulative level vs 2025</strong> at that
+            year — the compounded impact up to that measurement point, not a
+            year-over-year delta.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC = () => {
   const {
-    simulation, trends, scenarios,
+    simulation, scenarios,
     loading, simulating, error, backendAvailable,
     activeScenario, setActiveScenario, simulate, reconnect,
   } = usePrism();
 
   const [view, setView] = useState<ViewMode>('time');
+  const [selectedYear, setSelectedYear] = useState<number>(YEARS[YEARS.length - 1]!);
 
   // ─── Build matrix data ────────────────────────────────────────
   // rows use cat.name as the id so lookups against the backend (which keys
   // shift_matrix and category_exposure by display names like "Hair: Color")
-  // just work. `fallbackId` is the frontend snake_case id, kept so we stay
-  // resilient if the API ever normalizes to snake_case.
+  // just work.
   const matrixData = useMemo(() => {
     const rows = CATEGORIES.map((c) => ({
       id: c.name,
@@ -575,15 +560,7 @@ const ProfitPoolAnalysis2: FC = () => {
       fallbackId: c.id,
     }));
 
-    const trendList = trends ?? [];
-    // Terminal year for anchoring derived views to the simulation.
-    const terminalYear = YEARS[YEARS.length - 1]!;
-
     if (view === 'time') {
-      // Time Path shows ONLY real Bayesian MC output — no frontend
-      // fallback or calibrated synthesis. If the simulation is missing
-      // or the values look wrong, the fix belongs in the backend, not
-      // here.
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
       const data: Record<string, Record<string, number | null>> = {};
       rows.forEach((r) => {
@@ -592,65 +569,83 @@ const ProfitPoolAnalysis2: FC = () => {
           data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, r.fallbackId, y);
         });
       });
-      return { columns, rows, data };
+      // Column totals for Time Path: per-year grand total across categories
+      // (from backend totals.grand, which matches the sum of MC medians).
+      const colTotals: Record<string, number | null> = {};
+      YEARS.forEach((y) => {
+        colTotals[String(y)] = simulation?.totals?.grand?.[String(y)] ?? null;
+      });
+      return {
+        columns, rows, data,
+        rowTotals: undefined,
+        colTotals,
+        grandTotal: null,
+        showTotals: !!simulation?.totals,
+        // Time Path only renders column totals (row totals would be sums
+        // across time, which aren't a meaningful decomposition identity).
+        showRowTotals: false,
+      };
     }
+
+    // ── Force / VC / Region — read from backend decompositions ──────
+    const yearKey = String(selectedYear);
+    const decompositions = simulation?.decompositions;
+    const totals = simulation?.totals;
+
+    const makeDecompView = (
+      axisKeys: string[],
+      lens: 'force' | 'vc' | 'region',
+      colTotalSrc: Record<string, Record<string, number>> | undefined,
+    ): { data: Record<string, Record<string, number | null>>;
+         rowTotals: Record<string, number | null>;
+         colTotals: Record<string, number | null>;
+         grandTotal: number | null; } => {
+      const data: Record<string, Record<string, number | null>> = {};
+      const rowTotals: Record<string, number | null> = {};
+      rows.forEach((r) => {
+        data[r.id] = {};
+        const cell = (decompositions?.[lens] as Record<string, Record<string, Record<string, number>>> | undefined)
+          ?.[yearKey]?.[r.id] ?? {};
+        axisKeys.forEach((k) => {
+          const v = cell[k];
+          data[r.id][k] = typeof v === 'number' ? v : null;
+        });
+        rowTotals[r.id] = totals?.category_path?.[r.id]?.[yearKey] ?? null;
+      });
+      const colTotals: Record<string, number | null> = {};
+      const colSrc = colTotalSrc?.[yearKey] ?? {};
+      axisKeys.forEach((k) => {
+        colTotals[k] = typeof colSrc[k] === 'number' ? colSrc[k]! : null;
+      });
+      const grandTotal = totals?.grand?.[yearKey] ?? null;
+      return { data, rowTotals, colTotals, grandTotal };
+    };
 
     if (view === 'force') {
       const columns = FORCE_NAMES.map((f) => ({ id: f, label: f }));
-      const data: Record<string, Record<string, number | null>> = {};
-      rows.forEach((r) => {
-        const { sums, counts } = computeForceContributionRaw(
-          r.id, r.fallbackId, trendList, terminalYear,
-        );
-        const calibrated = applyForcePipeline(sums, counts);
-        const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
-        const anchored = anchorToSimulation(
-          calibrated as unknown as Record<string, number>,
-          anchor,
-        );
-        data[r.id] = {};
-        FORCE_NAMES.forEach((f) => { data[r.id][f] = anchored[f] ?? null; });
-      });
-      return { columns, rows, data };
+      const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
+        FORCE_NAMES as unknown as string[], 'force', totals?.by_force,
+      );
+      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
     }
 
     if (view === 'vc') {
       const columns = VC_STEPS;
-      const dimKeys = VC_STEPS.map((s) => s.id);
-      const data: Record<string, Record<string, number | null>> = {};
-      rows.forEach((r) => {
-        const { perForceSums, perForceCounts } = computeDimContributionRaw(
-          r.id, r.fallbackId, trendList, dimKeys,
-          (t) => (t.vc_exposure as Record<string, number> | undefined) ?? {},
-          terminalYear,
-        );
-        const calibrated = applyDimPipeline(perForceSums, perForceCounts);
-        const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
-        const anchored = anchorToSimulation(calibrated, anchor);
-        data[r.id] = {};
-        VC_STEPS.forEach((s) => { data[r.id][s.id] = anchored[s.id] ?? null; });
-      });
-      return { columns, rows, data };
+      const axisKeys = VC_STEPS.map((s) => s.id);
+      const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
+        axisKeys, 'vc', totals?.by_vc,
+      );
+      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
     }
 
     // region
     const columns = REGIONS;
-    const dimKeys = REGIONS.map((r) => r.id);
-    const data: Record<string, Record<string, number | null>> = {};
-    rows.forEach((r) => {
-      const { perForceSums, perForceCounts } = computeDimContributionRaw(
-        r.id, r.fallbackId, trendList, dimKeys,
-        (t) => (t.regional_exposure as Record<string, number> | undefined) ?? {},
-        terminalYear,
-      );
-      const calibrated = applyDimPipeline(perForceSums, perForceCounts);
-      const anchor = getYearShift(simulation?.shifts, r.id, r.fallbackId, terminalYear);
-      const anchored = anchorToSimulation(calibrated, anchor);
-      data[r.id] = {};
-      REGIONS.forEach((rg) => { data[r.id][rg.id] = anchored[rg.id] ?? null; });
-    });
-    return { columns, rows, data };
-  }, [view, simulation, trends]);
+    const axisKeys = REGIONS.map((r) => r.id);
+    const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
+      axisKeys, 'region', totals?.by_region,
+    );
+    return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
+  }, [view, simulation, selectedYear]);
 
   const scenarioList: Scenario[] = scenarios ?? [];
   const meta = VIEW_META[view];
@@ -658,7 +653,9 @@ const ProfitPoolAnalysis2: FC = () => {
 
   // ─── Empty / error banners ────────────────────────────────────
   const showBackendOffline = !loading && !backendAvailable;
-  const needsSimulation = view === 'time' && !simulation;
+  const needsSimulation = !simulation;
+  const decompositionsMissing = view !== 'time' && simulation != null
+    && simulation.decompositions == null;
 
   return (
     <div
@@ -694,8 +691,9 @@ const ProfitPoolAnalysis2: FC = () => {
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
               How the 12 Henkel Consumer Brands categories are projected to move —
-              read the same underlying data across time, strategic force,
-              value-chain step, and regional market.
+              read the same underlying MC output across time, strategic force,
+              value-chain step, and regional market. Row totals reconcile across
+              all three lenses by construction.
             </p>
           </div>
 
@@ -730,6 +728,7 @@ const ProfitPoolAnalysis2: FC = () => {
             {simulation?.generated && (
               <span style={{ color: S.mutedText, fontSize: 11 }}>
                 Last run · {new Date(simulation.generated).toLocaleString()}
+                {simulation.model_version && ` · ${simulation.model_version}`}
               </span>
             )}
           </div>
@@ -772,6 +771,22 @@ const ProfitPoolAnalysis2: FC = () => {
               {error}
             </motion.div>
           )}
+          {decompositionsMissing && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mb-6 px-5 py-4 rounded-2xl flex items-center gap-3"
+              style={{ backgroundColor: S.surfaceContainer, color: S.onSurfaceVariant, fontSize: 13 }}
+            >
+              <AlertTriangle size={16} style={{ color: S.primary }} />
+              <span>
+                This simulation was generated before the v2.5 engine update and doesn&apos;t
+                carry the per-year Force / VC / Region decomposition blocks yet. Re-run the
+                simulation to populate these lenses.
+              </span>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* ── Scenario row ─────────────────────────────────────── */}
@@ -811,17 +826,42 @@ const ProfitPoolAnalysis2: FC = () => {
             ))}
           </div>
           <div
-            className="flex items-center gap-2 text-[12px]"
+            className="flex items-center gap-3 flex-wrap"
             style={{ color: S.mutedText }}
           >
-            <MetaIcon size={14} style={{ color: S.primary }} />
-            <span>{meta.description}</span>
+            <div className="flex items-center gap-2 text-[12px]">
+              <MetaIcon size={14} style={{ color: S.primary }} />
+              <span>{meta.description}</span>
+            </div>
+            <PeakStressTooltip />
           </div>
         </section>
 
+        {/* ── Year selector (lens views only) ───────────────────── */}
+        {view !== 'time' && (
+          <section className="mb-6">
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
+              style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}
+            >
+              Measurement year · cumulative level vs 2025
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {YEARS.map((y) => (
+                <ScenarioPill
+                  key={y}
+                  active={selectedYear === y}
+                  onClick={() => setSelectedYear(y)}
+                  label={String(y)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ── Matrix ──────────────────────────────────────────── */}
         <motion.section
-          key={view}
+          key={view + ':' + selectedYear}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
@@ -855,9 +895,9 @@ const ProfitPoolAnalysis2: FC = () => {
                 className="max-w-md text-[14px] mb-5"
                 style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
               >
-                Run the simulation to populate the Time Path view.
-                Force, Value Chain and Region lenses are already
-                populated from the trend database.
+                Run the Bayesian Monte Carlo to populate all four lenses.
+                Force, Value Chain and Region decompositions are produced
+                by the engine (v2.5+) alongside the Time Path.
               </p>
               <button
                 type="button"
@@ -882,12 +922,20 @@ const ProfitPoolAnalysis2: FC = () => {
               columns={matrixData.columns}
               rows={matrixData.rows}
               data={matrixData.data}
-              subtitle={meta.label + ' · ' + meta.description}
+              subtitle={
+                view === 'time'
+                  ? `${meta.label} · ${meta.description}`
+                  : `${meta.label} · ${selectedYear} · ${meta.description}`
+              }
               emptyMessage={
                 view === 'time'
                   ? 'Simulation result contains no shift data for these years.'
-                  : 'Trend database has no exposure data to compute this view.'
+                  : 'No decomposition data for this year. Re-run the simulation on the v2.5+ engine.'
               }
+              rowTotals={matrixData.showRowTotals ? matrixData.rowTotals : undefined}
+              colTotals={matrixData.colTotals}
+              grandTotal={matrixData.grandTotal}
+              showTotals={matrixData.showTotals}
             />
           )}
         </motion.section>
@@ -898,17 +946,16 @@ const ProfitPoolAnalysis2: FC = () => {
           style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}
         >
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
-          Time Path values are median shifts from the Bayesian Monte Carlo engine (10K+ iterations,
-          Gaussian copula dependencies). Force, Value Chain and Region views decompose each
-          category's {YEARS[YEARS.length - 1]} shift through the calibrated attenuation chain
-          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{ATTENUATION_SOURCE}</code>):
-          per trend, <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>normalized_score × materialization(diffusion_curve, peak_year) × category_exposure</code>,
-          distributed proportionally across the dimension's exposure weights, dampened by each
-          force's within-force overlap, attenuated by the per-force effective attenuation
-          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>base {BASE_ATTENUATION.toFixed(2)} × (1 − mean cross-force overlap)</code>),
-          and anchored to the simulation's terminal-year shift when available. No flat
-          multipliers — every dampening factor is empirically calibrated from the 82-trend
-          April 2026 analysis.
+          All values in this matrix are produced by the Bayesian Monte Carlo engine
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.5'}</code>,
+          10K+ iterations, Gaussian / t-copula dependencies, 82 v3.1 trends). Each cell is a{' '}
+          <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
+          compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
+          The Force, Value Chain and Region lenses are per-year decompositions written by
+          the engine: every row total equals the MC median shift for that (category, year),
+          and is therefore identical across the three lenses by construction. Column totals
+          aggregate to the same grand total per year. No frontend calibration or anchoring —
+          the numbers you see here are the numbers the simulation wrote to the database.
         </footer>
       </main>
     </div>

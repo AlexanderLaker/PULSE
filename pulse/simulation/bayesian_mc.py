@@ -18,7 +18,8 @@ from pulse.simulation._scipy_compat import (
     t_cdf,
 )
 
-from pulse.config import (ModelConfig, FORCES, DEFAULT_WITHIN_FORCE_RHO,
+from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
+                           DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,
                            FORCE_MATERIALIZATION_OVERRIDES,
                            compute_materialization_schedule,
@@ -41,7 +42,7 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
-    MODEL_VERSION = "2.4.0"
+    MODEL_VERSION = "2.5.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -530,8 +531,10 @@ class BayesianMonteCarloEngine:
             }
 
             # Direct effects: per-force contribution to total category shift.
-            # Compute using same logic as the simulation: normalized_score × exposure × force_weight × region
-            # Then scale proportionally so contributions sum to the MC median at 2030.
+            # Compute using same logic as the simulation: normalized_score × exposure × force_weight
+            # Then scale proportionally so contributions sum to the MC median at the terminal year.
+            # This is the TERMINAL-YEAR attribution — for per-year attribution see
+            # `decompositions.force` in the returned dict below.
             raw_force_sums = {}
             for force in FORCES:
                 raw_force_sums[force] = 0.0
@@ -544,7 +547,7 @@ class BayesianMonteCarloEngine:
                     force_weight = self.config.force_weights.get(trend.force, 1.0 / len(FORCES))
                     raw_force_sums[trend.force] += trend.normalized_score * exposure_frac * force_weight
 
-            # Scale to match MC median at 2030 so contributions add up
+            # Scale to match MC median at terminal year so contributions add up
             raw_total = sum(raw_force_sums.values())
             last_year = self.config.path_years[-1]
             mc_median = path[last_year]["median"]
@@ -554,24 +557,25 @@ class BayesianMonteCarloEngine:
                 "direct_effects": {f: float(v * scale) for f, v in raw_force_sums.items()},
             }
 
-        # ── Value Chain Decomposition ──────────────────────────────────
+        # ── Value Chain Decomposition (terminal-year, back-compat) ─────
         # VC weights allocate the total category shift across VC steps.
         # For each category, compute how much of the shift lands on each
         # VC step based on trend VC exposures × vc_weights (normalized).
         vc_decomposition = {}
         vc_weights = getattr(self.config, 'vc_weights', {})
-        if vc_weights:
-            # Build case-insensitive lookup helper
-            def _vc_lookup(vc_exp: dict, step: str) -> float:
-                v = vc_exp.get(step, None)
-                if v is not None:
-                    return float(v)
-                norm = step.lower().replace(' ', '_')
-                for k, val in vc_exp.items():
-                    if k.lower().replace(' ', '_') == norm:
-                        return float(val)
-                return 0.0
 
+        # Build case-insensitive lookup helper (shared with per-year path below)
+        def _vc_lookup(vc_exp: dict, step: str) -> float:
+            v = vc_exp.get(step, None)
+            if v is not None:
+                return float(v)
+            norm = step.lower().replace(' ', '_')
+            for k, val in vc_exp.items():
+                if k.lower().replace(' ', '_') == norm:
+                    return float(val)
+            return 0.0
+
+        if vc_weights:
             trends = db.trends
             for c_idx, cat in enumerate(self.config.category_names):
                 # Compute raw relevance score per VC step for this category
@@ -594,7 +598,7 @@ class BayesianMonteCarloEngine:
                     n_steps = len(vc_weights)
                     step_shares = {s: 1.0 / n_steps for s in vc_weights}
 
-                # Apply shares to the median 2030 shift for this category
+                # Apply shares to the median terminal-year shift for this category
                 last_year = self.config.path_years[-1]
                 median_shift = shift_matrix[cat]["path"][last_year]["median"]
                 vc_decomposition[cat] = {
@@ -602,11 +606,146 @@ class BayesianMonteCarloEngine:
                     for step, share in step_shares.items()
                 }
 
+        # ═══════════════════════════════════════════════════════════════
+        # PER-YEAR DECOMPOSITIONS (Force / VC / Region)
+        # ═══════════════════════════════════════════════════════════════
+        # All three lenses decompose the SAME MC-median category shift for
+        # each (cat, year), so by construction:
+        #   sum over force  of force_decomp[y][c][f]  ==  mc_median[c][y]
+        #   sum over vc_step of vc_decomp[y][c][s]    ==  mc_median[c][y]
+        #   sum over region  of region_decomp[y][c][r] ==  mc_median[c][y]
+        # Row totals (per category, per year) are identical across lenses.
+        # Column totals (summed across categories) are unique per lens but
+        # share the same grand total per year.
+        trends = db.trends
+        cats = list(self.config.category_names)
+        years = list(self.config.path_years)
+        region_weights = getattr(self.config, 'region_weights', None) or {r: 1.0 / len(REGIONS) for r in REGIONS}
+
+        # Build the three per-category share structures ONCE (shares are
+        # exposure-weighted and do not depend on year — the year-dependent
+        # magnitude enters via mc_median[c][y]).
+        force_shares: dict = {}
+        vc_shares: dict = {}
+        region_shares: dict = {}
+
+        for cat in cats:
+            # Force shares (exposure × force_weight × |score|)
+            fsum = {f: 0.0 for f in FORCES}
+            for trend in trends:
+                cat_exp = trend.category_exposure.get(cat, 0)
+                if cat_exp > 0:
+                    fw = self.config.force_weights.get(trend.force, 1.0 / len(FORCES))
+                    fsum[trend.force] += abs(trend.normalized_score) * (cat_exp / 5.0) * fw
+            ftot = sum(fsum.values())
+            if ftot > 0:
+                force_shares[cat] = {f: v / ftot for f, v in fsum.items()}
+            else:
+                force_shares[cat] = {f: 1.0 / len(FORCES) for f in FORCES}
+
+            # VC shares (exposure × vc_weight × |score|)
+            vsum = {s: 0.0 for s in VC_STEPS}
+            for step in VC_STEPS:
+                w = vc_weights.get(step, 1.0 / len(VC_STEPS)) if vc_weights else 1.0 / len(VC_STEPS)
+                for trend in trends:
+                    cat_exp = trend.category_exposure.get(cat, 0)
+                    if cat_exp > 0:
+                        vc_exp = getattr(trend, 'vc_exposure', {}) or {}
+                        v = _vc_lookup(vc_exp, step)
+                        vsum[step] += abs(trend.normalized_score) * (cat_exp / 5.0) * (v / 5.0) * w
+            vtot = sum(vsum.values())
+            if vtot > 0:
+                vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
+            else:
+                vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
+
+            # Region shares (exposure × region_weight × |score|)
+            rsum = {r: 0.0 for r in REGIONS}
+            for region in REGIONS:
+                rw = region_weights.get(region, 1.0 / len(REGIONS))
+                for trend in trends:
+                    cat_exp = trend.category_exposure.get(cat, 0)
+                    if cat_exp > 0:
+                        reg_exp_map = getattr(trend, 'regional_exposure', {}) or {}
+                        r_exp = float(reg_exp_map.get(region, 0.0))
+                        rsum[region] += abs(trend.normalized_score) * (cat_exp / 5.0) * (r_exp / 5.0) * rw
+            rtot = sum(rsum.values())
+            if rtot > 0:
+                region_shares[cat] = {r: v / rtot for r, v in rsum.items()}
+            else:
+                # Fallback — if no trend carries regional_exposure, use equal weights
+                region_shares[cat] = {r: 1.0 / len(REGIONS) for r in REGIONS}
+
+        # Now materialize the per-year decompositions keyed by year → cat → dim
+        force_decomp = {int(y): {} for y in years}
+        vc_decomp = {int(y): {} for y in years}
+        region_decomp = {int(y): {} for y in years}
+
+        for year in years:
+            yi = int(year)
+            for cat in cats:
+                median_cy = float(shift_matrix[cat]["path"][year]["median"])
+                force_decomp[yi][cat] = {
+                    f: float(force_shares[cat][f] * median_cy) for f in FORCES
+                }
+                vc_decomp[yi][cat] = {
+                    s: float(vc_shares[cat][s] * median_cy) for s in VC_STEPS
+                }
+                region_decomp[yi][cat] = {
+                    r: float(region_shares[cat][r] * median_cy) for r in REGIONS
+                }
+
+        # ── Totals ─────────────────────────────────────────────────────
+        # Row totals: per-category MC median at each year (identical across lenses).
+        category_path_totals: dict = {
+            cat: {
+                int(y): float(shift_matrix[cat]["path"][y]["median"]) for y in years
+            }
+            for cat in cats
+        }
+        # Column totals: aggregate across categories, per (dim, year).
+        by_force_totals: dict = {int(y): {f: 0.0 for f in FORCES} for y in years}
+        by_vc_totals: dict = {int(y): {s: 0.0 for s in VC_STEPS} for y in years}
+        by_region_totals: dict = {int(y): {r: 0.0 for r in REGIONS} for y in years}
+        grand_totals: dict = {int(y): 0.0 for y in years}
+        for year in years:
+            yi = int(year)
+            for cat in cats:
+                for f in FORCES:
+                    by_force_totals[yi][f] += force_decomp[yi][cat][f]
+                for s in VC_STEPS:
+                    by_vc_totals[yi][s] += vc_decomp[yi][cat][s]
+                for r in REGIONS:
+                    by_region_totals[yi][r] += region_decomp[yi][cat][r]
+                grand_totals[yi] += category_path_totals[cat][yi]
+
+        decompositions = {
+            "force":  force_decomp,   # year → cat → force  → shift
+            "vc":     vc_decomp,      # year → cat → vc     → shift
+            "region": region_decomp,  # year → cat → region → shift
+            "dimensions": {
+                "forces":    list(FORCES),
+                "vc_steps":  list(VC_STEPS),
+                "regions":   list(REGIONS),
+                "categories": cats,
+                "years":     [int(y) for y in years],
+            },
+        }
+        totals = {
+            "category_path":  category_path_totals,  # row totals
+            "by_force":       by_force_totals,       # column totals (Force lens)
+            "by_vc":          by_vc_totals,          # column totals (VC lens)
+            "by_region":      by_region_totals,      # column totals (Region lens)
+            "grand":          grand_totals,          # cross-category grand total
+        }
+
         return {
             "shift_matrix": shift_matrix,
             "convergence": convergence,
             "force_attribution": force_attribution,
             "vc_decomposition": vc_decomposition,
+            "decompositions": decompositions,
+            "totals": totals,
             "raw_samples": samples,
             "iterations": n_iter,
             "model_type": "bayesian_copula",

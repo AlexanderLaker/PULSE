@@ -70,10 +70,53 @@ export interface ConvergenceDiagnostics {
   model_type?: ModelType;
 }
 
+/**
+ * Per-year Decomposition Matrix — backend-computed (bayesian_mc v2.5+).
+ *
+ * The backend produces three lenses (Force, Value Chain, Region) that each
+ * decompose the SAME MC-median category shift for every (category, year).
+ * By construction the row total (sum across the lens dimension) equals
+ * the MC median per category per year — so row totals are identical across
+ * all three lenses, and column totals aggregate across categories to the
+ * same per-year grand total.
+ *
+ *   sum over force   of force[y][cat][f]  === mc_median[cat][y]
+ *   sum over vc_step of vc[y][cat][s]     === mc_median[cat][y]
+ *   sum over region  of region[y][cat][r] === mc_median[cat][y]
+ */
+export interface DecompositionMatrix {
+  force:  Record<string, Record<string, Record<string, number>>>;   // year → cat → force → shift
+  vc:     Record<string, Record<string, Record<string, number>>>;   // year → cat → vc_step → shift
+  region: Record<string, Record<string, Record<string, number>>>;   // year → cat → region → shift
+  dimensions?: {
+    forces: string[];
+    vc_steps: string[];
+    regions: string[];
+    categories: string[];
+    years: number[];
+  };
+}
+
+/** Per-year totals block — row totals, column totals, grand totals. */
+export interface TotalsMatrix {
+  /** Row totals: per-category MC median at each year (identical across the 3 lenses by construction). */
+  category_path: Record<string, Record<string, number>>;         // cat → year → total
+  /** Column totals under the Force lens: aggregated across categories. */
+  by_force:      Record<string, Record<string, number>>;         // year → force → total
+  by_vc:         Record<string, Record<string, number>>;         // year → vc_step → total
+  by_region:     Record<string, Record<string, number>>;         // year → region → total
+  /** Grand total per year (sum of category row totals; same as sum of any lens's column totals). */
+  grand:         Record<string, number>;                         // year → total
+}
+
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
   force_attribution?: CategoryRecord<ForceAttribution>;
+  /** Per-year Force/VC/Region decompositions — source of truth for the Shift-Matrix lenses. */
+  decompositions?: DecompositionMatrix;
+  /** Per-year row/column/grand totals — matching the decompositions. */
+  totals?: TotalsMatrix;
   allocation_recommendation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;
   scenario?: ScenarioId;

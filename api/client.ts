@@ -119,6 +119,10 @@ function normalizeSimulation(raw: unknown): SimulationResult {
     allocation_recommendation: allocation as SimulationResult['allocation_recommendation'],
     convergence: r.convergence as SimulationResult['convergence'],
     force_attribution: r.force_attribution as SimulationResult['force_attribution'],
+    // v3.1: pass through the per-year decompositions and totals blocks.
+    // Already JSON-serializable (backend stringified int year keys).
+    decompositions: r.decompositions as SimulationResult['decompositions'],
+    totals: r.totals as SimulationResult['totals'],
   } as SimulationResult;
 }
 

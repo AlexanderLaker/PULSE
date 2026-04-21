@@ -62,6 +62,7 @@ TRENDS = [
     # ── C-01 ──
     Trend(
         id="consumer_r01", force="Consumer", sub_category="Market Structure",
+        peak_year=2031, diffusion_curve="front_loaded",  # PL structural penetration already advancing (42% EU6); front-loaded with long tail
         name="Private Label Structural Penetration in Europe",
         description="Private label hit 42% value share in EU6, €317B in total PL sales (Circana 52w to Sep 2025). PL now 50%+ in 3 core FMCG markets. Italy most dynamic at +4.7%. HCB-specific: PL penetration in Laundry is above average at ~45% in Germany, while Hair PL penetration is lower (~30%) due to higher brand loyalty in color/care. Retailer investment in premium PL tiers (Aldi Lacura, Lidl Cien) directly attacks Henkel mid-tier brands (Schauma, all, Purex). Rewe/Edeka PL in laundry pods format narrows gap to Persil Discs.",
         direction="Contraction", probability=5, start_year=2025,
@@ -78,6 +79,7 @@ TRENDS = [
     # ── C-02 (UPGRADED April 2026) ──
     Trend(
         id="consumer_r02", force="Consumer", sub_category="Behavioral",
+        peak_year=2032, diffusion_curve="s_curve",  # GLP-1 30M Americans by 2030; EU adoption 2027-2028; classic adoption curve
         name="GLP-1 Drugs Reshape Consumer Spending Patterns",
         description="GLP-1 adoption accelerating dramatically: 30M Americans projected on GLP-1 by 2030. Market exceeds $100B in 2026 revenue, reaching $116B by 2030 (JP Morgan). Over 50% of users report improved appearance perception; 43% motivated to invest more in personal care. For HCB Hair: GLP-1-related hair thinning creates demand for volumizing/thickening products — a Schwarzkopf Care opportunity. Body care spending reallocation confirmed: beauty/personal care up while grocery down 5.3%. EU adoption accelerating 12-18 months behind US (down from 18-24). LHC: laundry frequency slightly down in GLP-1 households (smaller portions, fewer cooking occasions).",
         direction="Expansion", probability=5, start_year=2025,
@@ -96,6 +98,7 @@ TRENDS = [
     # ── C-03 ──
     Trend(
         id="consumer_r03", force="Consumer", sub_category="Premiumization",
+        peak_year=2030, diffusion_curve="s_curve",  # Premium Hair already +15% L'Oreal Prof; mid-horizon saturation
         name="Premiumization Acceleration in Hair Care",
         description="Premium hair care growing 2-3x mass rate confirmed. Henkel Consumer Brands FY2025: 0.3% organic growth overall (price positive, volume slightly negative). L'Oréal Professional Products +15% in 2025, Kérastase double-digit, demonstrating premium ceiling not reached. Schwarzkopf Professional-to-consumer crossover is highest-ROI premiumization path. Gliss repositioning toward affordable prestige is the mid-tier play.",
         direction="Expansion", probability=5, start_year=2024,
@@ -112,6 +115,7 @@ TRENDS = [
     # ── C-04 ──
     Trend(
         id="consumer_r04", force="Consumer", sub_category="Behavioral",
+        peak_year=2031, diffusion_curve="s_curve",  # Cleanical/clean beauty entering mass retail 2026; mid-horizon plateau
         name="Conscious Consumption and Cleanical Beauty",
         description="Cleanical convergence confirmed as dominant Beauty trend, now entering mass retail aisles (2026). Intersects three regulatory forces (PFAS G-01, Cosmetics Reg G-03, Green Claims G-05). Schwarzkopf R&D formulation depth (3,000+ formulations annually) is a genuine competitive advantage — smaller brands cannot substantiate clinical claims as credibly. LHC: enzyme-based clean detergents (Persil cold-wash) align with cleanical demand.",
         direction="Expansion", probability=4, start_year=2025,
@@ -128,6 +132,7 @@ TRENDS = [
     # ── C-05 ──
     Trend(
         id="consumer_r05", force="Consumer", sub_category="Demographics",
+        peak_year=2033, diffusion_curve="linear",  # Silver economy is a slow demographic tailwind through H2
         name="Silver Economy — Aging Population Shifts Category Demand",
         description="Eurostat projections confirmed. Three HCB-specific effects: (1) Color: gray coverage remains #1 CEP — Henkel Color portfolio (Palette, Brillance, Igora-derived) has broadest shade range in mass retail, (2) Care: shift toward gentler salon-grade formulations for thinning/fragile hair, (3) LHC: ease-of-use packaging as competitive differentiator (arthritis-friendly caps, lighter bottles). Germany has among Europe's oldest demographics — structural tailwind for Henkel.",
         direction="Expansion", probability=5, start_year=2025,
@@ -144,6 +149,7 @@ TRENDS = [
     # ── C-06 ──
     Trend(
         id="consumer_r06", force="Consumer", sub_category="Macroeconomic",
+        peak_year=2029, diffusion_curve="front_loaded",  # Cost-of-living pressure already acute; ECB rate cuts ease pressure later
         name="Cost-of-Living Squeeze and Persistent Trading Down",
         description="Trading-down persists but stabilizing in 2026. Henkel FY2025: positive price but slightly negative volume — consumers accept premium pricing where innovation justifies it (Persil Discs, Schwarzkopf GLISS) but trade down in commodity segments. ECB rate cuts began mid-2024, easing mortgage pressure. Key bifurcation: premium Hair (Schwarzkopf) resilient, value LHC (Purex, all) under maximum PL pressure. Henkel dual-brand architecture provides natural hedge.",
         direction="Contraction", probability=4, start_year=2024,
@@ -160,6 +166,7 @@ TRENDS = [
     # ── C-07 ──
     Trend(
         id="consumer_r07", force="Consumer", sub_category="Category Creation",
+        peak_year=2031, diffusion_curve="s_curve",  # Scalp care +19% H1 2025; mass retail adoption through 2031
         name="Scalp Care Emerges as Standalone Category",
         description="Scalp care category grew 19% YoY in H1 2025. Market valued at $88.2B (2025), 7.0% CAGR to $150.5B by 2033. Skinification now hitting mass retail (2026). P&G microbiome on front-of-pack, Dove Scalp + Hair Therapy launched. Henkel has no dedicated scalp care consumer line — this is the single largest category white space in Hair. Schwarzkopf Professional dermatological expertise (Seborin heritage) is an underexploited asset.",
         direction="Expansion", probability=5, start_year=2025,
@@ -176,6 +183,7 @@ TRENDS = [
     # ── C-08 ──
     Trend(
         id="consumer_r08", force="Consumer", sub_category="Demographics",
+        peak_year=2032, diffusion_curve="s_curve",  # Male grooming structural growth; 7.65% CAGR matures late H2
         name="Male Grooming Structural Growth",
         description="European male grooming: $23.6B in 2025, 7.65% CAGR confirmed. For HCB: got2b is primary male vehicle but lacks dedicated Care and scalp care lines for men. Male scalp concerns (dandruff, thinning, oiliness) among fastest-growing search terms. Schwarzkopf Men range exists in Professional but not at consumer scale. LHC: male-targeted fragrance in laundry (sport/fresh fabric care) is untapped premiumization lever for Vernel.",
         direction="Expansion", probability=4, start_year=2025,
@@ -192,6 +200,7 @@ TRENDS = [
     # ── S-02 (Consumer) ──
     Trend(
         id="consumer_r09", force="Consumer", sub_category="Premiumization",
+        peak_year=2031, diffusion_curve="s_curve",  # Fragrance premiumization expanding from Southern to Northern Europe
         name="Fragrance and Sensory Premiumization in Home Care",
         description="Fragrance premiumization accelerating: laundry scent boosters/perfume products growing 15%+ in Southern Europe, now expanding to Germany/Northern Europe. Vernel and Persil fragrance extensions represent highest-margin premiumization path in Laundry. P&G Lenor Unstoppables is benchmark to beat. Critical PL defense: complex fragrance development is a genuine barrier to entry — PL cannot replicate credibly. Henkel fragrance chemistry capability (shared with Adhesive Technologies) is a distinctive competence.",
         direction="Expansion", probability=4, start_year=2025,
@@ -209,6 +218,7 @@ TRENDS = [
     # ── S-06 (Consumer) ──
     Trend(
         id="consumer_r10", force="Consumer", sub_category="Category Creation",
+        peak_year=2031, diffusion_curve="s_curve",  # Hair loss mainstreams alongside GLP-1 side-effect amplifier
         name="Hair Loss and Thinning Treatments Enter Consumer Mainstream",
         description="Hair loss market confirmed at $2.93B, 7.77% CAGR. GLP-1 hair thinning side effect (C-02) creates additional demand vector. Schwarzkopf Professional has existing thinning-hair expertise (Bonacure Scalp Genesis, Seborin). Salon-to-retail crossover (K-07) applies directly — professional-grade thinning solutions at mass retail is a white space. Regulatory caution: position at cosmetic thickening end, not pharmaceutical treatment end (FDA/EU distinction).",
         direction="Expansion", probability=4, start_year=2025,
@@ -225,6 +235,7 @@ TRENDS = [
     # ── S-07 (Consumer) ──
     Trend(
         id="consumer_r11", force="Consumer", sub_category="Behavioral",
+        peak_year=2030, diffusion_curve="s_curve",  # Gen Z dupe culture already structural; matures mid-horizon
         name="Gen Z Dupe Culture and Ingredient Literacy",
         description="Dupe culture confirmed as structural shift. HCB brand exposure: Schwarzkopf partially insulated (professional heritage provides credibility dupe-seekers respect). got2b most exposed — youth positioning with limited formulation differentiation makes it a prime dupe target. LHC less affected (detergent efficacy is functional, reducing dupe incentive). Real HCB risk: Gen Z minimalist routines (3-5 steps) reduce total Hair consumption occasions, especially Styling where usage declining among 18-24s.",
         direction="Contraction", probability=5, start_year=2024,
@@ -253,6 +264,7 @@ TRENDS = [
     # ── G-01 ──
     Trend(
         id="government_r01", force="Government", sub_category="Chemical Regulation",
+        peak_year=2028, diffusion_curve="step_function",  # EU PFAS cosmetics ban already effective Jan 2026; phased 2027-2032 cliff
         name="EU PFAS Universal Restriction",
         description="PFAS restriction accelerating: as of January 1, 2026, cosmetic products containing PFAS already prohibited in EU. ECHA aims to complete scientific evaluation by end of 2026. Second public consultation expected March 2026 covering 14 use sectors. Hair portfolio exposure is limited (most formulations already PFAS-free). LHC is the real risk — surface treatment chemistries, stain-resistance, and water-repellent coatings in FCN, FCA, and IC require reformulation. Henkel AI formulation capability (T-01) can turn this into competitive moat. Phased 2027-2032.",
         direction="Contraction", probability=5, start_year=2027,
@@ -269,6 +281,7 @@ TRENDS = [
     # ── G-02 ──
     Trend(
         id="government_r02", force="Government", sub_category="Chemical Regulation",
+        peak_year=2029, diffusion_curve="step_function",  # EU Microplastics Phase 2 cliff 2027-2029
         name="EU Microplastics Ban — Phase 2 Implementation",
         description="Phase 2 timeline confirmed 2027-2029. Persil Discs and Somat Excellence capsules are highest-risk product platforms — PVA film dissolution and microplastic classification under regulatory scrutiny. Bio-based capsule film R&D (connected to T-02) is critical mitigation. Risk scenario: if PVA classified as microplastic, capsule/pod formats face labeling restrictions or phase-out, disrupting ~15-20% of LAD/ADW volume. This is Henkel's single highest-impact LHC regulatory risk.",
         direction="Contraction", probability=5, start_year=2027,
@@ -285,6 +298,7 @@ TRENDS = [
     # ── G-03 ──
     Trend(
         id="government_r03", force="Government", sub_category="Cosmetics Regulation",
+        peak_year=2030, diffusion_curve="front_loaded",  # EU Cosmetics Omnibus — rolling restrictions hit early, plateau mid-horizon
         name="EU Cosmetics Regulation Omnibus VII/VIII Revision",
         description="Rolling restriction of UV filters, preservatives, fragrances, colorants under EC 1223/2009 amendments. EU Detergents and Surfactants Regulation endorsed by Council December 8, 2025. Color portfolio remains most exposed category in Henkel portfolio — hair dye reformulation among hardest in consumer chemistry (18-36 months per colorant). Schwarzkopf 100+ year color expertise and AI formulation (T-01) provide structural advantage over smaller competitors who cannot absorb reformulation costs.",
         direction="Contraction", probability=4, start_year=2026,
@@ -301,6 +315,7 @@ TRENDS = [
     # ── G-04 ──
     Trend(
         id="government_r04", force="Government", sub_category="Packaging",
+        peak_year=2027, diffusion_curve="step_function",  # PPWR applies Aug 12 2026; digital identifiers 2027; sharp step
         name="EU PPWR — Packaging and Packaging Waste Regulation",
         description="PPWR applies from August 12, 2026 confirmed. New: empty space in parcels must not exceed 40%, digital identifiers (QR codes) required from 2027. Recycled content: 30% by 2030, 65% by 2040. PFAS banned in packaging from August 2026. Every Henkel SKU affected — broadest regulatory impact across portfolio. PCR resin premium adds 10-15% to packaging costs. Henkel advantage: centralized packaging R&D and procurement scale. Risk: PCR resin supply bottleneck at scale.",
         direction="Contraction", probability=5, start_year=2026,
@@ -317,6 +332,7 @@ TRENDS = [
     # ── G-05 ──
     Trend(
         id="government_r05", force="Government", sub_category="Sustainability Claims",
+        peak_year=2027, diffusion_curve="step_function",  # EmpCo Green Claims applying Sep 2026; sharp compliance cliff
         name="EU Green Claims Directive / EmpCo Enforcement",
         description="EmpCo Directive applying September 2026 confirmed. Brands with genuine sustainability investment (Persil cold-wash, recyclable packaging) gain competitive advantage when competitors' unsubstantiated claims restricted. Henkel CSRD-compliant reporting positions it well. However: some current Henkel green claims may need substantiation upgrades. Love Nature brand positioning built on natural/eco messaging needs scrutiny under new regime.",
         direction="Contraction", probability=5, start_year=2026,
@@ -333,6 +349,7 @@ TRENDS = [
     # ── G-06 ──
     Trend(
         id="government_r06", force="Government", sub_category="Supply Chain",
+        peak_year=2027, diffusion_curve="step_function",  # EUDR Dec 2026 application — classic regulatory step
         name="EU Deforestation Regulation (EUDR)",
         description="EUDR December 2026 application confirmed. Palm-derived surfactants (sodium laureth sulfate, cocamidopropyl betaine) used in >80% of Henkel shampoo and liquid detergent formulations. Geolocation-level traceability required to specific plantation. Henkel 100% RSPO-certified provides head start, but EUDR no-deforestation-after-2020 threshold is stricter than RSPO. Supplier qualification and alternative surfactant sourcing (coconut-derived, synthetic) are mitigation paths.",
         direction="Contraction", probability=4, start_year=2026,
@@ -349,6 +366,7 @@ TRENDS = [
     # ── G-07 ──
     Trend(
         id="government_r07", force="Government", sub_category="Digital Compliance",
+        peak_year=2030, diffusion_curve="back_loaded",  # Digital Product Passport — slow PIM rollout across 50,000 SKUs
         name="EU Digital Product Passport (DPP)",
         description="PPWR mandates digital identifiers (QR codes) from 2027. Intersects with PPWR (G-04) and Green Claims (G-05), creating digital compliance triple stack. IT investment is substantial — Henkel needs PIM system upgrade across 50,000+ SKUs. Henkel advantage: scale amortizes fixed IT cost over larger SKU base. Strategic opportunity: use DPP as consumer engagement tool (scan-to-learn about ingredients, sustainability).",
         direction="Contraction", probability=4, start_year=2027,
@@ -370,6 +388,7 @@ TRENDS = [
     # ── T-01 ──
     Trend(
         id="technology_r01", force="Technology", sub_category="R&D",
+        peak_year=2030, diffusion_curve="s_curve",  # AI formulation adoption 67%+ already; S-curve to plateau mid-horizon
         name="AI-Driven Formulation and Speed-to-Market",
         direction="Expansion", probability=5, start_year=2025,
         # 10%: AI adoption at 67% makes this near-certain; intersection
@@ -386,6 +405,7 @@ TRENDS = [
     # ── T-02 ──
     Trend(
         id="technology_r02", force="Technology", sub_category="Green Chemistry",
+        peak_year=2031, diffusion_curve="s_curve",  # Bio-based chemistry cost parity 2028-2029; saturates 2031
         name="Bio-Based and Green Chemistry Alternatives",
         direction="Expansion", probability=4, start_year=2026,
         # 10%: Turns regulatory compliance cost into margin advantage;
@@ -402,6 +422,7 @@ TRENDS = [
     # ── T-03 ──
     Trend(
         id="technology_r03", force="Technology", sub_category="Format Innovation",
+        peak_year=2030, diffusion_curve="s_curve",  # Concentrated/solid formats crossing early-adopter threshold
         name="Concentrated and Solid Formats Innovation",
         direction="Expansion", probability=4, start_year=2025,
         # 7%: Improves per-use margin but from niche base; affects
@@ -419,6 +440,7 @@ TRENDS = [
     # ── T-04 ──
     Trend(
         id="technology_r04", force="Technology", sub_category="Biotech",
+        peak_year=2031, diffusion_curve="s_curve",  # Microbiome 14.6% CAGR; consumer mass retail arriving 2026-2031
         name="Microbiome Science for Hair and Skin",
         direction="Expansion", probability=4, start_year=2025,
         # 8%: Scalp care grew 19% in H1 2025; multiple competitor launches
@@ -435,6 +457,7 @@ TRENDS = [
     # ── T-05 ──
     Trend(
         id="technology_r05", force="Technology", sub_category="Operations",
+        peak_year=2032, diffusion_curve="linear",  # Manufacturing automation — steady continuous deployment
         name="Manufacturing Automation and Industry 4.0",
         direction="Expansion", probability=4, start_year=2025,
         # 6%: COGS efficiency across entire portfolio; 20-30% inventory
@@ -451,6 +474,7 @@ TRENDS = [
     # ── T-06 ──
     Trend(
         id="technology_r06", force="Technology", sub_category="Digital",
+        peak_year=2028, diffusion_curve="front_loaded",  # Retail media already 17.8% YoY; saturating fast then plateauing
         name="Retail Media Networks as Primary FMCG Channel",
         direction="Contraction", probability=5, start_year=2024,
         # 14%: 17.8% YoY growth exceeds original projections;
@@ -467,6 +491,7 @@ TRENDS = [
     # ── S-03 (Technology) ──
     Trend(
         id="technology_r07", force="Technology", sub_category="Digital",
+        peak_year=2032, diffusion_curve="back_loaded",  # AI personalization at scale — slow enterprise rollout, accelerates late
         name="AI-Powered Personalization at Scale",
         direction="Expansion", probability=3, start_year=2026,
         # 4%: L'Oréal K-SCAN proven +23% sales uplift validates
@@ -483,6 +508,7 @@ TRENDS = [
     # ── S-08 (Technology) ──
     Trend(
         id="technology_r08", force="Technology", sub_category="Smart Home",
+        peak_year=2031, diffusion_curve="s_curve",  # Smartwash launched 2025; 2-3 year mass adoption curve then plateau
         name="Connected Appliances and Auto-Dosing Transform Detergent Economics",
         direction="Expansion", probability=4, start_year=2025,
         # 7%: Smartwash launched in market (no longer concept stage);
@@ -504,6 +530,7 @@ TRENDS = [
     # ── E-01 ──
     Trend(
         id="environmental_r01", force="Environmental", sub_category="Supply Chain",
+        peak_year=2029, diffusion_curve="front_loaded",  # Palm oil B50 disruption acute near-term; supply adapts by 2029
         name="Palm Oil Supply Chain Disruption (Indonesia B50)",
         direction="Contraction", probability=4, start_year=2025,
         # 12%: Palm-derived surfactants are ~15-20% of raw material input;
@@ -520,6 +547,7 @@ TRENDS = [
     # ── E-02 ──
     Trend(
         id="environmental_r02", force="Environmental", sub_category="Resource",
+        peak_year=2031, diffusion_curve="s_curve",  # Water scarcity opportunity builds steadily across Southern Europe/MENA
         name="Water Scarcity Drives Low-Water Formulations",
         direction="Expansion", probability=4, start_year=2025,
         # 7%: Water scarcity now affecting more markets (Southern Europe
@@ -536,6 +564,7 @@ TRENDS = [
     # ── E-03 ──
     Trend(
         id="environmental_r03", force="Environmental", sub_category="Carbon",
+        peak_year=2028, diffusion_curve="step_function",  # CBAM phases in 2026; CSRD Scope 3 reporting mandatory cliff
         name="Carbon Border Adjustment and Scope 3 Reporting",
         direction="Contraction", probability=4, start_year=2026,
         # 4%: CBAM adds ~1-3% to imported raw material costs;
@@ -552,6 +581,7 @@ TRENDS = [
     # ── E-04 ──
     Trend(
         id="environmental_r04", force="Environmental", sub_category="Packaging",
+        peak_year=2031, diffusion_curve="linear",  # EPR fee escalation steady year-on-year across EU states
         name="EPR Fee Escalation and Eco-Modulation",
         direction="Contraction", probability=5, start_year=2025,
         # 4%: EPR fees are ~1-2% of packaging cost; eco-modulation
@@ -568,6 +598,7 @@ TRENDS = [
     # ── E-05 ──
     Trend(
         id="environmental_r05", force="Environmental", sub_category="Climate",
+        peak_year=2033, diffusion_curve="linear",  # Climate-driven pest migration is a slow geographic creep
         name="Climate-Driven Pest Pattern Shifts (Insecticide Demand)",
         direction="Expansion", probability=4, start_year=2024,
         # 8%: Directly expands IC addressable market by geographic
@@ -585,6 +616,7 @@ TRENDS = [
     # ── S-01 (Environmental) ──
     Trend(
         id="environmental_r06", force="Environmental", sub_category="Supply Chain",
+        peak_year=2029, diffusion_curve="front_loaded",  # Nearshoring premium acute near-term, plateaus as supply rebuilds
         name="Supply Chain Nearshoring and Geopolitical Diversification",
         direction="Contraction", probability=4, start_year=2024,
         # 6%: Tariff escalation amplifies nearshoring urgency;
@@ -606,6 +638,7 @@ TRENDS = [
     # ── X-01 ──
     Trend(
         id="competitive_r01", force="Competitive", sub_category="Restructuring",
+        peak_year=2028, diffusion_curve="front_loaded",  # Reckitt divestiture completed Dec 2025; 2-3 yr share window
         name="Reckitt Essential Home Divestiture",
         direction="Expansion", probability=5, start_year=2025,
         # 12%: Divestiture completed (not projected); Essential Home revenue
@@ -622,6 +655,7 @@ TRENDS = [
     # ── X-02 ──
     Trend(
         id="competitive_r02", force="Competitive", sub_category="Strategy",
+        peak_year=2029, diffusion_curve="front_loaded",  # Unilever B&W pivot already +4.3%; front-loaded competitive pressure
         name="Unilever Beauty and Wellbeing Pivot",
         direction="Contraction", probability=5, start_year=2024,
         # 15%: Direct competitive overlap in Hair Care/Body; Unilever's
@@ -638,6 +672,7 @@ TRENDS = [
     # ── X-03 ──
     Trend(
         id="competitive_r03", force="Competitive", sub_category="Strategy",
+        peak_year=2029, diffusion_curve="front_loaded",  # P&G superiority framework already strengthening; 2025 proof points
         name="P&G Superiority Framework and Innovation Fortress",
         direction="Contraction", probability=5, start_year=2024,
         # 14%: Ariel The Big One captured 40% of UK Fabric Care growth;
@@ -654,6 +689,7 @@ TRENDS = [
     # ── X-04 ──
     Trend(
         id="competitive_r04", force="Competitive", sub_category="Disruption",
+        peak_year=2030, diffusion_curve="s_curve",  # DTC/indie disruption maturing — major CPG acquisitions mid-horizon
         name="DTC and Indie Brand Disruption in Hair",
         direction="Contraction", probability=4, start_year=2023,
         # 8%: Indie brands capture premium sub-segments (~15% of Hair
@@ -670,6 +706,7 @@ TRENDS = [
     # ── X-05 ──
     Trend(
         id="competitive_r05", force="Competitive", sub_category="Disruption",
+        peak_year=2031, diffusion_curve="back_loaded",  # Chinese FMCG EU penetration <2% today; back-loaded tariff-diverted growth
         name="Chinese FMCG Brands Enter European Market",
         direction="Contraction", probability=3, start_year=2025,
         # 4%: US tariff-driven export redirection risk toward EU
@@ -686,6 +723,7 @@ TRENDS = [
     # ── X-06 ──
     Trend(
         id="competitive_r06", force="Competitive", sub_category="Growth",
+        peak_year=2032, diffusion_curve="s_curve",  # IMEA 12.1% organic — structural growth curve through H2
         name="Emerging Markets Growth Divergence — IMEA Leads",
         direction="Expansion", probability=5, start_year=2024,
         # 14%: IMEA 12.1% organic vs. 0.3% HCB overall; this is now the
@@ -702,6 +740,7 @@ TRENDS = [
     # ── S-04 (Competitive) ──
     Trend(
         id="competitive_r07", force="Competitive", sub_category="Strategy",
+        peak_year=2030, diffusion_curve="front_loaded",  # L'Oreal tech-beauty R&D gap already 4-5x; widens fast then plateaus
         name="L'Oreal Tech-Beauty Platform Strategy",
         direction="Contraction", probability=5, start_year=2024,
         # 12%: L'Oréal innovation output accelerating (725 patents,
@@ -723,6 +762,7 @@ TRENDS = [
     # ── K-01 ──
     Trend(
         id="customer_r01", force="Customer", sub_category="Channel Shift",
+        peak_year=2031, diffusion_curve="linear",  # Aldi/Lidl discount expansion — steady annual share gains
         name="Discount Retail Channel Expansion in Europe",
         direction="Contraction", probability=5, start_year=2024,
         # 20%: Discount = 25-35% of grocery; every share point to
@@ -739,6 +779,7 @@ TRENDS = [
     # ── K-02 ──
     Trend(
         id="customer_r02", force="Customer", sub_category="E-Commerce",
+        peak_year=2030, diffusion_curve="linear",  # E-commerce matured at 12-15%; steady erosion via S&S/retail media
         name="E-Commerce Profit Pool Maturation",
         direction="Contraction", probability=4, start_year=2024,
         # 8%: E-com is 12-15% of sales; pay-to-play economics erode
@@ -755,6 +796,7 @@ TRENDS = [
     # ── K-03 ──
     Trend(
         id="customer_r03", force="Customer", sub_category="Market Structure",
+        peak_year=2031, diffusion_curve="linear",  # Retailer consolidation — steady concentration of buyer power
         name="Retailer Consolidation and Power Concentration",
         direction="Contraction", probability=5, start_year=2024,
         # 15%: Top 10 grocers = 40-50% of sales; listing fee and
@@ -771,6 +813,7 @@ TRENDS = [
     # ── K-04 (UPGRADED April 2026) ──
     Trend(
         id="customer_r04", force="Customer", sub_category="Channel Shift",
+        peak_year=2029, diffusion_curve="s_curve",  # TikTok Shop UPGRADED — $23.4B US 2026 (+48% YoY); fast S-curve
         name="TikTok Shop Becomes Top-5 FMCG Channel",
         direction="Expansion", probability=5, start_year=2024,
         # 10%: UPGRADED from 4%. TikTok Shop US projected $23.4B in 2026
@@ -796,6 +839,7 @@ TRENDS = [
     # ── S-05 (Customer) ──
     Trend(
         id="customer_r06", force="Customer", sub_category="Business Model",
+        peak_year=2030, diffusion_curve="s_curve",  # FMCG subscription ecosystem — S&S + retailer apps mature mid-horizon
         name="FMCG Subscription and Loyalty Ecosystem Lock-in",
         direction="Contraction", probability=4, start_year=2024,
         # 6%: Subscription ecosystem expanding beyond Amazon to
@@ -813,6 +857,7 @@ TRENDS = [
     # ── S-10 (Customer) ──
     Trend(
         id="customer_r07", force="Customer", sub_category="Channel Creation",
+        peak_year=2031, diffusion_curve="s_curve",  # Salon-to-consumer crossover — Kérastase playbook scaling
         name="Professional Salon Channel to Consumer Crossover",
         direction="Expansion", probability=5, start_year=2025,
         # 12%: L'Oréal Prof Products +15% in 2025 proves commercial model;
@@ -834,6 +879,7 @@ TRENDS = [
     # ── M-01: Generative AI Disrupts Product Discovery ──
     Trend(
         id="technology_r09", force="Technology", sub_category="Digital",
+        peak_year=2029, diffusion_curve="front_loaded",  # Gen AI product discovery at 35% already; rapid front-loaded shift
         name="Generative AI Disrupts Product Discovery (GEO vs. SEO)",
         direction="Contraction", probability=5, start_year=2025,
         gp1_pct_affected=0.10,
@@ -848,6 +894,7 @@ TRENDS = [
     # ── M-02: Tariffs, Trade Wars, and Deglobalization ──
     Trend(
         id="government_r08", force="Government", sub_category="Trade Policy",
+        peak_year=2029, diffusion_curve="front_loaded",  # US-EU-CN tariffs already escalating; front-loaded with plateau
         name="Tariffs, Trade Wars, and Deglobalization (US-EU-China)",
         direction="Contraction", probability=5, start_year=2025,
         gp1_pct_affected=0.10,
@@ -862,6 +909,7 @@ TRENDS = [
     # ── M-03: Energy Cost Volatility and European Manufacturing ──
     Trend(
         id="environmental_r07", force="Environmental", sub_category="Cost Structure",
+        peak_year=2030, diffusion_curve="linear",  # EU energy-cost disadvantage structural through H1
         name="Energy Cost Volatility and European Manufacturing Competitiveness",
         direction="Contraction", probability=4, start_year=2024,
         gp1_pct_affected=0.07,
@@ -876,6 +924,7 @@ TRENDS = [
     # ── M-04: Generative AI Marketing Efficiency ──
     Trend(
         id="technology_r10", force="Technology", sub_category="Operations",
+        peak_year=2029, diffusion_curve="s_curve",  # Gen AI marketing 40-60% cost savings already at P&G/Unilever; fast S
         name="Generative AI Content and Marketing Efficiency Revolution",
         direction="Expansion", probability=5, start_year=2025,
         gp1_pct_affected=0.06,
@@ -890,6 +939,7 @@ TRENDS = [
     # ── M-05: Refill and Reuse Economy in Household Care ──
     Trend(
         id="consumer_r13", force="Consumer", sub_category="Behavioral",
+        peak_year=2031, diffusion_curve="s_curve",  # Refill/reuse tied to PPWR 2030 targets; S-curve to regulatory deadline
         name="Refill and Reuse Economy in Household Care",
         direction="Expansion", probability=3, start_year=2025,
         gp1_pct_affected=0.07,
@@ -905,6 +955,7 @@ TRENDS = [
     # ── CJ-01 integrated: Between-Wash Fabric Care ──
     Trend(
         id="consumer_r14", force="Consumer", sub_category="Category Creation",
+        peak_year=2031, diffusion_curve="s_curve",  # Between-wash fabric care largest LHC white space; mid-horizon buildout
         name="Between-Wash Fabric Care as Standalone Consumption Occasion",
         direction="Expansion", probability=4, start_year=2024,
         gp1_pct_affected=0.07,
@@ -919,6 +970,7 @@ TRENDS = [
     # ── CJ-02 integrated: Textile Longevity ──
     Trend(
         id="environmental_r08", force="Environmental", sub_category="Sustainability",
+        peak_year=2032, diffusion_curve="s_curve",  # Textile longevity economy — consumer awareness S-curve
         name="Textile Longevity and Garment Life Extension Economy",
         direction="Expansion", probability=3, start_year=2025,
         gp1_pct_affected=0.05,
@@ -933,6 +985,7 @@ TRENDS = [
     # ── CJ-03 integrated: Hair Styling Between Washes ──
     Trend(
         id="consumer_r15", force="Consumer", sub_category="Category Creation",
+        peak_year=2030, diffusion_curve="s_curve",  # Dry shampoo / between-wash hair already on S-curve
         name="Hair Styling and Maintenance Between Washes",
         direction="Expansion", probability=4, start_year=2024,
         gp1_pct_affected=0.06,
@@ -955,6 +1008,7 @@ TRENDS = [
     # ── APAC-01: China C-Beauty Nationalism ──
     Trend(
         id="consumer_r16", force="Consumer", sub_category="Regional / APAC",
+        peak_year=2030, diffusion_curve="front_loaded",  # C-Beauty nationalism already 56% of China beauty; front-loaded impact
         name="China C-Beauty Nationalism and Domestic Brand Preference",
         description="C-Beauty nationalism confirmed — domestic brands 56% of China beauty value. Schwarzkopf China is relatively small within Henkel total GP1 (estimated 3-5% of total Hair revenue), making original 15% gp1_pct_affected overstated. Trend is real and severe for China-exposed brands, but Henkel China hair exposure is sub-scale vs. L'Oréal. Adolph and Spes taking share from international brands. Strategic binary: either commit to significant China investment (acquisition of domestic hair brand) or accept managed decline and reallocate to India/APAC.",
         direction="Contraction", probability=5, start_year=2023,
@@ -973,6 +1027,7 @@ TRENDS = [
     # ── APAC-02: India Premium Affordability ──
     Trend(
         id="consumer_r17", force="Consumer", sub_category="Regional / APAC",
+        peak_year=2032, diffusion_curve="s_curve",  # India 11% CAGR; middle-class expansion through 2032
         name="India Premium Affordability and Middle-Class Expansion",
         description="India BPC market $30B, 11% CAGR confirmed as fastest-growing top-10 market. Affordable-premium tier requires India-specific pack sizes (Rs 10-50 sachets for trial, Rs 100-200 for regular), local fragrance preferences, and General Trade distribution (80% of FMCG). Henkel FY2025 IMEA organic growth 12.1% confirms geographic thesis. Washing machine penetration (14%) is structural LHC growth driver — every new washing machine creates a Persil/Perwoll customer. Hair penetration in India remains nascent.",
         direction="Expansion", probability=5, start_year=2024,
@@ -991,6 +1046,7 @@ TRENDS = [
     # ── NA-01: US Retail Media Networks ──
     Trend(
         id="customer_r08", force="Customer", sub_category="Regional / NA Channel",
+        peak_year=2029, diffusion_curve="front_loaded",  # US retail media already $58.8B; front-loaded margin extraction
         name="US Retail Media Networks Reshape Brand-Customer Economics",
         description="US retail media: $58.8B in 2025 (revised up from $55B), $69.3B forecast 2026. Amazon 79.7% share, Walmart 8.0%, capturing 89% of incremental spend. Retailers demand 8-12% of net revenue for media as condition of visibility. Schwarzkopf and Persil US face highest retail media burden relative to US market position — as mid-tier brands (not leaders like Tide/Ariel), must spend disproportionately to maintain visibility. Structural implication: Henkel US operations face lower profitability than European operations due to retail media compression. Factor into geographic capital allocation.",
         direction="Contraction", probability=5, start_year=2024,
@@ -1009,6 +1065,7 @@ TRENDS = [
     # ── NA-02: US Tariffs / Reshoring ──
     Trend(
         id="government_r09", force="Government", sub_category="Regional / NA Trade",
+        peak_year=2029, diffusion_curve="front_loaded",  # US Section 301 tariffs already effective; front-loaded NA impact
         name="US Tariffs and Reshoring Pressure on Imported FMCG Inputs",
         description="US tariff escalation confirmed. Henkel US supply chain vulnerabilities: Culver City (Hair Care) and Scottsdale (LHC) operations rely on imported Asian ingredients. P&G vertical integration and US manufacturing scale provide competitive advantage in tariff environment. Henkel mitigation: identify top-20 tariff-exposed SKUs, run reformulation scenarios with US-domestic surfactant suppliers (Stepan, Pilot Chemical). Longer-term: evaluate Culver City capacity expansion justified by tariff dynamics.",
         direction="Contraction", probability=5, start_year=2026,
@@ -1027,6 +1084,7 @@ TRENDS = [
     # ── APAC-03: K-Beauty / J-Beauty Export Wave ──
     Trend(
         id="competitive_r08", force="Competitive", sub_category="Regional / APAC Exports",
+        peak_year=2030, diffusion_curve="s_curve",  # K-Beauty/J-Beauty Europe 6.4% CAGR; S-curve penetration
         name="K-Beauty and J-Beauty Export Wave into NA and EU Hair Care",
         description="K-beauty expansion confirmed: Europe market $2.7B (2025), 6.4% CAGR. Amorepacific led EU with 12%+ share. Mise-en-Scène Perfect Serum #1 on Amazon Black Friday. Europe tripled K-beauty export share (3% to 11%, 2022-2025). Threatens Schwarzkopf in premium Care (ampoule formats, scalp-first) and Styling (serum-based). Henkel defense: professional-grade formulation credibility and broader Color shade range (K-beauty Color limited for European hair types). US tariff risk could be near-term headwind for K-beauty competitors.",
         direction="Contraction", probability=4, start_year=2024,
@@ -1045,6 +1103,7 @@ TRENDS = [
     # ── NA-03: US Hispanic/Latino Demographic Share ──
     Trend(
         id="consumer_r18", force="Consumer", sub_category="Regional / NA Demographics",
+        peak_year=2031, diffusion_curve="s_curve",  # US Hispanic demographics structural; go-to-market buildout mid-horizon
         name="US Hispanic/Latino Consumers Drive Hair and LHC Category Growth",
         description="Demographics and spending data confirmed. Henkel US portfolio (Schwarzkopf, got2b, Dial, Persil, all, Purex) has minimal Hispanic-targeted offerings. Textured/curly hair gap is acute — no curl care line comparable to Shea Moisture (Unilever), Cantu (PDC Brands), or Mielle Organics (P&G). LHC: Hispanic households' higher laundry frequency (6.2 loads/week) and over-indexing on fabric softener/premium scent = direct growth lever for Persil. Spanish-language marketing and Hispanic retailer distribution are table-stakes, not optional.",
         direction="Expansion", probability=5, start_year=2024,
@@ -1076,6 +1135,7 @@ TRENDS = [
     # ── NEW-01 ──
     Trend(
         id="technology_r11", force="Technology", sub_category="Agentic AI",
+        peak_year=2031, diffusion_curve="s_curve",  # Morgan Stanley projects 10-20% e-comm by 2030; S-curve to 2031
         name="Agentic Commerce: AI Agents Make Autonomous Purchase Decisions",
         description="By 2030, Morgan Stanley estimates AI shopping agents will capture $190-385B of US e-commerce spending (10-20% of online retail). McKinsey projects $3-5T globally. Amazon Alexa+ (launched Feb 2026) shows 3x higher shopping activity. OpenAI Operator + Instacart integration is live. Kearney projects 60% of global consumers will use AI agents for shopping by 2027. Laundry detergent and dish tabs are textbook 'low-consideration, high-frequency' categories — exactly where AI agents will make autonomous decisions. If an AI agent optimizes for price-per-load, sustainability score, and ratings, Persil must rank #1 on all three or face invisible brand switching. Byron Sharp's Mental Availability becomes irrelevant for a machine with no memory structures.",
         direction="Contraction", probability=5, start_year=2026,
@@ -1093,6 +1153,7 @@ TRENDS = [
     # ── NEW-02 ──
     Trend(
         id="technology_r12", force="Technology", sub_category="Agentic AI",
+        peak_year=2032, diffusion_curve="back_loaded",  # AI agent brand invisibility — second-order effect, accelerates H2
         name="AI Agent Brand Invisibility in Low-Consideration Categories",
         description="When AI agents make autonomous replenishment decisions, brand equity is bypassed for functional categories. Agents optimize on price-per-use, ratings, sustainability scores, and availability — not brand memory. Low-consideration, high-frequency categories (laundry detergent, dish tabs, basic shampoo) are most exposed. 58% of retailers predict AI will handle most shopper interactions within 5 years (Deloitte). Brand switching becomes invisible — consumers never see the alternatives the agent evaluated and rejected. Winner-take-most dynamics for agent-preferred SKUs. Premium brands with demonstrable superiority (clinical claims, patented tech, Smartwash lock-in) are defended; mid-tier brands face commoditization.",
         direction="Contraction", probability=4, start_year=2027,
@@ -1110,6 +1171,7 @@ TRENDS = [
     # ── NEW-03 ──
     Trend(
         id="technology_r13", force="Technology", sub_category="Digital",
+        peak_year=2029, diffusion_curve="front_loaded",  # GEO replacing SEO rapidly — 4700% YoY AI-to-e-commerce traffic
         name="Generative Search (GEO) Replaces Traditional Product Discovery — Expanded",
         description="Expands M-01 (technology_r09). Pace of disruption exceeds original assessment: 35% of US consumers now use AI for product discovery vs. 13.6% using traditional search. AI-to-e-commerce traffic surged 4,700% YoY. Google organic CTR declined 1.2pp; paid CTR declined 3.6pp. Brands not cited in LLM responses face 'invisible brand' risk. Broader than original scope: applies equally to Hair (shade matching, ingredient lookup) and LHC (product comparison, sustainability claims). Schwarzkopf and Persil must invest in Generative Engine Optimization (GEO) — structured authority content that LLMs cite. Fundamentally disrupts Byron Sharp: TV/display builds human memory structures but not LLM memory structures.",
         direction="Contraction", probability=5, start_year=2025,
@@ -1132,6 +1194,7 @@ TRENDS = [
     # ── NEW-04 ──
     Trend(
         id="competitive_r09", force="Competitive", sub_category="Geographic Expansion",
+        peak_year=2034, diffusion_curve="back_loaded",  # Sub-Saharan Africa $200B by 2030 — distribution build is 5-10 year H3
         name="Sub-Saharan Africa: $200B FMCG Frontier by 2030",
         description="Africa's FMCG market projected at $200B by 2030, driven by 1.7B consumers. Urbanization and middle-class expansion fuel demand. Private label competition lighter than Europe. Distribution inefficiency creates barriers to entry benefiting early movers with local manufacturing. Henkel has existing operations in Egypt, South Africa, and select North African markets — Sub-Saharan expansion is the gap. India (consumer_r17) proves the playbook: affordable-premium architecture, sachet formats, local production. Africa is the world's largest textured-hair market, connecting to natural hair trend (NEW-19). Nigeria and Kenya are priority hub markets.",
         direction="Expansion", probability=4, start_year=2026,
@@ -1149,6 +1212,7 @@ TRENDS = [
     # ── NEW-05 ──
     Trend(
         id="consumer_r19", force="Consumer", sub_category="Regional / APAC",
+        peak_year=2032, diffusion_curve="s_curve",  # SEA digital-first beauty; Indonesia/Vietnam S-curve adoption
         name="Southeast Asia Digital-First Beauty Market",
         description="600M consumers with the world's highest e-commerce growth rates. Shopee, Lazada, and TikTok Shop dominate beauty distribution. Indonesia, Vietnam, Philippines, and Thailand are growth leaders. K-beauty and J-beauty have strong positions; Western brands need digital-first go-to-market. Henkel's Schwarzkopf has professional salon networks in Thailand and Indonesia — distribution asset for premium consumer crossover (K-07). SEA beauty market $25B+ growing at 8-10% CAGR. Social commerce penetration 2-3x Western markets. Halal-certified formulations required for Indonesia/Malaysia (250M Muslim consumers).",
         direction="Expansion", probability=4, start_year=2025,
@@ -1166,6 +1230,7 @@ TRENDS = [
     # ── NEW-06 ──
     Trend(
         id="consumer_r20", force="Consumer", sub_category="Regional / LATAM",
+        peak_year=2033, diffusion_curve="s_curve",  # Brazil/Mexico premiumization + nearshoring beneficiary; H2 build
         name="Brazil/Mexico Premiumization and Nearshoring Beneficiary",
         description="Latin America BPC market $60B+ and growing. Brazil is world's #4 beauty market with strong premiumization trend. Mexico benefits from US tariff-driven nearshoring — manufacturing investment up 40% since 2023. Henkel has limited LatAm presence vs. competitors (P&G, Unilever, Natura with deep distribution). Premiumization in Hair Care accelerating: Brazilian keratin/smoothing treatments are global category-defining products. Mexico: US Hispanic growth (consumer_r18) creates cross-border brand leverage. LHC: concentrated formats align with water scarcity in Northern Mexico/NE Brazil.",
         direction="Expansion", probability=4, start_year=2026,
@@ -1188,6 +1253,7 @@ TRENDS = [
     # ── NEW-07 ──
     Trend(
         id="consumer_r21", force="Consumer", sub_category="Category Creation",
+        peak_year=2035, diffusion_curve="back_loaded",  # Longevity economy is H3 Transformation; slow start, accelerating finish
         name="Longevity Medicine Crossover into Beauty and Hair Care",
         description="Global anti-aging market reaching $120B by 2030 (7% CAGR from $85B in 2025). Industry pivoting from cosmetic 'anti-aging' to science-backed 'longevity' — biological resilience, cellular repair, peptide therapy, NAD+ supplementation. 70% of disposable income in US, China, Japan, Europe held by 60+ consumers. Hair care follows same trajectory: scalp longevity, follicle health, melanin preservation, gray delay. Schwarzkopf Professional's dermatological heritage (Seborin, Bonacure) provides credibility. Color portfolio has natural 'longevity' play: products that preserve natural hair health while covering gray. L'Oreal's NVIDIA partnership for AI molecule discovery is direct competitive threat.",
         direction="Expansion", probability=4, start_year=2027,
@@ -1205,6 +1271,7 @@ TRENDS = [
     # ── NEW-08 ──
     Trend(
         id="technology_r14", force="Technology", sub_category="Biotech",
+        peak_year=2033, diffusion_curve="back_loaded",  # Peptide hair science 18-24 month lab-to-shelf — commercial 2028-2033
         name="Peptide and Bioactive Hair Science",
         description="GHK-Cu peptides, NAD+ precursors, and bioactive compounds entering consumer hair formulation. Lab-to-shelf timeline compressing from 5 years to 18-24 months via AI formulation (T-01). Peptide-based hair care market emerging at $2-3B, growing 15%+ CAGR. Connects to longevity medicine (NEW-07) and microbiome science (T-04). Schwarzkopf Professional has dermatological R&D capability to develop clinical-grade peptide formulations. Risk: regulatory classification — if peptide hair products classified as quasi-pharmaceutical, EU Cosmetics Regulation (G-03) creates additional compliance burden. Position at cosmetic end, not pharmaceutical.",
         direction="Expansion", probability=3, start_year=2028,
@@ -1227,6 +1294,7 @@ TRENDS = [
     # ── NEW-09 ──
     Trend(
         id="technology_r15", force="Technology", sub_category="Biotech",
+        peak_year=2033, diffusion_curve="back_loaded",  # Precision fermentation cost parity 2029-2031; ramp through 2033
         name="Precision Fermentation Disrupts FMCG Ingredient Supply Chains",
         description="Precision fermentation market projected at $36B by 2030 (43-48% CAGR). Key FMCG ingredients — surfactants, fragrances, proteins, emollients — can be produced via engineered microorganisms in fermentation tanks. This eliminates palm oil dependency, EUDR compliance costs, and raw material price volatility in a single technology shift. Henkel uses palm-derived surfactants in >80% of shampoo and liquid detergent formulations. Indonesia B50 (E-01) and EUDR (G-06) already making palm sourcing expensive and compliance-heavy. First-mover advantage significant — IP on fermented surfactant formulations creates defensible moat. Cost parity with palm-derived ingredients projected 2029-2031.",
         direction="Expansion", probability=4, start_year=2028,
@@ -1244,6 +1312,7 @@ TRENDS = [
     # ── NEW-10 ──
     Trend(
         id="technology_r16", force="Technology", sub_category="Biotech",
+        peak_year=2035, diffusion_curve="back_loaded",  # Synthetic biology commercial scale 2030-2033; peaks H3
         name="Synthetic Biology Enables Novel Surfactants and Fragrances",
         description="Synthetic biology enables bio-identical production of aroma molecules, specialty surfactants, and functional proteins without agricultural extraction. Moves beyond precision fermentation (NEW-09) to entirely novel molecules impossible in nature. Companies like Ginkgo Bioworks and Zymergen designing custom organisms for consumer goods applications. Strategic for fragrance premiumization (consumer_r09): synthetic biology can create signature scent molecules exclusive to Henkel brands — genuine competitive moat vs. PL. Palm oil-free surfactants with identical or superior performance to SLS/SLES. Timeline longer than precision fermentation; commercial scale 2030-2033.",
         direction="Expansion", probability=3, start_year=2029,
@@ -1266,6 +1335,7 @@ TRENDS = [
     # ── NEW-11 ──
     Trend(
         id="government_r10", force="Government", sub_category="AI Regulation",
+        peak_year=2028, diffusion_curve="step_function",  # EU AI Act applies Aug 2026; high-risk AI extended to Aug 2027 — cliff
         name="EU AI Act Compliance Costs and Speed-to-Market Friction",
         description="EU AI Act fully applicable August 2, 2026; high-risk AI in regulated products extended to August 2, 2027. Every AI-powered system Henkel deploys must be classified and assessed: formulation AI (T-01), pricing algorithms, Smartwash dosing (T-08), marketing personalization (T-10), and supply chain optimization (T-05). Compliance requires risk classification, conformity assessment, and technical documentation for each system. AI-driven dynamic pricing faces scrutiny for discrimination. Competitors with EU legal/tech teams move faster; laggards face operational delays. Cost estimate: EUR 5-15M for comprehensive classification and documentation across HCB operations.",
         direction="Contraction", probability=5, start_year=2026,
@@ -1283,6 +1353,7 @@ TRENDS = [
     # ── NEW-12 ──
     Trend(
         id="government_r11", force="Government", sub_category="Biodiversity",
+        peak_year=2032, diffusion_curve="back_loaded",  # Biodiversity/TNFD reporting builds slowly through H2
         name="Biodiversity Regulation and Nature-Related Supply Chain Mandates",
         description="Kunming-Montreal Global Biodiversity Framework mandates halting biodiversity loss by 2030: 30% land/marine protection, 30% restoration. EU CSDDD and TNFD reporting require companies to assess and minimize biodiversity risks throughout value chains. Biodiversity loss projected to result in $2.7T lost revenue by 2030 (McKinsey). For Henkel: palm oil, water resources, agricultural inputs (fragrances, proteins), and packaging materials all have biodiversity footprints. Supply Chain Biodiversity Footprint assessments becoming mandatory. L'Oreal 100% RSPO-certified palm oil is the standard; Henkel must match or exceed.",
         direction="Contraction", probability=4, start_year=2027,
@@ -1300,6 +1371,7 @@ TRENDS = [
     # ── NEW-13 ──
     Trend(
         id="government_r12", force="Government", sub_category="Textile Regulation",
+        peak_year=2032, diffusion_curve="back_loaded",  # EU Textile Strategy — repositioning value builds with consumer awareness
         name="EU Textile Strategy and Circular Fashion Mandates",
         description="EU Strategy for Sustainable and Circular Textiles imposes garment longevity requirements and textile waste reduction targets. Directly affects Henkel's fabric care positioning: Perwoll, Persil, and Vernel can be repositioned as 'garment longevity partners' — washing products that demonstrably extend textile life. Innovation opportunity: enzyme-based pilling removers, color-restore boosters, fiber protection additives. Expands on environmental_r08 (Textile Longevity) with regulatory driver. Digital Product Passport (G-07) for textiles creates consumer awareness of garment care impact. Regulatory tailwind for premium fabric care positioning.",
         direction="Expansion", probability=3, start_year=2028,
@@ -1322,6 +1394,7 @@ TRENDS = [
     # ── NEW-14 ──
     Trend(
         id="competitive_r10", force="Competitive", sub_category="Platform",
+        peak_year=2031, diffusion_curve="s_curve",  # Amazon PL data-driven expansion — S-curve targeting high-margin pockets
         name="Amazon/Platform Vertical Integration into FMCG",
         description="Amazon's private label operation is qualitatively different from traditional retail PL. Amazon possesses real-time consumer behavior data, search intent data, and review sentiment analysis. Can identify underserved price points and launch targeted PL within months. US PL grew 4.4% vs. 1.1% for national brands (early 2025). Amazon Basics threatens not through volume share but through targeted margin destruction in profitable sub-segments. Subscribe & Save (K-06 connection) amplifies lock-in. Distinct from C-01 (traditional European PL): Amazon PL is data-driven, algorithmically optimized, and platform-integrated.",
         direction="Contraction", probability=4, start_year=2025,
@@ -1339,6 +1412,7 @@ TRENDS = [
     # ── NEW-15 ──
     Trend(
         id="competitive_r11", force="Competitive", sub_category="Innovation",
+        peak_year=2030, diffusion_curve="front_loaded",  # L'Oreal-NVIDIA R&D partnership already active; gap widens front-loaded
         name="L'Oreal NVIDIA AI Molecule Discovery Partnership",
         description="L'Oreal partnered with NVIDIA for atomic-scale AI-powered molecule discovery. 725 patents filed in 2025. R&D investment EUR 1.7B (4% of revenue) is 4-5x Henkel HCB. CES 2026 Innovation Awards for Light Straight+ and LED Face Mask. Professional Products +15% in 2025. This widens the structural R&D gap beyond what Henkel can close through organic investment alone. Counter-strategies: focused AI formulation partnerships (T-01), M&A of biotech startups, and concentrated Color/scalp expertise where Henkel has 100+ year advantage.",
         direction="Contraction", probability=4, start_year=2026,
@@ -1356,6 +1430,7 @@ TRENDS = [
     # ── NEW-16 ──
     Trend(
         id="competitive_r12", force="Competitive", sub_category="M&A",
+        peak_year=2029, diffusion_curve="front_loaded",  # DTC M&A arms race — target pool shrinking fast; 18-month urgency
         name="DTC/Indie Brand Acquisition Arms Race Intensifies",
         description="Major acquisitions 2025-26: Rhode (e.l.f., $1B+), Medik8 (L'Oreal, $1.1B), Color Wow (L'Oreal), Dr Squatch (Unilever, $1.5B). Specialist beauty buyers consolidating indie brands into multi-channel platforms. Henkel has not made significant hair care acquisition since 2015 beauty portfolio shift — acquisition gap becoming strategic liability. The addressable pool of high-quality indie brands is shrinking as competitors bid up valuations. Each P&G/Unilever/L'Oreal acquisition closes a potential Henkel target. Expands competitive_r04 with specific M&A urgency.",
         direction="Contraction", probability=4, start_year=2024,
@@ -1378,6 +1453,7 @@ TRENDS = [
     # ── NEW-17 ──
     Trend(
         id="consumer_r22", force="Consumer", sub_category="Format Disruption",
+        peak_year=2032, diffusion_curve="back_loaded",  # Laundry sheets niche today; back-loaded growth if threshold breached
         name="Laundry Sheet/Strip Format Disruption",
         description="Detergent sheets and ultra-concentrated strips gaining traction: Earth Breeze, Tru Earth, Blueland leading. Plastic-free eco positioning appeals to Gen Z/Millennial consumers. Consumer Reports: cleaning power gap closing vs. traditional formats. Sheets reduce shipping weight 80%, storage space 90% — logistics advantage. E-commerce native format (flat packaging ideal for letterbox delivery). Risk to Henkel: liquid Persil and pods/discs face format competition. Counter: Henkel Smartwash cartridge is the premium concentrated format — sheets compete at value/eco end. Monitoring trigger: if sheets reach 5% of any major market, Henkel needs own sheet offering.",
         direction="Contraction", probability=3, start_year=2025,
@@ -1395,6 +1471,7 @@ TRENDS = [
     # ── NEW-18 ──
     Trend(
         id="consumer_r23", force="Consumer", sub_category="Category Convergence",
+        peak_year=2033, diffusion_curve="back_loaded",  # Wellness-beauty ingestibles + topicals convergence is H3 theme
         name="Wellness-to-Beauty Convergence: Ingestibles + Topicals",
         description="Supplement + topical regimens combining for holistic beauty outcomes. Nutrafol (Unilever) proving model: oral supplements + topical products for hair health. Market expanding beyond niche: collagen supplements, biotin, and adaptogens mainstreaming. 'Beauty from within' is growing 12%+ CAGR. For Henkel: creates premiumization path but also competitive threat — if consumers believe supplements matter more than shampoo, topical product willingness-to-pay may decline. Schwarzkopf could develop 'inside + outside' hair health regimen. LHC: wellness-adjacent home care (aromatherapy laundry, stress-reducing scents) connects to fragrance premiumization (consumer_r09).",
         direction="Expansion", probability=3, start_year=2027,
@@ -1412,6 +1489,7 @@ TRENDS = [
     # ── NEW-19 ──
     Trend(
         id="consumer_r24", force="Consumer", sub_category="Category Creation",
+        peak_year=2032, diffusion_curve="s_curve",  # Textured hair global category mainstreaming; build or buy 24 months
         name="Natural/Textured Hair as Mainstream Global Category",
         description="65% of the world's population has textured, curly, or coily hair — yet mainstream hair care portfolios are designed primarily for straight/wavy hair types. This is the largest structural white space in global hair care. P&G acquired Mielle Organics; Unilever has Shea Moisture and TRESemme Curl range; Henkel has no credible textured-hair offering. Beyond US Hispanic (consumer_r18), extends to Africa, Caribbean, Southeast Asia, and global diaspora. Market sizing: textured hair care is $8B+ globally, growing 7-9% CAGR. Product architecture fundamentally different: curl definition, moisture retention, shrinkage management, protective styling.",
         direction="Expansion", probability=4, start_year=2025,
@@ -1434,6 +1512,7 @@ TRENDS = [
     # ── NEW-20 ──
     Trend(
         id="customer_r09", force="Customer", sub_category="Channel Disruption",
+        peak_year=2032, diffusion_curve="back_loaded",  # Agentic retail media — second-order retailer restructuring
         name="Agentic Commerce Reshapes Retailer-Brand Power Dynamics",
         description="Retailer-side mirror of NEW-01 (technology_r11). When AI agents handle grocery purchasing, traditional retail power structures dissolve: shelf placement, trade promotion, category captainship all lose relevance. New intermediaries emerge (AI platforms, aggregators). Retailers lose control of shopper's consideration set. But brands also lose promotional elasticity — AI agents are immune to end-cap displays and impulse purchases. Joint Business Plans (JBPs) between Henkel and retailers must evolve to include AI agent optimization, not just shelf layout and promotional calendars. The retailer consolidation trend (customer_r03) compounds: fewer, more powerful retailers deploying AI purchasing agents create unprecedented concentration of buying power.",
         direction="Contraction", probability=4, start_year=2027,
@@ -1459,6 +1538,7 @@ TRENDS = [
     # ── NEW-22 ──
     Trend(
         id="environmental_r09", force="Environmental", sub_category="Climate",
+        peak_year=2033, diffusion_curve="back_loaded",  # Climate adaptation capex accelerates as events intensify
         name="Climate Adaptation Costs for European Manufacturing",
         description="Extreme weather events disrupting European supply chains with increasing frequency. Henkel's 15+ European manufacturing plants face flood risk (Rhine corridor), heat stress (production shutdowns above 40C), and water supply constraints. Insurance costs for industrial properties rising 15-20% annually in climate-exposed regions. Munich Re data: European natural catastrophe losses doubled in the last decade. Beyond operational disruption: climate adaptation capex (flood barriers, cooling systems, water recycling) adds to fixed cost base. Strategic alignment with manufacturing footprint optimization (environmental_r07 energy costs, environmental_r06 nearshoring): plants in Turkey, India, and North Africa may have climate advantages over Central European locations.",
         direction="Contraction", probability=4, start_year=2026,
@@ -1476,6 +1556,7 @@ TRENDS = [
     # ── NEW-23 ──
     Trend(
         id="environmental_r10", force="Environmental", sub_category="Resource",
+        peak_year=2034, diffusion_curve="back_loaded",  # Freshwater regulatory limits plausible by 2032-2035 — H3 peak
         name="Freshwater Crisis Accelerates Waterless Formulation Mandate",
         description="Global freshwater demand will exceed supply by 40% by 2030 (UNEP). Half the world faces severe water stress. Expands and upgrades environmental_r02 (Water Scarcity) for the 10-year horizon. By 2032-2035, regulatory water-use limits on consumer products are plausible in Southern Europe, MENA, India, and parts of China. Water-intensive industries (cosmetics, detergents) face both manufacturing constraints and in-use reformulation pressure. This is not just about 'low-water formulations' — it's about fundamental product architecture: solid shampoo bars, waterless detergent concentrates, anhydrous hair treatments. Henkel Smartwash auto-dosing reduces water waste per wash — sustainability positioning opportunity.",
         direction="Contraction", probability=4, start_year=2027,
@@ -1493,6 +1574,7 @@ TRENDS = [
     # ── NEW-24 ──
     Trend(
         id="environmental_r11", force="Environmental", sub_category="Carbon",
+        peak_year=2030, diffusion_curve="step_function",  # CBAM downstream expansion decision Dec 2025; 2027-2028 cliff
         name="Scope 3+ Value Chain Decarbonization Mandates",
         description="CBAM expansion to downstream products proposed Dec 2025, decision pending. Likely to include surfactants, formulated products by 2027-2028. EU ETS carbon price EUR 75/tonne (Q1 2026) and rising. CSRD Scope 3 reporting now mandatory for large companies. For Henkel: chemical inputs (surfactants for detergents) face embedded carbon costs. Manufacturing-heavy European footprint sees EUR/tonne CO2 pricing advantage for competitors in lower-carbon grids. Expands environmental_r03 (CBAM/Scope 3) with specific downstream product inclusion risk. Supply chain decarbonization becomes competitive advantage when carbon-adjusted sourcing decisions favor lower-carbon suppliers.",
         direction="Contraction", probability=4, start_year=2027,
