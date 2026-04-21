@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
   Leaf, Swords, Sparkles, ChevronDown,
-  FileText, BarChart3, Clock, Zap, Newspaper,
+  FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -581,14 +581,6 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
   const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   const shift = trend.gp1_shift;
 
-  // Exposures are now rendered inline on every row (always visible), so that
-  // users can scan the category / value-chain / regional footprint of each
-  // trend at a glance — matching the behaviour of earlier PRISM versions.
-  const catExp = (trend.category_exposure ?? {}) as Record<string, number>;
-  const vcExp  = (trend.vc_exposure ?? {}) as Record<string, number>;
-  const regExp = ((trend as Trend & { regional_exposure?: Record<string, number> })
-    .regional_exposure ?? {}) as Record<string, number>;
-
   return (
     <div style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
       {/* Header row — click to toggle the exposure detail panel */}
@@ -665,20 +657,10 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
         </div>
       </button>
 
-      {/* Always-visible exposure strip — Category / Value Chain / Region.
-          Matches earlier PRISM versions where every trend row surfaced its
-          0–5 exposure rating across the three dimensions without requiring
-          a click to expand. The click-to-expand panel below adds the
-          richer editorial details (PRISM analysis, sources, etc.). */}
-      <InlineExposureStrip
-        catExposure={catExp}
-        vcExposure={vcExp}
-        regExposure={regExp}
-      />
-
       {/* Expanded detail panel — read-only port of Vite Trends2 ExpandedPanel.
           Two-column layout: Description / PRISM Analysis / GP1% / Probability /
-          Materialization / Sources on the left, exposure grids on the right. */}
+          Materialization / Sources on the left; Category / Region / Value Chain
+          exposure grids stacked vertically on the right. */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -697,72 +679,14 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
   );
 };
 
-// ─── Inline exposure strip ─────────────────────────────────────────
-// Always visible beneath each trend's primary row so the Category /
-// Value Chain / Region ratings (0–5) can be read at a glance without
-// clicking to expand. This restores the per-trend rating visibility
-// that earlier PRISM versions exposed inline.
-interface InlineExposureStripProps {
-  catExposure: Record<string, number>;
-  vcExposure: Record<string, number>;
-  regExposure: Record<string, number>;
-}
-
-const InlineExposureLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div
-    style={{
-      fontSize: 10,
-      fontWeight: 800,
-      letterSpacing: '0.14em',
-      textTransform: 'uppercase',
-      color: S.onSurfaceVariant,
-      marginBottom: 10,
-    }}
-  >
-    {children}
-  </div>
-);
-
-const InlineExposureStrip: FC<InlineExposureStripProps> = ({
-  catExposure, vcExposure, regExposure,
-}) => (
-  <div
-    style={{
-      padding: '18px 32px 20px',
-      backgroundColor: S.surfaceLow,
-      borderTop: `1px solid ${S.cardBorder}`,
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.7fr)',
-      gap: 28,
-      alignItems: 'flex-start',
-    }}
-  >
-    {/* Category Exposure */}
-    <div>
-      <InlineExposureLabel>Category Exposure · 0–5</InlineExposureLabel>
-      <CategoryExposureGrid exposures={catExposure} />
-    </div>
-
-    {/* Value-Chain Exposure */}
-    <div>
-      <InlineExposureLabel>Value Chain Exposure · 0–5</InlineExposureLabel>
-      <ValueChainExposureGrid exposures={vcExposure} />
-    </div>
-
-    {/* Regional Exposure */}
-    <div>
-      <InlineExposureLabel>Regional Exposure · 0–5</InlineExposureLabel>
-      <RegionExposureGrid exposures={regExposure} />
-    </div>
-  </div>
-);
-
 // ─── Expanded detail panel ─────────────────────────────────────────
-// Note: Category / Value Chain / Regional exposure grids have been hoisted
-// out of this panel into the always-visible InlineExposureStrip above so
-// that ratings remain visible for every trend without requiring a click.
-// This panel now focuses purely on the editorial detail (description,
-// PRISM analysis, GP1%, probability, materialization timing, sources).
+// Two-column layout:
+//   LEFT  — editorial detail (description, PRISM analysis, GP1%, probability,
+//           materialization timing, sources).
+//   RIGHT — exposure grids stacked vertically in the order requested by
+//           the strategy team: Category → Region → Value Chain.
+// The exposure grids are only rendered here (not inline) so the trend list
+// stays scannable by default; click-to-expand surfaces the full detail.
 const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
   const gp1Pct      = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10;
   const probability = trend.probability ?? 0;
@@ -772,6 +696,14 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
   const confidence  = trend.confidence;
   const dataSource  = trend.data_source;
   const diffusionMeta = DIFFUSION_LABELS[diffusion] ?? DIFFUSION_LABELS.s_curve;
+
+  // Exposure data for the right column. Backend keys by display name
+  // ("Hair: Color", "Raw Materials", "Europe"); readers inside each grid
+  // fall back to snake_case ids where applicable.
+  const catExp = (trend.category_exposure ?? {}) as Record<string, number>;
+  const vcExp  = (trend.vc_exposure ?? {}) as Record<string, number>;
+  const regExp = ((trend as Trend & { regional_exposure?: Record<string, number> })
+    .regional_exposure ?? {}) as Record<string, number>;
 
   return (
     <div
@@ -804,11 +736,14 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
         {dataSource && <MetaChip label={dataSource} />}
       </div>
 
-      {/* Single-column editorial detail layout */}
+      {/* Two-column editorial detail layout.
+          LEFT column — editorial narrative (description, analysis, GP1, probability,
+          timing, sources). RIGHT column — exposure grids stacked in the order
+          Category → Region → Value Chain. */}
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+        gap: 20,
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Description" icon={FileText}>
@@ -946,6 +881,19 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
               </div>
             </SectionCard>
           )}
+        </div>
+
+        {/* RIGHT column — exposure grids, ordered Category → Region → Value Chain */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SectionCard title="Category Exposure" icon={Layers}>
+            <CategoryExposureGrid exposures={catExp} />
+          </SectionCard>
+          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+            <RegionExposureGrid exposures={regExp} />
+          </SectionCard>
+          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+            <ValueChainExposureGrid exposures={vcExp} />
+          </SectionCard>
         </div>
       </div>
     </div>
