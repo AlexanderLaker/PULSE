@@ -42,7 +42,12 @@ export default function RootLayout({
           fontFamilyButtons:
             "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           fontSize: '14px',
-          borderRadius: '9999px',
+          // NOTE: keep this modest. A fully-rounded global radius (e.g. 9999px)
+          // gets applied to Clerk's card/main containers — and when the
+          // container is roughly square, it renders as a perfect circle
+          // (the "lens" bug). Pill-shaped CTAs are handled individually via
+          // `rounded-full` on formButtonPrimary / socialButtonsBlockButton.
+          borderRadius: '0.75rem',
           spacingUnit: '1rem',
         },
         elements: {
