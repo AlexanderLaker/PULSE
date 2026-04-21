@@ -43,17 +43,14 @@ export default function SignInPage() {
       }}
     >
       <div className="w-full max-w-md">
-        {/* Small brand mark — just a tonal square, no wordmark */}
+        {/* PRISM wordmark — identical to the dashboard top-nav brand */}
         <div className="flex justify-center mb-8">
           <div
-            className="rounded-2xl"
-            style={{
-              width: 48,
-              height: 48,
-              backgroundColor: S.primary,
-              boxShadow: '0 10px 30px -10px rgba(0, 93, 181, 0.55)',
-            }}
-          />
+            className="text-2xl font-extrabold tracking-tighter uppercase"
+            style={{ fontFamily: HEADLINE_FONT, color: S.onBg }}
+          >
+            PRISM
+          </div>
         </div>
 
         {/* Sign-in card */}
