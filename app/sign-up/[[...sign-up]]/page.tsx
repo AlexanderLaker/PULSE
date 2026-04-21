@@ -1,10 +1,10 @@
 /**
- * Sign-up page — minimal, neutral surface.
+ * Sign-up page — clean editorial surface, zero decorative overlays.
  *
- * Mirrors app/sign-in/[[...sign-in]]/page.tsx. Reveals nothing about the
- * application: no product name, taxonomy, scope or marketing copy. The
- * editorial tokens (maritime blue, Manrope + Inter, paper card, soft
- * tonal shadow) stay consistent with Trends 2 / Profit Pool Analysis 2.
+ * Mirrors app/sign-in/[[...sign-in]]/page.tsx exactly so the two
+ * auth surfaces feel identical. PRISM wordmark above the card,
+ * single flat white card below, Clerk's inner frame + stripes
+ * neutralised.
  *
  * Role assignment happens server-side via the Clerk webhook
  * (app/api/webhooks/clerk/route.ts) — first user in user_roles becomes
@@ -12,7 +12,7 @@
  */
 import { SignUp } from '@clerk/nextjs';
 
-// ─── Editorial design tokens (identical to Trends2 / ProfitPoolAnalysis2) ──
+// ─── Editorial design tokens ──────────────────────────────────────
 const S = {
   bg:                 '#f8f9ff',
   surface:            '#ffffff',
@@ -21,85 +21,150 @@ const S = {
   onBg:               '#00345e',
   onSurface:          '#00345e',
   onSurfaceVariant:   '#26619d',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
 };
 
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+const HEADLINE_FONT =
+  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+const BODY_FONT =
+  "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 export default function SignUpPage() {
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-6 py-12"
-      style={{
-        backgroundColor: S.bg,
-        color: S.onBg,
-        fontFamily: BODY_FONT,
-      }}
-    >
-      <div className="w-full max-w-md">
-        {/* Small brand mark — just a tonal square, no wordmark */}
-        <div className="flex justify-center mb-8">
+    <>
+      {/*
+        Strip every frame, shadow, border and background Clerk would
+        otherwise draw around its own form — we render the card chrome
+        ourselves. Also kills the orange diagonal-stripe "Development
+        mode" watermark that Clerk paints on the footer when using
+        pk_test_* keys, and any stray masks / clip-paths that could
+        reintroduce the lens bug.
+      */}
+      <style>{`
+        /* 1. Flatten all Clerk container layers */
+        .cl-rootBox,
+        .cl-cardBox,
+        .cl-card,
+        .cl-main,
+        .cl-footer,
+        .cl-footerAction,
+        .cl-footerPages {
+          background: transparent !important;
+          background-image: none !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+        }
+
+        /* 2. Hide Clerk's own branding footer + dev-mode watermark.
+              Keeps .cl-footerAction ("Already have an account? Sign in")
+              visible because that renders as a separate node. */
+        .cl-footerPages,
+        .cl-badge,
+        [class*="devModeNotice"],
+        [data-localization-key*="development"],
+        [data-localization-key="footer.pages"] {
+          display: none !important;
+        }
+
+        /* 3. Belt-and-suspenders: nuke any mask/clip-path that could
+              reintroduce the circular "lens" artefact. */
+        .cl-rootBox,
+        .cl-rootBox *,
+        .cl-cardBox,
+        .cl-cardBox * {
+          mask: none !important;
+          -webkit-mask: none !important;
+          mask-image: none !important;
+          -webkit-mask-image: none !important;
+          clip-path: none !important;
+          -webkit-clip-path: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          filter: none !important;
+        }
+        .cl-rootBox::before,
+        .cl-rootBox::after,
+        .cl-card::before,
+        .cl-card::after,
+        .cl-main::before,
+        .cl-main::after,
+        .cl-footer::before,
+        .cl-footer::after {
+          content: none !important;
+          display: none !important;
+        }
+      `}</style>
+
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-6 py-16"
+        style={{
+          backgroundColor: S.bg,
+          color: S.onBg,
+          fontFamily: BODY_FONT,
+        }}
+      >
+        {/* ─── PRISM wordmark — matches dashboard top-nav brand ───── */}
+        <div className="mb-10">
           <div
-            className="rounded-2xl"
-            style={{
-              width: 48,
-              height: 48,
-              backgroundColor: S.primary,
-              boxShadow: '0 10px 30px -10px rgba(0, 93, 181, 0.55)',
-            }}
-          />
+            className="text-2xl font-extrabold tracking-tighter uppercase"
+            style={{ fontFamily: HEADLINE_FONT, color: S.onBg }}
+          >
+            PRISM
+          </div>
         </div>
 
-        {/* Sign-up card */}
+        {/* ─── Sign-up surface — single clean card, no nested panels */}
         <div
-          className="rounded-2xl overflow-hidden"
+          className="w-full max-w-md rounded-3xl"
           style={{
             backgroundColor: S.surface,
-            boxShadow: '0 20px 80px -20px rgba(0, 52, 94, 0.18)',
+            boxShadow: '0 24px 80px -24px rgba(0, 52, 94, 0.18)',
+            padding: '40px 32px 32px',
           }}
         >
-          <div
-            className="px-8 py-6 text-center"
-            style={{
-              backgroundColor: S.surfaceLow,
-              borderBottom: `1px solid ${S.cardBorder}`,
-            }}
-          >
+          {/* Compact header */}
+          <div className="text-center mb-8">
             <div
-              className="text-[11px] font-bold uppercase tracking-[0.18em]"
+              className="text-[10px] font-bold uppercase tracking-[0.22em]"
               style={{ color: S.onSurfaceVariant }}
             >
               Request access
             </div>
             <div
-              className="mt-1 text-xl font-extrabold tracking-tight"
+              className="mt-2 text-2xl font-extrabold tracking-tight"
               style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}
             >
               Create account
             </div>
           </div>
 
-          <div className="px-4 py-6 sm:px-6 sm:py-8 flex justify-center">
+          {/* Clerk form — frame/shadow/stripes all suppressed above */}
+          <div className="flex justify-center">
             <SignUp
               appearance={{
                 elements: {
-                  rootBox: 'w-full',
-                  card: 'shadow-none bg-transparent p-0 w-full',
-                  header: 'hidden',
+                  rootBox:     'w-full',
+                  cardBox:     'shadow-none bg-transparent border-none p-0 w-full',
+                  card:        'shadow-none bg-transparent border-none p-0 w-full',
+                  main:        'gap-4',
+                  header:      'hidden',
+                  logoBox:     'hidden',
+                  footerPages: 'hidden',
+                  badge:       'hidden',
                 },
               }}
             />
           </div>
         </div>
 
+        {/* Footer label */}
         <div
-          className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.18em]"
+          className="mt-10 text-[10px] font-semibold uppercase tracking-[0.22em]"
           style={{ color: S.onSurfaceVariant }}
         >
           Authorised users only
         </div>
       </div>
-    </div>
+    </>
   );
 }
