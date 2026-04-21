@@ -8,7 +8,6 @@ import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
   Scenario,
-  SensitivityResult,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
   HealthStatus, ModelConfig, AuditEntry, ForceSummary,
@@ -142,11 +141,6 @@ export const getScenarios = (): Promise<Scenario[]> =>
 
 export const createScenario = (data: Partial<Scenario>): Promise<Scenario> =>
   request('/scenarios', { method: 'POST', body: JSON.stringify(data) });
-
-// ── Sensitivity ──────────────────────────────────────────────────
-
-export const getTornado = (category?: string): Promise<SensitivityResult> =>
-  request(`/sensitivity/tornado${category ? `?category=${encodeURIComponent(category)}` : ''}`);
 
 // ── Optimizer ────────────────────────────────────────────────────
 

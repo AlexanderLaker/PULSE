@@ -80,7 +80,6 @@ from pulse.api.routes.auth import router as auth_router
 # still serve auth / health / trend endpoints without crashing on
 # cold start.  Import them inside the functions that need them:
 #   from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-#   from pulse.simulation.sensitivity import SensitivityEngine
 #   from pulse.simulation.paths import PathAnalyzer
 #   from pulse.optimizer.allocation import AllocationOptimizer
 
@@ -1381,94 +1380,6 @@ def create_app(args=None) -> FastAPI:
                 "seed_wobble": mc_result.get("seed_wobble"),
                 "attenuation_band": mc_result.get("attenuation_band"),
             })
-
-    # ── Sensitivity ─────────────────────────────────────────────────
-    @app.get("/api/v1/sensitivity/tornado")
-    async def tornado(category: Optional[str] = None, user: dict = Depends(require_auth)):
-        """Tornado sensitivity analysis — which trends have highest leverage."""
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-
-        # Validate category if provided
-        if category and category not in CATEGORIES:
-            raise HTTPException(422, f"Invalid category: {category}")
-
-        from pulse.simulation.sensitivity import SensitivityEngine
-        se = SensitivityEngine(_state["config"])
-        return _sanitize(se.tornado_analysis(db, category))
-
-    @app.post("/api/v1/sensitivity/tornado")
-    async def tornado_post(category: Optional[str] = None, user: dict = Depends(require_auth)):
-        """POST variant of tornado (for consistency with test expectations)."""
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-
-        # Validate category if provided
-        if category and category not in CATEGORIES:
-            raise HTTPException(422, f"Invalid category: {category}")
-
-        from pulse.simulation.sensitivity import SensitivityEngine
-        se = SensitivityEngine(_state["config"])
-        return _sanitize(se.tornado_analysis(db, category))
-
-    @app.get("/api/v1/sensitivity/breakeven")
-    async def breakeven(category: Optional[str] = None, user: dict = Depends(require_auth)):
-        """Breakeven analysis — what score change makes a category neutral."""
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-
-        # Validate category if provided
-        if category and category not in CATEGORIES:
-            raise HTTPException(422, f"Invalid category: {category}")
-
-        from pulse.simulation.sensitivity import SensitivityEngine
-        se = SensitivityEngine(_state["config"])
-        # Call a breakeven method if it exists, otherwise return a placeholder
-        try:
-            return _sanitize(se.breakeven_analysis(db, category))
-        except (AttributeError, NotImplementedError):
-            # Fallback: return a simple breakeven result structure
-            return {
-                "status": "ok",
-                "category": category or "all",
-                "analysis": "breakeven_analysis",
-                "message": "Breakeven analysis not yet fully implemented"
-            }
-
-    @app.post("/api/v1/sensitivity/breakeven")
-    async def breakeven_post(category: Optional[str] = None, user: dict = Depends(require_auth)):
-        """POST variant of breakeven."""
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-
-        # Validate category if provided
-        if category and category not in CATEGORIES:
-            raise HTTPException(422, f"Invalid category: {category}")
-
-        from pulse.simulation.sensitivity import SensitivityEngine
-        se = SensitivityEngine(_state["config"])
-        try:
-            return _sanitize(se.breakeven_analysis(db, category))
-        except (AttributeError, NotImplementedError):
-            return {
-                "status": "ok",
-                "category": category or "all",
-                "analysis": "breakeven_analysis",
-                "message": "Breakeven analysis not yet fully implemented"
-            }
-
-    @app.get("/api/v1/sensitivity/attenuation")
-    async def attenuation_sensitivity(user: dict = Depends(require_auth)):
-        db = _state.get("db")
-        if not db:
-            raise HTTPException(404, "No model loaded")
-        from pulse.simulation.sensitivity import SensitivityEngine
-        se = SensitivityEngine(_state["config"])
-        return _sanitize(se.attenuation_sensitivity(db))
 
     # ── Optimizer ───────────────────────────────────────────────────
     @app.post("/api/v1/optimize/allocation")

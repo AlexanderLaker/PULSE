@@ -76,30 +76,39 @@ if not USE_POSTGRES:
 RETIRED_IDS = ["consumer_r12", "customer_r05"]
 
 
+def _vals(row):
+    """Normalize a row from RealDictCursor (dict) or default cursor (tuple) into a tuple."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return tuple(row.values())
+    return tuple(row)
+
+
 def count_trends() -> dict:
     """Return a before/after fingerprint of the trends table."""
     with get_db_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM trends")
-        total = cur.fetchone()[0]
+        total = _vals(cur.fetchone())[0]
         cur.execute(
             "SELECT COUNT(*) FROM trends WHERE peak_year IS NOT NULL AND peak_year > 0"
         )
-        with_peak = cur.fetchone()[0]
+        with_peak = _vals(cur.fetchone())[0]
         cur.execute(
             "SELECT COUNT(*) FROM trends "
             "WHERE diffusion_curve IS NOT NULL AND diffusion_curve <> ''"
         )
-        with_curve = cur.fetchone()[0]
+        with_curve = _vals(cur.fetchone())[0]
         cur.execute(
             "SELECT id FROM trends WHERE id = ANY(%s)",
             (RETIRED_IDS,),
         )
-        retired_present = [row[0] for row in cur.fetchall()]
+        retired_present = [_vals(row)[0] for row in cur.fetchall()]
         cur.execute(
             "SELECT force, COUNT(*) FROM trends GROUP BY force ORDER BY force"
         )
-        by_force = dict(cur.fetchall())
+        by_force = dict(_vals(row) for row in cur.fetchall())
     return {
         "total": total,
         "with_peak_year": with_peak,
@@ -123,7 +132,7 @@ def delete_retired(apply: bool) -> int:
     with get_db_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id FROM trends WHERE id = ANY(%s)", (RETIRED_IDS,))
-        targets = [row[0] for row in cur.fetchall()]
+        targets = [_vals(row)[0] for row in cur.fetchall()]
         if not targets:
             return 0
         print(f"  → would delete retired: {targets}" if not apply

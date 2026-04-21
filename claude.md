@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.1
+## Project Specification & Architecture — v3.2
 
 ---
 
@@ -11,6 +11,19 @@ PRISM is an **AI-augmented profit pool simulation engine** that transforms a sta
 
 ### The Core Innovation
 PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2036, 11-year horizon). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+
+### What Changed in v3.2 (vs. v3.1) — Dead-Code Cleanup, April 2026
+
+v3.2 is a housekeeping release focused on removing never-implemented / stub modules from the codebase so the specification matches reality:
+
+1. **Removed `pulse/simulation/sensitivity.py`** — the `SensitivityEngine` (tornado, breakeven, force-elimination, weight sensitivity, attenuation sensitivity) was a stub whose methods all raised `NotImplementedError`. What-if analysis is fully covered by the three production modules `sobol`, `reverse_stress`, and `tipping_points`.
+2. **Removed `pulse/backtesting/`** — the backtesting engine was a placeholder; no historical V1-V11 calibration data was ever available. The `backtesting_accuracy` column was dropped from `config_snapshots` DDL, related fields were removed from the TypeScript `ConvergenceDiagnostics`, and the `attenuation_source` enum was reduced to `"assumed" | "calibrated_v3.1_april2026" | "admin_override"`.
+3. **Purged Causal DAG / Game Theory references** — these were v2.0 architectural sketches that never shipped; their DB tables had already been removed in v2.4 and they are now also gone from the spec, risk register, and roadmap.
+4. **`--sensitivity` CLI flag removed** from `python -m pulse` and `pulse/api/app.py` no longer exposes `GET/POST /api/v1/sensitivity/*` endpoints.
+5. **Consumer Journey (Value Chain) decomposition reaffirmed** as first-class lens — the 8 VC steps (Ingredient, Formulation, Packaging, Manufacturing, Distribution, Shelf, Purchase, Use) remain fully supported via `trend_vc_exposure` and the `ConsumerJourney2.tsx` dashboard component.
+6. **MODEL_VERSION bumped to 2.5.0** to reflect the cleanup.
+
+No behavioral changes to simulation outputs.
 
 ### What Changed in v3.1 (vs. v3.0) — Bain Trend Review, April 2026
 Following a Bain Senior Partner-led strategic review with a 20-person team of senior consultants (ex-L'Oreal, P&G, Unilever, Apple, banking), the trend database was expanded and the time horizon extended:
@@ -84,12 +97,9 @@ All previous improvements carry forward:
 | Delphi expert elicitation | **Production** | Multi-round with DB persistence |
 | AI layer (scanner, narrator, calibrator, chat) | **Production** | Provider-agnostic (Claude / Azure OpenAI / Ollama) |
 | Excel / PowerPoint / Power BI export | **Production** | Professional Henkel-branded outputs |
-| War Room dashboard (Next.js) | **Production** | 29+ components, auth, dark mode |
+| War Room dashboard (Next.js) | **Production** | 29+ components, auth, dark mode, Consumer Journey lens |
 | REST API (FastAPI) | **Production** | 20+ endpoints with auth/admin controls |
-| Sensitivity analysis (tornado, breakeven) | **Stub** | Methods defined but raise NotImplementedError |
-| Causal DAG module | **Not implemented** | Designed in v2.0 spec, never built; DB tables removed |
-| Game theory / competitive response | **Not implemented** | Designed in v2.0 spec, never built; DB tables removed |
-| Backtesting engine | **Not implemented** | Designed in v2.0 spec, never built; DB tables removed |
+| Consumer Journey (Value Chain) decomposition | **Production** | 8 VC steps × 12 categories; trend_vc_exposure drives ConsumerJourney2.tsx |
 
 ### Design Philosophy
 1. **Vercel-deployed, enterprise-ready** — Production on Vercel with Neon PostgreSQL; local development with SQLite
@@ -181,13 +191,13 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 ### Module 1: SIMULATION ENGINE (`pulse/simulation/`)
 
 **bayesian_mc.py** — Bayesian Monte Carlo with copula dependencies (PRODUCTION)
-- Beta-distributed priors per trend (α, β from expert scores or backtesting)
-- Gaussian copula with t-copula tails for dependency modeling (via scipy.linalg.cholesky)
+- Beta-distributed priors per trend (α, β from expert scores / Delphi elicitation)
+- Gaussian copula with t-copula tails (df=8) for dependency modeling (via scipy.linalg.cholesky)
 - Within-force correlation (default ρ=0.3), cross-force correlation from config
 - 10,000 iterations default (configurable to 100,000)
-- Continuous annual paths (2026–2030) with 5 percentile bands (p10, p25, median, p75, p90)
+- Continuous annual paths (2026–2036) with 5 percentile bands (p10, p25, median, p75, p90)
 - Integrity event tracking for runtime repairs
-- Model version: 2.4.0
+- Model version: 2.5.0
 
 **paths.py** — Continuous path modeling (PRODUCTION)
 - 5 MECE diffusion curve types: s_curve, linear, front_loaded, back_loaded, step_function
@@ -196,11 +206,6 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - Velocity (year-over-year Δ) and acceleration (Δ of velocity) computation
 - TriggerCondition / TriggerAlert system for early-warning evaluation
 - PathAnalyzer classifies path shapes for strategic interpretation
-
-**sensitivity.py** — Tornado, breakeven, force elimination (STUB)
-- All 5 methods defined but raise `NotImplementedError`
-- Designed to integrate with BayesianMonteCarloEngine but not yet connected
-- **Gap: this is the only unimplemented simulation module**
 
 **cvar.py** — Conditional Value-at-Risk (PRODUCTION)
 - Portfolio-level CVaR (Expected Shortfall) across all categories
@@ -540,8 +545,7 @@ CREATE TABLE config_snapshots (
     vc_weights TEXT,
     category_names TEXT,
     path_years TEXT,
-    materialization_schedule TEXT,
-    backtesting_accuracy REAL
+    materialization_schedule TEXT
 );
 
 CREATE TABLE delphi_rounds (
@@ -602,7 +606,7 @@ CREATE TABLE users (
 );
 ```
 
-**Note:** The v2.0 spec included `causal_edges`, `competitors`, and `backtest_results` tables. These were removed in v2.4 as the underlying modules (Causal DAG, Game Theory, Backtesting) were never implemented. They remain in the architectural vision for future development.
+**Note:** Earlier v2.0 / v2.4 drafts referenced `causal_edges`, `competitors`, and `backtest_results` tables alongside a `backtesting_accuracy` column. All of these were removed in v3.2 along with the never-built Causal DAG, Game Theory, and Backtesting modules. The spec now matches the production schema exactly.
 
 ---
 
@@ -860,14 +864,13 @@ PROFIT_POOL_ENGINE/
 │   ├── database.py                    # Dual-mode DB (Postgres/SQLite)
 │   ├── env_loader.py                  # Environment variable loading
 │   ├── backup.py                      # Database backup utilities
-│   ├── seed_trends.py                 # 61 trend definitions
+│   ├── seed_trends.py                 # 82 trend definitions (v3.1 Bain review)
 │   │
 │   ├── simulation/
 │   │   ├── bayesian_mc.py             # Bayesian MC with copulas (PRODUCTION)
 │   │   ├── paths.py                   # Continuous path modeling (PRODUCTION)
-│   │   ├── sensitivity.py             # Tornado/breakeven (STUB)
 │   │   ├── cvar.py                    # Conditional Value-at-Risk (PRODUCTION)
-│   │   ├── sobol.py                   # Sobol sensitivity (PRODUCTION)
+│   │   ├── sobol.py                   # Sobol global sensitivity (PRODUCTION)
 │   │   ├── reverse_stress.py          # Reverse stress testing (PRODUCTION)
 │   │   └── tipping_points.py          # Tipping point detection (PRODUCTION)
 │   │
@@ -945,24 +948,14 @@ PROFIT_POOL_ENGINE/
 
 ---
 
-## 12. ARCHITECTURAL VISION (Not Yet Implemented)
+## 12. FUTURE ROADMAP
 
-The following modules were designed in v2.0 but have not been built. They remain part of the long-term roadmap:
-
-### Causal DAG (`pulse/causal/dag.py`)
-Directed Acyclic Graph modeling causal relationships between the 6 forces. Would enable shock propagation ("a regulatory event triggers reformulation costs triggers shelf price changes triggers consumer behavior shift") with lag structures and propagation weights. Current workaround: force correlation matrix in config.py provides simplified dependency modeling.
-
-### Game Theory Layer (`pulse/game_theory/competitive.py`)
-Would model competitive responses from P&G, Unilever, Reckitt, and others. Response archetypes (premium_defender, sustainability_leader, etc.) would generate second-order profit pool impacts. Currently, competitive intelligence is represented as static trends in the trend database.
-
-### Backtesting Engine (`pulse/backtesting/engine.py`)
-Would calibrate model parameters from historical V1-V11 assessments against actual market shifts. Would derive the attenuation factor empirically (currently assumed at 0.5), calibrate distribution shapes, and compute a model accuracy score for ExCo credibility. Prerequisite: historical version data.
+The production codebase (as of v3.2) covers the full simulation, optimization, analytics, Delphi, AI, and export stack. The only explicitly non-production module remaining is:
 
 ### External API Integrations (`pulse/integrations/`)
-The integration module exists as a stub. 19 free-tier APIs were mapped in v2.0 (GDELT, GNews, CurrentsAPI, ECHA, EUR-Lex, SEC EDGAR, Google Trends, Reddit, FRED, etc.). The AI scanner currently uses the LLM provider for trend intelligence rather than direct API integration.
+The integration module exists as a stub. A list of ~19 free-tier APIs was mapped in v2.0 (GDELT, GNews, CurrentsAPI, ECHA, EUR-Lex, SEC EDGAR, Google Trends, Reddit, FRED, etc.). The AI scanner currently uses the LLM provider for trend intelligence rather than direct API integration. Direct integration would reduce LLM token cost and improve signal freshness.
 
-### Sensitivity Analysis (`pulse/simulation/sensitivity.py`)
-Tornado analysis, breakeven analysis, force elimination, weight sensitivity, and attenuation sensitivity methods are defined but raise NotImplementedError. Designed to integrate with the Bayesian MC engine.
+**Explicitly out of scope (removed in v3.2):** Causal DAG, Game Theory competitive-response layer, Backtesting engine, and the `SensitivityEngine` tornado/breakeven stub. The force correlation matrix, trend database, reverse stress testing, and Sobol indices collectively cover what these modules were intended to provide, and no historical calibration data exists or is expected to exist for backtesting.
 
 ---
 
@@ -997,10 +990,8 @@ Tornado analysis, breakeven analysis, force elimination, weight sensitivity, and
 | Vercel cold-start latency | Medium | Medium | Retry logic in api/index.py, graceful degradation |
 | Mock data diverges from API schema | Medium | Medium | Shared TypeScript types, integration tests |
 | Neon PostgreSQL connection limits | Low | High | Connection pooling, SQLite fallback |
-| Sensitivity analysis remains stub | High | Medium | CVaR/Sobol provide alternative sensitivity insights |
 | AI hallucinations in scanner/narrator | Medium | Medium | Human-in-the-loop, never auto-applied |
-| Causal DAG never implemented | Medium | Medium | Force correlation matrix provides simplified alternative |
-| No backtesting data for calibration | High | Medium | Priors clearly labeled "assumed, not calibrated" |
+| No historical calibration data for priors | High | Medium | Priors clearly labeled `attenuation_source="assumed"` or `"calibrated_v3.1_april2026"` |
 | Serverless dependency size limit | Low | High | Stripped requirements in api/requirements.txt |
 | JWT secret exposure | Low | Critical | Environment variables, never in code |
 
@@ -1009,26 +1000,24 @@ Tornado analysis, breakeven analysis, force elimination, weight sensitivity, and
 ## 15. SUCCESS METRICS
 
 ### Current (Achieved)
-- [x] Bayesian MC completes 10,000 iterations reliably
+- [x] Bayesian MC completes 50,000 iterations reliably across 11-year horizon
 - [x] Dashboard wired to real API data with proper empty/error states
-- [x] 61 trends seeded with full metadata
+- [x] 82 v3.1 trends seeded in prod (Neon) with peak_year + diffusion_curve
+- [x] Consumer Journey (8 VC steps) decomposition live in `ConsumerJourney2.tsx`
 - [x] Auth system with JWT + role-based access
 - [x] Advanced analytics (CVaR, Sobol, reverse stress, tipping points) working
 - [x] Professional Excel/PPTX/Power BI export
-- [x] 11 test files covering simulation, analytics, API, and properties
+- [x] v3.2 dead-code cleanup: sensitivity stub, backtesting, causal DAG all removed
 
 ### Target (Next Milestones)
-- [ ] Implement sensitivity.py (tornado, breakeven, force elimination)
-- [ ] Build Causal DAG module for shock propagation
-- [ ] Wire external API integrations (GDELT, ECHA, etc.)
-- [ ] Backtesting against historical versions (V1-V11)
-- [ ] Game theory layer for competitive response modeling
+- [ ] Wire external API integrations (GDELT, ECHA, EUR-Lex, FRED, etc.)
 - [ ] Power BI automated sync scheduler
 - [ ] Increase test coverage to >80%
+- [ ] Delphi Round 2 (post-scoring convergence) UI polish
 
 ---
 
-*Document Version: 3.0 — April 2026*
+*Document Version: 3.2 — April 2026*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Bayesian hierarchical + copula dependencies + mean-variance optimization + Delphi elicitation + advanced risk analytics*

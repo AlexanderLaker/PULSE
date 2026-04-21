@@ -327,7 +327,7 @@ class ModelConfig:
     region: str = "Global"
     aggregation_method: str = "Multiplicative"
     attenuation: float = DEFAULT_ATTENUATION
-    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "assumed" | "calibrated_v3.1_april2026" | "backtested"
+    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "assumed" | "calibrated_v3.1_april2026" | "admin_override"
     neutral_threshold: float = DEFAULT_NEUTRAL_THRESHOLD
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))

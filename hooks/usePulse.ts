@@ -38,7 +38,7 @@ function generateMockSimulation(): SimulationResult {
   return {
     shifts: mock,
     allocation_recommendation: {},
-    convergence: { converged: true, r_hat: 1.03, backtestingAccuracy: 0.73 }
+    convergence: { converged: true, r_hat: 1.03 }
   };
 }
 

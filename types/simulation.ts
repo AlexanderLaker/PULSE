@@ -65,7 +65,6 @@ export interface ConvergenceDiagnostics {
   converged: boolean;
   r_hat?: number;
   ess?: number;
-  backtestingAccuracy?: number;
   iterations?: number;
   model_type?: ModelType;
 }
@@ -139,22 +138,5 @@ export interface Scenario {
   description: string;
   shocks?: Record<ForceName, number>;
   force_overrides?: Record<ForceName, number>;
-}
-
-/** Sensitivity tornado bar data. */
-export interface TornadoBar {
-  trend_id: string;
-  trend_name: string;
-  force: ForceName;
-  low_value: number;
-  high_value: number;
-  base_value: number;
-  range: number;
-}
-
-/** Sensitivity analysis result. */
-export interface SensitivityResult {
-  tornado: TornadoBar[];
-  category?: string;
 }
 

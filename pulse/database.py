@@ -264,8 +264,7 @@ def init_db() -> None:
                 vc_weights TEXT,
                 category_names TEXT,
                 path_years TEXT,
-                materialization_schedule TEXT,
-                backtesting_accuracy REAL
+                materialization_schedule TEXT
             )
         """)
 

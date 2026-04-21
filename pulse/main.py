@@ -15,7 +15,6 @@ from datetime import datetime
 from pulse import __version__
 from pulse.config import ModelConfig
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.simulation.sensitivity import SensitivityEngine
 from pulse.simulation.paths import PathAnalyzer
 from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.excel_bridge.writer import ShiftMatrixWriter
@@ -44,8 +43,6 @@ def create_parser():
                         help="Risk aversion for allocation optimizer (0-3)")
     parser.add_argument("--serve", action="store_true",
                         help="Launch Profit Pool Shift Model dashboard")
-    parser.add_argument("--sensitivity", action="store_true",
-                        help="Run sensitivity analysis (tornado, breakeven)")
     parser.add_argument("--audit", action="store_true",
                         help="Show audit trail")
     parser.add_argument("--ai", choices=["claude", "azure", "ollama", "none"],
@@ -68,7 +65,7 @@ def main():
 
     print(f"\n{'═' * 60}")
     print(f"  PRISM v{__version__} — Profit Pool Simulation Engine")
-    print(f"  Bayesian MC · Causal DAG · Copula Dependencies")
+    print(f"  Bayesian MC · Copula Dependencies · Allocation Optimizer")
     print(f"{'═' * 60}\n")
 
     # Audit trail
