@@ -28,6 +28,37 @@ from pulse.ingestion.models import Trend
 
 logger = logging.getLogger(__name__)
 
+
+# ── JSON serialization helpers ───────────────────────────────────────
+# NumPy / SciPy produce np.bool_, np.int64, np.float64, etc., which the
+# stdlib json encoder rejects with "Object of type bool is not JSON
+# serializable". Route everything through this helper so the simulation
+# engine's diagnostic dicts (convergence, force attribution, etc.) can
+# round-trip into Postgres JSONB columns.
+def _json_default(o):
+    try:
+        import numpy as _np  # local import — avoid circular at module load
+        if isinstance(o, _np.bool_):
+            return bool(o)
+        if isinstance(o, _np.integer):
+            return int(o)
+        if isinstance(o, _np.floating):
+            return float(o)
+        if isinstance(o, _np.ndarray):
+            return o.tolist()
+    except ImportError:
+        pass
+    if isinstance(o, (set, frozenset)):
+        return list(o)
+    if isinstance(o, datetime):
+        return o.isoformat()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
+def _safe_dumps(obj) -> str:
+    """json.dumps wrapper that handles numpy scalars, ndarrays, sets, datetimes."""
+    return json.dumps(obj, default=_json_default)
+
 # ── Detect database mode ─────────────────────────────────────────────
 POSTGRES_URL = os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL")
 USE_POSTGRES = bool(POSTGRES_URL)
@@ -735,10 +766,10 @@ def save_simulation_run(
                 ) VALUES ({ph(7)}) RETURNING id
                 """,
                 (
-                    iterations, model_type, json.dumps(results),
-                    json.dumps(force_attribution) if force_attribution else None,
-                    json.dumps(allocation_recommendation) if allocation_recommendation else None,
-                    json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
+                    iterations, model_type, _safe_dumps(results),
+                    _safe_dumps(force_attribution) if force_attribution else None,
+                    _safe_dumps(allocation_recommendation) if allocation_recommendation else None,
+                    _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
                 ),
             )
@@ -753,10 +784,10 @@ def save_simulation_run(
                 ) VALUES ({ph(7)})
                 """,
                 (
-                    iterations, model_type, json.dumps(results),
-                    json.dumps(force_attribution) if force_attribution else None,
-                    json.dumps(allocation_recommendation) if allocation_recommendation else None,
-                    json.dumps(convergence_diagnostics) if convergence_diagnostics else None,
+                    iterations, model_type, _safe_dumps(results),
+                    _safe_dumps(force_attribution) if force_attribution else None,
+                    _safe_dumps(allocation_recommendation) if allocation_recommendation else None,
+                    _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
                 ),
             )

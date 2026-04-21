@@ -172,11 +172,21 @@ def minimize_scalar(func, bounds, method='bounded'):
     return Result(x_min, func(x_min))
 
 
-def minimize(func, x0, bounds=None, constraints=None, method=None):
-    """Simple optimization fallback — returns x0 if scipy unavailable."""
+def minimize(func, x0, bounds=None, constraints=None, method=None, **kwargs):
+    """Simple optimization fallback — returns x0 if scipy unavailable.
+
+    Accepts arbitrary scipy keyword arguments (``options``, ``tol``,
+    ``callback``, ``jac``, etc.) via ``**kwargs`` and forwards them to
+    ``scipy.optimize.minimize`` when scipy is installed. The fallback
+    path ignores them, since it only returns the initial guess.
+    """
     if HAS_SCIPY:
         from scipy.optimize import minimize as _min
-        return _min(func, x0, bounds=bounds, constraints=constraints, method=method)
+        return _min(
+            func, x0,
+            bounds=bounds, constraints=constraints, method=method,
+            **kwargs,
+        )
 
     # Fallback: just return x0 (the allocation optimizer's initial guess is already reasonable)
     class Result:
