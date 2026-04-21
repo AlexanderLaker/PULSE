@@ -898,7 +898,6 @@ export function generateMockConvergence(): ConvergenceDiagnostics {
     r_hat: 1.03,
     converged: true,
     iterations: 5000,
-    backtestingAccuracy: 0.73,
   };
 }
 
