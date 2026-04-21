@@ -36,19 +36,46 @@ export default function SignInPage() {
   return (
     <>
       {/*
-        Global neutralizer for any Clerk-internal mask / clip-path /
-        backdrop-filter / pseudo-element shimmer that can manifest as a
-        circular "lens" over the form in dev mode. Scoped strictly to
-        Clerk's own DOM via the `cl-*` class prefix, so it can't leak
-        into the rest of the app.
+        Strip every frame, shadow, border and background Clerk would
+        otherwise draw around its own form — we render the card chrome
+        ourselves. Also kills the orange diagonal-stripe "Development
+        mode" watermark that Clerk paints on the footer when using
+        pk_test_* keys, and any stray masks / clip-paths that could
+        reintroduce the lens bug.
       */}
       <style>{`
+        /* 1. Flatten all Clerk container layers */
+        .cl-rootBox,
+        .cl-cardBox,
+        .cl-card,
+        .cl-main,
+        .cl-footer,
+        .cl-footerAction,
+        .cl-footerPages {
+          background: transparent !important;
+          background-image: none !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+        }
+
+        /* 2. Hide Clerk's own branding footer + dev-mode watermark.
+              Keeps .cl-footerAction ("Don't have an account? Sign up")
+              visible because that renders as a separate node. */
+        .cl-footerPages,
+        .cl-badge,
+        [class*="devModeNotice"],
+        [data-localization-key*="development"],
+        [data-localization-key="footer.pages"] {
+          display: none !important;
+        }
+
+        /* 3. Belt-and-suspenders: nuke any mask/clip-path that could
+              reintroduce the circular "lens" artefact. */
         .cl-rootBox,
         .cl-rootBox *,
-        .cl-card,
-        .cl-card *,
-        .cl-internal-b3fm6y,
-        .cl-internal-b3fm6y * {
+        .cl-cardBox,
+        .cl-cardBox * {
           mask: none !important;
           -webkit-mask: none !important;
           mask-image: none !important;
@@ -64,19 +91,11 @@ export default function SignInPage() {
         .cl-card::before,
         .cl-card::after,
         .cl-main::before,
-        .cl-main::after {
+        .cl-main::after,
+        .cl-footer::before,
+        .cl-footer::after {
           content: none !important;
           display: none !important;
-        }
-        /* Kill the dev-mode striped watermark banner that shows under
-           "Secured by Clerk" when using pk_test_* keys — keep the tiny
-           text label, lose the noisy stripes. */
-        .cl-badge,
-        .cl-internal-dev-mode-banner,
-        [class*="devMode"],
-        [class*="DevMode"] {
-          background-image: none !important;
-          box-shadow: none !important;
         }
       `}</style>
 
@@ -131,11 +150,14 @@ export default function SignInPage() {
             <SignIn
               appearance={{
                 elements: {
-                  rootBox:   'w-full',
-                  card:      'shadow-none bg-transparent p-0 w-full border-none',
-                  header:    'hidden',
-                  logoBox:   'hidden',
-                  main:      'gap-4',
+                  rootBox:     'w-full',
+                  cardBox:     'shadow-none bg-transparent border-none p-0 w-full',
+                  card:        'shadow-none bg-transparent border-none p-0 w-full',
+                  main:        'gap-4',
+                  header:      'hidden',
+                  logoBox:     'hidden',
+                  footerPages: 'hidden',
+                  badge:       'hidden',
                 },
               }}
             />
