@@ -26,8 +26,8 @@
 import React, { useMemo, useState, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar, Layers, Globe2, Zap, Play, Loader2, AlertTriangle,
-  ChevronRight, Sparkles, Info,
+  Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
+  Sparkles, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -541,8 +541,8 @@ const PeakStressTooltip: FC = () => {
 const ProfitPoolAnalysis2: FC = () => {
   const {
     simulation, scenarios,
-    loading, simulating, error, backendAvailable,
-    activeScenario, setActiveScenario, simulate, reconnect,
+    loading, error, backendAvailable,
+    activeScenario, setActiveScenario, reconnect,
   } = usePrism();
 
   const [view, setView] = useState<ViewMode>('time');
@@ -697,34 +697,10 @@ const ProfitPoolAnalysis2: FC = () => {
             </p>
           </div>
 
-          {/* Simulate button */}
+          {/* Simulations are CLI-only (scripts/run_50k_prod.py); this
+              header just surfaces when the latest persisted run was
+              produced. */}
           <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              onClick={() => { void simulate(); }}
-              disabled={simulating || !backendAvailable}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-all"
-              style={{
-                backgroundColor: simulating || !backendAvailable ? S.surfaceHigh : S.primary,
-                color: simulating || !backendAvailable ? S.mutedText : '#ffffff',
-                cursor: simulating || !backendAvailable ? 'not-allowed' : 'pointer',
-                border: 'none',
-                boxShadow: !simulating && backendAvailable ? '0 6px 18px -6px rgba(0, 93, 181, 0.45)' : 'none',
-                fontFamily: BODY_FONT,
-              }}
-            >
-              {simulating ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Running simulation…
-                </>
-              ) : (
-                <>
-                  <Play size={14} strokeWidth={2.3} />
-                  Run simulation
-                </>
-              )}
-            </button>
             {simulation?.generated && (
               <span style={{ color: S.mutedText, fontSize: 11 }}>
                 Last run · {new Date(simulation.generated).toLocaleString()}
@@ -883,39 +859,24 @@ const ProfitPoolAnalysis2: FC = () => {
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                 style={{ backgroundColor: S.primaryContainer, color: S.primary }}
               >
-                <Play size={22} />
+                <Info size={22} />
               </div>
               <h3
                 className="text-[20px] font-extrabold mb-2"
                 style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
               >
-                No simulation yet
+                No simulation persisted yet
               </h3>
               <p
-                className="max-w-md text-[14px] mb-5"
+                className="max-w-md text-[14px]"
                 style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
               >
-                Run the Bayesian Monte Carlo to populate all four lenses.
-                Force, Value Chain and Region decompositions are produced
-                by the engine (v2.5+) alongside the Time Path.
+                Simulations are triggered from the CLI
+                (<code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>scripts/run_50k_prod.py</code>).
+                Once a run has been persisted to Neon, all four lenses
+                — Time Path, Force, Value Chain and Region — will
+                populate here automatically.
               </p>
-              <button
-                type="button"
-                onClick={() => { void simulate(); }}
-                disabled={!backendAvailable || simulating}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold"
-                style={{
-                  backgroundColor: S.primary,
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: backendAvailable ? 'pointer' : 'not-allowed',
-                  fontFamily: BODY_FONT,
-                }}
-              >
-                <Play size={14} strokeWidth={2.3} />
-                Run simulation
-                <ChevronRight size={14} />
-              </button>
             </div>
           ) : (
             <Matrix

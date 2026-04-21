@@ -1226,13 +1226,29 @@ def create_app(args=None) -> FastAPI:
                 runs = load_simulation_runs(limit=1)
                 if runs:
                     latest = runs[0]
-                    # Reconstruct mc_result from DB
-                    mc = {
-                        "shift_matrix": latest.get("results", {}),
-                        "convergence": latest.get("convergence_diagnostics", {}),
-                        "iterations": latest.get("iterations", 5000),
-                        "model_type": latest.get("model_type", "bayesian_copula"),
-                    }
+                    # `results` may be either the legacy flat shift_matrix
+                    # (older runs) or the new bundle shape with
+                    # shift_matrix / decompositions / totals / vc_decomposition.
+                    # Detect and rehydrate either layout.
+                    results_blob = latest.get("results", {}) or {}
+                    if isinstance(results_blob, dict) and "shift_matrix" in results_blob:
+                        mc = {
+                            "shift_matrix": results_blob.get("shift_matrix", {}),
+                            "decompositions": results_blob.get("decompositions"),
+                            "totals": results_blob.get("totals"),
+                            "vc_decomposition": results_blob.get("vc_decomposition"),
+                            "convergence": latest.get("convergence_diagnostics", {}),
+                            "iterations": latest.get("iterations", 5000),
+                            "model_type": latest.get("model_type", "bayesian_copula"),
+                        }
+                    else:
+                        # Legacy flat shape (pre-v2.5.1): results IS the shift matrix
+                        mc = {
+                            "shift_matrix": results_blob,
+                            "convergence": latest.get("convergence_diagnostics", {}),
+                            "iterations": latest.get("iterations", 5000),
+                            "model_type": latest.get("model_type", "bayesian_copula"),
+                        }
                     _state["mc_result"] = mc
                     if latest.get("allocation_recommendation"):
                         _state["allocation"] = latest["allocation_recommendation"]
@@ -1249,6 +1265,8 @@ def create_app(args=None) -> FastAPI:
             "model_type": mc.get("model_type", "bayesian_copula"),
             "allocation": _state.get("allocation"),
             "vc_decomposition": mc.get("vc_decomposition"),
+            "decompositions": mc.get("decompositions"),
+            "totals": mc.get("totals"),
         })
 
     @app.post("/api/v1/simulate")
@@ -1352,13 +1370,23 @@ def create_app(args=None) -> FastAPI:
             _state["simulation_stale"] = False
             _state.pop("stale_reason", None)
 
-            # Persist simulation run to database (must succeed)
+            # Persist simulation run to database (must succeed).
+            # Store the full result bundle (shift_matrix + decompositions +
+            # totals + vc_decomposition) under `results` so cold-start reloads
+            # can hydrate the dashboard's "Trends 2" and "Profit Pool Analysis 2"
+            # views. Convergence + force_attribution live in their own columns.
             from pulse.database import save_simulation_run
             try:
+                results_bundle = {
+                    "shift_matrix": mc_result.get("shift_matrix"),
+                    "decompositions": mc_result.get("decompositions"),
+                    "totals": mc_result.get("totals"),
+                    "vc_decomposition": mc_result.get("vc_decomposition"),
+                }
                 save_simulation_run(
                     iterations=req.iterations,
                     model_type="bayesian_copula",
-                    results=_sanitize(mc_result["shift_matrix"]),
+                    results=_sanitize(results_bundle),
                     force_attribution=_sanitize(mc_result.get("force_attribution")),
                     allocation_recommendation=_sanitize(_state.get("allocation")),
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
@@ -1376,6 +1404,8 @@ def create_app(args=None) -> FastAPI:
                 "allocation": _state.get("allocation"),
                 "competitive": _state.get("competitive"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                "decompositions": mc_result.get("decompositions"),
+                "totals": mc_result.get("totals"),
                 "seed": mc_result.get("seed"),
                 "seed_wobble": mc_result.get("seed_wobble"),
                 "attenuation_band": mc_result.get("attenuation_band"),

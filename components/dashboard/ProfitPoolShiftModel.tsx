@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Zap, CheckCircle2, Clock,
+  CheckCircle2, Clock,
   Brain, AlertTriangle, FileDown, Settings, X, RefreshCw, Users,
   Download, Presentation, MessageCircle,
 } from 'lucide-react';
@@ -166,7 +166,7 @@ type ModalType = 'export' | 'briefing' | null;
 export default function ProfitPoolShiftModel(): React.ReactNode {
   const {
     loading, simulating, error, activeScenario, setActiveScenario,
-    simulate, connectionState, reconnect,
+    connectionState, reconnect,
     simulation, trends, forces, scenarios, analytics,
     aiSuggestions, triggers, health, updateTrend,
   } = usePrism();
@@ -207,10 +207,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
     text: s.content ?? '',
     type: s.suggestion_type ?? 'info',
   }));
-
-  const handleSimulate = async (): Promise<void> => {
-    await simulate();
-  };
 
   // Loading state
   if (loading) {
@@ -255,7 +251,7 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
           <div style={{ fontSize: 13, color: T.text3, lineHeight: 1.6 }}>
             {connectionState === 'offline'
               ? 'The PRISM engine is not reachable. Check that the backend is running and try reconnecting.'
-              : 'Run a simulation to generate shift matrix data. Click "Simulate" to start a Bayesian Monte Carlo run with 10,000 iterations.'}
+              : 'No simulation has been persisted yet. Simulations are triggered from the CLI (scripts/run_50k_prod.py) — this dashboard only displays the latest persisted run.'}
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
             {connectionState === 'offline' && (
@@ -272,21 +268,6 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
                 Reconnect
               </motion.button>
             )}
-            <motion.button
-              onClick={handleSimulate}
-              disabled={simulating || connectionState === 'offline'}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                padding: '8px 20px', borderRadius: 999, border: 'none',
-                background: connectionState === 'offline' ? T.text3 : T.text, color: '#fff',
-                fontSize: 12, fontWeight: 600, cursor: connectionState === 'offline' ? 'not-allowed' : 'pointer',
-                opacity: connectionState === 'offline' ? 0.5 : 1,
-              }}
-            >
-              <Zap size={13} style={{ marginRight: 6 }} />
-              Run Simulation
-            </motion.button>
           </div>
         </div>
       </div>
@@ -359,34 +340,10 @@ export default function ProfitPoolShiftModel(): React.ReactNode {
             margin: '0 auto',
           } as React.CSSProperties}
         >
-          {/* Primary Action Buttons — Simulate, Scenario, Export, Briefing */}
+          {/* Primary Action Buttons — Scenario, Export, Briefing
+              (Simulate button removed — simulations are CLI-only; the
+              dashboard is a pure consumer of the latest persisted run.) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 } as React.CSSProperties}>
-            {/* Simulate Button — primary action pill */}
-            <motion.button
-              onClick={handleSimulate}
-              disabled={simulating}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '7px 18px',
-                borderRadius: 999,
-                border: 'none',
-                background: T.text,
-                color: '#fff',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: simulating ? 'not-allowed' : 'pointer',
-                opacity: simulating ? 0.6 : 1,
-                transition: 'all 0.3s cubic-bezier(0.25,0.1,0.25,1)',
-              } as React.CSSProperties}
-            >
-              <Zap size={13} />
-              {simulating ? 'Simulating…' : 'Simulate'}
-            </motion.button>
-
             {/* Scenario Selector Button */}
             <motion.button
               onClick={() => setActiveModal('export')}

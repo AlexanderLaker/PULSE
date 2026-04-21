@@ -109,12 +109,22 @@ def main() -> int:
     )
 
     # ── 5) Persist to prod Neon ──────────────────────────────────────
+    # Save the full results bundle (shift_matrix + decompositions + totals +
+    # vc_decomposition) so the dashboard's "Trends 2" and
+    # "Profit Pool Analysis 2" views hydrate correctly on cold start. Must
+    # match the bundle shape the FastAPI /api/v1/simulation endpoint expects.
     log.info("[5/5] Persisting to Neon PROD…")
     try:
+        results_bundle = {
+            "shift_matrix": result.get("shift_matrix"),
+            "decompositions": result.get("decompositions"),
+            "totals": result.get("totals"),
+            "vc_decomposition": result.get("vc_decomposition"),
+        }
         run_id = save_simulation_run(
             iterations=config.iterations,
             model_type="bayesian_copula_multichain",
-            results=result.get("shift_matrix", {}),
+            results=results_bundle,
             force_attribution=result.get("force_attribution"),
             allocation_recommendation=allocation,
             convergence_diagnostics=result.get("convergence"),

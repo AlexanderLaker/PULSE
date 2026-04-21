@@ -12,8 +12,6 @@ interface ScenarioSelectorProps {
   scenarios: Scenario[];
   activeScenario: ScenarioId;
   setActiveScenario: (id: ScenarioId) => void;
-  onSimulate: () => void;
-  simulating: boolean;
 }
 
 // ─── Icon Map ─────────────────────────────────────────────────────────────
@@ -37,8 +35,6 @@ const ScenarioSelector: FC<ScenarioSelectorProps> = ({
   scenarios,
   activeScenario,
   setActiveScenario,
-  onSimulate,
-  simulating
 }) => {
   const [open, setOpen] = useState<boolean>(false);
 
@@ -57,34 +53,9 @@ const ScenarioSelector: FC<ScenarioSelectorProps> = ({
           <ChevronDown size={14} className={`text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
 
-        {/* Simulate button */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onSimulate()}
-          disabled={simulating}
-          className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-            simulating
-              ? 'bg-accent/30 text-text-muted cursor-wait'
-              : 'bg-accent hover:bg-accent-hover text-white shadow-lg shadow-accent/20'
-          }`}
-        >
-          {simulating ? (
-            <span className="flex items-center gap-2">
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-              />
-              Simulating…
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Play size={14} />
-              Run Simulation
-            </span>
-          )}
-        </motion.button>
+        {/* Simulate button removed — simulations are CLI-only
+            (scripts/run_50k_prod.py). The dashboard only renders the
+            latest persisted simulation_run. */}
       </div>
 
       {/* Dropdown panel */}
