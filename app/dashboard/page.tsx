@@ -22,6 +22,7 @@ import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
+import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
@@ -31,6 +32,7 @@ type DashboardTab =
   | 'trends'
   | 'trends-2'
   | 'consumer-journey'
+  | 'consumer-journey-2'
   | 'innovation-explorer';
 
 interface TabDef {
@@ -44,6 +46,7 @@ const TABS: TabDef[] = [
   { id: 'trends',              label: 'Trends' },
   { id: 'trends-2',            label: 'Trends 2' },
   { id: 'consumer-journey',    label: 'Consumer Journey' },
+  { id: 'consumer-journey-2',  label: 'Consumer Journey 2' },
   { id: 'innovation-explorer', label: 'Innovation Explorer' },
 ];
 
@@ -226,6 +229,13 @@ export default function DashboardPage() {
           {activeTab === 'trends-2' && <Trends2 />}
           {activeTab === 'consumer-journey' && (
             <ConsumerJourney
+              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool')}
+              onNavigateTrends={() => setActiveTab('trends')}
+              onNavigateInnovation={() => setActiveTab('innovation-explorer')}
+            />
+          )}
+          {activeTab === 'consumer-journey-2' && (
+            <ConsumerJourney2
               onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool')}
               onNavigateTrends={() => setActiveTab('trends')}
               onNavigateInnovation={() => setActiveTab('innovation-explorer')}
