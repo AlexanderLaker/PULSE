@@ -16,7 +16,7 @@
  *     Clerk invalidates the session on the server and clears cookies.
  *
  * Tab navigation (constant across all pages):
- *   Profit Pool Analysis | Profit Pool Analysis 2 | Trends | Trends 2 | Consumer Journey | Innovation Explorer
+ *   Profit Pool Analysis 2 | Trends 2 | Consumer Journey 2 | Innovation Explorer
  *
  * The top navigation has been redesigned in the "Editorial Intelligence" style
  * (see stitch_fmcg_trend_navigator-3/DESIGN.md) — a softer, magazine-inspired
@@ -26,21 +26,16 @@
 import { useState } from 'react';
 import { LogOut, Search, Settings } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/nextjs';
-import ProfitPoolShiftModel from '@/components/dashboard/ProfitPoolShiftModel';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import Trends2 from '@/components/dashboard/Trends2';
-import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
 type DashboardTab =
-  | 'profit-pool'
   | 'profit-pool-2'
-  | 'trends'
   | 'trends-2'
-  | 'consumer-journey'
   | 'consumer-journey-2'
   | 'innovation-explorer';
 
@@ -50,11 +45,8 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'profit-pool',         label: 'Profit Pool Analysis' },
   { id: 'profit-pool-2',       label: 'Profit Pool Analysis 2' },
-  { id: 'trends',              label: 'Trends' },
   { id: 'trends-2',            label: 'Trends 2' },
-  { id: 'consumer-journey',    label: 'Consumer Journey' },
   { id: 'consumer-journey-2',  label: 'Consumer Journey 2' },
   { id: 'innovation-explorer', label: 'Innovation Explorer' },
 ];
@@ -79,7 +71,7 @@ export default function DashboardPage() {
   const { signOut } = useClerk();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -224,28 +216,19 @@ export default function DashboardPage() {
       {/* ─── Main Content — Tab-Switched ─────────────────────────── */}
       <div className="relative">
         <ErrorBoundary>
-          {activeTab === 'profit-pool' && <ProfitPoolShiftModel />}
           {activeTab === 'profit-pool-2' && <ProfitPoolAnalysis2 />}
-          {activeTab === 'trends' && <ProfitPoolShiftModel />}
           {activeTab === 'trends-2' && <Trends2 />}
-          {activeTab === 'consumer-journey' && (
-            <ConsumerJourney
-              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool')}
-              onNavigateTrends={() => setActiveTab('trends')}
-              onNavigateInnovation={() => setActiveTab('innovation-explorer')}
-            />
-          )}
           {activeTab === 'consumer-journey-2' && (
             <ConsumerJourney2
-              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool')}
-              onNavigateTrends={() => setActiveTab('trends')}
+              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool-2')}
+              onNavigateTrends={() => setActiveTab('trends-2')}
               onNavigateInnovation={() => setActiveTab('innovation-explorer')}
             />
           )}
           {activeTab === 'innovation-explorer' && (
             <InnovationExplorer
-              onNavigateToTrend={() => setActiveTab('trends')}
-              onNavigateToConsumerJourney={() => setActiveTab('consumer-journey')}
+              onNavigateToTrend={() => setActiveTab('trends-2')}
+              onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
             />
           )}
         </ErrorBoundary>
