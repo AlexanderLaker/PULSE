@@ -66,6 +66,10 @@ if [[ ${#PATHS[@]} -eq 0 ]]; then
     --exclude='.git' --exclude='node_modules' --exclude='.next' \
     --exclude='.venv' --exclude='.vercel' --exclude='*.db' \
     --exclude='.env' --exclude='.env.deploy' \
+    --exclude='.hypothesis' --exclude='__pycache__' --exclude='*.pyc' \
+    --exclude='.claude' \
+    --exclude='*.db-journal' --exclude='*.db-wal' --exclude='*.db-shm' \
+    --exclude='tsconfig.tsbuildinfo' \
     "$WORKSPACE/" "$SCRATCH/"
 else
   for p in "${PATHS[@]}"; do

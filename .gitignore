@@ -22,3 +22,17 @@ tsconfig.tsbuildinfo
 
 # Deploy token for Cowork / sandbox auto-push — never commit
 .env.deploy
+
+# Post-deploy placeholder from prior token-upload flow — safe to delete locally
+DEPLOY_TOKEN_HIER_EINFUEGEN.txt
+
+# Sandbox / IDE local prefs — not part of the product
+.claude/settings.local.json
+
+# Python backup files from one-off migration scripts
+*.py.bak.*
+
+# SQLite write-ahead / journal side-files
+*.db-journal
+*.db-wal
+*.db-shm

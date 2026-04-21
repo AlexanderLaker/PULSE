@@ -6,6 +6,15 @@
  * Main entry point for the Profit Pool Shift Model.
  * Handles authentication, error boundaries, and component composition.
  *
+ * Auth model (Clerk):
+ *   - The Clerk middleware (middleware.ts) already guarantees the user
+ *     is signed in before this component renders. Unauthenticated
+ *     visitors are redirected to /sign-in before hitting this route.
+ *   - `useUser()` gives us reactive access to the current user for
+ *     display (email, avatar) without any fetch.
+ *   - `<SignOutButton>` / `useClerk().signOut()` handles logout —
+ *     Clerk invalidates the session on the server and clears cookies.
+ *
  * Tab navigation (constant across all pages):
  *   Profit Pool Analysis | Profit Pool Analysis 2 | Trends | Trends 2 | Consumer Journey | Innovation Explorer
  *
@@ -14,9 +23,9 @@
  * chrome that stays constant across every tab.
  */
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { LogOut, Search, Settings } from 'lucide-react';
+import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolShiftModel from '@/components/dashboard/ProfitPoolShiftModel';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
@@ -62,50 +71,36 @@ const NAV = {
 const HEADLINE_FONT =
   "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
-interface AuthCheck {
-  authenticated: boolean;
-  user?: { id: string; email: string };
-  error?: string;
-}
-
 export default function DashboardPage() {
-  const router = useRouter();
-  const [authCheck, setAuthCheck] = useState<AuthCheck | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Clerk: `isLoaded` flips true once the session state has been hydrated.
+  // `isSignedIn` and `user` come straight from the active session — no
+  // fetch, no race condition against middleware.
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool');
-
-  // Check authentication on mount
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const response = await fetch('/api/auth/check');
-        const data: AuthCheck = await response.json();
-        setAuthCheck(data);
-        if (!data.authenticated) router.push('/login');
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        setAuthCheck({ authenticated: false, error: 'Auth check failed' });
-        router.push('/login');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    checkAuth();
-  }, [router]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
+      // Redirect explicitly to /sign-in after Clerk clears the session.
+      // Without redirectUrl, Clerk would send the user to the app's
+      // configured after-sign-out URL (defaults to "/"), which our
+      // middleware would then bounce to /sign-in anyway — passing it
+      // here saves one hop.
+      await signOut({ redirectUrl: '/sign-in' });
     } catch (error) {
       console.error('Logout failed:', error);
       setIsLoggingOut(false);
     }
   };
 
-  if (isLoading) {
+  // Show the loading skeleton while Clerk is initializing. Middleware
+  // has already guaranteed authentication before we render, so the
+  // `!isSignedIn` branch should only fire in edge cases (token expiry
+  // mid-session, for example).
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-surface-primary">
         <FullPageSkeleton />
@@ -113,7 +108,15 @@ export default function DashboardPage() {
     );
   }
 
-  if (!authCheck?.authenticated) return null;
+  if (!isSignedIn) {
+    // Middleware normally prevents this, but we handle it defensively
+    // rather than rendering nothing. Push to /sign-in via a full
+    // navigation so the middleware re-evaluates.
+    if (typeof window !== 'undefined') window.location.href = '/sign-in';
+    return null;
+  }
+
+  const userEmail = user.primaryEmailAddress?.emailAddress ?? 'Signed in';
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#f8f9ff' }}>
@@ -193,9 +196,7 @@ export default function DashboardPage() {
               className="hidden sm:flex flex-col items-end leading-tight"
               style={{ color: NAV.onBg }}
             >
-              <span className="text-xs font-semibold">
-                {authCheck.user?.email || 'User'}
-              </span>
+              <span className="text-xs font-semibold">{userEmail}</span>
               <span className="text-[11px]" style={{ color: NAV.onSurfaceVariant }}>
                 Connected
               </span>

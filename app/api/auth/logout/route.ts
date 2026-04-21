@@ -1,36 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * Legacy /api/auth/logout — removed with the Clerk migration.
+ * Use Clerk's `signOut()` (from `useClerk()`) or `<SignOutButton>`.
+ */
+import { NextResponse } from 'next/server';
 
-export async function POST(request: NextRequest) {
-  try {
-    const response = NextResponse.json(
-      { success: true },
-      { status: 200 }
-    );
-
-    // Clear the pulse-token cookie
-    response.cookies.set('pulse-token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 0, // Immediately expires
-      path: '/',
-    });
-
-    // Clear the pulse-refresh-token cookie
-    response.cookies.set('pulse-refresh-token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 0, // Immediately expires
-      path: '/',
-    });
-
-    return response;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
-  }
+export function POST() {
+  return NextResponse.json(
+    {
+      error: 'Gone',
+      message:
+        'Custom logout was replaced by Clerk. Call signOut() from useClerk(), or render <SignOutButton />.',
+    },
+    { status: 410 }
+  );
 }
