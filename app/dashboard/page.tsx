@@ -24,7 +24,7 @@
  */
 
 import { useState } from 'react';
-import { LogOut, Search, Settings } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
@@ -46,9 +46,9 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'profit-pool-2',       label: 'Profit Pool Analysis 2' },
-  { id: 'trends-2',            label: 'Trends 2' },
-  { id: 'consumer-journey-2',  label: 'Consumer Journey 2' },
+  { id: 'profit-pool-2',       label: 'Profit Pool Shift Analysis' },
+  { id: 'trends-2',            label: 'Trends' },
+  { id: 'consumer-journey-2',  label: 'Consumer Journey' },
   { id: 'innovation-explorer', label: 'Innovation Explorer' },
 ];
 
@@ -160,24 +160,6 @@ export default function DashboardPage() {
 
           {/* Utilities */}
           <div className="flex items-center gap-3">
-            <div className="relative hidden lg:block">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: NAV.onSurfaceVariant }}
-              />
-              <input
-                type="text"
-                placeholder="Search trends…"
-                className="pl-10 pr-4 py-1.5 rounded-full text-sm focus:outline-none focus:ring-2 w-64"
-                style={{
-                  backgroundColor: NAV.surfaceLow,
-                  color: NAV.onBg,
-                  border: 'none',
-                }}
-              />
-            </div>
-
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
