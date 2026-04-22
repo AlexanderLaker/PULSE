@@ -1082,7 +1082,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
       className="min-h-screen"
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
-      <main className="max-w-[1440px] mx-auto px-8 py-10">
+      <main className="max-w-[1720px] mx-auto px-8 py-10">
         {/* ─── Editorial header with insight-rail accent ─── */}
         <header className="mb-8 flex items-start justify-between gap-8 flex-wrap">
           <div
@@ -1231,8 +1231,8 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
             <div
               className="grid"
               style={{
-                gridTemplateColumns: `repeat(${journey.length}, minmax(180px, 1fr))`,
-                minWidth: journey.length > 10 ? `${journey.length * 200}px` : undefined,
+                gridTemplateColumns: `repeat(${journey.length}, minmax(0, 1fr))`,
+                width: '100%',
                 gap: 0,
               }}
             >
