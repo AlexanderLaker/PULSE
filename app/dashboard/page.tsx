@@ -31,6 +31,7 @@ import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
+import SettingsModal from '@/components/dashboard/SettingsModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
 type DashboardTab =
@@ -72,6 +73,7 @@ export default function DashboardPage() {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -177,8 +179,9 @@ export default function DashboardPage() {
             </div>
 
             <button
+              onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
-              className="p-2 rounded-full transition-colors"
+              className="p-2 rounded-full transition-colors hover:bg-black/5"
               style={{ color: NAV.onSurfaceVariant }}
             >
               <Settings size={18} />
@@ -233,6 +236,9 @@ export default function DashboardPage() {
           )}
         </ErrorBoundary>
       </div>
+
+      {/* ─── Settings Modal (gear icon in top nav) ─────────────────── */}
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
