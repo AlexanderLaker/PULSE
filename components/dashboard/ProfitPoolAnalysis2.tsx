@@ -254,11 +254,17 @@ interface MatrixProps {
   grandTotal?: number | null;
   /** Whether to render row-total column and column-total row. */
   showTotals?: boolean;
+  /** Optional: label for the rightmost row-total column header.
+      Force / VC / Region lens views pass "Total 2030" etc. so the user
+      always sees which measurement year the row total refers to. Time Path
+      doesn't show a row-total column at all. Defaults to "Total". */
+  rowTotalLabel?: string;
 }
 
 const Matrix: FC<MatrixProps> = ({
   columns, rows, data, subtitle, emptyMessage,
   rowTotals, colTotals, grandTotal, showTotals = false,
+  rowTotalLabel = 'Total',
 }) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
@@ -354,7 +360,7 @@ const Matrix: FC<MatrixProps> = ({
                     borderLeft: `2px solid ${S.cardBorderStrong}`,
                   }}
                 >
-                  Total
+                  {rowTotalLabel}
                 </th>
               )}
             </tr>
@@ -366,7 +372,7 @@ const Matrix: FC<MatrixProps> = ({
                   <tr>
                     <td
                       colSpan={totalColSpan}
-                      className="px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em]"
+                      className="px-6 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
                       style={{
                         backgroundColor: gIdx === 0 ? S.surfaceLow : S.surfaceContainer,
                         color: S.onSurfaceVariant,
@@ -380,7 +386,7 @@ const Matrix: FC<MatrixProps> = ({
                 {groupRows.map((row) => (
                   <tr key={row.id}>
                     <td
-                      className="px-6 py-3 text-[13px] font-semibold sticky left-0 z-10"
+                      className="px-6 py-1 text-[13px] font-semibold sticky left-0 z-10"
                       style={{
                         backgroundColor: S.surface,
                         color: S.onSurface,
@@ -394,7 +400,7 @@ const Matrix: FC<MatrixProps> = ({
                       return (
                         <td
                           key={col.id}
-                          className="px-3 py-3 text-center text-[13px] tabular-nums"
+                          className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
                             backgroundColor: heatFill(v),
                             color: heatTextColor(v),
@@ -412,7 +418,7 @@ const Matrix: FC<MatrixProps> = ({
                       const rt = rowTotals?.[row.id] ?? null;
                       return (
                         <td
-                          className="px-3 py-3 text-center text-[13px] tabular-nums"
+                          className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
                             backgroundColor: heatFill(rt),
                             color: heatTextColor(rt),
@@ -434,7 +440,7 @@ const Matrix: FC<MatrixProps> = ({
             {showTotals && (
               <tr>
                 <td
-                  className="px-6 py-3 text-[11px] font-bold uppercase tracking-[0.12em] sticky left-0 z-10"
+                  className="px-6 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] sticky left-0 z-10"
                   style={{
                     backgroundColor: S.surfaceContainer,
                     color: S.onSurface,
@@ -449,7 +455,7 @@ const Matrix: FC<MatrixProps> = ({
                   return (
                     <td
                       key={col.id}
-                      className="px-3 py-3 text-center text-[13px] tabular-nums"
+                      className="px-3 py-1.5 text-center text-[13px] tabular-nums"
                       style={{
                         backgroundColor: heatFill(ct),
                         color: heatTextColor(ct),
@@ -464,7 +470,7 @@ const Matrix: FC<MatrixProps> = ({
                   );
                 })}
                 <td
-                  className="px-3 py-3 text-center text-[13px] tabular-nums"
+                  className="px-3 py-1.5 text-center text-[13px] tabular-nums"
                   style={{
                     backgroundColor: heatFill(grandTotal ?? null),
                     color: heatTextColor(grandTotal ?? null),
@@ -1111,6 +1117,7 @@ const ProfitPoolAnalysis2: FC = () => {
               colTotals={matrixData.colTotals}
               grandTotal={matrixData.grandTotal}
               showTotals={matrixData.showTotals}
+              rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
             />
           )}
         </motion.section>

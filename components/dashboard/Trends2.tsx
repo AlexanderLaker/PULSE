@@ -508,7 +508,7 @@ const Trends2: FC = () => {
         >
           {/* Column header */}
           <div
-            className="grid items-center px-8 py-5 text-[11px] font-bold uppercase tracking-[0.15em]"
+            className="grid items-center px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
             style={{
               gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
               backgroundColor: S.surfaceLow,
@@ -588,7 +588,7 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="w-full grid items-center px-8 py-6 text-left transition-colors"
+        className="w-full grid items-center px-8 py-2 text-left transition-colors"
         style={{
           gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
           backgroundColor: expanded ? S.surfaceLow : S.surface,
@@ -597,12 +597,12 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
         }}
       >
         {/* Trend identity */}
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center"
+            className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: tile.bg, color: tile.fg }}
           >
-            <Icon size={20} strokeWidth={2} />
+            <Icon size={16} strokeWidth={2} />
           </div>
           <div className="min-w-0">
             <div
@@ -618,12 +618,6 @@ const TrendRow: FC<TrendRowProps> = ({ trend, isLast, expanded, onToggle }) => {
                   transition: 'transform 180ms ease',
                 }}
               />
-            </div>
-            <div
-              className="text-[13px] truncate"
-              style={{ color: S.onSurfaceVariant }}
-            >
-              {trend.description || trend.strategic_implication || `${trend.force} signal`}
             </div>
           </div>
         </div>
