@@ -10,7 +10,7 @@ import type {
   Scenario,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
-  HealthStatus, ModelConfig, AuditEntry, ForceSummary,
+  HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
   DelphiSessionSummary, DelphiSession, DelphiScoreSubmission, DelphiScore,
   DelphiRoundSummary, CalibrationResult, DelphiConsensus, ScorerView,
   CreateDelphiSessionPayload,
@@ -56,6 +56,35 @@ export const getHealth = (): Promise<HealthStatus> =>
 
 export const getConfig = (): Promise<ModelConfig> =>
   request('/config');
+
+/** GET /api/v1/diagnostics — backend's view of its own DB state.
+ *  Drives the differentiated empty-state banner in ProfitPoolAnalysis2.tsx.
+ *  Never throws — returns a default "unreachable" shape on network error so
+ *  the UI can still say something useful. */
+export const getDiagnostics = async (): Promise<DiagnosticsResult> => {
+  try {
+    return await request<DiagnosticsResult>('/diagnostics');
+  } catch {
+    return {
+      db_mode: 'unknown',
+      db_host: null,
+      db_url_env: null,
+      db_reachable: false,
+      simulation_run_count: 0,
+      latest_run_id: null,
+      latest_run_date: null,
+      latest_iterations: null,
+      latest_has_shift_matrix: false,
+      latest_has_decompositions: false,
+      latest_has_totals: false,
+      latest_has_vc_decomposition: false,
+      error: 'diagnostics endpoint unreachable',
+      simulation_reason: 'db_error',
+      in_memory_simulation: false,
+      version: 'unknown',
+    };
+  }
+};
 
 // ── Trends ───────────────────────────────────────────────────────
 
