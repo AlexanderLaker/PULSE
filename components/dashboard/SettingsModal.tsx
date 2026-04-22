@@ -99,7 +99,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'profile',       label: 'Profile',          icon: User,             group: 'account' },
   { id: 'password',      label: 'Password',         icon: KeyRound,         group: 'account' },
   { id: 'sessions',      label: 'Active sessions',  icon: Monitor,          group: 'account' },
-  { id: 'config',        label: 'Config sheet',     icon: SlidersHorizontal, group: 'admin', adminOnly: true },
+  { id: 'config',        label: 'Config sheet',     icon: SlidersHorizontal, group: 'admin' },
   { id: 'users',         label: 'User management',  icon: UsersIcon,        group: 'admin', adminOnly: true },
 ];
 
@@ -725,24 +725,28 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
 
   const isDirty = useMemo(() => JSON.stringify(config) !== JSON.stringify(draft), [config, draft]);
 
-  if (!isAdmin) {
-    return (
-      <SectionCard
-        title="Config sheet"
-        icon={SlidersHorizontal}
-        description="The model configuration is shown below in read-only mode. Only administrators can edit these values — changes are versioned and audited."
-      >
-        <StatusBanner kind="info">
-          You have <b>viewer</b> access. Ask an administrator to promote you if you need to edit model configuration.
-        </StatusBanner>
-      </SectionCard>
-    );
-  }
+  // Everyone can see the Config sheet — only admins can change it. Non-admins
+  // get the same form but with every input disabled and the Save row hidden.
+  // We thread a single `readOnly` flag through so the UI stays consistent
+  // and the backend PUT gate (requireAdmin in /api/config) is the real
+  // enforcement boundary — the UI just mirrors it.
+  const readOnly = !isAdmin;
 
-  const patch = (p: Partial<ModelConfigPayload>) => setDraft((d) => (d ? { ...d, ...p } : d));
+  const patch = (p: Partial<ModelConfigPayload>) => {
+    if (readOnly) return;
+    setDraft((d) => (d ? { ...d, ...p } : d));
+  };
+
+  const ro = readOnly;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {readOnly && (
+        <StatusBanner kind="info">
+          You have <b>viewer</b> access — values below are read-only. Ask an administrator to make changes.
+        </StatusBanner>
+      )}
+
       <SectionCard
         title="Simulation parameters"
         icon={SlidersHorizontal}
@@ -760,7 +764,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   type="number" min={0} max={1} step={0.01}
                   value={draft.attenuation ?? 0.5}
                   onChange={(e) => patch({ attenuation: parseFloat(e.target.value) })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Attenuation source">
@@ -768,7 +773,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   type="text"
                   value={draft.attenuation_source ?? 'assumed'}
                   onChange={(e) => patch({ attenuation_source: e.target.value })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Neutral threshold" hint="Shifts below this magnitude are reported as neutral.">
@@ -776,7 +782,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   type="number" min={0} max={0.05} step={0.0005}
                   value={draft.neutral_threshold ?? 0.001}
                   onChange={(e) => patch({ neutral_threshold: parseFloat(e.target.value) })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="MC iterations" hint="10 000 default. Max 100 000.">
@@ -784,7 +791,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   type="number" min={1000} max={100000} step={1000}
                   value={draft.iterations ?? 10000}
                   onChange={(e) => patch({ iterations: parseInt(e.target.value, 10) })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Base year">
@@ -792,14 +800,16 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   type="number" min={2020} max={2030}
                   value={draft.base_year ?? 2025}
                   onChange={(e) => patch({ base_year: parseInt(e.target.value, 10) })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Region">
                 <select
                   value={draft.region ?? 'Europe'}
                   onChange={(e) => patch({ region: e.target.value })}
-                  style={INPUT_STYLE}
+                  disabled={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 >
                   {['Europe', 'North America', 'Asia', 'High Growth'].map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -823,7 +833,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 type="number" min={0} max={1} step={0.01}
                 value={draft.within_force_rho ?? 0.3}
                 onChange={(e) => patch({ within_force_rho: parseFloat(e.target.value) })}
-                style={INPUT_STYLE}
+                disabled={ro} readOnly={ro}
+                style={ro ? READONLY_STYLE : INPUT_STYLE}
               />
             </Field>
             <Field label="t-copula df" hint="2–30. Lower = heavier tails.">
@@ -831,7 +842,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 type="number" min={2} max={30} step={1}
                 value={draft.t_copula_df ?? 8}
                 onChange={(e) => patch({ t_copula_df: parseInt(e.target.value, 10) })}
-                style={INPUT_STYLE}
+                disabled={ro} readOnly={ro}
+                style={ro ? READONLY_STYLE : INPUT_STYLE}
               />
             </Field>
             <Field label="Residual cross-ρ" hint="Default 0.05">
@@ -839,7 +851,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 type="number" min={0} max={1} step={0.01}
                 value={draft.residual_cross_rho ?? 0.05}
                 onChange={(e) => patch({ residual_cross_rho: parseFloat(e.target.value) })}
-                style={INPUT_STYLE}
+                disabled={ro} readOnly={ro}
+                style={ro ? READONLY_STYLE : INPUT_STYLE}
               />
             </Field>
           </div>
@@ -861,7 +874,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   onChange={(e) => patch({
                     force_weights: { ...draft.force_weights, [force]: parseFloat(e.target.value) },
                   })}
-                  style={INPUT_STYLE}
+                  disabled={ro} readOnly={ro}
+                  style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
             ))}
@@ -880,14 +894,16 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         <button onClick={load} style={SECONDARY_BUTTON} disabled={loading}>
           Reload from backend
         </button>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={handleReset} disabled={!isDirty || saving} style={{ ...SECONDARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
-            Discard changes
-          </button>
-          <button onClick={handleSave} disabled={!isDirty || saving} style={{ ...PRIMARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
-            {saving ? 'Saving…' : 'Save configuration'}
-          </button>
-        </div>
+        {!readOnly && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={handleReset} disabled={!isDirty || saving} style={{ ...SECONDARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
+              Discard changes
+            </button>
+            <button onClick={handleSave} disabled={!isDirty || saving} style={{ ...PRIMARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
+              {saving ? 'Saving…' : 'Save configuration'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
