@@ -15,7 +15,8 @@ import { NextResponse } from 'next/server';
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/api/webhooks/(.*)', // Clerk webhooks verify via svix signature
+  '/api/webhooks/(.*)',   // Clerk webhooks verify via svix signature
+  '/api/admin/bootstrap', // Shared-secret bootstrap for first admin
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

@@ -33,12 +33,12 @@ import React, {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, User, KeyRound, Monitor, SlidersHorizontal, Users as UsersIcon,
-  ShieldCheck, RefreshCw, Check, AlertCircle, LogOut,
-  Clock, Sparkles,
+  ShieldCheck, Check, AlertCircle, LogOut,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
-  useUser, useClerk, useSessionList, useAuth, useSession,
+  useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
 
 // ─── Editorial design tokens (mirrors Trends2 / DESIGN.md) ──────────
@@ -84,7 +84,6 @@ type SectionId =
   | 'profile'
   | 'password'
   | 'sessions'
-  | 'session_info'
   | 'config'
   | 'users';
 
@@ -100,7 +99,6 @@ const SECTIONS: SectionDef[] = [
   { id: 'profile',       label: 'Profile',          icon: User,             group: 'account' },
   { id: 'password',      label: 'Password',         icon: KeyRound,         group: 'account' },
   { id: 'sessions',      label: 'Active sessions',  icon: Monitor,          group: 'account' },
-  { id: 'session_info',  label: 'Session status',   icon: RefreshCw,        group: 'account' },
   { id: 'config',        label: 'Config sheet',     icon: SlidersHorizontal, group: 'admin', adminOnly: true },
   { id: 'users',         label: 'User management',  icon: UsersIcon,        group: 'admin', adminOnly: true },
 ];
@@ -649,108 +647,6 @@ const SessionsSection: FC = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: Session Info (JWT refresh status)
-// ═══════════════════════════════════════════════════════════════════
-const SessionInfoSection: FC = () => {
-  const { sessionId, userId, getToken } = useAuth();
-  const { session } = useSession();
-  const [tokenSnippet, setTokenSnippet] = useState<string | null>(null);
-  const [fetchingToken, setFetchingToken] = useState(false);
-  const [expiresAt, setExpiresAt] = useState<number | null>(null);
-
-  const decodeExp = useCallback((jwt: string): number | null => {
-    try {
-      const parts = jwt.split('.');
-      if (parts.length !== 3) return null;
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const fetchToken = useCallback(async () => {
-    setFetchingToken(true);
-    try {
-      const token = await getToken();
-      if (token) {
-        setTokenSnippet(`${token.slice(0, 12)}…${token.slice(-12)}`);
-        setExpiresAt(decodeExp(token));
-      }
-    } finally {
-      setFetchingToken(false);
-    }
-  }, [getToken, decodeExp]);
-
-  useEffect(() => { fetchToken(); }, [fetchToken]);
-
-  const now = Date.now();
-  const secondsLeft = expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : null;
-  const sessionExpireAt = session?.expireAt ? new Date(session.expireAt) : null;
-  const sessionStatus = session?.status ?? 'unknown';
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionCard
-        title="Session lifetime"
-        icon={Clock}
-        description="Clerk issues short-lived JWTs that are automatically refreshed as long as your session is active. The session itself lives longer and governs overall sign-in state."
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Session ID">
-            <input readOnly value={sessionId ?? '—'} style={{ ...READONLY_STYLE, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} />
-          </Field>
-          <Field label="Session status">
-            <div style={{ padding: '9px 12px' }}>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase"
-                style={{
-                  backgroundColor: sessionStatus === 'active' ? S.successContainer : S.surfaceHigh,
-                  color: sessionStatus === 'active' ? S.success : S.mutedText,
-                }}>
-                {sessionStatus}
-              </span>
-            </div>
-          </Field>
-          <Field label="User ID">
-            <input readOnly value={userId ?? '—'} style={{ ...READONLY_STYLE, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} />
-          </Field>
-          <Field label="Session expires at">
-            <input readOnly value={sessionExpireAt ? sessionExpireAt.toLocaleString() : '—'} style={READONLY_STYLE} />
-          </Field>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="Current access token"
-        icon={RefreshCw}
-        description="Your current JWT — used for authenticated requests to the PRISM backend. It auto-refreshes in the background; hit 'Refresh now' to force a new one."
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-          <Field label="Token preview">
-            <input readOnly value={tokenSnippet ?? '—'} style={{ ...READONLY_STYLE, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} />
-          </Field>
-          <Field label="Token expires in">
-            <input
-              readOnly
-              value={secondsLeft !== null ? `${secondsLeft}s (${Math.floor(secondsLeft / 60)}m ${secondsLeft % 60}s)` : '—'}
-              style={READONLY_STYLE}
-            />
-          </Field>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={fetchToken} disabled={fetchingToken} style={{ ...SECONDARY_BUTTON, opacity: fetchingToken ? 0.6 : 1 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <RefreshCw size={12} strokeWidth={2.5} />
-                {fetchingToken ? 'Refreshing…' : 'Refresh now'}
-              </span>
-            </button>
-          </div>
-        </div>
-      </SectionCard>
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════
 // Section: Config Sheet (admin-editable)
 // ═══════════════════════════════════════════════════════════════════
 interface ModelConfigPayload {
@@ -1215,7 +1111,6 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
       case 'profile':      return <ProfileSection role={role} />;
       case 'password':     return <PasswordSection />;
       case 'sessions':     return <SessionsSection />;
-      case 'session_info': return <SessionInfoSection />;
       case 'config':       return <ConfigSection isAdmin={isAdmin} />;
       case 'users':        return <UsersSection isAdmin={isAdmin} currentUserId={user?.id ?? null} />;
       default:             return null;
@@ -1407,7 +1302,6 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                     {activeSection === 'profile' && 'Your identity and display name'}
                     {activeSection === 'password' && 'Rotate your credentials'}
                     {activeSection === 'sessions' && 'Devices and browsers with an active session'}
-                    {activeSection === 'session_info' && 'JWT and session lifetime'}
                     {activeSection === 'config' && 'PRISM simulation parameters'}
                     {activeSection === 'users' && 'Team access and roles'}
                   </div>
