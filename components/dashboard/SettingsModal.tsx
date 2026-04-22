@@ -559,9 +559,23 @@ const SessionsSection: FC = () => {
                 dateStyle: 'medium', timeStyle: 'short',
               })
               : 'unknown';
-            const device = s.latestActivity?.deviceType ?? 'Device';
-            const browser = s.latestActivity?.browserName ?? '';
-            const location = [s.latestActivity?.city, s.latestActivity?.country]
+            // Clerk v6 dropped `latestActivity` from the public SessionResource
+            // type, but the data is still hydrated at runtime when the session
+            // has been fetched via useSessionList(). We read it through a
+            // narrow cast so TypeScript doesn't block the build while still
+            // letting us display useful device / location metadata when the
+            // backend provided it.
+            const activity = (s as unknown as {
+              latestActivity?: {
+                deviceType?: string;
+                browserName?: string;
+                city?: string;
+                country?: string;
+              };
+            }).latestActivity;
+            const device = activity?.deviceType ?? 'Device';
+            const browser = activity?.browserName ?? '';
+            const location = [activity?.city, activity?.country]
               .filter(Boolean).join(', ') || 'Location unknown';
             return (
               <div
