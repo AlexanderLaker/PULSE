@@ -17,6 +17,13 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/webhooks/(.*)',   // Clerk webhooks verify via svix signature
   '/api/admin/bootstrap', // Shared-secret bootstrap for first admin
+  // Python FastAPI backend — the Next.js proxy routes under /api/* do a
+  // same-origin fetch to /api/v1/*, which re-enters this middleware. Without
+  // a Clerk session cookie on that server-side hop, it would 401 before the
+  // PRISM JWT Bearer reaches the Python adapter. The Python layer enforces
+  // its own admin gate on mutating endpoints (see pulse/api/app.py), so
+  // exposing /api/v1/* at the middleware level is safe.
+  '/api/v1/(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
