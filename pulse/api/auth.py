@@ -30,21 +30,28 @@ from pulse.database import get_db_connection, placeholder, ph, _row_to_dict, ini
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────
-# PRISM_JWT_SECRET is required. Fail loud at import time if missing or too short —
-# a hardcoded fallback here (as existed previously) lets anyone with the repo forge
-# tokens if the env var is ever missing in production. Minimum 32 chars.
-JWT_SECRET = os.environ.get("PRISM_JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError(
-        "PRISM_JWT_SECRET environment variable is required. "
-        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
-    )
-if len(JWT_SECRET) < 32:
-    raise RuntimeError(
-        "PRISM_JWT_SECRET is too short — must be at least 32 characters."
-    )
+# PRISM_JWT_SECRET is required. We resolve it lazily (on first auth-related
+# request) rather than at import time so that a missing secret in the Vercel
+# serverless environment doesn't crash create_app() and take down every
+# non-auth endpoint with it. Auth routes themselves will still fail loud
+# (as a 500) on the first call if the secret is truly absent.
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 72  # 3 days
+
+
+def _get_jwt_secret() -> str:
+    """Resolve PRISM_JWT_SECRET lazily. Raise on demand, not on import."""
+    secret = os.environ.get("PRISM_JWT_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "PRISM_JWT_SECRET environment variable is required. "
+            "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+        )
+    if len(secret) < 32:
+        raise RuntimeError(
+            "PRISM_JWT_SECRET is too short — must be at least 32 characters."
+        )
+    return secret
 
 # Access keyword — required to register. Configurable via env var.
 ACCESS_KEYWORD = os.environ.get("PRISM_ACCESS_KEYWORD", "PRISM2026")
@@ -148,8 +155,10 @@ def _b64decode(s: str) -> bytes:
     return urlsafe_b64decode(s)
 
 
-def _create_jwt(payload: dict, secret: str = JWT_SECRET) -> str:
+def _create_jwt(payload: dict, secret: Optional[str] = None) -> str:
     """Create a JWT token without external dependencies."""
+    if secret is None:
+        secret = _get_jwt_secret()
     header = {"alg": "HS256", "typ": "JWT"}
     header_b64 = _b64encode(json.dumps(header).encode())
     payload_b64 = _b64encode(json.dumps(payload).encode())
@@ -159,8 +168,14 @@ def _create_jwt(payload: dict, secret: str = JWT_SECRET) -> str:
     return f"{header_b64}.{payload_b64}.{sig_b64}"
 
 
-def _verify_jwt(token: str, secret: str = JWT_SECRET) -> Optional[dict]:
+def _verify_jwt(token: str, secret: Optional[str] = None) -> Optional[dict]:
     """Verify and decode a JWT token. Returns payload or None."""
+    try:
+        if secret is None:
+            secret = _get_jwt_secret()
+    except RuntimeError:
+        # Secret missing — treat all tokens as invalid rather than crashing
+        return None
     try:
         parts = token.split(".")
         if len(parts) != 3:
