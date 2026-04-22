@@ -108,6 +108,30 @@ export interface TotalsMatrix {
   grand:         Record<string, number>;                         // year → total
 }
 
+/** Per-run audit metadata attached to every persisted simulation.
+ *
+ * Populated by the `run_50k_prod.py` script (v3.2+) and rehydrated by
+ * the FastAPI /api/v1/simulation endpoint. Surfaced in the dashboard's
+ * "Showing run #N · date · scenario" ribbon so users can tell which
+ * persisted run they're looking at.
+ */
+export interface RunMeta {
+  run_id: number | null;
+  run_date: string | null;
+  iterations: number | null;
+  model_type: string | null;
+  scenario?: string | null;
+  notes?: string | null;
+  seed?: number | null;
+  chains?: number | null;
+  git_sha?: string | null;
+  model_version?: string | null;
+  engine_name?: string | null;
+  converged_categories?: number | null;
+  total_categories?: number | null;
+  persisted_at_utc?: string | null;
+}
+
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
@@ -121,6 +145,8 @@ export interface SimulationResult {
   scenario?: ScenarioId;
   generated?: string;
   model_version?: string;
+  /** Audit metadata about the persisted run — drives the dashboard ribbon. */
+  run_meta?: RunMeta | null;
 }
 
 /** Parameters for running a simulation. */
