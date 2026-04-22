@@ -140,12 +140,16 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
 
 @pytest.fixture
 def mock_model_config() -> ModelConfig:
-    """Create a mock ModelConfig with default parameters."""
+    """Create a mock ModelConfig with default parameters.
+
+    v3.2: scalar `attenuation` removed. Uses the calibrated per-force
+    dict that ships in DEFAULT_PER_FORCE_ATTENUATION.
+    """
     config = ModelConfig(
         region="Global",
         aggregation_method="Multiplicative",
-        attenuation=0.5,
-        attenuation_source="assumed",
+        # per_force_attenuation defaults to DEFAULT_PER_FORCE_ATTENUATION
+        attenuation_source="calibrated_v3.1_april2026",
         neutral_threshold=0.001,
         base_year=2025,
         path_years=[2026, 2027, 2028, 2029, 2030],

@@ -24,14 +24,35 @@ VC_STEPS = [
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
 # ── Default model parameters ────────────────────────────────────────
-# DEFAULT_ATTENUATION is the BASE attenuation before per-force calibration.
-# The effective attenuation per force is computed as:
-#     eff_att_i = DEFAULT_ATTENUATION × (1 − mean(O[i][j] for j ≠ i))
-# where O is the calibrated DEFAULT_FORCE_OVERLAP_MATRIX below. As of v3.1
-# the overlap matrix is calibrated (not assumed) — the base stays at 0.5
-# but the PER-FORCE attenuation is data-driven. See attenuation_source.
-DEFAULT_ATTENUATION = 0.5          # Admin-configurable via PUT /api/v1/config
-DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.1_april2026"  # was "assumed"
+# v3.2 (April 2026): the legacy flat ``DEFAULT_ATTENUATION = 0.5`` and the
+# ``base × (1 − mean_overlap)`` indirection have been REMOVED. The engine
+# now consumes ``DEFAULT_PER_FORCE_ATTENUATION`` directly — these six
+# numbers are the calibrated per-force effective attenuations from the
+# 82-trend Bain review (v3.1, April 2026). Each value equals what the
+# old derivation would have produced (base 0.5 × (1 − cross-force row
+# mean)) but is now hardcoded so there is no flat-0.5 default anywhere
+# in the codebase, exports, API, or dashboard.
+#
+# Provenance per force:
+#   force            cross-force row mean   eff_att (NEW & only)
+#   Consumer                       0.036                  0.482
+#   Customer                       0.164                  0.418
+#   Technology                     0.130                  0.435
+#   Government                     0.194                  0.403
+#   Environmental                  0.173                  0.413
+#   Competitive                    0.027                  0.486
+#
+# Trend-weighted mean across the 82 trends ≈ 0.446 (Config sheet sanity check).
+# Source: data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet).
+DEFAULT_PER_FORCE_ATTENUATION = {
+    "Consumer":      0.482,
+    "Customer":      0.418,
+    "Technology":    0.435,
+    "Government":    0.403,
+    "Environmental": 0.413,
+    "Competitive":   0.486,
+}
+DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.1_april2026"  # only valid sources now: this, or "admin_override"
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
@@ -326,8 +347,10 @@ class ModelConfig:
     """
     region: str = "Global"
     aggregation_method: str = "Multiplicative"
-    attenuation: float = DEFAULT_ATTENUATION
-    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "assumed" | "calibrated_v3.1_april2026" | "admin_override"
+    # v3.2: scalar ``attenuation`` removed. The engine consumes a per-force
+    # dict directly. Source-of-truth is data/Attenuation_Calibration.xlsx.
+    per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
+    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.1_april2026" | "admin_override"
     neutral_threshold: float = DEFAULT_NEUTRAL_THRESHOLD
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))

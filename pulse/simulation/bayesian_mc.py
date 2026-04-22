@@ -57,39 +57,33 @@ class BayesianMonteCarloEngine:
 
     def _compute_effective_attenuation(self) -> dict:
         """
-        Compute per-force effective attenuation from the overlap matrix.
+        Return per-force effective attenuation directly from configuration.
 
-        Replaces the flat attenuation (e.g. 0.5 for all forces) with a
-        force-specific dampening that accounts for how much each force's
-        mechanism overlaps with other forces.
-
-        Formula: eff_att_i = base_attenuation × (1 - mean(overlap_ij for j ≠ i))
-
-        Example for Government (overlap: Env=0.40, Tech=0.20, Cust=0.15,
-        Con=0.10, Comp=0.05):
-          mean_overlap = (0.40 + 0.20 + 0.15 + 0.10 + 0.05) / 5 = 0.18
-          eff_att = 0.5 × (1 - 0.18) = 0.41
+        v3.2 (April 2026): the legacy ``base × (1 − mean_overlap)`` indirection
+        has been removed. The engine now consumes ``config.per_force_attenuation``
+        — six calibrated values (one per force) sourced from
+        data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet, 82-trend
+        Bain review). There is no flat 0.5 default and no scalar fallback.
 
         Returns: dict {force_name: effective_attenuation}
+
+        Raises: KeyError if any of the six forces is missing from the config
+                (validated upstream by ModelConfigValidator).
         """
-        overlap = getattr(self.config, 'force_overlap_matrix', None)
-        if not overlap:
-            # Fallback to flat attenuation for backward compatibility
-            return {f: self.config.attenuation for f in FORCES}
-
-        base = self.config.attenuation
-        eff = {}
-        for force in FORCES:
-            row = overlap.get(force, {})
-            cross_overlaps = [v for f, v in row.items() if f != force and v > 0]
-            if cross_overlaps:
-                mean_overlap = sum(cross_overlaps) / len(cross_overlaps)
-            else:
-                mean_overlap = 0.0
-            eff[force] = base * (1.0 - mean_overlap)
-
-        logger.info(f"Overlap-aware attenuation: {', '.join(f'{f}={v:.3f}' for f, v in eff.items())}")
-        return eff
+        per_force = dict(self.config.per_force_attenuation)
+        # Defensive: fail loudly if any force is missing.
+        missing = [f for f in FORCES if f not in per_force]
+        if missing:
+            raise KeyError(
+                f"per_force_attenuation missing forces: {missing}. "
+                f"All six forces required: {FORCES}"
+            )
+        logger.info(
+            "Per-force attenuation (calibrated, source=%s): %s",
+            getattr(self.config, "attenuation_source", "calibrated_v3.1_april2026"),
+            ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES),
+        )
+        return per_force
 
     def run(self, db: TrendDatabase, iterations: Optional[int] = None) -> dict:
         """
@@ -331,10 +325,11 @@ class BayesianMonteCarloEngine:
                 force_score = total_score
                 force_contributions[force] = force_score * force_weight
 
-            # Multiplicative compounding with overlap-aware per-force attenuation
+            # Multiplicative compounding with calibrated per-force attenuation.
+            # No scalar fallback: missing force → loud KeyError (validated upstream).
             product = 1.0
             for force, contribution in force_contributions.items():
-                eff_att = self._effective_attenuation.get(force, self.config.attenuation)
+                eff_att = self._effective_attenuation[force]
                 attenuated = contribution * eff_att
                 product *= (1.0 + attenuated)
 
@@ -390,10 +385,9 @@ class BayesianMonteCarloEngine:
             for y_idx, yr in enumerate(self.config.path_years):
                 mat_matrix[j, y_idx] = sched.get(yr, 1.0)
 
-        # --- Overlap-aware attenuation (replaces flat self.config.attenuation) ---
+        # --- Calibrated per-force attenuation (no scalar default) ---
         # Per-force effective attenuation: (n_forces,)
-        eff_att = np.array([self._effective_attenuation.get(f, self.config.attenuation)
-                            for f in force_list])
+        eff_att = np.array([self._effective_attenuation[f] for f in force_list])
 
         # Within-force overlap: pre-compute per (force, category) dampening factors.
         # n_active[f][c] = number of trends in force f with non-zero exposure to category c
@@ -927,16 +921,26 @@ class BayesianMonteCarloEngine:
             raise ValueError("pct must be in (0, 1)")
         inner_iters = iterations if iterations is not None else min(self.config.iterations, 2000)
 
-        base_att = float(self.config.attenuation)
-        att_low = base_att * (1.0 - pct)
-        att_high = base_att * (1.0 + pct)
+        # v3.2: there is no scalar base attenuation. Flex each calibrated
+        # per-force value uniformly by ±pct, clipped to [0, 1].
+        base_per_force = dict(self.config.per_force_attenuation)
+        base_mean = float(np.mean(list(base_per_force.values())))
 
-        def _run_with_att(a: float) -> dict:
-            cfg = self.config.copy_with(attenuation=a, attenuation_source="admin_override")
+        def _scale(d: dict, factor: float) -> dict:
+            return {f: float(np.clip(v * factor, 0.0, 1.0)) for f, v in d.items()}
+
+        per_force_low = _scale(base_per_force, 1.0 - pct)
+        per_force_high = _scale(base_per_force, 1.0 + pct)
+
+        def _run_with_pfa(pfa: dict) -> dict:
+            cfg = self.config.copy_with(
+                per_force_attenuation=pfa,
+                attenuation_source="admin_override",
+            )
             return BayesianMonteCarloEngine(cfg, seed=self.seed).run(db, iterations=inner_iters)
 
-        low_res = _run_with_att(att_low)
-        high_res = _run_with_att(att_high)
+        low_res = _run_with_pfa(per_force_low)
+        high_res = _run_with_pfa(per_force_high)
 
         last_year = self.config.path_years[-1]
 
@@ -967,9 +971,10 @@ class BayesianMonteCarloEngine:
 
         return {
             "pct": pct,
-            "attenuation_base": base_att,
-            "attenuation_low": att_low,
-            "attenuation_high": att_high,
+            "attenuation_base_mean": base_mean,
+            "per_force_attenuation_base": base_per_force,
+            "per_force_attenuation_low": per_force_low,
+            "per_force_attenuation_high": per_force_high,
             "headline": {
                 "base": base_headline,
                 "low": low_headline,
@@ -979,8 +984,9 @@ class BayesianMonteCarloEngine:
             "by_category": per_cat,
             "inner_iterations": inner_iters,
             "note": (
-                "Band shows headline shift when the attenuation factor is "
-                f"flexed by ±{int(pct*100)}%. Labels are attenuation-space: "
-                "'low' = attenuation × (1-pct), 'high' = attenuation × (1+pct)."
+                "Band shows headline shift when each calibrated per-force "
+                f"attenuation is uniformly flexed by ±{int(pct*100)}% "
+                "(clipped to [0, 1]). 'low' = pfa × (1-pct), "
+                "'high' = pfa × (1+pct)."
             ),
         }

@@ -82,30 +82,40 @@ def test_seed_reproducibility(db, seed):
 @given(att=st.floats(min_value=0.1, max_value=0.9, allow_nan=False),
        iters=st.integers(min_value=100, max_value=50_000))
 def test_copy_with_is_pure(att, iters):
+    """v3.2: validate copy_with on per_force_attenuation (no scalar)."""
+    from pulse.config import FORCES
     base = ModelConfig()
-    original_att = base.attenuation
+    original_pfa = dict(base.per_force_attenuation)
     original_iters = base.iterations
-    clone = base.copy_with(attenuation=att, iterations=iters)
-    assert clone.attenuation == att
+    new_pfa = {f: att for f in FORCES}
+    clone = base.copy_with(per_force_attenuation=new_pfa, iterations=iters)
+    assert clone.per_force_attenuation == new_pfa
     assert clone.iterations == iters
     # Base is untouched
-    assert base.attenuation == original_att
+    assert base.per_force_attenuation == original_pfa
     assert base.iterations == original_iters
     # Frozen: cannot mutate
     with pytest.raises(Exception):
-        base.attenuation = 0.1  # type: ignore[misc]
+        base.per_force_attenuation = {f: 0.1 for f in FORCES}  # type: ignore[misc]
 
 
 # ── Invariant 5: attenuation monotonicity of |headline| ─────────────
-# With a fixed seed and iterations, increasing attenuation should
-# increase |headline shift| in the compounding model (all trends share
-# the same directional sign in aggregate). This is a weak monotonicity
-# test — we only require the *average* relationship, not strict.
+# v3.2: scalar attenuation removed. We now scale every per-force value
+# uniformly by a factor and verify |headline| is monotone in that factor
+# (under fixed seed + iterations). All trends share the same directional
+# aggregate sign, so larger attenuation amplifies the magnitude.
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
 def test_attenuation_monotonic_in_headline(db, seed):
-    def _headline(att):
-        cfg = ModelConfig().copy_with(attenuation=att)
+    from pulse.config import FORCES
+    base_pfa = ModelConfig().per_force_attenuation
+
+    def _headline(factor):
+        scaled = {f: max(0.0, min(1.0, base_pfa[f] * factor)) for f in FORCES}
+        cfg = ModelConfig().copy_with(
+            per_force_attenuation=scaled,
+            attenuation_source="admin_override",
+        )
         r = BayesianMonteCarloEngine(cfg, seed=seed).run(db, iterations=400)
         last_year = cfg.path_years[-1]
         meds = [
@@ -114,9 +124,9 @@ def test_attenuation_monotonic_in_headline(db, seed):
         ]
         return float(np.mean(meds))
 
-    h_low = _headline(0.35)
-    h_base = _headline(0.50)
-    h_high = _headline(0.65)
+    h_low = _headline(0.70)   # 30 % flex down from calibrated baseline
+    h_base = _headline(1.00)
+    h_high = _headline(1.30)  # 30 % flex up
     # Monotonic in |.| — allow small noise tolerance
     assert abs(h_low) <= abs(h_base) + 0.005, (
         f"|headline| not monotone low vs base: {h_low} {h_base}"

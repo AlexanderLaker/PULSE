@@ -17,11 +17,25 @@
 
 import type { ForceName, Trend } from '@/types';
 
-// ─── Base model parameters ─────────────────────────────────────
-/** Base attenuation before per-force calibration. Mirrors
- *  DEFAULT_ATTENUATION in pulse/config.py. The PER-FORCE effective
- *  attenuation is computed from this via the force overlap matrix. */
-export const BASE_ATTENUATION = 0.5;
+// ─── Per-force calibrated attenuation ──────────────────────────
+/** v3.2 (April 2026): the legacy scalar BASE_ATTENUATION = 0.5 has
+ *  been removed. The frontend now mirrors the backend's
+ *  DEFAULT_PER_FORCE_ATTENUATION dict directly — six calibrated
+ *  values, one per force. There is no flat 0.5 anywhere.
+ *
+ *  Source-of-truth: data/Attenuation_Calibration.xlsx
+ *  (Cross-Force_Matrix sheet, 82-trend Bain review).
+ *
+ *  These six values must stay in lock-step with
+ *  pulse/config.py::DEFAULT_PER_FORCE_ATTENUATION. */
+export const DEFAULT_PER_FORCE_ATTENUATION: Record<ForceName, number> = {
+  Consumer:      0.482,
+  Customer:      0.418,
+  Technology:    0.435,
+  Government:    0.403,
+  Environmental: 0.413,
+  Competitive:   0.486,
+};
 
 /** Calibration provenance string — matches attenuation_source in
  *  the backend config. */
@@ -179,8 +193,11 @@ export function materializationAt(
  * for the full calibration methodology (excess-overlap-above-baseline
  * + force-size asymmetry + mechanism adjustment).
  *
- * Applied as:
- *   eff_att_i = BASE_ATTENUATION × (1 − mean(O[i][j] for j ≠ i))
+ * v3.2: this matrix is retained for analytical / reporting purposes
+ * (Config sheet "Cross-Force Matrix" section, dependency visualizations).
+ * The engine no longer derives effective attenuation from it at runtime —
+ * the calibrated per-force values now live in DEFAULT_PER_FORCE_ATTENUATION
+ * and are consumed directly.
  */
 export const DEFAULT_FORCE_OVERLAP_MATRIX: Record<ForceName, Record<ForceName, number>> = {
   Consumer:      { Consumer: 0.0,   Customer: 0.050, Technology: 0.000, Government: 0.000, Environmental: 0.050, Competitive: 0.080 },
@@ -210,30 +227,30 @@ export const DEFAULT_WITHIN_FORCE_OVERLAP: Record<ForceName, number> = {
 };
 
 /**
- * Per-force effective attenuation.
+ * Per-force effective attenuation. v3.2: returns the calibrated value
+ * directly from DEFAULT_PER_FORCE_ATTENUATION — no `base × (1 − overlap)`
+ * derivation, no scalar fallback.
  *
- *   eff_att_i = base × (1 − mean(O[i][j] for j ≠ i))
+ * Calibrated values (frozen from 82-trend Bain review, April 2026):
+ *   Consumer      0.482
+ *   Customer      0.418
+ *   Technology    0.435
+ *   Government    0.403
+ *   Environmental 0.413
+ *   Competitive   0.486
  *
- * With BASE_ATTENUATION = 0.5 and the v3.1 calibrated matrix this yields:
- *   Consumer      ≈ 0.486   (very low external overlap)
- *   Customer      ≈ 0.396
- *   Technology    ≈ 0.432
- *   Government    ≈ 0.401
- *   Environmental ≈ 0.432
- *   Competitive   ≈ 0.456   (very low external overlap)
+ * @param force  One of the six force names.
+ * @param overrides  Optional per-force overrides (e.g. when the backend
+ *   has shipped admin-overridden values via GET /config). When omitted
+ *   the calibrated defaults are used.
  */
 export function effectiveAttenuation(
   force: ForceName,
-  base: number = BASE_ATTENUATION,
+  overrides?: Partial<Record<ForceName, number>>,
 ): number {
-  const row = DEFAULT_FORCE_OVERLAP_MATRIX[force];
-  if (!row) return base;
-  const offDiagonal = (Object.entries(row) as [ForceName, number][])
-    .filter(([other]) => other !== force)
-    .map(([, v]) => v);
-  if (offDiagonal.length === 0) return base;
-  const mean = offDiagonal.reduce((s, x) => s + x, 0) / offDiagonal.length;
-  return base * (1 - mean);
+  const v = overrides?.[force];
+  if (typeof v === 'number') return v;
+  return DEFAULT_PER_FORCE_ATTENUATION[force];
 }
 
 /**

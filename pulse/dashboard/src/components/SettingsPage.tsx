@@ -55,8 +55,11 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  const [attenuation, setAttenuation] = useState(0.5);
-  const [attenuationSource, setAttenuationSource] = useState<string>('assumed');
+  // v3.2: per-force calibrated attenuation (no scalar default).
+  const [perForceAttenuation, setPerForceAttenuation] = useState<Record<ForceName, number>>(
+    () => Object.fromEntries(FORCES.map(f => [f, 0])) as Record<ForceName, number>
+  );
+  const [attenuationSource, setAttenuationSource] = useState<string>('calibrated_v3.1_april2026');
   const [forceWeights, setForceWeights] = useState<Record<ForceName, number>>(
     () => Object.fromEntries(FORCES.map(f => [f, 1 / 6])) as Record<ForceName, number>
   );
@@ -100,7 +103,9 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      if (data.attenuation != null) setAttenuation(data.attenuation);
+      if (data.per_force_attenuation && typeof data.per_force_attenuation === 'object') {
+        setPerForceAttenuation(data.per_force_attenuation);
+      }
       if (data.attenuation_source) setAttenuationSource(data.attenuation_source);
       if (data.force_weights) setForceWeights(data.force_weights);
       if (data.vc_weights) setVCWeights(data.vc_weights);
@@ -298,8 +303,21 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
             />
 
             <Hint>
-              <strong style={{ color: T.text2 }}>What this does:</strong> Attenuation dampens the raw force signal to prevent double-counting when multiple trends capture the same phenomenon (e.g., Environmental and Government trends both covering PFAS). Each off-diagonal cell is the share of the <em>row force</em>'s signal that overlaps with the <em>column force</em>'s signal; the diagonal is within-force cohesion. Together these scale the effective attenuation per force by <em>1 − mean cross-force overlap</em>.
+              <strong style={{ color: T.text2 }}>What this does:</strong> Each off-diagonal cell is the share of the <em>row force</em>'s signal that overlaps with the <em>column force</em>'s signal; the diagonal is within-force cohesion. <strong style={{ color: T.text2 }}>v3.2:</strong> these matrices are retained for analytics and provenance, but the engine no longer derives effective attenuation from them at runtime. The six per-force values shown below are the calibrated outputs of the 82-trend Bain review (April 2026) and are consumed directly. There is no flat 0.5 default anywhere.
             </Hint>
+            <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>
+                Per-Force Effective Attenuation (read-only)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                {FORCES.map(f => (
+                  <div key={f} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, padding: '4px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}>
+                    <span style={{ color: FORCE_COLORS[f], fontWeight: 600 }}>{FORCE_SHORT[f]}</span>
+                    <span style={{ color: T.text2, fontFamily: T.mono }}>{(perForceAttenuation[f] ?? 0).toFixed(3)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </Card>
 
           {/* Force Weights */}

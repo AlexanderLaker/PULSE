@@ -2,7 +2,7 @@
 
 Ensures configuration parameters satisfy mathematical constraints:
 - Weights sum to 1.0 (with tolerance)
-- Attenuation within [0, 1]
+- Per-force attenuation values within [0, 1] (one per force)
 - Materialization values ascending from 0 to 1
 - Positive iterations and valid category counts
 """
@@ -79,7 +79,7 @@ class ModelConfigValidator(BaseModel):
 
     region: str
     aggregation_method: str
-    attenuation: float
+    per_force_attenuation: Dict[str, float]
     attenuation_source: str
     neutral_threshold: float
     base_year: int
@@ -92,24 +92,53 @@ class ModelConfigValidator(BaseModel):
     within_force_rho: float
     t_copula_df: int
 
-    @field_validator("attenuation")
+    @field_validator("per_force_attenuation")
     @classmethod
-    def validate_attenuation(cls, v: float) -> float:
-        """Attenuation must be between 0 and 1."""
-        if not (0.0 <= v <= 1.0):
+    def validate_per_force_attenuation(cls, v: Dict[str, float]) -> Dict[str, float]:
+        """Per-force attenuation must contain all six forces with values in [0, 1].
+
+        v3.2: the legacy flat scalar ``attenuation`` was removed. The engine
+        now consumes one calibrated value per force directly. Source-of-truth
+        is data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet),
+        seeded into ``DEFAULT_PER_FORCE_ATTENUATION``.
+        """
+        if not v:
+            raise ValueError("per_force_attenuation cannot be empty")
+
+        provided = set(v.keys())
+        required = set(FORCES)
+        missing = required - provided
+        if missing:
             raise ValueError(
-                f"Attenuation must be between 0 and 1 (got {v}). "
-                f"Default is 0.5."
+                f"per_force_attenuation missing forces: {missing}. "
+                f"All six forces required: {required}"
             )
+        extra = provided - required
+        if extra:
+            raise ValueError(
+                f"per_force_attenuation contains unknown forces: {extra}. "
+                f"Only these allowed: {required}"
+            )
+
+        for force, val in v.items():
+            if not isinstance(val, (int, float)):
+                raise ValueError(
+                    f"per_force_attenuation['{force}'] must be a number (got {type(val).__name__})"
+                )
+            if not (0.0 <= float(val) <= 1.0):
+                raise ValueError(
+                    f"per_force_attenuation['{force}'] = {val} is outside [0, 1]"
+                )
         return v
 
     @field_validator("attenuation_source")
     @classmethod
     def validate_attenuation_source(cls, v: str) -> str:
-        """Attenuation source must be 'assumed' or 'admin_override'."""
-        if v not in ("assumed", "admin_override"):
+        """Attenuation source must be 'calibrated_v3.1_april2026' or 'admin_override'."""
+        if v not in ("calibrated_v3.1_april2026", "admin_override"):
             raise ValueError(
-                f"attenuation_source must be 'assumed' or 'admin_override' (got '{v}')"
+                f"attenuation_source must be 'calibrated_v3.1_april2026' or "
+                f"'admin_override' (got '{v}')"
             )
         return v
 

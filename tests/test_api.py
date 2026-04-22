@@ -103,12 +103,13 @@ class TestAPIConfiguration:
             assert isinstance(data, dict)
 
     def test_config_includes_key_fields(self, client):
-        """Should include attenuation, iterations, etc."""
+        """Should include per_force_attenuation, iterations, etc. (v3.2: scalar
+        attenuation removed; per-force dict is now the source of truth)."""
         response = client.get("/api/v1/config")
         if response.status_code == 200:
             data = response.json()
             # Should have model configuration
-            expected_fields = ["region", "attenuation", "iterations", "path_years"]
+            expected_fields = ["region", "per_force_attenuation", "iterations", "path_years"]
             for field in expected_fields:
                 # At least some should be present
                 if field in data:

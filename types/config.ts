@@ -101,7 +101,12 @@ export interface DiagnosticsResult {
 export interface ModelConfig {
   region?: string;
   aggregation_method?: string;
-  attenuation?: number;
+  /** v3.2: per-force calibrated attenuation. The legacy scalar
+   *  `attenuation` was removed entirely — there is no flat 0.5 default
+   *  anywhere. Six values (one per force) sourced from
+   *  data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet). */
+  per_force_attenuation?: Record<ForceName, number>;
+  attenuation_source?: 'calibrated_v3.1_april2026' | 'admin_override';
   neutral_threshold?: number;
   base_year?: number;
   path_years?: ProjectionYear[];

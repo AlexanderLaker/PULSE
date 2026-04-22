@@ -219,13 +219,29 @@ class ShiftMatrixWriter:
         """Write run metadata and configuration."""
         ws = wb.create_sheet("Metadata")
 
+        # v3.2: per-force calibrated attenuation. No flat 0.5 default exists
+        # anywhere. The Config sheet (built separately) carries the full
+        # overlap detail; here we surface each force's calibrated value plus
+        # the trend-weighted mean for at-a-glance context.
+        pfa = dict(getattr(self.config, "per_force_attenuation", {}))
+        force_order = ["Consumer", "Customer", "Technology", "Government",
+                       "Environmental", "Competitive"]
+        pfa_str = ", ".join(
+            f"{f}={pfa[f]:.3f}" for f in force_order if f in pfa
+        ) or "n/a"
+        pfa_mean = (
+            sum(pfa.values()) / len(pfa) if pfa else 0.0
+        )
+
         data = [
             ("PRISM Shift Matrix", ""),
             ("Generated", datetime.now().isoformat()),
-            ("Model Version", "2.0 — Bayesian Copula + Causal DAG"),
+            ("Model Version", "2.5.0 — Bayesian Copula (v3.2 cleanup)"),
             ("Iterations", mc_result.get("iterations", "N/A")),
             ("Model Type", mc_result.get("model_type", "N/A")),
-            ("Attenuation", f"{self.config.attenuation:.3f} ({self.config.attenuation_source})"),
+            ("Attenuation Source", self.config.attenuation_source),
+            ("Per-Force Attenuation", pfa_str),
+            ("Per-Force Mean (unweighted)", f"{pfa_mean:.3f}"),
             ("Path Years", str(self.config.path_years)),
             ("", ""),
             ("SECURITY NOTE", "This file contains ONLY percentage shifts."),

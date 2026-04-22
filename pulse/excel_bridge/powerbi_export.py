@@ -325,13 +325,19 @@ class PowerBIExporter:
         Returns:
             Dictionary with metadata information
         """
+        # v3.2: per-force calibrated attenuation. Power BI semantic models
+        # consume the dict; downstream measures can flatten or pivot as needed.
+        pfa = {
+            f: round(float(v), 4)
+            for f, v in dict(getattr(self.config, "per_force_attenuation", {})).items()
+        }
         return {
             "export_type": "Power BI Flat Table",
             "generated": self.export_timestamp,
-            "model_version": "2.0 — Bayesian Copula + Causal DAG",
+            "model_version": "2.5.0 — Bayesian Copula (v3.2 cleanup)",
             "iterations": mc_result.get("iterations", "N/A"),
             "model_type": mc_result.get("model_type", "N/A"),
-            "attenuation": f"{self.config.attenuation:.3f}",
+            "per_force_attenuation": pfa,
             "attenuation_source": self.config.attenuation_source,
             "path_years": self.config.path_years,
             "categories": len(self.config.category_names),

@@ -69,7 +69,11 @@ export interface HealthStatus {
 export interface ModelConfig {
   region?: string;
   aggregation_method?: string;
-  attenuation?: number;
+  /** v3.2: per-force calibrated attenuation. The legacy scalar
+   *  `attenuation` was removed entirely. Six values (one per force)
+   *  sourced from data/Attenuation_Calibration.xlsx. */
+  per_force_attenuation?: Record<ForceName, number>;
+  attenuation_source?: 'calibrated_v3.1_april2026' | 'admin_override';
   neutral_threshold?: number;
   base_year?: number;
   path_years?: ProjectionYear[];
