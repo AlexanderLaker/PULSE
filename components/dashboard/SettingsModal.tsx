@@ -502,8 +502,11 @@ const SessionsSection: FC = () => {
     setRevokingId(sessionId);
     setStatus(null);
     try {
-      const target = sessions?.find((s: { id: string }) => s.id === sessionId);
-      if (target) await target.revoke();
+      // Clerk v6: revoke a specific session by passing its ID to signOut().
+      // This ends just that session (e.g. another device), leaving the
+      // current session untouched. The top-level useClerk().signOut({ sessionId })
+      // is the supported way to do this from the frontend SDK.
+      await signOut({ sessionId });
       setStatus({ kind: 'success', message: 'Session revoked.' });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to revoke session.';
@@ -511,7 +514,7 @@ const SessionsSection: FC = () => {
     } finally {
       setRevokingId(null);
     }
-  }, [sessions]);
+  }, [signOut]);
 
   const handleSignOutEverywhere = useCallback(async () => {
     setSigningOutAll(true);
