@@ -69,7 +69,7 @@ TRENDS = [
         # 25%: PL directly competes for ~40-50% of volume but branded margin
         # defense limits GP1 exposure to the price-gap erosion portion
         gp1_pct_affected=0.25,
-        strategic_implication="Defend through demonstrable superiority, not price. Invest in innovation that justifies the premium gap. LHC most exposed (45% PL penetration); Hair more insulated (30%).",
+        strategic_implication="Highest-impact Consumer trend in the database (probability 5, 25% GP1 affected, Contraction). Exposure is skewed to the LHC side of the portfolio: Fabric Cleaning, Fabric Care and Laundry Additives score 5 while Hair sits at 2-3, mirroring the ~45% PL penetration in German laundry versus ~30% in mass Hair. The value chain pressure points cluster downstream at Marketing (4), Commercial (5) and Consumer (5) — this is a shelf and shopper-consideration problem, not a formulation problem. Regional concentration is unambiguously European (5/5) with only secondary North American exposure (3/5) and near-zero Asia/High-Growth exposure. Source triangulation is strong (Circana EU6, NIQ, PLMA; Tier A/B) and confidence is High. For HCB the net situation is a structural margin squeeze in European LHC where mid-tier pricing ladders are being eroded by premium PL tiers from Aldi and Lidl, compounded by retailer consolidation (K-03). Hair is the natural hedge inside the portfolio but cannot offset the scale of LHC exposure in the home region.",
         category_exposure=cat(3,3,2,3, 5,5,4,5,4,4,3,4),
         vc_exposure=vc(1,1,1,1,1,4,5,5),
         regional_exposure=reg(5,3,2,2),
@@ -88,7 +88,7 @@ TRENDS = [
         # EU adoption curve steepening. Hair thinning side-effect creates
         # new demand vector. Body care spending uplift documented.
         gp1_pct_affected=0.10,
-        strategic_implication="Position Schwarzkopf Hair premium portfolio for self-care spending reallocation. Develop GLP-1-specific thickening/volumizing line under Care. Monitor LHC basket size impact. EU launch timing: 2027-2028.",
+        strategic_implication="Upgraded April 2026 to probability 5 / GP1 10% following JPM's $100B+ market projection and 30M US users by 2030 (Expansion). The category read is bifurcated: Hair Care and Hair Body score 4 (self-care spending reallocation, volumising demand from GLP-1 thinning side-effects), while LHC is near-zero (0-2) with a slight drag from reduced laundry frequency in GLP-1 households. Regionally this is a North America-first trend (5/5), with Europe a 12-18 month follower (4/5) and Asia/High-Growth lagging materially. The value chain hotspots are Consumer (5), Marketing (4) and Commercial (3) — demand-side not supply-side, though Formulation (2) acknowledges a thickening/volumising reformulation angle. Sources are top-tier (JPM, McKinsey, IQVIA, HBR; High confidence). For HCB the situation is an NA-weighted net tailwind for the premium-adjacent Care and Body segments, but with a timing gap: US-exposed players capture the 2026-2028 window while Europe waits for adoption to steepen. The trend's LHC drag is modest but real and reinforces the premiumisation imperative in Hair.",
         category_exposure=cat(2,4,2,4, 1,1,0,2,0,0,0,0),
         vc_exposure=vc(0,2,0,0,0,4,3,5),
         regional_exposure=reg(4,5,3,2),
@@ -105,7 +105,7 @@ TRENDS = [
         # 20%: Premium tier is ~25-30% of Hair GP1 and accelerating;
         # L'Oréal Prof +15% proves ceiling is higher
         gp1_pct_affected=0.20,
-        strategic_implication="Invest disproportionately in Schwarzkopf premiumization. Salon-to-retail crossover is the fastest white space.",
+        strategic_implication="Unambiguous expansion trend (probability 5, 20% GP1 affected). Category exposure is pure Hair — Color, Care, Styling and Body score 4-5 with zero LHC read. Premium hair care is growing 2-3x mass rate, L'Oréal Professional Products +15% in 2025 proves the ceiling is not saturated. Regional exposure is broad-based across Europe (5), North America (5), Asia (4) and High-Growth (3), making this a globally portable growth vector rather than a regional pocket. Value chain concentration is high across Formulation (5), Marketing (5), Packaging (4) and Consumer (5) — premiumisation is a whole-value-chain discipline, not a marketing exercise. Sources are strong (Henkel FY25, Euromonitor; High confidence). For HCB the situation is the single largest within-Hair growth pool, with a direct crossover opportunity from professional heritage into consumer retail. The asymmetry is that HCB's 0.3% FY25 organic growth contrasts sharply with L'Oréal PPD's +15% — the premium pool is expanding, but HCB is not capturing proportionate share at current run-rate.",
         category_exposure=cat(4,5,4,3, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(3,5,3,4,2,5,4,5),
         regional_exposure=reg(5,5,4,3),
@@ -122,7 +122,7 @@ TRENDS = [
         # 10%: Affects the ~30% of consumers who actively select on
         # clean/clinical criteria, translating to ~10% GP1 exposure
         gp1_pct_affected=0.10,
-        strategic_implication="Lead on formulation transparency and ingredient storytelling. Use Schwarzkopf R&D depth as credibility anchor.",
+        strategic_implication="Medium-confidence expansion trend (probability 4, 10% GP1 affected). Category exposure is broad but thinner than C-03 — Hair Care and Body score 4, Color 3, Styling 2; LHC is engaged at 2-3 across the enzyme-based cold-wash segments. The trend intersects three regulatory forces (G-01 PFAS, G-03 Cosmetics Regulation, G-05 Green Claims) and therefore has a compliance-to-credibility conversion angle. Regional exposure is Europe-led (5) and North America-second (4), with Asia (3) and High-Growth (2) trailing. Value chain activity is front-loaded at Raw Materials (4), Formulation (5) and Consumer (5) — this is a formulation-backed positioning play, not pure marketing. Sources are mid-tier (Mintel, Beauty Independent, CosmeticsDesign; Medium confidence). For HCB the situation is that established R&D depth and formulation scale create a credibility moat against smaller clean-beauty challengers who cannot substantiate clinical claims — but the same moat is also claimed by every competitor with scale R&D. Cleanical is no longer differentiating; it is table-stakes for premium Hair and increasingly for premium LHC.",
         category_exposure=cat(3,4,2,4, 3,3,2,2,2,2,1,1),
         vc_exposure=vc(4,5,2,3,2,4,3,5),
         regional_exposure=reg(5,4,3,2),
@@ -139,7 +139,7 @@ TRENDS = [
         # 12%: 65+ already ~20% of buyers; incremental growth in Color
         # (gray coverage) and gentle formulation segments
         gp1_pct_affected=0.12,
-        strategic_implication="Strengthen Color portfolio around gray coverage CEP. Adapt packaging for ease of use.",
+        strategic_implication="Demographic tailwind with 5/5 probability and 12% GP1 affected (Expansion). The category profile is heavily Color-weighted (5) — grey-coverage remains the #1 Category Entry Point for the 65+ cohort — with secondary exposure in Hair Care (3) and minor LHC exposure (2) via ease-of-use packaging demands (arthritis-friendly caps, lighter bottles). Regional exposure is Europe-dominant (5) and NA-second (4), reflecting the oldest demographic profiles in HCB's core markets. The value chain hotspots are Consumer (5), Marketing (4) and Packaging (3). Sources are S-tier (Eurostat, UN WPP, WHO, OECD; High confidence). For HCB the situation is structurally favourable given Europe-weighted revenue and a Color portfolio with the broadest shade range in mass retail — among the few demographic trends that work with rather than against HCB's geographic concentration. The caveat is that grey-coverage loyalty is traditionally high, meaning incremental share is hard to win but existing share is defensible.",
         category_exposure=cat(5,3,1,2, 2,2,1,2,2,1,1,1),
         vc_exposure=vc(1,3,1,3,1,4,3,5),
         regional_exposure=reg(5,4,3,2),
@@ -156,7 +156,7 @@ TRENDS = [
         # 20%: Broad-based but stabilizing; ECB rate cuts and easing
         # inflation slightly reduce pressure vs. original assessment
         gp1_pct_affected=0.20,
-        strategic_implication="Protect price-value perception. Avoid pure price defense — innovate in value formats (concentrated, refill).",
+        strategic_implication="Broad-based contraction trend (probability 4, 20% GP1 affected), stabilising in 2026 as ECB rate cuts ease mortgage pressure. Category exposure is even at 3 across Hair (Color, Care, Styling, Body) but materially higher on the LHC value side — Laundry Additives (5), Fabric Cleaning/Care (4), HDW/ADW (3). Regional weight is European (5), with secondary NA (3) and limited Asia/High-Growth exposure. Value chain concentration is downstream: Marketing (4), Commercial (5), Consumer (5) — this is a consideration-set and willingness-to-pay problem. Sources are strong (BCG, McKinsey; High confidence). For HCB the situation is bifurcated: the premium Hair tier remains relatively resilient while the value LHC tier faces maximum PL pressure (C-01 compounding). Dual-brand architecture provides a natural hedge, but the macro stabilisation means the trend is decelerating rather than reversing — the trading-down share captured since 2022 will not simply snap back.",
         category_exposure=cat(3,3,3,3, 4,4,3,5,3,3,2,2),
         vc_exposure=vc(1,1,1,2,1,4,5,5),
         regional_exposure=reg(5,3,2,2),
@@ -173,7 +173,7 @@ TRENDS = [
         # 8%: Scalp care grew 19% in H1 2025; mass retail arrival of
         # skinification expands addressable market
         gp1_pct_affected=0.08,
-        strategic_implication="Launch Schwarzkopf scalp care line leveraging professional expertise. New profit pool, not cannibalization.",
+        strategic_implication="High-probability expansion (5) with 8% GP1 affected on a new-pool basis (not cannibalisation). Category exposure is narrow but deep — Hair Care (5) and Color (2) are the only active categories; LHC is zero. Scalp care grew 19% YoY in H1 2025 and the $88.2B market is projected to reach $150.5B by 2033 (7% CAGR). Regional exposure is North America-first (5), Asia-second (5) where skinification is most advanced, and Europe a late-follower (4). Value chain engagement is heavy in Raw Materials (3), Formulation (5), Marketing (5), Commercial (4) and Consumer (5) — a full-stack innovation trend. Sources are mid-tier (Grand View Research, Kline, Spate; Medium confidence). For HCB the situation is the single largest category white space in Hair. Competitor activity is already dense (P&G microbiome front-of-pack, Unilever Dove Scalp+Hair Therapy) and dermatological heritage in the Professional arm is an underexploited translation asset into mass retail.",
         category_exposure=cat(2,5,1,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(3,5,2,3,1,5,4,5),
         regional_exposure=reg(4,5,5,2),
@@ -190,7 +190,7 @@ TRENDS = [
         # 8%: Males ~15-20% of Hair buyers; under-penetrated segment
         # growth adds to pool but from small base
         gp1_pct_affected=0.08,
-        strategic_implication="Expand got2b male positioning. Develop male-specific Care and Styling lines.",
+        strategic_implication="Steady expansion (probability 4, 8% GP1 affected). European male grooming $23.6B in 2025 at 7.65% CAGR. Category exposure concentrates on Hair Styling (4) and Hair Body (4), with secondary Hair Care (3) and Color (2); LHC is zero. A minor linkage exists into LHC premium fragrance (sport/fresh profiles) as a fragrance-premiumisation adjacency. Regional exposure is broad (EU=5, NA=4, Asia=4, HG=3). Value chain concentration is Marketing (5), Commercial (4), Consumer (5). Sources are mid-tier (Statista, Euromonitor, Allied, Mintel; Medium confidence). For HCB the situation is a structurally under-penetrated segment where the portfolio has a youth-styling foothold but lacks dedicated male Care and male scalp-care lines. Male scalp concerns (dandruff, thinning, oiliness) overlap with C-07 (Scalp) and C-10 (Hair Loss), meaning three trends reinforce a single white space.",
         category_exposure=cat(2,3,4,4, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(2,3,2,3,1,5,4,5),
         regional_exposure=reg(5,4,4,3),
@@ -207,7 +207,7 @@ TRENDS = [
         # 12%: Fragrance is now #1 premiumization lever in LHC,
         # expanding beyond Southern Europe; PL cannot follow credibly
         gp1_pct_affected=0.12,
-        strategic_implication="Invest in fragrance chemistry for Persil and Vernel. Premium sensory experience justifies branded price premium vs PL. Beat P&G Lenor Unstoppables.",
+        strategic_implication="High-margin expansion (probability 4, 12% GP1 affected). Category exposure is LHC-concentrated with Fabric Finisher (4), Laundry Additives (4), Fabric Cleaning (4), and Hard Surface Cleaner (3); Fabric Care Specialty and HDW/ADW are secondary. Fragrance/scent-booster products are growing 15%+ in Southern Europe and now expanding to Germany/Northern Europe. Regional exposure is Europe-led (5), Asia (4), High-Growth (3) and NA (3). Value chain engagement is heavy at Raw Materials (4), Formulation (5), Packaging (4), Marketing (5) and Consumer (5). Sources are Medium-confidence (Euromonitor, Kantar, IFF). For HCB the situation is that fragrance chemistry is a genuine PL-defence moat — PL cannot replicate complex fragrance development credibly — and the capability is shared across divisions. The reference competitor (P&G Lenor Unstoppables) is the benchmark. This is one of the few LHC trends that combines expansion direction with defensible differentiation.",
         # FCA→2 (Perwoll not the fragrance play), FFI→4 (Vernel IS the fragrance softener brand)
         category_exposure=cat(0,0,0,1, 4,2,4,4,1,2,3,1),
         vc_exposure=vc(4,5,2,4,1,5,3,5),
@@ -225,7 +225,7 @@ TRENDS = [
         # 6%: GLP-1 side-effect amplifier increases demand; new adjacent
         # pool with growing overlap to existing Care
         gp1_pct_affected=0.06,
-        strategic_implication="Launch clinical-grade Schwarzkopf hair loss treatment line. Professional credibility maps to clinical positioning.",
+        strategic_implication="Mid-size expansion (probability 4, 6% GP1 affected). Category exposure is narrow — Hair Care (5) only, with minor Color/Styling/Body adjacency. The trend is a category-creation vector rather than existing-pool reshaping. GLP-1 hair-thinning (C-02) acts as an additional demand amplifier, creating reinforcing trend dependencies. Regional profile favours North America (5), Asia (5) and Europe (4), with HG at 3. Value chain hotspots are Formulation (5), Marketing (5) and Consumer (5). Sources are Medium confidence (Fortune Business Insights, Mordor, Grand View, AAD). For HCB the situation is a new adjacent pool with growing overlap to existing Care — professional-grade thinning expertise is an underexploited asset that maps cleanly onto the consumer-grade thickening positioning. Regulatory caution applies: positioning at the cosmetic end vs pharmaceutical end matters for EU/FDA classification.",
         category_exposure=cat(1,5,1,1, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(3,5,2,2,1,5,4,5),
         regional_exposure=reg(4,5,5,3),
@@ -242,7 +242,7 @@ TRENDS = [
         # 12%: Gen Z ~20% of category spend; dupe-seeking erodes
         # branded price premium for ~60% of that cohort
         gp1_pct_affected=0.12,
-        strategic_implication="Counter with formulation transparency and ingredient storytelling. Schwarzkopf R&D depth is the defense.",
+        strategic_implication="Structural contraction (probability 5, 12% GP1 affected). Category exposure is broad across Hair (Care=4, Color=3, Styling=4, Body=3) with secondary LHC exposure (FCN=2, FCA=2, LAD=2). Regional profile is NA-led (5) and EU-second (4) — Gen Z dupe culture is culturally Anglo-American in origin. Value chain engagement is downstream at Marketing (5), Commercial (3) and Consumer (5). Sources are Medium confidence (Mintel, Attest, eMarketer, Beauty Independent). For HCB the situation has three layers: first, Gen Z dupe-seeking erodes branded price premium for roughly 60% of the cohort; second, professional heritage provides partial credibility insulation (dupe-seekers respect authenticated performance claims); third — and most overlooked — Gen Z minimalist routines of 3-5 steps structurally reduce total consumption occasions, particularly in Styling where 18-24 usage is already declining. LHC is less exposed because functional efficacy reduces dupe incentive, but Hair Styling is disproportionately exposed.",
         category_exposure=cat(3,4,4,3, 2,2,0,2,1,1,1,0),
         vc_exposure=vc(1,3,0,2,0,5,3,5),
         regional_exposure=reg(4,5,4,2),
@@ -271,7 +271,7 @@ TRENDS = [
         # 12%: Cosmetics PFAS ban already effective Jan 2026 — no longer
         # proposal but active regulation. LHC reformulation cost substantial
         gp1_pct_affected=0.12,
-        strategic_implication="Proactive reformulation as competitive advantage. AI-driven formulation (T-01) reduces reformulation cost and time.",
+        strategic_implication="High-confidence contraction (probability 5, 12% GP1 affected). Cosmetics PFAS ban already effective January 2026 — this is active regulation, not a proposal. Category exposure is disproportionately LHC: Insect Control (5), Fabric Care Specialty (5), Hard Surface Cleaner (4), Laundry Additives (4), Automatic Dish Wash (4), Fabric Cleaning (4), HDW/FFI (3). Hair is relatively insulated at 2-3. Regional exposure is Europe-dominant (5), with secondary North America (3) and minimal Asia/HG. Value chain engagement is heaviest upstream at Raw Materials (5), Formulation (5), Manufacturing (3) — reformulation cost is the core transmission channel. Sources are regulatory-tier (ECHA, RAC, SEAC; High confidence). For HCB the situation is a multi-year reformulation programme across surface-treatment chemistries, stain-resistance and water-repellent coatings in FCN, FCA and IC. The phase-in timeline through 2032 offers a compliance-to-moat conversion window for players with AI formulation depth (T-01), but the absolute compliance cost is real and front-loaded.",
         category_exposure=cat(2,2,3,2, 4,5,3,4,3,4,4,5),
         vc_exposure=vc(5,5,3,2,3,2,2,1),
         regional_exposure=reg(5,3,2,2),
@@ -288,7 +288,7 @@ TRENDS = [
         # 10%: Pod/capsule formats are ~15-20% of LAD/ADW volume;
         # reformulation + potential format disruption
         gp1_pct_affected=0.10,
-        strategic_implication="Accelerate bio-based capsule film R&D (T-02). Persil Discs and Somat capsules are core platforms at risk.",
+        strategic_implication="High-confidence contraction (probability 5, 10% GP1 affected). Microplastics Phase 2 timeline is 2027-2029 with a step-function impact profile. Category exposure concentrates on pod/capsule formats: Laundry Additives (5), Automatic Dish Wash (5), Fabric Cleaning (4), Fabric Care Specialty (4), HDW (3), IC (3), Color/Care/Styling/Body (2-3). Regional profile is Europe-led (5) with limited NA/Asia exposure. Value chain concentration is Raw Materials (4), Formulation (5), Manufacturing (4) and Packaging (5) — PVA capsule film and dissolution properties are the core technical risk. Sources are S-tier regulatory (ECHA). For HCB the situation is that pod and capsule formats represent ~15-20% of LAD and ADW volume, meaning a PVA reclassification as microplastic would trigger labelling restrictions or format phase-out in the two highest-penetration premium LHC formats. This is the single highest-impact LHC regulatory risk in the database and the tightest dependency on bio-based reformulation (T-02).",
         category_exposure=cat(2,3,2,2, 4,4,2,5,3,5,2,3),
         vc_exposure=vc(4,5,4,5,2,2,2,2),
         regional_exposure=reg(5,2,2,1),
@@ -305,7 +305,7 @@ TRENDS = [
         # 15%: Hair dye reformulation among hardest in consumer chemistry;
         # Color portfolio disproportionately exposed (colorant restrictions)
         gp1_pct_affected=0.15,
-        strategic_implication="Color portfolio most at risk — hair dye reformulation is among hardest in consumer chemistry.",
+        strategic_implication="High-confidence contraction (probability 4, 15% GP1 affected). Rolling restriction of UV filters, preservatives, fragrances and colorants under EC 1223/2009 amendments. Category exposure is Hair-dominant: Color (5), Care (4), Body (4), Styling (3); LHC minimal (0-2). Regional exposure is Europe (5), with limited NA (2), Asia (3) and HG (2). Value chain engagement is heavy at Raw Materials (5), Formulation (5), and minimal downstream. Sources are S-tier (EUR-Lex, SCCS, Cosmetics Europe; High confidence). For HCB the situation is that hair dye reformulation is among the hardest in consumer chemistry — 18-36 months per colorant — and the Color portfolio carries disproportionate regulatory exposure. The compensating factor is that century-scale color expertise and AI formulation capability create a structural cost-of-compliance advantage versus smaller competitors who cannot absorb the reformulation burden. Compliance itself becomes a concentration force in European Color.",
         category_exposure=cat(5,4,3,4, 2,2,1,1,1,1,1,0),
         vc_exposure=vc(5,5,2,1,2,2,2,2),
         regional_exposure=reg(5,2,3,2),
@@ -322,7 +322,7 @@ TRENDS = [
         # 7%: COGS increase from PCR premium + new packaging space
         # restrictions + digital identifier requirements compound compliance cost
         gp1_pct_affected=0.07,
-        strategic_implication="Front-load packaging redesign investment. PCR resin sourcing as strategic priority.",
+        strategic_implication="High-confidence contraction (probability 5, 7% GP1 affected) with a step-function profile. PPWR applies from August 12, 2026; digital identifiers required from 2027; recycled content thresholds at 30% by 2030 and 65% by 2040. Category exposure is uniform (3 across all 12 categories) because every SKU is affected — this is the broadest regulatory footprint in the database. Regional profile is Europe-only (5). Value chain concentration is Packaging (5), Raw Materials (3), Manufacturing (3), Supply Chain (3). Sources are S-tier (EUR-Lex, Gleiss Lutz, Circularise; High confidence). For HCB the situation is that PCR resin premium adds 10-15% to packaging costs across the entire portfolio, compounded by new empty-space restrictions and digital-identifier requirements. The scale advantage — centralised packaging R&D and procurement — partially offsets per-SKU compliance cost, but PCR resin supply bottlenecks at scale remain a binding constraint on compliance-at-pace.",
         category_exposure=cat(3,3,3,3, 3,3,3,3,3,3,3,3),
         vc_exposure=vc(3,0,3,5,3,2,2,2),
         regional_exposure=reg(5,2,2,1),
@@ -339,7 +339,7 @@ TRENDS = [
         # 8%: Restricts a marketing lever, not the product itself;
         # mainly affects the sustainability-premium pricing delta
         gp1_pct_affected=0.08,
-        strategic_implication="Invest in substantiation infrastructure. Turn compliance into credibility advantage for brands with genuine sustainability credentials.",
+        strategic_implication="High-confidence contraction (probability 5, 8% GP1 affected). EmpCo Directive applies September 2026 with a sharp step-function compliance cliff. Category exposure is broad and even (2-3 across all 12 categories) because sustainability claims span the entire portfolio. Regional profile is Europe-led (5), with minimal exposure elsewhere. Value chain concentration is Marketing (5), Commercial (3), Consumer (3) — the transmission channel is marketing architecture rather than product. Sources are S-tier (EU Directive 2024/825). For HCB the situation is two-sided: brands with genuine sustainability investment gain relative advantage as competitors' unsubstantiated claims get restricted, while some existing green claims may themselves require substantiation upgrades. Sub-brands positioned on natural/eco messaging face specific scrutiny under the new regime. CSRD-compliant reporting already in place provides a starting position; however, this is a marketing-lever restriction, not a product-level restriction — the impact is on the sustainability-premium pricing delta rather than the product itself.",
         category_exposure=cat(3,3,2,3, 3,3,2,3,2,3,2,2),
         vc_exposure=vc(1,1,1,2,2,5,3,3),
         regional_exposure=reg(5,2,1,1),
@@ -356,7 +356,7 @@ TRENDS = [
         # 5%: Supply chain compliance cost; palm-derived surfactants are
         # ~15% of raw material cost, traceability adds ~2-3% to that
         gp1_pct_affected=0.05,
-        strategic_implication="Palm-derived surfactant supply chain must achieve full traceability. Supplier qualification as strategic investment.",
+        strategic_implication="High-confidence contraction (probability 4, 5% GP1 affected). EUDR December 2026 application confirmed. Category exposure is broad across palm-derived formulations: Hair Care (3), Body (3), Fabric Cleaning (3), Fabric Care (3), Laundry Additives (4), Automatic Dish Wash (3), Insect Control (3). Regional exposure is Europe (5), with meaningful Asia (3) and HG (3) given upstream sourcing geography. Value chain concentration is Raw Materials (5), Manufacturing (1), Packaging (2), Supply Chain (5) — this is a traceability and procurement trend. Sources are S-tier (EU Regulation 2023/1115). For HCB the situation is that palm-derived surfactants (sodium laureth sulfate, cocamidopropyl betaine) appear in >80% of shampoo and liquid detergent formulations and EUDR requires geolocation-level traceability to specific plantation. RSPO certification provides a head start but EUDR's no-deforestation-after-2020 threshold is stricter. Supply chain compliance cost flows through ~2-3% of the ~15% raw material cost base tied to palm.",
         category_exposure=cat(1,3,2,3, 3,3,2,4,2,3,2,3),
         vc_exposure=vc(5,2,1,2,5,1,1,1),
         regional_exposure=reg(5,2,3,3),
@@ -373,7 +373,7 @@ TRENDS = [
         # 3%: Triple regulatory overlap (PPWR + Green Claims + DPP)
         # creates compounding IT cost across 50,000+ SKUs
         gp1_pct_affected=0.03,
-        strategic_implication="Compliance/IT cost — not a fundamental business model change. Detergents in first wave.",
+        strategic_implication="Medium-confidence contraction (probability 4, 3% GP1 affected) — the smallest GP1 impact among Government trends but compounding with G-04 and G-05. PPWR mandates digital identifiers (QR codes) from 2027. Category exposure is broad and moderate (2-3 across all 12 categories). Regional exposure is Europe-only (5). Value chain concentration is Packaging (4), Supply Chain (3), Raw Materials (2), Manufacturing (2), Commercial (2), Consumer (2). Sources are Medium confidence (EU ESPR, DPP standards). For HCB the situation is a compliance-plus-IT cost layer across 50,000+ SKUs requiring a PIM system upgrade — scale amortises the fixed IT cost but the per-SKU data-preparation burden is substantial. The triple regulatory stack (PPWR + Green Claims + DPP) creates compounding compliance load on the same packaging/marketing assets. There is a latent consumer-engagement opportunity if DPP is used as a scan-to-learn channel, but this is optionality not baseline.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
         vc_exposure=vc(2,2,2,4,3,1,2,2),
         regional_exposure=reg(5,1,1,1),
@@ -395,7 +395,7 @@ TRENDS = [
         # with 5 regulatory trends (G-01 to G-05) amplifies value
         gp1_pct_affected=0.10,
         description="AI formulation accelerated beyond initial projections. L'Oréal filed 725 patents in 2025, many AI-driven. 67% of organizations adopted LLMs by 2025. Intersects every Government trend (G-01 to G-05) — faster reformulation = lower compliance cost. L'Oréal R&D €1.7B (4% revenue) vs. Henkel HCB estimated €300-400M creates structural gap. Counter-play: partner with specialty AI formulation startups rather than building all in-house.",
-        strategic_implication="Deploy AI formulation to reduce regulatory compliance cost (G-01 to G-03) and accelerate innovation cycles.",
+        strategic_implication="Medium-confidence expansion (probability 5, 10% GP1 affected). AI-driven formulation at 67%+ organisational adoption. Category exposure is broad with Hair slightly heavier: Color (5), Care (4), Styling (3), Body (3); LHC uniform at 3-4. Regional exposure is global: NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is heavily upstream: Raw Materials (3), Formulation (5), Manufacturing (3). Sources are Medium confidence (Deloitte, trade press). For HCB the situation is that AI formulation intersects with five Government trends (G-01 to G-05), meaning faster reformulation cycles directly reduce compliance cost and create a compounding advantage as regulatory density increases. The structural constraint is scale: L'Oréal's €1.7B R&D spend (4% of revenue) creates a 4-5x absolute budget gap vs HCB, which means organic pace cannot match — AI-formulation partnerships with specialist startups become the access condition rather than full internal build-out.",
         category_exposure=cat(5,4,3,3, 4,3,3,4,3,4,3,3),
         vc_exposure=vc(3,5,3,1,1,1,2,1),
         regional_exposure=reg(4,5,4,2),
@@ -412,7 +412,7 @@ TRENDS = [
         # affects raw material cost (~25% of COGS) for reformulated products
         gp1_pct_affected=0.10,
         description="Bio-based chemistry progressing rapidly. Novozymes/dsm-firmenich enzyme scaling on track. Persil cold-wash enzyme platform is most mature bio-chemistry play in Henkel portfolio — directly addresses consumer (C-04 cleanical), government (G-01 PFAS, G-02 microplastics), and environmental (E-02 water scarcity) trends simultaneously. Single highest-value technology investment for LHC. PFAS restriction (G-01) accelerates from nice-to-have to must-have. Cost parity 2028-2029 achievable.",
-        strategic_implication="The Persil cold-wash enzyme platform is the LHC proof point. First-mover turns regulatory cost into competitive advantage.",
+        strategic_implication="Medium-confidence expansion (probability 4, 10% GP1 affected). Bio-based and green chemistry alternatives — Novozymes/dsm-firmenich enzyme platforms maturing, cost parity with palm-derived projected 2028-2029. Category exposure is broad LHC plus Hair: FCN (4), FCA (4), LAD (5), HSC (4), Body (3), Care (3), IC (4); Color (2), Styling (2). Regional exposure is global: Europe (5), NA (4), Asia (3), HG (3). Value chain concentration is front-heavy: Raw Materials (5), Formulation (5), Supply Chain (3), Manufacturing (3). Sources are Medium confidence (BASF/Novozymes, regulatory analysis). For HCB the situation is that this is the single highest-value technology investment on the LHC side — it addresses C-04 (cleanical demand), G-01 (PFAS), G-02 (microplastics) and E-02 (water scarcity) simultaneously, converting regulatory compliance cost into a margin advantage. The existing cold-wash enzyme platform is the most mature bio-chemistry play in the portfolio; first-mover economics are preserved while cost parity is still 2-3 years away.",
         category_exposure=cat(2,3,2,3, 4,4,3,5,3,4,4,4),
         vc_exposure=vc(5,5,3,2,3,3,2,3),
         regional_exposure=reg(5,4,3,3),
@@ -429,7 +429,7 @@ TRENDS = [
         # ~10% of volume currently transitioning to new formats
         gp1_pct_affected=0.07,
         description="Format innovation crossing early-adopter threshold confirmed. Solid shampoo bars are Hair format opportunity (Schwarzkopf limited presence); ultra-concentrated refills and laundry sheets the LHC play. Persil Discs already a concentrated format success — extending to ultra-concentrate refill pouches is next step. PPWR (G-04) packaging requirements create regulatory tailwind. Competitive watch: Blueland and DTC brands are category-defining the refill aesthetic.",
-        strategic_implication="Per-use margins improve even at lower shelf prices. Aligns with PPWR compliance.",
+        strategic_implication="Medium-confidence expansion (probability 4, 7% GP1 affected). Concentrated and solid formats — solid shampoo bars, ultra-concentrated refills, laundry sheets — crossing the early-adopter threshold. Category exposure is LHC-heavy: FCN (3), HDW (3), ADW (3), HSC (3), LAD (4), FCA (2), FFI (2), IC (2); Hair Care (4), Body (3), Color (1), Styling (2). Regional exposure is Europe (5), NA (4), Asia (3), HG (2). Value chain engagement is broad: Raw Materials (3), Formulation (4), Manufacturing (4), Packaging (5), Supply Chain (4), Marketing (3), Commercial (3), Consumer (4). Sources are Medium confidence (Unilever/Blueland, category analysis). For HCB the situation is that per-use margins improve even at lower shelf prices, PPWR (G-04) creates a regulatory tailwind, and existing pod/disc positions provide partial coverage of the concentrated-format consumer need-state. DTC brands (Blueland, Earth Breeze) are category-defining the refill aesthetic at the value end, meaning the premium-concentrated cartridge platform (T-08) is the defensive anchor while sheets (C-22) are the peripheral competitive threat.",
         # FCA→2 (Perwoll not the concentrated/solid formats play; FCN/LAD are)
         category_exposure=cat(1,4,2,3, 3,2,2,4,3,3,3,2),
         vc_exposure=vc(3,4,4,5,4,3,3,4),
@@ -447,7 +447,7 @@ TRENDS = [
         # (Dove Scalp + Hair Therapy, P&G front-of-pack) accelerate timeline
         gp1_pct_affected=0.08,
         description="Microbiome market accelerating (14.6% CAGR, scalp care 19% in H1 2025). P&G front-of-pack branding confirmed. Dove Scalp + Hair Therapy launched. Intersects with C-07 (Scalp Care) — microbiome science is technology platform for scalp care products. Schwarzkopf Professional has dermatological expertise (Seborin, Bonacure) but not translated to consumer microbiome positioning. L'Oréal created Beauty Tech hub in India for AI-powered solutions. Move now or lose position.",
-        strategic_implication="Formulation investment in microbiome-friendly actives. Care and Body are the categories.",
+        strategic_implication="Medium-confidence expansion (probability 4, 8% GP1 affected). Microbiome market at 14.6% CAGR, scalp care 19% in H1 2025 — multiple competitor launches (Dove Scalp + Hair Therapy, P&G front-of-pack branding) accelerating the timeline. Category exposure is Hair-only: Care (5), Body (4), Color (1), Styling (1); LHC minimal (FCA=2). Regional exposure is NA (5), Asia (5), Europe (4), HG (2). Value chain engagement is Raw Materials (4), Formulation (5), Manufacturing (3), Marketing (4), Consumer (4). Sources are Medium confidence (BeautyMatter, Data Insights). For HCB the situation is that the trend is the technology platform for scalp care (C-07), with a clear linkage into the professional dermatological heritage (Seborin/Bonacure lineage). L'Oréal's India Beauty Tech hub is already building AI-powered microbiome solutions, meaning the window to establish credible consumer microbiome positioning is closing rather than opening.",
         category_exposure=cat(1,5,1,4, 1,2,0,1,0,0,1,0),
         vc_exposure=vc(4,5,3,2,2,4,3,4),
         regional_exposure=reg(4,5,5,2),
@@ -464,7 +464,7 @@ TRENDS = [
         # reduction translates to ~2-3pp margin improvement on ~30% of ops
         gp1_pct_affected=0.06,
         description="Manufacturing AI adoption confirmed. Henkel 30+ Consumer Brands manufacturing plants represent significant deployment opportunity. Margin impact critical when pricing constrained by PL (C-01) and retail power (K-01, K-03). Henkel operational excellence heritage (OpEx) is cultural enabler. Priority: European plants where energy cost (E-07) structurally higher, making efficiency gains most valuable.",
-        strategic_implication="COGS reduction flows to margin — critical when pricing power constrained by PL.",
+        strategic_implication="Medium-confidence expansion (probability 4, 6% GP1 affected). Manufacturing automation and Industry 4.0. Category exposure is uniform at 3 across all 12 categories — this is a cross-portfolio COGS trend rather than a category-specific one. Regional exposure is broad: Europe (4), NA (4), Asia (4), HG (3). Value chain concentration is Manufacturing (5), Supply Chain (5), Raw Materials/Formulation/Packaging (2-3). Sources are Medium confidence (Deloitte). For HCB the situation is that 30+ Consumer Brands manufacturing plants represent significant deployment opportunity, with 20-30% inventory reduction translating to ~2-3pp margin improvement on ~30% of operations. Margin impact is critical when pricing is constrained by PL (C-01) and retailer power (K-01, K-03). Priority deployment logic favours European plants where energy cost (E-07) structurally higher makes efficiency gains most valuable — operational-excellence heritage is the cultural enabler.",
         category_exposure=cat(3,3,3,3, 3,3,3,3,3,3,3,3),
         vc_exposure=vc(2,2,5,3,5,1,1,0),
         regional_exposure=reg(4,4,4,3),
@@ -481,7 +481,7 @@ TRENDS = [
         # structural margin tax accelerating across all channels
         gp1_pct_affected=0.14,
         description="Retail media surging: US alone $58.8B in 2025, $69.3B forecast 2026 (+17.8% YoY). Amazon 79.7% share, Walmart 8.0%, capturing 89% of incremental spend. Structural margin tax — retailers extract 8-12% of brand net revenue for visibility. From Byron Sharp: over-indexing erodes long-term Mental Availability (brand memory) in favor of short-term Physical Availability (search ranking). Gen AI marketing efficiency (T-10) partially offsets cost.",
-        strategic_implication="From Byron Sharp perspective: over-indexing on retail media erodes long-term Mental Availability. Balance is critical.",
+        strategic_implication="High-confidence contraction (probability 5, 14% GP1 affected) — one of the largest structural margin-tax trends in the database. Retail media surging: US alone $58.8B in 2025, $69.3B forecast 2026 (+17.8% YoY). Amazon 79.7% share, Walmart 8.0%. Category exposure is uniform at 3 across all categories — every brand pays the tax. Regional exposure is global: NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is Marketing (5), Commercial (5), Consumer (4). Sources are High confidence (eMarketer). For HCB the situation is that retailers now extract 8-12% of brand net revenue for visibility — a structural re-allocation of margin from brand to channel. The Byron Sharp read is that over-indexing on retail media erodes long-term Mental Availability in favour of short-term Physical Availability, creating a second-order brand-strength decay. Gen AI marketing efficiency (T-10) offsets some of the cost but not the share of net revenue captured. This trend compounds K-08 (US retail media specifically) to create one of the largest multi-trend margin compressions in the model.",
         category_exposure=cat(3,3,3,3, 3,3,3,3,3,3,2,2),
         vc_exposure=vc(0,0,0,0,0,5,5,4),
         regional_exposure=reg(4,5,4,2),
@@ -498,7 +498,7 @@ TRENDS = [
         # commercial case; Schwarzkopf salon network is deployment asset
         gp1_pct_affected=0.04,
         description="L'Oréal K-SCAN (AI camera for personalized hair recommendations) proved +23% salon sales uplift — validating commercial case. L'Oréal Beauty Tech hub in India building AI solutions. Color shade matching is natural AI use case for Schwarzkopf. Schwarzkopf Professional salon network is unique deployment platform for AI diagnostics. LHC: limited personalization relevance (functional needs, not personal).",
-        strategic_implication="Color shade matching is natural AI use case. Schwarzkopf Professional digital tools as platform.",
+        strategic_implication="Low-confidence expansion (probability 3, 4% GP1 affected). L'Oréal K-SCAN (AI camera for personalised hair recommendations) proved +23% salon sales uplift, validating the commercial case. Category exposure is Hair-only: Color (4), Care (4), Styling (3), Body (3); LHC near-zero because personalisation relevance is low for functional categories. Regional exposure is NA (5), Asia (5), Europe (3), HG (1). Value chain concentration is Formulation (4), Manufacturing (3), Marketing (4), Consumer (5). Sources are Low confidence (L'Oréal Modiface, Function of Beauty). For HCB the situation is that Color shade matching is the natural use case and the professional salon network is a unique deployment platform that no competitor can easily replicate. The enterprise-rollout timeline is slow (2032 peak year), meaning this is a back-loaded technology trend where the commercial case is proven but scale deployment is still 3-5 years out.",
         category_exposure=cat(4,4,3,3, 1,1,0,1,0,0,0,0),
         vc_exposure=vc(1,4,3,2,1,4,3,5),
         regional_exposure=reg(3,5,5,1),
@@ -515,7 +515,7 @@ TRENDS = [
         # razor-and-blade model creates recurring cartridge revenue with lock-in
         gp1_pct_affected=0.07,
         description="Henkel Smartwash launched for sale in Europe 2025 (Persil Smartwash + Somat Smartwash). 300 quadrillion unique AI dosing configurations. Creates razor-and-blade model — device creates recurring cartridge revenue with platform lock-in. Most differentiated technology play and strongest defense against PL in premium laundry. Mass adoption timeline 2-3 years. Critical risk: if appliance OEMs (Bosch, Samsung, LG) build proprietary dosing platforms, Henkel could be disintermediated. Imperative: secure OEM partnerships before appliance makers create own detergent subscriptions.",
-        strategic_implication="Henkel Smartwash is the most differentiated LHC play. First-mover on dosing platform captures disproportionate value.",
+        strategic_implication="Medium-confidence expansion (probability 4, 7% GP1 affected). Smartwash launched for sale in Europe 2025; 300 quadrillion unique AI dosing configurations; razor-and-blade model with cartridge lock-in. Category exposure is LHC-pure: Laundry Additives (5), Fabric Care Specialty (4), Automatic Dish Wash (4), Fabric Cleaning (3), HDW (2); Hair zero. Regional exposure is Europe (5), NA (4), Asia (4), HG (1). Value chain engagement is balanced: Raw Materials (2), Formulation (5), Manufacturing (4), Packaging (4), Supply Chain (2), Marketing (3), Commercial (4), Consumer (4). Sources are Medium confidence (IMARC, CES 2025, Mordor). For HCB the situation is the most differentiated LHC technology position in the portfolio — a proprietary dosing platform creates retailer-bypass subscription economics and the strongest defence against PL at the premium end of laundry. The binding constraint is OEM: if appliance makers (Bosch, Samsung, LG) build proprietary dosing platforms, a disintermediation scenario is activated. This is both the largest defensive moat and the largest single-point-of-failure technology trend in LHC.",
         category_exposure=cat(0,0,0,0, 3,4,0,5,2,4,0,0),
         vc_exposure=vc(2,5,4,4,2,3,4,4),
         regional_exposure=reg(5,4,4,1),
@@ -537,7 +537,7 @@ TRENDS = [
         # B50 diverts supply, driving 20-40% price spikes on oleochemicals
         gp1_pct_affected=0.12,
         description="Indonesia B50 mandate impact confirmed. Henkel uses palm-derived surfactants in >80% of shampoo and liquid detergent formulations (see G-06). B50 creates supply squeeze independent of EUDR compliance costs. Combined: palm oil becoming both more expensive (B50 supply diversion) and more compliance-heavy (EUDR traceability). Accelerate bio-based alternatives (T-02) and diversify to coconut-derived and synthetic surfactants. Transition window: 2-3 years before structural cost impact.",
-        strategic_implication="Diversify away from palm-derived surfactants. Bio-based alternatives (T-02) become strategic imperative.",
+        strategic_implication="High-confidence contraction (probability 4, 12% GP1 affected). Indonesia B50 mandate impact confirmed. Category exposure is broad LHC + Hair: FCN (4), FCA (4), LAD (5), ADW (4), Care (4), Body (4), HSC (3), IC (4), HDW (3); Color (2), Styling (3). Regional exposure is concentrated in sourcing geography: Asia (5), NA (4), Europe (4), HG (4). Value chain concentration is Raw Materials (5), Manufacturing (2), Supply Chain (4). Sources are High confidence (Indonesia B50 analysis, FMCG supply chain reports). For HCB the situation is that palm-derived surfactants feature in >80% of shampoo and liquid detergent formulations, so B50 creates a supply squeeze independent of EUDR compliance costs (G-06). The combined effect is that palm is becoming both more expensive and more compliance-heavy, shifting the economics in favour of bio-based alternatives (T-02) and precision fermentation (T-15). The transition window is 2-3 years before structural cost impact bites.",
         category_exposure=cat(2,4,3,4, 4,4,3,5,3,4,3,4),
         vc_exposure=vc(5,3,2,1,4,0,2,1),
         regional_exposure=reg(4,4,5,4),
@@ -554,7 +554,7 @@ TRENDS = [
         # addition); three-pillar HCB opportunity structure
         gp1_pct_affected=0.07,
         description="Water scarcity intensifying in Southern Europe, MENA, Asia. Three HCB opportunities: (1) LHC: Persil cold-wash at 20°C becomes default recommendation in water-stressed regions, (2) Hair: dry shampoo growth (C-15) amplified by water conservation, (3) LHC: concentrated formulations reduce water in product (less water = sustainability claim). For High Growth markets: India and Middle East water scarcity makes low-water formulations a market entry advantage.",
-        strategic_implication="Cold-wash Persil at 20°C innovation. Styling benefits from dry shampoo growth.",
+        strategic_implication="Medium-confidence expansion (probability 4, 7% GP1 affected). Water scarcity intensifying in Southern Europe, MENA and Asia. Category exposure is broad: Hair Styling (4), Care (3), Body (2); LHC FCN (3), FCA (3), LAD (4), ADW (3), HDW (3), HSC (3). Regional exposure is High-Growth (5), Europe (4), Asia (4), NA (3) — this is a markets-where-water-is-scarce trend rather than a home-market trend. Value chain engagement is balanced: Raw Materials (2), Formulation (4), Manufacturing (3), Packaging (3), Supply Chain (2), Marketing (3), Consumer (4). Sources are Medium confidence (UN Water, Open-Meteo). For HCB the situation has three pillars: cold-wash detergent becomes the default recommendation in water-stressed regions, dry shampoo (C-15) is amplified by water conservation, and concentrated formulations can be positioned with a direct sustainability claim. India and Middle East water scarcity make low-water formulations a market-entry advantage rather than just a sustainability claim.",
         category_exposure=cat(1,3,4,2, 3,3,2,4,3,3,3,2),
         vc_exposure=vc(2,4,3,3,2,3,2,4),
         regional_exposure=reg(4,3,4,5),
@@ -571,7 +571,7 @@ TRENDS = [
         # Scope 3 reporting is compliance cost, not margin destruction
         gp1_pct_affected=0.04,
         description="CBAM and CSRD timeline confirmed. Scope 3 reporting requires tracing carbon footprint across entire supply chain. Henkel existing sustainability reporting infrastructure provides head start. Cost impact (1-3% on imported raw materials) modest but cumulative with palm oil (E-01), energy (E-07), tariffs (G-08/G-09). Strategic play: use Scope 3 data as supplier negotiation lever — incentivize lower-carbon offerings through preferential procurement.",
-        strategic_implication="Optimize supply chain carbon intensity. Front-load compliance to avoid future cost spikes.",
+        strategic_implication="High-confidence contraction (probability 4, 4% GP1 affected) with a step-function profile. CBAM phases in 2026; CSRD Scope 3 reporting mandatory. Category exposure is uniform at 2-3 across the portfolio. Regional exposure is Europe (5), Asia (3), HG (3), NA (2). Value chain concentration is upstream: Raw Materials (4), Manufacturing (4), Supply Chain (4), Packaging (3). Sources are High confidence (EU CBAM, CSRD text). For HCB the situation is that Scope 3 reporting forces traceable carbon accounting across the entire supply chain — existing sustainability reporting infrastructure provides a head start. Cost impact is modest at 1-3% on imported raw materials but cumulative with palm (E-01), energy (E-07), tariffs (G-08/09) and biodiversity (G-11). The trend's strategic value is that Scope 3 data becomes a supplier-negotiation lever — preferential procurement for lower-carbon suppliers creates durable cost advantage as carbon prices rise.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,2,2,3),
         vc_exposure=vc(4,2,4,3,4,1,1,0),
         regional_exposure=reg(5,2,3,3),
@@ -588,7 +588,7 @@ TRENDS = [
         # penalties can 2-5x for non-compliant materials, but small base
         gp1_pct_affected=0.04,
         description="EPR eco-modulation confirmed and expanding across EU member states. Henkel LHC trigger spray bottles (Bref, WC Frisch) specifically at risk of 3-5x eco-modulation penalties due to multi-material construction. Redesign toward mono-material packaging is mitigation — but requires R&D in spray mechanisms that work with single-plastic construction.",
-        strategic_implication="Packaging redesign for mono-material where possible. Reduce eco-modulation penalties.",
+        strategic_implication="High-confidence contraction (probability 5, 4% GP1 affected). EPR eco-modulation confirmed and expanding across EU member states. Category exposure is LHC-heavy: FCN (3), FCA (3), LAD (3), HSC (2), IC (3), FFI (2); Hair Color/Body/Styling (2-3). Regional exposure is Europe-only (5). Value chain concentration is Packaging (5), Raw Materials (1). Sources are High confidence (CITEO, CONAI). For HCB the situation is that trigger-spray bottles (HSC formats specifically) face 3-5x eco-modulation penalties due to multi-material construction — a targeted cost concentration on a small but margin-dense format sub-segment. Mono-material redesign is the mitigation lever but requires new R&D in spray mechanisms compatible with single-plastic construction. EPR fees themselves are a small share of packaging cost (1-2%) but the compounding risk is that eco-modulation penalties for non-compliant materials multiply the base fee by 2-5x.",
         category_exposure=cat(3,2,3,2, 3,3,2,3,2,2,2,3),
         vc_exposure=vc(1,0,1,5,2,0,2,0),
         regional_exposure=reg(5,2,1,1),
@@ -605,7 +605,7 @@ TRENDS = [
         # and seasonal expansion; concentrated effect on one category
         gp1_pct_affected=0.08,
         description="Climate-driven pest expansion confirmed. Henkel IC category (Catch, Home Mat) is niche but high-margin. Geographic expansion into Northern/Central Europe creates new addressable market in Germany, Austria, Benelux where Henkel distribution infrastructure is strongest. One of few climate trends unambiguously positive for HCB. Seasonal demand window extension (4 months to 6-7 months) directly increases annual sales potential.",
-        strategic_implication="IC category benefits from geographic and seasonal expansion.",
+        strategic_implication="Medium-confidence expansion (probability 4, 8% GP1 affected). Climate-driven pest pattern shifts — one of the few climate trends unambiguously positive for the portfolio. Category exposure is narrow and concentrated: Insect Control (5); all other categories zero. Regional exposure is broad: High-Growth (5), Europe (4), Asia (4), NA (3). Value chain engagement is Raw Materials (3), Formulation (3), Manufacturing (2), Marketing (3), Commercial (3), Consumer (4). Sources are Medium confidence (ECDC, Open-Meteo). For HCB the situation is that IC is a niche but high-margin category where geographic expansion into Northern/Central Europe (Germany, Austria, Benelux) creates a new addressable market precisely where distribution infrastructure is strongest. Seasonal demand-window extension from 4 months to 6-7 months directly increases annual sales potential. The category is small in absolute terms but the trend is directly accretive rather than defensive.",
         # IC=5 (insect control is the entire trend), not FFI (fabric softener)
         category_exposure=cat(0,0,0,0, 0,0,0,0,0,0,0,5),
         vc_exposure=vc(3,3,2,1,1,3,3,4),
@@ -623,7 +623,7 @@ TRENDS = [
         # dual-sourcing premium + transition costs increasing
         gp1_pct_affected=0.06,
         description="Supply chain diversification confirmed and accelerating post-tariff escalation (G-08). Henkel 75+ country manufacturing presence provides inherent nearshoring flexibility. Turkey is strategic hub (existing factory, proximity to EMEA, free trade agreements). Short-term COGS uplift from dual-sourcing (2-5% premium) but long-term resilience. Chinese surfactant suppliers represent ~30% of European FMCG supply — diversification urgent.",
-        strategic_implication="Short-term cost increase but long-term resilience. Invest in European/Turkish chemical sourcing.",
+        strategic_implication="Medium-confidence contraction (probability 4, 6% GP1 affected). Supply chain diversification confirmed and accelerating post-tariff escalation (G-08). Category exposure is uniform at 2-3 across the portfolio. Regional exposure is Asia (5), Europe (4), NA (4), HG (4). Value chain concentration is upstream: Raw Materials (4), Manufacturing (3), Packaging (2), Supply Chain (5). Sources are Medium confidence (McKinsey). For HCB the situation is that 75+ country manufacturing presence provides inherent nearshoring flexibility and Turkey is a strategic hub (existing factory, proximity to EMEA, free-trade agreements). Short-term COGS uplift from dual-sourcing sits at a 2-5% premium but long-term resilience is materially improved. Chinese surfactant suppliers represent ~30% of European FMCG supply — diversification is not optional given compounding tariff, palm and energy trends.",
         category_exposure=cat(3,3,3,3, 3,3,2,3,3,3,2,3),
         vc_exposure=vc(4,1,3,2,5,0,1,0),
         regional_exposure=reg(4,4,5,4),
@@ -645,7 +645,7 @@ TRENDS = [
         # declined 7% in early 2025 signaling brand weakness
         gp1_pct_affected=0.12,
         description="Completion confirmed December 31, 2025. Essential Home revenue declined 7% in early 2025 even before divestiture. ~80 brands including Calgon, Woolite, Cillit Bang transferred. Time-limited (2-3 year) share capture window: Calgon vs. Somat (water softener), Cillit Bang vs. Bref (bathroom/toilet), Woolite vs. Perwoll (fabric care). PE ownership means reduced marketing investment and R&D cuts within 12-18 months. Henkel actions: (1) increase trade promotion in overlap categories, (2) target weakened shelf positions in retailer negotiations, (3) monitor talent acquisition from Advent operations.",
-        strategic_implication="Capture shelf space and share during competitor transition period.",
+        strategic_implication="High-confidence expansion (probability 5, 12% GP1 affected). Reckitt Essential Home divestiture completed December 31, 2025 with Essential Home revenue already declining 7% in early 2025 before divestiture. Category exposure is LHC-only: FCN (4), FCA (3), FFI (3), LAD (4), ADW (3), HDW (3), HSC (4), IC (3); Hair zero. Regional exposure is Europe (5), HG (4), NA (3), Asia (2). Value chain concentration is Marketing (4), Commercial (5), Consumer (4). Sources are High confidence (Reckitt official, Advent deal terms). For HCB the situation is a time-limited share-capture window — roughly 2-3 years — across overlap categories where ~80 transferred brands face PE-ownership dynamics of reduced marketing investment and R&D cuts within 12-18 months. The core overlaps are water softener, bathroom/toilet cleaner and fabric care specialty. This is one of the few pure expansion trends on the competitive side and creates a forcing function for trade-promotion and shelf-negotiation intensity in the near term.",
         category_exposure=cat(0,0,0,0, 4,3,3,4,3,3,4,3),
         vc_exposure=vc(0,1,1,0,1,4,5,4),
         regional_exposure=reg(5,3,2,4),
@@ -662,7 +662,7 @@ TRENDS = [
         # €50B war chest intensifies fight for ~30% of Hair shelf
         gp1_pct_affected=0.15,
         description="Unilever B&W FY2025: +4.3% underlying sales confirmed. Dove Scalp + Hair Therapy launched (directly competing with C-07 scalp opportunity). Hair Care grew low-single digit but Dove Hair double-digit. Wellbeing brands (Nutrafol, K18, Liquid I.V.) delivered double-digit growth. Intensified competition in Care (Dove vs. GLISS/Schauma), Styling (TRESemmé vs. got2b). Threat is not just budget — Unilever innovation pace in Hair accelerating (Dove fibre repair technology). Henkel defense: premiumize faster via Schwarzkopf Professional crossover.",
-        strategic_implication="Accelerate Schwarzkopf premiumization before Unilever saturates the space. Care is the primary battleground.",
+        strategic_implication="High-confidence contraction (probability 5, 15% GP1 affected). Unilever B&W FY2025: +4.3% underlying sales, Dove Scalp + Hair Therapy launched, Hair Care grew low-single-digit but Dove Hair double-digit. Category exposure is Hair-only: Care (5), Color (3), Styling (3), Body (4); LHC minimal. Regional exposure is global: Europe (5), NA (5), Asia (5), HG (5) — this is the most geographically universal competitive threat. Value chain concentration is Marketing (5), Commercial (5), Consumer (4), Formulation (3). Sources are High confidence (Unilever FY25 results, Capital Markets Day). For HCB the situation is direct competitive overlap in Hair Care (Dove vs core Care), Styling (TRESemmé vs mass Styling) and a specific threat on scalp care (Dove Scalp + Hair Therapy directly competing with the C-07 opportunity). Beyond budget, Unilever's innovation pace in Hair is accelerating (Dove fibre repair) and the Wellbeing brand portfolio (Nutrafol, K18, Liquid I.V.) delivers double-digit growth. The intensity is unusual in that it combines scale, innovation velocity and adjacent-category acquisition simultaneously.",
         category_exposure=cat(3,5,3,4, 1,1,0,1,0,0,0,0),
         vc_exposure=vc(1,3,1,1,1,5,5,4),
         regional_exposure=reg(5,5,5,5),
@@ -679,7 +679,7 @@ TRENDS = [
         # P&G innovation pace exceeds original assessment
         gp1_pct_affected=0.14,
         description="P&G superiority framework confirmed and strengthening. Ariel The Big One pods contributed 40%+ of UK Fabric Care category growth FY2025. FY2025 net sales $84.3B, guided 0-4% organic 2026. Ariel vs. Persil is defining LHC battleground. P&G innovation pace in pods/capsules (larger sizes, pre-treatment integration) directly pressures Persil Discs. Pantene UV protection shows improving speed-to-market. P&G R&D ~$2B dwarfs Henkel HCB. Counter: operational efficiency and AI formulation (T-01) to compete on velocity, not budget.",
-        strategic_implication="Match P&G innovation pace in LAD (Persil vs Ariel) and ADW (Somat vs Fairy).",
+        strategic_implication="High-confidence contraction (probability 5, 14% GP1 affected). Ariel The Big One pods contributed 40%+ of UK Fabric Care category growth FY2025; P&G FY2025 net sales $84.3B. Category exposure is LHC-dominant: FCN (4), FCA (3), FFI (3), LAD (4), ADW (4), HDW (3); Hair Care/Color modest (2-3). Regional exposure is global: Europe (5), NA (5), Asia (4), HG (4). Value chain concentration is Marketing (5), Commercial (4), Consumer (3), Formulation (4). Sources are High confidence (P&G FY25 earnings). For HCB the situation is that the premium LHC detergent head-to-head against P&G is the defining category battleground and P&G's innovation pace in pods and capsules (larger sizes, pre-treatment integration) directly pressures the core premium LHC format. P&G R&D (~$2B) dwarfs HCB R&D, making absolute-budget competition infeasible. Pantene UV protection demonstrates improving speed-to-market beyond laundry. The gap must be closed via operational efficiency and AI formulation (T-01) — velocity rather than budget.",
         category_exposure=cat(2,3,2,2, 4,3,3,4,3,4,2,2),
         vc_exposure=vc(1,4,2,2,1,5,4,3),
         regional_exposure=reg(5,5,4,4),
@@ -696,7 +696,7 @@ TRENDS = [
         # premium) but limited mass-market GP1 exposure
         gp1_pct_affected=0.08,
         description="DTC/indie disruption confirmed. Competitive dynamics shifting — major CPGs acquiring indie brands (P&G: Mielle Organics; Unilever: K18, Nutrafol). Indie threat partially absorbed into X-02/X-03 competitive pressure. Henkel has not made significant hair care acquisition since 2015 beauty portfolio shift — acquisition gap becoming strategic liability. Schwarzkopf Professional credibility remains organic defense, but professional-grade-at-mass-retail positioning claimed by multiple competitors.",
-        strategic_implication="Acquire or out-innovate. Schwarzkopf Professional credibility is the counter-positioning.",
+        strategic_implication="Medium-confidence contraction (probability 4, 8% GP1 affected). DTC/indie disruption partially absorbed into X-02/X-03 competitive pressure via major-CPG acquisitions (P&G Mielle, Unilever K18/Nutrafol). Category exposure is Hair-only: Color (3), Care (5), Styling (3), Body (2); LHC zero. Regional exposure is NA (5), Europe (4), Asia (3), HG (2). Value chain concentration is Marketing (4), Commercial (3), Consumer (5), Formulation (3). Sources are Medium confidence (DTC brand tracking, Euromonitor). For HCB the situation is that indie brands capture premium sub-segments (~15% of Hair premium) but the more material effect is strategic: the absence of significant hair-care acquisition since 2015 is becoming a portfolio liability as competitors absorb the indie pool. The counter-positioning asset is professional heritage credibility at mass retail, but the positioning is now claimed by multiple competitors, eroding the differentiation value over time.",
         category_exposure=cat(3,5,3,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(1,3,0,2,1,4,3,5),
         regional_exposure=reg(4,5,3,2),
@@ -713,7 +713,7 @@ TRENDS = [
         # slightly increases near-term threat level
         gp1_pct_affected=0.04,
         description="Chinese brand EU penetration <2% but monitoring warranted. New risk: US tariffs (G-09) on Chinese goods may redirect export efforts toward tariff-free EU market via TikTok Shop/Temu — accelerating European entry. Hair Color most exposed category (Chinese brands strong in cosmetic color). LHC less exposed (transport cost for heavy liquids favors local production). Trigger: TikTok Shop hair care from Chinese brands exceeding 5% in any EU market should escalate response.",
-        strategic_implication="Monitor trigger: if TikTok Shop hair care from Chinese brands exceeds 5% in any EU market, escalate response.",
+        strategic_implication="Low-confidence contraction (probability 3, 4% GP1 affected). Chinese brand EU penetration remains <2% but US tariff-driven export redirection toward EU via TikTok Shop/Temu is a new amplifier. Category exposure is moderate across Hair (2-3) and light across LHC (0-2). Regional exposure is Europe (4), NA (3), HG (3), Asia (1). Value chain concentration is Marketing (3), Commercial (3), Consumer (4). Sources are Low confidence (TikTok Shop analytics, Temu EU data). For HCB the situation is that Hair Color is the most exposed category (Chinese brands strong in cosmetic Color) while LHC is insulated by the economics of shipping heavy liquids. The trigger condition — TikTok Shop Hair Care from Chinese brands exceeding 5% in any EU market — has not been hit but the monitoring window is active. This is a watchlist-tier trend rather than an action-tier trend, but its second-order interaction with K-04 (TikTok Shop) and G-09 (US tariffs) means small triggers can cascade.",
         category_exposure=cat(2,2,2,3, 2,1,1,2,1,1,1,0),
         vc_exposure=vc(0,1,0,0,0,3,3,4),
         regional_exposure=reg(4,3,1,3),
@@ -730,7 +730,7 @@ TRENDS = [
         # single most important geographic growth lever for HCB
         gp1_pct_affected=0.14,
         description="Henkel IMEA 12.1% organic growth confirmed, vastly outperforming 0.3% Consumer Brands organic average. IMEA is growth engine compensating for mature market stagnation. 2026 guidance (0.5-2.5% organic HCB) suggests IMEA acceleration required to hit upper end. India (C-17) and Middle East are priority. Africa next-wave potential but requires dedicated distribution and affordability investment.",
-        strategic_implication="Allocate disproportionate investment to High Growth markets. Portfolio diversification reduces European concentration risk.",
+        strategic_implication="High-confidence expansion (probability 5, 14% GP1 affected). IMEA organic growth 12.1% vastly outperforming 0.3% HCB overall — the single most important geographic growth lever in the portfolio. Category exposure is broad: Hair Care (4), Body (4), Color (3), Styling (2); LHC FCN (3), FCA (3), FFI (3), LAD (4), ADW (2), HDW (2), HSC (2), IC (2). Regional exposure is High-Growth (5), Asia (4), Europe (1), NA (1). Value chain engagement spans Formulation (3), Manufacturing (4), Packaging (3), Supply Chain (4), Marketing (4), Commercial (4), Consumer (5). Sources are High confidence (Henkel FY25 Annual Report, IMEA segment data). For HCB the situation is that IMEA acceleration is mathematically required to hit the upper end of 2026 HCB guidance (0.5-2.5% organic). India (C-17) and Middle East are the near-term priorities; Sub-Saharan Africa (X-09) is the next-wave pool. Portfolio diversification into High-Growth markets is the structural hedge against mature-market stagnation in Europe.",
         category_exposure=cat(3,4,2,4, 3,3,3,4,2,2,2,2),
         vc_exposure=vc(2,3,4,3,4,4,4,5),
         regional_exposure=reg(1,1,4,5),
@@ -747,7 +747,7 @@ TRENDS = [
         # K-SCAN +23% ROI, Prof Products +15%); R&D gap now 4-5x
         gp1_pct_affected=0.12,
         description="L'Oréal FY2025: €44.05B sales (+4% LfL), 725 patents filed, 4,000+ scientists. Professional Products +15% led by Kérastase. K-SCAN AI camera proved +23% salon sales uplift. Beauty Tech hub in India. CES 2026: Innovation Awards for Light Straight + Multi-styler and LED Face Mask. R&D investment €1.7B (4%) is 4-5x Henkel HCB. Competitive gap widening. Henkel counter: (1) Schwarzkopf Professional salon network, (2) AI formulation partnerships (T-01), (3) focused Color technical leadership.",
-        strategic_implication="Match L'Oreal tech investment in Color (shade matching) and Care (diagnostics). R&D partnership strategy.",
+        strategic_implication="High-confidence contraction (probability 5, 12% GP1 affected). L'Oréal FY2025: €44.05B sales (+4% LfL), 725 patents filed, 4,000+ scientists, K-SCAN proved +23% salon sales uplift. Category exposure is Hair-only: Color (5), Care (4), Styling (3), Body (3); LHC zero. Regional exposure is global: Europe (5), NA (5), Asia (5), HG (3). Value chain concentration is Formulation (4), Marketing (5), Commercial (4), Consumer (4). Sources are High confidence (L'Oréal Annual Report, Modiface platform). For HCB the situation is that L'Oréal's R&D investment (€1.7B, 4% of revenue) is 4-5x HCB R&D and the gap is widening, meaning organic-only investment cannot close the innovation differential. Compensating levers are: professional salon network as a deployment platform no competitor can easily replicate, AI formulation partnerships (T-01) that substitute for absolute R&D scale, and focused technical leadership in Color where century-scale expertise creates category-specific depth.",
         category_exposure=cat(5,4,3,3, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(1,4,1,1,0,5,4,4),
         regional_exposure=reg(5,5,5,3),
@@ -769,7 +769,7 @@ TRENDS = [
         # discount erodes branded margin by ~3-5pp on that volume
         gp1_pct_affected=0.20,
         description="Discount expansion confirmed. Aldi and Lidl are Henkel's most important and most challenging customers. Henkel has significant discount volume (Persil, Schwarzkopf listed in Aldi/Lidl Germany) at lower margin. Strategic tension: declining to supply discount cedes to PL; supplying means accepting margin erosion. Resolution: exclusive value formats for discount (different size/config vs. traditional retail), combined with DBA investment that makes consumers specifically request Persil/Schwarzkopf rather than accept PL.",
-        strategic_implication="Secure branded shelf space in discount with exclusive value formats. Cannot ignore 30%+ of market.",
+        strategic_implication="High-confidence contraction (probability 5, 20% GP1 affected) — one of the three largest Customer-side contractions in the database. Discount retail (Aldi, Lidl) is structurally expanding and captures 25-35% of European grocery. Category exposure is LHC-heavy: FCN (5), FCA (4), LAD (5), FFI (3), ADW (4), HDW (3), HSC (2), IC (2); Hair uniform at 3. Regional exposure is Europe (5), HG (2), Asia (1), NA (2). Value chain concentration is Commercial (5), Consumer (5), Marketing (3), Supply Chain (2). Sources are High confidence (NIQ, retail panel data). For HCB the situation is a strategic tension: declining to supply discount cedes volume to PL; supplying means accepting margin erosion on 30%+ of the market. Discount is simultaneously the most important and most challenging customer set in LHC. Exclusive value formats (different size/config vs traditional retail) combined with distinctive-brand-asset investment is the dual-track play, but brand-strength erosion under agent-mediated commerce (T-11/T-12) could weaken the second lever over time.",
         category_exposure=cat(3,3,3,3, 5,4,3,5,3,4,2,2),
         vc_exposure=vc(0,0,0,1,2,3,5,5),
         regional_exposure=reg(5,2,1,2),
@@ -786,7 +786,7 @@ TRENDS = [
         # ~2-3pp margin vs offline, affecting that volume slice
         gp1_pct_affected=0.08,
         description="E-commerce stabilization at 12-15% confirmed. Amazon Subscribe & Save is specific threat to LAD and ADW — habitual replenishment products are prime S&S targets. Once consumer sets Persil S&S subscription, switching unlikely; but if they set Ariel or PL, Henkel loses locked-in customer. Ensure Persil and Somat are default S&S recommendations through Amazon advertising and review management. Retail media cost (T-06) and e-com margin erosion are compounding threats.",
-        strategic_implication="Optimize retail media ROI. Build subscription models for LAD/ADW. Balance online vs offline profitability.",
+        strategic_implication="Medium-confidence contraction (probability 4, 8% GP1 affected). E-commerce stabilising at 12-15% of sales; Amazon Subscribe & Save is specific threat to habitual replenishment categories. Category exposure is uniform at 3 for Hair and moderate for LHC (FCN=2, FCA=2, FFI=2, LAD=3, ADW=2, HDW=2). Regional exposure is Asia (5), NA (5), Europe (4), HG (2). Value chain concentration is Marketing (4), Commercial (4), Consumer (4), Supply Chain (3), Packaging (2). Sources are Medium confidence (eMarketer, Amazon FMCG data). For HCB the situation is that Subscribe & Save is the specific transmission channel for LAD and ADW lock-in — once a consumer sets a premium laundry or dish subscription, switching is unlikely; but if they set a competitor or PL, lock-in works against HCB. Retail media cost (T-06) and e-commerce margin erosion are compounding threats that together make online channel mix a net-drag versus offline on margin terms, despite volume being flat to growing.",
         category_exposure=cat(3,3,3,3, 2,2,2,3,2,2,1,1),
         vc_exposure=vc(0,0,0,2,3,4,4,4),
         regional_exposure=reg(4,5,5,2),
@@ -803,7 +803,7 @@ TRENDS = [
         # promotional pressure erodes ~2-4pp on the negotiated volume
         gp1_pct_affected=0.15,
         description="Retailer consolidation accelerating. Schwarz Group (Lidl/Kaufland), Aldi, Edeka/Rewe together represent estimated 40-50% of Henkel European HCB revenue. From Byron Sharp: brand strength (Mental Availability via DBAs) is only sustainable leverage against concentrated buyer power — retailers cannot refuse to list brands consumers specifically demand. Invest in Distinctive Brand Assets: Schwarzkopf red silhouette, Persil white packaging architecture, Somat gold/blue.",
-        strategic_implication="Brand strength (Mental Availability) is the only leverage against concentrated buyer power. Invest in DBAs.",
+        strategic_implication="High-confidence contraction (probability 5, 15% GP1 affected). Top 10 grocers represent 40-50% of European HCB revenue via Schwarz Group, Aldi, Edeka/Rewe concentration. Category exposure is LHC-heavier (FCN=4, FCA=4, LAD=4, FFI=3, ADW=3, HDW=3) with Hair at 2-3. Regional exposure is Europe (5), NA (3), Asia (2), HG (2). Value chain concentration is Commercial (5), Consumer (3), Supply Chain (1). Sources are High confidence (Planet Retail, European grocery consolidation data). For HCB the situation is that concentrated buyer power erodes ~2-4pp margin on the negotiated volume, and the only durable counter-lever is brand strength — Mental Availability via Distinctive Brand Assets — since retailers cannot refuse to list brands consumers specifically demand. This compounds with C-01 (PL) and T-06/K-08 (retail media) to create a three-way margin squeeze in the same customer set. K-09 (agentic commerce reshaping) could ultimately dissolve traditional retailer leverage, but not within the near-term horizon.",
         category_exposure=cat(3,3,2,3, 4,4,3,4,3,3,2,2),
         vc_exposure=vc(0,0,0,0,1,2,5,3),
         regional_exposure=reg(5,3,2,2),
@@ -822,7 +822,7 @@ TRENDS = [
         # Sally Beauty launched Mar 2026. No longer "emerging" — it's a top channel.
         gp1_pct_affected=0.10,
         description="TikTok Shop US projected $23.4B in 2026 ecommerce sales (+48% YoY) — larger than Target, Costco, or Best Buy. Beauty/personal care is 22.5% of TikTok Shop GMV with 4.7% conversion rates (2x Instagram, 3x Facebook). Sally Beauty launched on TikTok Shop March 2026. got2b is natural social commerce brand (youth positioning, viral-ready formats). Schwarzkopf Color tutorials and before/after creator content proven to drive conversion. LHC: cleaning hacks and laundry TikToks increasingly driving purchase. This is no longer emerging — it's a structural channel.",
-        strategic_implication="Build dedicated TikTok Shop storefronts for got2b and Schwarzkopf. Invest in creator partnerships. Develop social-first SKUs (limited editions, viral formats). LHC: test Persil/Somat cleaning hack content. Allocate 10%+ of digital marketing budget to social commerce.",
+        strategic_implication="High-confidence expansion (probability 5, 10% GP1 affected — upgraded from 4% in April 2026). TikTok Shop US projected $23.4B in 2026 ecommerce sales (+48% YoY) — larger than Target, Costco or Best Buy. Beauty/personal care is 22.5% of TikTok Shop GMV at 4.7% conversion (2x Instagram, 3x Facebook). Category exposure is Hair-heavy: Care (4), Color (4), Styling (5), Body (2); LHC light (FCN=2, FCA=1, FFI=1, LAD=2). Regional exposure is NA (5), Asia (5), Europe (4), HG (3). Value chain concentration is entirely downstream: Marketing (5), Commercial (5), Consumer (5). Sources are High confidence (BeautyMatter, Sally Beauty, eMarketer). For HCB the situation is that youth-positioned Styling and Color portfolios map natively to viral-ready social commerce formats, and professional Color tutorials plus before/after creator content are proven conversion drivers. LHC adjacency via cleaning-hack content is smaller but growing. This is no longer an emerging channel — it is a structural top-5 FMCG channel in the US.",
         category_exposure=cat(4,4,5,2, 2,1,1,2,1,1,1,0),
         vc_exposure=vc(0,0,0,1,2,5,5,5),
         regional_exposure=reg(4,5,5,3),
@@ -846,7 +846,7 @@ TRENDS = [
         # European retailers; lock-in effect broadening
         gp1_pct_affected=0.06,
         description="Subscription lock-in expanding — now encompasses Amazon S&S, Walmart+, European retailer apps (dm app, Rossmann app, REWE Payback). Lock-in strongest in LAD and ADW — high-frequency replenishment where subscription is convenient. Persil and Somat must be default subscription option. Smartwash (T-08) is proprietary lock-in counter — cartridge-based dosing creates Henkel-owned subscription model bypassing retailer-mediated subscriptions.",
-        strategic_implication="Ensure Henkel brands are well-positioned within subscription platforms. Build own DTC subscription where viable.",
+        strategic_implication="Medium-confidence contraction (probability 4, 6% GP1 affected). Subscription lock-in expanding — Amazon S&S, Walmart+, European retailer apps (dm, Rossmann, REWE Payback). Category exposure is LHC-concentrated: Automatic Dish Wash (5), Laundry Additives (4), HDW (2), FCN (2), FCA (1), HSC (1); Hair minimal (1-2). Regional exposure is NA (5), Europe (4), Asia (3), HG (1). Value chain concentration is Consumer (5), Commercial (4), Marketing (3). Sources are Medium confidence (Amazon S&S data, retailer loyalty analysis). For HCB the situation is that lock-in is strongest in LAD and ADW — high-frequency replenishment where subscription is most convenient and switching costs are highest. The proprietary Smartwash cartridge-based dosing platform (T-08) is the counter-lock-in mechanism, creating a captive Henkel-owned subscription ecosystem that bypasses retailer-mediated subscriptions entirely. This trend is therefore simultaneously a contraction threat on third-party platforms and an expansion enabler on the Smartwash platform.",
         # FCA→1 (Perwoll not subscription), FCN→2 (less subscription), ADW→5 (Somat tabs = THE subscription product)
         category_exposure=cat(2,2,1,2, 2,1,1,4,2,5,1,1),
         vc_exposure=vc(0,0,0,1,2,3,4,5),
@@ -864,7 +864,7 @@ TRENDS = [
         # Schwarzkopf Professional is Henkel's highest-value growth play
         gp1_pct_affected=0.12,
         description="Salon-to-consumer crossover accelerating: L'Oréal Professional Products +15% in 2025, Kérastase double-digit. B2C now 63% of $23.4B market. Schwarzkopf Professional is top-3 global salon brand — credibility that Dove/Pantene/TRESemmé cannot match. Execution challenge: salon professionals may resist dilution into mass retail. Follow Kérastase playbook: selective premium retail (Douglas, Sephora, dm premium shelf), not mass distribution. This is Henkel Hair's highest-value strategic play.",
-        strategic_implication="Deploy Schwarzkopf Professional expertise into consumer retail channel. Color and Care are the profit pools.",
+        strategic_implication="High-confidence expansion (probability 5, 12% GP1 affected). Salon-to-consumer crossover accelerating: L'Oréal Professional Products +15% in 2025, Kérastase double-digit. B2C is now 63% of the $23.4B professional market. Category exposure is Hair-only: Color (5), Care (5), Styling (4), Body (2); LHC zero. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain engagement is broad: Raw Materials (2), Formulation (3), Manufacturing (2), Packaging (3), Supply Chain (3), Marketing (5), Commercial (5), Consumer (5). Sources are High confidence (Future Market Insights). For HCB the situation is that the professional arm is a top-3 global salon brand — credibility that mass Hair competitors cannot match — making this the highest-value Hair strategic play in the portfolio. The execution constraint is channel management: salon professionals may resist dilution into mass retail. Selective premium retail distribution (Douglas, Sephora, premium drugstore shelves) follows the Kérastase playbook and avoids the mass-retail cannibalisation risk.",
         category_exposure=cat(5,5,4,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(2,3,2,3,3,5,5,5),
         regional_exposure=reg(4,5,4,2),
@@ -884,7 +884,7 @@ TRENDS = [
         direction="Contraction", probability=5, start_year=2025,
         gp1_pct_affected=0.10,
         description="35% of US consumers use AI for product discovery vs. 13.6% using search engines. Google CTR declined 3.6pp (paid), 1.2pp (organic). AI-to-e-commerce traffic surged 4,700% YoY. Brands not cited in LLM responses face invisible brand risk. Schwarzkopf and Persil must invest in Generative Engine Optimization (GEO). Risk is asymmetric: indie brands with strong content authority could leapfrog established brands. Fundamentally disrupts Byron Sharp Mental Availability model — TV/display builds human memory structures but not LLM memory structures.",
-        strategic_implication="Invest in Generative Engine Optimization for Schwarzkopf and Persil. Brands not cited by LLMs lose consideration before the shopper reaches the shelf. Complement SEO with structured authority content.",
+        strategic_implication="Medium-confidence contraction (probability 5, 10% GP1 affected). 35% of US consumers use AI for product discovery vs 13.6% for search; AI-to-e-commerce traffic +4,700% YoY. Category exposure is uniform at 3 — every brand needs LLM citation. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream: Marketing (5), Commercial (5), Consumer (5). Sources are Medium confidence (eMarketer, Similarweb). For HCB the situation is asymmetric risk: brands not cited in LLM responses face invisible brand-switching — consumers never see the alternatives the LLM evaluated and rejected. This fundamentally disrupts Byron Sharp's Mental Availability model because TV/display builds human memory structures but not LLM memory structures. Indie brands with strong content authority can leapfrog established brands. The trend is the upstream driver of T-11 (agentic commerce) and must be read together with it — GEO optimisation is the pre-condition for agent consideration.",
         category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
         vc_exposure=vc(0,0,0,0,0,5,5,5),
         regional_exposure=reg(4,5,4,2),
@@ -899,7 +899,7 @@ TRENDS = [
         direction="Contraction", probability=5, start_year=2025,
         gp1_pct_affected=0.10,
         description="Trade tension escalated significantly. US Section 301 tariffs (25-60% on Chinese-origin inputs) now effective. Henkel faces three-front trade exposure: (1) US-bound products with imported ingredients face tariff pass-through, (2) EU-China surfactant supply chain disrupted, (3) K-beauty competitor advantage (Korean FTA with EU) while Henkel German production faces higher input costs. Henkel 75+ country manufacturing footprint provides flexibility for tariff arbitrage.",
-        strategic_implication="Diversify sourcing away from single-country dependency. Model tariff dynamics into annual procurement planning. Build buffer stock for critical raw materials.",
+        strategic_implication="Medium-confidence contraction (probability 5, 10% GP1 affected). US Section 301 tariffs at 25-60% on Chinese-origin inputs now effective. Category exposure is uniform at 2-3 across the portfolio, with slight tilt toward LHC (FCN=3, FCA=3, LAD=3, ADW=3, IC=3). Regional exposure is North America (5), Asia (5) and High-Growth (4) — multi-directional. Value chain concentration is Raw Materials (5), Supply Chain (5), Manufacturing (2), Packaging (3). Sources are Medium confidence (WTO, Peterson, Deloitte). For HCB the situation is three-front: US-bound products with imported ingredients face tariff pass-through; EU-China surfactant supply chains are disrupted; Korean competitors benefit from K-EU FTA while German production faces higher input costs. The 75+ country manufacturing footprint provides flexibility for tariff arbitrage but the frictional cost of repositioning production is real. This trend compounds E-01 (palm), E-06 (nearshoring) and E-07 (energy) — deglobalisation costs layer.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
         vc_exposure=vc(5,2,2,3,5,1,1,1),
         regional_exposure=reg(4,5,5,4),
@@ -914,7 +914,7 @@ TRENDS = [
         direction="Contraction", probability=4, start_year=2024,
         gp1_pct_affected=0.07,
         description="European energy cost disadvantage confirmed at 2-3x US levels. Henkel European manufacturing base (Düsseldorf HQ, 15+ European plants) disproportionately affected vs. P&G and Unilever with more diversified global manufacturing. German nuclear phase-out specifically increases Henkel home-market energy costs. Mitigation: energy efficiency programs and renewable PPAs. Strategic question: shift incremental manufacturing to lower-energy-cost regions (Turkey, Egypt, India) — aligned with High Growth strategy (X-06).",
-        strategic_implication="Accelerate energy efficiency programs in European plants. Evaluate manufacturing footprint optimization. Long-term PPAs for renewable energy as hedge.",
+        strategic_implication="High-confidence contraction (probability 4, 7% GP1 affected). European energy cost disadvantage confirmed at 2-3x US levels. Category exposure is uniform at 2-3 across the portfolio. Regional exposure is Europe (5), Asia (2), HG (2), NA (1). Value chain concentration is Manufacturing (5), Raw Materials (2), Formulation (2), Supply Chain (3). Sources are High confidence (IEA, CEFIC, VCI). For HCB the situation is disproportionate: the Düsseldorf-centred European manufacturing base (15+ plants) is structurally disadvantaged versus P&G and Unilever with more diversified global manufacturing footprints. German nuclear phase-out specifically increases home-market energy costs. The strategic implication is a manufacturing-footprint optimisation question that aligns with High-Growth strategy (X-06) — incremental manufacturing in Turkey, Egypt, India combines energy arbitrage with geographic growth.",
         category_exposure=cat(2,2,2,2, 3,3,3,3,3,3,3,3),
         vc_exposure=vc(2,2,5,2,3,0,0,0),
         regional_exposure=reg(5,1,2,2),
@@ -929,7 +929,7 @@ TRENDS = [
         direction="Expansion", probability=5, start_year=2025,
         gp1_pct_affected=0.06,
         description="Gen AI marketing efficiency confirmed at 40-60% content production cost reduction. P&G and Unilever deploying at scale. For Henkel: efficiency gains most valuable in localization — 75+ country presence means content localization at near-zero marginal cost is disproportionate advantage. Savings partially offset retail media margin extraction (T-06). Brand safety guardrails critical — AI-generated content for Schwarzkopf Professional (medical-adjacent claims) requires human oversight.",
-        strategic_implication="Deploy Gen AI for creative production, copy generation, and asset localization. Reinvest efficiency savings into reach extension. Maintain human oversight for brand safety.",
+        strategic_implication="High-confidence expansion (probability 5, 6% GP1 affected). Gen AI content production cost reduction confirmed at 40-60%; P&G and Unilever deploying at scale. Category exposure is uniform at 3 across the portfolio. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream at Marketing (5), Commercial (4), Consumer (3). Sources are High confidence (Deloitte, McKinsey, Bain). For HCB the situation is that efficiency gains are most valuable in localisation — 75+ country presence means content-localisation at near-zero marginal cost is a disproportionate advantage versus peers with narrower geographic footprints. Savings partially offset retail-media margin extraction (T-06), though the retail-media tax is larger than the gen-AI saving by ~2x. Brand-safety guardrails are non-optional for medical-adjacent professional claims; consumer-scale deployment for functional LHC messaging is lower-risk.",
         category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
         vc_exposure=vc(0,0,0,0,0,5,4,3),
         regional_exposure=reg(4,5,4,2),
@@ -944,7 +944,7 @@ TRENDS = [
         direction="Expansion", probability=3, start_year=2025,
         gp1_pct_affected=0.07,
         description="PPWR refill targets confirmed for 2030. Henkel already has concentrated refill formats for Persil and Pril in Germany — ahead of P&G on execution. dm/Rossmann refill station expansion creates retail infrastructure. Strategic choice for Henkel: concentrate on own-brand refills (cartridge-based, Smartwash-adjacent) or participate in retailer refill ecosystems (which commoditize the product). Smartwash dosing platform (T-08) is the premium refill play; retailer refill stations the mass play. Henkel needs both.",
-        strategic_implication="Develop Persil and Pril refill formats for dm/Rossmann. Concentrated refills align with PPWR and sustainability narrative. Test subscription-refill DTC model.",
+        strategic_implication="Low-confidence expansion (probability 3, 7% GP1 affected). Category exposure is LHC-centric: Hand Dish Wash (5), Fabric Cleaning (4), Laundry Additives (5), Automatic Dish Wash (3); Hair is minimal. PPWR 2030 refill targets act as a regulatory driver (linkage to G-04). Regional profile is Europe-led (5), secondary NA (3), Asia (2), HG (2). Value chain concentration is Packaging (5), Formulation (3), Supply Chain (3), Consumer (4). Sources are Low confidence (Ellen MacArthur, PPWR text, retailer announcements). For HCB the situation is partly de-risked — concentrated refill formats for Laundry and HDW already exist in Germany, putting HCB ahead of some peers on execution. Retailer refill stations at dm/Rossmann commoditise the product unless a proprietary cartridge platform (T-08) captures the premium refill economics. The strategic tension is refill-as-sustainability-claim vs refill-as-margin-destroyer, and which side HCB lands on depends on the mix between own-channel and retailer-channel refill exposure.",
         # FCA→2 (Perwoll refills less common), HDW→5 (Pril explicitly mentioned as the mass refill play)
         category_exposure=cat(0,1,0,1, 4,2,0,5,5,3,2,1),
         vc_exposure=vc(1,3,2,5,3,3,3,4),
@@ -960,7 +960,7 @@ TRENDS = [
         direction="Expansion", probability=4, start_year=2024,
         gp1_pct_affected=0.07,
         description="Between-wash fabric care confirmed as fastest-growing LHC occasion. Febreze ($1B+, P&G) and Lenor Crease Releaser (P&G) dominate with zero Henkel presence. This is the #1 strategic white space in LHC — every Febreze sale is a Henkel non-sale. Vernel brand extension (Vernel Fresh) or new sub-brand are logical vehicles. Outfit repeating trend (sustainability-driven) structurally reduces wash frequency, expanding between-wash occasions — self-reinforcing trend.",
-        strategic_implication="Evaluate fabric refresh product line under Vernel or new brand. The White Spot score (0.82) confirms this is the #1 strategic gap in the consumer journey. Test in Germany/UK first.",
+        strategic_implication="Confirmed expansion (probability 4, 7% GP1 affected). Category exposure is narrow and LHC-only: Fabric Care Specialty (5), Fabric Cleaning (4), Laundry Additives (3); all other categories zero. This is a single-category white-space trend. Febreze ($1B+, P&G) and Lenor Crease Releaser (P&G) dominate the between-wash fabric-care occasion with effectively zero HCB presence — every competitor sale in this occasion is an HCB non-sale. Regional profile: NA (5) leads, Europe (4) second, Asia (3) and HG (2). Value chain: Formulation (4), Marketing (4), Consumer (5). Sources are Medium confidence (Euromonitor, P&G brand data). For HCB the situation is the #1 strategic gap in the LHC consumer journey according to the White Spot score (0.82). The reinforcing linkage is that outfit-repeating trends (sustainability-driven) structurally reduce wash frequency and therefore expand the between-wash occasion — the trend is self-reinforcing on the timescale of the model.",
         category_exposure=cat(0,0,0,0, 4,5,0,3,0,0,0,0),
         vc_exposure=vc(2,4,2,3,2,4,3,5),
         regional_exposure=reg(4,5,3,2),
@@ -975,7 +975,7 @@ TRENDS = [
         direction="Expansion", probability=3, start_year=2025,
         gp1_pct_affected=0.05,
         description="EU Circular Textiles Strategy confirmed. Repositioning opportunity for Persil and Vernel — from cleaning products to garment care partners. Innovation: enzyme-based pilling removers, color-restore boosters, fiber protection additives. Outfit repeating trend creates demand for products extending garment life — premium positioning justifying price premiums. Perwoll (already positioned as gentle care) is natural HCB vehicle for garment longevity positioning.",
-        strategic_implication="Position Persil and Vernel as 'garment longevity partners' — washing products that demonstrably extend textile life. Innovation opportunity in fabric protection and color-restore.",
+        strategic_implication="Low-confidence expansion (probability 3, 5% GP1 affected). EU Circular Textiles Strategy confirmed. Category exposure is narrow LHC: Fabric Care Specialty (5), Fabric Cleaning (4), Laundry Additives (4); all other zero. Regional exposure is Europe (5), NA (3), Asia (2), HG (2). Value chain concentration is Formulation (4), Consumer (5), Marketing (4). Sources are Low confidence (EU Circular Textiles Strategy, Ellen MacArthur, Euromonitor). For HCB the situation is a repositioning opportunity: washing products can be reframed from cleaning agents to 'garment-longevity partners' with enzyme-based pilling removers, color-restore boosters and fiber-protection additives. Outfit-repeating behaviour creates demand for products that demonstrably extend garment life — premium positioning justifying price premiums. Specialty fabric-care brands already positioned as gentle care are the natural vehicle. This is a marketing-architecture trend with a latent formulation R&D component.",
         category_exposure=cat(1,1,0,0, 4,5,0,4,0,0,0,0),
         vc_exposure=vc(2,4,2,2,1,4,3,5),
         regional_exposure=reg(5,3,2,2),
@@ -990,7 +990,7 @@ TRENDS = [
         direction="Expansion", probability=4, start_year=2024,
         gp1_pct_affected=0.06,
         description="Dry shampoo/texture spray growth confirmed. got2b has existing between-wash position (dry shampoo, texture products) but significantly under-invests vs. Batiste (Church & Dwight, 40%+ share). Schwarzkopf Professional has salon-grade between-wash products not yet crossed to consumer retail. Wash frequency reduction trend (water awareness, hair health education, natural hair movement) structurally grows this occasion. Strategy: double got2b between-wash investment AND launch premium Schwarzkopf between-wash line.",
-        strategic_implication="Expand got2b dry shampoo and texture spray range. Leverage Schwarzkopf salon expertise for premium between-wash products. Fastest path to incremental Hair occasions.",
+        strategic_implication="Steady expansion (probability 4, 6% GP1 affected). Category exposure is Hair-only and narrow: Styling (5), Care (2), Body (1); LHC zero. The trend is an occasion-creation vector reinforced by wash-frequency reduction (water awareness, hair-health education, natural-hair movement). Regional profile is NA-led (5) and Europe (4), with Asia (3) and HG (2). Value chain engagement is Marketing (5), Consumer (5), Formulation (4). Sources are Medium confidence (Euromonitor, Spate, competitor brand data). For HCB the situation is an existing-foothold trend: the mass Styling portfolio has a between-wash position but is materially under-invested versus the category leader (Batiste at 40%+ share). A premium-professional between-wash line would be an adjacent pool. This is the fastest-reaching lever to create incremental Hair occasions because both the product architecture and the consumer routine already exist.",
         category_exposure=cat(0,2,5,1, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(2,4,2,3,2,5,4,5),
         regional_exposure=reg(4,5,3,2),
@@ -1015,7 +1015,7 @@ TRENDS = [
         # 12%: China is ~3-5% of Henkel's total Hair revenue; Schwarzkopf
         # China sub-scale vs L'Oréal — reduced from 15% to reflect actual exposure
         gp1_pct_affected=0.12,
-        strategic_implication="Strategic binary: commit (acquire domestic brand like Adolph/Spes) or accept managed decline and reallocate to India/APAC where Henkel has stronger positioning.",
+        strategic_implication="High-confidence contraction (probability 5, 12% GP1 affected — reduced from 15% in v3.1 to reflect true China Hair exposure). Category exposure is Hair-concentrated: Care (5), Color (4), Styling (3), Body (3); LHC minimal (0-1). Chinese domestic brands now hold 56% of China beauty value — the share loss is real and severe but HCB's China Hair revenue is estimated at only 3-5% of total Hair, capping the absolute GP1 impact. Regional exposure is Asia (5) and High-Growth (4) only. Value chain hotspots are Marketing (5), Commercial (5), Consumer (5), Supply Chain (3). Sources are High-confidence (Euromonitor, Daxue, McKinsey). For HCB the situation is a strategic binary: the footprint is too small to compete against scale competitors like L'Oréal China, and Chinese challengers (Adolph, Spes) are taking share at accelerating pace. The trend is material at the portfolio level primarily because it closes off a growth market, not because it destroys existing revenue.",
         category_exposure=cat(4,5,3,3, 1,1,0,1,0,0,0,0),
         vc_exposure=vc(2,3,2,2,3,5,5,5),
         regional_exposure=reg(1,1,5,4),
@@ -1034,7 +1034,7 @@ TRENDS = [
         # 15%: India is structural growth pool; affordable-premium tier
         # expansion creates new GP1 pools that didn't exist
         gp1_pct_affected=0.15,
-        strategic_implication="Double down on India with locally-engineered affordable-premium SKUs. Schwarzkopf Gliss and Persil Liquid must have India-specific price architecture and pack sizes. Consider acquiring a digital-native D2C brand (Mamaearth adjacency).",
+        strategic_implication="Structural growth pool (probability 5, 15% GP1 affected, Expansion). India BPC market $30B at 11% CAGR — the fastest-growing top-10 market globally. Category exposure is broad: Hair Care (5), Color (4), Body (4), Styling (3); LHC engaged on FCN/FCA (4) and LAD (4) where washing-machine penetration at 14% is a structural growth driver. Regional exposure is High-Growth (5) and Asia (3). Value chain activity spans Raw Materials (3), Formulation (4), Manufacturing (4), Packaging (4), Supply Chain (3), Marketing (5), Consumer (5) — a full-stack geographic expansion requires investment across the chain. Sources are High confidence (Redseer, Statista, Nykaa, Honasa). For HCB the situation is that IMEA organic growth of 12.1% in FY2025 already validates the thesis and is the single geographic lever compensating for mature-market stagnation (0.3% HCB overall). Every new washing machine is an incremental addressable customer; India premium-affordability architecture (sachets, local fragrance preferences, General Trade distribution) is the access condition.",
         category_exposure=cat(4,5,3,4, 4,4,3,4,2,2,2,3),
         vc_exposure=vc(3,4,4,4,3,5,4,5),
         regional_exposure=reg(0,0,3,5),
@@ -1053,7 +1053,7 @@ TRENDS = [
         # 18%: Affects US trade spend architecture directly; 8-12% of
         # revenue shift converts to meaningful GP1 erosion
         gp1_pct_affected=0.18,
-        strategic_implication="Reframe US trade investment: retail media is non-negotiable for visibility but ROAS must be measured ruthlessly. Negotiate joint business plans that include media guarantees, not just slotting. Build first-party data capability to reduce dependency.",
+        strategic_implication="High-confidence contraction (probability 5, 18% GP1 affected) — the single largest Customer-side GP1 impact in the database. US retail media: $58.8B in 2025, $69.3B forecast 2026; Amazon 79.7% share; retailers demand 8-12% of net revenue for visibility. Category exposure is uniform at 3-4 across the portfolio. Regional exposure is NA (5), Europe (2), Asia (2), HG (1). Value chain concentration is entirely downstream: Marketing (5), Commercial (4), Consumer (4), Supply Chain (2). Sources are High confidence (Insider Intelligence, Amazon Q4 2025, Walmart Connect). For HCB the situation is that as mid-tier US brands (not leaders like Tide/Ariel), the portfolio must spend disproportionately on retail media to maintain visibility, creating structural US operational profitability below European levels. This dynamic is a permanent rather than cyclical compression and must be factored into geographic capital-allocation decisions. The trend is the US-specific amplifier of T-06 and compounds both C-01 (PL) and C-10 (Amazon platform PL) in the same geography.",
         category_exposure=cat(3,3,3,3, 4,4,3,4,3,3,3,3),
         vc_exposure=vc(0,0,0,0,2,5,4,4),
         regional_exposure=reg(2,5,2,1),
@@ -1072,7 +1072,7 @@ TRENDS = [
         # 12%: Affects COGS on US-sold SKUs with imported content;
         # mitigation via reformulation and supplier swap possible
         gp1_pct_affected=0.12,
-        strategic_implication="Accelerate US supply-chain footprint review. Identify top-20 tariff-exposed SKUs and run reformulation/relocation scenarios. Use scale to negotiate with US-domestic surfactant suppliers (Stepan, Pilot Chemical). Consider whether Culver City capacity should expand.",
+        strategic_implication="High-confidence contraction (probability 5, 12% GP1 affected). US Section 301 tariffs are now operational with direct impact on US supply chain economics. Category exposure is broad at 3-4 across the portfolio. Regional exposure is North America (5), with minor exposure elsewhere. Value chain concentration is Raw Materials (5), Manufacturing (4), Packaging (4), Supply Chain (5) — this is an upstream cost-structure trend. Sources are High confidence (USTR, P&G earnings, BCG). For HCB the situation is that US operations (Hair Care in Culver City, LHC in Scottsdale) rely on imported Asian ingredients, placing them at direct tariff-exposure versus vertically-integrated competitors like P&G. Reformulation scenarios with US-domestic surfactant suppliers (Stepan, Pilot Chemical) are the mitigation lever, but speed-of-reformulation is bounded by formulation complexity. This is the geographic mirror of G-08 applied to HCB's NA operations.",
         category_exposure=cat(3,3,3,3, 4,4,3,4,4,4,3,3),
         vc_exposure=vc(5,3,4,4,5,1,1,2),
         regional_exposure=reg(1,5,2,1),
@@ -1091,7 +1091,7 @@ TRENDS = [
         # 10%: Premium Hair tier exposure in NA specifically; EU
         # penetration accelerating but still behind NA
         gp1_pct_affected=0.10,
-        strategic_implication="Schwarzkopf Professional must close the innovation gap on scalp-first and ampoule formats. Consider OEM partnership with Korean formulator or acquisition of a K-Beauty hair indie. Defend Sephora shelf through superior storytelling, not just heritage claims.",
+        strategic_implication="Medium-confidence contraction (probability 4, 10% GP1 affected). K-beauty Europe market $2.7B (2025) at 6.4% CAGR; Europe tripled K-beauty export share from 3% to 11% between 2022-2025. Category exposure is Hair-only: Care (5), Color (3), Styling (4), Body (2); LHC zero. Regional exposure is NA (5), Europe (4), Asia (2), HG (2). Value chain concentration is Raw Materials (3), Formulation (5), Marketing (5), Commercial (4), Consumer (5). Sources are Medium confidence (Circana, Amorepacific, Sephora, Mintel). For HCB the situation is that the threat concentrates in premium Care — ampoule formats, scalp-first positioning — and premium Styling (serum-based), precisely where the Professional heritage defence operates. The counter-asset is broader Color shade range (K-beauty Color is limited for European hair types). US tariff risk (G-09) is a near-term headwind for K-beauty competitors, creating a temporary defensive window that does not alter the structural direction.",
         category_exposure=cat(3,5,4,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(3,5,3,3,3,5,4,5),
         regional_exposure=reg(4,5,2,2),
@@ -1110,7 +1110,7 @@ TRENDS = [
         # 14%: Represents a specific growth pool in US; well-defined
         # behavioral patterns and higher category spend
         gp1_pct_affected=0.14,
-        strategic_implication="Build Hispanic/Latino go-to-market capability: textured-hair Schwarzkopf range, Spanish-language creative, Hispanic retailer partnerships (Vallarta, Northgate). LHC: Persil needs a 'Fresca Intensa' fragrance positioning. Hire Hispanic marketing leadership.",
+        strategic_implication="High-confidence expansion (probability 5, 14% GP1 affected). US Hispanic/Latino demographic and spend data confirmed. Category exposure is broad: Hair Care (5), Color (4), Styling (4), Body (3); LHC engaged on FCA (5), FCN (4), LAD (4), HDW/ADW (3). Regional exposure is NA (5) — HG (1) reflects cross-border Mexico linkage. Value chain concentration is Marketing (5), Commercial (5), Supply Chain (3), Consumer (4). Sources are High confidence (US Census ACS, NielsenIQ Multicultural, Circana). For HCB the situation is an existing-market-adjacent growth pool where the current portfolio has minimal textured-hair offering versus competitor positions (Shea Moisture at Unilever, Cantu at PDC, Mielle at P&G). On the LHC side, Hispanic households average 6.2 laundry loads/week and over-index on fabric softener and premium scent — a direct growth lever in a region already under retail-media compression (K-08). Hispanic-retailer distribution (Vallarta, Northgate) and Spanish-language creative are prerequisites rather than upside.",
         category_exposure=cat(4,5,4,3, 4,5,2,4,3,3,2,2),
         vc_exposure=vc(1,2,1,2,3,5,5,4),
         regional_exposure=reg(0,5,0,1),
@@ -1142,7 +1142,7 @@ TRENDS = [
         # 18%: AI agents will mediate 10-20% of online FMCG by 2030;
         # low-consideration categories (detergent, dish) most exposed
         gp1_pct_affected=0.18,
-        strategic_implication="Build native AI agent integrations for Persil and Somat. Ensure product data optimized for LLM citation (GEO). Smartwash cartridge model creates lock-in agents cannot override. #1 strategic technology priority for 2027-2030.",
+        strategic_implication="Medium-confidence contraction (probability 5, 18% GP1 affected) — the highest-impact Technology trend in the database. Morgan Stanley estimates $190-385B US e-commerce capture by agentic shopping by 2030 (10-20% of online retail); McKinsey $3-5T globally. Category exposure is LHC-heavy: Fabric Cleaning (5), Laundry Additives (5), Automatic Dish Wash (5), HDW (4), Fabric Care (4), Hard Surface Cleaner (3); Hair modest (1-2). Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream: Marketing (5), Commercial (5), Consumer (5). Sources are Medium confidence (Morgan Stanley, McKinsey, Kearney). For HCB the situation is that low-consideration, high-frequency categories — detergent, dish tabs, basic shampoo — are textbook agent-optimisation targets where price-per-load, sustainability score and ratings are the decision vector, not brand memory. If the portfolio does not rank #1 on those dimensions in the agent's evaluation, invisible brand switching occurs. Smartwash (T-08) is the one category where proprietary lock-in overrides agent optimisation.",
         category_exposure=cat(2,2,1,2, 5,4,3,5,4,5,3,2),
         vc_exposure=vc(0,0,0,0,2,5,5,5),
         regional_exposure=reg(4,5,4,2),
@@ -1160,7 +1160,7 @@ TRENDS = [
         # 14%: Distinct from NEW-01 (which is the channel); this is the
         # brand-equity erosion effect specifically on mid-tier brands
         gp1_pct_affected=0.14,
-        strategic_implication="Invest in demonstrable product superiority that AI agents can verify (ratings, clinical data, certifications). Smartwash IoT platform creates agent-proof lock-in. Schwarzkopf Professional credibility is defensible; Schauma/Syoss/got2b most exposed.",
+        strategic_implication="Low-confidence contraction (probability 4, 14% GP1 affected). Second-order effect of T-11: brand equity erosion in agent-mediated categories. 58% of retailers predict AI will handle most shopper interactions within 5 years. Category exposure is LHC-concentrated: Fabric Cleaning (4), Laundry Additives (5), Automatic Dish Wash (4), HDW (3), Fabric Care (3); Hair moderate (2-3). Regional exposure is NA (5), Asia (4), Europe (3), HG (1). Value chain concentration is Commercial (5), Consumer (5), Marketing (5). Sources are Low confidence (Deloitte, Bain, PYMNTS). For HCB the situation is that premium brands with demonstrable superiority (clinical claims, patented technology, cartridge lock-in) are defended, while mid-tier brands face commoditisation under agent evaluation. Professional heritage credibility is the only partial insulation for Hair; mass mid-tier Hair and mid-tier LHC are most exposed. This trend is a brand-equity decay mechanism distinct from the channel capture in T-11 — both need to be managed simultaneously.",
         category_exposure=cat(2,3,2,2, 4,3,2,5,3,4,2,1),
         vc_exposure=vc(0,0,0,0,1,5,5,5),
         regional_exposure=reg(3,5,4,1),
@@ -1178,7 +1178,7 @@ TRENDS = [
         # 12%: Upgraded from M-01's 10%. AI discovery is now mainstream,
         # not emerging; applies to Hair and LHC equally
         gp1_pct_affected=0.12,
-        strategic_implication="Invest in GEO for all Power Brands. Create structured authority content (ingredients, clinical claims, sustainability) that LLMs cite. Partner with AI platforms for brand data integration. This is a marketing architecture overhaul, not just SEO optimization.",
+        strategic_implication="High-confidence contraction (probability 5, 12% GP1 affected). Extends M-01 (T-09) with broader scope and faster disruption pace. Category exposure is uniform at 3 across the portfolio — applies to Hair (shade matching, ingredient lookup) and LHC (product comparison, sustainability claims) equally. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream at Marketing (5), Commercial (5), Consumer (5). Sources are High confidence (eMarketer, Similarweb, CB Insights). For HCB the situation is that Generative Engine Optimisation (GEO) is a marketing-architecture overhaul rather than an SEO extension — structured authority content that LLMs cite must be produced for ingredients, clinical claims and sustainability credentials. The Byron Sharp framework requires reinterpretation: Mental Availability must be engineered into LLM memory structures, not just human ones. This trend upgrades T-09 from 10% to 12% GP1 affected as AI discovery transitions from emerging to mainstream.",
         category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
         vc_exposure=vc(0,0,0,0,0,5,5,5),
         regional_exposure=reg(4,5,4,2),
@@ -1201,7 +1201,7 @@ TRENDS = [
         # 12%: New geographic pool that doesn't exist in current model;
         # highest growth rate of any remaining FMCG frontier
         gp1_pct_affected=0.12,
-        strategic_implication="Build dedicated Sub-Saharan Africa entry strategy with hub manufacturing (Nigeria, Kenya). Develop sachet pricing architecture. Partner with local distributors for General Trade access. 5-10 year build, not quick win — but must be in profit pool model.",
+        strategic_implication="Medium-confidence expansion (probability 4, 12% GP1 affected) — a 2034 peak year H3 Transformation trend. Africa's FMCG market projected at $200B by 2030, driven by 1.7B consumers. Category exposure is broad: Hair Care (4), Color (3), Body (4), Styling (2); LHC FCN (3), FCA (3), LAD (4), IC (3), HSC (2). Regional exposure is High-Growth (5), Asia (2), Europe (0), NA (0). Value chain engagement spans Raw Materials (3), Formulation (3), Manufacturing (4), Packaging (4), Supply Chain (5), Marketing (4), Commercial (4), Consumer (5). Sources are Medium confidence (GeoPoll, Fieldassist, EIU). For HCB the situation is a greenfield expansion pool — existing operations in Egypt, South Africa and select North African markets leave Sub-Saharan Africa as the gap. PL competition is lighter than Europe, distribution inefficiency creates entry barriers that favour early movers with local manufacturing, and the continent is the world's largest textured-hair market (connecting to C-24). This is a 5-10 year build-rather-than-capture trend that must be included in the profit pool model even though near-term P&L impact is limited.",
         category_exposure=cat(3,4,2,4, 3,3,2,4,2,1,2,3),
         vc_exposure=vc(3,3,4,4,5,4,4,5),
         regional_exposure=reg(0,0,2,5),
@@ -1219,7 +1219,7 @@ TRENDS = [
         # 10%: Represents next-wave growth pool after India;
         # digital-first channel economics different from EU
         gp1_pct_affected=0.10,
-        strategic_implication="Build digital-first go-to-market for Schwarzkopf in SEA via Shopee/Lazada/TikTok Shop. Leverage salon network for professional credibility. Develop halal-certified formulations. Partner with local influencers. Indonesia is priority market #1.",
+        strategic_implication="Mid-size expansion (probability 4, 10% GP1 affected). Southeast Asia 600M consumers, $25B+ beauty market at 8-10% CAGR, with the highest global e-commerce growth rates. Category exposure is Hair-led: Care (5), Color (4), Styling (3), Body (3); LHC minimal (1-2). Regional exposure is Asia (5) and High-Growth (4). Value chain engagement is Marketing (5), Commercial (5), Consumer (5), with secondary Formulation/Manufacturing/Supply Chain (3). Sources are Medium confidence (Euromonitor, Shopee/Lazada analytics, Mintel APAC). For HCB the situation is a next-wave growth pool after India with digital-first channel economics that differ structurally from Europe — social commerce penetration is 2-3x Western levels. Professional salon networks in Thailand and Indonesia provide an in-market distribution asset for premium consumer crossover. Halal-certified formulations are a regulatory access condition for Indonesia/Malaysia's 250M Muslim consumers — a capability that competitors with decades of local presence already possess.",
         category_exposure=cat(4,5,3,3, 2,2,1,3,1,1,1,1),
         vc_exposure=vc(2,3,3,3,3,5,5,5),
         regional_exposure=reg(0,0,5,4),
@@ -1237,7 +1237,7 @@ TRENDS = [
         # 8%: Mid-size growth pool; premiumization + nearshoring
         # create structural tailwind for expansion
         gp1_pct_affected=0.08,
-        strategic_implication="Evaluate Brazil market entry via acquisition (local hair care brand with keratin/treatment expertise). Mexico: leverage US Hispanic brand assets. Build manufacturing hub in Mexico to serve US market with tariff advantage.",
+        strategic_implication="Mid-size expansion (probability 4, 8% GP1 affected). LatAm BPC market $60B+, Brazil is the world's #4 beauty market with strong premiumisation. Category exposure is Hair-led: Care (5), Color (4), Styling (3), Body (3); LHC moderate (FCN=3, FCA=3, LAD=3). Regional exposure is High-Growth (5) and North America (1). Value chain exposure is Marketing (4), Consumer (5), Formulation/Manufacturing/Supply Chain (3). Sources are Medium confidence (Euromonitor, ABIHPEC, nearshoring data). For HCB the situation is an under-exploited mid-sized growth pool where competitor distribution depth (P&G, Unilever, Natura) creates structural barriers. Mexico is a particular case: US tariff-driven nearshoring (manufacturing investment up 40% since 2023) intersects with the US Hispanic demographic (C-18) to create cross-border brand leverage. Brazilian keratin/smoothing treatments are globally category-defining products — the in-market formulation expertise is a potential acquisition target rather than an organic build.",
         category_exposure=cat(4,5,3,3, 3,3,2,3,2,2,2,1),
         vc_exposure=vc(2,3,3,3,3,4,4,5),
         regional_exposure=reg(0,1,0,5),
@@ -1260,7 +1260,7 @@ TRENDS = [
         # 10%: Supercharges premiumization (C-03) and scalp care (C-07);
         # creates new pricing tier above current premium
         gp1_pct_affected=0.10,
-        strategic_implication="Position Schwarzkopf as 'hair longevity' brand, not just hair beauty. Develop clinical-grade anti-aging hair line targeting 45+ consumers. Partner with longevity researchers for ingredient innovation. Premium pricing unlock: $30 for scientifically validated hair longevity products.",
+        strategic_implication="Longevity-economy expansion (probability 4, 10% GP1 affected) with a 2035 peak year — this is an H3 Transformation horizon trend. Category exposure is Hair-only: Care (5), Color (4), Body (3), Styling (2); LHC zero. Global anti-aging market reaches $120B by 2030. Regional exposure is broad-based across Europe (5), NA (5) and Asia (4) — older affluent populations overlap precisely with HCB's geographic strength. Value chain engagement is heavy across Raw Materials (4), Formulation (5), Manufacturing (3), Marketing (5), Commercial (4) and Consumer (5). Sources are Medium confidence (Cosmeprof, Lancet Longevity Commission, Yahoo Finance). For HCB the situation is a supercharger for premiumisation (C-03) and scalp care (C-07) rather than a standalone vector: it unlocks a new pricing tier above current premium, where willingness-to-pay for scientifically validated hair-longevity claims supports $30+ retail price points. L'Oréal's NVIDIA partnership for AI molecule discovery (X-11) is the direct competitive threat — the R&D arms race plays out in this pool.",
         category_exposure=cat(4,5,2,3, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(4,5,3,3,1,5,4,5),
         regional_exposure=reg(5,5,4,2),
@@ -1278,7 +1278,7 @@ TRENDS = [
         # 6%: Emerging science; commercial-scale products 2028-2030;
         # premiumization enabler for Hair Care and Color
         gp1_pct_affected=0.06,
-        strategic_implication="Invest in peptide formulation R&D. Patent bioactive hair compounds. Launch under Schwarzkopf Professional first (credibility), then crossover to consumer. Position at cosmetic-grade to avoid pharmaceutical regulation.",
+        strategic_implication="Low-confidence expansion (probability 3, 6% GP1 affected) — emerging-science, 2033 peak year. Peptide hair care market at $2-3B and 15%+ CAGR. Category exposure is Hair-only: Care (5), Color (2), Body (2), Styling (1); LHC zero. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is Raw Materials (5), Formulation (5), Marketing (4), Consumer (4). Sources are Low confidence (CosmeticsDesign, BeautyMatter, PubMed). For HCB the situation is that the professional dermatological R&D arm has the capability to develop clinical-grade peptide formulations, and AI-formulation acceleration (T-01) is compressing lab-to-shelf from 5 years to 18-24 months. The linkage to longevity (C-21) and microbiome (T-04) means peptide bioactives are a convergent platform across three expansion vectors. The regulatory boundary between cosmetic and quasi-pharmaceutical classification under G-03 is the main execution risk.",
         category_exposure=cat(2,5,1,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(5,5,3,2,1,4,3,4),
         regional_exposure=reg(4,5,4,2),
@@ -1301,7 +1301,7 @@ TRENDS = [
         # 12%: Structural exit from palm dependency; affects ~20% of
         # raw material cost structure for Hair and LHC
         gp1_pct_affected=0.12,
-        strategic_implication="Invest in precision fermentation partnerships (Novozymes/dsm-firmenich or specialized startups). Run pilot reformulations for Persil and Schwarzkopf shampoo. Target cost parity by 2030. Connected to T-02 but more fundamental platform shift.",
+        strategic_implication="Medium-confidence expansion (probability 4, 12% GP1 affected). Precision fermentation market projected at $36B by 2030 (43-48% CAGR). Category exposure is broad LHC + Hair: FCN (4), FCA (4), LAD (5), ADW (4), HDW (3), HSC (3), IC (3); Hair Care (3), Body (3). Regional exposure is balanced across Europe (4), NA (4), Asia (3), HG (3). Value chain concentration is upstream: Raw Materials (5), Formulation (5), Supply Chain (3), Manufacturing (3). Sources are Medium confidence (MarketsandMarkets, Fairfield, Novozymes). For HCB the situation is that >80% of shampoo and liquid detergent formulations use palm-derived surfactants — precision fermentation eliminates palm dependency, EUDR compliance cost (G-06) and B50 supply disruption (E-01) in a single technology shift. Cost parity projected 2029-2031. First-mover IP on fermented surfactant formulations creates a defensible moat; this is the most fundamental platform shift in the LHC raw-material architecture since surfactant chemistry itself.",
         category_exposure=cat(2,3,2,3, 4,4,3,5,3,4,3,3),
         vc_exposure=vc(5,5,3,1,3,2,2,2),
         regional_exposure=reg(4,4,3,3),
@@ -1319,7 +1319,7 @@ TRENDS = [
         # 8%: Longer-term play (H2/H3 horizon); affects fragrance
         # premiumization and surfactant supply chain
         gp1_pct_affected=0.08,
-        strategic_implication="Build synthetic biology partnerships for exclusive fragrance molecules (Vernel, Persil premium). Evaluate Henkel Adhesive Technologies biotech capabilities for cross-divisional leverage. Patent novel surfactant structures.",
+        strategic_implication="Low-confidence expansion (probability 3, 8% GP1 affected) — H3 horizon trend, 2035 peak year. Synthetic biology enables bio-identical production of novel aroma molecules, specialty surfactants, and functional proteins impossible in nature. Category exposure is LHC-led: Fabric Cleaning (4), Laundry Additives (5), Automatic Dish Wash (4), HDW (3), FCA (3), HSC (3); Hair minor (1-2). Regional exposure is Europe (4), NA (4), Asia (3), HG (2). Value chain concentration is Raw Materials (5), Formulation (5), Marketing (3), Commercial (2). Sources are Low confidence (Ginkgo Bioworks, BCG, Nature). For HCB the situation is that synthetic biology extends precision fermentation (T-15) into novel-molecule territory — exclusive fragrance compounds could underwrite brand-specific scent signatures unobtainable by PL (reinforcing C-09 as a PL-defence moat). Cross-divisional adhesive-technologies biotech capability is latent leverage. Commercial scale is 2030-2033, so this is a position-building trend rather than an execution-window trend.",
         category_exposure=cat(1,2,1,2, 4,3,3,5,3,4,3,2),
         vc_exposure=vc(5,5,2,1,2,3,2,2),
         regional_exposure=reg(4,4,3,2),
@@ -1342,7 +1342,7 @@ TRENDS = [
         # 5%: Compliance cost + speed-to-market friction across multiple
         # AI applications; compounds across T-01, T-05, T-08, T-10
         gp1_pct_affected=0.05,
-        strategic_implication="Create centralized AI governance function for HCB. Classify all AI systems by Q3 2026. Front-load compliance investment to avoid operational delays. Use compliance as competitive advantage — demonstrate trustworthy AI to retailers and regulators.",
+        strategic_implication="High-confidence contraction (probability 5, 5% GP1 affected). EU AI Act fully applicable August 2, 2026; high-risk AI in regulated products extended to August 2, 2027. Category exposure is uniform at 2-3 across the portfolio — every AI system requires classification. Regional exposure is Europe-only (5). Value chain concentration is Formulation (4), Manufacturing (3), Marketing (4), Raw Materials/Packaging/Commercial (2). Sources are High confidence (EU AI Act timeline, Deloitte, SIG). For HCB the situation is a compliance-cost overlay on every AI-enabled system — formulation AI (T-01), pricing algorithms, Smartwash auto-dosing (T-08), marketing personalisation (T-10), supply-chain optimisation (T-05). Compounding effect across at least five technology trends means the classification and conformity-assessment burden is multiplicative, not additive. Estimated compliance cost of €5-15M is modest at the enterprise level but the speed-to-market friction on AI-enabled innovation is the more material effect.",
         category_exposure=cat(3,3,2,2, 3,3,2,3,2,3,2,2),
         vc_exposure=vc(2,4,3,1,2,4,3,2),
         regional_exposure=reg(5,1,2,1),
@@ -1360,7 +1360,7 @@ TRENDS = [
         # 6%: Supply chain compliance cost + sourcing constraints;
         # affects raw materials across Hair and LHC
         gp1_pct_affected=0.06,
-        strategic_implication="Conduct biodiversity footprint assessment across all supply chains. Invest in regenerative agriculture partnerships for key inputs. Build TNFD-compliant reporting by 2028. Use biodiversity credentials as brand asset for Green Claims compliance (G-05).",
+        strategic_implication="Medium-confidence contraction (probability 4, 6% GP1 affected). Kunming-Montreal Global Biodiversity Framework mandates halting biodiversity loss by 2030; EU CSDDD and TNFD reporting impose value-chain biodiversity assessments. Category exposure is 2-4 across the portfolio with LHC slightly heavier (FCN=3, FCA=3, LAD=4). Regional exposure is broad: Europe (5), Asia (3), HG (4), NA (3). Value chain concentration is Raw Materials (5), Supply Chain (5), Formulation (3), Manufacturing (2) — upstream-heavy. Sources are Medium confidence (Kunming-Montreal text, McKinsey, TNFD). For HCB the situation is a supply-chain footprint trend: palm oil, water resources, fragrance and protein inputs, and packaging materials all carry biodiversity exposures. Biodiversity-footprint assessments becoming mandatory create reporting cost and sourcing constraints; at the same time, biodiversity credentials become an asset for Green Claims (G-05) substantiation. This is a compliance trend that doubles as a differentiation mechanism for companies that invest early.",
         category_exposure=cat(2,3,2,3, 3,3,2,4,2,3,2,3),
         vc_exposure=vc(5,3,2,2,5,1,2,1),
         regional_exposure=reg(5,3,3,4),
@@ -1378,7 +1378,7 @@ TRENDS = [
         # 5%: Regulatory driver for repositioning existing products;
         # moderate GP1 impact but strategic brand positioning value
         gp1_pct_affected=0.05,
-        strategic_implication="Position Perwoll as the 'garment longevity' brand with clinically demonstrated textile life extension. Develop enzyme-based fabric protection innovations. Align packaging messaging with EU Textile Strategy. Premium pricing justified by cost-per-wear economics.",
+        strategic_implication="Low-confidence expansion (probability 3, 5% GP1 affected) — this is a regulatory trend that creates positive repositioning value rather than compliance cost. EU Strategy for Sustainable and Circular Textiles imposes garment-longevity and textile-waste reduction targets. Category exposure is LHC-only and narrow: Fabric Care Specialty (5), Fabric Cleaning (4), Laundry Additives (4), Fabric Finisher (2); Hair zero. Regional exposure is Europe (5), with minor secondary exposure. Value chain concentration is Formulation (4), Consumer (5), Marketing (4). Sources are Low confidence (EU Textile Strategy 2022, Ellen MacArthur, Euromonitor). For HCB the situation is a regulatory driver for premium fabric-care positioning — washing products that demonstrably extend textile life can be repositioned upward on the cost-per-wear value case. The trend connects to Digital Product Passport (G-07) for textiles, which raises consumer awareness of garment-care impact, and reinforces E-08 (Textile Longevity). Premium positioning unlock is conditioned on actual performance claims that survive EmpCo scrutiny (G-05).",
         category_exposure=cat(0,0,0,0, 4,5,2,4,0,0,0,0),
         vc_exposure=vc(2,4,2,2,1,4,3,5),
         regional_exposure=reg(5,2,2,2),
@@ -1401,7 +1401,7 @@ TRENDS = [
         # 10%: Targets highest-margin sub-segments specifically;
         # data advantage creates structural threat beyond traditional PL
         gp1_pct_affected=0.10,
-        strategic_implication="Defend through product superiority demonstrable in reviews/ratings. Ensure Persil and Somat #1 rated in Amazon sub-categories. Build first-party data to reduce Amazon dependency. Smartwash DTC subscription bypasses Amazon entirely.",
+        strategic_implication="High-confidence contraction (probability 4, 10% GP1 affected). Amazon PL operates qualitatively differently from traditional retail PL — real-time consumer behaviour data, search-intent data and review-sentiment analysis enable targeted sub-segment margin destruction. US PL grew 4.4% vs 1.1% for national brands in early 2025. Category exposure is LHC-heavy: FCN (4), FCA (3), LAD (5), ADW (4), HDW (3), HSC (2), Care (3), FFI (2), IC (1); Hair Color/Body/Styling moderate (2). Regional exposure is NA (5), Europe (3), Asia (3), HG (2). Value chain concentration is Marketing (4), Commercial (5), Consumer (4), Supply Chain (3). Sources are High confidence (Store Brands, Oliver Wyman, Amazon 10-K). For HCB the situation is that Amazon PL threatens through targeted margin destruction in profitable sub-segments, not through aggregate volume share. Subscribe & Save amplifies lock-in (K-06 linkage), and first-party data becomes the main defensive asset. Smartwash DTC bypasses Amazon entirely — the only proprietary channel that escapes Amazon PL competitive dynamics.",
         category_exposure=cat(2,3,2,2, 4,3,2,5,3,4,2,1),
         vc_exposure=vc(0,0,0,1,3,4,5,4),
         regional_exposure=reg(3,5,3,2),
@@ -1419,7 +1419,7 @@ TRENDS = [
         # 8%: Widening R&D gap from 4-5x to potentially 5-6x;
         # structural competitive disadvantage in Hair innovation
         gp1_pct_affected=0.08,
-        strategic_implication="Cannot match L'Oreal R&D spend; must compete on focus. Concentrate AI formulation investment on Color (shade matching, reformulation) and Scalp (diagnostics, microbiome) where Henkel has domain expertise. Acquire biotech startups with novel hair science IP.",
+        strategic_implication="High-confidence contraction (probability 4, 8% GP1 affected). L'Oréal-NVIDIA atomic-scale AI-powered molecule discovery partnership; 725 patents filed in 2025; CES 2026 Innovation Awards for Light Straight+ and LED Face Mask. Category exposure is Hair-only: Color (5), Care (4), Styling (3), Body (2); LHC zero. Regional exposure is global: Europe (5), NA (5), Asia (5), HG (3). Value chain concentration is Formulation (5), Marketing (4), Raw Materials (2), Commercial (3), Consumer (3). Sources are High confidence (L'Oréal Annual Report, PR Newswire, GCI Magazine). For HCB the situation is that the structural R&D gap widens from 4-5x to potentially 5-6x, creating a gap that cannot be closed through organic investment alone. Counter-positions are focused AI-formulation partnerships (T-01), M&A of biotech startups (X-12 linkage), and concentrated domain expertise in Color/scalp where century-scale depth matters more than absolute budget. This is the most direct signal that Hair R&D strategy must shift from catch-up-on-scale to pick-the-fight on narrow technical domains.",
         category_exposure=cat(5,4,3,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(2,5,2,1,0,4,3,3),
         regional_exposure=reg(5,5,5,3),
@@ -1437,7 +1437,7 @@ TRENDS = [
         # 7%: Indirectly shifts competitive balance; each acquisition
         # strengthens competitor portfolio in premium segments
         gp1_pct_affected=0.07,
-        strategic_implication="Build active M&A pipeline targeting 3-5 indie brands in: (1) textured/curly hair, (2) scalp care, (3) K-beauty hair. Budget EUR 500M-1B for acquisition program. Act within 18 months — target pool is shrinking rapidly.",
+        strategic_implication="High-confidence contraction (probability 4, 7% GP1 affected). Major 2025-26 acquisitions confirmed: Rhode (e.l.f., $1B+), Medik8 (L'Oréal, $1.1B), Color Wow (L'Oréal), Dr Squatch (Unilever, $1.5B). Category exposure is Hair-only: Color (4), Care (5), Styling (4), Body (2); LHC zero. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is Marketing (4), Commercial (3), Consumer (5), Formulation (3). Sources are High confidence (Capstone Partners, GCI Magazine, CB Insights). For HCB the situation is that the addressable pool of high-quality indie brands is shrinking as competitors bid up valuations — each P&G/Unilever/L'Oréal acquisition closes a potential target. HCB has not made a significant Hair Care acquisition since the 2015 beauty portfolio shift, making the acquisition gap a growing strategic liability. The three priority target segments (textured/curly hair, scalp care, K-Beauty hair) align with C-24, C-07 and X-08 — each acquisition window closes as competitors move first.",
         category_exposure=cat(4,5,4,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(1,3,1,1,1,4,3,5),
         regional_exposure=reg(4,5,4,2),
@@ -1460,7 +1460,7 @@ TRENDS = [
         # 6%: Niche but growing; threatens liquid and pod formats
         # in eco-conscious segments
         gp1_pct_affected=0.06,
-        strategic_implication="Monitor market share closely. Prepare Persil sheet format for defensive launch if threshold reached. Position Smartwash as premium concentrated alternative. Don't let eco-positioning be captured by DTC sheet brands.",
+        strategic_implication="Low-confidence contraction (probability 3, 6% GP1 affected). Laundry sheets remain niche but growing among eco-conscious Gen Z/Millennial consumers. Category exposure is narrow LHC: Fabric Cleaning (4), Laundry Additives (5), FCA (2); Hair zero. Regional profile is NA (5), Europe (4), Asia (3), HG (2). Value chain concentration is Packaging (5), Supply Chain (4), Formulation (4), Consumer (4), Manufacturing (3). Sources are Low confidence (Zanyu, Consumer Reports, DTC brand data). For HCB the situation is a monitoring-tier trend: sheets reduce shipping weight 80% and storage 90%, and are natively suited to letterbox e-commerce — but absolute share is still below the 5% threshold in any major market. The structural risk is category cannibalisation against incumbent liquid detergents and pod/disc formats in the eco-premium segment. The counter-effect is that a premium concentrated cartridge platform (T-08) already occupies the upper end of the same consumer need-state, leaving DTC sheets in a narrower value/eco niche.",
         category_exposure=cat(0,0,0,0, 4,2,0,5,0,1,0,0),
         vc_exposure=vc(2,4,3,5,4,3,3,4),
         regional_exposure=reg(4,5,3,2),
@@ -1478,7 +1478,7 @@ TRENDS = [
         # 5%: Category convergence; moderate near-term GP1 impact
         # but strategic positioning value
         gp1_pct_affected=0.05,
-        strategic_implication="Explore Schwarzkopf Hair Health supplement line (oral + topical). Partner with supplement brands rather than building from scratch. LHC: develop aromatherapy/wellness-positioned Vernel range. Monitor whether supplement adoption erodes topical willingness-to-pay.",
+        strategic_implication="Low-confidence expansion (probability 3, 5% GP1 affected). Wellness-to-beauty convergence of ingestibles + topicals, 12%+ CAGR. Category exposure is narrow: Hair Care (4), Body (3), Color (2), Styling (1); LHC minimal (1-2 on FCN/FCA/LAD). Regional profile is broad-ish: NA (5), EU (4), Asia (4), HG (2). Value chain concentration is Raw Materials (3), Formulation (4), Marketing (4), Consumer (5). Sources are Low confidence (Grand View, Mintel, Unilever Nutrafol case study). For HCB the situation is dual-edged: premium positioning opportunity on one hand (inside + outside hair health regimens), and competitive displacement risk on the other (if consumers believe supplements matter more than shampoo, topical willingness-to-pay compresses). LHC has a minor adjacency via aromatherapy/wellness-positioned fragrance ranges, reinforcing C-09. This is an H3 theme rather than near-term.",
         category_exposure=cat(2,4,1,3, 1,1,1,2,0,0,0,0),
         vc_exposure=vc(3,4,2,2,1,4,3,5),
         regional_exposure=reg(4,5,4,2),
@@ -1496,7 +1496,7 @@ TRENDS = [
         # 8%: Largest structural white space in Hair; 65% of
         # global population underserved; competitors acquiring positions
         gp1_pct_affected=0.08,
-        strategic_implication="Acquire a textured-hair brand (candidates: Cantu-adjacent, Afro-specific brands). Develop Schwarzkopf textured-hair line with professional credibility. Priority markets: US, UK, France, Brazil, Nigeria. This is a build-or-buy decision that must happen within 24 months.",
+        strategic_implication="Medium-confidence expansion (probability 4, 8% GP1 affected) targeting the largest structural white space in global hair care. Category exposure is Hair-only: Care (5), Color (3), Styling (4), Body (2); LHC zero. 65% of the world's population has textured, curly or coily hair yet mainstream portfolios are designed for straight/wavy hair. Regional exposure is broad: NA (5), High-Growth (5), Europe (3), Asia (3) — reflecting the global diaspora geography. Value chain concentration is Formulation (5), Marketing (5), Commercial (4), Consumer (5). Sources are Medium confidence (Circana, Mintel, Grand View). For HCB the situation is that major competitors have already built or acquired positions (P&G Mielle, Unilever Shea Moisture, Unilever TRESemme Curl) while the HCB portfolio has no credible textured-hair offering at consumer scale. Market sizing is $8B+ globally at 7-9% CAGR. The trend connects tightly to C-18 (US Hispanic) and C-04 (Sub-Saharan Africa on the Competitive side), meaning three expansion vectors converge on the same capability gap.",
         category_exposure=cat(3,5,4,2, 0,0,0,0,0,0,0,0),
         vc_exposure=vc(3,5,2,3,2,5,4,5),
         regional_exposure=reg(3,5,3,5),
@@ -1519,7 +1519,7 @@ TRENDS = [
         # 12%: Fundamental restructuring of brand-retailer economics;
         # trade spend architecture must be rebuilt for agentic era
         gp1_pct_affected=0.12,
-        strategic_implication="Redesign Joint Business Plans for agentic era. Build capabilities in AI agent optimization. Develop Smartwash as proprietary channel that bypasses retailer-mediated AI. First-party consumer data becomes existential asset.",
+        strategic_implication="Low-confidence contraction (probability 4, 12% GP1 affected) — H3 horizon retailer-side trend. When AI agents handle grocery purchasing, traditional retail power structures dissolve: shelf placement, trade promotion and category captainship lose relevance. Category exposure is LHC-heavy: FCN (4), FCA (3), LAD (4), ADW (4), HDW (3), HSC (2); Hair uniform at 2. Regional exposure is NA (5), Europe (4), Asia (3), HG (2). Value chain concentration is entirely downstream: Marketing (4), Commercial (5), Consumer (5), Supply Chain (2). Sources are Low confidence (Deloitte, Bain, PwC). For HCB the situation is that Joint Business Plans must evolve to include AI-agent optimisation rather than just shelf and promotion architecture, while retailer consolidation (K-03) compounds into unprecedented buyer-power concentration — fewer, more powerful retailers deploying AI purchasing agents. First-party consumer data becomes an existential asset; proprietary direct channels (Smartwash) bypass the retailer-mediated AI layer entirely.",
         category_exposure=cat(2,2,2,2, 4,3,2,4,3,4,2,2),
         vc_exposure=vc(0,0,0,0,2,4,5,5),
         regional_exposure=reg(4,5,3,2),
@@ -1545,7 +1545,7 @@ TRENDS = [
         # 6%: Increasing frequency of disruption events; capex
         # for climate-proofing compounds with energy costs
         gp1_pct_affected=0.06,
-        strategic_implication="Conduct climate risk assessment for all European plants. Prioritize climate adaptation investment for highest-risk sites. Factor climate resilience into manufacturing footprint decisions. Build supply chain redundancy for climate disruption scenarios.",
+        strategic_implication="Medium-confidence contraction (probability 4, 6% GP1 affected). Extreme weather events disrupting European supply chains; European natcat losses doubled in the last decade (Munich Re). Category exposure is uniform at 2-3 across the portfolio. Regional exposure is Europe (5), Asia (3), HG (3), NA (2). Value chain concentration is Manufacturing (5), Supply Chain (4), Raw Materials (3), Packaging (2). Sources are Medium confidence (Munich Re, IPCC AR6, EEA). For HCB the situation is that 15+ European plants face compound climate risk — flood (Rhine corridor), heat stress (production shutdowns above 40°C), and water supply constraints. Insurance costs for industrial properties are rising 15-20% annually in climate-exposed regions. Beyond operational disruption, climate-adaptation capex (flood barriers, cooling systems, water recycling) adds to fixed-cost base. The footprint-optimisation logic aligns with energy costs (E-07) and nearshoring (E-06) — Turkey/India/North Africa may have composite climate-energy advantages.",
         category_exposure=cat(2,2,2,2, 3,3,3,3,3,3,3,3),
         vc_exposure=vc(3,2,5,2,4,0,0,0),
         regional_exposure=reg(5,2,3,3),
@@ -1563,7 +1563,7 @@ TRENDS = [
         # 10%: Upgrades E-02 (7%) for longer horizon; regulatory
         # water-use limits become plausible by 2032-2035
         gp1_pct_affected=0.10,
-        strategic_implication="Accelerate waterless/anhydrous formulation R&D for both Hair and LHC. Smartwash auto-dosing as water conservation play. Position Persil cold-wash 20C as default in water-stressed markets. Build manufacturing water recycling infrastructure. This becomes regulatory by H2/H3.",
+        strategic_implication="Medium-confidence contraction (probability 4, 10% GP1 affected) — upgrades E-02 for the longer horizon. Global freshwater demand will exceed supply by 40% by 2030 (UNEP). Category exposure is broad: Hair Care (3), Color (2), Styling (3), Body (2); LHC heavy (FCN=4, FCA=4, LAD=4, ADW=4, HSC=3, HDW=3). Regional exposure is High-Growth (5), Europe (4), Asia (4), NA (3). Value chain concentration is Raw Materials (3), Formulation (5), Manufacturing (4), Supply Chain (2), Consumer (4). Sources are Medium confidence (UNEP, WRI, WEF). For HCB the situation is that by 2032-2035, regulatory water-use limits on consumer products become plausible in Southern Europe, MENA, India and parts of China. This is not just a low-water formulation trend — it is a fundamental product-architecture shift toward solid shampoo bars, waterless detergent concentrates and anhydrous hair treatments. Smartwash auto-dosing already reduces water waste per wash, positioning the platform for regulatory-tailwind marketing claims.",
         category_exposure=cat(2,3,3,2, 4,4,2,4,3,4,3,2),
         vc_exposure=vc(3,5,4,3,2,3,2,4),
         regional_exposure=reg(4,3,4,5),
@@ -1581,7 +1581,7 @@ TRENDS = [
         # 5%: Carbon cost pass-through from suppliers; compounds
         # with energy costs (E-07) and raw material costs (E-01)
         gp1_pct_affected=0.05,
-        strategic_implication="Model CBAM downstream expansion impact on surfactant sourcing costs. Negotiate carbon-adjusted pricing with suppliers. Invest in renewable energy for manufacturing to reduce Scope 1-2. Build carbon accounting into procurement decisions.",
+        strategic_implication="Medium-confidence contraction (probability 4, 5% GP1 affected) with a step-function profile. CBAM downstream expansion proposed December 2025; EU ETS carbon price €75/tonne (Q1 2026) and rising. Category exposure is uniform at 2-3 across the portfolio with slight LHC tilt. Regional exposure is Europe (5), Asia (3), HG (3), NA (2). Value chain concentration is Raw Materials (4), Manufacturing (4), Supply Chain (4). Sources are Medium confidence (CBAM expansion proposal, EU ETS, IntegrityNext). For HCB the situation is that chemical inputs — particularly surfactants for detergents — face embedded carbon costs as CBAM extends to downstream products. Manufacturing-heavy European footprint amplifies exposure versus competitors in lower-carbon grids. The trend compounds energy costs (E-07) and raw material costs (E-01). Carbon-adjusted procurement logic becomes a competitive advantage when suppliers pass through CBAM-equivalent carbon pricing — early movers lock in lower-carbon-cost supply at pre-escalation prices.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
         vc_exposure=vc(4,2,4,2,4,1,1,0),
         regional_exposure=reg(5,2,3,3),
