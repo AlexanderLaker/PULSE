@@ -25,6 +25,7 @@ import {
   Leaf, Swords, Sparkles, ChevronDown,
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
+  ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -387,6 +388,30 @@ const RegionExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposur
   </div>
 );
 
+// ─── Sort helpers ──────────────────────────────────────────────────
+type SortKey = 'name' | 'direction' | 'probability' | 'gp1' | 'shift';
+type SortDir = 'asc' | 'desc';
+
+// Per-column default direction when the user first activates the sort.
+// Numeric columns default to "biggest first" (desc), strings to A→Z (asc).
+const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
+  name:        'asc',
+  direction:   'asc',
+  probability: 'desc',
+  gp1:         'desc',
+  shift:       'desc',
+};
+
+function sortValue(t: Trend, key: SortKey): string | number | null | undefined {
+  switch (key) {
+    case 'name':        return t.name;
+    case 'direction':   return t.direction;
+    case 'probability': return t.probability;
+    case 'gp1':         return (t as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
+    case 'shift':       return t.gp1_shift;
+  }
+}
+
 // ─── Main component ────────────────────────────────────────────────
 const Trends2: FC = () => {
   const { trends, loading, backendAvailable } = usePrism();
@@ -394,6 +419,21 @@ const Trends2: FC = () => {
   const [search, setSearch] = useState('');
   // Which trend row is currently expanded to show category + VC exposure.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Sort state — null means "backend order" (initial state).
+  // Clicking a header sorts by that column; clicking the same column again
+  // flips direction; clicking a different column resets to its default dir.
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(SORT_DEFAULT_DIR[key]);
+    }
+  };
 
   const filtered = useMemo<Trend[]>(() => {
     const q = search.trim().toLowerCase();
@@ -416,6 +456,29 @@ const Trends2: FC = () => {
       );
     });
   }, [trends, categoryFilter, search]);
+
+  // Apply sort on top of filter. When no sortKey is set we preserve the
+  // backend's order (which is a stable editorial sequence by force group).
+  const sorted = useMemo<Trend[]>(() => {
+    if (!sortKey) return filtered;
+    const cmp = (a: Trend, b: Trend): number => {
+      const av = sortValue(a, sortKey);
+      const bv = sortValue(b, sortKey);
+      // Nulls / NaN always sink to the bottom regardless of direction
+      const aNull = av == null || (typeof av === 'number' && !isFinite(av));
+      const bNull = bv == null || (typeof bv === 'number' && !isFinite(bv));
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortDir === 'asc' ? av - bv : bv - av;
+      }
+      const as = String(av).toLowerCase();
+      const bs = String(bv).toLowerCase();
+      return sortDir === 'asc' ? as.localeCompare(bs) : bs.localeCompare(as);
+    };
+    return [...filtered].sort(cmp);
+  }, [filtered, sortKey, sortDir]);
 
   return (
     <div
@@ -506,7 +569,7 @@ const Trends2: FC = () => {
             boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
           }}
         >
-          {/* Column header */}
+          {/* Column header — all columns clickable, sort state in local hook */}
           <div
             className="grid items-center px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
             style={{
@@ -515,11 +578,11 @@ const Trends2: FC = () => {
               color: S.onSurfaceVariant,
             }}
           >
-            <span>Trend</span>
-            <span>Direction</span>
-            <span>Probability</span>
-            <span className="text-right">GP1 % Affected</span>
-            <span className="text-right">Shift</span>
+            <SortHeader label="Trend"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+            <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+            <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+            <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+            <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
           </div>
 
           {/* Rows */}
@@ -530,17 +593,17 @@ const Trends2: FC = () => {
             {!loading && !backendAvailable && (
               <EmptyRow text="Backend unavailable — reconnect to view live trend data." icon={<Sparkles size={20} />} />
             )}
-            {!loading && backendAvailable && filtered.length === 0 && (
+            {!loading && backendAvailable && sorted.length === 0 && (
               <EmptyRow text="No trends match the current filter." icon={<Sparkles size={20} />} />
             )}
-            {filtered.map((t, idx) => {
+            {sorted.map((t, idx) => {
               const key = t.id ?? String(idx);
               const expanded = expandedId === key;
               return (
                 <TrendRow
                   key={key}
                   trend={t}
-                  isLast={idx === filtered.length - 1}
+                  isLast={idx === sorted.length - 1}
                   expanded={expanded}
                   onToggle={() => setExpandedId(expanded ? null : key)}
                 />
@@ -566,6 +629,40 @@ const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = 
     {label}
   </button>
 );
+
+// ─── Sort header (clickable column header with asc/desc indicator) ────
+const SortHeader: FC<{
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey | null;
+  currentDir: SortDir;
+  onToggle: (key: SortKey) => void;
+  align?: 'left' | 'right';
+}> = ({ label, sortKey, currentKey, currentDir, onToggle, align = 'left' }) => {
+  const isActive = currentKey === sortKey;
+  const Icon = !isActive ? ArrowUpDown : currentDir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(sortKey)}
+      aria-sort={isActive ? (currentDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-colors"
+      style={{
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        color: isActive ? S.onSurface : S.onSurfaceVariant,
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        width: '100%',
+        textAlign: align,
+      }}
+    >
+      <span>{label}</span>
+      <Icon size={12} style={{ opacity: isActive ? 1 : 0.45 }} />
+    </button>
+  );
+};
 
 // ─── Trend row ─────────────────────────────────────────────────────
 interface TrendRowProps {

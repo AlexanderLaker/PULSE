@@ -171,11 +171,16 @@ function weightedAvg(values: Array<number | null>, weights: number[]): number | 
 }
 
 /** Heatmap cell color — signed diverging palette.
- *  Green (#22C55E) = expansion, Red (#EF4444) = contraction. */
-function heatFill(v: number | null): string {
+ *  Green (#22C55E) = expansion, Red (#EF4444) = contraction.
+ *  `scale` is the absolute value at which the gradient saturates.
+ *  Main grid cells use a fixed 5% scale; the Total column uses its own
+ *  data-driven scale so row totals don't get washed out against per-
+ *  dimension cells that are an order of magnitude smaller. */
+function heatFillScaled(v: number | null, scale: number): string {
   if (v == null || !isFinite(v)) return S.surfaceLow;
   if (Math.abs(v) < 0.0005) return S.surfaceLow;
-  const mag = Math.min(Math.abs(v) / 0.05, 1);
+  const s = Math.max(scale, 0.005);
+  const mag = Math.min(Math.abs(v) / s, 1);
   if (v > 0) {
     const a = 0.14 + mag * 0.62;
     return `rgba(34, 197, 94, ${a.toFixed(2)})`;
@@ -184,11 +189,21 @@ function heatFill(v: number | null): string {
   return `rgba(239, 68, 68, ${a.toFixed(2)})`;
 }
 
-function heatTextColor(v: number | null): string {
+function heatTextColorScaled(v: number | null, scale: number): string {
   if (v == null || !isFinite(v)) return S.onSurfaceVariant;
-  const mag = Math.min(Math.abs(v) / 0.05, 1);
+  const s = Math.max(scale, 0.005);
+  const mag = Math.min(Math.abs(v) / s, 1);
   if (mag > 0.45) return '#ffffff';
   return v > 0 ? '#14532d' : '#7f1d1d';
+}
+
+// Default 5% scale for the main grid cells and the bottom-row column totals
+// (same unit as data cells — per-dimension decomposition shares).
+function heatFill(v: number | null): string {
+  return heatFillScaled(v, 0.05);
+}
+function heatTextColor(v: number | null): string {
+  return heatTextColorScaled(v, 0.05);
 }
 
 // ─── UI Primitives ───────────────────────────────────────────────
@@ -278,6 +293,24 @@ const Matrix: FC<MatrixProps> = ({
   }, [rows]);
 
   const hasAnyData = rows.some((r) => columns.some((c) => (data[r.id]?.[c.id] ?? null) !== null));
+
+  // Total column gets its own conditional-formatting scale — the row totals
+  // (and the grand total) are typically much larger in magnitude than the
+  // per-force / per-VC / per-region cells in the main grid, so sharing the
+  // fixed 5% scale would either saturate them all or wash out the grid.
+  // Scale to the max |rowTotal| (with a defensive floor) so the Total
+  // column is independently legible.
+  const totalScale = useMemo(() => {
+    const vals: number[] = [];
+    if (rowTotals) {
+      Object.values(rowTotals).forEach((v) => {
+        if (v != null && isFinite(v)) vals.push(Math.abs(v));
+      });
+    }
+    if (grandTotal != null && isFinite(grandTotal)) vals.push(Math.abs(grandTotal));
+    const maxAbs = vals.length ? Math.max(...vals) : 0;
+    return Math.max(maxAbs, 0.02); // floor avoids blow-up when totals are near zero
+  }, [rowTotals, grandTotal]);
 
   if (!hasAnyData && emptyMessage) {
     return (
@@ -420,8 +453,8 @@ const Matrix: FC<MatrixProps> = ({
                         <td
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
-                            backgroundColor: heatFill(rt),
-                            color: heatTextColor(rt),
+                            backgroundColor: heatFillScaled(rt, totalScale),
+                            color: heatTextColorScaled(rt, totalScale),
                             fontWeight: 700,
                             fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                             borderLeft: `2px solid ${S.cardBorderStrong}`,
@@ -472,8 +505,8 @@ const Matrix: FC<MatrixProps> = ({
                 <td
                   className="px-3 py-1.5 text-center text-[13px] tabular-nums"
                   style={{
-                    backgroundColor: heatFill(grandTotal ?? null),
-                    color: heatTextColor(grandTotal ?? null),
+                    backgroundColor: heatFillScaled(grandTotal ?? null, totalScale),
+                    color: heatTextColorScaled(grandTotal ?? null, totalScale),
                     fontWeight: 800,
                     fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                     borderLeft: `2px solid ${S.cardBorderStrong}`,
