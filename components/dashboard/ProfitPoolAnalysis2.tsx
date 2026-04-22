@@ -7,34 +7,51 @@
  *   • Value Chain   — category × 8 value-chain steps, at a selected year
  *   • Region        — category × 4 regions, at a selected year
  *
- * v3.1 change: the Force / VC / Region decompositions are NO LONGER
- * synthesized in the frontend from trend exposures. They are produced by
- * the backend (bayesian_mc v2.5+) per year and arrive on the
- * `simulation.decompositions` + `simulation.totals` blocks. By construction
- * each lens's row total equals the MC median shift for that (cat, year),
- * which is also the row total of the other two lenses — so the three
- * lenses reconcile to the same per-category per-year shift. The column
- * totals aggregate across categories to the same grand total per year.
+ * Decomposition (Layer B) is produced by the backend (bayesian_mc v2.5+)
+ * and arrives on `simulation.decompositions`. By construction each lens's
+ * row total equals the MC median shift for that (cat, year), so the three
+ * lenses reconcile cell-by-cell to the same per-category per-year shift.
  *
- * All data is real. No frontend calibration chain, no flat multipliers,
- * no anchoring: the numbers you see here are literally the numbers the
- * simulation engine wrote to the DB.
+ * Totals (Layer C, Apr 2026 rewrite) — column totals, grand totals and
+ * Time-Path per-year totals are computed in the frontend as CATEGORY-WEIGHTED
+ * AVERAGES using `config.category_weights`, NOT as raw sums. This makes the
+ * bottom-right cell a single, interpretable portfolio-level shift per year:
+ *
+ *   grand[y]         = Σ_c cw[c] × mc_median[c][y]   /   Σ_c cw[c]
+ *   col_total[d][y]  = Σ_c cw[c] × decomp[c][d][y]   /   Σ_c cw[c]
+ *   row_total[c][y]  = mc_median[c][y]               (matches Time Path cell)
+ *
+ * Identity: Σ_d col_total[d][y] = grand[y] (shares sum to 1 per cat),
+ * so Force / VC / Region / Time Path all show the same grand total at a
+ * given year.
+ *
+ * Why cw only (not force/vc/region weights on rows)? Per-category row
+ * totals are anchored to the MC median — that's the one number the
+ * simulation produces per (cat, year), and the lens decomposition is
+ * exhaustive (shares sum to 1). Using force/vc/region weights on rows
+ * would rescale that anchor away from the Time Path figure the user
+ * already trusts. Those weights still live INSIDE the backend share
+ * computation (they shape which force/step/region gets what fraction
+ * of each cat shift), so business importance of a force / step / region
+ * is already baked into the cell values.
  */
 
 'use client';
 
-import React, { useMemo, useState, FC } from 'react';
+import React, { useMemo, useState, useEffect, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
-  Sparkles, Info,
+  Sparkles, Info, Database,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
+import * as api from '@/api/client';
 import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
 import type {
   ForceName, Scenario,
   PercentileDistribution, ShiftPath,
+  DiagnosticsResult,
 } from '@/types';
 
 // ─── Value-chain steps — must match backend VC_STEPS in pulse/config.py ──
@@ -129,6 +146,28 @@ function getYearShift(
   const v = (path as Record<string | number, unknown>)[year]
          ?? (path as Record<string | number, unknown>)[String(year)];
   return extractMedian(v as PercentileDistribution | number | undefined);
+}
+
+/** Category-weighted average helper — Layer C aggregation primitive.
+ *
+ * Returns  Σᵢ wᵢ·vᵢ / Σᵢ wᵢ   over the indices where vᵢ is finite and
+ * wᵢ > 0. Returns null if no cat contributes (all values missing, or all
+ * weights zero). Normalization is built in, so callers can pass raw
+ * weights from `config.category_weights` without pre-normalizing — if
+ * an admin sets weights that don't sum to 1.0, we still get a correct
+ * weighted average. */
+function weightedAvg(values: Array<number | null>, weights: number[]): number | null {
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    const w = weights[i] ?? 0;
+    if (v == null || !isFinite(v) || !isFinite(w) || w <= 0) continue;
+    num += w * v;
+    den += w;
+  }
+  if (den <= 0) return null;
+  return num / den;
 }
 
 /** Heatmap cell color — signed diverging palette.
@@ -451,7 +490,7 @@ const Matrix: FC<MatrixProps> = ({
       >
         <span style={{ fontFamily: BODY_FONT }}>
           Signed percentages. Positive → profit-pool expansion. Negative → contraction.
-          {showTotals && ' Row totals equal the MC median shift per category (identical across the three lenses by construction).'}
+          {showTotals && ' Row totals equal the MC median shift per category (identical across all four lenses). Column and grand totals are category-weighted averages using the business-importance weights from the Config sheet.'}
         </span>
         <div className="flex items-center gap-3">
           <span>−5%</span>
@@ -540,7 +579,7 @@ const PeakStressTooltip: FC = () => {
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC = () => {
   const {
-    simulation, scenarios,
+    simulation, scenarios, config,
     loading, error, backendAvailable,
     activeScenario, setActiveScenario, reconnect,
   } = usePrism();
@@ -548,10 +587,29 @@ const ProfitPoolAnalysis2: FC = () => {
   const [view, setView] = useState<ViewMode>('time');
   const [selectedYear, setSelectedYear] = useState<number>(YEARS[YEARS.length - 1]!);
 
+  // ─── Diagnostics — fetched only when the dashboard is empty so
+  // we can show the user *why* (no rows in DB vs DB unreachable vs
+  // malformed row), not a generic "No simulation persisted yet".
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
+  useEffect(() => {
+    if (loading || simulation || !backendAvailable) return;
+    let cancelled = false;
+    void api.getDiagnostics().then((d) => { if (!cancelled) setDiagnostics(d); });
+    return () => { cancelled = true; };
+  }, [loading, simulation, backendAvailable]);
+
   // ─── Build matrix data ────────────────────────────────────────
   // rows use cat.name as the id so lookups against the backend (which keys
   // shift_matrix and category_exposure by display names like "Hair: Color")
   // just work.
+  //
+  // All column totals, grand totals and Time-Path per-year totals are
+  // CATEGORY-WEIGHTED AVERAGES using `config.category_weights` from the
+  // config page. We deliberately IGNORE `simulation.totals.by_force`,
+  // `by_vc`, `by_region` and `grand` — those are raw sums written by the
+  // backend and are superseded by the frontend weighted-avg computation.
+  // Row totals remain the MC median per (cat, year) so they reconcile
+  // cell-by-cell with the Time Path view.
   const matrixData = useMemo(() => {
     const rows = CATEGORIES.map((c) => ({
       id: c.name,
@@ -559,6 +617,23 @@ const ProfitPoolAnalysis2: FC = () => {
       group: c.group,
       fallbackId: c.id,
     }));
+
+    // ── Category weights (source: config page) ──────────────────────
+    // Keyed by display name ("Hair: Color") to match backend DEFAULT_CATEGORY_WEIGHTS
+    // and the row.id we use above. Falls back to the snake_case id (e.g. "hair_color")
+    // in case a future backend persists either shape, and ultimately to 1.0
+    // (equal-weighted) if the config endpoint didn't return category_weights
+    // at all.
+    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    const catWeightFor = (catName: string, fallbackId: string): number => {
+      if (!catWeightsRaw) return 1; // equal-weight fallback
+      const byName = catWeightsRaw[catName];
+      if (typeof byName === 'number' && isFinite(byName)) return byName;
+      const byId = catWeightsRaw[fallbackId];
+      if (typeof byId === 'number' && isFinite(byId)) return byId;
+      return 0; // explicit zero → excluded from the weighted average
+    };
+    const rowWeights = rows.map((r) => catWeightFor(r.id, r.fallbackId));
 
     if (view === 'time') {
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
@@ -569,25 +644,32 @@ const ProfitPoolAnalysis2: FC = () => {
           data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, r.fallbackId, y);
         });
       });
-      // Column totals for Time Path: per-year grand total across categories
-      // (from backend totals.grand, which matches the sum of MC medians).
+
+      // Column totals for Time Path: per-year CATEGORY-WEIGHTED AVERAGE of
+      // the MC-median category shifts. This replaces the old raw-sum behaviour
+      // (`simulation.totals.grand[y]`) so the portfolio headline reflects each
+      // category's configured business importance, not just its count.
       const colTotals: Record<string, number | null> = {};
       YEARS.forEach((y) => {
-        colTotals[String(y)] = simulation?.totals?.grand?.[String(y)] ?? null;
+        const vals = rows.map((r) => data[r.id]![String(y)] ?? null);
+        colTotals[String(y)] = weightedAvg(vals, rowWeights);
       });
+
       return {
         columns, rows, data,
         rowTotals: undefined,
         colTotals,
         grandTotal: null,
-        showTotals: !!simulation?.totals,
-        // Time Path only renders column totals (row totals would be sums
-        // across time, which aren't a meaningful decomposition identity).
+        showTotals: !!simulation?.shifts,
+        // Time Path only renders column totals — per-year grand across
+        // cats. A row total (sum/avg across years for one cat) isn't a
+        // meaningful portfolio identity, so we keep it off.
         showRowTotals: false,
       };
     }
 
-    // ── Force / VC / Region — read from backend decompositions ──────
+    // ── Force / VC / Region — read backend decomposition cells, ───────
+    // compute totals as category-weighted averages in the frontend.
     const yearKey = String(selectedYear);
     const decompositions = simulation?.decompositions;
     const totals = simulation?.totals;
@@ -595,7 +677,6 @@ const ProfitPoolAnalysis2: FC = () => {
     const makeDecompView = (
       axisKeys: string[],
       lens: 'force' | 'vc' | 'region',
-      colTotalSrc: Record<string, Record<string, number>> | undefined,
     ): { data: Record<string, Record<string, number | null>>;
          rowTotals: Record<string, number | null>;
          colTotals: Record<string, number | null>;
@@ -610,21 +691,33 @@ const ProfitPoolAnalysis2: FC = () => {
           const v = cell[k];
           data[r.id][k] = typeof v === 'number' ? v : null;
         });
+        // Row total = MC median for (cat, year). Anchors row to the Time Path
+        // cell; identical across all three lenses by construction.
         rowTotals[r.id] = totals?.category_path?.[r.id]?.[yearKey] ?? null;
       });
+
+      // Column totals: per lens-dim, category-weighted avg of the
+      // decomposition cells across all 12 categories.
       const colTotals: Record<string, number | null> = {};
-      const colSrc = colTotalSrc?.[yearKey] ?? {};
       axisKeys.forEach((k) => {
-        colTotals[k] = typeof colSrc[k] === 'number' ? colSrc[k]! : null;
+        const vals = rows.map((r) => data[r.id]![k] ?? null);
+        colTotals[k] = weightedAvg(vals, rowWeights);
       });
-      const grandTotal = totals?.grand?.[yearKey] ?? null;
+
+      // Grand total: category-weighted avg of the per-cat MC medians at
+      // this year. Identity check — since shares sum to 1 per cat, this
+      // equals Σ_d colTotals[d]. Identical across Force/VC/Region/Time
+      // Path for the same year, so all four views reconcile.
+      const rowTotalVals = rows.map((r) => rowTotals[r.id] ?? null);
+      const grandTotal = weightedAvg(rowTotalVals, rowWeights);
+
       return { data, rowTotals, colTotals, grandTotal };
     };
 
     if (view === 'force') {
       const columns = FORCE_NAMES.map((f) => ({ id: f, label: f }));
       const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
-        FORCE_NAMES as unknown as string[], 'force', totals?.by_force,
+        FORCE_NAMES as unknown as string[], 'force',
       );
       return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
     }
@@ -633,7 +726,7 @@ const ProfitPoolAnalysis2: FC = () => {
       const columns = VC_STEPS;
       const axisKeys = VC_STEPS.map((s) => s.id);
       const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
-        axisKeys, 'vc', totals?.by_vc,
+        axisKeys, 'vc',
       );
       return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
     }
@@ -642,10 +735,10 @@ const ProfitPoolAnalysis2: FC = () => {
     const columns = REGIONS;
     const axisKeys = REGIONS.map((r) => r.id);
     const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
-      axisKeys, 'region', totals?.by_region,
+      axisKeys, 'region',
     );
     return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
-  }, [view, simulation, selectedYear]);
+  }, [view, simulation, selectedYear, config]);
 
   const scenarioList: Scenario[] = scenarios ?? [];
   const meta = VIEW_META[view];
@@ -693,20 +786,62 @@ const ProfitPoolAnalysis2: FC = () => {
               How the 12 Henkel Consumer Brands categories are projected to move —
               read the same underlying MC output across time, strategic force,
               value-chain step, and regional market. Row totals reconcile across
-              all three lenses by construction.
+              all four lenses; column and grand totals are category-weighted
+              averages using the Config-sheet weights.
             </p>
           </div>
 
-          {/* Simulations are CLI-only (scripts/run_50k_prod.py); this
-              header just surfaces when the latest persisted run was
-              produced. */}
-          <div className="flex flex-col items-end gap-2">
-            {simulation?.generated && (
+          {/* Run ribbon — tells the user exactly which persisted run is
+              on screen. Simulations are CLI-only (scripts/run_50k_prod.py),
+              so this is the only place the run_id, scenario tag, seed and
+              convergence count are surfaced to end users. */}
+          <div className="flex flex-col items-end gap-1 text-right">
+            {simulation?.run_meta?.run_id != null ? (
+              <>
+                <span
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+                  style={{
+                    backgroundColor: S.surfaceContainer,
+                    color: S.onPrimaryContainer,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  <Database size={12} />
+                  <span>Run #{simulation.run_meta.run_id}</span>
+                  {simulation.run_meta.scenario && (
+                    <span style={{ opacity: 0.75 }}>· {simulation.run_meta.scenario}</span>
+                  )}
+                </span>
+                <span style={{ color: S.mutedText, fontSize: 11, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                  {simulation.run_meta.run_date
+                    ? new Date(simulation.run_meta.run_date).toLocaleString()
+                    : simulation.generated
+                    ? new Date(simulation.generated).toLocaleString()
+                    : '—'}
+                  {simulation.run_meta.iterations != null &&
+                    ` · ${(simulation.run_meta.iterations / 1000).toFixed(0)}k iter`}
+                  {simulation.run_meta.chains != null &&
+                    ` × ${simulation.run_meta.chains}`}
+                  {simulation.run_meta.converged_categories != null &&
+                    simulation.run_meta.total_categories != null &&
+                    ` · R̂<1.05 ${simulation.run_meta.converged_categories}/${simulation.run_meta.total_categories}`}
+                </span>
+                {simulation.run_meta.git_sha && simulation.run_meta.git_sha !== 'unknown' && (
+                  <span style={{ color: S.mutedText, fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                    {simulation.run_meta.git_sha}
+                    {simulation.run_meta.seed != null && ` · seed ${simulation.run_meta.seed}`}
+                    {simulation.run_meta.model_version && ` · ${simulation.run_meta.model_version}`}
+                  </span>
+                )}
+              </>
+            ) : simulation?.generated ? (
               <span style={{ color: S.mutedText, fontSize: 11 }}>
                 Last run · {new Date(simulation.generated).toLocaleString()}
                 {simulation.model_version && ` · ${simulation.model_version}`}
               </span>
-            )}
+            ) : null}
           </div>
         </header>
 
@@ -851,33 +986,112 @@ const ProfitPoolAnalysis2: FC = () => {
               <span className="ml-3 text-[14px]">Loading shift matrix…</span>
             </div>
           ) : needsSimulation ? (
-            <div
-              className="flex flex-col items-center justify-center py-20 px-8 text-center rounded-2xl"
-              style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)' }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{ backgroundColor: S.primaryContainer, color: S.primary }}
-              >
-                <Info size={22} />
-              </div>
-              <h3
-                className="text-[20px] font-extrabold mb-2"
-                style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
-              >
-                No simulation persisted yet
-              </h3>
-              <p
-                className="max-w-md text-[14px]"
-                style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
-              >
-                Simulations are triggered from the CLI
-                (<code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>scripts/run_50k_prod.py</code>).
-                Once a run has been persisted to Neon, all four lenses
-                — Time Path, Force, Value Chain and Region — will
-                populate here automatically.
-              </p>
-            </div>
+            (() => {
+              // Differentiated empty state driven by /api/v1/diagnostics.
+              // Three real failure modes require three different user actions:
+              //   db_error   → Ops fix (POSTGRES_URL in Vercel env)
+              //   malformed  → Re-run on v2.5+ engine
+              //   no_rows    → Run the CLI
+              const reason = diagnostics?.simulation_reason;
+              const isDbError = reason === 'db_error';
+              const isMalformed = reason === 'malformed';
+
+              const EmptyIcon = isDbError || isMalformed ? AlertTriangle : Info;
+              const iconBg = isDbError || isMalformed ? S.errorContainer ?? S.primaryContainer : S.primaryContainer;
+              const iconFg = isDbError || isMalformed ? S.error ?? S.primary : S.primary;
+
+              const title = isDbError
+                ? 'Backend cannot reach the database'
+                : isMalformed
+                ? 'Latest run has incompatible shape'
+                : 'No simulation persisted yet';
+
+              return (
+                <div
+                  className="flex flex-col items-center justify-center py-20 px-8 text-center rounded-2xl"
+                  style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)' }}
+                >
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ backgroundColor: iconBg, color: iconFg }}
+                  >
+                    <EmptyIcon size={22} />
+                  </div>
+                  <h3
+                    className="text-[20px] font-extrabold mb-2"
+                    style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
+                  >
+                    {title}
+                  </h3>
+                  <div
+                    className="max-w-xl text-[14px] space-y-3"
+                    style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
+                  >
+                    {isDbError ? (
+                      <>
+                        <p>
+                          The FastAPI backend is running but cannot query the Neon
+                          database. This is almost always a Vercel environment
+                          issue — check that <code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>POSTGRES_URL</code> (or
+                          {' '}<code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>DATABASE_URL</code>)
+                          in the Vercel dashboard points to the same Neon branch
+                          you persist to from the CLI.
+                        </p>
+                        {diagnostics?.error && (
+                          <p style={{ fontFamily: 'monospace', fontSize: '12px', color: S.error ?? S.onSurfaceVariant }}>
+                            {diagnostics.error}
+                          </p>
+                        )}
+                        <p className="text-[12px]" style={{ color: S.onSurfaceVariant }}>
+                          Run <code style={{ fontFamily: 'monospace' }}>python3 scripts/diagnose_prism.py</code> locally
+                          for a full read-out of which env var and host are in use on each side.
+                        </p>
+                      </>
+                    ) : isMalformed ? (
+                      <>
+                        <p>
+                          Run{' '}
+                          <strong style={{ color: S.onSurface }}>
+                            #{diagnostics?.latest_run_id ?? '—'}
+                          </strong>{' '}
+                          exists in the database but is missing one of the required
+                          blocks ({' '}
+                          <code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>shift_matrix</code>,{' '}
+                          <code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>decompositions</code>,{' '}
+                          <code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>totals</code>
+                          ). It was likely persisted by an older engine version.
+                        </p>
+                        <p>
+                          Re-run <code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>python3 scripts/run_50k_prod.py</code>{' '}
+                          on the v2.5+ engine — the new runner verifies the
+                          persisted row has the full bundle before exiting
+                          successfully.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          Simulations are triggered from the CLI
+                          (<code style={{ fontFamily: 'monospace', fontSize: '0.92em' }}>scripts/run_50k_prod.py</code>).
+                          Once a run has been persisted to Neon, all four lenses
+                          — Time Path, Force, Value Chain and Region — will
+                          populate here automatically.
+                        </p>
+                        {diagnostics?.db_host && (
+                          <p className="text-[12px]" style={{ color: S.onSurfaceVariant }}>
+                            Connected to{' '}
+                            <code style={{ fontFamily: 'monospace' }}>{diagnostics.db_host}</code>
+                            {' · '}
+                            <strong>{diagnostics.simulation_run_count ?? 0}</strong>{' '}
+                            runs in this database.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <Matrix
               columns={matrixData.columns}
@@ -907,16 +1121,24 @@ const ProfitPoolAnalysis2: FC = () => {
           style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}
         >
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
-          All values in this matrix are produced by the Bayesian Monte Carlo engine
+          All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.5'}</code>,
           10K+ iterations, Gaussian / t-copula dependencies, 82 v3.1 trends). Each cell is a{' '}
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by
-          the engine: every row total equals the MC median shift for that (category, year),
-          and is therefore identical across the three lenses by construction. Column totals
-          aggregate to the same grand total per year. No frontend calibration or anchoring —
-          the numbers you see here are the numbers the simulation wrote to the database.
+          the engine; within each lens, the per-category shares use both the trend 0–5
+          ratings (category, force/VC/region exposure) and the Config-sheet dimension
+          weights, so both the strength of the trend's link and its business importance
+          are reflected. Every row total equals the MC median shift for that (category, year)
+          and is therefore identical across all four lenses. <strong>Column and grand totals
+          are category-weighted averages</strong> of the per-category values, using the
+          admin-editable category business-importance weights from the Config sheet —
+          so totals reflect the portfolio mix rather than simple sums of 12 categories.
+          Because the decomposition shares sum to 1 per category, the grand total for any
+          given year is identical across Time Path, Force, Value Chain and Region views.
+          No frontend calibration or anchoring of cells — only the portfolio-weighted
+          aggregation is computed client-side from the Config weights.
         </footer>
       </main>
     </div>

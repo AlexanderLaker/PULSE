@@ -63,6 +63,38 @@ export interface HealthStatus {
   };
   backtest_accuracy?: number;
   has_simulation?: boolean;
+  /** When has_simulation is false, explains WHY the dashboard is empty. */
+  simulation_reason?: 'ok' | 'no_rows' | 'malformed' | 'db_error';
+  simulation_error?: string | null;
+  latest_run_id?: number | null;
+  model_loaded?: boolean;
+  trend_count?: number;
+  categories?: number;
+}
+
+/** Diagnostic snapshot from GET /api/v1/diagnostics.
+ *
+ * Used by the dashboard's differentiated empty-state banner and by the
+ * `scripts/diagnose_prism.py` CLI tool. No credentials or €M values are
+ * ever returned — only the DB hostname (no user/password).
+ */
+export interface DiagnosticsResult {
+  db_mode: 'postgres' | 'sqlite' | 'unknown';
+  db_host: string | null;
+  db_url_env: 'POSTGRES_URL' | 'DATABASE_URL' | null;
+  db_reachable: boolean;
+  simulation_run_count: number;
+  latest_run_id: number | null;
+  latest_run_date: string | null;
+  latest_iterations: number | null;
+  latest_has_shift_matrix: boolean;
+  latest_has_decompositions: boolean;
+  latest_has_totals: boolean;
+  latest_has_vc_decomposition: boolean;
+  error: string | null;
+  simulation_reason: 'ok' | 'no_rows' | 'malformed' | 'db_error';
+  in_memory_simulation: boolean;
+  version: string;
 }
 
 /** Model configuration from GET /config. */
@@ -76,6 +108,18 @@ export interface ModelConfig {
   maturity_schedule?: Record<number, number>;
   force_weights?: Record<ForceName, number>;
   vc_weights?: Record<ValueChainStep, number>;
+  /** Regional business-importance weights — admin-editable on the config page.
+   *  Used by the frontend to aggregate decomposition cells across regions
+   *  for Region-lens row totals and for computing "overall region impact"
+   *  views. Keyed by region display name ("Europe", "North America", etc.). */
+  region_weights?: Record<string, number>;
+  /** Category business-importance weights — admin-editable on the config page.
+   *  Drives the Shift-Matrix column totals and grand total on the Profit
+   *  Pool Analysis 2 page: we take category-weighted averages across the
+   *  12 categories instead of raw sums, so totals reflect each category's
+   *  importance to the portfolio. Keyed by category display name
+   *  ("Hair: Color", "LHC: FCN", ...). */
+  category_weights?: Record<string, number>;
   category_names?: string[];
   ai_provider?: AIProvider;
 }
