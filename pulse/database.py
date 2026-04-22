@@ -103,6 +103,114 @@ def _sqlite_connect():
     return conn
 
 
+# ── Diagnostics helper ────────────────────────────────────────────────
+# Used by the FastAPI /api/v1/diagnostics endpoint. Returns a structured
+# view of "what is this process actually seeing" — DB mode, host
+# (credentials stripped), row count, latest run id, and any error — so
+# dashboard users can distinguish "backend cannot reach Neon" from
+# "Neon is reachable but empty" from "rows exist but latest is malformed".
+# Never raises — always returns a dict with an "error" key on failure.
+def diagnose_connection() -> Dict[str, Any]:
+    """Return a structured diagnostic snapshot of the DB layer.
+
+    Shape::
+
+        {
+          "db_mode": "postgres" | "sqlite",
+          "db_host": "ep-xxx.neon.tech" | "<sqlite:/path>",
+          "db_url_env": "POSTGRES_URL" | "DATABASE_URL" | None,
+          "db_reachable": bool,
+          "simulation_run_count": int,
+          "latest_run_id": int | None,
+          "latest_run_date": str | None,
+          "latest_iterations": int | None,
+          "latest_has_shift_matrix": bool,
+          "latest_has_decompositions": bool,
+          "latest_has_totals": bool,
+          "latest_has_vc_decomposition": bool,
+          "error": str | None,
+        }
+    """
+    from urllib.parse import urlparse
+
+    which_env = None
+    if os.environ.get("POSTGRES_URL"):
+        which_env = "POSTGRES_URL"
+    elif os.environ.get("DATABASE_URL"):
+        which_env = "DATABASE_URL"
+
+    out: Dict[str, Any] = {
+        "db_mode": "postgres" if USE_POSTGRES else "sqlite",
+        "db_host": None,
+        "db_url_env": which_env,
+        "db_reachable": False,
+        "simulation_run_count": 0,
+        "latest_run_id": None,
+        "latest_run_date": None,
+        "latest_iterations": None,
+        "latest_has_shift_matrix": False,
+        "latest_has_decompositions": False,
+        "latest_has_totals": False,
+        "latest_has_vc_decomposition": False,
+        "error": None,
+    }
+
+    # resolve host (credential-free)
+    if USE_POSTGRES and POSTGRES_URL:
+        try:
+            out["db_host"] = urlparse(POSTGRES_URL).hostname or "unknown"
+        except Exception:
+            out["db_host"] = "unparseable"
+    else:
+        try:
+            out["db_host"] = f"<sqlite:{_get_sqlite_path()}>"
+        except Exception:
+            out["db_host"] = "<sqlite>"
+
+    # probe DB
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            # count rows
+            cur.execute("SELECT COUNT(*) AS n FROM simulation_runs")
+            row = cur.fetchone()
+            n = row["n"] if isinstance(row, dict) else row[0]
+            out["db_reachable"] = True
+            out["simulation_run_count"] = int(n or 0)
+
+            if out["simulation_run_count"] > 0:
+                cur.execute(
+                    "SELECT id, run_date, iterations, results "
+                    "FROM simulation_runs ORDER BY run_date DESC LIMIT 1"
+                )
+                raw = cur.fetchone()
+                row = _row_to_dict(raw) if raw is not None else None
+                if row:
+                    out["latest_run_id"] = int(row["id"])
+                    run_date = row["run_date"]
+                    out["latest_run_date"] = (
+                        run_date.isoformat() if hasattr(run_date, "isoformat")
+                        else str(run_date) if run_date is not None else None
+                    )
+                    out["latest_iterations"] = int(row["iterations"]) if row["iterations"] is not None else None
+                    results = row["results"]
+                    if isinstance(results, str):
+                        try:
+                            results = json.loads(results)
+                        except Exception:
+                            results = {}
+                    if isinstance(results, dict):
+                        out["latest_has_shift_matrix"] = "shift_matrix" in results
+                        out["latest_has_decompositions"] = "decompositions" in results
+                        out["latest_has_totals"] = "totals" in results
+                        out["latest_has_vc_decomposition"] = "vc_decomposition" in results
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {e}"
+        logger.warning("diagnose_connection: DB probe failed: %s", out["error"])
+
+    return out
+
+
 @contextmanager
 def get_db_connection():
     """
@@ -284,6 +392,11 @@ def init_db() -> None:
         # (underlying modules not implemented)
 
         # ── Model configuration snapshots ────────────────────────────
+        # `config_json` + `label` capture the AuditLogger.save_snapshot()
+        # payload (a single serialised blob of the full config + an
+        # operator-supplied label). The structured columns alongside
+        # them are retained for queries that need to filter snapshots
+        # without parsing the JSON blob.
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS config_snapshots (
                 id {serial},
@@ -295,9 +408,28 @@ def init_db() -> None:
                 vc_weights TEXT,
                 category_names TEXT,
                 path_years TEXT,
-                materialization_schedule TEXT
+                materialization_schedule TEXT,
+                config_json TEXT,
+                label TEXT
             )
         """)
+
+        # v3.3 migration: databases created before the config_json/label
+        # columns were added need idempotent ALTERs so AuditLogger.save_snapshot()
+        # does not fail with "no column named config_json". Follows the
+        # same pattern as the causal_decomposition → force_attribution
+        # migration a few lines below.
+        for col_ddl in ("config_json TEXT", "label TEXT"):
+            try:
+                if POSTGRES_URL:
+                    cursor.execute("SAVEPOINT sp_add_col")
+                cursor.execute(f"ALTER TABLE config_snapshots ADD COLUMN {col_ddl}")
+                if POSTGRES_URL:
+                    cursor.execute("RELEASE SAVEPOINT sp_add_col")
+            except Exception:
+                if POSTGRES_URL:
+                    cursor.execute("ROLLBACK TO SAVEPOINT sp_add_col")
+                pass  # column already exists
 
         # ── Simulation runs ──────────────────────────────────────────
         cursor.execute(f"""

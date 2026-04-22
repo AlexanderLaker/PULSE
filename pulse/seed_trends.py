@@ -1,14 +1,27 @@
 """
-PRISM seed data: 82 trends (55 original global + 6 regional + 21 v3.0 expansion, April 2026).
+PRISM seed data: 95 trends (82 v3.1 base + 14 v3.3 additions − 1 consolidation, April 2026).
 
-v3.0 changes (April 2026):
+v3.3 changes (April 2026 — Strategic Review, 20-analyst team):
+  - 14 new trends across 14 structurally under-covered gap areas:
+      Demographics & household atomisation (2), Regulatory (1), Retailer
+      vertical integration (1), Emerging-market category shift (1), LHC
+      premiumisation (2), Channel disruption / loyalty-data (2), R&D /
+      IoT (2), Longevity LHC-split (1), Cohort-fluency decline (1),
+      Tele-derm DTC (1)
+  - 8 re-scored trends (competitive_r05, technology_r10, consumer_r04,
+    consumer_r09, consumer_r13, customer_r08, government_r07)
+  - 1 consolidation: technology_r09 retired; superseded by technology_r13
+    (hyper-personalised formulation already captures the ML-formulation
+    vector at higher resolution)
+  - Net active trend count: 95 (82 v3.1 base − 1 consolidated + 14 new)
+
+v3.1 changes (April 2026):
   - 2 retirements: consumer_r12 (Post-COVID Hygiene), customer_r05 (Quick Commerce)
   - 2 upgrades: consumer_r02 (GLP-1 5/0.10), customer_r04 (TikTok Shop 5/0.10)
   - 23 new trends across 6 gap areas: Agentic Commerce, Geographic Expansion,
     Longevity Economy, Ingredients & Bio-Manufacturing, Regulatory, and
     Consumer/Customer/Competitive gaps
   - Time horizon extended to 2036 (H1 Execution / H2 Disruption / H3 Transformation)
-  - Net active trend count: 82 (61 original - 2 retired + 23 new)
 
 This module lives inside the pulse package so it's importable on Vercel serverless.
 """
@@ -119,9 +132,12 @@ TRENDS = [
         name="Conscious Consumption and Cleanical Beauty",
         description="Cleanical convergence confirmed as dominant Beauty trend, now entering mass retail aisles (2026). Intersects three regulatory forces (PFAS G-01, Cosmetics Reg G-03, Green Claims G-05). Schwarzkopf R&D formulation depth (3,000+ formulations annually) is a genuine competitive advantage — smaller brands cannot substantiate clinical claims as credibly. LHC: enzyme-based clean detergents (Persil cold-wash) align with cleanical demand.",
         direction="Expansion", probability=4, start_year=2025,
-        # 10%: Affects the ~30% of consumers who actively select on
-        # clean/clinical criteria, translating to ~10% GP1 exposure
-        gp1_pct_affected=0.10,
+        # 8%: RE-SCORED v3.3 April 2026 (Strategic Review). Reduced
+        # 0.10→0.08 — cleanical is now table-stakes, not differentiating.
+        # Every scale R&D player (P&G, Unilever, L'Oréal) can make
+        # clinical claims credibly. Margin uplift therefore smaller
+        # than originally modelled.
+        gp1_pct_affected=0.08,
         strategic_implication="Medium-confidence expansion trend (probability 4, 10% GP1 affected). Category exposure is broad but thinner than C-03 — Hair Care and Body score 4, Color 3, Styling 2; LHC is engaged at 2-3 across the enzyme-based cold-wash segments. The trend intersects three regulatory forces (G-01 PFAS, G-03 Cosmetics Regulation, G-05 Green Claims) and therefore has a compliance-to-credibility conversion angle. Regional exposure is Europe-led (5) and North America-second (4), with Asia (3) and High-Growth (2) trailing. Value chain activity is front-loaded at Raw Materials (4), Formulation (5) and Consumer (5) — this is a formulation-backed positioning play, not pure marketing. Sources are mid-tier (Mintel, Beauty Independent, CosmeticsDesign; Medium confidence). For HCB the situation is that established R&D depth and formulation scale create a credibility moat against smaller clean-beauty challengers who cannot substantiate clinical claims — but the same moat is also claimed by every competitor with scale R&D. Cleanical is no longer differentiating; it is table-stakes for premium Hair and increasingly for premium LHC.",
         category_exposure=cat(3,4,2,4, 3,3,2,2,2,2,1,1),
         vc_exposure=vc(4,5,2,3,2,4,3,5),
@@ -204,9 +220,12 @@ TRENDS = [
         name="Fragrance and Sensory Premiumization in Home Care",
         description="Fragrance premiumization accelerating: laundry scent boosters/perfume products growing 15%+ in Southern Europe, now expanding to Germany/Northern Europe. Vernel and Persil fragrance extensions represent highest-margin premiumization path in Laundry. P&G Lenor Unstoppables is benchmark to beat. Critical PL defense: complex fragrance development is a genuine barrier to entry — PL cannot replicate credibly. Henkel fragrance chemistry capability (shared with Adhesive Technologies) is a distinctive competence.",
         direction="Expansion", probability=4, start_year=2025,
-        # 12%: Fragrance is now #1 premiumization lever in LHC,
-        # expanding beyond Southern Europe; PL cannot follow credibly
-        gp1_pct_affected=0.12,
+        # 10%: RE-SCORED v3.3 April 2026. Reduced 0.12→0.10 to avoid
+        # double-counting with new consumer_r28 (laundry scent-booster
+        # pure-play premiumisation). This trend now captures macro
+        # fragrance premiumisation across FFI + HSC; scent boosters
+        # are carved out into consumer_r28.
+        gp1_pct_affected=0.10,
         strategic_implication="High-margin expansion (probability 4, 12% GP1 affected). Category exposure is LHC-concentrated with Fabric Finisher (4), Laundry Additives (4), Fabric Cleaning (4), and Hard Surface Cleaner (3); Fabric Care Specialty and HDW/ADW are secondary. Fragrance/scent-booster products are growing 15%+ in Southern Europe and now expanding to Germany/Northern Europe. Regional exposure is Europe-led (5), Asia (4), High-Growth (3) and NA (3). Value chain engagement is heavy at Raw Materials (4), Formulation (5), Packaging (4), Marketing (5) and Consumer (5). Sources are Medium-confidence (Euromonitor, Kantar, IFF). For HCB the situation is that fragrance chemistry is a genuine PL-defence moat — PL cannot replicate complex fragrance development credibly — and the capability is shared across divisions. The reference competitor (P&G Lenor Unstoppables) is the benchmark. This is one of the few LHC trends that combines expansion direction with defensible differentiation.",
         # FCA→2 (Perwoll not the fragrance play), FFI→4 (Vernel IS the fragrance softener brand)
         category_exposure=cat(0,0,0,1, 4,2,4,4,1,2,3,1),
@@ -370,9 +389,12 @@ TRENDS = [
         name="EU Digital Product Passport (DPP)",
         description="PPWR mandates digital identifiers (QR codes) from 2027. Intersects with PPWR (G-04) and Green Claims (G-05), creating digital compliance triple stack. IT investment is substantial — Henkel needs PIM system upgrade across 50,000+ SKUs. Henkel advantage: scale amortizes fixed IT cost over larger SKU base. Strategic opportunity: use DPP as consumer engagement tool (scan-to-learn about ingredients, sustainability).",
         direction="Contraction", probability=4, start_year=2027,
-        # 3%: Triple regulatory overlap (PPWR + Green Claims + DPP)
-        # creates compounding IT cost across 50,000+ SKUs
-        gp1_pct_affected=0.03,
+        # 5%: RE-SCORED v3.3 April 2026. Lifted 0.03→0.05 following
+        # PPWR final text adoption Jan 2026 — DPP implementation
+        # timeline confirmed for Jan 2027, not 2028 as originally
+        # modelled. PIM investment estimates revised upward. ESPR
+        # textile pilot (G-12) extending DPP scope to packaging liners.
+        gp1_pct_affected=0.05,
         strategic_implication="Medium-confidence contraction (probability 4, 3% GP1 affected) — the smallest GP1 impact among Government trends but compounding with G-04 and G-05. PPWR mandates digital identifiers (QR codes) from 2027. Category exposure is broad and moderate (2-3 across all 12 categories). Regional exposure is Europe-only (5). Value chain concentration is Packaging (4), Supply Chain (3), Raw Materials (2), Manufacturing (2), Commercial (2), Consumer (2). Sources are Medium confidence (EU ESPR, DPP standards). For HCB the situation is a compliance-plus-IT cost layer across 50,000+ SKUs requiring a PIM system upgrade — scale amortises the fixed IT cost but the per-SKU data-preparation burden is substantial. The triple regulatory stack (PPWR + Green Claims + DPP) creates compounding compliance load on the same packaging/marketing assets. There is a latent consumer-engagement opportunity if DPP is used as a scan-to-learn channel, but this is optionality not baseline.",
         category_exposure=cat(2,2,2,2, 3,3,2,3,2,3,2,3),
         vc_exposure=vc(2,2,2,4,3,1,2,2),
@@ -708,10 +730,14 @@ TRENDS = [
         id="competitive_r05", force="Competitive", sub_category="Disruption",
         peak_year=2031, diffusion_curve="back_loaded",  # Chinese FMCG EU penetration <2% today; back-loaded tariff-diverted growth
         name="Chinese FMCG Brands Enter European Market",
-        direction="Contraction", probability=3, start_year=2025,
-        # 4%: US tariff-driven export redirection risk toward EU
-        # slightly increases near-term threat level
-        gp1_pct_affected=0.04,
+        direction="Contraction", probability=4, start_year=2025,
+        # 6%: RE-SCORED v3.3 (April 2026, Strategic Review). Probability
+        # lifted 3→4 as Trump 2.0 tariffs have materially accelerated
+        # Chinese export redirection toward EU via TikTok Shop / Temu;
+        # trigger (5% penetration in any EU Hair Care market) now
+        # plausible within H1. gp1_pct_affected lifted 0.04→0.06 to
+        # reflect broader LHC exposure via heavy-liquid direct-ship.
+        gp1_pct_affected=0.06,
         description="Chinese brand EU penetration <2% but monitoring warranted. New risk: US tariffs (G-09) on Chinese goods may redirect export efforts toward tariff-free EU market via TikTok Shop/Temu — accelerating European entry. Hair Color most exposed category (Chinese brands strong in cosmetic color). LHC less exposed (transport cost for heavy liquids favors local production). Trigger: TikTok Shop hair care from Chinese brands exceeding 5% in any EU market should escalate response.",
         strategic_implication="Low-confidence contraction (probability 3, 4% GP1 affected). Chinese brand EU penetration remains <2% but US tariff-driven export redirection toward EU via TikTok Shop/Temu is a new amplifier. Category exposure is moderate across Hair (2-3) and light across LHC (0-2). Regional exposure is Europe (4), NA (3), HG (3), Asia (1). Value chain concentration is Marketing (3), Commercial (3), Consumer (4). Sources are Low confidence (TikTok Shop analytics, Temu EU data). For HCB the situation is that Hair Color is the most exposed category (Chinese brands strong in cosmetic Color) while LHC is insulated by the economics of shipping heavy liquids. The trigger condition — TikTok Shop Hair Care from Chinese brands exceeding 5% in any EU market — has not been hit but the monitoring window is active. This is a watchlist-tier trend rather than an action-tier trend, but its second-order interaction with K-04 (TikTok Shop) and G-09 (US tariffs) means small triggers can cascade.",
         category_exposure=cat(2,2,2,3, 2,1,1,2,1,1,1,0),
@@ -876,21 +902,19 @@ TRENDS = [
     # NEW TRENDS — Added March 2026 Source Audit
     # ═══════════════════════════════════════════════════════════════════
 
-    # ── M-01: Generative AI Disrupts Product Discovery ──
-    Trend(
-        id="technology_r09", force="Technology", sub_category="Digital",
-        peak_year=2029, diffusion_curve="front_loaded",  # Gen AI product discovery at 35% already; rapid front-loaded shift
-        name="Generative AI Disrupts Product Discovery (GEO vs. SEO)",
-        direction="Contraction", probability=5, start_year=2025,
-        gp1_pct_affected=0.10,
-        description="35% of US consumers use AI for product discovery vs. 13.6% using search engines. Google CTR declined 3.6pp (paid), 1.2pp (organic). AI-to-e-commerce traffic surged 4,700% YoY. Brands not cited in LLM responses face invisible brand risk. Schwarzkopf and Persil must invest in Generative Engine Optimization (GEO). Risk is asymmetric: indie brands with strong content authority could leapfrog established brands. Fundamentally disrupts Byron Sharp Mental Availability model — TV/display builds human memory structures but not LLM memory structures.",
-        strategic_implication="Medium-confidence contraction (probability 5, 10% GP1 affected). 35% of US consumers use AI for product discovery vs 13.6% for search; AI-to-e-commerce traffic +4,700% YoY. Category exposure is uniform at 3 — every brand needs LLM citation. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream: Marketing (5), Commercial (5), Consumer (5). Sources are Medium confidence (eMarketer, Similarweb). For HCB the situation is asymmetric risk: brands not cited in LLM responses face invisible brand-switching — consumers never see the alternatives the LLM evaluated and rejected. This fundamentally disrupts Byron Sharp's Mental Availability model because TV/display builds human memory structures but not LLM memory structures. Indie brands with strong content authority can leapfrog established brands. The trend is the upstream driver of T-11 (agentic commerce) and must be read together with it — GEO optimisation is the pre-condition for agent consideration.",
-        category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
-        vc_exposure=vc(0,0,0,0,0,5,5,5),
-        regional_exposure=reg(4,5,4,2),
-        data_source="eMarketer 2026; Similarweb Gen AI Report 2025; Marketing Dive 2026", source_type="research_report",
-        confidence="Medium",
-    ),
+    # ── M-01 — RETIRED (CONSOLIDATED) v3.3 April 2026 ──
+    # Generative AI Disrupts Product Discovery (technology_r09) RETIRED.
+    # Rationale: v3.1 added technology_r13 ("Generative Search (GEO)
+    # Replaces Traditional Product Discovery — Expanded") which already
+    # states in its description that it expands and supersedes M-01.
+    # Running both creates double-counting of GEO/LLM discovery shift
+    # in the Shift Matrix (same VC Marketing/Commercial/Consumer rows,
+    # same category spread, same regional profile). The v3.3 Strategic
+    # Review recommended retiring technology_r09 to eliminate the
+    # duplication. technology_r13 remains active with prob 5 / GP1 12%
+    # and carries the full signal going forward.
+    # Retained as comment for audit trail.
+
     # ── M-02: Tariffs, Trade Wars, and Deglobalization ──
     Trend(
         id="government_r08", force="Government", sub_category="Trade Policy",
@@ -924,10 +948,16 @@ TRENDS = [
     # ── M-04: Generative AI Marketing Efficiency ──
     Trend(
         id="technology_r10", force="Technology", sub_category="Operations",
-        peak_year=2029, diffusion_curve="s_curve",  # Gen AI marketing 40-60% cost savings already at P&G/Unilever; fast S
+        peak_year=2028, diffusion_curve="front_loaded",  # RE-SCORED v3.3: Gen AI creative now at full diffusion in CPG; front-loaded with early peak
         name="Generative AI Content and Marketing Efficiency Revolution",
         direction="Expansion", probability=5, start_year=2025,
-        gp1_pct_affected=0.06,
+        # 8%: RE-SCORED v3.3 April 2026 (Strategic Review). Diffusion
+        # moved s_curve→front_loaded and peak 2029→2028 — P&G and
+        # Unilever are already past the 40-60% cost-save mark; the
+        # curve is behind us, not ahead. GP1 impact lifted 0.06→0.08
+        # as savings compound with localisation advantage for a 75-
+        # country portfolio.
+        gp1_pct_affected=0.08,
         description="Gen AI marketing efficiency confirmed at 40-60% content production cost reduction. P&G and Unilever deploying at scale. For Henkel: efficiency gains most valuable in localization — 75+ country presence means content localization at near-zero marginal cost is disproportionate advantage. Savings partially offset retail media margin extraction (T-06). Brand safety guardrails critical — AI-generated content for Schwarzkopf Professional (medical-adjacent claims) requires human oversight.",
         strategic_implication="High-confidence expansion (probability 5, 6% GP1 affected). Gen AI content production cost reduction confirmed at 40-60%; P&G and Unilever deploying at scale. Category exposure is uniform at 3 across the portfolio. Regional exposure is NA (5), Europe (4), Asia (4), HG (2). Value chain concentration is entirely downstream at Marketing (5), Commercial (4), Consumer (3). Sources are High confidence (Deloitte, McKinsey, Bain). For HCB the situation is that efficiency gains are most valuable in localisation — 75+ country presence means content-localisation at near-zero marginal cost is a disproportionate advantage versus peers with narrower geographic footprints. Savings partially offset retail-media margin extraction (T-06), though the retail-media tax is larger than the gen-AI saving by ~2x. Brand-safety guardrails are non-optional for medical-adjacent professional claims; consumer-scale deployment for functional LHC messaging is lower-risk.",
         category_exposure=cat(3,3,3,3, 3,3,2,3,2,3,2,2),
@@ -942,7 +972,13 @@ TRENDS = [
         peak_year=2031, diffusion_curve="s_curve",  # Refill/reuse tied to PPWR 2030 targets; S-curve to regulatory deadline
         name="Refill and Reuse Economy in Household Care",
         direction="Expansion", probability=3, start_year=2025,
-        gp1_pct_affected=0.07,
+        # 5%: RE-SCORED v3.3 April 2026 (Strategic Review). Reduced
+        # 0.07→0.05 — actual refill adoption is running materially
+        # behind projection. dm/Rossmann refill stations reporting
+        # <2% share of category volume; consumer friction higher than
+        # regulatory tailwind. PPWR 2030 target remains but voluntary
+        # adoption disappointing.
+        gp1_pct_affected=0.05,
         description="PPWR refill targets confirmed for 2030. Henkel already has concentrated refill formats for Persil and Pril in Germany — ahead of P&G on execution. dm/Rossmann refill station expansion creates retail infrastructure. Strategic choice for Henkel: concentrate on own-brand refills (cartridge-based, Smartwash-adjacent) or participate in retailer refill ecosystems (which commoditize the product). Smartwash dosing platform (T-08) is the premium refill play; retailer refill stations the mass play. Henkel needs both.",
         strategic_implication="Low-confidence expansion (probability 3, 7% GP1 affected). Category exposure is LHC-centric: Hand Dish Wash (5), Fabric Cleaning (4), Laundry Additives (5), Automatic Dish Wash (3); Hair is minimal. PPWR 2030 refill targets act as a regulatory driver (linkage to G-04). Regional profile is Europe-led (5), secondary NA (3), Asia (2), HG (2). Value chain concentration is Packaging (5), Formulation (3), Supply Chain (3), Consumer (4). Sources are Low confidence (Ellen MacArthur, PPWR text, retailer announcements). For HCB the situation is partly de-risked — concentrated refill formats for Laundry and HDW already exist in Germany, putting HCB ahead of some peers on execution. Retailer refill stations at dm/Rossmann commoditise the product unless a proprietary cartridge platform (T-08) captures the premium refill economics. The strategic tension is refill-as-sustainability-claim vs refill-as-margin-destroyer, and which side HCB lands on depends on the mix between own-channel and retailer-channel refill exposure.",
         # FCA→2 (Perwoll refills less common), HDW→5 (Pril explicitly mentioned as the mass refill play)
@@ -1050,9 +1086,12 @@ TRENDS = [
         name="US Retail Media Networks Reshape Brand-Customer Economics",
         description="US retail media: $58.8B in 2025 (revised up from $55B), $69.3B forecast 2026. Amazon 79.7% share, Walmart 8.0%, capturing 89% of incremental spend. Retailers demand 8-12% of net revenue for media as condition of visibility. Schwarzkopf and Persil US face highest retail media burden relative to US market position — as mid-tier brands (not leaders like Tide/Ariel), must spend disproportionately to maintain visibility. Structural implication: Henkel US operations face lower profitability than European operations due to retail media compression. Factor into geographic capital allocation.",
         direction="Contraction", probability=5, start_year=2024,
-        # 18%: Affects US trade spend architecture directly; 8-12% of
-        # revenue shift converts to meaningful GP1 erosion
-        gp1_pct_affected=0.18,
+        # 20%: RE-SCORED v3.3 April 2026. Lifted 0.18→0.20 following
+        # Amazon Q4 2025 advertising disclosure ($17.3B Q4, +24% YoY)
+        # and Walmart Connect investor-day guidance. Take-rate for
+        # mid-tier brands rising into 10-13% band, above original
+        # 8-12% modelled range.
+        gp1_pct_affected=0.20,
         strategic_implication="High-confidence contraction (probability 5, 18% GP1 affected) — the single largest Customer-side GP1 impact in the database. US retail media: $58.8B in 2025, $69.3B forecast 2026; Amazon 79.7% share; retailers demand 8-12% of net revenue for visibility. Category exposure is uniform at 3-4 across the portfolio. Regional exposure is NA (5), Europe (2), Asia (2), HG (1). Value chain concentration is entirely downstream: Marketing (5), Commercial (4), Consumer (4), Supply Chain (2). Sources are High confidence (Insider Intelligence, Amazon Q4 2025, Walmart Connect). For HCB the situation is that as mid-tier US brands (not leaders like Tide/Ariel), the portfolio must spend disproportionately on retail media to maintain visibility, creating structural US operational profitability below European levels. This dynamic is a permanent rather than cyclical compression and must be factored into geographic capital-allocation decisions. The trend is the US-specific amplifier of T-06 and compounds both C-01 (PL) and C-10 (Amazon platform PL) in the same geography.",
         category_exposure=cat(3,3,3,3, 4,4,3,4,3,3,3,3),
         vc_exposure=vc(0,0,0,0,2,5,4,4),
@@ -1587,6 +1626,277 @@ TRENDS = [
         regional_exposure=reg(5,2,3,3),
         data_source="CBAM Expansion Proposal Dec 2025; EU ETS Price Data Q1 2026; IntegrityNext CBAM Guide 2026",
         source_type="regulation",
+        confidence="Medium",
+    ),
+
+    # ═══════════════════════════════════════════════════════════════════
+    # v3.3 EXPANSION (April 2026 Strategic Review — 14 Must-Add Trends)
+    # Addresses identified gaps: demographics, US regulation, retailer
+    # vertical integration, LHC sub-category under-coverage, live-commerce,
+    # loyalty economics, neurocosmetics, bathroom IoT, longevity LHC,
+    # cleaning fluency, beauty-as-medicine DTC.
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── GAP 1 ── Demographics: Birth rate collapse / household atomisation
+    Trend(
+        id="consumer_r25", force="Consumer", sub_category="Demographics",
+        peak_year=2033, diffusion_curve="linear",  # Slow demographic creep: EU TFR 1.38, DE 1.35, KR 0.72; linear through H3
+        name="Birth Rate Collapse and Household Atomisation",
+        description="Sub-replacement fertility is now structural across Europe (TFR 1.38), East Asia (Korea 0.72, Japan 1.20), and North America (1.62). Average household size declined from 2.6 (2000) to 2.2 (2025) in EU; single-person households now 35%+ in Germany. Implication for HCB is a volume-compression tailwind across Laundry (fewer wash cycles per household × fewer households forming), Dish (fewer cooking occasions), and Hair (fewer children in the formative usage window). Partially offset by smaller pack sizes commanding higher unit price, but aggregate category volume erodes in developed markets. Emerging markets (India, SEA, Africa) remain on positive demographic trajectory and become proportionally more important for HCB growth.",
+        direction="Contraction", probability=5, start_year=2024,
+        # 12%: Affects volume base for every category in Europe and
+        # East Asia; offsets partial via smaller-pack unit pricing.
+        # Structural, certain, under-modelled.
+        gp1_pct_affected=0.12,
+        strategic_implication="High-certainty structural contraction for developed-market volume base. Every LHC category is exposed at 3-4; Hair Color and Body at 3 (child-base erosion mitigates slower than adult population). Regional profile Europe (5), Asia (4), NA (3), HG (1). Value chain engagement Commercial (4), Marketing (3), Consumer (5). This trend is the demographic floor of the Shift Matrix: it does not peak, it compounds. Strategic response is pack-size architecture (singles, couples, seniors) and geographic rebalancing toward HG markets. Sources: Eurostat, UN WPP 2024, OECD.",
+        category_exposure=cat(3,3,2,3, 4,4,3,3,4,3,3,2),
+        vc_exposure=vc(0,1,1,2,1,3,4,5),
+        regional_exposure=reg(5,3,4,1),
+        data_source="Eurostat Demography Report 2025; UN WPP 2024 Revision; OECD Family Database 2025; Statistisches Bundesamt Household Data", source_type="government_data",
+        confidence="High",
+    ),
+
+    # ── GAP 2 ── Demographics: Gen Alpha (2010+) enters category
+    Trend(
+        id="consumer_r26", force="Consumer", sub_category="Demographics",
+        peak_year=2032, diffusion_curve="s_curve",  # Gen Alpha enters hair/personal care ~2027-2030 as teens; full formative window by 2032
+        name="Gen Alpha (2010+) Enters Personal-Care Category",
+        description="Gen Alpha (born 2010-2024) begins entering the personal-care category in earnest 2026-2030 as the oldest cohort turns 14-16. Early signals from Sephora Kids phenomenon (skincare at 8-12) indicate formative category entry is happening earlier than any prior generation. Brand formation in this cohort is TikTok-mediated and ingredient-literate from day one — Byron Sharp's distinctive-brand-asset playbook needs reinterpretation for a cohort that does not know pre-digital brands. For HCB Hair Styling and Color are most exposed (first independent purchase categories); Body Care is the entry point from ages 8-12. Risk: legacy brand assets (Schauma, got2b) may be culturally invisible to the cohort. Opportunity: earliest cohort ever to be reachable at formation.",
+        direction="Expansion", probability=4, start_year=2026,
+        # 8%: Affects future addressable Hair/Body base; asymmetric
+        # opportunity-risk — brands that miss cohort formation lose
+        # decade-plus penetration window.
+        gp1_pct_affected=0.08,
+        strategic_implication="Medium-confidence expansion with asymmetric upside/downside. Hair Styling (5), Hair Color (4), Body (5), Hair Care (3) are primary exposures; LHC minimal. Regional profile NA (5), Europe (4), Asia (4), HG (3). Value chain concentration at Marketing (5), Commercial (4), Consumer (5). Sources: Mintel Gen Alpha 2025, NielsenIQ demographic panel. Strategic tension: Mental Availability must be built via TikTok / YouTube Shorts / Roblox and ingredient-literacy content, not legacy TV assets. For HCB the got2b brand is the most natural Gen Alpha vehicle but needs creator-led re-activation. Cohort entry timing: 2027-2030 window is the critical CEP formation period.",
+        category_exposure=cat(4,3,5,5, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(0,1,0,1,1,5,4,5),
+        regional_exposure=reg(4,5,4,3),
+        data_source="Mintel Gen Alpha Consumer Report 2025; NielsenIQ Youth Demographics Panel; WGSN Gen Alpha Forecast 2026", source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 3 ── US Cosmetics Regulation (MoCRA + States)
+    Trend(
+        id="government_r13", force="Government", sub_category="Cosmetics Regulation",
+        peak_year=2029, diffusion_curve="step_function",  # MoCRA phased enforcement 2024-2028; California/NY state cliffs 2026-2027
+        name="MoCRA + US State Cosmetics Regulation (CA Prop 65, NY, WA)",
+        description="MoCRA (Modernization of Cosmetics Regulation Act, 2022) enforcement phases fully in through 2028 — FDA registration, GMP, adverse-event reporting, fragrance-allergen disclosure all now binding. State layer is accelerating independently: California Prop 65 expansion (PFAS-listed substances July 2026), New York PFAS ban (2027), Washington State toxic-chemical list expansion. Compliance architecture in the US was previously light-touch relative to EU; the gap is closing fast and the state-by-state patchwork makes compliance cost per SKU materially higher than unified EU approach. For HCB Hair (Schwarzkopf Professional, Syoss US) faces the heaviest burden — professional products are explicitly covered by MoCRA. Body Care (Dial, Fa US) is in scope. LHC is out of direct scope but state-level ingredient bans may capture cleaning products via trigger rules.",
+        direction="Contraction", probability=5, start_year=2024,
+        # 8%: US compliance cost layer materialising for first time
+        # at scale; asymmetric vs EU-style unified regulation because
+        # state patchwork multiplies fixed cost per SKU.
+        gp1_pct_affected=0.08,
+        strategic_implication="High-certainty contraction and a material US-specific compliance cost layer. Hair categories (Color 4, Care 5, Styling 3) and Body (4) carry the weight; LHC lighter at 1-2. Regional profile NA (5), Europe (1), others (0). Value chain concentration at Raw Materials (4), Formulation (5), Packaging (3), Commercial (3). Sources: FDA MoCRA implementation updates, California OEHHA Prop 65 list, NY Department of State. Strategic implication for HCB: (a) state-by-state SKU variation multiplies PIM complexity and argues for unified most-stringent-state formulation to avoid multi-variant production; (b) MoCRA closes the regulatory-arbitrage advantage indie US brands previously enjoyed versus scaled players, net advantage for HCB; (c) EU regulatory know-how is transferable and a latent competitive asset.",
+        category_exposure=cat(4,5,3,4, 2,1,1,2,1,2,2,1),
+        vc_exposure=vc(4,5,2,3,2,2,3,2),
+        regional_exposure=reg(1,5,0,0),
+        data_source="FDA MoCRA Implementation Guidance 2025-2026; California OEHHA Prop 65 Expansion Notice July 2026; NY State Department PFAS Ban 2027; Washington State Toxic-Free Cosmetics Act", source_type="regulation",
+        confidence="High",
+    ),
+
+    # ── GAP 4 ── Walmart/Costco/Aldi Vertical Integration
+    Trend(
+        id="competitive_r13", force="Competitive", sub_category="Retailer Vertical Integration",
+        peak_year=2030, diffusion_curve="s_curve",  # Retailer PL premium tier scaling 2025-2030; vertical integration back-loaded
+        name="Walmart / Costco / Aldi Vertical Integration into FMCG Supply",
+        description="Top retailers are moving beyond traditional PL into full vertical integration. Walmart operates contract manufacturing for Great Value and has announced investment in dedicated CPG manufacturing capacity (2025). Costco Kirkland Signature now sources direct from manufacturers Kirkland specs, bypassing branded players entirely in multiple categories. Aldi expanding Lacura (premium PL) into Hair Care and Laundry Pods — directly attacking Schwarzkopf and Persil mid-tier price points. The structural shift is from 'PL as value option' to 'PL as the primary retailer product ecosystem' with branded manufacturers relegated to category reference points. This is a competitive trend, not a PL penetration trend — it captures the specific threat of retailers becoming manufacturing rivals rather than distribution partners.",
+        direction="Contraction", probability=4, start_year=2025,
+        # 10%: Distinct from consumer_r01 (PL penetration) — captures
+        # vertical integration threat where retailers become rivals
+        # not just channel. Amazon Basics / Solimo pattern now
+        # spreading to Walmart, Costco, Aldi.
+        gp1_pct_affected=0.10,
+        strategic_implication="Medium-high confidence contraction. Distinct from consumer_r01 (generic PL) and competitive_r10 (Amazon PL) because it captures the specific threat of major retailers investing in their own manufacturing capacity and vertical-brand ecosystems. Category exposure is heaviest in LHC (FCN 4, ADW 4, HDW 3, FFI 3) and moderate in Hair (Care 3, Color 3). Regional profile NA (5), Europe (4 — Aldi/Lidl), Asia (2), HG (2). Value chain Commercial (5), Marketing (3), Consumer (4), Manufacturing (3). Sources: Walmart investor day, Costco annual report, Aldi expansion announcements, NielsenIQ PL premium tier data. Strategic response required: invest-more in fragrance-defensible premium segments (consumer_r09, consumer_r28), harvest the mid-tier where vertical integration is most aggressive.",
+        category_exposure=cat(3,3,2,2, 4,3,3,3,3,4,3,2),
+        vc_exposure=vc(1,1,3,2,3,3,5,4),
+        regional_exposure=reg(4,5,2,2),
+        data_source="Walmart Investor Day 2025; Costco Annual Report 2025; Aldi Group Expansion Announcement; NielsenIQ Premium PL Tier Report 2025", source_type="analyst_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 5 ── HDW → ADW Conversion in Emerging Markets
+    Trend(
+        id="consumer_r27", force="Consumer", sub_category="Category Shift",
+        peak_year=2033, diffusion_curve="s_curve",  # Dishwasher penetration India 4%, China 12%, Brazil 9%; long S-curve as middle class scales
+        name="Hand-Dish to Auto-Dish Conversion in Emerging Markets",
+        description="Dishwasher penetration in India (4%), China (12%), Brazil (9%), Mexico (15%) remains far below developed-market levels (Germany 71%, US 68%). Middle-class expansion in these geographies (300M+ new middle-class households 2026-2036) is the single largest addressable market for ADW in global FMCG. The category-shift pattern is asymmetric for HCB: HDW volume grows in absolute terms (middle class consumes more dishes) but ADW grows multi-x faster. Somat global distribution gives HCB a first-mover advantage but faces Finish (Reckitt) and local players. Separate from consumer_r17 India affordability — this trend captures the specific HDW→ADW category-migration dynamic rather than the price architecture.",
+        direction="Expansion", probability=4, start_year=2026,
+        # 6%: Captures ADW category expansion specifically in HG
+        # markets; distinct from generic HG growth (competitive_r06).
+        # Under-modelled in current base.
+        gp1_pct_affected=0.06,
+        strategic_implication="Medium-confidence expansion addressing a specific LHC category under-coverage (ADW only 4 trends previously). Category exposure is ADW (5), HDW (3 — partial offset from decline, partial growth from volume base expansion). Regional profile HG (5), Asia (5), others minimal. Value chain Formulation (3), Packaging (3), Commercial (4), Marketing (4), Consumer (4). Sources: Euromonitor APAC/India dishwasher penetration, Brazil ABRALIMP data. Strategic implication: Somat ADW is HCB's natural entry vehicle; India/Brazil/Indonesia the priority markets. ADW premiumisation in these geographies starts from zero, so PL risk is lower than in EU/NA.",
+        category_exposure=cat(0,0,0,0, 1,0,0,0,3,5,1,0),
+        vc_exposure=vc(1,3,2,3,3,4,4,4),
+        regional_exposure=reg(1,1,5,5),
+        data_source="Euromonitor Dishwashing Global 2025; India Appliance Penetration Data; Brazil ABRALIMP; China Home Appliance Research Institute", source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 6 ── Laundry Additive Premiumisation (Scent Boosters)
+    Trend(
+        id="consumer_r28", force="Consumer", sub_category="Premiumization",
+        peak_year=2030, diffusion_curve="s_curve",  # Scent boosters EU €2B 2025 → €4.5B 2030; S-curve expansion north from Southern Europe
+        name="Laundry Scent Boosters as Structural Premium Category",
+        description="Laundry scent boosters (P&G Lenor Unstoppables archetype) have graduated from category novelty to structural premium LAD segment. EU scent-booster market €2B in 2025, forecast €4.5B by 2030 (+18% CAGR). US market already $1.8B. HCB faces a strategic choice: Vernel Aroma Boost (current offering) is under-invested versus Lenor Unstoppables; Silan Powerboosters (Central Europe) has stronger share. This trend carves out scent boosters specifically from the broader fragrance premiumisation trend (consumer_r09) to get better category-level signal on LAD. LAD was under-covered in v3.1 (only 4 trends) — this addresses the gap. GP1 impact is large because scent-booster gross margin is 2-3x standard softener and the category is creating genuinely incremental consumption (not cannibalising softener).",
+        direction="Expansion", probability=4, start_year=2025,
+        # 8%: Captures LAD-specific premiumisation; combined with
+        # consumer_r09 (reduced to 10%) the total premium-fragrance
+        # GP1 signal is 18%, consistent with Euromonitor segment
+        # growth data.
+        gp1_pct_affected=0.08,
+        strategic_implication="Medium-high confidence expansion with defensible PL moat (complex fragrance chemistry). Category exposure concentrated: Laundry Additives (5), Fabric Finisher (4), Fabric Cleaning (2). Hair zero. Regional profile Europe (5), NA (5), Asia (3), HG (2). Value chain Raw Materials (4 — fragrance house sourcing), Formulation (5), Packaging (4 — booster-bottle design is a DBA), Marketing (5), Consumer (5). Sources: Euromonitor Home Care, NPD Laundry Segment, IRI POS. Strategic read: this is the single most attractive premium LHC segment by margin × growth × defensibility. Invest-more designation in allocation.",
+        category_exposure=cat(0,0,0,0, 2,1,4,5,1,1,1,0),
+        vc_exposure=vc(4,5,2,4,1,5,4,5),
+        regional_exposure=reg(5,5,3,2),
+        data_source="Euromonitor Home Care 2025 — Scent Boosters Segment; NPD Laundry Additives; IRI US POS LAD; Kantar Worldpanel Laundry", source_type="market_report",
+        confidence="High",
+    ),
+
+    # ── GAP 7 ── Delicates & Performance Fabric Care Revival
+    Trend(
+        id="consumer_r29", force="Consumer", sub_category="Category Creation",
+        peak_year=2031, diffusion_curve="s_curve",  # Athleisure stock drives performance fabric wash needs; S-curve 2026-2031
+        name="Delicates & Performance Fabric Care Revival (Perwoll Occasion)",
+        description="Technical-fabric ownership (athleisure, merino, performance synthetics) now represents 35%+ of the average European wardrobe vs. 12% a decade ago. These fabrics are not served by standard detergent — they require specialty care (delicates, wool wash, anti-microbial for synthetics). Perwoll is the HCB asset directly positioned for this wave but has been managed as a tail brand. The ageing wardrobe value (linked to environmental_r08 textile longevity) compounds the delicates-wash consumption occasion. Separate consumption trigger from general laundry: performance-wash occasions are 1-3x monthly vs. 4-8x weekly for standard loads, but unit price is 3-5x standard detergent. FCA (Fabric Care Specialty) was materially under-covered in v3.1 (only 5 trends).",
+        direction="Expansion", probability=3, start_year=2026,
+        # 5%: Small absolute pool but high-margin and defensible;
+        # addresses FCA under-coverage. Linked to environmental_r08
+        # (textile longevity).
+        gp1_pct_affected=0.05,
+        strategic_implication="Medium-confidence expansion in a previously under-covered LHC sub-category. Category exposure is tightly focused: Fabric Care Specialty (5), Fabric Finisher (2); other categories zero. Regional profile Europe (5), Asia (3), NA (3), HG (2). Value chain Formulation (4), Packaging (3), Marketing (4), Consumer (5). Sources: Euromonitor Textile Care, WGSN Athleisure Report, Textile Exchange Material Report. Strategic implication: Perwoll has been a tail brand but sits exactly on a structural wave; modest investment in performance-fabric positioning can re-activate the brand. Low competitive intensity — Woolite (Reckitt) is the only scaled direct competitor.",
+        category_exposure=cat(0,0,0,0, 0,5,2,1,0,0,0,0),
+        vc_exposure=vc(2,4,1,3,1,4,3,5),
+        regional_exposure=reg(5,3,3,2),
+        data_source="Euromonitor Textile Care 2025; WGSN Athleisure Forecast 2026; Textile Exchange Preferred Fiber Material Market Report", source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 8 ── Chinese Live-Commerce Model Exports
+    Trend(
+        id="customer_r10", force="Customer", sub_category="Channel Disruption",
+        peak_year=2029, diffusion_curve="front_loaded",  # Douyin/TikTok Live exporting fast to SEA, Europe 2025-2029
+        name="Chinese Live-Commerce / Douyin Model Exports",
+        description="Live-commerce (livestream shopping with immediate cart integration) captured 10-12% of Chinese FMCG retail by 2024 and is now exporting at speed: TikTok Shop Live in SEA (Indonesia 8% by 2025), Europe (UK live-commerce +140% YoY), and accelerating. The channel economics are structurally different from static e-commerce — creator take-rates 15-25%, discovery-driven not search-driven, and requires always-on content operations. Schwarzkopf APAC has early Douyin presence but HCB globally is under-invested in the operating model. This is a Customer-force trend (channel structure) distinct from technology_r11 (agentic commerce) which is supply-side AI. Addresses Customer force under-weighting (10% of base).",
+        direction="Contraction", probability=4, start_year=2025,
+        # 7%: Channel margin architecture shift; creator take-rates
+        # structurally higher than retail-media fees. Addresses
+        # Customer force under-weighting.
+        gp1_pct_affected=0.07,
+        strategic_implication="Medium-confidence contraction addressing Customer force under-coverage. Category exposure is Hair-heavy (Color 4, Care 4, Styling 4, Body 3) — live-commerce is disproportionately beauty-weighted — with moderate LHC exposure where retailers run live formats (FCN 2, LAD 2). Regional profile Asia (5), HG (4), NA (3), Europe (3). Value chain concentration at Marketing (5), Commercial (5), Consumer (5). Sources: iResearch Douyin FMCG, TikTok Shop data, Accenture Livestream Commerce Report. Strategic implication: the channel requires a fundamentally different content operating model — always-on creator partnerships, real-time SKU management, different promo architecture. HCB peers (P&G, Unilever) are ahead in APAC. Invest-in-capability rather than invest-in-spend is the right framing.",
+        category_exposure=cat(4,4,4,3, 2,1,1,2,1,1,1,0),
+        vc_exposure=vc(0,0,0,1,2,5,5,5),
+        regional_exposure=reg(3,3,5,4),
+        data_source="iResearch Douyin FMCG Commerce Report 2025; TikTok Shop Performance Data; Accenture Livestream Commerce 2026; Statista Live-Commerce Europe", source_type="analyst_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 9 ── Loyalty Program Cannibalisation of Trade Spend
+    Trend(
+        id="customer_r11", force="Customer", sub_category="Channel Economics",
+        peak_year=2030, diffusion_curve="s_curve",  # Retailer loyalty data monetisation accelerating as retail media matures
+        name="Retailer Loyalty Program Cannibalisation of Trade Spend",
+        description="Retailer loyalty programs (Tesco Clubcard, Kroger, Carrefour Rewards, dm App) are evolving from marketing vehicles into data-brokerage platforms that capture first-party consumer data and monetise it back to brands at a premium over traditional retail media. Tesco Clubcard Prices requires brand co-funding; Kroger's 84.51° monetises loyalty data at retail-media-adjacent take-rates; dm's app is becoming a paid media channel. Net effect is that the same promotional budget is now being extracted twice (trade spend + loyalty fee). Separate from customer_r08 (US retail media) because this is loyalty-data monetisation, not advertising placement. Addresses Customer force under-coverage.",
+        direction="Contraction", probability=4, start_year=2025,
+        # 6%: Additional channel margin extraction layer stacking on
+        # top of retail media. Compounds customer_r08 and consumer_r01.
+        gp1_pct_affected=0.06,
+        strategic_implication="Medium-confidence contraction. Distinct from customer_r08 (US retail media — advertising placement) and consumer_r01 (PL penetration — share shift) because it captures the loyalty-data monetisation layer specifically. Category exposure uniform at 3 across the portfolio (all categories sold through loyalty-program retailers). Regional profile Europe (5), NA (4), Asia (3), HG (2). Value chain concentration Marketing (4), Commercial (5), Consumer (3). Sources: Tesco Clubcard Prices commercial terms, Kroger 84.51° investor communications, dm Digital Strategy. Strategic implication: triple-stack margin extraction (PL + retail media + loyalty-data fees) is the consolidated bear case for European LHC and requires a defensive premium-fragrance play (consumer_r28) or channel-diversification (DTC, customer_r10 live commerce) to offset.",
+        category_exposure=cat(3,3,3,3, 3,3,3,3,3,3,3,3),
+        vc_exposure=vc(0,0,0,0,1,4,5,3),
+        regional_exposure=reg(5,4,3,2),
+        data_source="Tesco Clubcard Prices Analysis; Kroger 84.51° Commercial Terms; Carrefour Rewards Data Monetisation; dm Digital Ecosystem", source_type="analyst_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 10 ── Neurocosmetics & Sensory-Science Hair Care
+    Trend(
+        id="technology_r17", force="Technology", sub_category="R&D",
+        peak_year=2033, diffusion_curve="back_loaded",  # Neurocosmetics is a late-H2 science wave; peer-reviewed claims scaling 2028+
+        name="Neurocosmetics and Sensory-Science Hair Care",
+        description="Neurocosmetics — the science of topical ingredients acting on nerve endings to produce measurable sensory/wellbeing outcomes — has moved from claim to mechanism with peer-reviewed evidence in 2024-2025 (IFSCC, JCD publications). Peptides that modulate TRP channels, aroma-chemistry that measurably reduces cortisol, scalp microbiome-derived actives targeting barrier function. For Hair Care specifically, neurocosmetics converges with scalp care (consumer_r07) and longevity (consumer_r21) but the science is distinct — it is not wellness-marketing, it is pharmacology-adjacent efficacy. L'Oréal and Estée Lauder have filed multiple patents 2024-2025. Schwarzkopf Professional R&D (3,000+ formulations/year) is capable of leading this wave but requires deliberate portfolio positioning.",
+        direction="Expansion", probability=3, start_year=2027,
+        # 5%: Small premium segment but high margin and scientifically
+        # defensible; material over 10-year horizon.
+        gp1_pct_affected=0.05,
+        strategic_implication="Low-medium confidence expansion over long time horizon. Category exposure is Hair-focused: Care (5), Color (3), Styling (2), Body (3); LHC zero. Regional profile NA (4), Europe (5), Asia (5), HG (2). Value chain concentration Raw Materials (4), Formulation (5), Marketing (4), Consumer (4). Sources: IFSCC publications, JCD Neurocosmetics Review 2025, L'Oréal/Estée Lauder patent filings. Strategic implication: this is a Schwarzkopf Professional play specifically — consumer mass brands (Schauma, Gliss) cannot make the claims credibly. Build R&D capability with fragrance-house partners (IFF, Givaudan neuroscience divisions).",
+        category_exposure=cat(3,5,2,3, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(4,5,2,2,1,4,3,4),
+        regional_exposure=reg(5,4,5,2),
+        data_source="IFSCC Conference Proceedings 2024-2025; J Cosmetic Dermatology Neurocosmetics Review 2025; L'Oréal Patent Filings 2025; Givaudan Sensory Science", source_type="research_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 11 ── Bathroom & Laundry-Room IoT
+    Trend(
+        id="technology_r18", force="Technology", sub_category="Smart Home",
+        peak_year=2032, diffusion_curve="back_loaded",  # IoT bathroom devices small today; back-loaded build as smart-home matures
+        name="Bathroom and Laundry-Room IoT — Connected Dispensers, Smart Mirrors",
+        description="Distinct from Smartwash (technology_r08, in-machine dosing). This trend captures the broader smart-home extension into bathroom (smart mirrors with skin/hair diagnostics — Lululemon Mirror patents, Withings Body Scan adjacent) and laundry-room (connected shelf/storage, auto-replenishment sensors). Samsung, LG, GE Appliances integrating consumables-sensing into new appliance lines from 2026. Amazon Dash-style auto-replenishment is scaling via Alexa Hunches. For HCB the opportunity is consumables-sensing partnership (appliance makers capture the data, branded manufacturers are the 'preferred refill'). Risk: if HCB is not the default in the auto-replenishment funnel, the switching cost becomes meaningful.",
+        direction="Expansion", probability=3, start_year=2027,
+        # 4%: Small GP1 near-term but strategically important; must be
+        # monitored for appliance-partnership signals.
+        gp1_pct_affected=0.04,
+        strategic_implication="Low-confidence expansion with optionality. Category exposure distributed across LHC (FCN 3, LAD 3, ADW 3, HDW 2) and Hair (Care 3, Color 2, Body 3). Regional profile NA (5), Europe (4), Asia (4), HG (2). Value chain concentration Packaging (3), Commercial (4), Consumer (5). Sources: Samsung/LG Connected Appliance Roadmap, IDC Smart Home Forecast, Amazon Dash Auto-Replenishment. Strategic implication: appliance-partnership deals need to be pursued now (Samsung, LG, Miele, Bosch) to secure default-supplier positioning. Losing the default slot is irreversible in the 2030+ auto-replenishment ecosystem.",
+        category_exposure=cat(2,3,1,3, 3,2,2,3,2,3,3,1),
+        vc_exposure=vc(0,1,2,3,2,3,4,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Samsung/LG Connected Appliance Roadmap 2026; IDC Smart Home Forecast 2026-2030; Amazon Dash Auto-Replenishment Data; Miele Smart@Home", source_type="analyst_report",
+        confidence="Low",
+    ),
+
+    # ── GAP 12 ── Longevity Economy — LHC Split
+    Trend(
+        id="consumer_r30", force="Consumer", sub_category="Category Creation",
+        peak_year=2034, diffusion_curve="linear",  # Longevity spending growing linearly with aging population; long horizon
+        name="Longevity Economy — LHC / Home Hygiene Split",
+        description="consumer_r21 (Longevity Economy) correctly captures the Hair/Beauty side of the longevity wave but the LHC-specific dimension has been missed. 60+ consumers represent 40% of LHC spend in Europe and spend 1.8x the adult average on home hygiene — driven by immune-system concerns, pet hygiene (elderly pet ownership +38% vs adult average), and assisted-living integration. Categories most exposed: Hand Dish Wash (senior-targeted ergonomic packaging), Hard Surface Cleaner (disinfection claims), Laundry (hypoallergenic positioning). This trend splits the longevity lens so the Shift Matrix produces differentiated signal for Hair longevity (consumer_r21) and LHC longevity (this trend).",
+        direction="Expansion", probability=3, start_year=2027,
+        # 4%: Small discrete uplift but unique LHC angle not
+        # captured elsewhere. Complements consumer_r05 (silver economy)
+        # and consumer_r21 (longevity).
+        gp1_pct_affected=0.04,
+        strategic_implication="Medium-confidence expansion addressing an LHC-specific demographic opportunity. Category exposure: HSC (5), HDW (4), FCN (3 — hypoallergenic segment), LAD (3), FFI (3); Hair zero. Regional profile Europe (5), NA (5), Asia (4), HG (2). Value chain concentration Formulation (3), Packaging (4 — ergonomics), Marketing (4), Consumer (5). Sources: Euromonitor Silver Economy, OECD Ageing Societies, AgeCommerce data. Strategic implication: Bref ergonomic-grip line, Pril senior-ergonomic dish, Persil hypoallergenic variants are all natural 60+ positioning plays. The segment is large, growing, and under-addressed by peers.",
+        category_exposure=cat(0,0,0,1, 3,2,3,3,4,2,5,2),
+        vc_exposure=vc(1,3,1,4,2,4,3,5),
+        regional_exposure=reg(5,5,4,2),
+        data_source="Euromonitor Silver Economy Report 2025; OECD Ageing Societies Data; AgeCommerce Senior Consumer Panel; AARP Consumer Spending", source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 13 ── Cleaning-Fluency Generational Decline
+    Trend(
+        id="consumer_r31", force="Consumer", sub_category="Behavioral",
+        peak_year=2032, diffusion_curve="linear",  # Generational shift, slow linear trajectory
+        name="Cleaning-Fluency Generational Decline (Gen Z Home-Care Literacy)",
+        description="Gen Z enters adult household formation (2026-2030) with materially lower 'cleaning fluency' than prior generations — only 34% know when to use specialty cleaners, versus 68% of Gen X (NielsenIQ 2025). Implications for LHC category architecture: (a) SKU proliferation (separate cleaners for surfaces, fabrics, dishes) becomes a liability — the cohort reaches for 'one cleaner' multi-purpose options; (b) the specialty/premium LHC pool contracts as fluency-gated categories (Perwoll, WC-Frisch, Somat specifics) lose knowledge-based purchase intent; (c) opportunity in simplification-positioned SKUs (Bref one-for-all, Pril ultra-concentrate all-in-one). Byron Sharp read: category-entry-points tied to specific cleaning scenarios are losing mental availability as the scenarios themselves are no longer recognised by the cohort.",
+        direction="Contraction", probability=3, start_year=2026,
+        # 5%: Slow-building cohort effect but structural; affects
+        # specialty LHC portfolio disproportionately.
+        gp1_pct_affected=0.05,
+        strategic_implication="Medium-confidence contraction with slow onset. Category exposure is LHC-specialty: Fabric Care (4), Hard Surface Cleaner (4), Auto Dish (3), HDW (3), Laundry Additives (3). Hair near-zero. Regional profile NA (5), Europe (4), Asia (3), HG (2). Value chain Marketing (5), Packaging (3 — clarity of use), Consumer (5). Sources: NielsenIQ Gen Z Home Care Fluency Study 2025, Mintel Young Adult Housing, Euromonitor Multi-Purpose Cleaners. Strategic implication: portfolio simplification play — reduce SKU count on specialty LHC, invest in multi-purpose flagships (Bref one-for-all). Also argues against pursuing deeper specialty fragmentation.",
+        category_exposure=cat(0,1,0,1, 2,4,1,3,3,3,4,1),
+        vc_exposure=vc(1,2,1,3,2,5,4,5),
+        regional_exposure=reg(4,5,3,2),
+        data_source="NielsenIQ Gen Z Home Care Fluency Study 2025; Mintel Young Adult Housing Formation; Euromonitor Multi-Purpose Cleaners Segment", source_type="market_report",
+        confidence="Medium",
+    ),
+
+    # ── GAP 14 ── Beauty-as-Medicine / Tele-Derm DTC
+    Trend(
+        id="consumer_r32", force="Consumer", sub_category="Channel Creation",
+        peak_year=2030, diffusion_curve="front_loaded",  # Tele-derm DTC scaling fast; Hims/Hers Hair $500M+ run-rate
+        name="Beauty-as-Medicine / Tele-Derm DTC (Hair & Scalp)",
+        description="Direct-to-consumer tele-dermatology services (Hims Hair, Hers, Ro, Nurx) have built $2B+ run-rates in hair/scalp treatment prescriptions (finasteride, minoxidil, spironolactone). The channel bypasses retail entirely and captures the 'hair loss' CEP (category entry point) that consumer_r10 partially addresses. Critically, these services are building adjacent OTC product ecosystems — Hims Shampoo, Hers Hair Masks — bundling prescription care with branded consumer products in a way Schwarzkopf / Pantene / Head & Shoulders cannot. The risk for HCB Hair Care (specifically thickening/scalp franchises) is that the highest-value prescriber-adjacent consumer is lost entirely to DTC before they ever reach a retail shelf. Separate from consumer_r10 (hair-loss market size) and technology_r17 (neurocosmetics science) — this captures the channel-structure threat.",
+        direction="Contraction", probability=4, start_year=2025,
+        # 7%: High GP1 affected because captures highest-value Hair
+        # Care consumer before retail; channel structurally new.
+        gp1_pct_affected=0.07,
+        strategic_implication="Medium-high confidence contraction with asymmetric margin risk. Category exposure Hair-focused: Care (5), Color (2), Body (2); Styling (1). LHC zero. Regional profile NA (5 — tele-derm legalised broadly), Europe (3 — regulated more tightly), Asia (2), HG (1). Value chain concentration Marketing (4), Commercial (5 — channel), Consumer (5), Formulation (2). Sources: Hims & Hers Q4 2025 earnings, Ro/Roman data, JAMA Dermatology Telehealth Review. Strategic implication: HCB cannot replicate the tele-derm regulatory infrastructure but can (a) partner with tele-derm services for OTC bundling; (b) strengthen Schwarzkopf Professional DTC adjacency via stylist-telehealth referral; (c) defend the thickening/scalp CEP aggressively at retail before the tele-derm funnel captures it permanently.",
+        category_exposure=cat(2,5,1,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(0,2,0,1,0,4,5,5),
+        regional_exposure=reg(3,5,2,1),
+        data_source="Hims & Hers Q4 2025 Earnings; Ro/Roman Commercial Data; JAMA Dermatology Telehealth Review 2025; Forrester Tele-Derm Market Size", source_type="analyst_report",
         confidence="Medium",
     ),
 ]
@@ -2131,6 +2441,119 @@ SOURCE_URLS = {
         {"title": "GHG Protocol: Scope 3 Calculation Guidance — Consumer Products", "url": "https://ghgprotocol.org/scope-3-technical-calculation-guidance", "source_type": "research_report", "tier": "A"},
         {"title": "CDP: Supply Chain Report 2025 — Scope 3 Disclosure Progress", "url": "https://www.cdp.net/en/supply-chain", "source_type": "research_report", "tier": "A"},
         {"title": "ISSB/IFRS S2: Climate-Related Disclosure Standard — Use-Phase Emissions", "url": "https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/", "source_type": "regulation", "tier": "S"},
+    ],
+
+    # ═══ v3.3 APRIL 2026 STRATEGIC REVIEW — 14 NEW TRENDS ═══
+    # GAP 1 — Demographics / household atomisation
+    "consumer_r25": [  # Birth Rate Collapse and Household Atomisation
+        {"title": "Eurostat: Demography of Europe — 2025 edition", "url": "https://ec.europa.eu/eurostat/web/population-demography", "source_type": "government_data", "tier": "S"},
+        {"title": "UN DESA: World Population Prospects 2024 Revision", "url": "https://population.un.org/wpp/", "source_type": "government_data", "tier": "S"},
+        {"title": "OECD Family Database 2025 — Fertility and Household Composition", "url": "https://www.oecd.org/en/data/datasets/oecd-family-database.html", "source_type": "government_data", "tier": "S"},
+        {"title": "Statistisches Bundesamt: Haushalte und Familien 2025", "url": "https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Haushalte-Familien/_inhalt.html", "source_type": "government_data", "tier": "S"},
+    ],
+
+    # GAP 2 — Gen Alpha cohort entry
+    "consumer_r26": [  # Gen Alpha (2010+) Enters Personal-Care Category
+        {"title": "Mintel: Gen Alpha Consumer Report 2025", "url": "https://www.mintel.com/consumer-insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "NielsenIQ: Youth Demographics Panel — Personal Care Entry Trends", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "WGSN: Gen Alpha Consumer Forecast 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
+        {"title": "Piper Sandler: Taking Stock With Teens — Spring 2025", "url": "https://www.pipersandler.com/teens", "source_type": "analyst_report", "tier": "A"},
+    ],
+
+    # GAP 3 — MoCRA + US State Cosmetics Regulation
+    "government_r13": [  # MoCRA + US State Cosmetics Regulation
+        {"title": "FDA: MoCRA (Modernization of Cosmetics Regulation Act) Implementation", "url": "https://www.fda.gov/cosmetics/cosmetics-laws-regulations/modernization-cosmetics-regulation-act-2022", "source_type": "regulation", "tier": "S"},
+        {"title": "California OEHHA: Proposition 65 Chemicals List — PFAS Expansion", "url": "https://oehha.ca.gov/proposition-65/proposition-65-list", "source_type": "regulation", "tier": "S"},
+        {"title": "New York State Department of State: PFAS in Cosmetics Ban (effective 2027)", "url": "https://dos.ny.gov/consumer-protection", "source_type": "regulation", "tier": "S"},
+        {"title": "Washington State Toxic-Free Cosmetics Act (HB 1047)", "url": "https://ecology.wa.gov/Regulations-Permits/Laws-rules-rulemaking/Laws", "source_type": "regulation", "tier": "S"},
+    ],
+
+    # GAP 4 — Walmart / Costco / Aldi vertical integration
+    "competitive_r13": [  # Retailer Vertical Integration into FMCG Supply
+        {"title": "Walmart: Investor Day 2025 — Private Brand Manufacturing Strategy", "url": "https://stock.walmart.com/financials/quarterly-results/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Costco Wholesale: Annual Report 2025 — Kirkland Signature Direct Sourcing", "url": "https://investor.costco.com/financial-information/annual-reports", "source_type": "company_page", "tier": "B+"},
+        {"title": "Aldi Group: Lacura Premium PL Expansion Announcement 2025", "url": "https://www.aldi.us/about-aldi/press-releases/", "source_type": "company_page", "tier": "B"},
+        {"title": "NielsenIQ: Premium Private Label Tier Report 2025", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+    ],
+
+    # GAP 5 — HDW→ADW conversion in Emerging Markets
+    "consumer_r27": [  # Hand-Dish to Auto-Dish Conversion in Emerging Markets
+        {"title": "Euromonitor International: Dishwashing Global Report 2025", "url": "https://www.euromonitor.com/dishwashing/report", "source_type": "market_report", "tier": "A"},
+        {"title": "India Appliance and Consumer Electronics: Dishwasher Penetration Data 2025", "url": "https://www.ciceindia.com/", "source_type": "market_report", "tier": "A-"},
+        {"title": "ABRALIMP (Brazilian Cleaning Products Association): Automatic Dish Wash Market 2025", "url": "https://www.abralimp.org.br/", "source_type": "government_data", "tier": "A-"},
+        {"title": "China Home Appliance Research Institute: Dishwasher Penetration 2025", "url": "http://en.cheari.com/", "source_type": "market_report", "tier": "A-"},
+    ],
+
+    # GAP 6 — Laundry Scent Boosters structural premium
+    "consumer_r28": [  # Laundry Scent Boosters as Structural Premium Category
+        {"title": "Euromonitor: Home Care — Scent Boosters Segment 2025", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
+        {"title": "NPD Group / Circana: Laundry Additives Segment 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "IRI / Circana: US POS Laundry Additives Data 2025", "url": "https://www.circana.com/intelligence/", "source_type": "market_report", "tier": "A"},
+        {"title": "Kantar Worldpanel: Laundry Category Report 2025", "url": "https://www.kantar.com/expertise/worldpanel", "source_type": "market_report", "tier": "A"},
+    ],
+
+    # GAP 7 — Delicates & Performance Fabric Care revival
+    "consumer_r29": [  # Delicates & Performance Fabric Care Revival (Perwoll)
+        {"title": "Euromonitor International: Textile Care 2025 — Specialty Detergents", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
+        {"title": "WGSN: Athleisure and Performance Fabric Forecast 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
+        {"title": "Textile Exchange: Preferred Fiber & Materials Market Report 2025", "url": "https://textileexchange.org/knowledge-center/reports/preferred-fiber-and-materials/", "source_type": "research_report", "tier": "A"},
+        {"title": "Statista: Performance-Wear Wardrobe Share Europe 2025", "url": "https://www.statista.com/", "source_type": "market_report", "tier": "B+"},
+    ],
+
+    # GAP 8 — Chinese Live-Commerce model exports
+    "customer_r10": [  # Chinese Live-Commerce / Douyin Model Exports
+        {"title": "iResearch: China FMCG Live-Commerce Report 2025", "url": "https://www.iresearchchina.com/", "source_type": "analyst_report", "tier": "A-"},
+        {"title": "TikTok Shop: Live Commerce Performance Data 2025", "url": "https://shop.tiktok.com/", "source_type": "company_page", "tier": "B"},
+        {"title": "Accenture: Livestream Commerce Global Report 2026", "url": "https://www.accenture.com/us-en/insights/retail/live-commerce", "source_type": "analyst_report", "tier": "A"},
+        {"title": "Statista: Live-Commerce Europe Market Size 2025", "url": "https://www.statista.com/", "source_type": "market_report", "tier": "B+"},
+    ],
+
+    # GAP 9 — Retailer Loyalty Program cannibalisation
+    "customer_r11": [  # Retailer Loyalty Program Cannibalisation of Trade Spend
+        {"title": "Tesco PLC: Clubcard Prices — Commercial Terms and Investor Communications", "url": "https://www.tescoplc.com/investors/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Kroger / 84.51°: Loyalty Data and Retail Media Capabilities", "url": "https://www.8451.com/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Carrefour Group: Loyalty Data Monetisation Strategy 2025", "url": "https://www.carrefour.com/en/group/investors", "source_type": "company_page", "tier": "B+"},
+        {"title": "Forrester: Retailer Loyalty-to-Retail-Media Convergence 2025", "url": "https://www.forrester.com/", "source_type": "analyst_report", "tier": "A"},
+    ],
+
+    # GAP 10 — Neurocosmetics and Sensory-Science
+    "technology_r17": [  # Neurocosmetics and Sensory-Science Hair Care
+        {"title": "IFSCC (International Federation of Societies of Cosmetic Chemists): Conference Proceedings 2024-2025", "url": "https://ifscc.org/publications/", "source_type": "academic", "tier": "S"},
+        {"title": "Journal of Cosmetic Dermatology: Neurocosmetics Mechanism Review 2025", "url": "https://onlinelibrary.wiley.com/journal/14732165", "source_type": "academic", "tier": "S"},
+        {"title": "L'Oréal Research & Innovation: Patent Filings on Neuroactive Cosmetics 2024-2025", "url": "https://www.loreal.com/en/commitments-and-responsibilities/for-innovation/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Givaudan: Sensory Science and Neuroscience Division Capabilities", "url": "https://www.givaudan.com/fragrance-beauty/active-beauty", "source_type": "company_page", "tier": "B"},
+    ],
+
+    # GAP 11 — Bathroom & Laundry-Room IoT
+    "technology_r18": [  # Bathroom and Laundry-Room IoT
+        {"title": "Samsung / LG Connected Appliance Roadmap 2026", "url": "https://www.samsung.com/global/business/networks/insights/", "source_type": "company_page", "tier": "B+"},
+        {"title": "IDC: Smart Home Market Forecast 2026-2030", "url": "https://www.idc.com/promo/smarthome", "source_type": "market_report", "tier": "A"},
+        {"title": "Amazon: Dash Auto-Replenishment and Alexa Hunches Data 2025", "url": "https://www.amazon.com/dash", "source_type": "company_page", "tier": "B"},
+        {"title": "Miele: Smart@Home Connected Laundry Ecosystem", "url": "https://www.miele.com/en/com/smart-home.htm", "source_type": "company_page", "tier": "B"},
+    ],
+
+    # GAP 12 — Longevity Economy (LHC split)
+    "consumer_r30": [  # Longevity Economy — LHC / Home Hygiene Split
+        {"title": "Euromonitor International: Silver Economy Report 2025", "url": "https://www.euromonitor.com/silver-economy", "source_type": "market_report", "tier": "A"},
+        {"title": "OECD: Ageing and Employment Policies — Society at a Glance 2025", "url": "https://www.oecd.org/els/ageing-and-employment-policies.htm", "source_type": "government_data", "tier": "S"},
+        {"title": "AARP: Consumer Spending Behavior of Americans 50+ 2025", "url": "https://www.aarp.org/research/topics/economics/", "source_type": "research_report", "tier": "A"},
+        {"title": "AgeCommerce: Senior Consumer Panel — Home Hygiene 2025", "url": "https://www.agewave.com/", "source_type": "market_report", "tier": "B+"},
+    ],
+
+    # GAP 13 — Cleaning-Fluency Generational Decline
+    "consumer_r31": [  # Cleaning-Fluency Generational Decline
+        {"title": "NielsenIQ: Gen Z Home Care Fluency Study 2025", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "Mintel: Young Adult Household Formation and Home-Care Behaviours 2025", "url": "https://www.mintel.com/consumer-insights/", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor International: Multi-Purpose Cleaners Segment 2025", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
+        {"title": "Kantar Worldpanel: Home Care Category Architecture 2025", "url": "https://www.kantar.com/expertise/worldpanel", "source_type": "market_report", "tier": "A"},
+    ],
+
+    # GAP 14 — Beauty-as-Medicine / Tele-Derm DTC
+    "consumer_r32": [  # Beauty-as-Medicine / Tele-Derm DTC (Hair & Scalp)
+        {"title": "Hims & Hers Health Inc.: Q4 2025 Earnings Report", "url": "https://investors.hims.com/financials/quarterly-results/", "source_type": "company_page", "tier": "A-"},
+        {"title": "Ro / Roman Health: Commercial Data and DTC Tele-Derm Reporting 2025", "url": "https://ro.co/", "source_type": "company_page", "tier": "B"},
+        {"title": "JAMA Dermatology: Telehealth and Direct-to-Consumer Hair Loss Review 2025", "url": "https://jamanetwork.com/journals/jamadermatology", "source_type": "academic", "tier": "S"},
+        {"title": "Forrester: Tele-Dermatology Market Size and Segmentation 2025", "url": "https://www.forrester.com/", "source_type": "analyst_report", "tier": "A"},
     ],
 }
 
