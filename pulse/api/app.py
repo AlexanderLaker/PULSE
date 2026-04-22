@@ -313,13 +313,20 @@ def create_app(args=None) -> FastAPI:
                 category_order=config.category_names,
             )
 
-            # Persist to database
+            # Persist to database as a full bundle so cold-start reloads
+            # rehydrate decompositions and totals (not just the shift matrix).
             try:
                 from pulse.database import save_simulation_run
+                results_bundle = {
+                    "shift_matrix": mc_result.get("shift_matrix", {}),
+                    "decompositions": mc_result.get("decompositions"),
+                    "totals": mc_result.get("totals"),
+                    "vc_decomposition": mc_result.get("vc_decomposition"),
+                }
                 save_simulation_run(
                     iterations=iterations,
                     model_type="bayesian_copula",
-                    results=mc_result.get("shift_matrix", {}),
+                    results=results_bundle,
                     force_attribution=mc_result.get("force_attribution"),
                     allocation_recommendation=_state.get("allocation"),
                     convergence_diagnostics=mc_result.get("convergence"),
@@ -374,14 +381,56 @@ def create_app(args=None) -> FastAPI:
                     conv = latest.get("convergence_diagnostics")
                     if isinstance(conv, str):
                         conv = json.loads(conv)
-                    _state["mc_result"] = {
-                        "shift_matrix": results,
-                        "convergence": conv or {},
-                        "iterations": latest.get("iterations", 1000),
-                        "model_type": latest.get("model_type", "bayesian_copula"),
+                    force_attr = latest.get("force_attribution")
+                    if isinstance(force_attr, str):
+                        force_attr = json.loads(force_attr)
+
+                    # v3.2: detect bundle shape (results is a dict containing
+                    # "shift_matrix" key plus optional decompositions/totals/
+                    # vc_decomposition) vs legacy flat shape (results IS the
+                    # shift matrix dict keyed by category). Unpack accordingly
+                    # so `mc_result["shift_matrix"]` is always the category→
+                    # path map the `/simulation` endpoint and frontend expect.
+                    if isinstance(results, dict) and "shift_matrix" in results:
+                        # New bundle shape
+                        _state["mc_result"] = {
+                            "shift_matrix": results.get("shift_matrix", {}),
+                            "decompositions": results.get("decompositions"),
+                            "totals": results.get("totals"),
+                            "vc_decomposition": results.get("vc_decomposition"),
+                            "force_attribution": results.get("force_attribution") or force_attr,
+                            "convergence": conv or results.get("convergence") or {},
+                            "iterations": latest.get("iterations") or results.get("iterations") or 1000,
+                            "model_type": latest.get("model_type") or results.get("model_type") or "bayesian_copula",
+                            "model_version": results.get("model_version"),
+                            "engine_name": results.get("engine_name"),
+                            "seed": results.get("seed"),
+                        }
+                    else:
+                        # Legacy flat shape — results IS the shift matrix
+                        _state["mc_result"] = {
+                            "shift_matrix": results or {},
+                            "convergence": conv or {},
+                            "force_attribution": force_attr,
+                            "iterations": latest.get("iterations", 1000),
+                            "model_type": latest.get("model_type", "bayesian_copula"),
+                        }
+
+                    # Populate run_meta so the dashboard's "Showing run #N" ribbon fills on cold start.
+                    run_date = latest.get("run_date")
+                    _state["run_meta"] = {
+                        "run_id": latest.get("id"),
+                        "run_date": run_date.isoformat() if hasattr(run_date, "isoformat") else (str(run_date) if run_date else None),
+                        "iterations": latest.get("iterations"),
+                        "model_type": latest.get("model_type"),
                     }
                     _state["allocation"] = alloc
-                    logger.info("Loaded latest simulation from database on startup")
+                    logger.info(
+                        "Loaded latest simulation from database on startup "
+                        "(run_id=%s, shape=%s)",
+                        latest.get("id"),
+                        "bundle" if (isinstance(results, dict) and "shift_matrix" in results) else "flat",
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load simulation from DB: {e}")
 
@@ -409,12 +458,21 @@ def create_app(args=None) -> FastAPI:
 
                 _state["simulation_stale"] = False
 
-                # Persist to database
+                # Persist to database as a bundle (shift_matrix +
+                # decompositions + totals + vc_decomposition) so cold-start
+                # reloads can fully rehydrate Trends 2, Profit Pool Analysis 2,
+                # and Consumer Journey 2 without re-running the engine.
                 from pulse.database import save_simulation_run
+                results_bundle = {
+                    "shift_matrix": mc_result.get("shift_matrix", {}),
+                    "decompositions": mc_result.get("decompositions"),
+                    "totals": mc_result.get("totals"),
+                    "vc_decomposition": mc_result.get("vc_decomposition"),
+                }
                 save_simulation_run(
                     iterations=config.iterations or 5000,
                     model_type="bayesian_copula",
-                    results=_sanitize(mc_result["shift_matrix"]),
+                    results=_sanitize(results_bundle),
                     force_attribution=_sanitize(mc_result.get("force_attribution")),
                     allocation_recommendation=_sanitize(_state.get("allocation")),
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
@@ -537,11 +595,36 @@ def create_app(args=None) -> FastAPI:
                                 conv = latest.get("convergence_diagnostics")
                                 if isinstance(conv, str):
                                     conv = json.loads(conv)
-                                _state["mc_result"] = {
-                                    "shift_matrix": results,
-                                    "convergence": conv or {},
-                                    "iterations": latest.get("iterations", 1000),
-                                    "model_type": latest.get("model_type", "bayesian_copula"),
+                                force_attr = latest.get("force_attribution")
+                                if isinstance(force_attr, str):
+                                    force_attr = json.loads(force_attr)
+
+                                # v3.2: detect bundle shape vs legacy flat shape.
+                                if isinstance(results, dict) and "shift_matrix" in results:
+                                    _state["mc_result"] = {
+                                        "shift_matrix": results.get("shift_matrix", {}),
+                                        "decompositions": results.get("decompositions"),
+                                        "totals": results.get("totals"),
+                                        "vc_decomposition": results.get("vc_decomposition"),
+                                        "force_attribution": results.get("force_attribution") or force_attr,
+                                        "convergence": conv or results.get("convergence") or {},
+                                        "iterations": latest.get("iterations") or results.get("iterations") or 1000,
+                                        "model_type": latest.get("model_type") or results.get("model_type") or "bayesian_copula",
+                                    }
+                                else:
+                                    _state["mc_result"] = {
+                                        "shift_matrix": results or {},
+                                        "convergence": conv or {},
+                                        "force_attribution": force_attr,
+                                        "iterations": latest.get("iterations", 1000),
+                                        "model_type": latest.get("model_type", "bayesian_copula"),
+                                    }
+                                run_date = latest.get("run_date")
+                                _state["run_meta"] = {
+                                    "run_id": latest.get("id"),
+                                    "run_date": run_date.isoformat() if hasattr(run_date, "isoformat") else (str(run_date) if run_date else None),
+                                    "iterations": latest.get("iterations"),
+                                    "model_type": latest.get("model_type"),
                                 }
                                 _state["allocation"] = alloc
                                 _state["simulation_stale"] = False
@@ -569,12 +652,20 @@ def create_app(args=None) -> FastAPI:
                                     )
                                     _state["simulation_stale"] = False
 
-                                    # Persist to database for next cold start
+                                    # Persist to database for next cold start as
+                                    # a full bundle (shift_matrix + decompositions
+                                    # + totals + vc_decomposition).
                                     from pulse.database import save_simulation_run
+                                    results_bundle = {
+                                        "shift_matrix": mc_result.get("shift_matrix", {}),
+                                        "decompositions": mc_result.get("decompositions"),
+                                        "totals": mc_result.get("totals"),
+                                        "vc_decomposition": mc_result.get("vc_decomposition"),
+                                    }
                                     save_simulation_run(
                                         iterations=config.iterations or 5000,
                                         model_type="bayesian_copula",
-                                        results=_sanitize(mc_result["shift_matrix"]),
+                                        results=_sanitize(results_bundle),
                                         force_attribution=_sanitize(mc_result.get("force_attribution")),
                                         allocation_recommendation=_sanitize(_state.get("allocation")),
                                         convergence_diagnostics=_sanitize(mc_result.get("convergence")),
@@ -604,26 +695,111 @@ def create_app(args=None) -> FastAPI:
     app.add_middleware(LazyInitMiddleware)
 
     # ── Helpers ─────────────────────────────────────────────────────
-    def _has_persisted_simulation() -> bool:
-        """Check if there's a simulation run in the database (for serverless cold starts)."""
+    def _persisted_simulation_state() -> dict:
+        """Detailed check for persisted runs — returns structured reason.
+
+        Returns::
+
+            {"has": bool, "reason": "ok" | "db_error" | "no_rows" | "malformed",
+             "error": str | None, "latest_run_id": int | None}
+
+        This is what /api/v1/health and /api/v1/diagnostics both consume so
+        the dashboard can show *why* it thinks no simulation exists rather
+        than a generic empty state.
+        """
         try:
-            from pulse.database import load_simulation_runs
-            runs = load_simulation_runs(limit=1)
-            return len(runs) > 0
-        except Exception:
-            return False
+            from pulse.database import diagnose_connection
+            diag = diagnose_connection()
+        except Exception as e:
+            return {"has": False, "reason": "db_error", "error": str(e), "latest_run_id": None}
+
+        if not diag["db_reachable"]:
+            return {
+                "has": False, "reason": "db_error",
+                "error": diag.get("error") or "DB unreachable",
+                "latest_run_id": None,
+            }
+        if diag["simulation_run_count"] == 0:
+            return {"has": False, "reason": "no_rows", "error": None, "latest_run_id": None}
+        if not diag["latest_has_shift_matrix"]:
+            return {
+                "has": False, "reason": "malformed",
+                "error": "latest row is missing shift_matrix key",
+                "latest_run_id": diag.get("latest_run_id"),
+            }
+        return {
+            "has": True, "reason": "ok", "error": None,
+            "latest_run_id": diag.get("latest_run_id"),
+        }
+
+    def _has_persisted_simulation() -> bool:
+        """Back-compat boolean wrapper around _persisted_simulation_state()."""
+        return _persisted_simulation_state()["has"]
 
     # ── Health ──────────────────────────────────────────────────────
     @app.get("/api/v1/health")
     async def health():
         db = _state.get("db")
+        in_memory = _state.get("mc_result") is not None
+        persisted = _persisted_simulation_state()
+        has_sim = in_memory or persisted["has"]
+        # `simulation_reason` is the diagnostic code when has_simulation is False:
+        #   "ok"        — simulation is available (in-memory or DB-persisted)
+        #   "no_rows"   — DB reachable, simulation_runs is empty
+        #   "malformed" — rows exist but latest is missing shift_matrix
+        #   "db_error"  — DB unreachable / query failed (error in `simulation_error`)
         return {
             "status": "ok",
             "version": __version__,
             "model_loaded": db is not None,
             "trend_count": db.trend_count if db else 0,
             "categories": len(db.categories) if db else 0,
-            "has_simulation": _state.get("mc_result") is not None or _has_persisted_simulation(),
+            "has_simulation": has_sim,
+            "simulation_reason": "ok" if has_sim else persisted["reason"],
+            "simulation_error": None if has_sim else persisted.get("error"),
+            "latest_run_id": persisted.get("latest_run_id"),
+        }
+
+    # ── Diagnostics (public — no auth, no credentials exposed) ─────
+    @app.get("/api/v1/diagnostics")
+    async def diagnostics():
+        """Diagnostic snapshot for dashboard + the scripts/diagnose_prism.py tool.
+
+        Returns the same shape as pulse.database.diagnose_connection() plus
+        a simulation_reason code that mirrors /api/v1/health. No credentials
+        or secrets are ever returned — only the DB hostname.
+        """
+        try:
+            from pulse.database import diagnose_connection
+            diag = diagnose_connection()
+        except Exception as e:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "db_mode": "unknown",
+                    "db_host": None,
+                    "db_url_env": None,
+                    "db_reachable": False,
+                    "simulation_run_count": 0,
+                    "latest_run_id": None,
+                    "latest_run_date": None,
+                    "latest_iterations": None,
+                    "latest_has_shift_matrix": False,
+                    "latest_has_decompositions": False,
+                    "latest_has_totals": False,
+                    "latest_has_vc_decomposition": False,
+                    "error": f"{type(e).__name__}: {e}",
+                    "simulation_reason": "db_error",
+                    "in_memory_simulation": _state.get("mc_result") is not None,
+                    "version": __version__,
+                },
+            )
+        persisted = _persisted_simulation_state()
+        return {
+            **diag,
+            "simulation_reason": "ok" if (persisted["has"] or _state.get("mc_result")) else persisted["reason"],
+            "in_memory_simulation": _state.get("mc_result") is not None,
+            "version": __version__,
         }
 
     # ── Manual Seed + Simulate (for Vercel debugging) ──────────────
@@ -1219,6 +1395,7 @@ def create_app(args=None) -> FastAPI:
     async def get_simulation():
         """Get current cached simulation results. Falls back to DB on serverless cold start."""
         mc = _state.get("mc_result")
+        run_meta: dict = _state.get("run_meta") or {}
         if not mc:
             # Serverless cold start — try loading latest simulation from database
             try:
@@ -1231,6 +1408,10 @@ def create_app(args=None) -> FastAPI:
                     # shift_matrix / decompositions / totals / vc_decomposition.
                     # Detect and rehydrate either layout.
                     results_blob = latest.get("results", {}) or {}
+                    inner_meta = (
+                        results_blob.get("meta")
+                        if isinstance(results_blob, dict) else None
+                    ) or {}
                     if isinstance(results_blob, dict) and "shift_matrix" in results_blob:
                         mc = {
                             "shift_matrix": results_blob.get("shift_matrix", {}),
@@ -1249,10 +1430,35 @@ def create_app(args=None) -> FastAPI:
                             "iterations": latest.get("iterations", 5000),
                             "model_type": latest.get("model_type", "bayesian_copula"),
                         }
+                    # Build the run_meta block the dashboard displays in the
+                    # "Showing run #N" ribbon. Pull from results_bundle.meta
+                    # if the writer included it (v3.2+ runs), else synthesize
+                    # from the row-level columns.
+                    run_date = latest.get("run_date")
+                    run_meta = {
+                        "run_id": latest.get("id"),
+                        "run_date": run_date.isoformat() if hasattr(run_date, "isoformat") else str(run_date) if run_date else None,
+                        "iterations": latest.get("iterations"),
+                        "model_type": latest.get("model_type"),
+                        "scenario": inner_meta.get("scenario"),
+                        "notes": inner_meta.get("notes"),
+                        "seed": inner_meta.get("seed"),
+                        "chains": inner_meta.get("chains"),
+                        "git_sha": inner_meta.get("git_sha"),
+                        "model_version": inner_meta.get("model_version"),
+                        "engine_name": inner_meta.get("engine_name"),
+                        "converged_categories": inner_meta.get("converged_categories"),
+                        "total_categories": inner_meta.get("total_categories"),
+                        "persisted_at_utc": inner_meta.get("persisted_at_utc"),
+                    }
                     _state["mc_result"] = mc
+                    _state["run_meta"] = run_meta
                     if latest.get("allocation_recommendation"):
                         _state["allocation"] = latest["allocation_recommendation"]
-                    logger.info("Restored simulation from database (serverless cold start)")
+                    logger.info(
+                        "Restored simulation from database (run_id=%s, scenario=%s)",
+                        run_meta.get("run_id"), run_meta.get("scenario"),
+                    )
             except Exception as e:
                 logger.warning(f"Failed to load simulation from DB: {e}")
 
@@ -1267,6 +1473,11 @@ def create_app(args=None) -> FastAPI:
             "vc_decomposition": mc.get("vc_decomposition"),
             "decompositions": mc.get("decompositions"),
             "totals": mc.get("totals"),
+            # Run metadata the dashboard's "Showing run #N · date · scenario"
+            # ribbon consumes. Safe to expose (no credentials, no €M).
+            "run_meta": run_meta or None,
+            "generated": (run_meta or {}).get("run_date") or (run_meta or {}).get("persisted_at_utc"),
+            "model_version": (run_meta or {}).get("model_version"),
         })
 
     @app.post("/api/v1/simulate")
