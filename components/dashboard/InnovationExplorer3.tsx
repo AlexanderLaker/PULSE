@@ -574,7 +574,7 @@ const InnovationRow: FC<{
       <button
         type="button"
         onClick={onOpen}
-        className="w-full grid items-center px-8 py-3 text-left transition-colors hover:bg-[rgba(0,93,181,0.035)]"
+        className="w-full grid items-center px-8 py-2 text-left transition-colors hover:bg-[rgba(0,93,181,0.035)]"
         style={{
           gridTemplateColumns: '2.6fr 1.1fr 1.3fr 1.2fr 1.2fr 0.9fr',
           backgroundColor: S.surface,
@@ -582,43 +582,35 @@ const InnovationRow: FC<{
           border: 'none',
         }}
       >
-        {/* Innovation identity: icon tile + number + name + subtitle */}
+        {/* Innovation identity: icon tile + number + name (title-only, single line) */}
         <div className="flex items-center gap-3 min-w-0 pr-4">
           <div
-            className="w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center"
+            className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center"
             style={{ backgroundColor: tile.bg, color: tile.fg }}
           >
-            <Icon size={18} strokeWidth={2} />
+            <Icon size={16} strokeWidth={2} />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                style={{
-                  fontFamily: HEADLINE_FONT,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: S.onSurfaceVariant,
-                  letterSpacing: '0.08em',
-                }}
-              >
-                {String(innovation.number).padStart(2, '0')}
-              </span>
-              <TierBadge level={innovation.tierLevel} />
-            </div>
+          <div className="min-w-0 flex items-center gap-2">
+            <span
+              style={{
+                fontFamily: HEADLINE_FONT,
+                fontSize: 11,
+                fontWeight: 800,
+                color: S.onSurfaceVariant,
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+              }}
+            >
+              {String(innovation.number).padStart(2, '0')}
+            </span>
             <div
-              className="font-bold text-[15px] truncate mt-0.5"
+              className="font-bold text-[14px] truncate"
               style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
-              title={innovation.name}
+              title={innovation.subtitle ? `${innovation.name} — ${innovation.subtitle}` : innovation.name}
             >
               {innovation.name}
             </div>
-            <div
-              className="text-[12px] truncate mt-0.5"
-              style={{ color: S.onSurfaceVariant, lineHeight: 1.3 }}
-              title={innovation.subtitle}
-            >
-              {innovation.subtitle}
-            </div>
+            <TierBadge level={innovation.tierLevel} />
           </div>
         </div>
 
