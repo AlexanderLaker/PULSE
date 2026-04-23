@@ -42,6 +42,8 @@ import {
   SprayCan,
   Bug,
   Boxes,
+  Feather,
+  Hand,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -86,23 +88,31 @@ const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sa
 const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 // ─── Category → icon + tonal container mapping ───────────────────────
-// Innovations carry a short category label (Color, Care, Styling, Body,
-// FCN, FCA, FFI, LAD, HDW, ADW, HSC, IC) or belong to Cross-Category. We
-// map each to a domain-appropriate icon with the editorial tonal palette.
-const CATEGORY_TILE: Record<string, { Icon: LucideIcon; bg: string; fg: string }> = {
-  Color:     { Icon: Palette,           bg: S.primaryContainer,   fg: S.primary },
-  Care:      { Icon: Droplet,           bg: S.secondaryContainer, fg: S.onSecondaryContainer },
-  Styling:   { Icon: Scissors,          bg: S.tertiaryContainer,  fg: S.onTertiaryContainer },
-  Body:      { Icon: ShowerHead,        bg: S.surfaceHighest,     fg: S.onSurface },
-  FCN:       { Icon: Shirt,             bg: S.primaryContainer,   fg: S.primary },
-  FCA:       { Icon: Shirt,             bg: S.secondaryContainer, fg: S.onSecondaryContainer },
-  FFI:       { Icon: WashingMachine,    bg: S.tertiaryContainer,  fg: S.onTertiaryContainer },
-  LAD:       { Icon: WashingMachine,    bg: S.surfaceHighest,     fg: S.onSurface },
-  HDW:       { Icon: UtensilsCrossed,   bg: S.primaryContainer,   fg: S.primary },
-  ADW:       { Icon: UtensilsCrossed,   bg: S.secondaryContainer, fg: S.onSecondaryContainer },
-  HSC:       { Icon: SprayCan,          bg: S.tertiaryContainer,  fg: S.onTertiaryContainer },
-  IC:        { Icon: Bug,               bg: S.surfaceHigh,        fg: S.primary },
-  Cross:     { Icon: Boxes,             bg: S.surfaceContainer,   fg: S.primaryDim },
+// Every category gets a *distinct* icon so no two tiles render the same
+// silhouette. Earlier versions reused Shirt (FCN/FCA), WashingMachine
+// (FFI/LAD) and UtensilsCrossed (HDW/ADW), which at 16 px could look
+// ambiguous — particularly alongside the IC (Bug) tile. This mapping
+// uses 13 unique lucide icons covering the full Hair and LHC taxonomy.
+const CATEGORY_TILE: Record<
+  string,
+  { Icon: LucideIcon; bg: string; fg: string; title: string }
+> = {
+  // Hair
+  Color:     { Icon: Palette,         bg: S.primaryContainer,   fg: S.primary,              title: 'Hair: Color' },
+  Care:      { Icon: Droplet,         bg: S.secondaryContainer, fg: S.onSecondaryContainer, title: 'Hair: Care' },
+  Styling:   { Icon: Scissors,        bg: S.tertiaryContainer,  fg: S.onTertiaryContainer,  title: 'Hair: Styling' },
+  Body:      { Icon: ShowerHead,      bg: S.surfaceHighest,     fg: S.onSurface,            title: 'Hair: Body' },
+  // LHC — every laundry & cleaning sub-category gets its own distinct icon
+  FCN:       { Icon: WashingMachine,  bg: S.primaryContainer,   fg: S.primary,              title: 'LHC: FCN — Fabric Cleaning (Detergent)' },
+  FCA:       { Icon: Shirt,           bg: S.secondaryContainer, fg: S.onSecondaryContainer, title: 'LHC: FCA — Fabric Care (Delicates)' },
+  FFI:       { Icon: Feather,         bg: S.tertiaryContainer,  fg: S.onTertiaryContainer,  title: 'LHC: FFI — Fabric Finisher (Softener)' },
+  LAD:       { Icon: Sparkles,        bg: S.surfaceHighest,     fg: S.onSurface,            title: 'LHC: LAD — Laundry Additives (Scent Booster)' },
+  HDW:       { Icon: Hand,            bg: S.primaryContainer,   fg: S.primary,              title: 'LHC: HDW — Hand Dish Wash' },
+  ADW:       { Icon: UtensilsCrossed, bg: S.secondaryContainer, fg: S.onSecondaryContainer, title: 'LHC: ADW — Automatic Dish Wash' },
+  HSC:       { Icon: SprayCan,        bg: S.tertiaryContainer,  fg: S.onTertiaryContainer,  title: 'LHC: HSC — Hard Surface Cleaner' },
+  IC:        { Icon: Bug,             bg: S.surfaceHigh,        fg: S.primary,              title: 'LHC: IC — Insect Control' },
+  // Cross-category platforms
+  Cross:     { Icon: Boxes,           bg: S.surfaceContainer,   fg: S.primaryDim,           title: 'Cross-Category' },
 };
 
 // Resolve tile from innovation.categoryShort (e.g. "Color") with
@@ -111,6 +121,7 @@ const getCategoryTile = (innovation: Innovation) => {
   if (innovation.categoryGroup === 'Cross-Category') return CATEGORY_TILE.Cross;
   return CATEGORY_TILE[innovation.categoryShort] ?? {
     Icon: Layers, bg: S.surfaceContainer, fg: S.primaryDim,
+    title: innovation.category,
   };
 };
 
@@ -587,6 +598,8 @@ const InnovationRow: FC<{
           <div
             className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center"
             style={{ backgroundColor: tile.bg, color: tile.fg }}
+            title={tile.title}
+            aria-label={tile.title}
           >
             <Icon size={16} strokeWidth={2} />
           </div>
