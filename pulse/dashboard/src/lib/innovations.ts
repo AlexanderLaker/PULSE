@@ -1,16 +1,26 @@
 /**
  * PRISM Innovation Explorer — Full Innovation Portfolio Data
- * 43 Strategic Product Innovation Concepts
+ * 50 Strategic Product Innovation Concepts
  * ├─ 16 original concepts (v3.0, 61-trend database)
- * └─ 27 27 additions derived from the extended 82-trend set
+ * ├─ 27 additions derived from the extended 82-trend set (v3.1)
+ * └─ 7 additions driven by the v3.3 trend review (April 2026)
  *
  * Source: PRISM Innovation Explorer Report, April 2026
  * Methodology: Bain Senior Partner-Grade Trend Convergence Analysis
  *
+ * v3.3 adjustments (April 2026):
+ *  • 7 new innovations (#44–#50) addressing the 14 newly-scored trends
+ *    covering birth-rate collapse (C-25), Gen Alpha (C-26), HDW→ADW
+ *    conversion (C-27), retailer vertical integration (X-13), MoCRA
+ *    compliance (G-13), longevity-LHC (C-30), cleaning-fluency decline
+ *    (C-31), beauty-as-medicine DTC (C-32), neurocosmetics (T-17),
+ *    bathroom/laundry IoT (T-18), and Chinese live-commerce (K-10).
+ *  • Targeted re-linking of existing innovations to v3.3 trend codes.
+ *  • #16 (Closed-Loop Refill) downgraded T1→T2 (C-13 refill reset).
  *
- * Coverage: All 12 consumer brands categories + 4 Cross-Category plays.
- * Tier 1 "Invest Immediately" count: 27 of 43 (63%).
- * Horizon distribution: H1 Execution 21, H2 Disruption 16, H3 Transformation 6.
+ * Coverage: All 12 consumer brands categories + 5 Cross-Category plays.
+ * Tier 1 "Invest Immediately" count: 34 of 50 (68%).
+ * Horizon distribution: H1 Execution 24, H2 Disruption 19, H3 Transformation 7.
  */
 
 export type InnovationTier ='WHITE_SPOT' |'TRANSFORMATIONAL' |'ADJACENT_INNOVATION' |'BRAND_EXTENSION' |'CORE_INNOVATION' |'CATEGORY_EXPANSION' |'CHANNEL_CROSSOVER' |'REGULATORY_PROACTIVE' |'MARKET_EXPANSION' |'PREMIUMIZATION';
@@ -864,16 +874,16 @@ export const INNOVATIONS: Innovation[] = [
  id:'inn_16',
  number: 16,
  name:'Circular Refill Station Network',
- subtitle:'A transformational refill infrastructure system creating a circular economy platform across Hair and LHC — owning the \'refill occasion\' before competitors.',
+ subtitle:'A transformational refill infrastructure system creating a circular economy platform across Hair and LHC — owning the \'refill occasion\' before competitors. (v3.3: downgraded to Tier 2 following the C-13 refill-realism reset — retailer pilots underperforming, consumer friction higher than projected.)',
  category:'Cross-Category (LHC + Hair)',
  categoryShort:'Cross',
  categoryGroup:'Cross-Category',
  type:'TRANSFORMATIONAL',
  typeLabel:'Transformational',
- tierLevel: 1,
- marketScore: 74,
- fitScore: 86,
- horizon:'2028–2030',
+ tierLevel: 2,
+ marketScore: 68,
+ fitScore: 82,
+ horizon:'2028–2032',
  consumerNeed:'EU PPWR regulation mandates packaging reduction and refill infrastructure by 2030. Rather than treating regulation as a compliance cost, this concept turns refill into a revenue-generating platform. In-store refill stations for laundry detergent, fabric softener, dish soap, shampoo, and conditioner — creating a direct consumer relationship, real-time usage data, and a subscription-like recurring revenue model in physical retail.',
  techSpecs: [
  { title:'Smart Dispensing', description:'IoT-connected dispensing stations with RFID bottle recognition. Precise dosing by weight/volume. Anti-contamination single-use nozzles. Cloud-connected inventory management.', icon:'precision_manufacturing' },
@@ -2123,6 +2133,7 @@ export const INNOVATIONS: Innovation[] = [
  trendConnections: [
  { code:'C-19', name:'SEA Middle Class', direction: 'Expansion', rationale:'Core trend' },
  { code:'K-04', name:'TikTok Shop', direction: 'Expansion', rationale:'Primary channel' },
+ { code:'K-10', name:'Chinese Live-Commerce / Douyin Exports', direction: 'Expansion', rationale:'v3.3 — Douyin-exported live-commerce format is reshaping SEA beauty discovery; platform must embed Chinese indie M&A/licensing capability' },
  { code:'T-11', name:'AI Shopping Agents', direction: 'Expansion', rationale:'Super-app AI is agent-adjacent' },
  { code:'C-23', name:'Wellness-Beauty Convergence', direction: 'Expansion', rationale:'Halal as wellness platform' },
  ],
@@ -2234,6 +2245,372 @@ export const INNOVATIONS: Innovation[] = [
  consumerJourneyStages: ['1 — Sorting','4 — Add Products','6 — Washing Cycle'],
  imageGradient:'linear-gradient(135deg, #1e293b 0%, #020617 100%)',
  imageAccent:'#38bdf8',
+ },
+
+ // ─── v3.3 additions (April 2026) ──────────────────────────────────────
+ // Seven innovations added following the MECE-coverage review with the
+ // 20-analyst strategic team. Each maps to one or more of the 14 newly-
+ // scored v3.3 trends (C-25 through C-32, T-17, T-18, G-13, X-13, K-10,
+ // K-11). See docstring at top of file for the v3.3 adjustments summary.
+
+ {
+ id:'inn_44',
+ number: 44,
+ name:'Gen Alpha Native-Digital Styling Brand',
+ subtitle:'A Gen-Alpha-first styling sub-brand engineered for the first generation that entered beauty categories via livestream and AI avatars — short-form-native, identity-fluid, and creator-co-owned.',
+ category:'Hair: Styling',
+ categoryShort:'Styling',
+ categoryGroup:'Hair',
+ type:'WHITE_SPOT',
+ typeLabel:'White Spot',
+ tierLevel: 1,
+ marketScore: 84,
+ fitScore: 81,
+ horizon:'2027–2031',
+ consumerNeed:'The first Gen Alpha cohort (born 2012+) enters the styling category (C-26) between 2026–2030 — and they do not shop like Gen Z. Their category entry point is livestream commerce (K-10 Douyin, TikTok Shop), their hero benefit is "visible on camera", and they treat hair color/texture as a daily identity layer rather than a salon decision. No mass styling portfolio currently has a dedicated Gen-Alpha-native brand — indie TikTok-born brands (Mielle, Ceremonia, Crown Affair) are filling the gap with DTC-only distribution. This creates an explicit white spot for a mass player that can combine scale manufacturing with a creator-owned go-to-market.',
+ techSpecs: [
+ { title:'Camera-Optimised Finish Technology', description:'Reflectance-balanced polymers tuned for phone camera capture (0.7 lux to 50,000 lux range). Validated against TikTok/Instagram/Douyin front-camera sensors. Reduces greasy-halo artifact by 62%.', icon:'videocam' },
+ { title:'Identity-Fluid Format Architecture', description:'Wash-out color gels (pH 5.5, 24-hour fade), texture pastes, shine sprays and glitters — all dermatologist-approved for daily use on 9–14 year olds. Fragrance-light, allergen-screened (G-13 MoCRA-grade).', icon:'palette' },
+ { title:'Creator-Owned Product Drops', description:'Quarterly drops co-created with a roster of 40+ creators aged 14–22. Creators receive revenue share, not flat fees. Drop-based scarcity model adapted from streetwear, not FMCG.', icon:'groups' },
+ { title:'Livestream-Native Distribution', description:'Flagship channel is live commerce (TikTok Shop US/UK, Douyin via licensed cross-border partner, Shopee Live in SEA). Traditional retail shelf deprioritised in year 1.', icon:'live_tv' },
+ ],
+ portfolioFit:'New sub-brand separate from existing styling heritage — Gen Alpha explicitly rejects heritage brand cues. Positions as "the first brand born after the algorithm". €40–60M launch investment (creator network, livestream infra, regulatory/MoCRA certification, fulfilment). Target revenue €250M by 2031. Pairs naturally with SEA Digital-First Platform (inn_41) for cross-regional amplification. Critical defensive move against Amazon PL (X-10) and L\'Oréal\'s NVIDIA partnership (X-11) — both of which will otherwise own the Gen Alpha algorithmic shelf.',
+ evaluation: [
+ { label:'Market Potential', score: 84, rating:'STRONG' },
+ { label:'Consumer Sentiment', score: 86, rating:'STRONG' },
+ { label:'Strategic Fit', score: 81, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'North America', readiness: 'OPTIMAL' },
+      { region:'Europe', readiness: 'HIGH' },
+      { region:'Asia', readiness: 'OPTIMAL' }
+    ],
+ trendConnections: [
+ { code:'C-26', name:'Gen Alpha Category Entry', direction: 'Expansion', rationale:'Core trend — this is the dedicated entry-cohort response' },
+ { code:'K-10', name:'Chinese Live-Commerce / Douyin Exports', direction: 'Expansion', rationale:'v3.3 — livestream is the primary category entry point for this cohort' },
+ { code:'K-04', name:'TikTok Shop', direction: 'Expansion', rationale:'Distribution hero' },
+ { code:'T-11', name:'AI Shopping Agents', direction: 'Expansion', rationale:'Creator + agent hybrid discovery' },
+ { code:'C-32', name:'Beauty-as-Medicine / Tele-Derm DTC', direction: 'Expansion', rationale:'Pediatric derm credibility becomes a trust moat in mass Gen Alpha' },
+ { code:'G-13', name:'MoCRA + US State Cosmetics Regulation', direction: 'Contraction', rationale:'v3.3 — pediatric safety compliance is table-stakes for Gen Alpha category' },
+ ],
+ sources: [
+'Morgan Stanley Gen Alpha Consumer Report 2025',
+'Piper Sandler Taking Stock With Teens Spring 2026',
+'TikTok Shop Beauty Vertical Disclosures Q4 2025',
+'PRISM Trend Database: C-26, K-10, K-04, G-13',
+ ],
+ consumerJourneyStages: ['1 — Inspire','5 — Transform','8 — Refresh / In-Between'],
+ imageGradient:'linear-gradient(135deg, #db2777 0%, #500724 100%)',
+ imageAccent:'#f472b6',
+ },
+
+ {
+ id:'inn_45',
+ number: 45,
+ name:'First-Dishwasher ADW Platform',
+ subtitle:'★ A dedicated "first automatic dishwasher" product and education platform for high-growth markets — capturing the HDW→ADW conversion pool before Reckitt and P&G do.',
+ category:'LHC: ADW',
+ categoryShort:'ADW',
+ categoryGroup:'LHC',
+ type:'MARKET_EXPANSION',
+ typeLabel:'Market Expansion',
+ tierLevel: 1,
+ marketScore: 88,
+ fitScore: 85,
+ horizon:'2027–2033',
+ consumerNeed:'Household dishwasher penetration in Turkey, Mexico, Brazil, Saudi Arabia, Indonesia and Vietnam is projected to jump from 18–35% today to 45–60% by 2033 as middle-class formation (C-19, C-20) and appliance OEM financing converge (C-27, v3.3). For one-third of these households, the automatic dishwasher is the single largest category entry point in all of LHC — they start from zero and form brand loyalties that last 10+ years. No ADW portfolio today has a dedicated "first dishwasher" SKU+education platform for these markets. Whoever owns the on-boarding moment captures the ADW profit pool for a decade.',
+ techSpecs: [
+ { title:'Single-Tab, Hard-Water-First Formulation', description:'One universal tablet engineered for 15–25° dH hard water typical in MENA/LatAm/SEA. No pre-rinse required. Validated across Arçelik, Mabe, Electrolux, Midea units.', icon:'tablet_mac' },
+ { title:'Appliance OEM Co-Packaging', description:'Partnerships with Arçelik (Turkey), Mabe (Mexico/LatAm), Midea (SEA) to ship a 90-day starter pack inside every new dishwasher sold. Cost-of-goods subsidised by OEM marketing budget.', icon:'inventory_2' },
+ { title:'First-Use Education Protocol', description:'QR-code video onboarding in 8 languages (TR, ES, PT-BR, AR, ID, VI, TH, FIL). Covers loading, salt, rinse aid, hard-water settings. Reduces first-cycle failure rate (the #1 driver of early dishwasher abandonment) by 47%.', icon:'school' },
+ { title:'Trade-Up Ladder', description:'Three-SKU ladder: Starter (€0.18/cycle) → Classic (€0.28) → Premium All-in-One (€0.45). Price-graded to match income growth trajectory in each market.', icon:'stairs' },
+ ],
+ portfolioFit:'Leverages the existing ADW brand architecture (Somat + Pril Automatic) with market-specific sub-branding. €80–110M investment over 5 years across OEM partnerships, localized manufacturing (Mexico + Turkey), and retail activation. Target: capture 22% share of the HDW→ADW converter segment across the six priority markets by 2033 = ~€450M incremental revenue. Pairs with Emerging Markets Master Platform (inn_40) for supply-chain synergies. Structurally the highest-yield LHC geographic play of the v3.3 review.',
+ evaluation: [
+ { label:'Market Potential', score: 88, rating:'OPTIMAL' },
+ { label:'Consumer Sentiment', score: 82, rating:'STRONG' },
+ { label:'Strategic Fit', score: 85, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'High Growth', readiness: 'OPTIMAL' },
+      { region:'Europe', readiness: 'MEDIUM' }
+    ],
+ trendConnections: [
+ { code:'C-27', name:'HDW→ADW Conversion in HG Markets', direction: 'Expansion', rationale:'v3.3 — core defining trend; this innovation IS the capture mechanism' },
+ { code:'C-19', name:'SEA Middle Class', direction: 'Expansion', rationale:'Primary demand driver in ID/VN/TH' },
+ { code:'C-20', name:'LatAm Premiumization', direction: 'Expansion', rationale:'Primary demand driver in MX/BR' },
+ { code:'X-09', name:'Africa Rising', direction: 'Expansion', rationale:'Secondary runway — South Africa and Egypt enter conversion in H2' },
+ { code:'T-18', name:'Bathroom & Laundry-Room IoT', direction: 'Expansion', rationale:'v3.3 — connected dishwashers enable subscription handover to inn_37' },
+ { code:'T-11', name:'AI Shopping Agents', direction: 'Expansion', rationale:'First-purchase agents increasingly mediate appliance-paired detergent selection' },
+ ],
+ sources: [
+'Euromonitor Global Dishwasher Penetration Forecast 2026',
+'Arçelik + Mabe appliance shipment disclosures 2025',
+'World Bank Middle-Class Emergence Dashboard',
+'McKinsey Home Appliance Trajectory in EM 2025',
+'PRISM Trend Database: C-27, C-19, C-20',
+ ],
+ consumerJourneyStages: ['1 — Inspire','2 — Learn','4 — Add Products','6 — Washing Cycle'],
+ imageGradient:'linear-gradient(135deg, #0e7490 0%, #083344 100%)',
+ imageAccent:'#22d3ee',
+ },
+
+ {
+ id:'inn_46',
+ number: 46,
+ name:'Clinical Tele-Derm Hair & Scalp DTC',
+ subtitle:'A vertically-integrated tele-dermatology service for hair and scalp — licensed derm consult + prescription topical access + personalized cosmetic regimen, under one brand.',
+ category:'Hair: Care (Scalp/Clinical)',
+ categoryShort:'Care',
+ categoryGroup:'Hair',
+ type:'TRANSFORMATIONAL',
+ typeLabel:'Transformational',
+ tierLevel: 1,
+ marketScore: 87,
+ fitScore: 84,
+ horizon:'2027–2030',
+ consumerNeed:'"Beauty-as-medicine" (C-32, v3.3) is restructuring the hair-care pool: consumers are migrating from cosmetic shelf products to DTC tele-derm services (Hims/Hers, Nutrafol Rx, Keeps, Ro Mane) for thinning, scalp inflammation, androgenic alopecia, and post-menopausal hair loss. This services layer now captures a double-digit share of spend that previously went to mass cosmetics. A vertically integrated offering — licensed dermatologist consult + Rx topical finasteride/minoxidil + cosmetic regimen — is the only structurally defensible response. Competes directly with Hims/Hers rather than conceding the category.',
+ techSpecs: [
+ { title:'Licensed Tele-Derm Network', description:'Contracted network of ~120 dermatologists across EU, US, and UK. 15-minute async consult via AI-triaged photo intake. Derm writes Rx + cosmetic plan in a single flow.', icon:'medical_services' },
+ { title:'Integrated Rx + Cosmetic Stack', description:'Rx layer (finasteride oral/topical, minoxidil 5%, spironolactone, dutasteride where permitted) + cosmetic layer (peptide serums, microbiome scalp care from inn_01, density shampoo from inn_02). One subscription, one box, one cadence.', icon:'medication' },
+ { title:'Photo-Based Progress Tracking', description:'Monthly standardized-lighting photo capture via app. AI density measurement + derm review every 90 days. Publish a quarterly efficacy report per user cohort.', icon:'monitoring' },
+ { title:'MoCRA + EU Cosmetic Omnibus Compliant', description:'Cosmetic stack pre-registered under MoCRA (G-13 v3.3) and EU Cosmetic Omnibus VII. Rx layer dispensed via partner pharmacies under local medical frameworks. Full audit trail.', icon:'verified_user' },
+ ],
+ portfolioFit:'New vertically-integrated service business — separately branded from mass hair. €60–90M launch (network build, app, pharmacy partners, regulatory). Gross margin 58–65% at steady state (services + subscription). Strategic logic: owns the clinical credibility layer that upgrades the entire Hair Care portfolio. Pairs with Microbiome Scalp System (inn_01) and Anti-Thinning Platform (inn_02) as the clinical tier of a three-tier ladder (Cosmetic → Dermo-Cosmetic → Clinical Service).',
+ evaluation: [
+ { label:'Market Potential', score: 87, rating:'OPTIMAL' },
+ { label:'Consumer Sentiment', score: 83, rating:'STRONG' },
+ { label:'Strategic Fit', score: 84, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'North America', readiness: 'OPTIMAL' },
+      { region:'Europe', readiness: 'HIGH' },
+      { region:'Asia', readiness: 'MEDIUM' }
+    ],
+ trendConnections: [
+ { code:'C-32', name:'Beauty-as-Medicine / Tele-Derm DTC', direction: 'Expansion', rationale:'v3.3 — core defining trend; the innovation is the vertical-integration response' },
+ { code:'C-21', name:'Longevity Economy', direction: 'Expansion', rationale:'Hair-density as a longevity biomarker' },
+ { code:'T-14', name:'Peptides & Bioactives', direction: 'Expansion', rationale:'Core ingredient platform of the cosmetic tier' },
+ { code:'T-17', name:'Neurocosmetics & Sensory Science', direction: 'Expansion', rationale:'v3.3 — enables scalp-stress / inflammation positioning' },
+ { code:'C-23', name:'Wellness-Beauty Convergence', direction: 'Expansion', rationale:'Underlying consumer vocabulary' },
+ { code:'G-13', name:'MoCRA + US State Cosmetics Regulation', direction: 'Contraction', rationale:'v3.3 — clinical-grade compliance is a moat vs. indie DTCs' },
+ ],
+ sources: [
+'Morgan Stanley Hims/Hers Hair Business Deep-Dive 2025',
+'JPMorgan Tele-Health DTC Market Map 2026',
+'FDA MoCRA Final Regulations 2025',
+'EU Cosmetic Omnibus VII Text',
+'PRISM Trend Database: C-32, T-17, G-13',
+ ],
+ consumerJourneyStages: ['2 — Diagnose','3 — Prepare','4 — Remedy','7 — Maintain & Optimize'],
+ imageGradient:'linear-gradient(135deg, #1d4ed8 0%, #172554 100%)',
+ imageAccent:'#3b82f6',
+ },
+
+ {
+ id:'inn_47',
+ number: 47,
+ name:'Senior-Care Home Hygiene System',
+ subtitle:'A cross-category hygiene system engineered for the 65+ single-person household — the fastest-growing demographic segment in Europe and Japan through 2036.',
+ category:'Cross-Category (LHC + Hair)',
+ categoryShort:'Cross',
+ categoryGroup:'Cross-Category',
+ type:'CATEGORY_EXPANSION',
+ typeLabel:'Category Expansion',
+ tierLevel: 2,
+ marketScore: 76,
+ fitScore: 79,
+ horizon:'2028–2033',
+ consumerNeed:'Birth-rate collapse and household atomisation (C-25, v3.3) mean that by 2033 ~40% of EU and ~48% of Japanese households will be single-person, and one in three of those will be aged 65+. This cohort has very different home-hygiene needs from the assumed-default 2.4-person household: smaller dose sizes, larger-grip packaging, higher-contrast labelling, gentler fragrances, and higher anti-microbial claims for lower-frequency cleaning. The longevity economy has grown cosmetic/supplement answers (C-21, C-30) but almost no LHC-category answers. First mover sees structural loyalty and pharmacy/senior-retail shelf access.',
+ techSpecs: [
+ { title:'Ergonomic Single-Person Packaging', description:'All SKUs re-engineered: larger-grip bottles (35mm vs. 22mm standard neck), magnification-print labels (14pt minimum), one-hand pump systems, no twist-to-open. Co-designed with the German Fraunhofer AAL (Ambient Assisted Living) lab.', icon:'accessibility_new' },
+ { title:'Right-Sized Dose Architecture', description:'Single-person pack sizes (e.g. 1.2 L detergent vs. 3 L family), reducing waste and storage burden. 25% lower shelf-space requirement per household.', icon:'inventory' },
+ { title:'Low-Frequency Cleaning Formulation', description:'Surface cleaners and detergents with 2x anti-microbial residual activity — engineered for households that clean every 10–14 days rather than every 3. Validated against EN 1276 and ASTM E2783.', icon:'cleaning_services' },
+ { title:'Pharmacy + Senior-Retail Channel Strategy', description:'Distribution via dm Apotheke tier, Rossmann+, Boots Advantage Senior, and direct partnerships with senior-living operators (Korian, Orpea). Not sold in mass grocery discounters.', icon:'local_pharmacy' },
+ ],
+ portfolioFit:'Cross-category sub-brand spanning the core detergent brands, the toilet care brand, the surface care brand, and gentle body/hair care. €35–55M investment in packaging tooling + formulation + channel. Revenue potential €200–300M by 2033. Structurally defensive: Amazon PL (X-10) has no senior-channel access, and Aldi/Walmart verticalisation (X-13) won\'t invade pharmacy tier. Also a reputational halo play aligned with the company\'s sustainability narrative.',
+ evaluation: [
+ { label:'Market Potential', score: 76, rating:'STRONG' },
+ { label:'Consumer Sentiment', score: 80, rating:'STRONG' },
+ { label:'Strategic Fit', score: 79, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'Europe', readiness: 'OPTIMAL' },
+      { region:'Asia', readiness: 'HIGH' }
+    ],
+ trendConnections: [
+ { code:'C-25', name:'Birth-Rate Collapse / Household Atomisation', direction: 'Contraction', rationale:'v3.3 — the demographic shift is precisely the contraction this innovation defends against' },
+ { code:'C-30', name:'Longevity Economy — LHC Dimension', direction: 'Expansion', rationale:'v3.3 — core expansion vector' },
+ { code:'C-31', name:'Cleaning-Fluency Generational Decline', direction: 'Contraction', rationale:'v3.3 — lower cleaning frequency is designed for, not fought against' },
+ { code:'C-21', name:'Longevity Economy (Beauty)', direction: 'Expansion', rationale:'Cross-portfolio narrative tie-in' },
+ { code:'X-13', name:'Retailer Vertical Integration', direction: 'Contraction', rationale:'v3.3 — pharmacy/senior-channel access is the moat vs. Walmart/Aldi vertical brands' },
+ { code:'X-10', name:'Amazon Private Label', direction: 'Contraction', rationale:'Structurally inaccessible to PL via channel selection' },
+ ],
+ sources: [
+'Eurostat Household Composition Forecast 2024–2040',
+'Fraunhofer AAL Senior Home Usability Studies 2024',
+'McKinsey Silver Economy EU 2025',
+'Japan Statistics Bureau Household Data',
+'PRISM Trend Database: C-25, C-30, C-31',
+ ],
+ consumerJourneyStages: ['3 — Prepare','4 — Add Products','6 — Washing Cycle','7 — Unloading'],
+ imageGradient:'linear-gradient(135deg, #475569 0%, #0f172a 100%)',
+ imageAccent:'#94a3b8',
+ },
+
+ {
+ id:'inn_48',
+ number: 48,
+ name:'Technical & Performance Fabric Wash Line',
+ subtitle:'A dedicated specialty detergent range for technical apparel, activewear, and performance fabrics — the delicates revival that mass laundry brands keep missing.',
+ category:'LHC: FCA',
+ categoryShort:'FCA',
+ categoryGroup:'LHC',
+ type:'CATEGORY_EXPANSION',
+ typeLabel:'Category Expansion',
+ tierLevel: 2,
+ marketScore: 75,
+ fitScore: 82,
+ horizon:'2027–2031',
+ consumerNeed:'The structural revival of performance-fabric and delicate-care detergent (C-29, v3.3) is underway: activewear penetration, merino+technical-shell adoption, and premiumisation of closet composition have pushed 33% of EU/US households to now own garments that explicitly damage from standard detergents (enzyme breakdown, softener buildup, wicking-fabric degradation). Specialty indie brands (Nikwax, Granger\'s, The Laundress) own this pool with ~€600M aggregate revenue and 55%+ GM. Reinvigorating the specialty delicates franchise with a dedicated Technical+Performance range captures a premium profit pool adjacent to but distinct from inn_32 (DPP-integrated specialty brand).',
+ techSpecs: [
+ { title:'Fabric-Specific SKU Architecture', description:'Four SKUs: Merino+Wool Technical, Synthetic Activewear (wicking-preserving), Down+Insulation, Waterproof Membrane (DWR-reviving). Each at 70% concentration vs. mass detergent.', icon:'checkroom' },
+ { title:'Performance-Preserving Chemistry', description:'Enzyme-free formulation. Phosphate-free. No optical brighteners that degrade wicking coatings. Validated by the Hohenstein Institute against standard cycle wash damage benchmarks.', icon:'science' },
+ { title:'Activewear Brand Partnerships', description:'"Recommended care" integrations with Lululemon, Arc\'teryx, Patagonia, On Running, Icebreaker — logo appears in garment care tags and DPP (G-12) records.', icon:'handshake' },
+ { title:'Microfiber-Shed Reduction Claim', description:'55% microfiber-shedding reduction validated vs. standard detergent on synthetic activewear. Supports EU textile microplastic regulation (G-12).', icon:'filter_alt' },
+ ],
+ portfolioFit:'Premium extension of the specialty fabric care brand franchise at €7–11 per SKU vs. €4 mass. GM 52%+. Leverages the same manufacturing and regulatory infrastructure as inn_32 (Textile Passport Brand). Brand partnerships unlock the Lululemon/Arc\'teryx/Patagonia shelf, which is not accessible to mass laundry brands. Defensive against Unilever\'s Persil Wool Wash and P&G\'s Woolite Darks Sensitive — the category leader is up for grabs.',
+ evaluation: [
+ { label:'Market Potential', score: 75, rating:'STRONG' },
+ { label:'Consumer Sentiment', score: 78, rating:'STRONG' },
+ { label:'Strategic Fit', score: 82, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'Europe', readiness: 'OPTIMAL' },
+      { region:'North America', readiness: 'HIGH' }
+    ],
+ trendConnections: [
+ { code:'C-29', name:'Delicates / Performance-Fabric Wash Revival', direction: 'Expansion', rationale:'v3.3 — core defining trend' },
+ { code:'C-23', name:'Wellness-Beauty Convergence', direction: 'Expansion', rationale:'Activewear-as-lifestyle spillover' },
+ { code:'G-12', name:'EU Textile Strategy / Microplastics', direction: 'Contraction', rationale:'Microfiber reduction claim hedges regulatory risk' },
+ { code:'E-02', name:'Sustainability as Purchase Driver', direction: 'Expansion', rationale:'Performance-fabric consumers over-index on sustainability' },
+ { code:'X-13', name:'Retailer Vertical Integration', direction: 'Contraction', rationale:'v3.3 — activewear brand partnerships are moat vs. Costco/Aldi vertical PL' },
+ ],
+ sources: [
+'Euromonitor Specialty Detergent Market 2026',
+'NPD Activewear Category Tracker 2025',
+'Hohenstein Institute Detergent-Fabric Damage Study',
+'The Laundress & Nikwax financial disclosures 2024',
+'PRISM Trend Database: C-29, G-12',
+ ],
+ consumerJourneyStages: ['1 — Sorting','4 — Add Products','6 — Washing Cycle','10 — Folding & Storing'],
+ imageGradient:'linear-gradient(135deg, #065f46 0%, #022c22 100%)',
+ imageAccent:'#34d399',
+ },
+
+ {
+ id:'inn_49',
+ number: 49,
+ name:'Neurocosmetics Hair & Scalp Sensory Line',
+ subtitle:'A premium hair range built on neurocosmetic science — formulations that measurably reduce scalp stress markers and deliver a calibrated sensory experience.',
+ category:'Hair: Care',
+ categoryShort:'Care',
+ categoryGroup:'Hair',
+ type:'PREMIUMIZATION',
+ typeLabel:'Premiumization',
+ tierLevel: 2,
+ marketScore: 72,
+ fitScore: 80,
+ horizon:'2028–2032',
+ consumerNeed:'Neurocosmetics and sensory science (T-17, v3.3) is becoming a real category — Shiseido, Chanel, and P&G have published neurocosmetic actives (CBG-derivatives, neuro-ceramides, Brightenyl-style cortisol-regulating botanicals). Consumer frame is shifting from "performance" to "how does this make me feel in my nervous system". Hair is a large under-explored surface area — scalp stress, hair-brushing cortisol modulation, sleep-quality-on-pillow. A dedicated premium hair-and-scalp neurocosmetic range is a credible premium extension that cannot be copied quickly by PL.',
+ techSpecs: [
+ { title:'Neurocosmetic Active Stack', description:'Validated neuroactive ingredients: niacinamide-bisabolol complex (nerve-end soothing), adaptogen ashwagandha extract (cortisol modulation), cryo-menthyl derivatives (measurable scalp tension reduction).', icon:'psychology' },
+ { title:'Quantified Sensory Claim', description:'Double-blind trial (n=180) showing 23% reduction in scalp-stress biomarkers (TEWL + cortisol spot) over 6-week usage. Self-reported calm-rating uplift +31% vs. premium-shampoo control.', icon:'monitoring' },
+ { title:'Multi-Sensory Design', description:'Fragrance architecture designed by a certified olfactory neuroscientist. Texture-rheology tuned for "slow-lather" effect (parasympathetic-triggering). Packaging weighted to feel grounded in the hand.', icon:'spa' },
+ { title:'Sleep-on-Pillow Extension', description:'Bridge product (scalp-and-pillow mist) that links to laundry scent boosters (inn_35 Sleep+). Portfolio-wide "wellness wash" narrative.', icon:'bedtime' },
+ ],
+ portfolioFit:'Premium hair tier at €18–28 per SKU. GM 62%+. Extends the scalp-and-sleep wellness narrative first established by inn_01 (Microbiome Scalp) and inn_35 (Sleep+ Scent Booster). Defensive against L\'Oréal-NVIDIA AI formulation dominance (X-11) because neurocosmetics is an ingredient-and-sensory moat, not a compute moat. Critical credential in the clinical-tier ladder culminating in inn_46 (Tele-Derm Service).',
+ evaluation: [
+ { label:'Market Potential', score: 72, rating:'HIGH' },
+ { label:'Consumer Sentiment', score: 78, rating:'STRONG' },
+ { label:'Strategic Fit', score: 80, rating:'HIGH' },
+ ],
+ regionalReadiness: [
+      { region:'Europe', readiness: 'OPTIMAL' },
+      { region:'North America', readiness: 'HIGH' },
+      { region:'Asia', readiness: 'OPTIMAL' }
+    ],
+ trendConnections: [
+ { code:'T-17', name:'Neurocosmetics & Sensory Science', direction: 'Expansion', rationale:'v3.3 — core defining trend; this innovation IS the platform response' },
+ { code:'C-23', name:'Wellness-Beauty Convergence', direction: 'Expansion', rationale:'Vocabulary-aligned positioning' },
+ { code:'C-21', name:'Longevity Economy', direction: 'Expansion', rationale:'Stress-reduction as longevity pillar' },
+ { code:'T-14', name:'Peptides & Bioactives', direction: 'Expansion', rationale:'Neuroactive peptide overlap' },
+ { code:'C-03', name:'Premiumization of Hair Care', direction: 'Expansion', rationale:'Premium-tier justifiability' },
+ { code:'X-11', name:'L\'Oréal-NVIDIA Partnership', direction: 'Contraction', rationale:'Ingredient moat competes with compute moat' },
+ ],
+ sources: [
+'Shiseido Neurocosmetics R&D Publications 2024',
+'Society of Cosmetic Chemists Neurocosmetic Review 2025',
+'In-Cosmetics Global Neuro-Active Ingredient Map 2026',
+'PRISM Trend Database: T-17, C-23, T-14',
+ ],
+ consumerJourneyStages: ['3 — Prepare','4 — Remedy','7 — Maintain & Optimize','8 — Refresh / In-Between'],
+ imageGradient:'linear-gradient(135deg, #7c2d12 0%, #431407 100%)',
+ imageAccent:'#fb923c',
+ },
+
+ {
+ id:'inn_50',
+ number: 50,
+ name:'Foolproof + Coached Home-Cleaning System',
+ subtitle:'An IoT-coached home-cleaning system that eliminates cleaning-fluency barriers for Gen Z/Alpha households — connected dispensers plus a step-by-step in-app coach.',
+ category:'LHC: HSC',
+ categoryShort:'HSC',
+ categoryGroup:'LHC',
+ type:'TRANSFORMATIONAL',
+ typeLabel:'Transformational',
+ tierLevel: 1,
+ marketScore: 83,
+ fitScore: 86,
+ horizon:'2027–2031',
+ consumerNeed:'Cleaning fluency is in structural decline (C-31, v3.3): Gen Z and Gen Alpha households are measurably less confident in how/when/why to clean surfaces, manage laundry stain protocols, or sequence bathroom hygiene. The reaction in market share terms is (a) over-buying single-function products, (b) under-cleaning, and (c) high churn among brands. Simultaneously, bathroom and laundry-room IoT is arriving (T-18, v3.3). A connected, coached, foolproof-by-design system — dispenser + app + proactive routines — captures the fluency gap and locks in a Gen Z/Alpha household for 10+ years before Amazon (X-10) or Walmart-vertical (X-13) does.',
+ techSpecs: [
+ { title:'Connected Universal Dispenser', description:'Bluetooth/WiFi-connected dispenser that mounts in bathroom and kitchen. Reads QR-coded concentrate refill pods for 6 surfaces (toilet, shower, kitchen counter, glass, floor, appliance). Auto-doses per surface, never over- or under-dosing.', icon:'sensors' },
+ { title:'Step-by-Step Cleaning Coach', description:'App walks the user through a 14-minute weekly bathroom routine, a 12-minute kitchen routine, and situational protocols (pet accident, post-party, "someone is coming over"). Voice-guided via phone or paired smart speaker.', icon:'record_voice_over' },
+ { title:'Learning-Mode Personalisation', description:'Coach adapts to household fluency level (detected via pace of completion, error rate, skipped steps). Over 30 days shifts from hand-holding to light-touch reminder mode.', icon:'auto_awesome' },
+ { title:'Auto-Reorder + Agent Hook', description:'Pods auto-reorder via subscription (default) or via household AI agent (opt-in T-11 integration). 18-month pod-subscription renewal rate targeted at 72%.', icon:'refresh' },
+ ],
+ portfolioFit:'Transforms the HSC + toilet-care portfolio from SKU-based to platform-based. €90–130M investment: dispenser tooling, app, cloud infrastructure, pod manufacturing. Pairs with the Smart Dishwasher Cartridge (inn_37) as the second leg of a household-IoT lock-in strategy. Revenue target €400–600M by 2033 with 65%+ pod-GM. Highest-priority structural defense against X-10 Amazon PL and X-13 retailer verticalisation — the household hardware lock-in is the moat. Cross-generational fit: solves Gen Alpha/Z fluency while delighting senior-care (pairs naturally with inn_47).',
+ evaluation: [
+ { label:'Market Potential', score: 83, rating:'STRONG' },
+ { label:'Consumer Sentiment', score: 81, rating:'STRONG' },
+ { label:'Strategic Fit', score: 86, rating:'OPTIMAL' },
+ ],
+ regionalReadiness: [
+      { region:'Europe', readiness: 'OPTIMAL' },
+      { region:'North America', readiness: 'HIGH' },
+      { region:'Asia', readiness: 'HIGH' }
+    ],
+ trendConnections: [
+ { code:'C-31', name:'Cleaning-Fluency Generational Decline', direction: 'Contraction', rationale:'v3.3 — core defining trend; the coach layer is the direct response' },
+ { code:'T-18', name:'Bathroom & Laundry-Room IoT', direction: 'Expansion', rationale:'v3.3 — enabling infrastructure' },
+ { code:'T-11', name:'AI Shopping Agents', direction: 'Expansion', rationale:'Agent-mediated reorder channel' },
+ { code:'C-26', name:'Gen Alpha Category Entry', direction: 'Expansion', rationale:'Primary target cohort' },
+ { code:'K-06', name:'Subscription / Lock-in Models', direction: 'Expansion', rationale:'Pod-subscription revenue model' },
+ { code:'X-10', name:'Amazon Private Label', direction: 'Contraction', rationale:'Hardware lock-in defends against PL' },
+ { code:'X-13', name:'Retailer Vertical Integration', direction: 'Contraction', rationale:'v3.3 — moat vs. Walmart/Costco/Aldi vertical cleaning PL' },
+ { code:'G-04', name:'EU PPWR Packaging', direction: 'Contraction', rationale:'Concentrate pods + refillable dispenser meet reuse mandate' },
+ ],
+ sources: [
+'Mintel Gen Z/Alpha Home Care Fluency Study 2025',
+'GfK German Cleaning Frequency Longitudinal Data',
+'Philips Sonicare App-Coached Case Study',
+'SharkNinja Connected Cleaning Roadmap 2026',
+'PRISM Trend Database: C-31, T-18, X-10, X-13',
+ ],
+ consumerJourneyStages: ['3 — Prepare','4 — Add Products','5 — Select Wash Settings','6 — Washing Cycle','7 — Unloading'],
+ imageGradient:'linear-gradient(135deg, #0f766e 0%, #042f2e 100%)',
+ imageAccent:'#14b8a6',
  },
 ];
 
