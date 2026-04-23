@@ -27,7 +27,6 @@ import { useState } from 'react';
 import { LogOut, Settings } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
-import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
 import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
@@ -39,7 +38,6 @@ type DashboardTab =
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
-  | 'innovation-explorer'
   | 'innovation-explorer-3';
 
 interface TabDef {
@@ -52,10 +50,6 @@ const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'innovation-explorer-3', label: 'Innovation Explorer' },
-  // Hidden: 'innovation-explorer' (a.k.a. "Innovation Explorer old") —
-  // superseded by the list-view 'innovation-explorer-3'. Route definition is
-  // retained below so legacy links / direct state navigation still resolve,
-  // but it is no longer shown in the top navigation.
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -214,12 +208,6 @@ export default function DashboardPage() {
               onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool-2')}
               onNavigateTrends={() => setActiveTab('trends-2')}
               onNavigateInnovation={() => setActiveTab('innovation-explorer-3')}
-            />
-          )}
-          {activeTab === 'innovation-explorer' && (
-            <InnovationExplorer
-              onNavigateToTrend={() => setActiveTab('trends-2')}
-              onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
             />
           )}
           {activeTab === 'innovation-explorer-3' && (
