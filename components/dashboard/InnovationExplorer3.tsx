@@ -610,7 +610,6 @@ const InnovationRow: FC<{
             >
               {innovation.name}
             </div>
-            <TierBadge level={innovation.tierLevel} />
           </div>
         </div>
 
