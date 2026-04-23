@@ -52,9 +52,7 @@ import type {
   ForceName, Scenario,
   PercentileDistribution, ShiftPath,
   DiagnosticsResult,
-  Trend, TriggerStatus, AllocationRecommendation,
 } from '@/types';
-import CategoryDetailPanel from './CategoryDetailPanel';
 
 // ─── Value-chain steps — must match backend VC_STEPS in pulse/config.py ──
 const VC_STEPS: Array<{ id: string; label: string }> = [
@@ -302,11 +300,6 @@ interface MatrixProps {
       Bayesian MC shift matrix; the Force / VC / Region lens decompositions
       are scalar per cell so cellDetails is omitted for those views. */
   cellDetails?: Record<string, Record<string, PercentileDistribution | null>>;
-  /** Optional: drill-down handler. When provided, the sticky-left category
-      label cell becomes an interactive button that opens the Category
-      Detail Panel with the fan chart, trigger status, and allocation
-      recommendation for that single category. */
-  onRowClick?: (rowId: string) => void;
 }
 
 const Matrix: FC<MatrixProps> = ({
@@ -314,7 +307,6 @@ const Matrix: FC<MatrixProps> = ({
   rowTotals, colTotals, grandTotal, showTotals = false,
   rowTotalLabel = 'Total',
   cellDetails,
-  onRowClick,
 }) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
@@ -486,38 +478,11 @@ const Matrix: FC<MatrixProps> = ({
                       className="px-6 py-1 text-[13px] font-semibold sticky left-0 z-10"
                       style={{
                         backgroundColor: S.surface,
-                        color: onRowClick ? S.primary : S.onSurface,
+                        color: S.onSurface,
                         fontFamily: BODY_FONT,
-                        cursor: onRowClick ? 'pointer' : 'default',
-                        transition: 'color 0.15s ease, background-color 0.15s ease',
                       }}
-                      onClick={onRowClick ? () => onRowClick(row.id) : undefined}
-                      onMouseEnter={onRowClick ? (e) => {
-                        e.currentTarget.style.backgroundColor = S.surfaceLow;
-                        e.currentTarget.style.color = S.primaryDim;
-                      } : undefined}
-                      onMouseLeave={onRowClick ? (e) => {
-                        e.currentTarget.style.backgroundColor = S.surface;
-                        e.currentTarget.style.color = S.primary;
-                      } : undefined}
-                      title={onRowClick ? `Open ${row.label} detail — fan chart, triggers, allocation` : undefined}
-                      role={onRowClick ? 'button' : undefined}
-                      tabIndex={onRowClick ? 0 : undefined}
-                      onKeyDown={onRowClick ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onRowClick(row.id);
-                        }
-                      } : undefined}
                     >
-                      {onRowClick ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          {row.label}
-                          <span aria-hidden style={{ opacity: 0.5, fontSize: 11 }}>›</span>
-                        </span>
-                      ) : (
-                        row.label
-                      )}
+                      {row.label}
                     </td>
                     {columns.map((col) => {
                       const v = data[row.id]?.[col.id] ?? null;
@@ -827,20 +792,13 @@ const PeakStressTooltip: FC = () => {
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC = () => {
   const {
-    simulation, scenarios, config, trends, triggers,
+    simulation, scenarios, config,
     loading, error, backendAvailable,
     activeScenario, setActiveScenario, reconnect,
   } = usePrism();
 
   const [view, setView] = useState<ViewMode>('time');
   const [selectedYear, setSelectedYear] = useState<number>(YEARS[YEARS.length - 1]!);
-
-  // ── Drill-down state ─────────────────────────────────────────────
-  // Null until the user clicks a category row; then the Category Detail
-  // Panel slides in from the right with the full percentile fan chart,
-  // force decomposition, contributing trends, trigger status, and
-  // allocation recommendation for that one category.
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // ─── Diagnostics — fetched only when the dashboard is empty so
   // we can show the user *why* (no rows in DB vs DB unreachable vs
@@ -1003,87 +961,6 @@ const ProfitPoolAnalysis2: FC = () => {
     );
     return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
   }, [view, simulation, selectedYear, config]);
-
-  // ── Category Detail Panel data ─────────────────────────────────
-  // Rebuilds only when the underlying simulation / trends / selected year
-  // changes. Category keys follow the display-name convention
-  // ("Hair: Color") to match `simulation.shifts` and the row.id used in the
-  // matrix. For the force decomposition we snapshot at `selectedYear`
-  // (Time Path view defaults to the horizon end so the user sees peak
-  // exposure). Contributing trends are filtered by the trend's category
-  // exposure map and sorted by score magnitude inside the panel itself.
-  const panelData = useMemo(() => {
-    const cats = CATEGORIES.map((c) => ({ id: c.name, name: c.name, group: c.group }));
-    const shifts_path: { [cat: string]: Record<string, { median?: number; p10?: number; p90?: number }> } = {};
-    const force_decomposition: { [cat: string]: Record<ForceName, number> } = {};
-    const contributing_trends: { [cat: string]: Trend[] } = {};
-
-    cats.forEach((c) => {
-      // Fan-chart path: pass median + p10/p90 for every projection year.
-      const raw = simulation?.shifts?.[c.id] as ShiftPath | undefined;
-      if (raw) {
-        const path: Record<string, { median?: number; p10?: number; p90?: number }> = {};
-        YEARS.forEach((y) => {
-          const v = (raw as Record<string | number, unknown>)[y]
-                 ?? (raw as Record<string | number, unknown>)[String(y)];
-          if (v == null) return;
-          if (typeof v === 'number') {
-            path[String(y)] = { median: v };
-          } else {
-            const pd = v as PercentileDistribution;
-            path[String(y)] = { median: pd.median, p10: pd.p10, p90: pd.p90 };
-          }
-        });
-        shifts_path[c.id] = path;
-      }
-
-      // Force decomposition at selectedYear. Falls back to horizon-end when
-      // the selected year doesn't carry a block for this category.
-      const yearKey = String(selectedYear);
-      const forceCell = simulation?.decompositions?.force?.[yearKey]?.[c.id]
-        ?? simulation?.decompositions?.force?.[String(YEARS[YEARS.length - 1])]?.[c.id];
-      if (forceCell) {
-        // Pad any missing force with 0 so the panel's bars render a complete set.
-        const rec: Record<ForceName, number> = {
-          Consumer: 0, Customer: 0, Technology: 0,
-          Government: 0, Environmental: 0, Competitive: 0,
-        };
-        (Object.keys(forceCell) as ForceName[]).forEach((k) => {
-          const val = forceCell[k];
-          if (typeof val === 'number' && isFinite(val)) rec[k] = val;
-        });
-        force_decomposition[c.id] = rec;
-      }
-
-      // Contributing trends: any trend whose category_exposure for this cat
-      // is > 0. Score is the trend's normalized_score (prob × gp1% × sign),
-      // which the panel displays as a compact pct badge.
-      const cid = CATEGORIES.find((x) => x.name === c.id)?.id ?? c.id;
-      const trendsForCat = (trends ?? [])
-        .map((t): Trend | null => {
-          const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
-          const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
-          if (!exp || exp <= 0) return null;
-          return {
-            ...t,
-            exposure_level: exp,
-          } as unknown as Trend;
-        })
-        .filter((t): t is Trend => t !== null);
-      if (trendsForCat.length > 0) contributing_trends[c.id] = trendsForCat;
-    });
-
-    return {
-      shifts_path,
-      force_decomposition,
-      contributing_trends,
-      categories: cats,
-    };
-  }, [simulation, trends, selectedYear]);
-
-  const allocationForPanel: AllocationRecommendation | null =
-    simulation?.allocation_recommendation ?? null;
-  const triggersForPanel: TriggerStatus[] = triggers ?? [];
 
   const scenarioList: Scenario[] = scenarios ?? [];
   const meta = VIEW_META[view];
@@ -1458,27 +1335,9 @@ const ProfitPoolAnalysis2: FC = () => {
               showTotals={matrixData.showTotals}
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
               cellDetails={matrixData.cellDetails}
-              onRowClick={setSelectedCategoryId}
             />
           )}
         </motion.section>
-
-        {/* ── Category Detail Panel (drill-down) ────────────────────
-            Slides in from the right when a category row is clicked.
-            Shows fan chart, force decomposition, trigger status,
-            allocation recommendation, and contributing trends for
-            the single selected category. */}
-        <AnimatePresence>
-          {selectedCategoryId && (
-            <CategoryDetailPanel
-              data={panelData}
-              categoryId={selectedCategoryId}
-              onClose={() => setSelectedCategoryId(null)}
-              triggers={triggersForPanel}
-              allocation={allocationForPanel}
-            />
-          )}
-        </AnimatePresence>
 
         {/* ── Footer note ─────────────────────────────────────── */}
         <footer
@@ -1487,8 +1346,8 @@ const ProfitPoolAnalysis2: FC = () => {
         >
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
-          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.6'}</code>,
-          50,000 iterations, Gaussian / t-copula dependencies, 95 v3.3 trends). Each cell is a{' '}
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.5'}</code>,
+          10K+ iterations, Gaussian / t-copula dependencies, 82 v3.1 trends). Each cell is a{' '}
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by

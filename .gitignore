@@ -13,8 +13,6 @@ dist-*/
 .vercel/
 .hypothesis/
 tsconfig.tsbuildinfo
-tsconfig.check.json
-tsconfig.check.tsbuildinfo
 # Office app lock files
 .~lock.*#
 ~$*
