@@ -28,6 +28,7 @@ import { LogOut, Settings } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer from '@/components/dashboard/InnovationExplorer';
+import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
@@ -38,7 +39,8 @@ type DashboardTab =
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
-  | 'innovation-explorer';
+  | 'innovation-explorer'
+  | 'innovation-explorer-3';
 
 interface TabDef {
   id: DashboardTab;
@@ -46,10 +48,11 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'profit-pool-2',       label: 'Profit Pool Shift Analysis' },
-  { id: 'trends-2',            label: 'Trends' },
-  { id: 'consumer-journey-2',  label: 'Consumer Journey' },
-  { id: 'innovation-explorer', label: 'Innovation Explorer' },
+  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
+  { id: 'trends-2',              label: 'Trends' },
+  { id: 'consumer-journey-2',    label: 'Consumer Journey' },
+  { id: 'innovation-explorer',   label: 'Innovation Explorer' },
+  { id: 'innovation-explorer-3', label: 'Innovation Explorer Alternative' },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -212,6 +215,12 @@ export default function DashboardPage() {
           )}
           {activeTab === 'innovation-explorer' && (
             <InnovationExplorer
+              onNavigateToTrend={() => setActiveTab('trends-2')}
+              onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
+            />
+          )}
+          {activeTab === 'innovation-explorer-3' && (
+            <InnovationExplorer3
               onNavigateToTrend={() => setActiveTab('trends-2')}
               onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
             />
