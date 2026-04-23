@@ -81,9 +81,36 @@ export const INNOVATION_CATEGORIES = [
  { id:'lhc_hdw', label:'LHC: HDW', short:'HDW' },
  { id:'lhc_adw', label:'LHC: ADW', short:'ADW' },
  { id:'lhc_hsc', label:'LHC: HSC', short:'HSC' },
+ { id:'lhc_toilet', label:'LHC: Toilet', short:'Toilet' },
  { id:'lhc_ic', label:'LHC: IC', short:'IC' },
  { id:'cross', label:'Cross-Category', short:'Cross' },
 ];
+
+// ─── Hard-coded innovation → filter-category membership ──────────────
+// Explicit map of filter id → list of innovation numbers. This replaces
+// the older string-matching logic which was fragile (e.g. filtering by
+// 'IC' picked up any innovation whose category contained "Fabric" because
+// "fabr[ic]" matches "ic"; filtering by 'Care' mixed Hair Care with Fabric
+// Care). Every innovation belongs to exactly ONE primary filter category
+// (its `categoryShort`). Multi-category innovations stay in their primary
+// bucket only — the full `category` string on the detail page still shows
+// secondary affiliations for context.
+export const INNOVATION_FILTER_MAP: Record<string, number[]> = {
+ hair_color:   [8, 12, 17, 18],
+ hair_care:    [1, 2, 10, 19, 20, 21, 22, 23, 24],
+ hair_styling: [7, 14, 25, 26],
+ hair_body:    [27, 28],
+ lhc_fcn:      [3, 5, 29, 30, 31],
+ lhc_fca:      [4, 6, 32],
+ lhc_ffi:      [33],
+ lhc_lad:      [34, 35],
+ lhc_hdw:      [36],
+ lhc_adw:      [9, 37],
+ lhc_hsc:      [15, 39],
+ lhc_toilet:   [38],
+ lhc_ic:       [11],
+ cross:        [13, 16, 40, 41, 42, 43],
+};
 
 export const INNOVATIONS: Innovation[] = [
  {
@@ -1953,8 +1980,8 @@ export const INNOVATIONS: Innovation[] = [
  number: 38,
  name:'Biodiversity-Positive Toilet Care',
  subtitle:'A toilet care range with certified biodiversity-positive impact — pollinator-safe surfactants, protected-species-safe dyes, and verified TNFD disclosure.',
- category:'LHC: HSC',
- categoryShort:'HSC',
+ category:'LHC: Toilet Care',
+ categoryShort:'Toilet',
  categoryGroup:'LHC',
  type:'REGULATORY_PROACTIVE',
  typeLabel:'Regulatory Proactive',
@@ -2237,37 +2264,16 @@ export const INNOVATIONS: Innovation[] = [
  },
 ];
 
-// Helper function to get innovations by category filter
+// Helper function to get innovations by category filter — strictly driven
+// by INNOVATION_FILTER_MAP (hardcoded), so "Care" only returns Hair Care,
+// "HSC" never returns toilet care, "IC" never returns anything with the
+// word "Fabric" in it, etc.
 export function getFilteredInnovations(categoryFilter: string): Innovation[] {
  if (categoryFilter ==='all') return INNOVATIONS;
- if (categoryFilter ==='cross') return INNOVATIONS.filter(i => i.categoryGroup ==='Cross-Category');
-
- const catMap: Record<string, string[]> = {
-'hair_color': ['Color'],
-'hair_care': ['Care'],
-'hair_styling': ['Styling'],
-'hair_body': ['Body'],
-'lhc_fcn': ['FCN'],
-'lhc_fca': ['FCA'],
-'lhc_ffi': ['FFI'],
-'lhc_lad': ['LAD'],
-'lhc_hdw': ['HDW'],
-'lhc_adw': ['ADW'],
-'lhc_hsc': ['HSC'],
-'lhc_ic': ['IC'],
- };
-
- const shorts = catMap[categoryFilter] || [];
- return INNOVATIONS.filter(i => {
- // Match by categoryShort or check if category string contains the filter keyword
- if (shorts.includes(i.categoryShort)) return true;
- // Also check the full category string for multi-category innovations
- const catLower = i.category.toLowerCase();
- for (const s of shorts) {
- if (catLower.includes(s.toLowerCase())) return true;
- }
- return false;
- });
+ const ids = INNOVATION_FILTER_MAP[categoryFilter];
+ if (!ids || ids.length === 0) return [];
+ const idSet = new Set(ids);
+ return INNOVATIONS.filter(i => idSet.has(i.number));
 }
 
 // Get type color for badges

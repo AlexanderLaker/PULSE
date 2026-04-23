@@ -33,6 +33,7 @@ import {
   ArrowUpDown,
   Star,
   Droplet,
+  Droplets,
   Scissors,
   Palette,
   ShowerHead,
@@ -110,6 +111,7 @@ const CATEGORY_TILE: Record<
   HDW:       { Icon: Hand,            bg: S.primaryContainer,   fg: S.primary,              title: 'LHC: HDW — Hand Dish Wash' },
   ADW:       { Icon: UtensilsCrossed, bg: S.secondaryContainer, fg: S.onSecondaryContainer, title: 'LHC: ADW — Automatic Dish Wash' },
   HSC:       { Icon: SprayCan,        bg: S.tertiaryContainer,  fg: S.onTertiaryContainer,  title: 'LHC: HSC — Hard Surface Cleaner' },
+  Toilet:    { Icon: Droplets,        bg: S.surfaceHighest,     fg: S.onSurface,            title: 'LHC: Toilet Care' },
   IC:        { Icon: Bug,             bg: S.surfaceHigh,        fg: S.primary,              title: 'LHC: IC — Insect Control' },
   // Cross-category platforms
   Cross:     { Icon: Boxes,           bg: S.surfaceContainer,   fg: S.primaryDim,           title: 'Cross-Category' },
