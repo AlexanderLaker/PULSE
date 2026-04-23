@@ -51,8 +51,11 @@ const TABS: TabDef[] = [
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
-  { id: 'innovation-explorer',   label: 'Innovation Explorer' },
-  { id: 'innovation-explorer-3', label: 'Innovation Explorer Alternative' },
+  { id: 'innovation-explorer-3', label: 'Innovation Explorer' },
+  // Hidden: 'innovation-explorer' (a.k.a. "Innovation Explorer old") —
+  // superseded by the list-view 'innovation-explorer-3'. Route definition is
+  // retained below so legacy links / direct state navigation still resolve,
+  // but it is no longer shown in the top navigation.
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -210,7 +213,7 @@ export default function DashboardPage() {
             <ConsumerJourney2
               onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool-2')}
               onNavigateTrends={() => setActiveTab('trends-2')}
-              onNavigateInnovation={() => setActiveTab('innovation-explorer')}
+              onNavigateInnovation={() => setActiveTab('innovation-explorer-3')}
             />
           )}
           {activeTab === 'innovation-explorer' && (
