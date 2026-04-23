@@ -708,6 +708,9 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           boxShadow: '-24px 0 60px -15px rgba(0, 52, 94, 0.24)',
           display: 'flex',
           flexDirection: 'column',
+          // Flexbox overflow: parent must clip so the child flex:1 scroll
+          // region can actually overflow instead of growing to its content.
+          overflow: 'hidden',
           zIndex: 50,
         }}
       >
@@ -905,8 +908,16 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         {/* ─── Scrollable content ────────────────────────────────── */}
         <div
           style={{
-            flex: 1,
+            flex: '1 1 auto',
+            // minHeight:0 + minWidth:0 is the fix for the flex-item overflow
+            // bug: without it, `min-height: auto` pins this div to its content
+            // height and the `overflowY: auto` never engages — users see the
+            // content spill past the viewport with no scrollbar.
+            minHeight: 0,
+            minWidth: 0,
             overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
             padding: '20px 20px 28px',
             display: 'flex',
             flexDirection: 'column',
