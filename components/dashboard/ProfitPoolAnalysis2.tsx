@@ -148,6 +148,26 @@ function getYearShift(
   return extractMedian(v as PercentileDistribution | number | undefined);
 }
 
+/** Get the full percentile distribution (median + p10/p25/p75/p90) for a
+ *  category at a given year. Returns `null` if the cell has no data. If the
+ *  backend only stored a scalar median for this cell, returns `{ median }`
+ *  with no percentile bands — the tooltip will gracefully omit P10/P90. */
+function getYearPercentiles(
+  shifts: Record<string, ShiftPath> | undefined,
+  catKey: string,
+  catFallbackId: string,
+  year: number,
+): PercentileDistribution | null {
+  if (!shifts) return null;
+  const path = shifts[catKey] ?? shifts[catFallbackId];
+  if (!path) return null;
+  const v = (path as Record<string | number, unknown>)[year]
+         ?? (path as Record<string | number, unknown>)[String(year)];
+  if (v == null) return null;
+  if (typeof v === 'number') return { median: v };
+  return v as PercentileDistribution;
+}
+
 /** Category-weighted average helper — Layer C aggregation primitive.
  *
  * Returns  Σᵢ wᵢ·vᵢ / Σᵢ wᵢ   over the indices where vᵢ is finite and
@@ -274,12 +294,19 @@ interface MatrixProps {
       always sees which measurement year the row total refers to. Time Path
       doesn't show a row-total column at all. Defaults to "Total". */
   rowTotalLabel?: string;
+  /** Optional: per-cell percentile distribution, keyed [rowId][colId].
+      When provided, hovering a cell shows a tooltip with the MC median plus
+      the P10 and P90 percentile bands. Time Path view supplies this from the
+      Bayesian MC shift matrix; the Force / VC / Region lens decompositions
+      are scalar per cell so cellDetails is omitted for those views. */
+  cellDetails?: Record<string, Record<string, PercentileDistribution | null>>;
 }
 
 const Matrix: FC<MatrixProps> = ({
   columns, rows, data, subtitle, emptyMessage,
   rowTotals, colTotals, grandTotal, showTotals = false,
   rowTotalLabel = 'Total',
+  cellDetails,
 }) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
@@ -291,6 +318,35 @@ const Matrix: FC<MatrixProps> = ({
     });
     return map;
   }, [rows]);
+
+  // ─── Hover tooltip state ─────────────────────────────────────────
+  // Tracks which data cell the cursor is over, plus the viewport-anchor
+  // point (cell top-center). Uses `position: fixed` so the tooltip is
+  // never clipped by the horizontally-scrolling table wrapper.
+  const [hover, setHover] = useState<{
+    rowId: string;
+    colId: string;
+    rowLabel: string;
+    colLabel: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const onCellEnter = (
+    e: React.MouseEvent<HTMLTableCellElement>,
+    rowId: string,
+    colId: string,
+    rowLabel: string,
+    colLabel: string,
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHover({
+      rowId, colId, rowLabel, colLabel,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+  };
+  const onCellLeave = () => setHover(null);
 
   const hasAnyData = rows.some((r) => columns.some((c) => (data[r.id]?.[c.id] ?? null) !== null));
 
@@ -440,8 +496,10 @@ const Matrix: FC<MatrixProps> = ({
                             fontWeight: v != null && Math.abs(v) > 0.02 ? 700 : 600,
                             fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                             transition: 'background-color 0.25s ease',
+                            cursor: v != null ? 'default' : 'inherit',
                           }}
-                          title={v != null ? `${row.label} · ${col.label}: ${fmtShift(v, 2)}` : undefined}
+                          onMouseEnter={v != null ? (e) => onCellEnter(e, row.id, col.id, row.label, col.label) : undefined}
+                          onMouseLeave={v != null ? onCellLeave : undefined}
                         >
                           {v == null ? '—' : fmtShift(v, 1)}
                         </td>
@@ -543,6 +601,122 @@ const Matrix: FC<MatrixProps> = ({
           <span>+5%</span>
         </div>
       </div>
+
+      {/* ── Cell hover tooltip ────────────────────────────────────
+          Fixed-positioned so it escapes the horizontally-scrolling
+          table wrapper. Shows the MC median plus the P10 / P90
+          percentile bands when `cellDetails` is supplied (Time Path
+          view); decomposition lenses show just the median because
+          the backend stores per-cell scalars for those views. */}
+      {hover && (() => {
+        const v = data[hover.rowId]?.[hover.colId];
+        if (v == null) return null;
+        const d = cellDetails?.[hover.rowId]?.[hover.colId] ?? null;
+        const p10 = d?.p10 ?? null;
+        const p90 = d?.p90 ?? null;
+        const hasBands = p10 != null || p90 != null;
+        return (
+          <div
+            className="fixed z-50 pointer-events-none rounded-xl shadow-2xl"
+            style={{
+              left: hover.x,
+              top: hover.y - 10,
+              transform: 'translate(-50%, -100%)',
+              backgroundColor: S.onSurface,
+              color: '#ffffff',
+              padding: '10px 14px',
+              fontFamily: BODY_FONT,
+              fontSize: 12,
+              minWidth: 176,
+              boxShadow: '0 16px 40px -8px rgba(0, 52, 94, 0.35)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                opacity: 0.75,
+                marginBottom: 6,
+                fontFamily: HEADLINE_FONT,
+              }}
+            >
+              {hover.rowLabel} · {hover.colLabel}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr',
+                columnGap: 14,
+                rowGap: 2,
+                alignItems: 'baseline',
+              }}
+            >
+              <span style={{ opacity: 0.7, fontSize: 11 }}>Median</span>
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                  fontWeight: 700,
+                  textAlign: 'right',
+                }}
+              >
+                {fmtShift(v, 2)}
+              </span>
+              {p10 != null && (
+                <>
+                  <span style={{ opacity: 0.7, fontSize: 11 }}>P10</span>
+                  <span
+                    style={{
+                      fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontWeight: 600,
+                      textAlign: 'right',
+                    }}
+                  >
+                    {fmtShift(p10, 2)}
+                  </span>
+                </>
+              )}
+              {p90 != null && (
+                <>
+                  <span style={{ opacity: 0.7, fontSize: 11 }}>P90</span>
+                  <span
+                    style={{
+                      fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontWeight: 600,
+                      textAlign: 'right',
+                    }}
+                  >
+                    {fmtShift(p90, 2)}
+                  </span>
+                </>
+              )}
+            </div>
+            {!hasBands && cellDetails && (
+              <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
+                P10 / P90 not available for this cell
+              </div>
+            )}
+            {!cellDetails && (
+              <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
+                Switch to Time Path for P10 / P90 bands
+              </div>
+            )}
+            {/* Pointer arrow */}
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                bottom: -5,
+                width: 10,
+                height: 10,
+                backgroundColor: S.onSurface,
+                transform: 'translateX(-50%) rotate(45deg)',
+              }}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -677,10 +851,18 @@ const ProfitPoolAnalysis2: FC = () => {
     if (view === 'time') {
       const columns = YEARS.map((y) => ({ id: String(y), label: String(y) }));
       const data: Record<string, Record<string, number | null>> = {};
+      // Per-cell percentile distribution for the hover tooltip — the
+      // Bayesian MC shift matrix carries median + p10/p25/p75/p90 per
+      // (cat, year), so we preserve the full band here. Decomposition
+      // lenses (Force / VC / Region) are scalar per cell and skip this.
+      const cellDetails: Record<string, Record<string, PercentileDistribution | null>> = {};
       rows.forEach((r) => {
         data[r.id] = {};
+        cellDetails[r.id] = {};
         YEARS.forEach((y) => {
-          data[r.id][String(y)] = getYearShift(simulation?.shifts, r.id, r.fallbackId, y);
+          const pct = getYearPercentiles(simulation?.shifts, r.id, r.fallbackId, y);
+          cellDetails[r.id][String(y)] = pct;
+          data[r.id][String(y)] = pct?.median ?? null;
         });
       });
 
@@ -704,6 +886,7 @@ const ProfitPoolAnalysis2: FC = () => {
         // cats. A row total (sum/avg across years for one cat) isn't a
         // meaningful portfolio identity, so we keep it off.
         showRowTotals: false,
+        cellDetails,
       };
     }
 
@@ -758,7 +941,7 @@ const ProfitPoolAnalysis2: FC = () => {
       const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
         FORCE_NAMES as unknown as string[], 'force',
       );
-      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
+      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
     }
 
     if (view === 'vc') {
@@ -767,7 +950,7 @@ const ProfitPoolAnalysis2: FC = () => {
       const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
         axisKeys, 'vc',
       );
-      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
+      return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
     }
 
     // region
@@ -776,7 +959,7 @@ const ProfitPoolAnalysis2: FC = () => {
     const { data, rowTotals, colTotals, grandTotal } = makeDecompView(
       axisKeys, 'region',
     );
-    return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true };
+    return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
   }, [view, simulation, selectedYear, config]);
 
   const scenarioList: Scenario[] = scenarios ?? [];
@@ -1151,6 +1334,7 @@ const ProfitPoolAnalysis2: FC = () => {
               grandTotal={matrixData.grandTotal}
               showTotals={matrixData.showTotals}
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
+              cellDetails={matrixData.cellDetails}
             />
           )}
         </motion.section>
