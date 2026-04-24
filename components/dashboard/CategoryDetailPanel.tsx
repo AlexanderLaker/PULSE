@@ -815,11 +815,17 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         role="dialog"
         aria-label={`${category?.name ?? 'Category'} drill-down`}
         style={{
-          position: 'absolute',
+          // Fixed (not absolute) so we get the initial containing block
+          // regardless of ancestor transforms (Framer Motion layout
+          // animations elsewhere on the page create containing blocks
+          // that can trap an absolutely-positioned child). top/right/
+          // bottom pin the aside to exactly the viewport edges -- no
+          // more 100vh quirks on mobile Safari / Chrome with URL bar.
+          position: 'fixed',
           top: 0,
           right: 0,
+          bottom: 0,
           width: 'min(480px, 100vw)',
-          height: '100vh',
           backgroundColor: S.bg,
           borderLeft: `1px solid ${S.cardBorder}`,
           boxShadow: '-24px 0 60px -15px rgba(0, 52, 94, 0.24)',
@@ -1032,9 +1038,12 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             // content spill past the viewport with no scrollbar.
             minHeight: 0,
             minWidth: 0,
+            height: '100%',
             overflowY: 'auto',
             overflowX: 'hidden',
             WebkitOverflowScrolling: 'touch',
+            // Keep scroll contained so the matrix page doesn't jitter.
+            overscrollBehavior: 'contain',
             padding: '20px 20px 28px',
             display: 'flex',
             flexDirection: 'column',
