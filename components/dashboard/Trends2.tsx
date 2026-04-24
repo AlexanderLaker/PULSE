@@ -965,6 +965,9 @@ const TrendRow: FC<TrendRowProps> = ({
                 (α = p, β = 6 − p), giving <em>p / 6</em> — not p / 5.
                 So a 4/5 rating contributes <strong>4/6 ≈ 0.667×</strong>,
                 and 5/5 contributes 5/6 ≈ 0.833× (the model never asserts full certainty).
+                {' '}Chosen over a linear <em>p / 5</em> mapping so the Monte Carlo stays
+                probabilistic at both tails — a 5/5 is highly likely, not deterministic,
+                and a 1/5 remains non-trivially possible rather than zero.
               </div>
             </div>
           )}
