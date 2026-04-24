@@ -15,21 +15,25 @@
  *   - `<SignOutButton>` / `useClerk().signOut()` handles logout —
  *     Clerk invalidates the session on the server and clears cookies.
  *
- * Tab navigation (constant across all pages):
- *   Profit Pool Analysis 2 | Trends 2 | Consumer Journey 2 | Innovation Explorer
+ * Authorization (admin-only tabs):
+ *   Identity comes from Clerk; *authorization* (admin vs viewer) is
+ *   served by our own /api/me endpoint, which reads user_roles in Neon
+ *   Postgres. We mirror the pattern used in SettingsModal.tsx. The
+ *   Profit Pool Explorer tab is admin-gated.
  *
- * The top navigation has been redesigned in the "Editorial Intelligence" style
- * (see stitch_fmcg_trend_navigator-3/DESIGN.md) — a softer, magazine-inspired
- * chrome that stays constant across every tab.
+ * Tab navigation (constant across all pages):
+ *   Profit Pool Shift Analysis | Trends | Consumer Journey | Innovation Explorer
+ *   [+ Profit Pool Explorer — admin-only, appended to the right]
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LogOut, Settings } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
+import ProfitPoolExplorer from '@/components/dashboard/ProfitPoolExplorer';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
@@ -38,11 +42,13 @@ type DashboardTab =
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
-  | 'innovation-explorer-3';
+  | 'innovation-explorer-3'
+  | 'profit-pool-explorer';
 
 interface TabDef {
   id: DashboardTab;
   label: string;
+  adminOnly?: boolean;
 }
 
 const TABS: TabDef[] = [
@@ -50,6 +56,7 @@ const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'innovation-explorer-3', label: 'Innovation Explorer' },
+  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer', adminOnly: true },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -74,6 +81,37 @@ export default function DashboardPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Authorization — same pattern as SettingsModal.tsx. 'unknown' until fetched;
+  // we fall back to 'viewer' on error so admin-only UI stays hidden by default.
+  const [role, setRole] = useState<'admin' | 'viewer' | 'unknown'>('unknown');
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/me', { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as { role: 'admin' | 'viewer' };
+        if (!cancelled) setRole(data.role);
+      } catch {
+        if (!cancelled) setRole('viewer');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+
+  const isAdmin = role === 'admin';
+  const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+
+  // Safety: if the user was on the admin tab and then loses admin (role
+  // change mid-session), bounce them back to the default tab.
+  useEffect(() => {
+    if (activeTab === 'profit-pool-explorer' && !isAdmin && role !== 'unknown') {
+      setActiveTab('profit-pool-2');
+    }
+  }, [activeTab, isAdmin, role]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -133,7 +171,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="hidden md:flex items-center gap-6">
-              {TABS.map((tab) => {
+              {visibleTabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
                   <button
@@ -215,6 +253,9 @@ export default function DashboardPage() {
               onNavigateToTrend={() => setActiveTab('trends-2')}
               onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
             />
+          )}
+          {activeTab === 'profit-pool-explorer' && isAdmin && (
+            <ProfitPoolExplorer />
           )}
         </ErrorBoundary>
       </div>
