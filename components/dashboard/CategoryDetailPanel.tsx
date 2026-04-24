@@ -815,12 +815,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         role="dialog"
         aria-label={`${category?.name ?? 'Category'} drill-down`}
         style={{
-          // Fixed (not absolute) so we get the initial containing block
-          // regardless of ancestor transforms (Framer Motion layout
-          // animations elsewhere on the page create containing blocks
-          // that can trap an absolutely-positioned child). top/right/
-          // bottom pin the aside to exactly the viewport edges -- no
-          // more 100vh quirks on mobile Safari / Chrome with URL bar.
+          // The aside IS the scroll container. Header below becomes
+          // position:sticky so it stays pinned while the rest scrolls.
+          // Simpler than the nested flex pattern -- no min-height auto
+          // flex-child bug, no dependence on parent box propagation.
           position: 'fixed',
           top: 0,
           right: 0,
@@ -829,21 +827,22 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           backgroundColor: S.bg,
           borderLeft: `1px solid ${S.cardBorder}`,
           boxShadow: '-24px 0 60px -15px rgba(0, 52, 94, 0.24)',
-          display: 'flex',
-          flexDirection: 'column',
-          // Flexbox overflow: parent must clip so the child flex:1 scroll
-          // region can actually overflow instead of growing to its content.
-          overflow: 'hidden',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
           zIndex: 50,
         }}
       >
-        {/* ─── Header ────────────────────────────────────────────── */}
+        {/* ─── Header (sticky) ─────────────────────────────────────── */}
         <header
           style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 2,
             padding: '22px 24px 18px',
             backgroundColor: S.surface,
             borderBottom: `1px solid ${S.cardBorder}`,
-            flexShrink: 0,
           }}
         >
           <div
@@ -1031,19 +1030,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         {/* ─── Scrollable content ────────────────────────────────── */}
         <div
           style={{
-            flex: '1 1 auto',
-            // minHeight:0 + minWidth:0 is the fix for the flex-item overflow
-            // bug: without it, `min-height: auto` pins this div to its content
-            // height and the `overflowY: auto` never engages — users see the
-            // content spill past the viewport with no scrollbar.
-            minHeight: 0,
-            minWidth: 0,
-            height: '100%',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch',
-            // Keep scroll contained so the matrix page doesn't jitter.
-            overscrollBehavior: 'contain',
             padding: '20px 20px 28px',
             display: 'flex',
             flexDirection: 'column',
