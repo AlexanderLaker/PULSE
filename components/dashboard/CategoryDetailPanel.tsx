@@ -97,6 +97,12 @@ interface Trend {
   direction: 'Expansion' | 'Contraction';
   score?: number;
   exposure_level?: number;
+  /** Scaled contribution to the MC terminal shift (percentage points, signed). */
+  contribution?: number;
+  /** Pre-scaling contribution = gp1_shift x (exposure/5), for auditing. */
+  raw_contribution?: number;
+  /** Absolute share of the category's explained movement (0..1). */
+  attribution_share?: number;
 }
 
 interface CategoryDetailPanelData {
@@ -453,19 +459,38 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
   );
 };
 
-// ─── ContributingTrendItem ─────────────────────────────────────────────────
-
-interface ContributingTrendItemProps {
+// ─── TrendCard — Bain-grade attribution row ──────────────────────────────
+//
+// Each card answers one question a Bain partner would ask in a matrix read-out:
+//
+//   "This trend — in one glance — how big is it, which way, and does it matter?"
+//
+// Hero metric is attribution_share (|scaled| / Σ|scaled|, sums to 100% across
+// the category's contributing trends). This is what turns a wall of 0.0% noise
+// into a decision-ready ranking. Secondary metric is the signed contribution in
+// percentage points of MC terminal shift — same units as the matrix cell.
+interface TrendCardProps {
   trend: Trend;
   index: number;
+  rank: number;
 }
 
-const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, index }) => {
-  const isExpansion = trend.direction === 'Expansion';
+const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
+  const contribution = trend.contribution ?? 0;
+  const share = trend.attribution_share ?? 0;
+  const isExpansion = contribution !== 0
+    ? contribution > 0
+    : trend.direction === 'Expansion';
   const dirColor = isExpansion ? S.expansion : S.contraction;
   const dirBg = isExpansion ? S.expansionDim : S.contractionDim;
   const dirInk = isExpansion ? S.expansionInk : S.contractionInk;
   const forceColor = FORCE_COLORS[trend.force] ?? S.primary;
+
+  // Width of the inline share bar (cap at 100%, floor at 2% so non-zero trends
+  // are still visible even when they're tiny relative to the top driver).
+  const barWidth = share > 0 ? Math.max(2, Math.min(100, share * 100)) : 0;
+  const shareLabel = share > 0 ? fmtPct(share, share >= 0.1 ? 0 : 1) : '—';
+  const contribLabel = contribution !== 0 ? fmtShift(contribution, 2) : '—';
 
   return (
     <motion.div
@@ -473,29 +498,37 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.25, ease: 'easeOut' }}
       style={{
-        padding: '10px 12px',
+        padding: '12px 14px',
         backgroundColor: S.surface,
-        borderRadius: 10,
+        borderRadius: 12,
         border: `1px solid ${S.cardBorder}`,
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '28px 1fr auto',
+        columnGap: 12,
         alignItems: 'center',
-        gap: 10,
       }}
     >
-      {/* Force swatch */}
-      <span
-        aria-hidden
+      {/* Rank */}
+      <div
         style={{
-          width: 4,
-          alignSelf: 'stretch',
-          backgroundColor: forceColor,
-          borderRadius: 2,
-          flexShrink: 0,
+          width: 28,
+          height: 28,
+          borderRadius: 999,
+          backgroundColor: rank <= 5 ? S.primaryContainer : S.surfaceLow,
+          color: rank <= 5 ? S.onPrimaryContainer : S.onSurfaceVariant,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: MONO_FONT,
+          fontSize: 11.5,
+          fontWeight: 700,
         }}
-      />
+      >
+        {rank}
+      </div>
 
       {/* Body */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ minWidth: 0 }}>
         <div
           style={{
             fontSize: 12.5,
@@ -511,11 +544,14 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
         >
           {trend.name}
         </div>
+
+        {/* Meta row: force tag + exposure chip + direction pill */}
         <div
           style={{
-            marginTop: 3,
+            marginTop: 4,
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: 8,
             fontSize: 10.5,
             color: S.onSurfaceVariant,
@@ -525,6 +561,25 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
           <span style={{ color: forceColor, fontWeight: 600 }}>
             {FORCE_ICONS[trend.force]} {trend.force}
           </span>
+          {trend.exposure_level != null && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                padding: '1px 7px',
+                borderRadius: 999,
+                backgroundColor: S.surfaceLow,
+                color: S.onSurfaceVariant,
+                fontSize: 9.5,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Exposure {trend.exposure_level}/5
+            </span>
+          )}
           <span
             style={{
               display: 'inline-flex',
@@ -540,45 +595,79 @@ const ContributingTrendItem: React.FC<ContributingTrendItemProps> = ({ trend, in
               textTransform: 'uppercase',
             }}
           >
-            {isExpansion ? '▲' : '▼'} {trend.direction}
+            {isExpansion ? '▲' : '▼'} {isExpansion ? 'Expansion' : 'Contraction'}
           </span>
+        </div>
+
+        {/* Share bar */}
+        <div
+          style={{
+            marginTop: 8,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: S.surfaceLow,
+            overflow: 'hidden',
+          }}
+        >
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${barWidth}%` }}
+            transition={{ delay: 0.08 + index * 0.02, duration: 0.5, ease: 'easeOut' }}
+            style={{
+              height: '100%',
+              backgroundColor: dirColor,
+              opacity: 0.82,
+              borderRadius: 2,
+            }}
+          />
         </div>
       </div>
 
-      {/* Score + exposure */}
+      {/* Hero metrics */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: 2,
-          minWidth: 52,
+          minWidth: 68,
         }}
       >
         <div
           style={{
-            fontSize: 12,
-            fontWeight: 700,
+            fontSize: 15,
+            fontWeight: 800,
             fontFamily: MONO_FONT,
             color: dirColor,
+            lineHeight: 1,
+            letterSpacing: '-0.01em',
           }}
         >
-          {fmtPct((trend.score ?? 0) / 25, 1)}
+          {shareLabel}
         </div>
-        {trend.exposure_level != null && (
-          <div
-            style={{
-              fontSize: 9.5,
-              color: S.mutedText,
-              fontFamily: MONO_FONT,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              fontWeight: 600,
-            }}
-          >
-            Exp {trend.exposure_level}
-          </div>
-        )}
+        <div
+          style={{
+            fontSize: 10,
+            color: S.mutedText,
+            fontFamily: MONO_FONT,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+          }}
+        >
+          of movement
+        </div>
+        <div
+          style={{
+            marginTop: 2,
+            fontSize: 10.5,
+            color: S.onSurfaceVariant,
+            fontFamily: MONO_FONT,
+            fontWeight: 600,
+          }}
+        >
+          {contribLabel}
+        </div>
       </div>
     </motion.div>
   );
@@ -648,10 +737,38 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
   const trendList = useMemo<Trend[]>(() => {
     if (!data?.contributing_trends?.[categoryId]) return [];
-    return [...data.contributing_trends[categoryId]].sort(
-      (a, b) => Math.abs(b.score ?? 0) - Math.abs(a.score ?? 0),
-    );
+    // Rank by |scaled contribution| primarily; fall back to |score| when
+    // the scaled attribution field isn't populated (legacy data).
+    return [...data.contributing_trends[categoryId]].sort((a, b) => {
+      const ca = Math.abs(a.contribution ?? 0);
+      const cb = Math.abs(b.contribution ?? 0);
+      if (Math.abs(ca - cb) > 1e-9) return cb - ca;
+      return Math.abs(b.score ?? 0) - Math.abs(a.score ?? 0);
+    });
   }, [data, categoryId]);
+
+  // Aggregates for the Contributing Trends section header and narrative.
+  const totalAttribution = useMemo(() => {
+    return trendList.reduce((acc, t) => acc + Math.abs(t.contribution ?? 0), 0);
+  }, [trendList]);
+  const topShare = useMemo(() => {
+    const topN = Math.min(5, trendList.length);
+    if (totalAttribution <= 1e-9) return 0;
+    const sumTop = trendList.slice(0, topN).reduce(
+      (acc, t) => acc + Math.abs(t.contribution ?? 0),
+      0,
+    );
+    return sumTop / totalAttribution;
+  }, [trendList, totalAttribution]);
+  const topDriver = trendList[0] ?? null;
+  const topForce = useMemo<ForceName | null>(() => {
+    const entries = Object.entries(forceDecomposition) as Array<[ForceName, number]>;
+    let best: [ForceName, number] | null = null;
+    for (const [k, v] of entries) {
+      if (!best || Math.abs(v) > Math.abs(best[1])) best = [k, v];
+    }
+    return best && Math.abs(best[1]) > 1e-9 ? best[0] : null;
+  }, [forceDecomposition]);
 
   // Horizon endpoints — summary KPIs
   const horizonEnd = YEARS[YEARS.length - 1];
@@ -1183,7 +1300,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             </Section>
           )}
 
-          {/* Contributing trends */}
+          {/* Contributing trends — ranked by scaled attribution share */}
           {trendList.length > 0 && (
             <Section
               title="Contributing Trends"
@@ -1199,13 +1316,125 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   }}
                 >
                   {trendList.length} TOTAL
+                  {topShare > 0 ? ' \u00B7 TOP-5 ' + fmtPct(topShare, 0) : ''}
                 </span>
               }
             >
+              {/* Concentration strip — share of movement captured by top 5 */}
+              {topShare > 0 && (
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    backgroundColor: S.surfaceLow,
+                    border: `1px solid ${S.cardBorder}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      marginBottom: 6,
+                      fontSize: 10.5,
+                      color: S.onSurfaceVariant,
+                      fontFamily: BODY_FONT,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>Top 5 drivers</span>
+                    <span style={{ fontFamily: MONO_FONT, fontWeight: 700, color: S.onBg }}>
+                      {fmtPct(topShare, 0)} of movement
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: S.surface,
+                      overflow: 'hidden',
+                      border: `1px solid ${S.cardBorder}`,
+                    }}
+                  >
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, topShare * 100)}%` }}
+                      transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
+                      style={{
+                        height: '100%',
+                        backgroundColor: S.primary,
+                        opacity: 0.82,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {trendList.map((trend, idx) => (
-                  <ContributingTrendItem key={trend.id} trend={trend} index={idx} />
+                  <TrendCard
+                    key={trend.id}
+                    trend={trend}
+                    index={idx}
+                    rank={idx + 1}
+                  />
                 ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Strategic Read — auto-generated Bain narrative */}
+          {(trendList.length > 0 || Math.abs(shiftEnd) > 1e-9) && (
+            <Section title="Strategic Read" icon={Sparkles}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                  color: S.onSurface,
+                  fontFamily: BODY_FONT,
+                }}
+              >
+                <p style={{ margin: 0 }}>
+                  <strong style={{ fontWeight: 700 }}>
+                    {shiftEnd > 0 ? 'Expansion' : shiftEnd < 0 ? 'Contraction' : 'Flat'}
+                  </strong>
+                  {' '}to <strong style={{ fontFamily: MONO_FONT, fontWeight: 700 }}>{fmtShift(shiftEnd, 2)}</strong>
+                  {' '}by {horizonEnd}
+                  {topForce ? (
+                    <>
+                      , carried primarily by the{' '}
+                      <strong style={{ color: FORCE_COLORS[topForce], fontWeight: 700 }}>
+                        {topForce}
+                      </strong>{' '}force
+                    </>
+                  ) : null}
+                  {topDriver ? (
+                    <>
+                      {'. Single biggest driver: '}
+                      <strong style={{ fontWeight: 700 }}>{topDriver.name}</strong>
+                      {' ('}
+                      <span style={{ fontFamily: MONO_FONT }}>
+                        {fmtPct(topDriver.attribution_share ?? 0, 0)}
+                      </span>
+                      {' of movement)'}
+                    </>
+                  ) : null}
+                  .
+                </p>
+                <p style={{ margin: 0, color: S.onSurfaceVariant }}>
+                  {shiftEnd > 0 && topShare > 0.6
+                    ? 'Concentration is high — a handful of trends carries most of the upside. Defend and lean into those; don\u2019t spread investment thin.'
+                    : shiftEnd > 0
+                    ? 'Broad-based tailwind — multiple vectors push in the same direction, which de-risks the thesis.'
+                    : shiftEnd < 0 && topShare > 0.6
+                    ? 'Concentrated headwind — the shift is driven by a few large trends. Mitigate those specifically rather than across the full portfolio.'
+                    : shiftEnd < 0
+                    ? 'Broad-based contraction — the entire category is leaking; structural review of positioning is warranted.'
+                    : 'Directional balance — opposing trends roughly cancel. Watch for the tipping point rather than acting on the net.'}
+                </p>
               </div>
             </Section>
           )}

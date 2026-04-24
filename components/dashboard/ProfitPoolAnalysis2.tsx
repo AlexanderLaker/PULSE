@@ -1055,21 +1055,60 @@ const ProfitPoolAnalysis2: FC = () => {
         force_decomposition[c.id] = rec;
       }
 
-      // Contributing trends: any trend whose category_exposure for this cat
-      // is > 0. Score is the trend's normalized_score (prob × gp1% × sign),
-      // which the panel displays as a compact pct badge.
+      // ------ Contributing trends -- Bain-grade scaled attribution ------
+      // Raw per-trend contribution = gp1_shift × (exposure/5). We rescale
+      // so the sum matches the MC terminal median shift for this category,
+      // making each trend's contribution readable as 'pp of final shift'.
+      // attribution_share = |scaled| / sum(|scaled|) across contributing
+      // trends -- the denominator a Bain partner wants to see.
       const cid = CATEGORIES.find((x) => x.name === c.id)?.id ?? c.id;
-      const trendsForCat = (trends ?? [])
-        .map((t): Trend | null => {
-          const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
-          const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
-          if (!exp || exp <= 0) return null;
-          return {
-            ...t,
-            exposure_level: exp,
-          } as unknown as Trend;
-        })
-        .filter((t): t is Trend => t !== null);
+
+      // Prefilter: trends that actually touch this category.
+      const filtered = (trends ?? []).filter((t) => {
+        const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
+        const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
+        return exp > 0;
+      });
+
+      // Raw directional contribution per trend.
+      const rawContribs = filtered.map((t) => {
+        const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
+        const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
+        const gp1Shift = (t as { gp1_shift?: number; normalized_score?: number }).gp1_shift
+          ?? t.normalized_score
+          ?? 0;
+        return gp1Shift * (Math.max(0, Math.min(5, exp)) / 5);
+      });
+      const rawTotal = rawContribs.reduce((a, b) => a + b, 0);
+
+      // MC terminal shift for this category (horizon end).
+      const horizonEndKey = String(YEARS[YEARS.length - 1]);
+      let mcTotal = 0;
+      const pathPts = shifts_path[c.id];
+      if (pathPts && pathPts[horizonEndKey]) {
+        mcTotal = pathPts[horizonEndKey]?.median ?? 0;
+      }
+
+      const scale = (Math.abs(rawTotal) > 1e-9 && Math.abs(mcTotal) > 1e-9)
+        ? mcTotal / rawTotal
+        : 1;
+      const scaled = rawContribs.map((v) => v * scale);
+      const totalAbs = scaled.reduce((a, b) => a + Math.abs(b), 0);
+
+      const trendsForCat = filtered.map((t, i): Trend => {
+        const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
+        const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
+        const contribution = scaled[i] ?? 0;
+        const raw_contribution = rawContribs[i] ?? 0;
+        const attribution_share = totalAbs > 1e-9 ? Math.abs(contribution) / totalAbs : 0;
+        return {
+          ...t,
+          exposure_level: exp,
+          contribution,
+          raw_contribution,
+          attribution_share,
+        } as unknown as Trend;
+      });
       if (trendsForCat.length > 0) contributing_trends[c.id] = trendsForCat;
     });
 
