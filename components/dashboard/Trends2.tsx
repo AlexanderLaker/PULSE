@@ -1189,9 +1189,13 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
           ...(s.tier ? { tier: s.tier } : {}),
         })),
     };
-    // Only send confidence if the value is non-empty (backend expects enum)
-    if (draftConfidence) {
-      (updates as TrendUpdate & { confidence?: string }).confidence = draftConfidence;
+    // Only send confidence if the value is a valid enum member
+    if (
+      draftConfidence === 'High' ||
+      draftConfidence === 'Medium' ||
+      draftConfidence === 'Low'
+    ) {
+      updates.confidence = draftConfidence;
     }
     try {
       await updateTrend(trend.id, updates);
