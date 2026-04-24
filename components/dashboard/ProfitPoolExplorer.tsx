@@ -257,12 +257,43 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
         Forward CAGR (market): <b>{cagrSign}{cagrPct}%</b>
       </div>
 
-      <div style={{ fontSize: 10, color: S.mutedText }}>
-        Sources: {slide.sources}
+      {/* Per-item sources — revenue + margin, both publicly referenced */}
+      <div
+        style={{
+          borderTop: `1px solid ${S.surfaceHigh}`,
+          paddingTop: 10,
+          marginTop: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        <SourceLine label="Revenue src" value={item.sources.revenue} />
+        <SourceLine label="Margin src"  value={item.sources.margin} />
+        <div style={{ fontSize: 9, color: S.mutedText, marginTop: 2, lineHeight: 1.35 }}>
+          Slide ref: {slide.sources}
+        </div>
       </div>
     </motion.div>
   );
 };
+
+const SourceLine: FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+    <div
+      style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: 1,
+        textTransform: 'uppercase', color: S.outline,
+        minWidth: 72, flexShrink: 0, paddingTop: 1,
+      }}
+    >
+      {label}
+    </div>
+    <div style={{ fontSize: 10, color: S.onSurfaceVariant, lineHeight: 1.4 }}>
+      {value}
+    </div>
+  </div>
+);
 
 const Metric: FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
@@ -290,11 +321,9 @@ interface PoolChartProps {
 }
 
 const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }) => {
-  // Sort descending by GP1 margin so tall bars anchor left (classic Bain)
-  const ordered = useMemo(
-    () => [...slide.items].sort((a, b) => b.gp1Margin - a.gp1Margin),
-    [slide.items],
-  );
+  // Order is authored: ValueChain runs raw→retail; Sub-segments follow format
+  // logic (volume → specialty); Core+Adjacent keeps CORE first.
+  const ordered = slide.items;
 
   const W = 960;
   const H = 460;

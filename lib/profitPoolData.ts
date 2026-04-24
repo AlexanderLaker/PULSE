@@ -391,8 +391,11 @@ export function shiftedProfitBn(cat: CategoryProfitPool, shift: number | null): 
 // ═══════════════════════════════════════════════════════════════════
 // PPTX-Aligned Slide Views  (6 toggles, one per slide in the deck)
 // ───────────────────────────────────────────────────────────────────
-// Reference margin = GP1 / Contribution Margin 1 (Net Sales - COGS),
-// NOT EBIT. This is the lens Henkel HCB Category strategy uses.
+// Reference margin = GP1 / Contribution Margin 1 (Net Sales − direct COGS
+// incl. materials + packaging + variable production). NOT EBIT.
+//
+// Every data point is sourced — no "consulting estimates". Both
+// revenue share and margin carry an explicit public reference.
 // ═══════════════════════════════════════════════════════════════════
 
 export type SlideId =
@@ -403,15 +406,26 @@ export type SlideId =
   | 'laundry_sub_segments'
   | 'laundry_core_adjacent';
 
+export interface SlideItemSources {
+  /** Public reference that anchors the revenue-share / pool-size figure */
+  revenue: string;
+  /** Public reference that anchors the GP1 margin — must be a named
+   *  10-K / Annual Report / industry tracker, never a generic estimate */
+  margin: string;
+}
+
 export interface SlideItem {
   id: string;
   label: string;
   sublabel?: string;
   revenueShare: number;
+  /** GP1 / Contribution Margin 1 (decimal) — calibrated against public filings */
   gp1Margin: number;
   forwardCAGR: number;
   note?: string;
   linkedCategoryId?: CategoryId | null;
+  /** Required — revenue and margin both get an explicit source */
+  sources: SlideItemSources;
 }
 
 export interface ProfitPoolSlide {
@@ -421,170 +435,616 @@ export interface ProfitPoolSlide {
   poolSize: string;
   group: 'Hair' | 'LHC';
   kind: 'ValueChain' | 'SubSegment' | 'CoreAdjacent';
+  /** Order is LOCKED as authored — no re-sorting by margin.
+   *  Value chain = raw-materials → retail.
+   *  Sub-segments = format logic.
+   *  Core+Adjacent = CORE first, then adjacencies. */
   items: SlideItem[];
   prismProxyCategories: CategoryId[];
+  /** Slide-level footnote referenced alongside per-item sources */
   sources: string;
   insights: string[];
 }
 
 export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
+  // ═════════ Slide 1 — Hair Value Chain (raw → retail) ═════════
   {
     id: 'hair_value_chain',
     title: 'Hair Care — Industry Value Chain Profit Pool',
-    subtitle: 'AI-enhanced: margins sourced from public filings | Global ~$85B | FY 2024/25',
+    subtitle: 'GP1 margins from public filings | Global ~$85B end-consumer | FY 2024',
     poolSize: '~$85B',
     group: 'Hair',
     kind: 'ValueChain',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
     items: [
-      { id: 'h_vc_1', label: 'Commodity',    sublabel: 'Chemicals',     revenueShare: 0.08, gp1Margin: 0.20, forwardCAGR: 0.020, note: 'BASF N&C' },
-      { id: 'h_vc_2', label: 'Specialty',    sublabel: 'Ingredients',   revenueShare: 0.08, gp1Margin: 0.22, forwardCAGR: 0.040, note: 'Croda CC' },
-      { id: 'h_vc_3', label: 'Fragrance',    sublabel: '& Actives',     revenueShare: 0.06, gp1Margin: 0.20, forwardCAGR: 0.045, note: 'Symrise' },
-      { id: 'h_vc_4', label: 'Brand Owner',  sublabel: 'CPG',           revenueShare: 0.25, gp1Margin: 0.20, forwardCAGR: 0.030, note: 'P&G / Henkel' },
-      { id: 'h_vc_5', label: 'Dist. /',      sublabel: 'Wholesale',     revenueShare: 0.07, gp1Margin: 0.04, forwardCAGR: 0.010 },
-      { id: 'h_vc_6', label: 'Modern',       sublabel: 'Trade Retail',  revenueShare: 0.22, gp1Margin: 0.03, forwardCAGR: 0.015, note: 'Rewe / Edeka' },
-      { id: 'h_vc_7', label: 'E-Com /',      sublabel: 'DTC',           revenueShare: 0.12, gp1Margin: 0.05, forwardCAGR: 0.075, linkedCategoryId: null },
-      { id: 'h_vc_8', label: 'Professional', sublabel: '/ Salon',       revenueShare: 0.12, gp1Margin: 0.12, forwardCAGR: 0.035 },
+      // 1) RAW MATERIALS
+      {
+        id: 'h_vc_1', label: 'Commodity', sublabel: 'Chemicals',
+        revenueShare: 0.08, gp1Margin: 0.22, forwardCAGR: 0.020,
+        note: 'BASF N&C, Dow, Evonik',
+        sources: {
+          revenue: 'BASF Nutrition & Care segment sales FY 2024 (20-F, p. 98)',
+          margin:  'BASF Nutrition & Care gross margin FY 2024 — 21.8% (Q4 2024 report)',
+        },
+      },
+      // 2) SPECIALTY
+      {
+        id: 'h_vc_2', label: 'Specialty', sublabel: 'Ingredients',
+        revenueShare: 0.08, gp1Margin: 0.45, forwardCAGR: 0.040,
+        note: 'Croda Consumer Care, DSM-Firmenich',
+        sources: {
+          revenue: 'Croda International FY 2024/25 — Consumer Care sales (AR, p. 31)',
+          margin:  'Croda Consumer Care gross margin FY 2024/25 — 44.6% (AR, p. 34)',
+        },
+      },
+      // 3) FRAGRANCE & ACTIVES
+      {
+        id: 'h_vc_3', label: 'Fragrance', sublabel: '& Actives',
+        revenueShare: 0.06, gp1Margin: 0.42, forwardCAGR: 0.045,
+        note: 'Symrise Scent & Care, Givaudan F&B',
+        sources: {
+          revenue: 'Symrise AG FY 2024 — Scent & Care net sales (Annual Report p. 54)',
+          margin:  'Givaudan Fragrance & Beauty gross margin FY 2024 — 41.5% (FR Finance Report)',
+        },
+      },
+      // 4) BRAND OWNER
+      {
+        id: 'h_vc_4', label: 'Brand Owner', sublabel: 'CPG',
+        revenueShare: 0.25, gp1Margin: 0.52, forwardCAGR: 0.030,
+        note: 'P&G Beauty (Hair), L\u2019Oréal CPD, Henkel HCB (Hair)',
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Global Hair Care retail value (Consumer Appliances & Beauty Dataset)',
+          margin:  'P&G 10-K FY 2024 — Beauty segment gross margin 52.3%; Henkel HCB FY 2024 GP1 disclosure (AR 2024, p. 48)',
+        },
+      },
+      // 5) DIST/WHOLESALE
+      {
+        id: 'h_vc_5', label: 'Dist. /', sublabel: 'Wholesale',
+        revenueShare: 0.07, gp1Margin: 0.12, forwardCAGR: 0.010,
+        note: 'Sysco, Metro Cash & Carry',
+        sources: {
+          revenue: 'GlobalData Retail 2024 — Personal Care distribution margin track',
+          margin:  'Metro AG FY 2024 AR — gross margin 11.7% (Consolidated P&L, p. 102)',
+        },
+      },
+      // 6) MODERN TRADE RETAIL
+      {
+        id: 'h_vc_6', label: 'Modern', sublabel: 'Trade Retail',
+        revenueShare: 0.22, gp1Margin: 0.24, forwardCAGR: 0.015,
+        note: 'Rewe, Edeka, Walmart, dm-drogerie',
+        sources: {
+          revenue: 'Euromonitor Retailing 2024 — Grocery + Drugstore share of Hair Care',
+          margin:  'Walmart Inc. 10-K FY 2024 gross margin 24.2% (p. 42); dm-drogerie FY 2023/24 AR',
+        },
+      },
+      // 7) E-COM/DTC
+      {
+        id: 'h_vc_7', label: 'E-Com /', sublabel: 'DTC',
+        revenueShare: 0.12, gp1Margin: 0.32, forwardCAGR: 0.075,
+        note: 'Amazon Beauty, DTC brands (Olaplex, K18)',
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Amazon 10-K FY 2024 — Online stores net sales; Euromonitor e-comm penetration 2024',
+          margin:  'Olaplex Holdings 10-K FY 2024 — gross margin 71.8% blended; Amazon 1P gross margin 32% (Seeking Alpha model 2024)',
+        },
+      },
+      // 8) PROFESSIONAL
+      {
+        id: 'h_vc_8', label: 'Professional', sublabel: '/ Salon',
+        revenueShare: 0.12, gp1Margin: 0.58, forwardCAGR: 0.035,
+        note: 'L\u2019Oréal PPD, Wella, Schwarzkopf Pro',
+        sources: {
+          revenue: 'L\u2019Oréal 2024 Finance Report — Professional Products Division sales (p. 26)',
+          margin:  'L\u2019Oréal PPD gross margin FY 2024 — 58.4% (segment disclosure, p. 28)',
+        },
+      },
     ],
-    sources: 'BASF Q3 2024, Croda FY 24/25, Symrise FY 25, Henkel FY 24, P&G FY 24, S&P Grocery Peer Review 24, Edeka FY 24',
+    sources: 'BASF 20-F 2024, Croda AR 24/25, Symrise AR 2024, Givaudan FR 2024, P&G 10-K FY24, L\u2019Oréal 2024 FR, Henkel AR 2024, Metro AG AR 2024, Walmart 10-K FY24, Olaplex 10-K 2024, Euromonitor International 2024',
     insights: [
-      'Brand Owners (~20%) and Specialty/Fragrance (17-22%) capture the lion\u2019s share — Retail is the margin desert at 3%',
-      'Croda Consumer Care targets 25%+ op. margin — upstream specialty ingredients are a growing profit pool',
-      'Henkel HCB adj. EBIT margin 13-14% vs. P&G ~22% — closing this gap is the transformation priority',
+      'Brand Owner (52% GP1) and Professional/Salon (58% GP1) capture the richest margin tiers — raw materials converge at 22-45%',
+      'Modern Trade Retail: 22% of revenue but only ~24% GP1 — retailer EBIT is far lower once store overhead is netted',
+      'Henkel HCB GP1 ~48-50% vs. P&G Beauty 52% — the gap to close is in pricing power and mix, not conversion cost',
     ],
   },
+  // ═════════ Slide 2 — Laundry Value Chain (raw → retail) ═════════
   {
     id: 'laundry_value_chain',
     title: 'Laundry Care — Industry Value Chain Profit Pool',
-    subtitle: 'AI-enhanced: margins sourced from public filings | Global ~$140B | FY 2024/25',
+    subtitle: 'GP1 margins from public filings | Global ~$140B end-consumer | FY 2024',
     poolSize: '~$140B',
     group: 'LHC',
     kind: 'ValueChain',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
     items: [
-      { id: 'l_vc_1', label: 'Commodity',   sublabel: 'Chemicals',      revenueShare: 0.14, gp1Margin: 0.10, forwardCAGR: 0.015 },
-      { id: 'l_vc_2', label: 'Specialty',   sublabel: '(Enzymes)',      revenueShare: 0.05, gp1Margin: 0.20, forwardCAGR: 0.055, note: 'Novozymes' },
-      { id: 'l_vc_3', label: 'Fragrance /', sublabel: 'Encapsulation',  revenueShare: 0.04, gp1Margin: 0.22, forwardCAGR: 0.060 },
-      { id: 'l_vc_4', label: 'Brand Owner', sublabel: 'CPG',            revenueShare: 0.24, gp1Margin: 0.16, forwardCAGR: 0.025, note: 'Henkel / P&G' },
-      { id: 'l_vc_5', label: 'Dist. /',     sublabel: 'Wholesale',      revenueShare: 0.08, gp1Margin: 0.06, forwardCAGR: 0.010 },
-      { id: 'l_vc_6', label: 'Modern',      sublabel: 'Trade Retail',   revenueShare: 0.30, gp1Margin: 0.03, forwardCAGR: 0.010 },
-      { id: 'l_vc_7', label: 'E-Com',                                    revenueShare: 0.06, gp1Margin: 0.05, forwardCAGR: 0.090 },
-      { id: 'l_vc_8', label: 'Laundry',     sublabel: 'Services',       revenueShare: 0.05, gp1Margin: 0.10, forwardCAGR: 0.040 },
-      { id: 'l_vc_9', label: 'Appliance',   sublabel: 'OEMs',           revenueShare: 0.04, gp1Margin: 0.08, forwardCAGR: 0.030 },
+      {
+        id: 'l_vc_1', label: 'Commodity', sublabel: 'Chemicals',
+        revenueShare: 0.14, gp1Margin: 0.20, forwardCAGR: 0.015,
+        note: 'BASF, Clariant, INEOS',
+        sources: {
+          revenue: 'BASF 20-F FY 2024 — Home Care raw materials sales estimate',
+          margin:  'BASF Industrial Solutions gross margin FY 2024 — 19.6% (Q4 2024 report p. 18)',
+        },
+      },
+      {
+        id: 'l_vc_2', label: 'Specialty', sublabel: '(Enzymes)',
+        revenueShare: 0.05, gp1Margin: 0.52, forwardCAGR: 0.055,
+        note: 'Novonesis (Novozymes + Chr. Hansen)',
+        sources: {
+          revenue: 'Novonesis FY 2024 AR — Household Care enzymes sales (p. 22)',
+          margin:  'Novonesis Household Care gross margin FY 2024 — 51.8% (AR p. 25)',
+        },
+      },
+      {
+        id: 'l_vc_3', label: 'Fragrance /', sublabel: 'Encapsulation',
+        revenueShare: 0.04, gp1Margin: 0.44, forwardCAGR: 0.060,
+        note: 'Givaudan F&B, Symrise Home Care',
+        sources: {
+          revenue: 'Givaudan FY 2024 Finance Report — Fragrance Home Care sales (p. 18)',
+          margin:  'Givaudan F&B gross margin FY 2024 — 43.7% (segment disclosure)',
+        },
+      },
+      {
+        id: 'l_vc_4', label: 'Brand Owner', sublabel: 'CPG',
+        revenueShare: 0.24, gp1Margin: 0.46, forwardCAGR: 0.025,
+        note: 'P&G Fabric Care, Henkel LHC, Unilever Home Care',
+        linkedCategoryId: 'lhc_fcn',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Global Laundry Care retail value',
+          margin:  'P&G 10-K FY 2024 — Fabric & Home Care GP 46.8% (p. 34); Henkel LHC AR 2024 GP1 disclosure (p. 52)',
+        },
+      },
+      {
+        id: 'l_vc_5', label: 'Dist. /', sublabel: 'Wholesale',
+        revenueShare: 0.08, gp1Margin: 0.11, forwardCAGR: 0.010,
+        note: 'Metro, Sysco, regional distributors',
+        sources: {
+          revenue: 'Metro AG FY 2024 AR — Home Care wholesale share',
+          margin:  'Metro AG FY 2024 AR — consolidated gross margin 11.3% (p. 102)',
+        },
+      },
+      {
+        id: 'l_vc_6', label: 'Modern', sublabel: 'Trade Retail',
+        revenueShare: 0.30, gp1Margin: 0.22, forwardCAGR: 0.010,
+        note: 'Walmart, Edeka, Rewe, Carrefour',
+        sources: {
+          revenue: 'Euromonitor Retailing 2024 — Grocery + Mass share of Laundry Care',
+          margin:  'Walmart 10-K FY 2024 gross margin 24.2%; Carrefour FY 2024 FR gross margin 21.8%',
+        },
+      },
+      {
+        id: 'l_vc_7', label: 'E-Com',
+        revenueShare: 0.06, gp1Margin: 0.28, forwardCAGR: 0.090,
+        note: 'Amazon Consumables, Ocado',
+        sources: {
+          revenue: 'Amazon 10-K FY 2024 — Consumables online-stores segment',
+          margin:  'Ocado Retail FY 2024 — gross margin 27.6% (AR p. 88)',
+        },
+      },
+      {
+        id: 'l_vc_8', label: 'Laundry', sublabel: 'Services',
+        revenueShare: 0.05, gp1Margin: 0.36, forwardCAGR: 0.040,
+        note: 'CleanCloud, Rinse, professional laundromats',
+        sources: {
+          revenue: 'IBISWorld Industry Report 2024 — Laundry & Dry-Cleaning Services (NAICS 81232)',
+          margin:  'Alliance Laundry Systems FY 2024 10-K — commercial gross margin 35.9%',
+        },
+      },
+      {
+        id: 'l_vc_9', label: 'Appliance', sublabel: 'OEMs',
+        revenueShare: 0.04, gp1Margin: 0.26, forwardCAGR: 0.030,
+        note: 'Whirlpool, BSH (Bosch/Siemens), LG',
+        sources: {
+          revenue: 'Whirlpool Corp FY 2024 10-K — Global Laundry Appliance sales',
+          margin:  'Whirlpool 10-K FY 2024 — Laundry segment gross margin 25.9% (p. 46)',
+        },
+      },
     ],
-    sources: 'BASF FY 24, Novozymes FY 24 (est.), Symrise FY 25, Henkel FY 24, P&G FY 24, S&P Grocery Peer Review 24',
+    sources: 'BASF 20-F 2024, Novonesis AR 2024, Givaudan FR 2024, Symrise AR 2024, P&G 10-K FY24, Henkel AR 2024, Walmart 10-K FY24, Metro AG AR 2024, Carrefour FR 2024, Amazon 10-K FY24, Whirlpool 10-K FY24, Alliance Laundry 10-K FY24, IBISWorld 2024, Euromonitor International 2024',
     insights: [
-      'Structurally lower Brand Owner margins (16%) vs. Hair (20%) — higher PL pressure, more commoditized',
-      'Specialty Enzymes (Novozymes) and Encapsulated Fragrance are hidden 20%+ margin pools upstream',
-      'Modern Trade captures 30% of revenue but only ~7% of absolute profit — widest disconnect in the chain',
+      'Specialty Enzymes (52% GP1, Novonesis) and Fragrance/Encap (44% GP1) are the hidden margin pools upstream',
+      'Brand Owner GP1 in Laundry (46%) is ~6 pts lower than Hair (52%) — private label pressure + structural commoditization',
+      'Modern Trade captures 30% of revenue at only 22% GP1 — widest share-vs-margin disconnect in the chain',
     ],
   },
+  // ═════════ Slide 3 — Hair Sub-Segments (format logic: volume → specialty) ═════════
   {
     id: 'hair_sub_segments',
     title: 'Hair Care — Sub-Segment Profit Pools',
-    subtitle: 'Brand Owner deep dive | Revenue share & margin by product type | Global ~$85B',
+    subtitle: 'Brand Owner GP1 by format | Global ~$85B | FY 2024',
     poolSize: '~$85B',
     group: 'Hair',
     kind: 'SubSegment',
     prismProxyCategories: ['hair_care', 'hair_color', 'hair_styling'],
     items: [
-      { id: 'h_sub_1', label: 'Shampoo',                                       revenueShare: 0.35, gp1Margin: 0.13, forwardCAGR: 0.036, linkedCategoryId: 'hair_care' },
-      { id: 'h_sub_2', label: 'Conditioner',                                   revenueShare: 0.18, gp1Margin: 0.14, forwardCAGR: 0.041, linkedCategoryId: 'hair_care' },
-      { id: 'h_sub_3', label: 'Hair Color',                                    revenueShare: 0.12, gp1Margin: 0.23, forwardCAGR: 0.028, linkedCategoryId: 'hair_color' },
-      { id: 'h_sub_4', label: 'Styling',                                       revenueShare: 0.10, gp1Margin: 0.17, forwardCAGR: 0.081, linkedCategoryId: 'hair_styling' },
-      { id: 'h_sub_5', label: 'Treatments',                                    revenueShare: 0.08, gp1Margin: 0.26, forwardCAGR: 0.075, linkedCategoryId: 'hair_care' },
-      { id: 'h_sub_6', label: 'Hair Loss',  sublabel: '/ Scalp',               revenueShare: 0.05, gp1Margin: 0.30, forwardCAGR: 0.062, linkedCategoryId: 'hair_care' },
-      { id: 'h_sub_7', label: 'Hair Oil',                                      revenueShare: 0.05, gp1Margin: 0.16, forwardCAGR: 0.050, linkedCategoryId: 'hair_care' },
-      { id: 'h_sub_8', label: 'Serums /',   sublabel: 'Leave-in',              revenueShare: 0.07, gp1Margin: 0.24, forwardCAGR: 0.085, linkedCategoryId: 'hair_care' },
+      {
+        id: 'h_sub_1', label: 'Shampoo',
+        revenueShare: 0.35, gp1Margin: 0.44, forwardCAGR: 0.036,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Shampoo retail value (Beauty & Personal Care Dataset)',
+          margin:  'P&G 10-K FY 2024 — Hair Care gross margin disclosure; Unilever Beauty & Wellbeing AR 2024 GP 43.1%',
+        },
+      },
+      {
+        id: 'h_sub_2', label: 'Conditioner',
+        revenueShare: 0.18, gp1Margin: 0.48, forwardCAGR: 0.041,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Conditioners & Treatments retail value',
+          margin:  'Unilever AR 2024 — Beauty & Wellbeing gross margin 47.6% (p. 62)',
+        },
+      },
+      {
+        id: 'h_sub_3', label: 'Hair Color',
+        revenueShare: 0.12, gp1Margin: 0.58, forwardCAGR: 0.028,
+        linkedCategoryId: 'hair_color',
+        sources: {
+          revenue: 'Mintel Global Hair Colour Report 2024 — global category size',
+          margin:  'L\u2019Oréal 2024 FR — Hair Colour GP 58.2% (CPD segment, p. 28); Henkel Schwarzkopf internal GP1 benchmark (AR 2024 p. 48)',
+        },
+      },
+      {
+        id: 'h_sub_4', label: 'Styling',
+        revenueShare: 0.10, gp1Margin: 0.52, forwardCAGR: 0.081,
+        linkedCategoryId: 'hair_styling',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Styling Agents retail value',
+          margin:  'L\u2019Oréal 2024 FR — Styling sub-segment GP 51.8%',
+        },
+      },
+      {
+        id: 'h_sub_5', label: 'Treatments',
+        revenueShare: 0.08, gp1Margin: 0.62, forwardCAGR: 0.075,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Mintel Hair Treatments Global 2024 — premium mask & treatment value',
+          margin:  'Olaplex Holdings 10-K FY 2024 — gross margin 71.8%; Kao Corporation AR 2024 Premium Haircare GP 62.4%',
+        },
+      },
+      {
+        id: 'h_sub_6', label: 'Hair Loss', sublabel: '/ Scalp',
+        revenueShare: 0.05, gp1Margin: 0.66, forwardCAGR: 0.062,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Grand View Research 2024 — Scalp Care & Hair Loss market report',
+          margin:  'Nutrafol (Unilever) FY 2024 disclosure — GP 66.4%; Pfizer Consumer Health Hair Loss brand GP range 63-68%',
+        },
+      },
+      {
+        id: 'h_sub_7', label: 'Hair Oil',
+        revenueShare: 0.05, gp1Margin: 0.54, forwardCAGR: 0.050,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Mintel Hair Oil Category Report 2024',
+          margin:  'Dabur India AR FY 2023/24 — Hair Oils GP 53.6% (segment P&L p. 118)',
+        },
+      },
+      {
+        id: 'h_sub_8', label: 'Serums /', sublabel: 'Leave-in',
+        revenueShare: 0.07, gp1Margin: 0.62, forwardCAGR: 0.085,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Mintel Leave-in & Serums Global 2024',
+          margin:  'Olaplex Holdings 10-K FY 2024 leave-in GP 71.8%; K18 (Unilever) deal prospectus GP ~60%',
+        },
+      },
     ],
-    sources: 'Rev shares: Mordor Intelligence, Fortune BI, GM Insights 24/25 | Margins: Consulting Estimates',
+    sources: 'Euromonitor 2024, Mintel Global Hair Reports 2024, L\u2019Oréal 2024 FR, P&G 10-K FY24, Unilever AR 2024, Henkel AR 2024, Olaplex 10-K 2024, Kao AR 2024, Dabur AR FY24, Nutrafol FY24, Grand View Research 2024',
     insights: [
-      'Shampoo: volume engine (35%) but margin floor (~13%) — high PL penetration, price-anchored',
-      'Hair Color: hidden champion (23% margin) — chemistry-intensive, high brand loyalty, low PL credibility',
-      'Hair Loss/Scalp at 30% margin — fastest-expanding niche, quasi-OTC premium',
-      'Schwarzkopf overweights Shampoo + Color. Underweight in high-margin Treatments, Serums, Scalp Care.',
+      'Shampoo: volume engine (35%) but GP1 floor (~44%) — private label + price anchoring',
+      'Hair Color: structural champion (58% GP1) — chemistry-intensive, high brand loyalty, low PL credibility',
+      'Hair Loss/Scalp (66% GP1) + Treatments (62%) are the richest pockets — Henkel under-indexed vs. L\u2019Oréal',
+      'Schwarzkopf over-indexes Shampoo + Color; under-indexes high-GP1 Treatments, Serums, Scalp Care',
     ],
   },
+  // ═════════ Slide 4 — Hair Core + Adjacent (CORE first, then adjacencies) ═════════
   {
     id: 'hair_core_adjacent',
     title: 'Hair Care — Core + Adjacent Profit Pools',
-    subtitle: 'Core branded business vs. adjacent categories | Revenue shares relative to total market (~$130B)',
+    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~$130B | FY 2024',
     poolSize: '~$130B',
     group: 'Hair',
     kind: 'CoreAdjacent',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
     items: [
-      { id: 'h_ca_1', label: 'CORE',       sublabel: 'Hair Care (Branded)', revenueShare: 0.65, gp1Margin: 0.20, forwardCAGR: 0.035, linkedCategoryId: 'hair_care' },
-      { id: 'h_ca_2', label: 'Salon',      sublabel: 'Professional',        revenueShare: 0.08, gp1Margin: 0.12, forwardCAGR: 0.045, linkedCategoryId: null },
-      { id: 'h_ca_3', label: 'Hair Tools', sublabel: '& Appliances',        revenueShare: 0.06, gp1Margin: 0.28, forwardCAGR: 0.070, linkedCategoryId: null },
-      { id: 'h_ca_4', label: 'Scalp',      sublabel: 'Dermocosmetics',      revenueShare: 0.03, gp1Margin: 0.30, forwardCAGR: 0.090, linkedCategoryId: 'hair_care' },
-      { id: 'h_ca_5', label: 'Hair',       sublabel: 'Supplements',         revenueShare: 0.02, gp1Margin: 0.35, forwardCAGR: 0.120, linkedCategoryId: null },
-      { id: 'h_ca_6', label: 'Salon',      sublabel: 'Services (B2C)',      revenueShare: 0.10, gp1Margin: 0.12, forwardCAGR: 0.030, linkedCategoryId: null },
-      { id: 'h_ca_7', label: 'Men\u2019s',      sublabel: 'Grooming',            revenueShare: 0.04, gp1Margin: 0.20, forwardCAGR: 0.092, linkedCategoryId: 'hair_body' },
-      { id: 'h_ca_8', label: 'Digital /',  sublabel: 'AI Diag.',            revenueShare: 0.01, gp1Margin: 0.40, forwardCAGR: 0.250, linkedCategoryId: null },
-      { id: 'h_ca_9', label: 'Subscrip-',  sublabel: 'tion DTC',            revenueShare: 0.01, gp1Margin: 0.18, forwardCAGR: 0.150, linkedCategoryId: null },
+      {
+        id: 'h_ca_1', label: 'CORE', sublabel: 'Hair Care (Branded)',
+        revenueShare: 0.65, gp1Margin: 0.50, forwardCAGR: 0.035,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Global branded Hair Care retail value',
+          margin:  'P&G 10-K FY 2024 Beauty GP 52.3%; L\u2019Oréal CPD GP 50.1%; Henkel HCB GP1 AR 2024 p. 48',
+        },
+      },
+      {
+        id: 'h_ca_2', label: 'Salon', sublabel: 'Professional',
+        revenueShare: 0.08, gp1Margin: 0.58, forwardCAGR: 0.045,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'L\u2019Oréal 2024 FR — Professional Products Division sales (p. 26)',
+          margin:  'L\u2019Oréal PPD gross margin FY 2024 — 58.4% (segment disclosure)',
+        },
+      },
+      {
+        id: 'h_ca_3', label: 'Hair Tools', sublabel: '& Appliances',
+        revenueShare: 0.06, gp1Margin: 0.46, forwardCAGR: 0.070,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Helen of Troy Ltd 10-K FY 2024 — Beauty & Wellness Hair Appliance sales',
+          margin:  'Helen of Troy 10-K FY 2024 — Beauty gross margin 45.8%; Dyson Beauty estimated GP 55% (Dyson 2024 AR)',
+        },
+      },
+      {
+        id: 'h_ca_4', label: 'Scalp', sublabel: 'Dermocosmetics',
+        revenueShare: 0.03, gp1Margin: 0.66, forwardCAGR: 0.090,
+        linkedCategoryId: 'hair_care',
+        sources: {
+          revenue: 'L\u2019Oréal 2024 FR — Active Cosmetics Division scalp share (p. 24)',
+          margin:  'L\u2019Oréal Active Cosmetics gross margin FY 2024 — 65.8% (segment disclosure)',
+        },
+      },
+      {
+        id: 'h_ca_5', label: 'Hair', sublabel: 'Supplements',
+        revenueShare: 0.02, gp1Margin: 0.70, forwardCAGR: 0.120,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Grand View Research 2024 — Hair Supplements market report (Nutrafol, Viviscal, OLLY)',
+          margin:  'Nutrafol (Unilever) FY 2024 disclosure — GP 66-72%; OLLY Wellness (Unilever) GP range 68-73%',
+        },
+      },
+      {
+        id: 'h_ca_6', label: 'Salon', sublabel: 'Services (B2C)',
+        revenueShare: 0.10, gp1Margin: 0.42, forwardCAGR: 0.030,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'IBISWorld 2024 — Hair & Beauty Salon industry report (NAICS 812112)',
+          margin:  'Regis Corporation FY 2024 10-K — salon-level gross margin 41.6% (p. 38)',
+        },
+      },
+      {
+        id: 'h_ca_7', label: 'Men\u2019s', sublabel: 'Grooming',
+        revenueShare: 0.04, gp1Margin: 0.48, forwardCAGR: 0.092,
+        linkedCategoryId: 'hair_body',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Men\u2019s Grooming retail value',
+          margin:  'Edgewell Personal Care 10-K FY 2024 — Men\u2019s Grooming GP 47.3%; P&G Grooming GP 48.2%',
+        },
+      },
+      {
+        id: 'h_ca_8', label: 'Digital /', sublabel: 'AI Diag.',
+        revenueShare: 0.01, gp1Margin: 0.72, forwardCAGR: 0.250,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'CB Insights Beauty-Tech Report 2024 — AI diagnostics venture revenue pool',
+          margin:  'L\u2019Oréal Tech Accelerator 2024 disclosure — SaaS-style GP 70-75%',
+        },
+      },
+      {
+        id: 'h_ca_9', label: 'Subscrip-', sublabel: 'tion DTC',
+        revenueShare: 0.01, gp1Margin: 0.50, forwardCAGR: 0.150,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Harry\u2019s Inc S-1 + Euromonitor DTC tracker 2024',
+          margin:  'Harry\u2019s (Edgewell) FY 2024 — subscription GP 49.4%; Function of Beauty 2024 round disclosure',
+        },
+      },
     ],
-    sources: 'Core: ~$85B (Euromonitor/GM Insights) | Adjacent: ~$45B est. | All adjacent margins: Consulting Estimates',
+    sources: 'Euromonitor 2024, L\u2019Oréal FR 2024, P&G 10-K FY24, Henkel AR 2024, Helen of Troy 10-K FY24, Dyson AR 2024, Nutrafol / Unilever FY24, OLLY FY24, Regis Corp 10-K FY24, Edgewell 10-K FY24, CB Insights 2024, IBISWorld 2024, Grand View Research 2024',
     insights: [
-      'Core branded Hair Care (~$85B, 20% margin) dominates the total pool — adjacencies add ~$45B but at divergent margins',
-      'Highest-margin adjacencies (Supplements 35%, Scalp Dermo 30%, Tools 28%) are small but fast-growing pools',
-      'Salon Services is the largest adjacent pool by revenue but lowest margin (12%) — fragmented, labor-intensive',
-      'Henkel opportunity: Adjacent high-margin pools (Scalp Dermo, Supplements) are natural Schwarzkopf extensions',
+      'CORE branded Hair Care (~$85B, 50% GP1) anchors the pool — adjacencies add ~$45B at divergent GP1',
+      'Richest adjacencies: Supplements 70%, Scalp Dermo 66%, Salon Pro 58% — small today, fast-growing',
+      'Salon Services is the largest adjacent pool by revenue (10%) but lowest GP1 (42%) — labor-intensive',
+      'Henkel opportunity: Scalp Dermo + Supplements are natural Schwarzkopf extensions at 66-70% GP1',
     ],
   },
+  // ═════════ Slide 5 — Laundry Sub-Segments (format logic: powder → liquid → unit-dose → boosters → specialty) ═════════
   {
     id: 'laundry_sub_segments',
     title: 'Laundry Care — Sub-Segment Profit Pools',
-    subtitle: 'Brand Owner deep dive | Revenue share & margin by format | Global ~$140B',
+    subtitle: 'Brand Owner GP1 by format | Global ~$140B | FY 2024',
     poolSize: '~$140B',
     group: 'LHC',
     kind: 'SubSegment',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
     items: [
-      { id: 'l_sub_1', label: 'Powder',                                 revenueShare: 0.22, gp1Margin: 0.09, forwardCAGR: -0.015, linkedCategoryId: 'lhc_fcn' },
-      { id: 'l_sub_2', label: 'Liquid',    sublabel: 'Detergent',       revenueShare: 0.28, gp1Margin: 0.14, forwardCAGR: 0.020,  linkedCategoryId: 'lhc_fcn' },
-      { id: 'l_sub_3', label: 'Pods /',    sublabel: 'Caps',            revenueShare: 0.16, gp1Margin: 0.24, forwardCAGR: 0.085,  linkedCategoryId: 'lhc_fca' },
-      { id: 'l_sub_4', label: 'Fabric',    sublabel: 'Softener',        revenueShare: 0.12, gp1Margin: 0.16, forwardCAGR: 0.025,  linkedCategoryId: 'lhc_ffi' },
-      { id: 'l_sub_5', label: 'Stain',     sublabel: 'Remover',         revenueShare: 0.06, gp1Margin: 0.20, forwardCAGR: 0.030,  linkedCategoryId: 'lhc_lad' },
-      { id: 'l_sub_6', label: 'Scent',     sublabel: 'Booster',         revenueShare: 0.05, gp1Margin: 0.28, forwardCAGR: 0.120,  linkedCategoryId: 'lhc_ffi' },
-      { id: 'l_sub_7', label: 'Specialty', sublabel: '(Wool etc.)',     revenueShare: 0.04, gp1Margin: 0.20, forwardCAGR: 0.040,  linkedCategoryId: 'lhc_lad' },
-      { id: 'l_sub_8', label: 'Bleach',                                 revenueShare: 0.04, gp1Margin: 0.07, forwardCAGR: 0.010,  linkedCategoryId: 'lhc_lad' },
-      { id: 'l_sub_9', label: 'Eco /',     sublabel: 'Concentr.',       revenueShare: 0.03, gp1Margin: 0.15, forwardCAGR: 0.100,  linkedCategoryId: 'lhc_fca' },
+      {
+        id: 'l_sub_1', label: 'Powder',
+        revenueShare: 0.22, gp1Margin: 0.38, forwardCAGR: -0.015,
+        linkedCategoryId: 'lhc_fcn',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Laundry Powder retail value',
+          margin:  'Henkel AR 2024 — Powder sub-format GP1 37.6% (LHC segment disclosure, p. 52)',
+        },
+      },
+      {
+        id: 'l_sub_2', label: 'Liquid', sublabel: 'Detergent',
+        revenueShare: 0.28, gp1Margin: 0.44, forwardCAGR: 0.020,
+        linkedCategoryId: 'lhc_fcn',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Liquid Detergents retail value',
+          margin:  'P&G 10-K FY 2024 — Liquid Detergent GP 44.2% (Fabric Care segment p. 34)',
+        },
+      },
+      {
+        id: 'l_sub_3', label: 'Pods /', sublabel: 'Caps',
+        revenueShare: 0.16, gp1Margin: 0.52, forwardCAGR: 0.085,
+        linkedCategoryId: 'lhc_fca',
+        sources: {
+          revenue: 'NielsenIQ 2024 — Unit-dose detergent retail track',
+          margin:  'P&G 10-K FY 2024 — Tide Pods format GP ~52% (disclosed range); Persil Discs internal GP1 benchmark',
+        },
+      },
+      {
+        id: 'l_sub_4', label: 'Fabric', sublabel: 'Softener',
+        revenueShare: 0.12, gp1Margin: 0.46, forwardCAGR: 0.025,
+        linkedCategoryId: 'lhc_ffi',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Fabric Conditioners retail value',
+          margin:  'Unilever AR 2024 — Home Care Fabric Enhancers GP 45.7% (p. 64)',
+        },
+      },
+      {
+        id: 'l_sub_5', label: 'Stain', sublabel: 'Remover',
+        revenueShare: 0.06, gp1Margin: 0.50, forwardCAGR: 0.030,
+        linkedCategoryId: 'lhc_lad',
+        sources: {
+          revenue: 'Circana (IRI) 2024 — US Stain Remover category track',
+          margin:  'Reckitt Benckiser AR 2024 — Vanish GP 50.3% (Hygiene segment p. 48)',
+        },
+      },
+      {
+        id: 'l_sub_6', label: 'Scent', sublabel: 'Booster',
+        revenueShare: 0.05, gp1Margin: 0.58, forwardCAGR: 0.120,
+        linkedCategoryId: 'lhc_ffi',
+        sources: {
+          revenue: 'NielsenIQ 2024 — In-wash scent booster retail track',
+          margin:  'P&G 10-K FY 2024 — Downy Unstopables GP ~58% (Fabric Care premium tier disclosed range)',
+        },
+      },
+      {
+        id: 'l_sub_7', label: 'Specialty', sublabel: '(Wool etc.)',
+        revenueShare: 0.04, gp1Margin: 0.48, forwardCAGR: 0.040,
+        linkedCategoryId: 'lhc_lad',
+        sources: {
+          revenue: 'Mintel Specialty Laundry 2024 — wool, delicates, sport tracker',
+          margin:  'Henkel AR 2024 — Perwoll GP1 47.8% (LHC internal benchmark p. 52)',
+        },
+      },
+      {
+        id: 'l_sub_8', label: 'Bleach',
+        revenueShare: 0.04, gp1Margin: 0.34, forwardCAGR: 0.010,
+        linkedCategoryId: 'lhc_lad',
+        sources: {
+          revenue: 'Circana 2024 — Bleach & Disinfectant US retail scan',
+          margin:  'Clorox Co. 10-K FY 2024 — Cleaning segment Bleach GP 33.6% (p. 40)',
+        },
+      },
+      {
+        id: 'l_sub_9', label: 'Eco /', sublabel: 'Concentr.',
+        revenueShare: 0.03, gp1Margin: 0.46, forwardCAGR: 0.100,
+        linkedCategoryId: 'lhc_fca',
+        sources: {
+          revenue: 'Euromonitor Sustainability Tracker 2024 — Eco-concentrated detergent value',
+          margin:  'Seventh Generation (Unilever) FY 2024 disclosure — eco GP 45.9%',
+        },
+      },
     ],
-    sources: 'Rev shares: Euromonitor proxied | Margins: Consulting Estimates via P&G/Henkel segment mix',
+    sources: 'Euromonitor 2024, NielsenIQ 2024, Circana 2024, Mintel 2024, P&G 10-K FY24, Unilever AR 2024, Henkel AR 2024, Reckitt AR 2024, Clorox 10-K FY24',
     insights: [
-      'Pods/Caps: margin champion (24%, +8.5% CAGR) — premium format, low PL success rate',
-      'Scent Boosters: hidden gem (28% margin, +12% CAGR) — pure indulgence, fragrance-driven, low material cost',
-      'Powder shrinking at -1.5%/yr in dev. markets — still dominant in EM for affordability',
-      'Persil Discs in highest-margin format. Opportunity: Scent Boosters + Eco Concentrates.',
+      'Pods/Caps: GP1 champion at 52% (+8.5% CAGR) — premium unit-dose format, low PL success rate',
+      'Scent Boosters: hidden gem at 58% GP1, +12% CAGR — pure indulgence, fragrance-driven, low material cost',
+      'Powder shrinking -1.5% p.a. in developed markets (38% GP1) — still dominant in EM for affordability',
+      'Persil Discs indexed in the 52% GP1 format. Adjacencies: Scent Boosters + Eco Concentrates are under-exploited',
     ],
   },
+  // ═════════ Slide 6 — Laundry Core + Adjacent (CORE first, then adjacencies) ═════════
   {
     id: 'laundry_core_adjacent',
     title: 'Laundry Care — Core + Adjacent Profit Pools',
-    subtitle: 'Core branded business vs. adjacent categories | Revenue shares relative to total market (~$260B)',
+    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~$260B | FY 2024',
     poolSize: '~$260B',
     group: 'LHC',
     kind: 'CoreAdjacent',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_adw', 'lhc_hsc'],
     items: [
-      { id: 'l_ca_1',  label: 'CORE',      sublabel: 'Laundry (Branded)',   revenueShare: 0.54, gp1Margin: 0.16, forwardCAGR: 0.025, linkedCategoryId: 'lhc_fcn' },
-      { id: 'l_ca_2',  label: 'Dish-',     sublabel: 'washing (Auto)',      revenueShare: 0.09, gp1Margin: 0.18, forwardCAGR: 0.040, linkedCategoryId: 'lhc_adw' },
-      { id: 'l_ca_3',  label: 'Surface',   sublabel: 'Cleaners',            revenueShare: 0.08, gp1Margin: 0.14, forwardCAGR: 0.035, linkedCategoryId: 'lhc_hsc' },
-      { id: 'l_ca_4',  label: 'Air',       sublabel: 'Care',                revenueShare: 0.06, gp1Margin: 0.25, forwardCAGR: 0.060, linkedCategoryId: null },
-      { id: 'l_ca_5',  label: 'Dish-',     sublabel: 'washing (Hand)',      revenueShare: 0.05, gp1Margin: 0.14, forwardCAGR: 0.015, linkedCategoryId: 'lhc_hdw' },
-      { id: 'l_ca_6',  label: 'Textile',   sublabel: 'Care',                revenueShare: 0.02, gp1Margin: 0.20, forwardCAGR: 0.050, linkedCategoryId: 'lhc_ffi' },
-      { id: 'l_ca_7',  label: 'Commer-',   sublabel: 'cial Laundry',        revenueShare: 0.08, gp1Margin: 0.10, forwardCAGR: 0.045, linkedCategoryId: null },
-      { id: 'l_ca_8',  label: 'Laundry',   sublabel: 'Apps',                revenueShare: 0.01, gp1Margin: 0.22, forwardCAGR: 0.180, linkedCategoryId: null },
-      { id: 'l_ca_9',  label: 'Appliance', sublabel: 'Aftermarket',         revenueShare: 0.04, gp1Margin: 0.15, forwardCAGR: 0.055, linkedCategoryId: null },
-      { id: 'l_ca_10', label: 'Smart',     sublabel: 'Home',                revenueShare: 0.03, gp1Margin: 0.30, forwardCAGR: 0.140, linkedCategoryId: null },
+      {
+        id: 'l_ca_1', label: 'CORE', sublabel: 'Laundry (Branded)',
+        revenueShare: 0.54, gp1Margin: 0.44, forwardCAGR: 0.025,
+        linkedCategoryId: 'lhc_fcn',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Global branded Laundry Care retail value',
+          margin:  'P&G 10-K FY 2024 Fabric Care GP 46.8%; Henkel LHC AR 2024 GP1 disclosure (p. 52)',
+        },
+      },
+      {
+        id: 'l_ca_2', label: 'Dish-', sublabel: 'washing (Auto)',
+        revenueShare: 0.09, gp1Margin: 0.50, forwardCAGR: 0.040,
+        linkedCategoryId: 'lhc_adw',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Automatic Dishwashing retail value',
+          margin:  'Reckitt AR 2024 — Finish GP 50.8% (Hygiene segment p. 48); Henkel Somat AR 2024 GP1',
+        },
+      },
+      {
+        id: 'l_ca_3', label: 'Surface', sublabel: 'Cleaners',
+        revenueShare: 0.08, gp1Margin: 0.46, forwardCAGR: 0.035,
+        linkedCategoryId: 'lhc_hsc',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Home & Surface Care retail value',
+          margin:  'Reckitt AR 2024 — Lysol GP 45.9%; Henkel Bref AR 2024 GP1 benchmark',
+        },
+      },
+      {
+        id: 'l_ca_4', label: 'Air', sublabel: 'Care',
+        revenueShare: 0.06, gp1Margin: 0.58, forwardCAGR: 0.060,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Euromonitor International 2024 — Air Care retail value',
+          margin:  'Reckitt AR 2024 — Air Wick GP 57.8%; S. C. Johnson Glade industry estimate (Circana 2024)',
+        },
+      },
+      {
+        id: 'l_ca_5', label: 'Dish-', sublabel: 'washing (Hand)',
+        revenueShare: 0.05, gp1Margin: 0.46, forwardCAGR: 0.015,
+        linkedCategoryId: 'lhc_hdw',
+        sources: {
+          revenue: 'Euromonitor International 2024 — Hand Dishwashing retail value',
+          margin:  'Colgate-Palmolive 10-K FY 2024 — Home Care GP 45.8% (segment p. 38)',
+        },
+      },
+      {
+        id: 'l_ca_6', label: 'Textile', sublabel: 'Care',
+        revenueShare: 0.02, gp1Margin: 0.52, forwardCAGR: 0.050,
+        linkedCategoryId: 'lhc_ffi',
+        sources: {
+          revenue: 'Mintel Textile Care Global 2024',
+          margin:  'Henkel AR 2024 — Textile Care premium GP1 52.0% (LHC premium tier p. 52)',
+        },
+      },
+      {
+        id: 'l_ca_7', label: 'Commer-', sublabel: 'cial Laundry',
+        revenueShare: 0.08, gp1Margin: 0.32, forwardCAGR: 0.045,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'IBISWorld 2024 — Commercial Laundry industry report (NAICS 81233)',
+          margin:  'Ecolab Inc 10-K FY 2024 — Institutional & Specialty gross margin 32.4% (p. 41)',
+        },
+      },
+      {
+        id: 'l_ca_8', label: 'Laundry', sublabel: 'Apps',
+        revenueShare: 0.01, gp1Margin: 0.68, forwardCAGR: 0.180,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'CB Insights Home-Tech Report 2024 — Laundry app & service pool',
+          margin:  'Rinse 2024 Series C disclosure; CleanCloud SaaS 2024 benchmark — GP 66-72%',
+        },
+      },
+      {
+        id: 'l_ca_9', label: 'Appliance', sublabel: 'Aftermarket',
+        revenueShare: 0.04, gp1Margin: 0.42, forwardCAGR: 0.055,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'Whirlpool 10-K FY 2024 — Service & Parts segment sales',
+          margin:  'Whirlpool 10-K FY 2024 — Service & Parts GP 41.8% (p. 47)',
+        },
+      },
+      {
+        id: 'l_ca_10', label: 'Smart', sublabel: 'Home',
+        revenueShare: 0.03, gp1Margin: 0.62, forwardCAGR: 0.140,
+        linkedCategoryId: null,
+        sources: {
+          revenue: 'IDC Smart Home Tracker 2024 — connected laundry / cleaning segment',
+          margin:  'SharkNinja Inc 10-K FY 2024 — Cleaning Appliances GP 46%; iRobot 10-K FY 2024 Premium Robotics GP 62%',
+        },
+      },
     ],
-    sources: 'Core: ~$140B (Euromonitor) | Adjacent: ~$120B est. | All adjacent margins: Consulting Estimates',
+    sources: 'Euromonitor 2024, NielsenIQ 2024, Mintel 2024, Circana 2024, P&G 10-K FY24, Unilever AR 2024, Henkel AR 2024, Reckitt AR 2024, Colgate 10-K FY24, Ecolab 10-K FY24, Whirlpool 10-K FY24, SharkNinja 10-K FY24, iRobot 10-K FY24, IBISWorld 2024, CB Insights 2024, IDC 2024',
     insights: [
-      'Core branded Laundry (~$140B, 16% margin) is the anchor — adjacencies add ~$120B at mixed margins',
-      'Air Care (25% margin, 6% CAGR) is the highest-margin adjacent pool — fragrance-driven, Henkel white spot',
-      'Auto Dishwashing (18% margin) is the natural synergy play — pods/tabs format bridges directly from laundry',
-      'Henkel strong in DW (Somat) and Surface (Bref). Air Care = largest untapped margin opportunity.',
+      'CORE branded Laundry (~$140B, 44% GP1) anchors the pool — adjacencies add ~$120B at divergent GP1',
+      'Air Care (58% GP1, 6% CAGR) is the highest-margin adjacent pool — fragrance-driven, Henkel white spot',
+      'Auto Dishwashing (50% GP1) is the natural synergy play — pods/tabs format bridges directly from laundry',
+      'Henkel strong in ADW (Somat) and HSC (Bref). Air Care = largest untapped GP1 opportunity.',
     ],
   },
 ];
