@@ -26,11 +26,12 @@ import {
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
   ArrowUp, ArrowDown, ArrowUpDown,
+  Plus, Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
-import type { Trend, ForceName, CategoryId } from '@/types';
+import type { Trend, ForceName, CategoryId, TrendSource, TrendUpdate } from '@/types';
 
 // ─── Value-chain steps — must match backend VC_KEYS in pulse/config.py ──
 // The Python engine (seed_trends / config) keys vc_exposure by the display-
@@ -355,10 +356,28 @@ const MetaChip: FC<{ label: string }> = ({ label }) => (
   </span>
 );
 
+// ─── Source tier rating (editorial credibility scale) ──────────────
+// Mirrors pulse/dashboard/src/components/Trends2.tsx. S = official regulator /
+// statistical authority; E = unverified social. Tooltip explains the meaning
+// on hover.
+const TIER_CONFIG: Record<string, { label: string; color: string; description: string }> = {
+  'S':  { label: 'S',  color: '#22c55e', description: 'Official regulatory / statistical authority' },
+  'A':  { label: 'A',  color: '#3b82f6', description: 'Tier-1 consulting or analyst primary research' },
+  'A-': { label: 'A-', color: '#60a5fa', description: 'Investment-bank equity research' },
+  'B+': { label: 'B+', color: '#a78bfa', description: 'Specialist market-research firm' },
+  'B':  { label: 'B',  color: '#c084fc', description: 'Industry trade press' },
+  'B-': { label: 'B-', color: '#e879f9', description: 'Company first-party source' },
+  'C':  { label: 'C',  color: '#f59e0b', description: 'General business press' },
+  'D':  { label: 'D',  color: '#ef4444', description: 'Aggregator / forecast' },
+  'E':  { label: 'E',  color: '#991b1b', description: 'Social / unverified' },
+};
+const TIER_OPTIONS: Array<TrendSource['tier']> = ['S','A','A-','B+','B','B-','C','D','E'];
+
 // ─── Source item ──────────────────────────────────────────────────
-const SourceItem: FC<{ src: { title: string; url: string; data?: string } }> = ({ src }) => {
+const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
   const cls = classifySource(src.url);
   const Icon = SOURCE_ICON[cls] ?? Newspaper;
+  const tierCfg = src.tier ? TIER_CONFIG[src.tier] : undefined;
   return (
     <a
       href={src.url}
@@ -382,10 +401,29 @@ const SourceItem: FC<{ src: { title: string; url: string; data?: string } }> = (
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
-          display: 'block', fontSize: 13, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          fontSize: 13, fontWeight: 600,
           color: S.onSurface, lineHeight: 1.35,
         }}>
-          {src.title}
+          <span style={{ fontWeight: 600 }}>{src.title}</span>
+          {tierCfg && (
+            <span
+              title={`Source rating ${tierCfg.label} — ${tierCfg.description}`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                minWidth: 22, height: 18, padding: '0 6px',
+                borderRadius: 4,
+                fontFamily: HEADLINE_FONT,
+                fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
+                backgroundColor: `${tierCfg.color}22`,
+                color: tierCfg.color,
+                border: `1px solid ${tierCfg.color}55`,
+                textTransform: 'none',
+              }}
+            >
+              {tierCfg.label}
+            </span>
+          )}
         </span>
         <span style={{
           display: 'block', fontSize: 11, color: S.mutedText, marginTop: 2,
@@ -988,7 +1026,7 @@ const TrendRow: FC<TrendRowProps> = ({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
-            <ExpandedPanel trend={trend} />
+            <ExpandedPanel trend={trend} isAdmin={isAdmin} updateTrend={updateTrend} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1002,9 +1040,61 @@ const TrendRow: FC<TrendRowProps> = ({
 //           materialization timing, sources).
 //   RIGHT — exposure grids stacked vertically in the order requested by
 //           the strategy team: Category → Region → Value Chain.
-// The exposure grids are only rendered here (not inline) so the trend list
-// stays scannable by default; click-to-expand surfaces the full detail.
-const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
+//
+// ADMIN-EDITABLE: when isAdmin is true an "Edit" button appears in the top
+// right. Clicking it swaps every field (except PRISM Analysis — which is
+// always read-only) into an editable form and shows Cancel / Save buttons.
+// Save sends a single TrendUpdate through usePrism.updateTrend.
+interface ExpandedPanelProps {
+  trend: Trend;
+  isAdmin?: boolean;
+  updateTrend?: (trendId: string, updates: TrendUpdate) => Promise<void>;
+}
+
+// Small wrapper for a labeled edit control (keeps the form tidy)
+const FieldLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{
+    fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+    textTransform: 'uppercase', color: S.mutedText, marginBottom: 6,
+  }}>
+    {children}
+  </div>
+);
+
+// Editable 0-5 dot bar used for category / region / value-chain exposure.
+const EditableDots: FC<{
+  value: number;
+  onChange: (next: number) => void;
+  tone?: 'emerald' | 'purple';
+}> = ({ value, onChange, tone = 'emerald' }) => {
+  const FILLED = tone === 'emerald' ? S.primary : S.onTertiaryContainer;
+  const EMPTY  = S.surfaceHigh;
+  return (
+    <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`}>
+      {[0, 1, 2, 3, 4, 5].map((d) => (
+        <button
+          key={d}
+          type="button"
+          onClick={() => onChange(d)}
+          aria-checked={d === value}
+          role="radio"
+          title={`${d} / 5`}
+          style={{
+            width: 14, height: 14, borderRadius: 999,
+            border: 'none', padding: 0, cursor: 'pointer',
+            backgroundColor: d === 0
+              ? (value === 0 ? FILLED : EMPTY)
+              : (d <= value ? FILLED : EMPTY),
+            opacity: d === 0 ? 0.35 : 1,
+            transition: 'background-color 120ms',
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateTrend }) => {
   const gp1Pct      = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10;
   const probability = trend.probability ?? 0;
   const peakYear    = (trend as Trend & { peak_year?: number }).peak_year ?? 2030;
@@ -1022,6 +1112,104 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
   const regExp = ((trend as Trend & { regional_exposure?: Record<string, number> })
     .regional_exposure ?? {}) as Record<string, number>;
 
+  // ─── Admin edit state ────────────────────────────────────────────
+  const canEdit = isAdmin && !!updateTrend;
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Editable drafts — hydrated from the trend on entering edit mode.
+  const [draftDesc, setDraftDesc]           = useState(trend.description || '');
+  const [draftProb, setDraftProb]           = useState<number>(Math.round(probability));
+  const [draftDir, setDraftDir]             = useState<Trend['direction']>(trend.direction);
+  const [draftGp1, setDraftGp1]             = useState<number>(Math.round(gp1Pct * 100));
+  const [draftPeak, setDraftPeak]           = useState<number>(peakYear);
+  const [draftCurve, setDraftCurve]         = useState<string>(diffusion);
+  const [draftConfidence, setDraftConfidence] = useState<string>(confidence ?? '');
+  const [draftCatExp, setDraftCatExp]       = useState<Record<string, number>>({ ...catExp });
+  const [draftVcExp, setDraftVcExp]         = useState<Record<string, number>>({ ...vcExp });
+  const [draftRegExp, setDraftRegExp]       = useState<Record<string, number>>({ ...regExp });
+  const [draftSources, setDraftSources]     = useState<TrendSource[]>(
+    sources.map((s) => ({ ...s }))
+  );
+
+  // Re-hydrate drafts every time the trend data changes (e.g. after save).
+  useEffect(() => {
+    setDraftDesc(trend.description || '');
+    setDraftProb(Math.round(trend.probability ?? 0));
+    setDraftDir(trend.direction);
+    setDraftGp1(Math.round(((trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10) * 100));
+    setDraftPeak((trend as Trend & { peak_year?: number }).peak_year ?? 2030);
+    setDraftCurve((trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve');
+    setDraftConfidence((trend.confidence as string) ?? '');
+    setDraftCatExp({ ...((trend.category_exposure ?? {}) as Record<string, number>) });
+    setDraftVcExp({ ...((trend.vc_exposure ?? {}) as Record<string, number>) });
+    setDraftRegExp({ ...((trend as Trend & { regional_exposure?: Record<string, number> }).regional_exposure ?? {}) });
+    setDraftSources((trend.sources ?? []).map((s) => ({ ...s })));
+  }, [trend]);
+
+  const handleCancel = () => {
+    // Reset drafts back to the persisted trend values
+    setDraftDesc(trend.description || '');
+    setDraftProb(Math.round(trend.probability ?? 0));
+    setDraftDir(trend.direction);
+    setDraftGp1(Math.round(gp1Pct * 100));
+    setDraftPeak(peakYear);
+    setDraftCurve(diffusion);
+    setDraftConfidence((confidence as string) ?? '');
+    setDraftCatExp({ ...catExp });
+    setDraftVcExp({ ...vcExp });
+    setDraftRegExp({ ...regExp });
+    setDraftSources(sources.map((s) => ({ ...s })));
+    setSaveError(null);
+    setIsEditing(false);
+  };
+
+  const handleSave = async () => {
+    if (!canEdit || !updateTrend) return;
+    setSaving(true);
+    setSaveError(null);
+    const updates: TrendUpdate = {
+      description: draftDesc,
+      probability: Math.max(1, Math.min(5, Math.round(draftProb))),
+      direction: draftDir,
+      gp1_pct_affected: Math.max(0, Math.min(1, draftGp1 / 100)),
+      peak_year: Math.max(2025, Math.min(2035, Math.round(draftPeak))),
+      diffusion_curve: draftCurve,
+      category_exposure: draftCatExp,
+      vc_exposure: draftVcExp,
+      regional_exposure: draftRegExp,
+      // Filter out empty rows before sending
+      sources: draftSources
+        .filter((s) => (s.title && s.title.trim()) || (s.url && s.url.trim()))
+        .map((s) => ({
+          title: s.title || '',
+          url: s.url || '',
+          data: s.data || '',
+          ...(s.tier ? { tier: s.tier } : {}),
+        })),
+    };
+    // Only send confidence if the value is non-empty (backend expects enum)
+    if (draftConfidence) {
+      (updates as TrendUpdate & { confidence?: string }).confidence = draftConfidence;
+    }
+    try {
+      await updateTrend(trend.id, updates);
+      setIsEditing(false);
+    } catch (e) {
+      setSaveError((e as Error)?.message ?? 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSource = () =>
+    setDraftSources((arr) => [...arr, { title: '', url: '', data: '', tier: undefined }]);
+  const removeSource = (idx: number) =>
+    setDraftSources((arr) => arr.filter((_, i) => i !== idx));
+  const patchSource = (idx: number, patch: Partial<TrendSource>) =>
+    setDraftSources((arr) => arr.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
@@ -1036,8 +1224,49 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
         display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
         marginBottom: 24,
       }}>
-        <DirectionPill direction={trend.direction} />
-        {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
+        {isEditing ? (
+          <>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FieldLabel>Direction</FieldLabel>
+              <select
+                value={draftDir}
+                onChange={(e) => setDraftDir(e.target.value as Trend['direction'])}
+                style={{
+                  padding: '4px 10px', borderRadius: 999, fontSize: 11,
+                  fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  backgroundColor: S.surfaceLow, color: S.onSurface,
+                  border: `1px solid ${S.cardBorder}`,
+                }}
+              >
+                <option value="Expansion">Expansion</option>
+                <option value="Contraction">Contraction</option>
+              </select>
+            </label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <FieldLabel>Confidence</FieldLabel>
+              <select
+                value={draftConfidence}
+                onChange={(e) => setDraftConfidence(e.target.value)}
+                style={{
+                  padding: '4px 10px', borderRadius: 999, fontSize: 11,
+                  fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  backgroundColor: S.surfaceLow, color: S.onSurface,
+                  border: `1px solid ${S.cardBorder}`,
+                }}
+              >
+                <option value="">—</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </label>
+          </>
+        ) : (
+          <>
+            <DirectionPill direction={trend.direction} />
+            {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
+          </>
+        )}
         {trend.ai_suggested && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1050,7 +1279,7 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
             <Sparkles size={12} /> AI Suggested
           </span>
         )}
-        {dataSource && <MetaChip label={dataSource} />}
+        {!isEditing && dataSource && <MetaChip label={dataSource} />}
       </div>
 
       {/* Two-column editorial detail layout.
@@ -1064,14 +1293,30 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Description" icon={FileText}>
-            <p style={{
-              margin: 0, fontSize: 14, lineHeight: 1.6, color: S.onSurface,
-              whiteSpace: 'pre-wrap',
-            }}>
-              {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
-            </p>
+            {isEditing ? (
+              <textarea
+                value={draftDesc}
+                onChange={(e) => setDraftDesc(e.target.value)}
+                rows={6}
+                style={{
+                  width: '100%', padding: '10px 12px',
+                  borderRadius: 8, border: `1px solid ${S.cardBorder}`,
+                  backgroundColor: S.surfaceLow, color: S.onSurface,
+                  fontSize: 14, lineHeight: 1.6, fontFamily: BODY_FONT,
+                  resize: 'vertical',
+                }}
+              />
+            ) : (
+              <p style={{
+                margin: 0, fontSize: 14, lineHeight: 1.6, color: S.onSurface,
+                whiteSpace: 'pre-wrap',
+              }}>
+                {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
+              </p>
+            )}
           </SectionCard>
 
+          {/* PRISM Analysis is ALWAYS read-only — never editable by the admin */}
           <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
             <blockquote style={{
               margin: 0,
@@ -1090,6 +1335,14 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
                 </span>
               )}
             </blockquote>
+            {isEditing && (
+              <div style={{
+                marginTop: 8, fontSize: 10, letterSpacing: '0.06em',
+                textTransform: 'uppercase', color: S.mutedText, fontWeight: 700,
+              }}>
+                PRISM Analysis is generated by the engine and is not editable.
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard
@@ -1097,35 +1350,59 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
             icon={BarChart3}
             footnote={
               <>
-                What fraction of a category's GP1 can this trend realistically affect at full
-                materialization? A 5/5 probability trend with {Math.round(gp1Pct * 100)}% GP1 affected
-                means: maximum-severity trend, but only touches {Math.round(gp1Pct * 100)}% of the pool.
+                What fraction of a category&apos;s GP1 can this trend realistically affect at full
+                materialization?
               </>
             }
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{
-                flex: 1, height: 6, borderRadius: 4,
-                backgroundColor: S.surfaceHigh, position: 'relative',
-              }}>
+            {isEditing ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <input
+                  type="range"
+                  min={0} max={100} step={1}
+                  value={draftGp1}
+                  onChange={(e) => setDraftGp1(parseInt(e.target.value, 10))}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  type="number"
+                  min={0} max={100} step={1}
+                  value={draftGp1}
+                  onChange={(e) => setDraftGp1(Math.max(0, Math.min(100, parseInt(e.target.value || '0', 10))))}
+                  style={{
+                    width: 72, padding: '6px 8px', borderRadius: 8,
+                    border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow,
+                    color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800,
+                    fontSize: 15, textAlign: 'right',
+                  }}
+                />
+                <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{
-                  position: 'absolute', inset: 0,
-                  width: `${Math.min(100, Math.round(gp1Pct * 100 * 2))}%`,
-                  backgroundColor: S.primary, borderRadius: 4,
-                }} />
+                  flex: 1, height: 6, borderRadius: 4,
+                  backgroundColor: S.surfaceHigh, position: 'relative',
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    width: `${Math.min(100, Math.round(gp1Pct * 100 * 2))}%`,
+                    backgroundColor: S.primary, borderRadius: 4,
+                  }} />
+                </div>
+                <div style={{
+                  minWidth: 64,
+                  padding: '6px 12px', borderRadius: 8,
+                  backgroundColor: S.surfaceLow,
+                  border: `1px solid ${S.cardBorder}`,
+                  textAlign: 'center',
+                  fontFamily: HEADLINE_FONT,
+                  fontWeight: 800, fontSize: 15, color: S.primary,
+                }}>
+                  {Math.round(gp1Pct * 100)}%
+                </div>
               </div>
-              <div style={{
-                minWidth: 64,
-                padding: '6px 12px', borderRadius: 8,
-                backgroundColor: S.surfaceLow,
-                border: `1px solid ${S.cardBorder}`,
-                textAlign: 'center',
-                fontFamily: HEADLINE_FONT,
-                fontWeight: 800, fontSize: 15, color: S.primary,
-              }}>
-                {Math.round(gp1Pct * 100)}%
-              </div>
-            </div>
+            )}
           </SectionCard>
 
           <SectionCard
@@ -1137,7 +1414,11 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
             }
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
-              <DotBar value={Math.round(probability)} />
+              <DotBar
+                value={isEditing ? draftProb : Math.round(probability)}
+                editable={isEditing}
+                onChange={isEditing ? (v) => setDraftProb(v) : undefined}
+              />
               <div style={{
                 padding: '6px 12px', borderRadius: 8,
                 backgroundColor: S.surfaceLow,
@@ -1145,7 +1426,7 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
                 fontFamily: HEADLINE_FONT,
                 fontWeight: 800, fontSize: 15, color: S.primary,
               }}>
-                {Math.round(probability)} / 5
+                {(isEditing ? draftProb : Math.round(probability))} / 5
               </div>
             </div>
           </SectionCard>
@@ -1157,45 +1438,176 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
-                  Peak Year
-                </div>
-                <div style={{
-                  padding: '8px 10px', borderRadius: 8,
-                  fontSize: 13, fontWeight: 700, color: S.onSurface,
-                  backgroundColor: S.surfaceLow,
-                  border: `1px solid ${S.cardBorder}`,
-                }}>
-                  {peakYear}
-                </div>
+                <FieldLabel>Peak Year</FieldLabel>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    min={2025} max={2035} step={1}
+                    value={draftPeak}
+                    onChange={(e) => setDraftPeak(parseInt(e.target.value || '2030', 10))}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      border: `1px solid ${S.cardBorder}`,
+                      backgroundColor: S.surfaceLow, color: S.onSurface,
+                      fontSize: 13, fontWeight: 700,
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    padding: '8px 10px', borderRadius: 8,
+                    fontSize: 13, fontWeight: 700, color: S.onSurface,
+                    backgroundColor: S.surfaceLow,
+                    border: `1px solid ${S.cardBorder}`,
+                  }}>
+                    {peakYear}
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
                   Year when 100% of impact materializes
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.mutedText, marginBottom: 6 }}>
-                  Diffusion Curve
-                </div>
-                <div style={{
-                  padding: '8px 10px', borderRadius: 8,
-                  fontSize: 13, fontWeight: 700, color: S.onSurface,
-                  backgroundColor: S.surfaceLow,
-                  border: `1px solid ${S.cardBorder}`,
-                }}>
-                  {diffusionMeta.label}
-                </div>
+                <FieldLabel>Diffusion Curve</FieldLabel>
+                {isEditing ? (
+                  <select
+                    value={draftCurve}
+                    onChange={(e) => setDraftCurve(e.target.value)}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 8,
+                      border: `1px solid ${S.cardBorder}`,
+                      backgroundColor: S.surfaceLow, color: S.onSurface,
+                      fontSize: 13, fontWeight: 700,
+                    }}
+                  >
+                    {Object.entries(DIFFUSION_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{
+                    padding: '8px 10px', borderRadius: 8,
+                    fontSize: 13, fontWeight: 700, color: S.onSurface,
+                    backgroundColor: S.surfaceLow,
+                    border: `1px solid ${S.cardBorder}`,
+                  }}>
+                    {diffusionMeta.label}
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
-                  {diffusionMeta.description}
+                  {(DIFFUSION_LABELS[isEditing ? draftCurve : diffusion] ?? diffusionMeta).description}
                 </div>
               </div>
             </div>
           </SectionCard>
 
-          {sources.length > 0 && (
-            <SectionCard title={`Sources · ${sources.length}`} icon={Newspaper}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sources.map((src, i) => <SourceItem key={i} src={src} />)}
-              </div>
+          {/* Sources — edit mode reveals per-row title / url / data / tier controls */}
+          {(isEditing || sources.length > 0) && (
+            <SectionCard title={`Sources · ${isEditing ? draftSources.length : sources.length}`} icon={Newspaper}>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {draftSources.map((s, i) => (
+                    <div key={i} style={{
+                      padding: 10, borderRadius: 10,
+                      backgroundColor: S.surfaceLow,
+                      border: `1px solid ${S.cardBorder}`,
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                    }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Source title"
+                          value={s.title}
+                          onChange={(e) => patchSource(i, { title: e.target.value })}
+                          style={{
+                            flex: 2, padding: '6px 10px', borderRadius: 6,
+                            border: `1px solid ${S.cardBorder}`,
+                            backgroundColor: S.surface, color: S.onSurface,
+                            fontSize: 13, fontWeight: 600,
+                          }}
+                        />
+                        <select
+                          value={s.tier ?? ''}
+                          onChange={(e) =>
+                            patchSource(i, { tier: (e.target.value || undefined) as TrendSource['tier'] })}
+                          title="Source rating"
+                          style={{
+                            padding: '6px 10px', borderRadius: 6,
+                            border: `1px solid ${S.cardBorder}`,
+                            backgroundColor: S.surface, color: S.onSurface,
+                            fontSize: 12, fontWeight: 700,
+                          }}
+                        >
+                          <option value="">Rating…</option>
+                          {TIER_OPTIONS.map((t) => (
+                            <option key={t} value={t ?? ''}>{t} · {TIER_CONFIG[t ?? '']?.description}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => removeSource(i)}
+                          title="Remove source"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 30, height: 30, borderRadius: 6,
+                            border: `1px solid ${S.cardBorder}`,
+                            backgroundColor: S.surface, color: S.error,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type="url"
+                          placeholder="https://…"
+                          value={s.url}
+                          onChange={(e) => patchSource(i, { url: e.target.value })}
+                          style={{
+                            flex: 2, padding: '6px 10px', borderRadius: 6,
+                            border: `1px solid ${S.cardBorder}`,
+                            backgroundColor: S.surface, color: S.onSurface,
+                            fontSize: 12,
+                          }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Data / quote / metric"
+                          value={s.data}
+                          onChange={(e) => patchSource(i, { data: e.target.value })}
+                          style={{
+                            flex: 3, padding: '6px 10px', borderRadius: 6,
+                            border: `1px solid ${S.cardBorder}`,
+                            backgroundColor: S.surface, color: S.onSurface,
+                            fontSize: 12,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addSource}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      alignSelf: 'flex-start',
+                      padding: '6px 12px', borderRadius: 999,
+                      fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700,
+                      letterSpacing: '0.04em', textTransform: 'uppercase',
+                      backgroundColor: S.primaryContainer,
+                      color: S.onPrimaryContainer,
+                      border: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={12} strokeWidth={2.5} />
+                    Add source
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {sources.map((src, i) => <SourceItem key={i} src={src} />)}
+                </div>
+              )}
             </SectionCard>
           )}
         </div>
@@ -1203,19 +1615,197 @@ const ExpandedPanel: FC<{ trend: Trend }> = ({ trend }) => {
         {/* RIGHT column — exposure grids, ordered Category → Region → Value Chain */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Category Exposure" icon={Layers}>
-            <CategoryExposureGrid exposures={catExp} />
+            {isEditing ? (
+              <EditableCategoryGrid exposures={draftCatExp} onChange={setDraftCatExp} />
+            ) : (
+              <CategoryExposureGrid exposures={catExp} />
+            )}
           </SectionCard>
           <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
-            <RegionExposureGrid exposures={regExp} />
+            {isEditing ? (
+              <EditableRegionGrid exposures={draftRegExp} onChange={setDraftRegExp} />
+            ) : (
+              <RegionExposureGrid exposures={regExp} />
+            )}
           </SectionCard>
           <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
-            <ValueChainExposureGrid exposures={vcExp} />
+            {isEditing ? (
+              <EditableValueChainGrid exposures={draftVcExp} onChange={setDraftVcExp} />
+            ) : (
+              <ValueChainExposureGrid exposures={vcExp} />
+            )}
           </SectionCard>
         </div>
       </div>
+
+      {/* Admin toolbar — lower-right pill buttons matching the editorial
+          language of FilterChip / DirectionPill / MetaChip. No icons. */}
+      {canEdit && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: 10, marginTop: 24,
+        }}>
+          {saveError && isEditing && (
+            <span style={{ color: S.error, fontSize: 12, marginRight: 4 }}>
+              {saveError}
+            </span>
+          )}
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              style={{
+                padding: '8px 20px',
+                borderRadius: 999,
+                fontFamily: HEADLINE_FONT,
+                fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                backgroundColor: S.primaryContainer,
+                color: S.onPrimaryContainer,
+                border: 'none', cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+          )}
+          {isEditing && (
+            <>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={saving}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: 999,
+                  fontFamily: HEADLINE_FONT,
+                  fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  backgroundColor: S.surfaceLow,
+                  color: S.onSurfaceVariant,
+                  border: 'none',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.5 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: 999,
+                  fontFamily: HEADLINE_FONT,
+                  fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  backgroundColor: S.primary,
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.7 : 1,
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+// ─── Editable exposure grids (used in ExpandedPanel edit mode) ─────
+const EditableCategoryGrid: FC<{
+  exposures: Record<string, number>;
+  onChange: (next: Record<string, number>) => void;
+}> = ({ exposures, onChange }) => {
+  const grouped = {
+    Hair: CATEGORIES.filter((c) => c.group === 'Hair'),
+    LHC:  CATEGORIES.filter((c) => c.group === 'LHC'),
+  };
+  const set = (key: string, val: number) => onChange({ ...exposures, [key]: val });
+  return (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([group, cats]) => (
+        <div key={group}>
+          <div
+            className="text-[10px] font-semibold mb-2"
+            style={{ color: S.onSurfaceVariant, letterSpacing: '0.08em' }}
+          >
+            {group.toUpperCase()}
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {cats.map((cat) => {
+              const current = readExposure(exposures, cat.name, cat.id);
+              return (
+                <div key={cat.id} className="flex flex-col items-center gap-1.5">
+                  <EditableDots
+                    value={current}
+                    onChange={(v) => set(cat.name, v)}
+                    tone="emerald"
+                  />
+                  <div
+                    className="text-[10px] font-medium text-center"
+                    style={{ color: S.onSurface }}
+                  >
+                    {shortCat(cat.name)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const EditableRegionGrid: FC<{
+  exposures: Record<string, number>;
+  onChange: (next: Record<string, number>) => void;
+}> = ({ exposures, onChange }) => (
+  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+    {REGIONS.map((r) => (
+      <div key={r.id} className="flex flex-col gap-1.5">
+        <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
+          {r.label}
+        </div>
+        <EditableDots
+          value={exposures?.[r.id] ?? 0}
+          onChange={(v) => onChange({ ...exposures, [r.id]: v })}
+          tone="emerald"
+        />
+      </div>
+    ))}
+  </div>
+);
+
+const EditableValueChainGrid: FC<{
+  exposures: Record<string, number>;
+  onChange: (next: Record<string, number>) => void;
+}> = ({ exposures, onChange }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      {VC_STEPS.map((step) => (
+        <div key={step.id} className="flex flex-col gap-1.5">
+          <div
+            className="text-[11px] font-medium"
+            style={{ color: S.onSurface }}
+          >
+            {step.label}
+          </div>
+          <EditableDots
+            value={readVCExposure(exposures, step)}
+            onChange={(v) => onChange({ ...exposures, [step.id]: v })}
+            tone="purple"
+          />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 // ─── Empty / loading row ───────────────────────────────────────────
 const EmptyRow: FC<{ text: string; icon: React.ReactNode }> = ({ text, icon }) => (

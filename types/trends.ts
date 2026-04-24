@@ -7,11 +7,17 @@ import type {
   ForceName, Direction, Confidence, CategoryId, ValueChainStep,
 } from './index';
 
+/** Source tier — editorial credibility rating assigned to a single evidence
+ *  source. Mirrors the backend classification (S=official regulator → E=social). */
+export type SourceTier = 'S' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C' | 'D' | 'E';
+
 /** A single external evidence source for a trend. */
 export interface TrendSource {
   title: string;
   url: string;
   data: string;
+  /** Credibility tier — optional so legacy sources without a rating still render. */
+  tier?: SourceTier;
 }
 
 /** Bayesian posterior parameters (Beta distribution). */
@@ -83,6 +89,12 @@ export interface TrendUpdate {
   confidence?: Confidence;
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
+  regional_exposure?: RegionalExposure;
+  gp1_pct_affected?: number;
+  peak_year?: number;
+  diffusion_curve?: string;
+  sources?: TrendSource[];
+  name?: string;
 }
 
 /** Force contribution to a category shift. */
