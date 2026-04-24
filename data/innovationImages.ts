@@ -1,11 +1,19 @@
 /**
  * PRISM Innovation Explorer — Local Static Product Photography
  *
- * Each of the 43 innovation concepts is mapped to a curated stock photo
- * downloaded at build time (scripts/download-images.mjs) and served as a
+ * Each of the 53 innovation concepts is mapped to a curated, unique image
+ * generated at build time (scripts/download-images.mjs) and served as a
  * static asset from Vercel's edge CDN. Zero external requests at runtime.
  *
- * Photos sourced from Unsplash (free commercial license).
+ * Primary source: Pollinations.ai (Flux) — bespoke, prompt-matched imagery.
+ * Fallback:       hand-picked Unsplash photos (free commercial license).
+ *
+ * v3.6 (April 2026):
+ *  • Extended from 43 → 53 entries (inn_44–inn_53 now mapped).
+ *  • All duplicate photo IDs eliminated (previously 4 collisions).
+ *  • inn_19 Textured Hair master brand explicitly Black/4C imagery.
+ *  • inn_11 Insect Control & inn_38 Toilet Care prompts force category
+ *    recognisability.
  */
 
 /** Local static image paths per innovation. */
@@ -53,11 +61,23 @@ const localPaths: Record<string, string> = {
   inn_41: '/images/innovations/inn_41.jpg',
   inn_42: '/images/innovations/inn_42.jpg',
   inn_43: '/images/innovations/inn_43.jpg',
+  inn_44: '/images/innovations/inn_44.jpg',
+  inn_45: '/images/innovations/inn_45.jpg',
+  inn_46: '/images/innovations/inn_46.jpg',
+  inn_47: '/images/innovations/inn_47.jpg',
+  inn_48: '/images/innovations/inn_48.jpg',
+  inn_49: '/images/innovations/inn_49.jpg',
+  inn_50: '/images/innovations/inn_50.jpg',
+  inn_51: '/images/innovations/inn_51.jpg',
+  inn_52: '/images/innovations/inn_52.jpg',
+  inn_53: '/images/innovations/inn_53.jpg',
 };
 
 /**
  * Get the image URL for a given innovation.
- * Returns a local static path (served from Vercel edge CDN).
+ * Returns a local static path (served from Vercel edge CDN) or `null`
+ * when no mapping exists — the component then falls back to the branded
+ * gradient background.
  */
 export function getInnovationImageUrl(
   innovationId: string,
