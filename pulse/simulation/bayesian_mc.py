@@ -62,7 +62,7 @@ class BayesianMonteCarloEngine:
         v3.2 (April 2026): the legacy ``base × (1 − mean_overlap)`` indirection
         has been removed. The engine now consumes ``config.per_force_attenuation``
         — six calibrated values (one per force) sourced from
-        data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet, 82-trend
+        data/Attenuation_Calibration_v3_4.xlsx (Cross-Force sheet, 95-trend
         Bain review). There is no flat 0.5 default and no scalar fallback.
 
         Returns: dict {force_name: effective_attenuation}
@@ -80,7 +80,7 @@ class BayesianMonteCarloEngine:
             )
         logger.info(
             "Per-force attenuation (calibrated, source=%s): %s",
-            getattr(self.config, "attenuation_source", "calibrated_v3.1_april2026"),
+            getattr(self.config, "attenuation_source", "calibrated_v3.4_april2026"),
             ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES),
         )
         return per_force

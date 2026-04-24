@@ -803,7 +803,7 @@ const PeakStressTooltip: FC = () => {
           </div>
           <p className="mb-2">
             Each trend has its own diffusion curve (<em>s_curve, linear, front-loaded,
-            back-loaded, step-function</em>) and its own peak year. The 82 v3.1 trends
+            back-loaded, step-function</em>) and its own peak year. The 95 v3.4 trends
             are spread across 2027–2035 peak years and five curve shapes.
           </p>
           <p className="mb-2">
@@ -1488,7 +1488,7 @@ const ProfitPoolAnalysis2: FC = () => {
           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.6'}</code>,
-          50,000 iterations, Gaussian / t-copula dependencies, 95 v3.3 trends). Each cell is a{' '}
+          50,000 iterations, Gaussian / t-copula dependencies, 95 v3.4 trends). Each cell is a{' '}
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by

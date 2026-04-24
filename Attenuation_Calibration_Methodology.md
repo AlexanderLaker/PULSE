@@ -144,3 +144,151 @@ python3 build_excel.py              # regenerates Excel
 *Methodology: Excess-overlap-above-baseline + force-size asymmetry + mechanism adjustment*
 *Input: 82 trends × 12 categories = 984 exposure scores*
 *Pairs evaluated: 3,321 unordered pairs (within + across forces)*
+
+---
+
+# PRISM v3.4 — Recalibration on 95-Trend Base
+**Bain Senior Partner Review | April 2026 | 95-Trend Empirical Analysis**
+
+Sections 1–6 above document the v3.1 calibration on the 82-trend base and remain the authoritative reference for the methodology (weighted Jaccard, excess-over-baseline, asymmetric force-size normalization, mechanism adjustments, clamps). Sections 7–11 below document the v3.4 recalibration on the expanded 95-trend base. **Methodology is unchanged — only inputs and outputs differ.**
+
+---
+
+## 7. Why we recalibrated again (v3.1 → v3.4)
+
+Between the v3.1 review and the v3.4 review the trend database was expanded by thirteen additional trends — four from the Gemini deep-search pass (one each into Consumer, Technology, Government, Competitive) and nine from targeted gap-fill across Customer and Environmental categories. The expanded footprint is:
+
+| Force | v3.1 count | v3.4 count | Δ |
+|:---|---:|---:|---:|
+| Consumer | 30 | 31 | +1 |
+| Customer | 6 | 10 | +4 |
+| Technology | 16 | 17 | +1 |
+| Government | 12 | 13 | +1 |
+| Environmental | 7 | 11 | +4 |
+| Competitive | 11 | 13 | +2 |
+| **Total** | **82** | **95** | **+13** |
+
+A +16% expansion of the base is material enough that the within- and cross-force overlap matrices had to be re-computed end-to-end. The expansion disproportionately added *structural variety* — especially in Customer and Environmental, which had been under-represented in v3.1 — so the random-pair J₀ baseline and the force-specific cohesion numbers shift non-trivially.
+
+The methodology (weighted Jaccard on 12-category exposure vectors, excess-over-baseline transform, asymmetric force-size normalization, mechanism adjustment, clamps [0.10, 0.45]) is **unchanged from v3.1**. All six numerical steps in §2 execute identically — only the trend set they consume is different.
+
+---
+
+## 8. What shifted at the matrix level
+
+### 8.1 Random-pair baseline J₀
+
+```
+v3.1  J₀ = 0.4846   (82 trends, 3,321 pairs)
+v3.4  J₀ = 0.4592   (95 trends, 4,465 pairs)
+         Δ = −0.0254
+```
+
+The baseline dropped because the added trends expanded the structural space — pairs drawn at random now overlap less on average. This means the **excess-overlap signal is cleaner** in v3.4 (more headroom above floor noise) and per-force cohesion numbers separate more cleanly.
+
+### 8.2 Trend-weighted mean attenuation
+
+```
+v3.1  mean(eff_att) = 0.4462   (weighted by trend count)
+v3.4  mean(eff_att) = 0.4492
+         Δ = +0.0030
+```
+
+Slight upward drift — the engine is marginally *less* dampening on average. Intuition: the added trends are on average more structurally independent from their force-mates (higher eff_att), pulling the mean up.
+
+### 8.3 Within-force cohesion (after mechanism adjustment)
+
+| Force | v3.1 within | v3.4 within | Δ |
+|:---|---:|---:|---:|
+| Consumer | 0.10 (clamped) | 0.10 (clamped) | 0.00 |
+| Customer | 0.25 | 0.233 | −0.017 |
+| Technology | 0.20 | 0.204 | +0.004 |
+| Government | 0.42 | 0.415 | −0.005 |
+| Environmental | 0.30 | 0.305 | +0.005 |
+| Competitive | 0.10 (clamped) | 0.10 (clamped) | 0.00 |
+
+Government remains the most tightly-coupled force (regulatory cascades — any trend in the force pulls the others). Consumer and Competitive remain at the 0.10 floor: Henkel's consumer-taste trends and its competitor-action trends each span very different category vectors internally (skin vs. fabric vs. hair; startup vs. retailer vs. incumbent).
+
+### 8.4 Cross-force matrix row means (→ eff_att)
+
+| Force | v3.1 row mean | v3.4 row mean | eff_att v3.1 | eff_att v3.4 | Δ eff_att |
+|:---|---:|---:|---:|---:|---:|
+| Consumer | 0.036 | 0.010 | 0.482 | 0.495 | +0.013 |
+| Customer | 0.164 | 0.195 | 0.418 | 0.402 | −0.016 |
+| Technology | 0.130 | 0.137 | 0.435 | 0.432 | −0.003 |
+| Government | 0.194 | 0.206 | 0.403 | 0.397 | −0.006 |
+| Environmental | 0.173 | 0.168 | 0.413 | 0.416 | +0.003 |
+| Competitive | 0.027 | 0.043 | 0.486 | 0.479 | −0.007 |
+
+The identity `eff_att_i = 0.5 × (1 − mean(O[i][j] for j≠i))` is applied as before — these are not re-derived numbers, they are the direct outputs of the updated cross-force overlap matrix.
+
+---
+
+## 9. Where it lands in code
+
+The engine consumes `DEFAULT_PER_FORCE_ATTENUATION` directly — there is no base × (1−overlap) derivation at runtime. The six v3.4 values replace the six v3.1 values across three authoritative locations:
+
+| Location | Constant | v3.4 value |
+|:---|:---|:---|
+| `pulse/config.py` | `DEFAULT_PER_FORCE_ATTENUATION` | {Consumer:0.495, Customer:0.402, Technology:0.432, Government:0.397, Environmental:0.416, Competitive:0.479} |
+| `lib/calibration.ts` | `DEFAULT_PER_FORCE_ATTENUATION` | same six values (Δ vs v3.1 commented inline) |
+| `data/attenuation_calibration_v3_4.json` | `per_force_eff_att` | same six values (API/audit export) |
+
+The `attenuation_source` field is now a three-way enum:
+
+```
+"calibrated_v3.4_april2026"   (default — live)
+"calibrated_v3.1_april2026"   (legacy — still valid for reproduction runs)
+"admin_override"              (manual experimentation)
+```
+
+Validator (`pulse/config_validation.py`), TypeScript union types (`types/config.ts`, `pulse/dashboard/src/types/config.ts`), Bayesian MC fallback (`pulse/simulation/bayesian_mc.py`), test fixtures (`tests/conftest.py`), and the SettingsModal/SettingsPage UI all enforce this enum.
+
+---
+
+## 10. Sensitivity — what this means for the headline number
+
+Trend-weighted mean attenuation moved +0.003 (0.446 → 0.449). Mechanically this means the engine applies ~0.3% less dampening to cross-force signal propagation on average. The *shape* of the shift matters more than the scalar:
+
+- **Customer got more dampening** (eff_att 0.418 → 0.402, Δ −0.016) — Customer-force trends (retailer consolidation, marketplace shifts, channel-specific trends) now look structurally more entangled with Technology and Government than v3.1 assumed. This is intuitive: omnichannel, D2C, and marketplace-regulatory trends genuinely spill over.
+- **Consumer got less dampening** (eff_att 0.482 → 0.495, Δ +0.013) — the added Consumer trend plus the expansion of sibling forces makes Consumer look *more* structurally independent. Consumer taste shifts don't pull other forces as much as v3.1 suggested.
+- **Competitive got slightly more dampening** (eff_att 0.486 → 0.479, Δ −0.007) — consistent with the added competitive trend (Chinese-brand expansion into Western FMCG) which shares structure with Government (trade policy) and Technology (platform-native DTC).
+
+A full Monte Carlo re-run is required to translate these per-force shifts into profit-pool mean/median/p-band deltas — see §11 deliverables.
+
+---
+
+## 11. v3.4 deliverables
+
+| File | Purpose |
+|:---|:---|
+| `pulse/config.py` | Live model configuration — v3.4 values deployed |
+| `lib/calibration.ts` | TypeScript mirror for dashboard — v3.4 values deployed |
+| `data/Attenuation_Calibration_v3_4.xlsx` | 6-sheet companion workbook: Summary, Within-Force, Cross-Force, Empirical Computation, Mechanism Adjustments, Trend Census (95 trends) |
+| `data/attenuation_calibration_v3_4.json` | Raw calibration output (API/audit) |
+| `compute_attenuation_v3_4.py` | Reproducible computation script for v3.4 |
+| `build_attenuation_xlsx.py` | Excel build script that consumes the JSON |
+| `Attenuation_Calibration_Methodology.md` | This document (v3.1 + v3.4 combined reference) |
+
+**To re-run the v3.4 calibration** (after future trend-database updates):
+```bash
+python3 compute_attenuation_v3_4.py   # recomputes matrices on current trend DB
+python3 build_attenuation_xlsx.py     # regenerates companion Excel
+python3 scripts/recalc.py data/Attenuation_Calibration_v3_4.xlsx   # recalculates formulas
+```
+
+**To re-run the simulation with v3.4 attenuation** (required for profit-pool number refresh):
+```bash
+# Dashboard Monte Carlo auto-picks up new values from lib/calibration.ts
+# Python simulation:
+python3 -m pulse.simulation.bayesian_mc --config live --iterations 50000
+```
+
+---
+
+*v3.4 calibration date: April 22, 2026*
+*Methodology: unchanged from v3.1 — weighted Jaccard + excess-over-baseline + force-size asymmetry + mechanism adjustment, clamps [0.10, 0.45]*
+*Input: 95 trends × 12 categories = 1,140 exposure scores*
+*Pairs evaluated: 4,465 unordered pairs (within + across forces)*
+*Baseline J₀ shift: 0.4846 → 0.4592 (−0.0254)*
+*Trend-weighted mean eff_att shift: 0.4462 → 0.4492 (+0.0030)*

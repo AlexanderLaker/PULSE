@@ -24,22 +24,22 @@ import type { ForceName, Trend } from '@/types';
  *  values, one per force. There is no flat 0.5 anywhere.
  *
  *  Source-of-truth: data/Attenuation_Calibration.xlsx
- *  (Cross-Force_Matrix sheet, 82-trend Bain review).
+ *  (Cross-Force_Matrix sheet, 95-trend v3.4 recalibration (April 2026)).
  *
  *  These six values must stay in lock-step with
  *  pulse/config.py::DEFAULT_PER_FORCE_ATTENUATION. */
 export const DEFAULT_PER_FORCE_ATTENUATION: Record<ForceName, number> = {
-  Consumer:      0.482,
-  Customer:      0.418,
-  Technology:    0.435,
-  Government:    0.403,
-  Environmental: 0.413,
-  Competitive:   0.486,
+  Consumer:      0.495,   // v3.1 was 0.482  (Δ +0.013)
+  Customer:      0.402,   // v3.1 was 0.418  (Δ −0.016)
+  Technology:    0.432,   // v3.1 was 0.435  (Δ −0.003)
+  Government:    0.397,   // v3.1 was 0.403  (Δ −0.006)
+  Environmental: 0.416,   // v3.1 was 0.413  (Δ +0.003)
+  Competitive:   0.479,   // v3.1 was 0.486  (Δ −0.007)
 };
 
 /** Calibration provenance string — matches attenuation_source in
  *  the backend config. */
-export const ATTENUATION_SOURCE = 'calibrated_v3.1_april2026';
+export const ATTENUATION_SOURCE = 'calibrated_v3.4_april2026';
 
 export const BASE_YEAR = 2025;
 
@@ -231,13 +231,17 @@ export const DEFAULT_WITHIN_FORCE_OVERLAP: Record<ForceName, number> = {
  * directly from DEFAULT_PER_FORCE_ATTENUATION — no `base × (1 − overlap)`
  * derivation, no scalar fallback.
  *
- * Calibrated values (frozen from 82-trend Bain review, April 2026):
- *   Consumer      0.482
- *   Customer      0.418
- *   Technology    0.435
- *   Government    0.403
- *   Environmental 0.413
- *   Competitive   0.486
+ * Calibrated values (frozen from 95-trend v3.4 recalibration (April 2026), April 2026):
+ *   Consumer      0.495  (v3.1 0.482)
+ *   Customer      0.402  (v3.1 0.418)
+ *   Technology    0.432  (v3.1 0.435)
+ *   Government    0.397  (v3.1 0.403)
+ *   Environmental 0.416  (v3.1 0.413)
+ *   Competitive   0.479  (v3.1 0.486)
+ *
+ *  v3.4 recalibration on 95-trend base (+13 trends since v3.1):
+ *  J₀ shifted 0.4846 → 0.4592 as structural variety increased.
+ *  Trend-weighted mean attenuation: 0.4492 (v3.1 ≈ 0.446).
  *
  * @param force  One of the six force names.
  * @param overrides  Optional per-force overrides (e.g. when the backend

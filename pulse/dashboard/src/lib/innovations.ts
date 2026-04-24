@@ -2,7 +2,7 @@
  * PRISM Innovation Explorer — Full Innovation Portfolio Data
  * 50 Strategic Product Innovation Concepts
  * ├─ 16 original concepts (v3.0, 61-trend database)
- * ├─ 27 additions derived from the extended 82-trend set (v3.1)
+ * ├─ 27 additions derived from the 82-trend v3.1 set (v3.4 recalibration retained same innovation topology)
  * └─ 7 additions driven by the v3.3 trend review (April 2026)
  *
  * Source: PRISM Innovation Explorer Report, April 2026
@@ -925,7 +925,7 @@ export const INNOVATIONS: Innovation[] = [
 
  // ============================================================
  // ADDITIONS (– inn_43)
- // Derived from the extended 82-trend set. Bain-grade convergence
+ // Derived from the 95-trend v3.4 set. Bain-grade convergence
  // analysis across H1 Execution (2026–2028), H2 Disruption
  // (2029–2032), H3 Transformation (2033–2036).
  // ============================================================
