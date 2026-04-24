@@ -24,35 +24,35 @@ VC_STEPS = [
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
 # ── Default model parameters ────────────────────────────────────────
-# v3.4 recalibration (April 2026, 95-trend base). Each value equals what the
+# v3.5 recalibration (April 2026, 99-trend base). Each value equals what the
 # cross-force overlap matrix yields for that force via the identity
 #   eff_att_i = 0.5 × (1 − mean(O[i][j] for j≠i))
 # so the runtime engine consumes them directly — there is no base × (1−overlap)
 # step anywhere. The six values span 0.40–0.50 and reflect the spread between
-# tightly-coupled Government signal (0.397) and loosely-coupled Consumer (0.495)
+# tightly-coupled Customer signal (0.401) and loosely-coupled Consumer (0.495)
 # / Competitive (0.479) signal in the expanded Henkel trend-space.
 #
-# Provenance per force (v3.4 — delta vs v3.1 in parens):
+# Provenance per force (v3.5 — delta vs v3.1 in parens):
 #   force            cross-force row mean   eff_att_NEW   (Δ v3.1)
 #   Consumer                       0.010        0.495      (+0.013)
-#   Customer                       0.195        0.402      (−0.016)
-#   Technology                     0.137        0.432      (−0.003)
-#   Government                     0.206        0.397      (−0.006)
-#   Environmental                  0.168        0.416      (+0.003)
-#   Competitive                    0.043        0.479      (−0.007)
+#   Customer                       0.198        0.401      (-0.017)
+#   Technology                     0.132        0.434      (-0.001)
+#   Government                     0.170        0.415      (+0.012)
+#   Environmental                  0.164        0.418      (+0.005)
+#   Competitive                    0.042        0.479      (-0.007)
 #
-# Trend-weighted mean across the 95 trends = 0.4492 (v3.1 sanity ≈ 0.446).
-# J₀ random-pair baseline = 0.4592 (v3.1 was 0.4846).
-# Source: data/Attenuation_Calibration_v3_4.xlsx (Summary sheet).
+# Trend-weighted mean across the 99 trends = 0.4523 (v3.1 sanity ~= 0.446).
+# J0 random-pair baseline = 0.4525 (v3.1 was 0.4846).
+# Source: data/Attenuation_Calibration_v3_5.xlsx (Summary sheet).
 DEFAULT_PER_FORCE_ATTENUATION = {
     "Consumer":      0.495,
-    "Customer":      0.402,
-    "Technology":    0.432,
-    "Government":    0.397,
-    "Environmental": 0.416,
+    "Customer":      0.401,
+    "Technology":    0.434,
+    "Government":    0.415,
+    "Environmental": 0.418,
     "Competitive":   0.479,
 }
-DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.4_april2026"  # valid sources: "calibrated_v3.4_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
+DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.5_april2026"  # valid sources: "calibrated_v3.5_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
@@ -213,13 +213,13 @@ DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 #   Other pairs: ≤0.10 (largely independent mechanisms)
 
 DEFAULT_FORCE_OVERLAP_MATRIX = {
-    # ── CALIBRATED from 95-trend empirical analysis (April 2026, v3.4) ──
+    # ── CALIBRATED from 99-trend empirical analysis (April 2026, v3.5) ──
     # Methodology: excess-overlap-above-baseline + force-size asymmetry + mechanism adjustment
     #
     # Step 1 (empirical): Computed mean pairwise weighted Jaccard between each
-    #   pair of trends across every cross-force combination in the 95-trend db.
+    #   pair of trends across every cross-force combination in the 99-trend db.
     #   Converted to "excess overlap": max(0, mean_J - J₀) / (1 - J₀) where
-    #   J₀ = 0.485 is the random-pair baseline across all trends. This removes
+    #   J₀ = 0.453 is the random-pair baseline across all trends. This removes
     #   the structural-overlap floor (baseline FMCG scorecell similarity) and
     #   isolates the signal.
     # Step 2 (asymmetry): Multiplied by sqrt(n_j / n_i) capped at 1.5× to
@@ -245,7 +245,7 @@ DEFAULT_FORCE_OVERLAP_MATRIX = {
     # preserve non-zero values: Consumer→Competitive (0.08) via dupe↔indie, and
     # a handful of small cross-links.
     #
-    # See also: attenuation_source = "calibrated_v3.4_april2026"
+    # See also: attenuation_source = "calibrated_v3.5_april2026"
     # Exported matrix: data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet)
     "Consumer":      {"Consumer": 0.0,  "Customer": 0.050, "Technology": 0.000, "Government": 0.000, "Environmental": 0.050, "Competitive": 0.080},
     "Customer":      {"Consumer": 0.000, "Customer": 0.0,  "Technology": 0.266, "Government": 0.300, "Environmental": 0.163, "Competitive": 0.090},
@@ -282,10 +282,10 @@ DEFAULT_FORCE_OVERLAP_MATRIX = {
 #   Competitive 0.15: competitor-specific trends are more independent
 
 DEFAULT_WITHIN_FORCE_OVERLAP = {
-    # ── CALIBRATED from 95-trend empirical analysis (April 2026, v3.4) ──
+    # ── CALIBRATED from 99-trend empirical analysis (April 2026, v3.5) ──
     # Methodology: mean pairwise weighted Jaccard over 12-category exposure
     # vectors WITHIN each force, converted to excess-overlap above the
-    # 95-trend random-pair baseline J₀ = 0.459, then adjusted ±0.03-0.10
+    # 99-trend random-pair baseline J₀ = 0.453, then adjusted ±0.03-0.10
     # for mechanism-cluster density vs. diversity.
     #
     # Empirical signal per force (raw mean J → excess → final):
@@ -350,7 +350,7 @@ class ModelConfig:
     # v3.2: scalar ``attenuation`` removed. The engine consumes a per-force
     # dict directly. Source-of-truth is data/Attenuation_Calibration.xlsx.
     per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
-    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.4_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
+    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.5_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
     neutral_threshold: float = DEFAULT_NEUTRAL_THRESHOLD
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))

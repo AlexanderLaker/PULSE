@@ -59,7 +59,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
   const [perForceAttenuation, setPerForceAttenuation] = useState<Record<ForceName, number>>(
     () => Object.fromEntries(FORCES.map(f => [f, 0])) as Record<ForceName, number>
   );
-  const [attenuationSource, setAttenuationSource] = useState<string>('calibrated_v3.4_april2026');
+  const [attenuationSource, setAttenuationSource] = useState<string>('calibrated_v3.5_april2026');
   const [forceWeights, setForceWeights] = useState<Record<ForceName, number>>(
     () => Object.fromEntries(FORCES.map(f => [f, 1 / 6])) as Record<ForceName, number>
   );
@@ -303,7 +303,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
             />
 
             <Hint>
-              <strong style={{ color: T.text2 }}>What this does:</strong> Each off-diagonal cell is the share of the <em>row force</em>'s signal that overlaps with the <em>column force</em>'s signal; the diagonal is within-force cohesion. <strong style={{ color: T.text2 }}>v3.2:</strong> these matrices are retained for analytics and provenance, but the engine no longer derives effective attenuation from them at runtime. The six per-force values shown below are the calibrated outputs of the v3.4 recalibration on the 95-trend base (April 2026) and are consumed directly. There is no flat 0.5 default anywhere.
+              <strong style={{ color: T.text2 }}>What this does:</strong> Each off-diagonal cell is the share of the <em>row force</em>'s signal that overlaps with the <em>column force</em>'s signal; the diagonal is within-force cohesion. <strong style={{ color: T.text2 }}>v3.2:</strong> these matrices are retained for analytics and provenance, but the engine no longer derives effective attenuation from them at runtime. The six per-force values shown below are the calibrated outputs of the v3.5 recalibration on the 99-trend base (April 2026) and are consumed directly. There is no flat 0.5 default anywhere.
             </Hint>
             <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: T.text3, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>

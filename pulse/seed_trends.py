@@ -1,5 +1,32 @@
 """
-PRISM seed data: 95 trends (82 v3.1 base + 14 v3.3 additions − 1 consolidation, April 2026).
+PRISM seed data: 99 trends (v3.3 base of 95 + 4 Gemini-review additions,
+with competitive_r04 amended by Gemini and Part-3 source augmentations
+applied to consumer_r23 + technology_r07; April 2026).
+
+GEMINI_REVIEW_APPLIED_APR2026 — external-reviewer delta on top of v3.3:
+  - competitive_r04 repositioned "DTC and Indie Brand Disruption in Hair"
+    → "Indie Brand Omnichannel Pivot via TikTok Shop"; substance of the
+    threat preserved, channel vector updated to the post-acquisition
+    social-commerce-first reality.
+  - 4 new trends added on fresh, collision-free IDs (Gemini originally
+    suggested IDs already used by v3.3; re-homed to keep v3.3 integrity):
+      consumer_r33    Ultra-Fast-Fashion Beauty (Shein/Temu price-floor collapse)
+      technology_r19  Neuro-Scents (functional fragrance, neuro-validated)
+      competitive_r14 AfCFTA Pan-African Integration
+      government_r14  PVA Unit-Dose Film Biodegradability Reclassification
+  - technology_r19 (Neuro-Scents) has an acknowledged scope overlap with
+    v3.3's technology_r17 (Neurocosmetics and Sensory-Science Hair Care):
+    scalp-sensorial vs. fragrance-olfactory. Both retained as distinct.
+
+GEMINI_REVIEW_PART34_APPLIED_APR2026 — source-augmentation + PVA trend:
+  - consumer_r23 (Wellness-to-Beauty Convergence): Lancet clinical paper
+    (Tier S) added to anchor signal in hard clinical data.
+  - technology_r07 (AI-Powered Personalization at Scale): Gartner Hype
+    Cycle for Consumer Tech 2026 (Tier A) added; confidence Low → Medium
+    to reflect the tightened Bayesian probability distribution.
+  - government_r14 added: PVA unit-dose film reclassification risk —
+    covers the existential LHC exposure that government_r02 explicitly
+    exempts (currently "biodegradable" polymers).
 
 v3.3 changes (April 2026 — Strategic Review, 20-analyst team):
   - 14 new trends across 14 structurally under-covered gap areas:
@@ -13,7 +40,7 @@ v3.3 changes (April 2026 — Strategic Review, 20-analyst team):
   - 1 consolidation: technology_r09 retired; superseded by technology_r13
     (hyper-personalised formulation already captures the ML-formulation
     vector at higher resolution)
-  - Net active trend count: 95 (82 v3.1 base − 1 consolidated + 14 new)
+  - Net active trend count after Gemini review: 99 (v3.3 base 95 + 4 Gemini additions, with competitive_r04 amended)
 
 v3.1 changes (April 2026):
   - 2 retirements: consumer_r12 (Post-COVID Hygiene), customer_r05 (Quick Commerce)
@@ -524,8 +551,8 @@ TRENDS = [
         category_exposure=cat(4,4,3,3, 1,1,0,1,0,0,0,0),
         vc_exposure=vc(1,4,3,2,1,4,3,5),
         regional_exposure=reg(3,5,5,1),
-        data_source="L'Oreal Modiface; Function of Beauty; Industry analysis", source_type="analyst_report",
-        confidence="Low",
+        data_source="L'Oreal Modiface; Function of Beauty; Industry analysis; Gartner Hype Cycle Consumer Tech 2026 (Gemini augment Apr-2026)", source_type="analyst_report",
+        confidence="Medium",  # Gemini Apr-2026: uplifted Low→Medium after Gartner tier-A anchor added; signal morphs toward AI biometric scanning
     ),
     # ── S-08 (Technology) ──
     Trend(
@@ -708,22 +735,27 @@ TRENDS = [
         data_source="P&G FY2025 earnings; Investor presentation", source_type="analyst_report",
         confidence="High",
     ),
-    # ── X-04 ──
+    # ── X-04 (AMENDED by Gemini review Apr-2026) ──
+    # Repositioned from "DTC and Indie Brand Disruption in Hair" to the
+    # TikTok-Shop channel-shift vector that now carries the residual indie
+    # threat after the P&G / Unilever / L'Oréal acquisition wave absorbed
+    # the first cohort of web-native challengers.
     Trend(
-        id="competitive_r04", force="Competitive", sub_category="Disruption",
-        peak_year=2030, diffusion_curve="s_curve",  # DTC/indie disruption maturing — major CPG acquisitions mid-horizon
-        name="DTC and Indie Brand Disruption in Hair",
-        direction="Contraction", probability=4, start_year=2023,
-        # 8%: Indie brands capture premium sub-segments (~15% of Hair
-        # premium) but limited mass-market GP1 exposure
-        gp1_pct_affected=0.08,
-        description="DTC/indie disruption confirmed. Competitive dynamics shifting — major CPGs acquiring indie brands (P&G: Mielle Organics; Unilever: K18, Nutrafol). Indie threat partially absorbed into X-02/X-03 competitive pressure. Henkel has not made significant hair care acquisition since 2015 beauty portfolio shift — acquisition gap becoming strategic liability. Schwarzkopf Professional credibility remains organic defense, but professional-grade-at-mass-retail positioning claimed by multiple competitors.",
-        strategic_implication="The indie-brand disruption threat has shifted from organic share loss to consolidated acquisition: P&G acquired Mielle Organics, Unilever bought K18 and Nutrafol, L'Oréal owns Color Wow and Medik8. The addressable pool of high-quality indie brands is shrinking as competitors bid up valuations. HCB has not made a significant Hair Care acquisition since the 2015 portfolio shift — the acquisition gap is becoming a strategic liability because every competitor acquisition removes a future HCB target. Professional-heritage brand equity remains organic defence, but 'professional-grade at mass retail' is precisely what Mielle, K18, and Color Wow occupy under new ownership.",
-        category_exposure=cat(3,5,3,2, 0,0,0,0,0,0,0,0),
-        vc_exposure=vc(1,3,0,2,1,4,3,5),
-        regional_exposure=reg(4,5,3,2),
-        data_source="DTC brand tracking; Euromonitor Hair Care 2025", source_type="analyst_report",
-        confidence="Medium",
+        id="competitive_r04", force="Competitive", sub_category="Indie/DTC Channel Shift",
+        peak_year=2029, diffusion_curve="s_curve",  # TikTok Shop beauty GMV on 3-4x YoY run-rate; channel matures by 2029
+        name="Indie Brand Omnichannel Pivot via TikTok Shop",
+        direction="Contraction", probability=4, start_year=2024,
+        # 9%: TikTok-Shop-native indie challengers pressure premium
+        # sub-segments with a 6-12 month launch-to-viral-peak lifecycle;
+        # uplift vs. 8% reflects channel-concentration risk.
+        gp1_pct_affected=0.09,
+        description="The DTC-only indie-brand threat has mutated rather than disappeared. After P&G (Mielle Organics), Unilever (K18, Nutrafol) and L'Oréal (Color Wow, Medik8) absorbed the first wave of web-native challengers, a second cohort is now pivoting to a social-commerce-first model, with TikTok Shop as the dominant demand engine in beauty/personal-care. Marketplace Pulse and Jungle Scout both show TikTok Shop beauty GMV running 3-4x YoY through 2025-26, with hair and scalp brands over-indexed. Circana flags it as the fastest-growing prestige-adjacent hair channel in the US. This creates a new indie pressure vector that Henkel's historical shelf/wholesale-first commercial model is structurally slow to counter.",
+        strategic_implication="The acquisition playbook (buy the indie brand) is now too slow and too expensive for TikTok-Shop-native challengers whose lifecycle from launch to viral peak is 6-12 months. HCB needs a parallel 'live-commerce-native' commercial capability — creator seeding, livestream merchandising, and short-form content factories — operated out of the brand teams rather than outsourced to retailers. Threat is concentrated in Hair: Care and Hair: Styling (scalp, bonding, heat-styling sub-segments) and in the 18-34 consumer cohort. Downside risk 5-8% GP1 in the affected sub-segments over 2027-30 if the capability gap persists. Professional-heritage equity (Schwarzkopf Professional) remains the organic defence, but must be activated natively on the TikTok-Shop surface rather than via retailer-owned media.",
+        category_exposure=cat(3,5,4,2, 0,0,0,0,0,0,0,0),
+        vc_exposure=vc(1,3,0,2,2,5,4,5),
+        regional_exposure=reg(4,5,4,2),
+        data_source="Marketplace Pulse TikTok Shop GMV tracker; Jungle Scout TikTok Shop category report 2026; Circana social-commerce channel tracker; P&G 2025 Investor Day", source_type="market_report",
+        confidence="Medium-High",
     ),
     # ── X-05 ──
     Trend(
@@ -1521,9 +1553,9 @@ TRENDS = [
         category_exposure=cat(2,4,1,3, 1,1,1,2,0,0,0,0),
         vc_exposure=vc(3,4,2,2,1,4,3,5),
         regional_exposure=reg(4,5,4,2),
-        data_source="Grand View Research Beauty Supplements 2025; Nutrafol/Unilever Case Study; Mintel Beauty from Within 2026",
+        data_source="Grand View Research Beauty Supplements 2025; Nutrafol/Unilever Case Study; Mintel Beauty from Within 2026; The Lancet — Clinical Efficacy in Hybrid Beauty (Gemini augment Apr-2026)",
         source_type="market_report",
-        confidence="Low",
+        confidence="Low",  # Gemini Apr-2026: evidence base upgraded via Lancet clinical paper; confidence held Low pending additional peer-reviewed replication
     ),
     # ── NEW-19 ──
     Trend(
@@ -1899,6 +1931,99 @@ TRENDS = [
         data_source="Hims & Hers Q4 2025 Earnings; Ro/Roman Commercial Data; JAMA Dermatology Telehealth Review 2025; Forrester Tele-Derm Market Size", source_type="analyst_report",
         confidence="Medium",
     ),
+    # ═══════════════════════════════════════════════════════════════════════
+    # GEMINI REVIEW ADDITIONS (April 2026) — 3 net-new trends proposed by
+    # external reviewer. Re-homed from Gemini-suggested IDs that collided
+    # with v3.3 (consumer_r25, technology_r17, competitive_r13).
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # ── GEMINI-NEW-1 ── Ultra-Fast-Fashion Beauty (Shein/Temu price-floor)
+    Trend(
+        id="consumer_r33", force="Consumer", sub_category="Value Erosion",
+        peak_year=2029, diffusion_curve="front_loaded",
+        name="Ultra-Fast-Fashion Beauty: Shein/Temu-Style Price Floor Collapse",
+        description="Shein, Temu and Pinduoduo-owned beauty lines are replicating the ultra-fast-fashion model in mass hair and body care: direct-from-Guangzhou shipping, <€3 hero SKUs, creator-driven virality. Euromonitor and WGSN both flag 2026 as the tipping point for category contamination outside of apparel. Henkel's entry-tier shampoo and styling SKUs (Schauma, Taft mass, regional value brands) sit directly in the blast radius. Front-loaded diffusion captures the 2026-28 price-floor shock; EU product-safety enforcement at the border is the primary regulator of peak impact.",
+        direction="Contraction", probability=4, start_year=2025,
+        # 11%: Entry-tier Hair Body/Care and regional value brands most
+        # exposed; blast radius is Western Europe + LatAm mass.
+        gp1_pct_affected=0.11,
+        strategic_implication="Price-floor collapse in entry mass is the single largest 2026-29 downside risk on Western European and LATAM hair value share. Three mitigations: (1) re-engineer mass packaging and formulation cost-of-goods to defend a €3.49 shelf price, (2) differentiate on provenance / clean-label messaging that ultra-fast-fashion cannot credibly replicate, (3) engage regulators on product-safety enforcement at the border (already underway in the EU). Front-loaded profile means H1-H2 2027 is the decision window.",
+        category_exposure=cat(1,4,4,5, 2,1,0,0,0,0,0,0),
+        vc_exposure=vc(2,1,2,3,3,4,5,5),
+        regional_exposure=reg(5,3,4,4),
+        data_source="Gemini review Apr-2026: Euromonitor ultra-fast-fashion beauty; WGSN Shein/Temu scan; Reuters EU cosmetics-safety probe; McKinsey State of Beauty 2026",
+        source_type="market_report",
+        confidence="Medium",
+        ai_suggested=True,
+    ),
+
+    # ── GEMINI-NEW-2 ── Neuro-Scents (functional fragrance, neuro-validated)
+    # OVERLAP FLAG: scope-adjacent to technology_r17 (Neurocosmetics and
+    # Sensory-Science Hair Care). technology_r17 covers the scalp-sensorial
+    # topical vector; this trend covers the olfactory/fragrance vector.
+    # Both retained as distinct but flagged for joint review.
+    Trend(
+        id="technology_r19", force="Technology", sub_category="Functional Fragrance",
+        peak_year=2030, diffusion_curve="s_curve",
+        name="Neuro-Scents: Functional Fragrance with Measured Neuro-Benefit",
+        description="A new class of fragrance formulation backed by EEG and fMRI validation: scents engineered and clinically tested for stated cognitive/emotional outcomes (focus, calm, sleep onset, stress reduction). IFF, Givaudan and Symrise are all building neuroscience labs; Estée Lauder and L'Oréal have filed neuro-functional fragrance patents; startups like Osmo and Arcaea are pushing algorithmic scent design. For Henkel this is both an incremental premium-fragrance opportunity (styling, fine-fragrance laundry) and a structural shift in how fragrance IP is built. Scope-adjacent to technology_r17 (scalp-sensorial topical tech); retained as distinct olfactory vector.",
+        direction="Expansion", probability=3, start_year=2026,
+        # 6%: Premium styling + fine-fragrance laundry upside; not a
+        # category-wide shift in the horizon.
+        gp1_pct_affected=0.06,
+        strategic_implication="Neuro-functional fragrance could support a 15-25% price premium in styling and personal-care by 2029, and create a reason-to-believe for premiumisation in laundry-perfume territory. Henkel should (1) secure access to neuro-validated fragrance libraries via its existing fragrance-house relationships, (2) co-invest in 1-2 upstream neuroscience partnerships, (3) pilot a functional-fragrance SKU in Dial/Schwarzkopf in 2027. Keep scope clean vs. technology_r17 — this is olfactory-first, not scalp-sensorial.",
+        category_exposure=cat(1,3,4,3, 4,3,2,2,1,0,1,0),
+        vc_exposure=vc(5,5,2,1,2,4,3,4),
+        regional_exposure=reg(4,4,3,2),
+        data_source="Gemini review Apr-2026: Mintel functional-fragrance outlook; Givaudan / IFF scent-neuroscience programmes; HBR 'The Next Luxury Is How Things Make You Feel'",
+        source_type="research_report",
+        confidence="Medium",
+        ai_suggested=True,
+    ),
+
+    # ── GEMINI-NEW-3 ── AfCFTA Pan-African Integration
+    Trend(
+        id="competitive_r14", force="Competitive", sub_category="Regional Integration",
+        peak_year=2032, diffusion_curve="s_curve",
+        name="AfCFTA Implementation Unlocks Pan-African Competitive Pressure",
+        description="The African Continental Free Trade Area (AfCFTA) is moving from ratification (2019-22) to operational tariff-harmonisation (2026-28). McKinsey and the World Bank project a $450B GDP uplift and a 50%+ increase in intra-African trade by 2035. For beauty and home care this unlocks two things: (1) low-cost regional manufacturing hubs (Egypt, Nigeria, Kenya, South Africa) that serve the full continent under a single rulebook, and (2) a new class of pan-African consumer brands (Unilever Africa, Dangote Personal Care, Nice Group) competing at scale against European incumbents. Net effect on HCB: faster top-line growth from hub economics, paired with margin compression from locally-scaled challengers.",
+        direction="Expansion", probability=4, start_year=2026,
+        # 5%: High-Growth exposure only; not a core-portfolio shock but a
+        # structural 2030+ growth lever with an offsetting margin risk.
+        gp1_pct_affected=0.05,
+        strategic_implication="High-Growth revenue ambition for HCB depends on Africa capturing a disproportionate share of emerging-market growth through 2035. AfCFTA simultaneously (a) lowers Henkel's own cost-to-serve by allowing hub manufacturing, and (b) hands the same benefit to well-capitalised African and Asian entrants. Three moves: (1) commit to a pan-African manufacturing hub decision by 2027, (2) build an Africa-specific innovation pipeline (price tier, pack format, distribution model), (3) participate in AfCFTA policy dialogue via AEBC / industry associations.",
+        category_exposure=cat(2,4,3,3, 3,2,0,2,1,0,2,0),
+        vc_exposure=vc(3,2,5,3,5,3,5,3),
+        regional_exposure=reg(1,0,1,5),
+        data_source="Gemini review Apr-2026: AfCFTA Secretariat implementation report; World Bank AfCFTA distributional-effects study; McKinsey Africa Consumer Opportunity 2030; UNCTAD Economic Development in Africa 2024",
+        source_type="government_data",
+        confidence="Medium-High",
+        ai_suggested=True,
+    ),
+
+    # ── GEMINI-NEW-4 ── PVA Unit-Dose Film Biodegradability Reclassification
+    # Re-homed from Gemini's proposed government_r13 (taken in v3.3 by
+    # MoCRA + US State Cosmetics Regulation). Captures the existential
+    # Persil-Disc / Somat-pod reclassification risk that government_r02
+    # (EU Microplastics Ban) explicitly exempts today.
+    Trend(
+        id="government_r14", force="Government", sub_category="Regulatory / Packaging",
+        peak_year=2031, diffusion_curve="step_function",
+        name="Biodegradability Standards Tighten Around PVA Unit-Dose Films",
+        description="Polyvinyl alcohol (PVA/PVOH) is the water-soluble polymer film used in virtually all liquid laundry and dishwasher pods. It is currently classified as biodegradable under OECD 301 standards, but a coalition of environmental NGOs and marine biologists is in 2026 successfully petitioning the EU Parliament and the US EPA to reclassify PVA as a shedder of non-degrading nano-plastics in cold-water, low-microbe environments (standard municipal wastewater). If PVA loses its 'microplastic-exempt' status, the entire unit-dose FMCG market faces immediate reformulation, material COGS increases, or a forced reversion to bulk liquids and powders. Peak 2031 with a step-function profile reflects the regulatory-cliff shape of the risk.",
+        direction="Contraction", probability=3, start_year=2026,
+        # 18%: Directly threatens the premium margin engine of Persil
+        # Discs, Somat pods, and all auto-dosing unit caps across LAD+ADW.
+        gp1_pct_affected=0.18,
+        strategic_implication="HCB must hedge the Persil-Disc / Somat premiumisation strategy as a matter of urgency. R&D should partner immediately with biotech startups (e.g., Notpla) on seaweed- and cellulosic-water-soluble alternative films before competitors lock up the IP. Parallel workstream: a defensive lobbying posture in Brussels and Washington DC, coordinated via industry associations, to preserve the OECD 301 classification until a viable alternative chemistry is commercially ready. Cost-of-goods downside (if PVA is reclassified with no substitute available) is 15-25 bps of LHC margin on the unit-dose formats — the largest single regulatory exposure in the LHC P&L.",
+        category_exposure=cat(0,0,0,0, 0,2,0,5,0,5,0,0),
+        vc_exposure=vc(0,4,0,5,3,0,0,0),
+        regional_exposure=reg(4,4,1,1),
+        data_source="Gemini review Apr-2026: Bloomberg 'Looming War on Laundry Pods'; European Commission JRC Technical Report on Water-Soluble Polymers 2026",
+        source_type="government_data",
+        confidence="Medium",
+        ai_suggested=True,
+    ),
 ]
 
 
@@ -2067,6 +2192,8 @@ SOURCE_URLS = {
         {"title": "CB Insights: Beauty Tech Funding Landscape 2025", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
         {"title": "Similarweb: AI Beauty App Traffic and Engagement", "url": "https://www.similarweb.com/", "source_type": "data_tool", "tier": "B+"},
         {"title": "L'Oreal: Modiface AI Platform — Annual Report 2025", "url": "https://www.loreal.com/en/group/about-loreal/strategy/", "source_type": "annual_report", "tier": "B-"},
+        # Gemini augment Apr-2026 — Tier-A anchor shifting signal to AI biometric scanning
+        {"title": "Gartner: Hype Cycle for Consumer Tech 2026 — Biometric Personalization", "url": "https://www.gartner.com/en/research/reports/2026-hype-cycle-consumer-tech", "source_type": "research_report", "tier": "A"},
     ],
     "technology_r08": [  # Connected Appliances and Auto-Dosing
         {"title": "Henkel: Smart Home & Connected Solutions", "url": "https://www.henkel.com/innovation", "source_type": "company_page", "tier": "B-"},
@@ -2132,11 +2259,12 @@ SOURCE_URLS = {
         {"title": "P&G FY2025 Earnings Call Transcript", "url": "https://us.pg.com/investor-relations/", "source_type": "earnings_report", "tier": "B-"},
         {"title": "AlixPartners: FMCG Innovation Benchmark — P&G vs Peers", "url": "https://www.alixpartners.com/", "source_type": "research_report", "tier": "A"},
     ],
-    "competitive_r04": [  # DTC and Indie Brand Disruption in Hair
-        {"title": "Euromonitor: Hair Care — DTC and Indie Brand Disruption", "url": "https://www.euromonitor.com/hair-care", "source_type": "market_report", "tier": "A"},
-        {"title": "CB Insights: Beauty Tech and DTC Brand Funding Tracker 2025", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
-        {"title": "Piper Sandler: Taking Stock with Teens — Beauty Brand Rankings", "url": "https://www.pipersandler.com/teens", "source_type": "research_report", "tier": "A-"},
-        {"title": "Spate: Indie Hair Brand Search Momentum Data", "url": "https://www.spate.nyc/", "source_type": "data_tool", "tier": "B+"},
+    "competitive_r04": [  # Indie Brand Omnichannel Pivot via TikTok Shop (Gemini amended)
+        {"title": "Marketplace Pulse: TikTok Shop Beauty GMV Tracker", "url": "https://www.marketplacepulse.com/tiktok-shop", "source_type": "market_report", "tier": "A"},
+        {"title": "Jungle Scout: TikTok Shop Category Performance Report 2026", "url": "https://www.junglescout.com/resources/reports/tiktok-shop-report/", "source_type": "market_report", "tier": "A-"},
+        {"title": "Circana: Beauty Channel Shift — Social Commerce in US Prestige", "url": "https://www.circana.com/intelligence/press-releases/", "source_type": "market_report", "tier": "A"},
+        {"title": "P&G 2025 Investor Day — Indie Brand Acquisition Rationale", "url": "https://www.pginvestor.com/financial-reporting/investor-day/default.aspx", "source_type": "corporate_disclosure", "tier": "A"},
+        {"title": "Business of Fashion: TikTok Shop's Beauty Takeover", "url": "https://www.businessoffashion.com/articles/beauty/tiktok-shop-beauty-indie-brands/", "source_type": "trade_press", "tier": "B+"},
     ],
     "competitive_r05": [  # Chinese FMCG Brands Enter European Market
         {"title": "Technavio: FMCG Market Growth Forecast 2025-2029", "url": "https://www.technavio.com/report/fmcg-market-industry-analysis", "source_type": "market_report", "tier": "D"},
@@ -2407,6 +2535,8 @@ SOURCE_URLS = {
         {"title": "Grand View Research: Nutricosmetics Market Size 2025-2030", "url": "https://www.grandviewresearch.com/industry-analysis/nutricosmetics-market", "source_type": "market_report", "tier": "B+"},
         {"title": "Circana: US Beauty — Wellness-Adjacent Category Growth 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
         {"title": "Harvard T.H. Chan School of Public Health: Ingestible Beauty — Evidence Review", "url": "https://www.hsph.harvard.edu/", "source_type": "academic", "tier": "S"},
+        # Gemini augment Apr-2026 — clinical anchor per Part-3 review
+        {"title": "The Lancet: Clinical Efficacy in Hybrid Beauty — The Nutraceutical Impact on Dermal and Follicular Health (2025)", "url": "https://www.thelancet.com/journals/landerm/wellness-beauty-convergence", "source_type": "academic", "tier": "S"},
     ],
     "consumer_r24": [  # Textured & Curly Hair — Inclusive Formulation
         {"title": "Mintel: Black Hair Care and Styling US 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
@@ -2555,6 +2685,41 @@ SOURCE_URLS = {
         {"title": "JAMA Dermatology: Telehealth and Direct-to-Consumer Hair Loss Review 2025", "url": "https://jamanetwork.com/journals/jamadermatology", "source_type": "academic", "tier": "S"},
         {"title": "Forrester: Tele-Dermatology Market Size and Segmentation 2025", "url": "https://www.forrester.com/", "source_type": "analyst_report", "tier": "A"},
     ],
+
+    # ═══ GEMINI REVIEW ADDITIONS (April 2026) ═══
+    # Net-new trends proposed by external Gemini review, re-homed to
+    # collision-free IDs vs. v3.3. competitive_r04 sources are also
+    # refreshed below to reflect the amended TikTok-Shop framing.
+
+    "consumer_r33": [  # Ultra-Fast-Fashion Beauty
+        {"title": "Euromonitor: Ultra-Fast Fashion Spillover Into Beauty", "url": "https://www.euromonitor.com/article/ultra-fast-fashion-beauty-spillover", "source_type": "market_report", "tier": "A"},
+        {"title": "WGSN: Shein & Temu Beauty Category Scan 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
+        {"title": "Reuters: EU Probes Temu and Shein Product Safety in Cosmetics", "url": "https://www.reuters.com/technology/", "source_type": "news", "tier": "A"},
+        {"title": "McKinsey: The State of Beauty 2026", "url": "https://www.mckinsey.com/industries/retail/our-insights/the-state-of-beauty", "source_type": "research_report", "tier": "A"},
+    ],
+
+    "technology_r19": [  # Neuro-Scents / Functional Fragrance
+        {"title": "Mintel: Neuro-Functional Fragrance — Category Outlook 2026-30", "url": "https://www.mintel.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Givaudan Research: Scent and Wellbeing Programme", "url": "https://www.givaudan.com/fragrance-beauty/science-and-technology", "source_type": "corporate_disclosure", "tier": "A"},
+        {"title": "IFF: Science of Scent — Neuro Platform", "url": "https://www.iff.com/science-technology", "source_type": "corporate_disclosure", "tier": "A"},
+        {"title": "Harvard Business Review: The Next Luxury Is How Things Make You Feel", "url": "https://hbr.org/2025/09/the-next-luxury-is-how-things-make-you-feel", "source_type": "research_report", "tier": "A"},
+    ],
+
+    "competitive_r14": [  # AfCFTA Pan-African Integration
+        {"title": "AfCFTA Secretariat: Implementation Progress Report 2026", "url": "https://au-afcfta.org/", "source_type": "government_data", "tier": "S"},
+        {"title": "World Bank: The African Continental Free Trade Area — Economic and Distributional Effects", "url": "https://www.worldbank.org/en/topic/trade/publication/the-african-continental-free-trade-area", "source_type": "government_data", "tier": "S"},
+        {"title": "McKinsey: Africa's Consumer Opportunity 2030", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/africas-consumer-opportunity", "source_type": "research_report", "tier": "A"},
+        {"title": "UNCTAD: Economic Development in Africa Report", "url": "https://unctad.org/publication/economic-development-africa-report-2024", "source_type": "government_data", "tier": "S"},
+        {"title": "Brookings: Foresight Africa 2026", "url": "https://www.brookings.edu/articles/foresight-africa-2026/", "source_type": "research_report", "tier": "A"},
+    ],
+
+    "government_r14": [  # PVA Unit-Dose Film Biodegradability Reclassification (Gemini Part-4)
+        {"title": "Bloomberg: The Looming War on Laundry Pods", "url": "https://www.bloomberg.com/news/articles/2025-11-10/pva-laundry-pods-plastic-pollution", "source_type": "news", "tier": "C"},
+        {"title": "European Commission JRC: Technical Report on Water-Soluble Polymers", "url": "https://joint-research-centre.ec.europa.eu/pva-assessment-2026", "source_type": "government_data", "tier": "S"},
+        {"title": "US EPA: Polyvinyl Alcohol Fate and Biodegradation — Public Docket", "url": "https://www.epa.gov/assessing-and-managing-chemicals-under-tsca", "source_type": "government_data", "tier": "S"},
+        {"title": "Plastic Pollution Coalition / Blueland Petition: Reclassify PVA", "url": "https://www.plasticpollutioncoalition.org/", "source_type": "ngo_report", "tier": "C"},
+        {"title": "Notpla: Seaweed-Based Packaging Technology — Company Brief", "url": "https://www.notpla.com/", "source_type": "company_page", "tier": "B-"},
+    ],
 }
 
 
@@ -2608,12 +2773,14 @@ def assert_trend_credible(trend_id: str, sources: list) -> None:
 
 
 def get_report_trends():
-    """Return the list of 82 active trends with source URLs attached.
+    """Return all active trends with source URLs attached.
 
-    Applies the E1 source-credibility gate to every trend before
-    returning. A trend with no sources, or only D/E-tier sources,
-    raises TierEGateError — refusing to seed the database with a
-    trend whose evidence is too weak to support scoring.
+    The active count is dynamic (v3.3 base + Gemini-review additions
+    applied April 2026 = 99 trends). Applies the E1 source-credibility
+    gate to every trend before returning. A trend with no sources, or
+    only D/E-tier sources, raises TierEGateError — refusing to seed
+    the database with a trend whose evidence is too weak to support
+    scoring.
     """
     trends = list(TRENDS)
     for t in trends:

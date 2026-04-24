@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Attenuation_Calibration_v3_4.xlsx per methodology §6.
+"""Build Attenuation_Calibration_v3_5.xlsx per methodology §6.
 
 Six sheets:
   1. Summary
@@ -26,8 +26,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-CALIB_JSON = Path('/sessions/charming-cool-babbage/mnt/PROFIT_POOL_ENGINE/data/attenuation_calibration_v3_4.json')
-OUT        = Path('/tmp/Attenuation_Calibration_v3_4.xlsx')
+CALIB_JSON = Path('/sessions/charming-cool-babbage/mnt/PROFIT_POOL_ENGINE/data/attenuation_calibration_v3_5.json')
+OUT        = Path('/tmp/Attenuation_Calibration_v3_5.xlsx')
 
 calib = json.loads(CALIB_JSON.read_text())
 trends = get_report_trends()
@@ -83,7 +83,7 @@ wb = Workbook()
 s = wb.active
 s.title = 'Summary'
 
-s['A1'] = 'PRISM v3.4 — Attenuation Calibration Summary'
+s['A1'] = 'PRISM v3.5 — Attenuation Calibration Summary'
 s['A1'].font = Font(name=FONT_NAME, bold=True, size=14)
 s.merge_cells('A1:F1')
 
@@ -137,9 +137,9 @@ s.cell(r,3).number_format='0.0%'; s.cell(r,3).border=BORDER_ALL; s.cell(r,3).ali
 
 # Within-force final — comparison to v3.1
 r += 3
-s.cell(r,1,'Within-force overlap — v3.4 vs v3.1'); s.cell(r,1).font = BLACK_B
+s.cell(r,1,'Within-force overlap — v3.5 vs v3.1'); s.cell(r,1).font = BLACK_B
 r += 1
-for i,h in enumerate(['Force','v3.4 final','v3.1 final','Δ','Direction'], start=1):
+for i,h in enumerate(['Force','v3.5 final','v3.1 final','Δ','Direction'], start=1):
     hdr(s.cell(r,i), h)
 r += 1
 v34_w = calib['within_force_final']
@@ -154,7 +154,7 @@ for f in FORCES:
 
 # Per-force effective attenuation comparison
 r += 2
-s.cell(r,1,'Per-force effective attenuation — v3.4 vs v3.1'); s.cell(r,1).font = BLACK_B
+s.cell(r,1,'Per-force effective attenuation — v3.5 vs v3.1'); s.cell(r,1).font = BLACK_B
 r += 1
 for i,h in enumerate(['Force','Row-mean cross overlap','eff_att_NEW','v3.1 eff_att','Δ'], start=1):
     hdr(s.cell(r,i), h)
@@ -260,7 +260,7 @@ for col, w in [(1,14),(2,8),(3,12),(4,22),(5,10),(6,16),(7,16),(8,60)]:
 # Sheet 3: Cross-Force
 # ════════════════════════════════════════════════════════════════════════
 s3 = wb.create_sheet('Cross-Force')
-s3['A1'] = 'Cross-Force Overlap Matrix (FINAL, v3.4)'
+s3['A1'] = 'Cross-Force Overlap Matrix (FINAL, v3.5)'
 s3['A1'].font = Font(name=FONT_NAME, bold=True, size=14)
 s3.merge_cells('A1:H1')
 s3['A2'] = 'Read as: row-force signal covered by column-force. Asymmetric by construction.'
@@ -348,7 +348,7 @@ s4.cell(r,1,'Formulas').font = BLACK_B
 r += 1
 formulas = [
     ('Weighted Jaccard',        'J(x,y) = Σ min(e_x,c, e_y,c) / Σ max(e_x,c, e_y,c)  for c in 12 FMCG categories'),
-    ('Random-pair baseline',    'J₀ = mean J over all unordered pairs in the full 95-trend base'),
+    ('Random-pair baseline',    'J₀ = mean J over all unordered pairs in the full 99-trend base'),
     ('Excess-over-baseline',    'e(J̄) = max(0, (J̄ − J₀) / (1 − J₀))'),
     ('Asymmetric normalization','asymm_ij = e_ij × min(1.5, √(n_j / n_i))       [cross-force only]'),
     ('Final (within-force)',    'O_ii_final = clamp[0.10, 0.45]( e_ii + mech_ii )'),

@@ -864,7 +864,7 @@ PROFIT_POOL_ENGINE/
 │   ├── database.py                    # Dual-mode DB (Postgres/SQLite)
 │   ├── env_loader.py                  # Environment variable loading
 │   ├── backup.py                      # Database backup utilities
-│   ├── seed_trends.py                 # 82 trend definitions (v3.1 Bain review)
+│   ├── seed_trends.py                 # 99 trend definitions (v3.5 — v3.3 base + Gemini additions)
 │   │
 │   ├── simulation/
 │   │   ├── bayesian_mc.py             # Bayesian MC with copulas (PRODUCTION)

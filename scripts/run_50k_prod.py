@@ -11,7 +11,7 @@ Requirements:
       openpyxl, arviz  (arviz optional — used only for R̂ diagnostics)
 
 What it does:
-    1. Loads the 82 v3.1 trends from prod Neon via pulse.database.load_trends
+    1. Loads the 99 v3.5 trends from prod Neon via pulse.database.load_trends
     2. Runs BayesianMonteCarloEngine.run_multichain(n_chains=3, iterations=50_000)
     3. Persists the shift matrix + allocation + convergence to prod Neon
     4. Writes a QA Excel alongside the repo root
@@ -56,7 +56,7 @@ def main() -> int:
         log.warning("DB URL does not look like Neon — double-check this is prod.")
 
     log.info("=" * 60)
-    log.info("PRISM v3.2 — 50K Production Monte Carlo")
+    log.info("PRISM v3.5 — 50K Production Monte Carlo")
     log.info("=" * 60)
 
     # ── 1) Load trends from prod Neon ────────────────────────────────
@@ -75,8 +75,8 @@ def main() -> int:
         "      %d trends, %d categories, %d forces",
         len(trend_db.trends), len(trend_db.categories), len(trend_db.forces),
     )
-    if len(trend_db.trends) != 82:
-        log.warning("Expected 82 trends (v3.1), found %d", len(trend_db.trends))
+    if len(trend_db.trends) != 99:
+        log.warning("Expected 99 trends (v3.5), found %d", len(trend_db.trends))
 
     # ── 2) Configure for 50K multichain ──────────────────────────────
     config = ModelConfig().copy_with(iterations=50_000)

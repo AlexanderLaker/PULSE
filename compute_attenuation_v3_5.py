@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v3.4 Attenuation Calibration — empirical recalibration on the 99-trend base.
+v3.5 Attenuation Calibration — empirical recalibration on the 99-trend base.
 
 Mirrors the v3.1 methodology documented in Attenuation_Calibration_Methodology.md:
   Step 1: pairwise weighted Jaccard on 12-category exposure vectors
@@ -15,7 +15,7 @@ Then derives DEFAULT_PER_FORCE_ATTENUATION via:
 Outputs
 -------
 - Console: full before/after table + delta vs v3.1
-- JSON:    /tmp/attenuation_calibration_v3_4.json (machine-readable)
+- JSON:    /tmp/attenuation_calibration_v3_5.json (machine-readable)
 """
 import sys, json, itertools, math
 from collections import defaultdict, Counter
@@ -80,18 +80,18 @@ for f in FORCES:
     print(f"  {f:14s}  n={len(fids):2d}  mean J={m:.4f}  excess={within_excess[f]:.4f}")
 
 # Mechanism adjustments (same framing as v3.1 — ±0.03 … ±0.10)
-# v3.1 rationale retained; newly added v3.4 trends (4) evaluated for impact:
+# v3.1 rationale retained; newly added v3.5 trends (4) evaluated for impact:
 #   consumer_r33  (ultra-fast-fashion) — diversifies Consumer further, keep −0.03
 #   technology_r19 (neuro-scents)     — adds to tech innovation cluster, keep +0.05
 #   competitive_r14 (AfCFTA)          — geo/competitive independent, keep −0.05
 #   government_r14 (PVA regulatory)   — joins Green Deal cluster → strengthens +0.05 case
 within_mech = {
-    "Consumer":      -0.03,  # v3.1 was -0.03 (diversity); v3.4 r33 adds further diversity
+    "Consumer":      -0.03,  # v3.1 was -0.03 (diversity); v3.5 r33 adds further diversity
     "Customer":       0.00,  # v3.1 was 0.00 (channel/digital coexist)
     "Technology":    +0.05,  # v3.1 was +0.05 (AI cluster 8 + bio-chem 5 + now neuro-scents in bio-chem)
-    "Government":    +0.05,  # v3.1 was +0.05; v3.4 r14 (PVA) is another Green-Deal trend, strengthens cluster
+    "Government":    +0.05,  # v3.1 was +0.05; v3.5 r14 (PVA) is another Green-Deal trend, strengthens cluster
     "Environmental": +0.05,  # v3.1 was +0.05 (climate/water/palm web intact)
-    "Competitive":   -0.05,  # v3.1 was -0.05; v3.4 r14 (AfCFTA geo) remains distinct
+    "Competitive":   -0.05,  # v3.1 was -0.05; v3.5 r14 (AfCFTA geo) remains distinct
 }
 
 within_final = {}
@@ -141,7 +141,7 @@ for i in FORCES:
 # ── Step 3b — mechanism adjustments (v3.1 cell-level values, retained) ──
 # v3.1 mechanism adjustments per cross-force cell. We retain these ±0.03..0.10
 # additive deltas because the underlying FMCG causal couplings have not
-# changed — only trend count has. Where new v3.4 trends strengthen a
+# changed — only trend count has. Where new v3.5 trends strengthen a
 # coupling (e.g., government_r14 PVA reinforces Gov↔Env), the empirical
 # raw Jaccard already captures it in Step 1.
 cross_mech = {i: {j: 0.0 for j in FORCES} for i in FORCES}
@@ -160,7 +160,7 @@ cross_mech["Technology"]["Environmental"] = +0.05
 # Consumer ↔ Competitive (dupe/indie bridge, reinforced by consumer_r33 + competitive_r04)
 cross_mech["Consumer"]["Competitive"]     = +0.05
 cross_mech["Competitive"]["Consumer"]     = +0.05
-# Retailer compliance under regulation (NEW v3.4 emphasis: PVA→retailer reformulation)
+# Retailer compliance under regulation (NEW v3.5 emphasis: PVA→retailer reformulation)
 cross_mech["Customer"]["Government"]      = +0.05
 cross_mech["Government"]["Customer"]      = +0.05
 
@@ -191,7 +191,7 @@ for i in FORCES:
         if i == j: continue
         flat.append((i, j, cross_final[i][j], cross_raw[i][j], cross_excess[i][j], cross_asymm[i][j], cross_mech[i][j]))
 flat.sort(key=lambda x: -x[2])
-print("\n=== Top 12 cross-force couplings (v3.4) ===")
+print("\n=== Top 12 cross-force couplings (v3.5) ===")
 print(f"  {'rank':>4s}  {'from':14s}  {'to':14s}  {'raw J':>6s}  {'excess':>6s}  {'asymm':>6s}  {'mech':>5s}  {'FINAL':>5s}")
 for rank, (i, j, fin, raw, ex, asym, mech) in enumerate(flat[:12], 1):
     print(f"  {rank:>4d}  {i:14s}  {j:14s}  {raw:.4f}  {ex:.4f}  {asym:.4f}  {mech:+.2f}   {fin:.3f}")
@@ -206,7 +206,7 @@ for i in FORCES:
     row_means[i] = row_mean
     per_force_att[i] = round(0.5 * (1 - row_mean), 3)
 
-print("\n=== Per-force effective attenuation (v3.4) ===")
+print("\n=== Per-force effective attenuation (v3.5) ===")
 print(f"  {'force':14s}  {'row mean':>8s}  {'eff_att_NEW':>12s}  {'v3.1':>6s}  {'Δ':>6s}")
 v3_1_eff = {
     "Consumer":      0.482,
@@ -230,7 +230,7 @@ v3_1_within = {
     "Competitive":   0.100,
 }
 print("\n=== Within-force comparison ===")
-print(f"  {'force':14s}  {'v3.4':>6s}  {'v3.1':>6s}  {'Δ':>6s}")
+print(f"  {'force':14s}  {'v3.5':>6s}  {'v3.1':>6s}  {'Δ':>6s}")
 for f in FORCES:
     d = within_final[f] - v3_1_within[f]
     print(f"  {f:14s}  {within_final[f]:.3f}  {v3_1_within[f]:.3f}  {d:+.3f}")
@@ -242,7 +242,7 @@ print(f"\nTrend-weighted mean attenuation: {tw_mean:.4f}  (v3.1 sanity: ≈0.446
 
 # ── Persist for downstream code + docs ─────────────────────────────────
 out = {
-    "calibration_version": "calibrated_v3.4_april2026",
+    "calibration_version": "calibrated_v3.5_april2026",
     "n_trends": len(trends),
     "force_counts": n_force,
     "J0_baseline": round(J0, 6),
@@ -262,6 +262,6 @@ out = {
     "v3_1_within_force_final": v3_1_within,
     "v3_1_per_force_effective_attenuation": v3_1_eff,
 }
-with open('/tmp/attenuation_calibration_v3_4.json', 'w') as f:
+with open('/tmp/attenuation_calibration_v3_5.json', 'w') as f:
     json.dump(out, f, indent=2)
-print("\nWrote /tmp/attenuation_calibration_v3_4.json")
+print("\nWrote /tmp/attenuation_calibration_v3_5.json")

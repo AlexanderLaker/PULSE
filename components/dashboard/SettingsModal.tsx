@@ -768,10 +768,10 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   style={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
-              <Field label="Attenuation source" hint="calibrated_v3.4_april2026 · calibrated_v3.1_april2026 (legacy) · admin_override">
+              <Field label="Attenuation source" hint="calibrated_v3.5_april2026 · calibrated_v3.1_april2026 (legacy) · admin_override">
                 <input
                   type="text"
-                  value={draft.attenuation_source ?? 'calibrated_v3.4_april2026'}
+                  value={draft.attenuation_source ?? 'calibrated_v3.5_april2026'}
                   onChange={(e) => patch({ attenuation_source: e.target.value })}
                   disabled={ro} readOnly={ro}
                   style={ro ? READONLY_STYLE : INPUT_STYLE}
