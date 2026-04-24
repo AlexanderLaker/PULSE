@@ -188,7 +188,7 @@ export default function App() {
     return (
       <ErrorBoundary>
         <Suspense fallback={<FullPageSkeleton />}>
-          <Trends2 onBack={() => setPage('profitpoolshiftmodel')} />
+          <Trends2 onBack={() => setPage('profitpoolshiftmodel')} isAdmin={isAdmin} />
         </Suspense>
         <div style={{
           position: 'fixed', top: 12, left: 16, zIndex: 9999,

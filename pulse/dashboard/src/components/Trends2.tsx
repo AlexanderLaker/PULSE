@@ -840,7 +840,7 @@ interface Trends2Props {
 type SortKey = 'name' | 'direction' | 'probability' | 'gp1_pct_affected' | 'gp1_shift';
 type SortDir = 'asc' | 'desc';
 
-const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
+const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = false }) => {
   const { trends, loading, backendAvailable, updateTrend } = usePrism();
   const [forceFilter, setForceFilter] = useState<ForceName | 'All'>('All');
   const [search, setSearch] = useState('');
@@ -1018,6 +1018,8 @@ const Trends2: FC<Trends2Props> = ({ onBack, isAdmin = true }) => {
                     isLast={idx === filtered.length - 1 && !isExpanded}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedId(isExpanded ? null : (t.id ?? String(idx)))}
+                    isAdmin={isAdmin}
+                    updateTrend={updateTrend as (id: string, u: Partial<Trend>) => Promise<void>}
                   />
                   {isExpanded && (
                     <ExpandedPanel
@@ -1117,16 +1119,64 @@ const TrendRow: FC<{
   isLast: boolean;
   isExpanded: boolean;
   onToggle: () => void;
-}> = ({ trend, isLast, isExpanded, onToggle }) => {
+  isAdmin?: boolean;
+  updateTrend?: (id: string, updates: Partial<Trend>) => Promise<void>;
+}> = ({ trend, isLast, isExpanded, onToggle, isAdmin = false, updateTrend }) => {
   const tile = FORCE_TILE[trend.force] ?? FORCE_TILE.Consumer;
   const { Icon } = tile;
   const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   const shift = trend.gp1_shift;
 
+  // Inline-edit state for GP1 % Affected (admin-only)
+  const [gp1Draft, setGp1Draft] = useState<string>(
+    gp1 != null ? String(Math.round(gp1 * 100)) : ''
+  );
+  const [editingGp1, setEditingGp1] = useState(false);
+  React.useEffect(() => {
+    setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
+  }, [gp1]);
+
+  // Shift tooltip hover state
+  const [showShiftTip, setShowShiftTip] = useState(false);
+
+  // Bayesian posterior mean for probability: p / 6 (not p / 5)
+  // Matches backend formula in pulse/ingestion/models.py: prob_mean = α/(α+β)
+  // where α = max(p,1), β = max(6-p,1). For p ∈ [1..5] this is p/6.
+  const probRaw   = trend.probability ?? 0;
+  const probClamped = Math.max(1, Math.min(5, Math.round(probRaw)));
+  const probMean  = probClamped / 6;                       // e.g. 4/6 ≈ 0.667
+  const gp1PctNum = gp1 ?? 0;                              // 0..1
+  const dirSign   = trend.direction === 'Contraction' ? -1 : 1;
+
+  const commitGp1 = () => {
+    setEditingGp1(false);
+    if (!isAdmin || !updateTrend) return;
+    const raw = parseInt(gp1Draft, 10);
+    if (!isNaN(raw) && raw >= 1 && raw <= 100) {
+      const next = raw / 100;
+      if (next !== gp1) {
+        updateTrend(trend.id, { gp1_pct_affected: next } as Partial<Trend>)
+          .catch(() => { /* handled in hook */ });
+      }
+    } else {
+      setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
+    }
+  };
+
+  const handleProbChange = (val: number) => {
+    if (!isAdmin || !updateTrend) return;
+    updateTrend(trend.id, { probability: val } as Partial<Trend>)
+      .catch(() => { /* handled in hook */ });
+  };
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); }
+      }}
       aria-expanded={isExpanded}
       style={{
         display: 'grid', width: '100%',
@@ -1139,10 +1189,10 @@ const TrendRow: FC<{
         boxShadow: isLast ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}`,
       }}
       onMouseEnter={(e) => {
-        if (!isExpanded) (e.currentTarget as HTMLButtonElement).style.backgroundColor = S.surfaceLow;
+        if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = S.surfaceLow;
       }}
       onMouseLeave={(e) => {
-        if (!isExpanded) (e.currentTarget as HTMLButtonElement).style.backgroundColor = S.surface;
+        if (!isExpanded) (e.currentTarget as HTMLDivElement).style.backgroundColor = S.surface;
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -1171,20 +1221,140 @@ const TrendRow: FC<{
       </div>
 
       <div><DirectionPill direction={trend.direction} /></div>
-      <div><DotBar value={Math.round(trend.probability ?? 0)} /></div>
 
-      <div style={{ textAlign: 'right' }}>
-        <span style={{ fontFamily: HEADLINE_FONT, color: S.onSurface, fontWeight: 800, fontSize: '0.95rem' }}>
-          {gp1 != null ? fmtPct(gp1) : '—'}
-        </span>
+      {/* Probability — inline editable for admin */}
+      <div onClick={(e) => { if (isAdmin) e.stopPropagation(); }}>
+        <DotBar
+          value={Math.round(trend.probability ?? 0)}
+          editable={isAdmin && !!updateTrend}
+          onChange={handleProbChange}
+        />
       </div>
 
-      <div style={{ textAlign: 'right' }}>
+      {/* GP1 % Affected — inline editable for admin */}
+      <div
+        style={{ textAlign: 'right' }}
+        onClick={(e) => { if (isAdmin) e.stopPropagation(); }}
+      >
+        {isAdmin && editingGp1 ? (
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            autoFocus
+            value={gp1Draft}
+            onChange={(e) => setGp1Draft(e.target.value)}
+            onBlur={commitGp1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitGp1(); }
+              if (e.key === 'Escape') {
+                setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
+                setEditingGp1(false);
+              }
+            }}
+            style={{
+              width: 56, padding: '3px 6px',
+              borderRadius: 6, border: `1px solid ${S.primary}`,
+              backgroundColor: S.surface, color: S.onSurface,
+              fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 13,
+              textAlign: 'right', outline: 'none',
+            }}
+          />
+        ) : (
+          <span
+            onClick={(e) => {
+              if (!isAdmin) return;
+              e.stopPropagation();
+              setEditingGp1(true);
+            }}
+            title={isAdmin ? 'Click to edit (admin)' : undefined}
+            style={{
+              fontFamily: HEADLINE_FONT, color: S.onSurface,
+              fontWeight: 800, fontSize: '0.95rem',
+              cursor: isAdmin ? 'text' : 'default',
+              padding: isAdmin ? '2px 6px' : 0,
+              borderRadius: 4,
+              borderBottom: isAdmin ? `1px dashed ${S.cardBorder}` : 'none',
+            }}
+          >
+            {gp1 != null ? fmtPct(gp1) : '—'}
+          </span>
+        )}
+      </div>
+
+      {/* Shift — read-only, with calculation tooltip on hover */}
+      <div
+        style={{ textAlign: 'right', position: 'relative' }}
+        onMouseEnter={() => setShowShiftTip(true)}
+        onMouseLeave={() => setShowShiftTip(false)}
+      >
         <span style={{ fontWeight: 700, fontSize: 12.5,
           color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
+          borderBottom: `1px dotted ${S.cardBorder}`,
+          cursor: 'help',
         }}>
           {shift != null ? fmtShift(shift) : '—'}
         </span>
+        {showShiftTip && shift != null && (
+          <div
+            role="tooltip"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 'calc(100% + 6px)',
+              zIndex: 40,
+              minWidth: 280,
+              maxWidth: 340,
+              padding: '10px 12px',
+              borderRadius: 8,
+              backgroundColor: S.onSurface,
+              color: S.surface,
+              fontFamily: HEADLINE_FONT,
+              fontSize: 11.5,
+              lineHeight: 1.45,
+              fontWeight: 500,
+              textAlign: 'left',
+              boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
+              pointerEvents: 'none',
+              whiteSpace: 'normal',
+            }}
+          >
+            <div style={{
+              fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+              fontSize: 10, opacity: 0.75, marginBottom: 6,
+            }}>
+              Shift Calculation
+            </div>
+            <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11 }}>
+              Shift = Probability × GP1% Affected × Direction
+            </div>
+            <div style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: 11, marginTop: 4,
+            }}>
+              = ({probClamped}/6) × {(gp1PctNum * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'}
+            </div>
+            <div style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: 11, marginTop: 4, fontWeight: 700,
+            }}>
+              = {fmtShift(shift)} (≈ {(probMean * gp1PctNum * dirSign * 100).toFixed(2)} pp)
+            </div>
+            <div style={{
+              marginTop: 8, paddingTop: 8,
+              borderTop: '1px solid rgba(255,255,255,0.15)',
+              opacity: 0.85,
+            }}>
+              <strong style={{ opacity: 1 }}>Why 4/5 is not 0.80×:</strong>{' '}
+              Probability is normalized via the Bayesian Beta posterior mean
+              (α = p, β = 6 − p), giving <em>p / 6</em> — not p / 5.
+              So a 4/5 rating contributes <strong>4/6 ≈ 0.667×</strong>,
+              and 5/5 contributes 5/6 ≈ 0.833× (full certainty is never asserted).
+            </div>
+          </div>
+        )}
       </div>
 
       <span
@@ -1200,7 +1370,7 @@ const TrendRow: FC<{
       >
         <ChevronDown size={14} strokeWidth={2.5} />
       </span>
-    </button>
+    </div>
   );
 };
 
