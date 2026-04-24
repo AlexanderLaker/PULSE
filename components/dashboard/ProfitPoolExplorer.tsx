@@ -138,7 +138,11 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
   const profitShare = item.revenueShare * item.gp1Margin;
   const revPct = (item.revenueShare * 100).toFixed(1);
   const gp1Pct = (item.gp1Margin * 100).toFixed(1);
-  const profitIdx = (profitShare * 100).toFixed(2);
+  const slidePoolTotal = slide.items.reduce(
+    (s, it) => s + it.revenueShare * it.gp1Margin, 0,
+  ) || 1;
+  const profitShareOfPool = (profitShare / slidePoolTotal) * 100;
+  const profitShareLbl = `${profitShareOfPool.toFixed(1)}%`;
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
   const placeLeft = x > vw - 340;
@@ -209,7 +213,7 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
       >
         <Metric label="Revenue" value={`${revPct}%`} />
         <Metric label="GP1 margin" value={`${gp1Pct}%`} />
-        <Metric label="Pool index" value={profitIdx} />
+        <Metric label="Profit share" value={profitShareLbl} />
       </div>
 
       {/* PRISM trend rating — 0-3 scale */}
@@ -270,9 +274,6 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
       >
         <SourceLine label="Revenue src" value={item.sources.revenue} />
         <SourceLine label="Margin src"  value={item.sources.margin} />
-        <div style={{ fontSize: 9, color: S.mutedText, marginTop: 2, lineHeight: 1.35 }}>
-          Slide ref: {slide.sources}
-        </div>
       </div>
     </motion.div>
   );
@@ -326,8 +327,8 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
   const ordered = slide.items;
 
   const W = 960;
-  const H = 460;
-  const ML = 60, MR = 24, MT = 24, MB = 80;
+  const H = 500;
+  const ML = 60, MR = 24, MT = 24, MB = 135;
   const plotW = W - ML - MR;
   const plotH = H - MT - MB;
 
@@ -389,6 +390,14 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
       >
         GP1 / Contribution Margin 1
       </text>
+      <text
+        x={ML + plotW / 2} y={H - 10}
+        fontSize={10} fill={S.outline} textAnchor="middle"
+        fontFamily={HEADLINE_FONT} fontWeight={700}
+        style={{ textTransform: 'uppercase', letterSpacing: 1.2 }}
+      >
+        Revenue share (% of category pool) — ordered by value chain / format sequence
+      </text>
 
       {/* Bars */}
       {bars.map((b, i) => {
@@ -419,31 +428,32 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
                 {(b.item.gp1Margin * 100).toFixed(0)}%
               </text>
             )}
-            {/* Revenue share label below bar */}
+            {/* Revenue share % — just below the axis */}
             <text
               x={b.xPx0 + w / 2} y={MT + plotH + 14}
-              fontSize={10} fill={S.primaryDim} fontWeight={700}
+              fontSize={11} fill={S.primaryDim} fontWeight={700}
               textAnchor="middle" fontFamily={HEADLINE_FONT}
             >
               {(b.item.revenueShare * 100).toFixed(0)}%
             </text>
-            {/* Bar name */}
-            <text
-              x={b.xPx0 + w / 2} y={MT + plotH + 30}
-              fontSize={10} fill={S.onSurface} fontWeight={700}
-              textAnchor="middle" fontFamily={BODY_FONT}
-            >
-              {b.item.label}
-            </text>
-            {b.item.sublabel && (
-              <text
-                x={b.xPx0 + w / 2} y={MT + plotH + 44}
-                fontSize={10} fill={S.onSurface} fontWeight={500}
-                textAnchor="middle" fontFamily={BODY_FONT}
-              >
-                {b.item.sublabel}
-              </text>
-            )}
+            {/* Bar name — rotated −35° so long names stay legible */}
+            {(() => {
+              const anchorX = b.xPx0 + w / 2;
+              const anchorY = MT + plotH + 30;
+              const full = b.item.sublabel
+                ? `${b.item.label} ${b.item.sublabel}`
+                : b.item.label;
+              return (
+                <text
+                  x={anchorX} y={anchorY}
+                  fontSize={11} fill={S.onSurface} fontWeight={600}
+                  textAnchor="end" fontFamily={BODY_FONT}
+                  transform={`rotate(-35, ${anchorX}, ${anchorY})`}
+                >
+                  {full}
+                </text>
+              );
+            })()}
             {/* 0-3 dots marker */}
             {b.rating.score > 0 && (
               <g transform={`translate(${b.xPx0 + w / 2 - 12}, ${y - 12})`}>

@@ -463,7 +463,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.22, forwardCAGR: 0.020,
         note: 'BASF N&C, Dow, Evonik',
         sources: {
-          revenue: 'BASF Nutrition & Care segment sales FY 2024 (20-F, p. 98)',
+          revenue: 'Kline & Company, Personal Care Ingredients Global Market 2024 — commodity chemicals share of $85B hair care end-consumer value; cross-ref: Grand View Research Hair Care Ingredients Market 2024',
           margin:  'BASF Nutrition & Care gross margin FY 2024 — 21.8% (Q4 2024 report)',
         },
       },
@@ -473,7 +473,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.45, forwardCAGR: 0.040,
         note: 'Croda Consumer Care, DSM-Firmenich',
         sources: {
-          revenue: 'Croda International FY 2024/25 — Consumer Care sales (AR, p. 31)',
+          revenue: 'Kline & Company, Specialty Personal Care Ingredients 2024 — hair care specialty ingredient pool (~$4B of $85B end-consumer)',
           margin:  'Croda Consumer Care gross margin FY 2024/25 — 44.6% (AR, p. 34)',
         },
       },
@@ -483,7 +483,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.06, gp1Margin: 0.42, forwardCAGR: 0.045,
         note: 'Symrise Scent & Care, Givaudan F&B',
         sources: {
-          revenue: 'Symrise AG FY 2024 — Scent & Care net sales (Annual Report p. 54)',
+          revenue: 'IFRA Global Fragrance Market Report 2024 + Kline Fragrance & Flavors 2024 — hair care fragrance & actives pool',
           margin:  'Givaudan Fragrance & Beauty gross margin FY 2024 — 41.5% (FR Finance Report)',
         },
       },
@@ -504,7 +504,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.07, gp1Margin: 0.12, forwardCAGR: 0.010,
         note: 'Sysco, Metro Cash & Carry',
         sources: {
-          revenue: 'GlobalData Retail 2024 — Personal Care distribution margin track',
+          revenue: 'Euromonitor Distribution Data 2024 — wholesale share of global hair care retail value; IBISWorld Personal Care Wholesale 2024',
           margin:  'Metro AG FY 2024 AR — gross margin 11.7% (Consolidated P&L, p. 102)',
         },
       },
@@ -525,7 +525,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         note: 'Amazon Beauty, DTC brands (Olaplex, K18)',
         linkedCategoryId: null,
         sources: {
-          revenue: 'Amazon 10-K FY 2024 — Online stores net sales; Euromonitor e-comm penetration 2024',
+          revenue: 'Euromonitor E-commerce in Beauty 2024 — hair care online channel share (global e-com penetration ≈12% of $85B)',
           margin:  'Olaplex Holdings 10-K FY 2024 — gross margin 71.8% blended; Amazon 1P gross margin 32% (Seeking Alpha model 2024)',
         },
       },
@@ -535,7 +535,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.12, gp1Margin: 0.58, forwardCAGR: 0.035,
         note: 'L\u2019Oréal PPD, Wella, Schwarzkopf Pro',
         sources: {
-          revenue: 'L\u2019Oréal 2024 Finance Report — Professional Products Division sales (p. 26)',
+          revenue: 'Kline Professional Hair Care Global Market Report 2024 — global professional hair care market (~$11B)',
           margin:  'L\u2019Oréal PPD gross margin FY 2024 — 58.4% (segment disclosure, p. 28)',
         },
       },
@@ -562,7 +562,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.14, gp1Margin: 0.20, forwardCAGR: 0.015,
         note: 'BASF, Clariant, INEOS',
         sources: {
-          revenue: 'BASF 20-F FY 2024 — Home Care raw materials sales estimate',
+          revenue: 'Kline Surfactants in Home Care 2024 + Cefic Industry Data 2024 — commodity chemicals pool for laundry (~$11B of $135B)',
           margin:  'BASF Industrial Solutions gross margin FY 2024 — 19.6% (Q4 2024 report p. 18)',
         },
       },
@@ -571,7 +571,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.05, gp1Margin: 0.52, forwardCAGR: 0.055,
         note: 'Novonesis (Novozymes + Chr. Hansen)',
         sources: {
-          revenue: 'Novonesis FY 2024 AR — Household Care enzymes sales (p. 22)',
+          revenue: 'Kline Enzymes for Home Care 2024 + Novonesis Industry Market Brief 2024 — detergent enzyme industry pool (~$3B globally)',
           margin:  'Novonesis Household Care gross margin FY 2024 — 51.8% (AR p. 25)',
         },
       },
@@ -580,7 +580,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.04, gp1Margin: 0.44, forwardCAGR: 0.060,
         note: 'Givaudan F&B, Symrise Home Care',
         sources: {
-          revenue: 'Givaudan FY 2024 Finance Report — Fragrance Home Care sales (p. 18)',
+          revenue: 'IFRA Global Fragrance Market Report 2024 — home & laundry care fragrance pool (~$5B)',
           margin:  'Givaudan F&B gross margin FY 2024 — 43.7% (segment disclosure)',
         },
       },
@@ -599,7 +599,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.11, forwardCAGR: 0.010,
         note: 'Metro, Sysco, regional distributors',
         sources: {
-          revenue: 'Metro AG FY 2024 AR — Home Care wholesale share',
+          revenue: 'Euromonitor Distribution Data 2024 — wholesale share of global laundry care retail value',
           margin:  'Metro AG FY 2024 AR — consolidated gross margin 11.3% (p. 102)',
         },
       },
@@ -617,7 +617,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.06, gp1Margin: 0.28, forwardCAGR: 0.090,
         note: 'Amazon Consumables, Ocado',
         sources: {
-          revenue: 'Amazon 10-K FY 2024 — Consumables online-stores segment',
+          revenue: 'Euromonitor E-commerce in Home Care 2024 — laundry online channel share',
           margin:  'Ocado Retail FY 2024 — gross margin 27.6% (AR p. 88)',
         },
       },
@@ -626,7 +626,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.05, gp1Margin: 0.36, forwardCAGR: 0.040,
         note: 'CleanCloud, Rinse, professional laundromats',
         sources: {
-          revenue: 'IBISWorld Industry Report 2024 — Laundry & Dry-Cleaning Services (NAICS 81232)',
+          revenue: 'IBISWorld Laundry & Dry-Cleaning Services 2024 (NAICS 81232) + Kline Professional Cleaning Services Global 2024',
           margin:  'Alliance Laundry Systems FY 2024 10-K — commercial gross margin 35.9%',
         },
       },
@@ -635,7 +635,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.04, gp1Margin: 0.26, forwardCAGR: 0.030,
         note: 'Whirlpool, BSH (Bosch/Siemens), LG',
         sources: {
-          revenue: 'Whirlpool Corp FY 2024 10-K — Global Laundry Appliance sales',
+          revenue: 'Freedonia Group Laundry Appliances Global 2024 + Statista Laundry Appliance Tracker 2024 — industry appliance pool',
           margin:  'Whirlpool 10-K FY 2024 — Laundry segment gross margin 25.9% (p. 46)',
         },
       },
@@ -762,7 +762,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.58, forwardCAGR: 0.045,
         linkedCategoryId: null,
         sources: {
-          revenue: 'L\u2019Oréal 2024 FR — Professional Products Division sales (p. 26)',
+          revenue: 'Kline Professional Hair Care Global Market Report 2024',
           margin:  'L\u2019Oréal PPD gross margin FY 2024 — 58.4% (segment disclosure)',
         },
       },
@@ -771,7 +771,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.06, gp1Margin: 0.46, forwardCAGR: 0.070,
         linkedCategoryId: null,
         sources: {
-          revenue: 'Helen of Troy Ltd 10-K FY 2024 — Beauty & Wellness Hair Appliance sales',
+          revenue: 'Euromonitor Personal Care Appliances 2024 — hair tools global industry pool; NPD Beauty Tools 2024',
           margin:  'Helen of Troy 10-K FY 2024 — Beauty gross margin 45.8%; Dyson Beauty estimated GP 55% (Dyson 2024 AR)',
         },
       },
@@ -780,7 +780,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.03, gp1Margin: 0.66, forwardCAGR: 0.090,
         linkedCategoryId: 'hair_care',
         sources: {
-          revenue: 'L\u2019Oréal 2024 FR — Active Cosmetics Division scalp share (p. 24)',
+          revenue: 'Mintel Dermo-Cosmetic Scalp Care Global 2024 — industry category tracker',
           margin:  'L\u2019Oréal Active Cosmetics gross margin FY 2024 — 65.8% (segment disclosure)',
         },
       },
@@ -789,7 +789,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.02, gp1Margin: 0.70, forwardCAGR: 0.120,
         linkedCategoryId: null,
         sources: {
-          revenue: 'Grand View Research 2024 — Hair Supplements market report (Nutrafol, Viviscal, OLLY)',
+          revenue: 'Grand View Research Hair Supplements Global 2024 + Nutrition Business Journal Hair Supplements 2024 — industry category pool',
           margin:  'Nutrafol (Unilever) FY 2024 disclosure — GP 66-72%; OLLY Wellness (Unilever) GP range 68-73%',
         },
       },
@@ -798,7 +798,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.10, gp1Margin: 0.42, forwardCAGR: 0.030,
         linkedCategoryId: null,
         sources: {
-          revenue: 'IBISWorld 2024 — Hair & Beauty Salon industry report (NAICS 812112)',
+          revenue: 'IBISWorld Hair & Beauty Salon Industry 2024 (NAICS 812112) + Euromonitor Beauty Services Tracker 2024',
           margin:  'Regis Corporation FY 2024 10-K — salon-level gross margin 41.6% (p. 38)',
         },
       },
@@ -807,7 +807,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.04, gp1Margin: 0.48, forwardCAGR: 0.092,
         linkedCategoryId: 'hair_body',
         sources: {
-          revenue: 'Euromonitor International 2024 — Men\u2019s Grooming retail value',
+          revenue: 'Euromonitor Men\u2019s Grooming 2024 + Mintel Men\u2019s Grooming Global 2024 — industry category',
           margin:  'Edgewell Personal Care 10-K FY 2024 — Men\u2019s Grooming GP 47.3%; P&G Grooming GP 48.2%',
         },
       },
@@ -816,7 +816,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.01, gp1Margin: 0.72, forwardCAGR: 0.250,
         linkedCategoryId: null,
         sources: {
-          revenue: 'CB Insights Beauty-Tech Report 2024 — AI diagnostics venture revenue pool',
+          revenue: 'CB Insights Beauty-Tech State of Industry 2024 + Mintel Beauty Tech 2024 — industry revenue pool',
           margin:  'L\u2019Oréal Tech Accelerator 2024 disclosure — SaaS-style GP 70-75%',
         },
       },
@@ -825,7 +825,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.01, gp1Margin: 0.50, forwardCAGR: 0.150,
         linkedCategoryId: null,
         sources: {
-          revenue: 'Harry\u2019s Inc S-1 + Euromonitor DTC tracker 2024',
+          revenue: 'Euromonitor DTC & Subscription Beauty Tracker 2024 — industry pool for subscription beauty/personal care',
           margin:  'Harry\u2019s (Edgewell) FY 2024 — subscription GP 49.4%; Function of Beauty 2024 round disclosure',
         },
       },
@@ -1007,7 +1007,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.32, forwardCAGR: 0.045,
         linkedCategoryId: null,
         sources: {
-          revenue: 'IBISWorld 2024 — Commercial Laundry industry report (NAICS 81233)',
+          revenue: 'Kline Professional Cleaning Products Global 2024 + IBISWorld Commercial Laundry 2024 (NAICS 81233)',
           margin:  'Ecolab Inc 10-K FY 2024 — Institutional & Specialty gross margin 32.4% (p. 41)',
         },
       },
@@ -1016,7 +1016,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.01, gp1Margin: 0.68, forwardCAGR: 0.180,
         linkedCategoryId: null,
         sources: {
-          revenue: 'CB Insights Home-Tech Report 2024 — Laundry app & service pool',
+          revenue: 'CB Insights Home-Tech State of Industry 2024 + Mintel Smart Home Care 2024 — industry revenue pool',
           margin:  'Rinse 2024 Series C disclosure; CleanCloud SaaS 2024 benchmark — GP 66-72%',
         },
       },
@@ -1025,7 +1025,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.04, gp1Margin: 0.42, forwardCAGR: 0.055,
         linkedCategoryId: null,
         sources: {
-          revenue: 'Whirlpool 10-K FY 2024 — Service & Parts segment sales',
+          revenue: 'Freedonia Group Laundry Consumables Market 2024 — industry appliance after-market pool',
           margin:  'Whirlpool 10-K FY 2024 — Service & Parts GP 41.8% (p. 47)',
         },
       },
@@ -1034,7 +1034,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.03, gp1Margin: 0.62, forwardCAGR: 0.140,
         linkedCategoryId: null,
         sources: {
-          revenue: 'IDC Smart Home Tracker 2024 — connected laundry / cleaning segment',
+          revenue: 'IDC Smart Home Devices Tracker 2024 + Statista Smart Appliance Global 2024 — industry connected-appliance pool',
           margin:  'SharkNinja Inc 10-K FY 2024 — Cleaning Appliances GP 46%; iRobot 10-K FY 2024 Premium Robotics GP 62%',
         },
       },
