@@ -1,128 +1,101 @@
 #!/usr/bin/env node
 /**
- * PRISM Innovation Explorer — Image Pipeline v4.1 (April 2026)
+ * PRISM Innovation Explorer — Image Pipeline v4.2 (April 2026)
  *
- * Strategy: keyword-driven Unsplash search at Vercel build time.
- * Each innovation has a tightly-crafted search query (gender/ethnicity/
- * concept-specific where it matters — e.g. "men barber luxury" not
- * "grooming"; "Black woman afro coils natural" for textured hair).
+ * Strategy: official Unsplash API search with per-innovation queries.
+ * Requires env var UNSPLASH_ACCESS_KEY (set in Vercel project settings).
  *
- * Pipeline per innovation:
- *   1. POST search query to Unsplash napi (returns JSON with photo URLs)
- *   2. Sort results by photo ID (stable across builds)
+ * Per innovation:
+ *   1. GET api.unsplash.com/search/photos?query=<keywords>&...
+ *      with Authorization: Client-ID <key>
+ *   2. Sort results by photo ID for build determinism
  *   3. Download top result at 1280x960, q=85
- *   4. If size>40KB & content-type=image/* → save as inn_XX.jpg
- *   5. If search fails or download fails → try next 2 results
- *   6. Last resort: fall back to hand-picked photo-{id} from v4.0
+ *   4. Validate content-type=image/* and size>30KB → save
+ *   5. Try next 2 results on download failure
+ *   6. Last resort: hand-picked photo-{id} fallback
  *
- * Storage: static assets in public/images/innovations/, cached forever
- *   via vercel.json (max-age=31536000, immutable). First-paint < 100ms.
+ * Rate limit: 50 req/hour for demo apps. We do 53 sequential queries
+ * (1.5s gap = 80s total). After first successful build, files are
+ * cached on disk (>40KB) so subsequent builds skip the API entirely
+ * unless the file is missing or corrupted.
  *
- * Determinism: results sorted by Unsplash photo ID (a stable property),
- *   so the same query yields the same image across rebuilds.
+ * If UNSPLASH_ACCESS_KEY is missing, falls back to hand-picked IDs
+ * directly — same as v4.0 behavior (no broken builds).
  *
- * Throttling: 1.8s between napi calls (Unsplash unauthenticated limit
- *   ~50 req/h; we do 53 spread over ~95s — well within limits).
+ * Storage: static assets in public/images/innovations/, served with
+ * Cache-Control: public, max-age=31536000, immutable (vercel.json).
+ * First-paint <100ms once cached.
  */
 
 import { writeFile, mkdir, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const OUT_DIR = join(process.cwd(), 'public', 'images', 'innovations');
-const NAPI_GAP_MS = 1800;
+const ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || '';
+const API_BASE = 'https://api.unsplash.com';
+const API_GAP_MS = 1500;
 const W = 1280, H = 960, Q = 85;
 
-// ─── Per-innovation search queries (carefully crafted) ──────────────
-// Specifics that matter:
-//  - gender lock for inn_07 (men), inn_17/23 (mature/older woman)
-//  - ethnicity lock for inn_19 (Black, 4C texture)
-//  - subject lock for inn_38/52 (toilet, not generic bathroom)
-//  - concept-anchored verbs (e.g. "dropper" not "serum" alone)
+// Per-innovation search queries (carefully scoped: gender, ethnicity,
+// product category-specific, concept-anchored verbs).
 const queries = {
-  // Hair: Care
-  inn_01: 'scalp serum dropper bottle skincare clinical white minimal',
-  inn_02: 'hair scalp brush thick density treatment wood handle',
-  inn_10: 'biotech hair serum ampoule glass laboratory science',
-  inn_19: 'Black woman natural afro coily 4c hair portrait studio',
-  inn_20: 'clinical hair recovery serum white bottle pharmacy luxury',
-  inn_21: 'peptide serum dropper laboratory glass blue science skincare',
-  inn_22: 'hair supplement vitamins capsules wellness flat lay',
-  inn_23: 'mature elegant woman portrait grey blonde hair beauty',
-  inn_24: 'shampoo bar solid soap eco bathroom wood sustainable',
-  inn_46: 'doctor video consultation tablet telemedicine dermatology',
-  inn_49: 'aromatherapy serum diffuser calm purple wellness skincare',
-
-  // Hair: Color
-  inn_08: 'hair dye box mixing bowl colorful tubes vanity bathroom',
-  inn_12: 'salon hair stylist coloring treatment chair professional',
-  inn_17: 'silver grey hair woman elegant mature portrait studio',
-  inn_18: 'hair salon tablet AI technology stylist colorful palette',
-
-  // Hair: Styling
-  inn_07: 'men barber razor brush grooming flat lay luxury wooden',
-  inn_14: 'dry shampoo aerosol bottle vanity morning bedroom mirror',
-  inn_25: 'TikTok beauty influencer ring light hair products colorful',
-  inn_26: 'smartphone AI app beauty hair products sleek modern',
-  inn_44: 'gen alpha teen pink hair clips colorful styling youth',
-
-  // Hair: Body
-  inn_27: 'body cream firming bottle white wellness measuring tape',
-  inn_28: 'tropical coconut body cream halal Asian beauty pandan',
-
-  // LHC: FCN
-  inn_03: 'laundry detergent sheets eco green folded towels white',
-  inn_05: 'modern washing machine smart cartridge laundry room minimal',
-  inn_29: 'biotech laboratory glass flask green liquid detergent',
-  inn_30: 'subscription delivery box doorstep cardboard apartment',
-  inn_31: 'eco green leaf detergent bottle nature forest sustainability',
-
-  // LHC: FCA
-  inn_04: 'walk-in wardrobe luxury garments hangers fabric mist',
-  inn_06: 'closet wardrobe garments hanging clothes neat luxury',
-  inn_32: 'QR code phone scan clothing label fashion technology',
-  inn_48: 'athletic running gear sportswear blue sneakers performance',
-
-  // LHC: FFI
-  inn_33: 'perfume bottles luxury silk fabric softener boudoir',
+  inn_01: 'scalp serum dropper bottle skincare clinical',
+  inn_02: 'hair scalp brush thick density treatment',
+  inn_03: 'laundry detergent sheets eco green folded towels',
+  inn_04: 'walk-in wardrobe luxury garments hangers fabric',
+  inn_05: 'modern washing machine laundry room minimal',
+  inn_06: 'closet wardrobe garments hanging clothes neat',
+  inn_07: 'mens grooming kit razor brush flat lay',
+  inn_08: 'hair dye box mixing bowl vanity bathroom',
+  inn_09: 'dishwasher modern kitchen plates clean',
+  inn_10: 'biotech hair serum ampoule glass laboratory',
+  inn_11: 'mosquito repellent spray outdoor garden tropical',
+  inn_12: 'salon hair stylist coloring treatment professional',
+  inn_13: 'colorful sachets shop emerging market street',
+  inn_14: 'dry shampoo aerosol bottle vanity morning',
+  inn_15: 'aromatherapy candles diffuser lavender spa',
+  inn_16: 'refill station bottles eco store amber glass',
+  inn_17: 'silver grey hair woman elegant mature portrait',
+  inn_18: 'hair salon tablet AI technology stylist palette',
+  inn_19: 'black woman natural afro coily hair portrait',
+  inn_20: 'clinical hair recovery serum bottle pharmacy',
+  inn_21: 'peptide serum dropper laboratory glass science',
+  inn_22: 'hair supplement vitamins capsules wellness',
+  inn_23: 'mature elegant woman portrait blonde hair beauty',
+  inn_24: 'shampoo bar solid soap eco bathroom',
+  inn_25: 'beauty influencer ring light hair products colorful',
+  inn_26: 'smartphone app beauty hair products sleek',
+  inn_27: 'body cream firming bottle wellness measuring tape',
+  inn_28: 'tropical coconut body cream Asian beauty pandan',
+  inn_29: 'biotech laboratory glass flask green liquid',
+  inn_30: 'subscription delivery box doorstep cardboard',
+  inn_31: 'eco green leaf detergent bottle nature forest',
+  inn_32: 'QR code phone scan clothing label fashion',
+  inn_33: 'perfume bottles luxury silk fabric softener',
+  inn_34: 'cashmere knit sweater fabric care wool soft',
+  inn_35: 'lavender bedding sleep linen white bedroom',
+  inn_36: 'kitchen sink dish soap clean white plates',
+  inn_37: 'dishwasher cartridge tablet smart appliance',
+  inn_38: 'toilet bowl modern bathroom clean white',
+  inn_39: 'colorful cleaning sachets shop shelf',
+  inn_40: 'colorful retail shelf emerging market shop',
+  inn_41: 'beauty influencer ring light camera content creator',
+  inn_42: 'sleek straight glossy hair woman keratin',
+  inn_43: 'AI search interface laptop neural network glow',
+  inn_44: 'gen alpha teen pink hair colorful styling',
+  inn_45: 'modern kitchen dishwasher tablet middle class',
+  inn_46: 'doctor video consultation tablet telemedicine',
+  inn_47: 'senior elderly hand cleaning home kitchen',
+  inn_48: 'athletic running gear sportswear blue sneakers',
+  inn_49: 'aromatherapy serum diffuser calm purple wellness',
+  inn_50: 'cleaning app smartphone home counter routine',
+  inn_51: 'smart mosquito trap device bedroom modern',
+  inn_52: 'toilet bowl bathroom probiotic clean modern',
   inn_53: 'perfume bottles row luxury haute couture boutique',
-
-  // LHC: LAD
-  inn_34: 'cashmere knit sweater fabric care luxury wool soft',
-  inn_35: 'lavender bedding sleep linen white bedroom calm evening',
-
-  // LHC: HDW
-  inn_36: 'kitchen sink dish soap clean white plates pristine',
-
-  // LHC: ADW
-  inn_09: 'dishwasher modern kitchen plates clean glasses minimal',
-  inn_37: 'dishwasher cartridge tablet smart appliance kitchen',
-  inn_45: 'modern kitchen dishwasher tablet aspirational middle class',
-
-  // LHC: HSC
-  inn_15: 'aromatherapy candles diffuser lavender spa bathroom calm',
-  inn_39: 'colorful cleaning sachets shop shelf affordable products',
-  inn_50: 'cleaning app smartphone home counter routine modern',
-
-  // LHC: Toilet
-  inn_38: 'toilet bowl modern bathroom clean white green plant',
-  inn_52: 'toilet bowl bathroom probiotic clean modern green',
-
-  // LHC: IC
-  inn_11: 'mosquito repellent spray outdoor garden tropical evening',
-  inn_51: 'smart mosquito trap device bedroom Scandinavian modern',
-
-  // Cross-Category
-  inn_13: 'colorful sachets shop emerging market street stall',
-  inn_16: 'refill station bottles eco store amber glass bulk',
-  inn_40: 'colorful retail shelf emerging market shop affordable',
-  inn_41: 'beauty influencer ring light pink camera content creator',
-  inn_42: 'sleek straight glossy hair woman keratin smooth portrait',
-  inn_43: 'AI search interface laptop neural network glow tech',
-  inn_47: 'senior elderly hand cleaning home kitchen ergonomic',
 };
 
-// Hand-picked photo-IDs as last-resort fallback (all verified distinct).
+// Hand-picked photo-IDs as last-resort fallback.
 const fallbackIds = {
   inn_01:'photo-1556228720-195a672e8a03', inn_02:'photo-1559599101-f09722fb4948',
   inn_03:'photo-1545173168-9f1947eebb7f', inn_04:'photo-1489274495757-95c7c837b101',
@@ -156,28 +129,40 @@ const fallbackIds = {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const COMMON_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (compatible; PRISM-Build/4.1; +https://github.com)',
+  'User-Agent': 'PRISM-Build/4.2 (+github.com/AlexanderLaker/PULSE)',
   'Accept': 'application/json,image/*',
 };
 
-async function searchUnsplash(query, attempt = 0) {
-  const url = `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape&content_filter=high`;
+let rateLimitRemaining = 50;
+
+async function searchUnsplashApi(query, attempt = 0) {
+  if (!ACCESS_KEY) throw new Error('no access key');
+  const url = `${API_BASE}/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape&content_filter=high`;
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(15000),
-      headers: COMMON_HEADERS,
+      headers: {
+        ...COMMON_HEADERS,
+        'Authorization': `Client-ID ${ACCESS_KEY}`,
+        'Accept-Version': 'v1',
+      },
     });
-    if (res.status === 429 || res.status >= 500) {
+    const remaining = res.headers.get('x-ratelimit-remaining');
+    if (remaining !== null) rateLimitRemaining = parseInt(remaining, 10);
+    if (res.status === 429) {
       if (attempt < 2) {
-        await sleep(3000 * (attempt + 1));
-        return searchUnsplash(query, attempt + 1);
+        await sleep(60000);
+        return searchUnsplashApi(query, attempt + 1);
       }
-      throw new Error(`napi HTTP ${res.status}`);
+      throw new Error('rate limited');
     }
-    if (!res.ok) throw new Error(`napi HTTP ${res.status}`);
+    if (res.status >= 500 && attempt < 2) {
+      await sleep(3000 * (attempt + 1));
+      return searchUnsplashApi(query, attempt + 1);
+    }
+    if (!res.ok) throw new Error(`api HTTP ${res.status}`);
     const data = await res.json();
     if (!data.results || data.results.length === 0) throw new Error('no results');
-    // Stable sort by photo ID for determinism across rebuilds.
     data.results.sort((a, b) => a.id.localeCompare(b.id));
     return data.results;
   } catch (err) {
@@ -200,7 +185,6 @@ async function downloadFromUrl(url) {
 }
 
 function buildCdnUrl(rawUrl) {
-  // Append our sizing params; raw includes the photo-XXX path already.
   const sep = rawUrl.includes('?') ? '&' : '?';
   return `${rawUrl}${sep}auto=format&fit=crop&w=${W}&h=${H}&q=${Q}`;
 }
@@ -208,7 +192,6 @@ function buildCdnUrl(rawUrl) {
 async function downloadInnovation(id) {
   const outPath = join(OUT_DIR, `${id}.jpg`);
 
-  // Skip cache if we already have a real photo (>40KB).
   if (existsSync(outPath)) {
     try {
       const s = await stat(outPath);
@@ -220,48 +203,69 @@ async function downloadInnovation(id) {
   }
 
   const query = queries[id];
-  if (query) {
+  if (query && ACCESS_KEY) {
     try {
-      const results = await searchUnsplash(query);
-      // Try top 3 results, in case the first 404s on the CDN.
+      const results = await searchUnsplashApi(query);
       for (let i = 0; i < Math.min(3, results.length); i++) {
         const photo = results[i];
         const cdnUrl = buildCdnUrl(photo.urls.raw);
         try {
           const buf = await downloadFromUrl(cdnUrl);
           await writeFile(outPath, buf);
-          console.log(`  SEARCH   ${id}  ${photo.id}  (${(buf.length / 1024).toFixed(0)} KB)  q="${query.slice(0, 50)}"`);
+          console.log(`  API      ${id}  ${photo.id}  (${(buf.length/1024).toFixed(0)} KB)  q="${query.slice(0,45)}"  rl=${rateLimitRemaining}`);
           return true;
         } catch (err) {
           console.warn(`    photo ${photo.id} miss: ${err.message}`);
         }
       }
     } catch (err) {
-      console.warn(`  SEARCH-X ${id}  ${err.message}`);
+      console.warn(`  API-X    ${id}  ${err.message}`);
     }
   }
 
-  // Fallback: hand-picked photo ID from v4.0
+  // Fallback: hand-picked photo ID
   const fbId = fallbackIds[id];
   if (fbId) {
     const fbUrl = `https://images.unsplash.com/${fbId}?auto=format&fit=crop&w=${W}&h=${H}&q=${Q}`;
     try {
       const buf = await downloadFromUrl(fbUrl);
       await writeFile(outPath, buf);
-      console.log(`  FALLBACK ${id}  ${fbId}  (${(buf.length / 1024).toFixed(0)} KB)`);
+      console.log(`  FALLBACK ${id}  ${fbId}  (${(buf.length/1024).toFixed(0)} KB)`);
       return true;
     } catch (err) {
       console.warn(`  FB-MISS  ${id}  ${err.message}`);
     }
   }
 
-  console.error(`  FAIL     ${id}  no image obtained — keeping placeholder`);
+  console.error(`  FAIL     ${id}  no image obtained`);
   return false;
 }
 
+const SCRIPT_VERSION = '4.2';
+
+function maybeInvalidateCache() {
+  const versionFile = join(OUT_DIR, '.version');
+  let current = '';
+  try { current = readFileSync(versionFile, 'utf8').trim(); } catch {}
+  if (current === SCRIPT_VERSION) return;
+  console.log(`  Cache version mismatch (was: '${current}', now: '${SCRIPT_VERSION}') — clearing JPGs`);
+  try {
+    for (const f of readdirSync(OUT_DIR)) {
+      if (f.endsWith('.jpg')) {
+        try { unlinkSync(join(OUT_DIR, f)); } catch {}
+      }
+    }
+    writeFileSync(versionFile, SCRIPT_VERSION);
+  } catch (err) {
+    console.warn(`  cache clear warning: ${err.message}`);
+  }
+}
+
 async function main() {
-  console.log(`\n📸 PRISM image pipeline v4.1 — keyword-driven Unsplash search\n`);
+  console.log(`\n📸 PRISM image pipeline v4.2 — Unsplash official API`);
+  console.log(`   Access key: ${ACCESS_KEY ? `${ACCESS_KEY.slice(0,8)}...${ACCESS_KEY.slice(-4)}` : 'MISSING — using fallback IDs only'}`);
   await mkdir(OUT_DIR, { recursive: true });
+  maybeInvalidateCache();
 
   const ids = Array.from({ length: 53 }, (_, i) => `inn_${String(i + 1).padStart(2, '0')}`);
   let ok = 0, fail = 0;
@@ -269,16 +273,15 @@ async function main() {
 
   for (const id of ids) {
     const success = await downloadInnovation(id);
-    if (success) ok++;
-    else { fail++; failures.push(id); }
-    await sleep(NAPI_GAP_MS);
+    if (success) ok++; else { fail++; failures.push(id); }
+    await sleep(API_GAP_MS);
   }
 
-  console.log(`\n✅ ${ok}/${ids.length} downloaded${fail ? `, ${fail} failed: ${failures.join(', ')}` : ''}\n`);
+  console.log(`\n✅ ${ok}/${ids.length} downloaded${fail ? `, ${fail} failed: ${failures.join(', ')}` : ''}`);
+  console.log(`   Rate-limit remaining: ${rateLimitRemaining}\n`);
 }
 
 main().catch((err) => {
   console.error('Image pipeline crashed:', err);
-  // Don't break the build — gradient placeholders ship as last resort.
   process.exit(0);
 });
