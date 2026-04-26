@@ -712,6 +712,23 @@ function getProductBrands(name: string, isHair: boolean): string {
   return 'Persil (core LHC franchise)';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Strategic read-out generator.
+//
+// Two sections only:
+//   1. Summary               — what the entry is + which PRISM forces are
+//                              moving it, with a hard data point from the
+//                              source trend (the per-trend descriptions are
+//                              already shown in the "Trend Drivers" card
+//                              above this one, so we don't re-list them).
+//   2. Strategic Evaluation  — brand-agnostic effect on HCB (no individual
+//                              Henkel brand names), with named external
+//                              competitors, plus the opportunity and the
+//                              threat in plain partner language.
+//
+// Tone: senior-partner read-out. No tier labels, no toolbox option lists,
+// no boilerplate "validate WTP / pilot in 3 markets" closers.
+// ─────────────────────────────────────────────────────────────────────────────
 function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string): string {
   const key = `${entry.name}::${direction}`;
   const override = PRISM_OVERRIDES[key];
@@ -719,60 +736,102 @@ function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'co
 
   const isHair = HAIR_STAGES.has(stageName);
   const ctx = (isHair ? HAIR_CTX : LHC_CTX)[stageName];
-  const brands = getProductBrands(entry.name, isHair);
-  const trendCodes = entry.trendDrivers.match(/[TCGKXE]-\d+/g) || [];
-  const trendNames = trendCodes
-    .map(code => { const c = TREND_CONTEXT[code]; return c ? `${c.name} (${c.force} force)` : null; })
-    .filter(Boolean);
-  const trendText = trendNames.length > 0 ? trendNames.join('; ') : entry.trendDrivers;
-  const typeWord = entry.type === 'tech' ? 'technology' : entry.type === 'service' ? 'service model' : 'product segment';
-  const iw = entry.intensity === 3 ? 'high-conviction' : entry.intensity === 2 ? 'moderate-conviction' : 'emerging-signal';
+  const bu = isHair ? 'HCB Hair' : 'HCB LHC';
+  const journey = isHair ? 'hair journey' : 'LHC journey';
 
+  // Resolve trend codes to TREND_CONTEXT entries
+  const trendCodes = (entry.trendDrivers.match(/[TCGKXE]-\d+/g) || []) as string[];
+  const trends = trendCodes
+    .map(c => ({ code: c, def: TREND_CONTEXT[c] }))
+    .filter((t): t is { code: string; def: { name: string; force: string; description: string } } => !!t.def);
+
+  // Pull a hard data point from a trend description — prefer one with a number.
+  // Returns an object with the chosen trend code and the cleaned signal text,
+  // so the Summary can attribute the data point to its source trend.
+  const dataPoint = (() => {
+    if (!trends.length) return null;
+    const withNumber = trends.find(t => /\d/.test(t.def.description));
+    const chosen = withNumber || trends[0];
+    if (!chosen) return null;
+    const sentences = chosen.def.description.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const first = sentences[0] || '';
+    const second = sentences[1] || '';
+    const slice = /\d/.test(first) ? first : (second && /\d/.test(second) ? `${first} ${second}` : first);
+    // Strip trailing period(s) — the wrapping sentence supplies its own punctuation.
+    const cleaned = slice.trim().replace(/\s+\([^)]*force\)/i, '').replace(/[.!?\s]+$/, '');
+    if (!cleaned) return null;
+    return { code: chosen.code, text: cleaned };
+  })();
+
+  const codeRef = trendCodes.length ? trendCodes.join(' · ') : 'cross-force pressure inside the model';
+
+  // White-space heuristic — if the legacy brand mapper returns extension/opportunity/potential
+  // language for this entry, HCB has no incumbent brand here. We don't surface the brand
+  // text itself, only the white-space signal.
+  const brandsHint = getProductBrands(entry.name, isHair);
+  const whiteSpace = /extension|opportunity|Potential|natural brand extension|white space|under-leveraged|undermonetized|no\s+(?:henkel|incumbent)/i.test(brandsHint);
+
+  // ─── 1. Summary ───
+  let summary: string;
   if (direction === 'expansion') {
-    return (
-      `**Trend Mechanism.** "${entry.name}" is a ${iw} growth vector in the ${stageName} stage, driven by: ${trendText}. ` +
-      `This ${typeWord} reflects a structural shift — not a cyclical uptick — in ${isHair ? 'consumer hair care behavior, ingredient science, and channel dynamics' : 'laundry and home care habits, sustainability regulation, and appliance technology'}. ` +
-      `PRISM projects these tailwinds to compound through 2030 as the underlying forces reinforce each other across the model.\n\n` +
-
-      `**Henkel Portfolio Position.** The relevant Henkel asset is ${brands}. ` +
-      (ctx ? `Across the ${stageName} stage, Henkel\'s brand portfolio includes ${ctx.henkelBrands}. ` : '') +
-      (brands.includes('extension') || brands.includes('opportunity') || brands.includes('Potential')
-        ? `This is currently a portfolio gap — no existing Henkel brand directly addresses this opportunity. Competitors could establish category leadership before Henkel enters. The window for a first-mover or fast-follower play is narrowing as ${isHair ? 'L\'Oréal, P&G, and indie DTC brands' : 'P&G, Unilever, and private label operators'} invest aggressively. `
-        : `Henkel has a credible right-to-win here, grounded in ${isHair ? 'Schwarzkopf\'s professional heritage, the established salon-to-retail bridge, and European market leadership in color and styling' : 'Persil\'s brand trust (90%+ awareness in core European markets), over a century of surface chemistry and formulation IP, and established appliance OEM partnerships with Miele, Bosch, and Samsung'}. `) +
-      `The ${iw} intensity rating means this warrants ${entry.intensity === 3 ? 'immediate pipeline acceleration and dedicated innovation investment within the current planning cycle' : entry.intensity === 2 ? 'active R&D scoping and launch planning on a 12-18 month horizon' : 'exploratory research and quarterly trend monitoring before committing significant resources'}.\n\n` +
-
-      `**Competitive Dynamics.** ` +
-      (ctx ? `${ctx.competitors} ` : '') +
-      `For Henkel, speed of execution is critical — the competitive window for establishing category leadership in FMCG typically closes within 18-24 months of trend inflection. ` +
-      `${isHair ? 'The premium Hair market is increasingly winner-take-most, with consumers concentrating spend on brands that demonstrate clinically validated efficacy. Second-movers in this space rarely capture more than 15-20% of the pioneer\'s share.' : 'In LHC, the battle is fought on two fronts simultaneously: innovation leadership against P&G above (Ariel, Tide), and value-tier defense against private label below (now at 42% EU6 share). Winning requires excellence on both fronts.'}\n\n` +
-
-      `**Strategic Recommendation.** ` +
-      (ctx ? ctx.opportunity + ' ' : '') +
-      `Classify this as a ${entry.intensity === 3 ? '**Tier 1 priority** — allocate innovation pipeline resources immediately, target concept validation within 3 months and lead-market launch (Germany, France, UK) within 6-12 months' : entry.intensity === 2 ? '**Tier 2 priority** — initiate consumer concept testing and R&D feasibility within the next planning cycle, targeting a 12-18 month launch window in 2-3 lead markets' : '**Tier 3 monitor item** — track competitive moves and consumer adoption signals quarterly, prepare a contingency innovation brief for rapid activation if the trend accelerates beyond current projections'}. ` +
-      `Validate consumer willingness-to-pay through rapid concept testing before scaling — the insight from testing in lead markets should inform the global rollout architecture.`
-    );
+    summary =
+      `${entry.name} sits at the ${stageName.toLowerCase()} stage of the ${journey} and is in structural expansion — the move is mechanical, not cyclical. ` +
+      `The push comes from ${codeRef}` +
+      (dataPoint ? ` (source signal, ${dataPoint.code}: ${dataPoint.text})` : '') +
+      `. Inside the model these forces reinforce each other through 2030 rather than offsetting, which is why the segment compounds rather than stabilises.`;
+  } else {
+    summary =
+      `${entry.name} sits at the ${stageName.toLowerCase()} stage of the ${journey} and is in structural contraction — the trajectory is set, this is not a soft patch. ` +
+      `The pressure stack is ${codeRef}` +
+      (dataPoint ? ` (source signal, ${dataPoint.code}: ${dataPoint.text})` : '') +
+      `. Regulatory and consumer vectors compound rather than offset, so the contraction accelerates rather than fades.`;
   }
 
-  return (
-    `**Structural Decline Assessment.** "${entry.name}" faces ${iw} headwinds in the ${stageName} stage, driven by: ${trendText}. ` +
-    `This is a structural contraction — not a temporary dip — reflecting ${isHair ? 'premiumization displacing commodity tiers, tighter ingredient regulation under EU Cosmetics Regulation amendments, and digital disruption of traditional purchase and discovery journeys' : 'regulatory bans on legacy chemistry (PFAS restriction, microplastics phase-out), format obsolescence as concentrated innovations displace bulky legacy products, and consumer migration toward sustainable and transparent alternatives'}. These forces are mutually reinforcing and accelerating through the simulation model.\n\n` +
+  // ─── 2. Strategic Evaluation ───
+  const competitors = ctx?.competitors?.trim() || '';
+  let strategic: string;
 
-    `**Henkel Exposure.** ${brands} has direct exposure to this decline vector and requires proactive management. ` +
-    (ctx ? `Within the ${stageName} stage, Henkel\'s portfolio (${ctx.henkelBrands}) faces varying degrees of risk depending on specific SKU positioning and reformulation readiness. ` : '') +
-    `The ${iw} rating indicates ${entry.intensity === 3 ? 'material P&L impact within 12-18 months if no defensive action is taken — this is an urgent priority requiring immediate portfolio review, reformulation assessment, and resource reallocation planning' : entry.intensity === 2 ? 'growing margin pressure that will compound through the 2026-2028 period — proactive repositioning is advisable before the contraction accelerates and options narrow' : 'an early warning signal with limited near-term P&L impact, but strategic monitoring is warranted to avoid being caught off-guard by sudden regulatory or competitive acceleration'}.\n\n` +
+  if (direction === 'expansion') {
+    const conviction =
+      entry.intensity === 3 ? 'a high-conviction expansion pool' :
+      entry.intensity === 2 ? 'a moderate-conviction expansion pool' :
+                              'an early-signal expansion pool that warrants live tracking';
 
-    `**Competitive Context.** ` +
-    (ctx ? `${ctx.competitors} ` : 'Competitors face similar structural pressure in this segment. ') +
-    `The strategic question is whether to defend, pivot, or harvest. Competitors who exit declining segments early can redeploy resources to growth vectors; those who defend too long burn investment in a shrinking profit pool and miss the window on adjacent opportunities. ` +
-    `${isHair ? 'In Hair, the premium-value polarization means mid-tier positions are especially vulnerable — consumers either trade up to efficacy-proven premium brands (where margins justify the investment) or trade down to value alternatives and private label (where price is the only decision criterion). The squeezed middle offers the worst of both worlds.' : 'In LHC, regulatory-driven reformulation costs compound the margin pressure — brands that reformulate early gain compliance advantage and can claim "clean" positioning, but those that delay face cliff-edge obsolescence when regulation takes effect. The PFAS restriction timeline makes this concrete and urgent.'}\n\n` +
+    const hcbAngle = whiteSpace
+      ? `${bu} has no incumbent position here — the segment is open. That is the buying signal: a pool that compounds at this pace without a defending HCB asset will either be claimed by an external player inside this planning cycle, or surface as a build-versus-buy decision against an indie/DTC challenger that has already taken the consumer narrative.`
+      : `${bu} has a defensible right-to-win — ${isHair ? 'category leadership in Europe, salon-channel R&D credibility, and an active premium-mass bridge' : 'deep formulation IP across surfactants and bio-actives, OEM appliance partnerships, and a trade footprint that spans premium, mainstream and discount'} — but the right-to-win only converts to share if HCB moves at the speed of the trend, not after the share map is drawn.`;
 
-    `**Defensive Action Plan.** ` +
-    `${entry.intensity === 3 ? 'Immediate portfolio review required — this is a current-year priority that should be escalated to category leadership.' : entry.intensity === 2 ? 'Initiate a structured evaluation within the next planning cycle with clear decision gates.' : 'Add to the strategic monitoring dashboard for quarterly review by the category team.'} ` +
-    `Three response options: (1) **Reformulate** — adapt the product to comply with emerging regulations and evolving consumer preferences, extending the product lifecycle by 2-3 years while maintaining shelf position and retailer relationships. ` +
-    `(2) **Pivot** — redirect marketing spend, innovation resources, and negotiated shelf space from this declining segment to adjacent growth vectors within the ${stageName} stage where Henkel has right-to-win. ` +
-    `(3) **Managed harvest** — extract remaining margin while progressively reducing investment (media, trade promotion, innovation), and redeploy the freed capital toward ${isHair ? 'premium treatment plays (Gliss bond repair), scalp care innovation (Schwarzkopf), and styling growth (got2b/Taft) that represent structurally expanding profit pools' : 'concentrated format innovation (Persil Discs), bio-enzymatic stain science (Sil), and between-wash fabric care (Vernel refresh range) that represent the highest-ROI expansion opportunities in LHC'}. ` +
-    (ctx ? `The opportunity cost of defensive inaction is significant: investment trapped in declining segments cannot fund the growth plays. For context, ${ctx.opportunity}` : '')
-  );
+    const threat =
+      entry.intensity === 3
+        ? `Threat: this is the segment around which the next share map of the ${stageName.toLowerCase()} stage gets drawn. Whoever locks listings, OEM exclusivity or social-narrative ownership in the next 12-18 months sets the consumer default for the rest of the decade — and that consumer default is extremely expensive to displace.`
+        : entry.intensity === 2
+          ? `Threat: a fast-follower window is open, but it is a window, not a door. Once two of the three structural competitors anchor a position here, the remaining shelf and media economics get materially worse for the entrant.`
+          : `Threat: the signal is early. The risk is not acting too late — it is letting the trend mature inside competitor portfolios while ${bu} debates whether to participate.`;
+
+    strategic =
+      `Effect on ${bu}: ${conviction} inside the ${stageName.toLowerCase()} stage — profit is migrating into this segment, not rotating within it. ` +
+      (competitors ? `Competitive context: ${competitors} ` : '') +
+      `Opportunity: ${hcbAngle} ` +
+      threat;
+  } else {
+    const exposure =
+      entry.intensity === 3
+        ? `Effect on ${bu}: a high-conviction contraction with material P&L leak inside 12-18 months if portfolio investment is not actively redirected. Every euro held in this segment is forgoing the expansion vectors that sit one column over at the same stage.`
+        : entry.intensity === 2
+          ? `Effect on ${bu}: a moderate-conviction contraction. Margin compresses through 2026-2028 as regulatory and consumer pressure intensifies, and the window to redeploy narrows each quarter the segment is left untouched.`
+          : `Effect on ${bu}: an early-signal contraction with limited near-term P&L impact, but the direction is set. Defensive optionality is cheap to preserve now and expensive to recover later.`;
+
+    const oppLine = whiteSpace
+      ? `Opportunity: with no anchored HCB position to defend, the contraction is mostly a reading on which expansion segments at the same stage will absorb the freed-up shelf space — that is where attention should sit, not on the declining product.`
+      : `Opportunity: the same stage hosts expansion segments with higher gross margins and weaker incumbents. The strategic gain is from rotating shelf space, media spend, R&D capacity, and trade-promo budget out of the declining SKUs into those adjacent vectors before the structural competitors do the same. ${bu} should treat this contraction less as a defensive problem and more as the funding source for the expansion play next door.`;
+
+    strategic =
+      `${exposure} ` +
+      (competitors ? `Competitive context: ${competitors} ` : '') +
+      oppLine;
+  }
+
+  return `**1. Summary.** ${summary}\n\n**2. Strategic Evaluation.** ${strategic}`;
 }
 
 // Trend context mapping — enriched descriptions for each trend code
