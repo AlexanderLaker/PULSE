@@ -79,17 +79,12 @@ const localPaths: Record<string, string> = {
  * when no mapping exists — the component then falls back to the branded
  * gradient background.
  */
-// Bumped on every image-pipeline cache invalidation to force browser/CDN
-// re-fetch (vercel.json sets max-age=31536000 immutable on /images/*).
-export const IMAGE_VERSION = '4.3';
-
 export function getInnovationImageUrl(
   innovationId: string,
   _seed: number,
   _size: 'card' | 'hero' = 'card'
 ): string | null {
-  const path = localPaths[innovationId];
-  return path ? `${path}?v=${IMAGE_VERSION}` : null;
+  return localPaths[innovationId] ?? null;
 }
 
 export { localPaths as innovationPrompts };
