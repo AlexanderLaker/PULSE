@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PRISM Innovation Explorer — Image Pipeline v4.2 (April 2026)
+ * PRISM Innovation Explorer — Image Pipeline v4.3 (April 2026)
  *
  * Strategy: official Unsplash API search with per-innovation queries.
  * Requires env var UNSPLASH_ACCESS_KEY (set in Vercel project settings).
@@ -67,7 +67,7 @@ const queries = {
   inn_25: 'beauty influencer ring light hair products colorful',
   inn_26: 'smartphone app beauty hair products sleek',
   inn_27: 'body cream firming bottle wellness measuring tape',
-  inn_28: 'tropical coconut body cream Asian beauty pandan',
+  inn_28: 'tropical body lotion coconut spa',
   inn_29: 'biotech laboratory glass flask green liquid',
   inn_30: 'subscription delivery box doorstep cardboard',
   inn_31: 'eco green leaf detergent bottle nature forest',
@@ -83,7 +83,7 @@ const queries = {
   inn_41: 'beauty influencer ring light camera content creator',
   inn_42: 'sleek straight glossy hair woman keratin',
   inn_43: 'AI search interface laptop neural network glow',
-  inn_44: 'gen alpha teen pink hair colorful styling',
+  inn_44: 'girl colorful hair pink fun youth',
   inn_45: 'modern kitchen dishwasher tablet middle class',
   inn_46: 'doctor video consultation tablet telemedicine',
   inn_47: 'senior elderly hand cleaning home kitchen',
@@ -110,7 +110,7 @@ const fallbackIds = {
   inn_21:'photo-1581456495146-65a71b2c8e52', inn_22:'photo-1556228453-c4a4be29c739',
   inn_23:'photo-1580618672591-eb180b1a973f', inn_24:'photo-1599751449128-eb7249c3d6b1',
   inn_25:'photo-1611162617213-7d7a39e9b1d7', inn_26:'photo-1556761175-5973dc0f32e7',
-  inn_27:'photo-1571019613454-1cb2f99b2d8b', inn_28:'photo-1601379329542-31c59cfd2a52',
+  inn_27:'photo-1571019613454-1cb2f99b2d8b', inn_28:'photo-1570172619644-dfd03ed5d881',
   inn_29:'photo-1532996122724-e3c354a0b15b', inn_30:'photo-1556742049-0cfed4f6a45d',
   inn_31:'photo-1473773508845-188df298d2d1', inn_32:'photo-1572584642822-6f8de0243c93',
   inn_33:'photo-1629140727571-9b5c6f6267b4', inn_34:'photo-1620799140408-edc6dcb6d633',
@@ -118,7 +118,7 @@ const fallbackIds = {
   inn_37:'photo-1584568694244-14fbdf83bd30', inn_38:'photo-1564540583246-934409427776',
   inn_39:'photo-1556911220-bff31c812dba', inn_40:'photo-1599249300969-0a9d86a26abb',
   inn_41:'photo-1611162616475-46b635cb6868', inn_42:'photo-1519699047748-de8e457a634e',
-  inn_43:'photo-1677442136019-21780ecad995', inn_44:'photo-1595433562696-88a8e2ad88e0',
+  inn_43:'photo-1677442136019-21780ecad995', inn_44:'photo-1503944168849-8bf86d22ac41',
   inn_45:'photo-1581578731548-c64695cc6952', inn_46:'photo-1576091160399-112ba8d25d1d',
   inn_47:'photo-1581579185169-9c53b38ecf85', inn_48:'photo-1506629082955-511b1aa562c8',
   inn_49:'photo-1499728603263-13726abce5fd', inn_50:'photo-1603712610494-e54a8fd7d1c0',
@@ -241,7 +241,7 @@ async function downloadInnovation(id) {
   return false;
 }
 
-const SCRIPT_VERSION = '4.2';
+const SCRIPT_VERSION = '4.3';
 
 function maybeInvalidateCache() {
   const versionFile = join(OUT_DIR, '.version');
@@ -262,7 +262,7 @@ function maybeInvalidateCache() {
 }
 
 async function main() {
-  console.log(`\n📸 PRISM image pipeline v4.2 — Unsplash official API`);
+  console.log(`\n📸 PRISM image pipeline v4.3 — Unsplash official API`);
   console.log(`   Access key: ${ACCESS_KEY ? `${ACCESS_KEY.slice(0,8)}...${ACCESS_KEY.slice(-4)}` : 'MISSING — using fallback IDs only'}`);
   await mkdir(OUT_DIR, { recursive: true });
   maybeInvalidateCache();
