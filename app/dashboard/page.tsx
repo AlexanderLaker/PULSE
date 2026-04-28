@@ -28,7 +28,7 @@
 
 import { useEffect, useState } from 'react';
 import { LogOut, Settings } from 'lucide-react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
@@ -36,6 +36,7 @@ import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import ProfitPoolExplorer from '@/components/dashboard/ProfitPoolExplorer';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import SettingsModal from '@/components/dashboard/SettingsModal';
+import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
 type DashboardTab =
@@ -77,10 +78,45 @@ export default function DashboardPage() {
   // fetch, no race condition against middleware.
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
+  const { session } = useSession();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // ─── Welcome / MVP onboarding modal ─────────────────────────────────
+  // Shown on every fresh login. We key sessionStorage by the active Clerk
+  // session ID — once dismissed, the same session won't show it again
+  // (so a tab refresh inside an active session stays silent), but a new
+  // sign-in produces a new session ID and the modal re-appears.
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  useEffect(() => {
+    if (!isSignedIn || !session?.id) return;
+    if (typeof window === 'undefined') return;
+    const key = `prism.welcomeSeen.${session.id}`;
+    try {
+      if (!window.sessionStorage.getItem(key)) {
+        setWelcomeOpen(true);
+      }
+    } catch {
+      // sessionStorage unavailable (e.g. privacy mode) — show anyway.
+      setWelcomeOpen(true);
+    }
+  }, [isSignedIn, session?.id]);
+
+  const handleWelcomeClose = () => {
+    setWelcomeOpen(false);
+    if (typeof window !== 'undefined' && session?.id) {
+      try {
+        window.sessionStorage.setItem(
+          `prism.welcomeSeen.${session.id}`,
+          '1',
+        );
+      } catch {
+        /* noop */
+      }
+    }
+  };
 
   // Authorization — same pattern as SettingsModal.tsx. 'unknown' until fetched;
   // we fall back to 'viewer' on error so admin-only UI stays hidden by default.
@@ -262,6 +298,9 @@ export default function DashboardPage() {
 
       {/* ─── Settings Modal (gear icon in top nav) ─────────────────── */}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* ─── Welcome / MVP modal — shown on every fresh login ──────── */}
+      <WelcomeModal open={welcomeOpen} onClose={handleWelcomeClose} />
     </div>
   );
 }
