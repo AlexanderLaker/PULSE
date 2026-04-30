@@ -57,7 +57,7 @@ const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)' },
-  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer', adminOnly: true },
+  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', adminOnly: true },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
