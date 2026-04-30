@@ -50,14 +50,16 @@ interface TabDef {
   id: DashboardTab;
   label: string;
   adminOnly?: boolean;
+  /** Render in a muted gray to signal "(Beta)" status. */
+  beta?: boolean;
 }
 
 const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
-  { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)' },
-  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', adminOnly: true },
+  { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',          beta: true },
+  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', adminOnly: true, beta: true },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -68,6 +70,10 @@ const NAV = {
   surfaceLow:       '#eff4ff',
   surfaceHigh:      '#dce9ff',
   outlineVariant:   '#81b5f6',
+  // Muted gray scale for "(Beta)" tabs — readable but visually
+  // de-emphasized vs. the production tabs in maritime blue.
+  betaInactive:     '#94a3b8',
+  betaActive:       '#64748b',
 };
 const HEADLINE_FONT =
   "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -209,6 +215,10 @@ export default function DashboardPage() {
             <div className="hidden md:flex items-center gap-6">
               {visibleTabs.map((tab) => {
                 const isActive = activeTab === tab.id;
+                // Beta tabs render in a muted gray to clearly differentiate
+                // them from the production tabs (which use maritime blue).
+                const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
+                const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onSurfaceVariant;
                 return (
                   <button
                     key={tab.id}
@@ -216,14 +226,14 @@ export default function DashboardPage() {
                     className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
                     style={{
                       fontFamily: HEADLINE_FONT,
-                      color: isActive ? NAV.primary : NAV.onSurfaceVariant,
+                      color: isActive ? activeColor : inactiveColor,
                     }}
                   >
                     {tab.label}
                     {isActive && (
                       <span
                         className="absolute left-0 right-0 -bottom-[2px] h-[2px] rounded-full"
-                        style={{ backgroundColor: NAV.primary }}
+                        style={{ backgroundColor: activeColor }}
                       />
                     )}
                   </button>
