@@ -240,7 +240,7 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
     const ok =
       code.trim().toLowerCase() === REQUIRED_CODE.toLowerCase();
     if (!ok) {
-      setError('That code is not valid. Please double-check or contact Alexander Laker.');
+      setError('That code is not valid. Please double-check and try again.');
       setSubmitting(false);
       return;
     }
@@ -267,8 +267,8 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
           className="mt-3 text-sm leading-relaxed"
           style={{ color: S.onSurfaceVariant }}
         >
-          PRISM is currently invite-only. Please enter the access code you
-          received from Alexander Laker to continue.
+          PRISM is currently invite-only. Please enter the access code
+          you received to continue.
         </p>
       </div>
 
@@ -291,7 +291,7 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
           setCode(e.target.value);
           if (error) setError(null);
         }}
-        placeholder="e.g. HCB2026"
+        placeholder="Enter your access code"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'prism-access-code-error' : undefined}
         className="w-full px-4 py-3 rounded-xl text-base outline-none transition-all"
