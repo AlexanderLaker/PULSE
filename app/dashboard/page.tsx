@@ -55,11 +55,13 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  // Production views — left side of the top nav, in maritime blue.
   { id: 'trends-2',              label: 'Trends' },
-  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
-  { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',          beta: true },
-  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', adminOnly: true, beta: true },
+  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
+  // Beta views — pinned to the right side of the top nav, in muted gray.
+  { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',  beta: true },
+  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -145,15 +147,12 @@ export default function DashboardPage() {
   }, [isSignedIn]);
 
   const isAdmin = role === 'admin';
+  // All tabs visible to all users; the `adminOnly` flag is no longer used.
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
-
-  // Safety: if the user was on the admin tab and then loses admin (role
-  // change mid-session), bounce them back to the default tab.
-  useEffect(() => {
-    if (activeTab === 'profit-pool-explorer' && !isAdmin && role !== 'unknown') {
-      setActiveTab('profit-pool-2');
-    }
-  }, [activeTab, isAdmin, role]);
+  // Split for layout: production tabs anchor to the brand on the left,
+  // Beta tabs are pinned to the right of the nav next to the Settings icon.
+  const mainTabs = visibleTabs.filter((t) => !t.beta);
+  const betaTabs = visibleTabs.filter((t) => t.beta);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -192,6 +191,33 @@ export default function DashboardPage() {
 
   const userEmail = user.primaryEmailAddress?.emailAddress ?? 'Signed in';
 
+  // Renders one tab button. Beta tabs use a muted gray scale to clearly
+  // differentiate them from the production tabs (which use maritime blue).
+  const renderTabButton = (tab: TabDef) => {
+    const isActive = activeTab === tab.id;
+    const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
+    const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onSurfaceVariant;
+    return (
+      <button
+        key={tab.id}
+        onClick={() => setActiveTab(tab.id)}
+        className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
+        style={{
+          fontFamily: HEADLINE_FONT,
+          color: isActive ? activeColor : inactiveColor,
+        }}
+      >
+        {tab.label}
+        {isActive && (
+          <span
+            className="absolute left-0 right-0 -bottom-[2px] h-[2px] rounded-full"
+            style={{ backgroundColor: activeColor }}
+          />
+        )}
+      </button>
+    );
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#f8f9ff' }}>
       {/* ─── Editorial Top Navigation (constant across all tabs) ─── */}
@@ -213,37 +239,22 @@ export default function DashboardPage() {
             </div>
 
             <div className="hidden md:flex items-center gap-6">
-              {visibleTabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                // Beta tabs render in a muted gray to clearly differentiate
-                // them from the production tabs (which use maritime blue).
-                const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
-                const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onSurfaceVariant;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
-                    style={{
-                      fontFamily: HEADLINE_FONT,
-                      color: isActive ? activeColor : inactiveColor,
-                    }}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <span
-                        className="absolute left-0 right-0 -bottom-[2px] h-[2px] rounded-full"
-                        style={{ backgroundColor: activeColor }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+              {mainTabs.map((tab) => renderTabButton(tab))}
             </div>
           </div>
 
           {/* Utilities */}
           <div className="flex items-center gap-3">
+            {/* Beta tabs — pinned to the far right, immediately before the
+                Settings icon. Hidden below md to mirror the main tab group. */}
+            {betaTabs.length > 0 && (
+              <div
+                className="hidden md:flex items-center gap-5 pr-3 mr-1 border-r"
+                style={{ borderColor: 'rgba(0, 52, 94, 0.10)' }}
+              >
+                {betaTabs.map((tab) => renderTabButton(tab))}
+              </div>
+            )}
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
@@ -300,7 +311,7 @@ export default function DashboardPage() {
               onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
             />
           )}
-          {activeTab === 'profit-pool-explorer' && isAdmin && (
+          {activeTab === 'profit-pool-explorer' && (
             <ProfitPoolExplorer />
           )}
         </ErrorBoundary>

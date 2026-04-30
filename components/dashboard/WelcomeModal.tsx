@@ -2,9 +2,10 @@
  * WelcomeModal — Two-step welcome / orientation popup shown on every login.
  *
  * Step 1: MVP disclaimer + feedback channel (Alexander Laker).
- * Step 2: Brief explainer of the four views, in header order:
- *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis
- *           -> Innovation Explorer.
+ * Step 2: Brief explainer of the three production views, in header order:
+ *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis.
+ *           Beta tabs (Innovation Explorer, Profit Pool Explorer) are not
+ *           introduced here — they live to the right of the top nav.
  *
  * Design language mirrors SettingsModal / Trends2 / ProfitPoolAnalysis2
  * (Maritime blue editorial tokens, Manrope headlines, pill-shaped CTAs).
@@ -27,7 +28,6 @@ import {
   Activity,
   Route,
   TrendingUp,
-  Lightbulb,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -383,9 +383,9 @@ const Step2Views: FC = () => (
         color: S.onSurfaceVariant,
       }}
     >
-      Four views, in the order shown in the header.{' '}
+      Three views, in the order shown in the header.{' '}
       <strong style={{ color: S.onBg }}>Trends is the main input page</strong>{' '}
-      — the other three are output views built on top of it.
+      — the other two are output views built on top of it.
     </p>
 
     {/* INPUT */}
@@ -411,12 +411,6 @@ const Step2Views: FC = () => (
       title="Profit Pool Shift Analysis"
       body="Visualizes where value is migrating, sliced by time path, force, region, and value chain step."
       note="Values reflect the isolated trend impact on HCB's current business — excluding price moves, innovations, or competitor actions."
-    />
-    <ViewCard
-      number="4"
-      icon={Lightbulb}
-      title="Innovation Explorer"
-      body="Explores innovation white spaces and opportunities derived from the shifts above."
     />
   </div>
 );
