@@ -53,8 +53,8 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   { id: 'trends-2',              label: 'Trends' },
+  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)' },
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', adminOnly: true },
