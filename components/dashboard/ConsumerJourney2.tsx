@@ -713,24 +713,15 @@ function getProductBrands(name: string, isHair: boolean): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PRISM read-out generator — bespoke executive prose per (entry × stage × direction).
+// ─────────────────────────────────────────────────────────────────────────────
+// PRISM read-out generator — short, crisp, entry-specific.
 //
-// Voice: a Bain senior partner has written each tile by hand, with twenty
-// consultants doing the underlying source pulls. Each Summary and Strategic
-// Evaluation is anchored to the specific entry name, the actual trend
-// mechanism (paraphrased from the trend description, with hard numbers
-// attributed to their trend code), the stage-specific competitive map, and
-// HCB's brand-routed exposure. No tier labels, no toolbox option lists, no
-// boilerplate "validate WTP / pilot in 3 markets" closers.
-//
-// Layout:
-//   1. Summary             — what the entry is, the actual force in motion,
-//                            why the model treats the slope as structural,
-//                            and the stake for HCB top management.
-//   2. Strategic Evaluation — why the profit pool is moving the way it is,
-//                            named competitive context, HCB's brand-routed
-//                            position, and the posture top management should
-//                            adopt.
+// Two sections, ~1 sentence each (max 2). No framing/opening, no platitudes.
+// Each tile leads with the profit-pool delta on THIS entry, the actual trend
+// mechanism (with hard-data clause + trend code), and only when material a
+// named competitor or HCB brand. Sentence shape branches on entry-name
+// archetype × direction × white-space-vs-entrenched, so adjacent tiles never
+// share structure.
 // ─────────────────────────────────────────────────────────────────────────────
 function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'contraction', stageName: string): string {
   const key = `${entry.name}::${direction}`;
@@ -740,201 +731,292 @@ function generatePrismAnalysis(entry: ProductEntry, direction: 'expansion' | 'co
   const isHair = HAIR_STAGES.has(stageName);
   const ctx = (isHair ? HAIR_CTX : LHC_CTX)[stageName];
   const bu = isHair ? 'HCB Hair' : 'HCB LHC';
-  const journey = isHair ? 'hair journey' : 'LHC journey';
   const stageLc = stageName.toLowerCase();
   const entryName = entry.name;
+  const isExp = direction === 'expansion';
 
-  // ─── Resolve trends + extract source signals ────────────────────────────
+  // ── Resolve trends + extract the most data-rich clause from each ──
   const trendCodes = (entry.trendDrivers.match(/[TCGKXE]-\d+/g) || []) as string[];
   const trends = trendCodes
     .map(c => ({ code: c, def: TREND_CONTEXT[c] }))
     .filter((t): t is { code: string; def: { name: string; force: string; description: string } } => !!t.def);
 
-  type Signal = { code: string; name: string; force: string; text: string; hasNumber: boolean };
+  type Signal = { code: string; name: string; force: string; clause: string; hasNumber: boolean };
   const signals: Signal[] = trends.map(t => {
     const sentences = t.def.description.split(/(?<=[.!?])\s+/).filter(Boolean);
-    const numbered = sentences.find(s => /\d/.test(s));
-    const text = (numbered || sentences[0] || '').trim().replace(/[.!?\s]+$/, '');
-    return { code: t.code, name: t.def.name, force: t.def.force, text, hasNumber: /\d/.test(text) };
+    const score = (s: string) => (s.match(/\$[\d.,]+|€[\d.,]+|\d[\d.,]*\s*%|\d[\d.,]*\s*CAGR|\b\d+x\b|\bbillion\b/gi) || []).length * 10 + (/\d/.test(s) ? 1 : 0);
+    const ranked = [...sentences].sort((a, b) => score(b) - score(a));
+    const clause = (ranked[0] || sentences[0] || '').trim().replace(/[.!?\s]+$/, '');
+    return { code: t.code, name: t.def.name, force: t.def.force, clause, hasNumber: /\d/.test(clause) };
   });
   const primary: Signal | null = signals.find(s => s.hasNumber) || signals[0] || null;
   const secondary: Signal | null = signals.find(s => s !== primary && s.hasNumber) || signals.find(s => s !== primary) || null;
 
-  // Extract a full numeric sentence from the stage opportunity text (CAGR, $Bn, %, etc.)
-  const stageOppNumber = (() => {
-    const opp = ctx?.opportunity || '';
-    const sentences = opp.split(/(?<=[.!?])\s+/).filter(Boolean);
-    const numbered = sentences.find(s =>
-      /(\$[\d.,]+\s*[BbMm]|€[\d.,]+\s*[BbMm]|\b[\d.,]+\s*%|\b[\d.,]+\s*CAGR|[\d.,]+\s*[Bb]illion|\b\d{4}\b|\b\d+x\b)/.test(s)
-    );
-    return numbered ? numbered.trim().replace(/[.!?\s]+$/, '') : null;
-  })();
-
-  // ─── Brand routing + white-space classification ────────────────────────
+  // ── Brand routing + lead Henkel asset ──
   const brandRouting = getProductBrands(entry.name, isHair);
   const whiteSpace = /extension|opportunity|natural brand extension|white space|under-leveraged|undermonetized|no\s+(?:henkel|incumbent)|defense brand/i.test(brandRouting);
-
-  // Pick the lead Henkel asset — first brand name before any parenthetical or comma
   const leadBrand = (() => {
     const m = brandRouting.match(/^([^,()]+)/);
-    const cleaned = (m?.[1] || '').trim().replace(/\s+(and|or)\s+.*$/i, '');
-    return cleaned || (isHair ? 'Schwarzkopf' : 'Persil');
+    return ((m?.[1] || '').trim().replace(/\s+(and|or)\s+.*$/i, '') || (isHair ? 'Schwarzkopf' : 'Persil'));
   })();
 
-  // Type-aware framing for the entry itself
-  const typeFrame: Record<string, string> = {
-    product: 'product line',
-    tech: 'capability',
-    service: 'service layer',
-  };
-  const typeLabel = typeFrame[entry.type] || 'asset';
+  // ── Pull a named external competitor from stage CTX (longest match wins) ──
+  const namedCompetitor = (() => {
+    const c = ctx?.competitors || '';
+    const known = [
+      "L'Oréal Modiface", "L'Oréal Magic Retouch", "L'Oréal Excellence", "L'Oréal Préférence",
+      "L'Oréal Elvive", "L'Oréal Elsève", "L'Oréal Elnett", "L'Oréal Serioxyl",
+      "P&G Head & Shoulders", "P&G Ariel Pods", "P&G Ariel/Tide", "P&G Ariel", "P&G Tide",
+      "P&G Pantene", "P&G Lenor", "P&G Downy", "P&G Bounce", "P&G Febreze",
+      "Unilever OMO", "Unilever Dove", "Unilever TRESemmé", "Unilever Comfort", "Unilever Clear",
+      "Reckitt Air Wick", "Air Wick", "Vanish",
+      "Samsung SmartThings", "LG ThinQ",
+      "Kérastase", "Olaplex", "K18", "Function of Beauty", "Madison Reed", "eSalon", "Prose",
+      "Nioxin", "Vegamour", "Nutrafol", "Batiste", "Wella", "Clairol", "Garnier Nutrisse", "Nutrisse",
+      "Moroccanoil", "Oribe", "R+Co", "Church & Dwight", "OxiClean", "Arm & Hammer", "Snuggle",
+      "L'Oréal", "P&G", "Unilever", "Reckitt", "Advent",
+      "Samsung", "LG", "Miele", "Bosch",
+      "Aldi", "Lidl", "Tide", "Ariel", "Pantene", "Lenor", "Downy", "Bounce", "Comfort",
+      "OMO", "Dove", "Febreze", "Head & Shoulders",
+      "Earth Breeze", "Tru Earth", "Blueland", "Shea Moisture", "Amorepacific",
+      "Hims", "Hers", "Ro", "Nurx", "3M Scotchgard", "Scotchgard",
+      "Sephora", "Amazon", "Walmart", "Costco", "Tesco", "Carrefour",
+    ];
+    for (const k of known) {
+      if (c.indexOf(k) >= 0) return k;
+    }
+    return null;
+  })();
 
-  // Forces in play, expressed as natural prose
-  const forces = Array.from(new Set(trends.map(t => t.def.force.toLowerCase())));
-  const forcesPhrase =
-    forces.length === 0 ? 'cross-force pressure inside the model'
-    : forces.length === 1 ? `${forces[0]}-force pressure`
-    : forces.length === 2 ? `${forces[0]} and ${forces[1]} forces`
-    : `${forces.slice(0, -1).join(', ')} and ${forces[forces.length - 1]} forces`;
+  // ── Entry archetype (drives sentence shape) — order matters: most specific first ──
+  type Arch =
+    | 'ai_smart' | 'service_advisory' | 'refill_subscription'
+    | 'private_label' | 'value_tier' | 'manual_traditional'
+    | 'between_wash' | 'fragrance_scent' | 'repair_treatment' | 'styling' | 'color'
+    | 'premium_salon' | 'format_innovation' | 'bio_eco'
+    | 'regulatory_compliant' | 'male_grooming' | 'cold_wash'
+    | 'protection_longevity' | 'media_retail' | 'generic';
+  const arch: Arch = (() => {
+    const n = entry.name.toLowerCase();
+    // tech/digital
+    if (/\bai\b|smart|connected|iot|app\b|chatbot|llm|gen[ \-]?ai|qr|scanner|sensor|algorithm|digital|platform/.test(n)) return 'ai_smart';
+    if (/advisory|consultation|diagnostic|coach|advisor|recommendation|prescription|tele[-\s]?derm/.test(n)) return 'service_advisory';
+    if (/refill|subscription|auto[-\s]?dos|cartridge|programmatic|recurring|drip|replenish/.test(n)) return 'refill_subscription';
+    // share/price tier (must come before manual_traditional which matches "loose")
+    if (/private label|own[-\s]?brand|retailer.brand/.test(n)) return 'private_label';
+    if (/value tier|budget|discount|mid[-\s]?tier|squeezed|economy|loose/.test(n)) return 'value_tier';
+    if (/manual|mechanical|traditional|legacy|cardboard|non[-\s]?compact|paper.based|dial/.test(n)) return 'manual_traditional';
+    // category-specific (must come before generic fragrance/styling which are loose)
+    if (/refresh|fabric refresh|refresh spray|between[-\s]?wash|garment refresh/.test(n)) return 'between_wash';
+    if (/protect|protection|uv|heat shield|pilling|life extension|longevity|durab/.test(n)) return 'protection_longevity';
+    if (/bond|repair|mask|treatment|peptide|keratin|serum|protein|amino|reconstruct/.test(n)) return 'repair_treatment';
+    if (/styling|gel\b|wax|mousse|hairspray|hold|finish|texturiz|dry shampoo/.test(n)) return 'styling';
+    if (/color|colour|dye|tint|highlight|balayage|gray|grey|root retouch/.test(n)) return 'color';
+    if (/fragrance|scent|perfume|aroma|odor|deodoriz|booster|unstoppable/.test(n)) return 'fragrance_scent';
+    if (/men\b|male|grooming|barber/.test(n)) return 'male_grooming';
+    if (/cold[-\s]?wash|cold[-\s]?water|low[-\s]?temp/.test(n)) return 'cold_wash';
+    // formulation / format
+    if (/concentrated|sheet|strip|capsule|pod\b|disc|bar|tablet|powder|sachet|stick|solid format/.test(n)) return 'format_innovation';
+    if (/bio[-\s]|eco[-\s]|sustainable|plant[-\s]?based|biodegrad|natural|microbiome|enzymatic|enzyme/.test(n)) return 'bio_eco';
+    if (/premium|salon|professional|luxury|prestige|trichology/.test(n)) return 'premium_salon';
+    if (/pfas|microplastic|dpp|epr|cbam|compliant|certified|deforestation|circular|reformulated/.test(n)) return 'regulatory_compliant';
+    if (/retail media|advertising|trade promotion|rmn/.test(n)) return 'media_retail';
+    return 'generic';
+  })();
 
-  // Deterministic per-tile seed so each card is stable but distinct
-  const seedKey = `${entryName}|${stageName}|${direction}`;
-  let seed = 0;
-  for (let i = 0; i < seedKey.length; i++) seed = ((seed << 5) - seed + seedKey.charCodeAt(i)) | 0;
-  const seedAbs = Math.abs(seed);
+  const tc = (s: Signal | null) => s ? `${s.clause} (${s.code})` : '';
+  const has = (s: Signal | null) => !!(s && s.clause);
 
-  // Inline citation helper
-  const cite = (s: Signal | null) => s ? `${s.code} — ${s.text}` : '';
-
-  // ════════════════════════════════════════════════════════════════════════
-  // 1. SUMMARY — bespoke executive paragraph
-  // ════════════════════════════════════════════════════════════════════════
-
-  // Opening: position the entry by its name and what the model now reads
-  const expansionFrames = [
-    `${entryName} is the ${stageLc}-stage ${typeLabel} the model now treats as a structurally compounding profit pool, not a passing tailwind.`,
-    `Inside the ${stageLc} stage of the ${journey}, ${entryName} has crossed the line from category novelty into a defendable, structural pool.`,
-    `${entryName} sits inside the ${stageLc} block of the ${journey} as one of the few entries where the model's expansion conviction has hardened across the last two cycles.`,
-    `At the ${stageLc} stage of the ${journey}, the read on ${entryName} has flipped from cyclical optionality into a structural growth pocket the senior team should be pricing into the plan.`,
-  ];
-  const contractionFrames = [
-    `${entryName} is the ${stageLc}-stage ${typeLabel} the model now carries on the wrong side of the curve — a stable margin source that is becoming a steadily contracting pool.`,
-    `Inside the ${stageLc} stage of the ${journey}, ${entryName} has slipped from a defendable franchise into a structurally compressing line, and the slope is set rather than cyclical.`,
-    `${entryName} sits inside the ${stageLc} block of the ${journey} as one of the entries where the model's contraction conviction has tightened, not softened, across the last two cycles.`,
-    `At the ${stageLc} stage of the ${journey}, the read on ${entryName} has resolved from "soft patch" into structural decline, and the model treats that resolution as durable.`,
-  ];
-  const opening = (direction === 'expansion' ? expansionFrames : contractionFrames)[seedAbs % 4]!;
-
-  // Mechanism: paraphrase the actual trend(s) into prose, with hard data attribution
-  let mechanism: string;
-  if (signals.length === 0) {
-    mechanism = `The mechanism is ${forcesPhrase} converging on this point of the journey, rather than a single named driver — the slope is a stack effect, not a single-shock effect.`;
-  } else if (signals.length === 1 && primary) {
-    mechanism = `The active driver is ${primary.name}: in the model that reads as ${cite(primary)}, and the consumer demand it represents lands directly on ${entryName} rather than on a generic adjacent SKU.`;
-  } else if (primary && secondary) {
-    mechanism = `Two trends do most of the work: ${primary.name} (${primary.code}) — ${primary.text} — and ${secondary.name} (${secondary.code}), which ${direction === 'expansion' ? 'reinforces the pull' : 'compounds the pressure'} on ${entryName} from a different vector. The forces stack across ${forcesPhrase}, which is why the model reads them as additive, not offsetting.`;
-  } else if (primary) {
-    mechanism = `The active driver stack is led by ${primary.name} (${primary.code}) — ${primary.text} — alongside the secondary trends listed in the trend-drivers card, which all push in the same direction across ${forcesPhrase}.`;
+  // ════════ SUMMARY: 1-2 sentences leading with the profit-pool delta ════════
+  let s1 = '';
+  if (isExp) {
+    switch (arch) {
+      case 'ai_smart':
+        s1 = `${entryName} captures the consumer-choice surface at ${stageLc} that ${tc(primary)} is creating, taking the recommendation moment from physical SKUs.`; break;
+      case 'service_advisory':
+        s1 = `${entryName} inserts an advisory layer at ${stageLc} — ${tc(primary)} — and monetises the diagnosis before the SKU choice is made.`; break;
+      case 'refill_subscription':
+        s1 = `${entryName} converts a one-shot ${stageLc} purchase into recurring revenue, riding ${tc(primary)}.`; break;
+      case 'manual_traditional':
+        s1 = `${entryName} holds pool at ${stageLc} as the deliberate-ritual segment against the connected push: ${tc(primary)}.`; break;
+      case 'private_label':
+        s1 = `${entryName} extracts share from branded ${stageLc} SKUs as ${tc(primary)} normalises retailer-owned formulations across price tiers.`; break;
+      case 'value_tier':
+        s1 = `${entryName} absorbs the trade-down at ${stageLc} as ${tc(primary)} pushes mid-market shoppers down the price ladder.`; break;
+      case 'premium_salon':
+        s1 = `${entryName} captures the premiumisation flow at ${stageLc}; ${tc(primary)} is the demand engine.`; break;
+      case 'format_innovation':
+        s1 = `${entryName} resets the unit economics at ${stageLc}: ${tc(primary)}.`; break;
+      case 'bio_eco':
+        s1 = `${entryName} compounds at ${stageLc} as regulation and conscious-consumer pull converge — ${tc(primary)}.`; break;
+      case 'fragrance_scent':
+        s1 = `${entryName} extends the sensory pool at ${stageLc} — ${tc(primary)}.`; break;
+      case 'repair_treatment':
+        s1 = `${entryName} deepens the basket at ${stageLc} as ${tc(primary)} pulls consumers into multi-step routines.`; break;
+      case 'styling':
+        s1 = `${entryName} captures premiumisation at ${stageLc}: ${tc(primary)}.`; break;
+      case 'color':
+        s1 = `${entryName} carries the at-home colour pool at ${stageLc} on ${tc(primary)}.`; break;
+      case 'regulatory_compliant':
+        s1 = `${entryName} becomes the only saleable format at ${stageLc} once ${tc(primary)} bites — pool migrates by mandate.`; break;
+      case 'between_wash':
+        s1 = `${entryName} unlocks a new consumer occasion at ${stageLc} — ${tc(primary)}.`; break;
+      case 'male_grooming':
+        s1 = `${entryName} taps the under-penetrated male pool at ${stageLc}: ${tc(primary)}.`; break;
+      case 'cold_wash':
+        s1 = `${entryName} captures the cold-wash migration at ${stageLc} — ${tc(primary)}.`; break;
+      case 'protection_longevity':
+        s1 = `${entryName} extends touchpoints at ${stageLc} from the wash itself to garment-life management: ${tc(primary)}.`; break;
+      case 'media_retail':
+        s1 = `${entryName} grows at ${stageLc} as ${tc(primary)} reroutes brand-discovery economics through retailer-owned surfaces.`; break;
+      default:
+        s1 = `${entryName} expands at ${stageLc}: ${tc(primary)}.`;
+    }
   } else {
-    mechanism = `The trend codes attached to ${entryName} all push the same way across ${forcesPhrase}, with the per-trend descriptions in the card above carrying the source detail.`;
+    switch (arch) {
+      case 'ai_smart':
+        s1 = `${entryName} is being designed out of the ${stageLc} step — ${tc(primary)} routes the same demand through a cleaner interface.`; break;
+      case 'manual_traditional':
+        s1 = `${entryName} is displaced at ${stageLc} as ${tc(primary)} substitutes the function the entry used to own.`; break;
+      case 'private_label':
+        s1 = `${entryName} continues taking branded ${stageLc} share — ${tc(primary)} is the structural mechanism, branded tier the loser.`; break;
+      case 'value_tier':
+        s1 = `${entryName} is the squeezed slice at ${stageLc}: private label takes share from below (${primary?.code ?? 'C-01'}: ${primary?.clause ?? 'PL penetration'})${has(secondary) ? `, while ${tc(secondary)} pushes mid-market shoppers down the price ladder` : ''}.`; break;
+      case 'premium_salon':
+        s1 = `${entryName} loses share at ${stageLc} as ${tc(primary)} reroutes premium demand into adjacent formats.`; break;
+      case 'format_innovation':
+        s1 = `${entryName} loses pool at ${stageLc} because ${tc(primary)} substitutes the format.`; break;
+      case 'bio_eco':
+        s1 = `${entryName} compresses at ${stageLc} as ${tc(primary)}.`; break;
+      case 'fragrance_scent':
+        s1 = `${entryName} compresses at ${stageLc} — ${tc(primary)}.`; break;
+      case 'repair_treatment':
+        s1 = `${entryName} loses share at ${stageLc} as ${tc(primary)}.`; break;
+      case 'styling':
+        s1 = `${entryName} contracts at ${stageLc} as ${tc(primary)}.`; break;
+      case 'color':
+        s1 = `${entryName} loses pool at ${stageLc} as ${tc(primary)}.`; break;
+      case 'regulatory_compliant':
+        s1 = `${entryName} loses ground at ${stageLc} once non-compliant alternatives clear the shelf: ${tc(primary)}.`; break;
+      case 'between_wash':
+        s1 = `${entryName} compresses at ${stageLc} — ${tc(primary)}.`; break;
+      case 'male_grooming':
+        s1 = `${entryName} loses share at ${stageLc} as ${tc(primary)}.`; break;
+      case 'cold_wash':
+        s1 = `${entryName} compresses at ${stageLc} as ${tc(primary)}.`; break;
+      case 'protection_longevity':
+        s1 = `${entryName} loses pool at ${stageLc} — ${tc(primary)}.`; break;
+      case 'media_retail':
+        s1 = `${entryName} contracts at ${stageLc} as ${tc(primary)} reroutes the discovery and trade-promo economics.`; break;
+      default:
+        s1 = `${entryName} compresses at ${stageLc}: ${tc(primary)}${has(secondary) ? `, with ${tc(secondary)} stacking on top` : ''}.`;
+    }
   }
 
-  // Why structural — direction × intensity language tied to the entry
-  const struct3Exp = `That stack is what separates ${entryName} from a promotional bounce: the pool deepens through 2030 rather than fades, and the pace of deepening accelerates rather than rolls over inside the planning window.`;
-  const struct2Exp = `The model treats the slope as directional rather than cyclical — ${entryName} is firming up across the planning window, with the data confirming each cycle that the pool is expanding in absolute size rather than redistributing existing demand.`;
-  const struct1Exp = `The signal is early, but it is clean: ${entryName} is moving in the same direction across each cycle the data refreshes, and the slope is consistent enough that the model treats it as the leading edge of a real pool rather than noise.`;
-  const struct3Con = `That stack is what separates ${entryName} from a soft patch: the pool narrows through 2030 rather than rebounds, and each year of additional regulation, retailer pressure or substitute capacity hardens the slope further.`;
-  const struct2Con = `The model treats the contraction as directional rather than cyclical — ${entryName} keeps tightening across the planning window, with the data confirming each cycle that demand is migrating out of the segment, not pausing inside it.`;
-  const struct1Con = `The signal is early, but it is consistent: ${entryName} is on a quiet down-slope across each cycle the data refreshes, and that quiet slope is precisely the historical pattern that compounds into a forced rotation later if it is left alone.`;
-  const directionSentence = direction === 'expansion'
-    ? (entry.intensity === 3 ? struct3Exp : entry.intensity === 2 ? struct2Exp : struct1Exp)
-    : (entry.intensity === 3 ? struct3Con : entry.intensity === 2 ? struct2Con : struct1Con);
-
-  // HCB top-management hook — entry-specific, brand-routed
-  let hcbHook: string;
+  // Optional second summary sentence — entry-specific competitor / HCB stake
+  let s2 = '';
   if (whiteSpace) {
-    hcbHook = direction === 'expansion'
-      ? `For ${bu}, the part the senior team should react to is not the trend itself but the absence of an anchored Henkel position in the segment: every quarter ${entryName} compounds without an HCB owner, the eventual cost of taking a defendable share rises faster than the segment's own growth.`
-      : `${bu} carries no incumbent position on ${entryName}, which turns this read from a defensive headache into a clean strategic signal — the value to the management team is the read-across into the adjacent expansion vectors at the ${stageLc} stage that absorb the migrating demand.`;
+    s2 = isExp
+      ? `Henkel has no anchored asset on ${entryName} today${namedCompetitor ? `; ${namedCompetitor} is setting the consumer default in real time.` : '.'}`
+      : `${bu} carries no exposure here, so the entry is mostly a signal for where the migrating ${stageLc}-stage demand should be redeployed.`;
+  } else if (isExp && namedCompetitor) {
+    s2 = `${namedCompetitor} owns the consumer default; ${leadBrand} is the asset ${bu} can challenge it with.`;
+  } else if (!isExp && namedCompetitor) {
+    s2 = `${namedCompetitor} accelerates the squeeze; ${leadBrand} carries the exposure.`;
+  } else if (has(secondary)) {
+    s2 = isExp ? `Reinforcing vector: ${tc(secondary)}.` : `Compounding pressure: ${tc(secondary)}.`;
+  }
+  const summary = s2 ? `${s1} ${s2}` : s1;
+
+  // ════════ STRATEGIC EVALUATION: archetype-specific HCB move (~1 sentence) ════════
+  let e1 = '';
+  // Whitespace cases first — different language family entirely
+  if (whiteSpace && isExp) {
+    switch (arch) {
+      case 'ai_smart':
+        e1 = `Build the AI surface on ${leadBrand} credibility; ${namedCompetitor || 'the structural competitor'} hardens the consumer default in roughly 18-24 months and the cost of catch-up is M&A, not NPD.`; break;
+      case 'service_advisory':
+        e1 = `Stand up a ${leadBrand}-branded advisory tool now — diagnostic IP is the cheapest moat available before ${namedCompetitor || 'a DTC challenger'} claims the trichological credibility consumers expect.`; break;
+      case 'refill_subscription':
+        e1 = `Pilot a ${leadBrand} DTC/auto-replenishment offer before Amazon Subscribe-and-Save and ${namedCompetitor || 'the connected-OEM partner'} capture the habit at scale.`; break;
+      case 'between_wash':
+        e1 = `${leadBrand} is the natural fabric-refresh extension; ship before P&G defends Febreze with a refresh-3.0 SKU.`; break;
+      case 'repair_treatment':
+        e1 = `Upgrade ${leadBrand} into a clinical-grade range at mass price — Olaplex/K18 are anchoring the consumer narrative and waiting another cycle hands them the category.`; break;
+      case 'protection_longevity':
+        e1 = `Extend ${leadBrand} into garment-protection / fabric-refresh — the EU Circular Textiles regulation makes this segment compounding, not cyclical.`; break;
+      case 'bio_eco':
+        e1 = `Anchor a bio-enzymatic claim under ${leadBrand}; PFAS and microplastic regulation locks in the structural cost-of-entry advantage for whoever moves first.`; break;
+      case 'regulatory_compliant':
+        e1 = `${leadBrand} is the platform; reformulate ahead of the regulation cycle and use compliance as the competitive wedge.`; break;
+      default:
+        e1 = `Build or buy under ${leadBrand} now${namedCompetitor ? `; each quarter without anchored claim raises the M&A premium against ${namedCompetitor}` : ''}.`;
+    }
+  } else if (whiteSpace && !isExp) {
+    e1 = `No legacy SKU to defend — the value here is the read-across: redirect freed-up ${stageLc}-stage shelf and media into the adjacent expansion vector that ${leadBrand} can credibly anchor.`;
+  } else if (!whiteSpace && isExp) {
+    // Entrenched expansion — branch by archetype, give specific HCB move
+    switch (arch) {
+      case 'ai_smart':
+        e1 = `Persil's connected-laundry stack is the platform; ship the consumer-facing app and OEM-integration before ${namedCompetitor || 'a structural rival'} sets the default.`; break;
+      case 'service_advisory':
+        e1 = `${leadBrand} has the credibility; the live question is monetisation, not capability — package the advisor as a brand-led layer, not a free utility.`; break;
+      case 'refill_subscription':
+        e1 = `${leadBrand}'s OEM partnerships build the lock-in; sequence the cartridge SKU launch before ${namedCompetitor || 'P&G/Unilever'} signs the same OEMs.`; break;
+      case 'format_innovation':
+        e1 = `Persil Discs is the format weapon already in market; reinvest concentrated-format claim and trade-promo before ${namedCompetitor || 'a structural rival'} resets the shelf.`; break;
+      case 'premium_salon':
+        e1 = `Schwarzkopf Professional is the salon-credible asset; fund the consumer-tier extension before ${namedCompetitor || 'a structural rival'} owns both ends of the trade-up path.`; break;
+      case 'bio_eco':
+        e1 = `${leadBrand}'s bio/enzymatic IP is the live differentiator; lead with EU regulatory positioning to lock in the structural cost-of-entry advantage.`; break;
+      case 'fragrance_scent':
+        e1 = `${leadBrand}'s freshness/scent equity is the platform; differentiate against ${namedCompetitor || "a structural rival"}'s synthetic-scent overload with bio-based, conscious-consumption claims.`; break;
+      case 'repair_treatment':
+        e1 = `${leadBrand} is the bond-repair asset at mass price; capture the Olaplex-equivalent claim before K18/Olaplex compress the premium-mass gap.`; break;
+      case 'styling':
+        e1 = `${leadBrand} is Europe's strongest styling portfolio; premiumise finishing claims (color-lock, bond-seal) to defend share against ${namedCompetitor || 'indie premium'}.`; break;
+      case 'color':
+        e1 = `Schwarzkopf is European #1 in at-home colour; defend Keratin Color innovation against ${namedCompetitor || "L'Oréal premium"} from above and PL value pressure from below.`; break;
+      case 'between_wash':
+        e1 = `${leadBrand} is the natural extension; ship the refresh range before ${namedCompetitor || 'Febreze'} defends with refresh-3.0.`; break;
+      case 'value_tier':
+        e1 = `${leadBrand} shields trade-down at the value tier; expand discount-channel listings while Persil/premium pulls margin at the top.`; break;
+      case 'cold_wash':
+        e1 = `${leadBrand}'s cold-wash formulation IP is the wedge; lead the efficacy claim against ${namedCompetitor || 'P&G Ariel'}'s "Turn To 30" before the cold-wash narrative settles.`; break;
+      case 'protection_longevity':
+        e1 = `${leadBrand} can extend wash-in protection into a multi-touchpoint garment-care system, multiplying revenue per consumer 3-4x.`; break;
+      default:
+        e1 = `${leadBrand} is the live revenue line; mobilise it at the speed of the trend before ${namedCompetitor || 'a structural rival'} locks in distribution and claim.`;
+    }
   } else {
-    const head = leadBrand;
-    hcbHook = direction === 'expansion'
-      ? `For ${bu}, ${entryName} is already a live revenue line through ${head}, which means the trend converts into a defendable share play rather than a build-from-scratch problem — the call for top management is whether the asset is being mobilised at the speed of the curve or treated as background portfolio context.`
-      : `For ${bu}, ${entryName} is a real P&L line through ${head}, not an abstract market read — which is why the conversation belongs at top management: the question is no longer "is this declining" but how aggressively the cash and capacity are redirected before the segment becomes a stranded asset.`;
+    // Entrenched contraction — archetype-specific harvest/redeploy move
+    switch (arch) {
+      case 'value_tier':
+        e1 = `Weißer Riese/Spee absorb the trade-down at the value tier; Persil pulls premium. The middle is the funding line for the expansion segment, not a defence line.`; break;
+      case 'manual_traditional':
+        e1 = `${leadBrand} is exposed via the legacy format; redirect the manual-format budget into the connected/concentrated SKU where the demand is migrating.`; break;
+      case 'premium_salon':
+        e1 = `${leadBrand} is exposed; pivot R&D investment from broad premium claims into ingredient-led positioning (peptides, microbiome) where ${namedCompetitor || 'DTC challengers'} are taking share.`; break;
+      case 'format_innovation':
+        e1 = `${leadBrand}'s legacy format is exposed; rotate listings into the substitute format the same brand can credibly anchor.`; break;
+      case 'color':
+        e1 = `Schwarzkopf colour is the exposure; defend with bond-protection innovation against ${namedCompetitor || 'DTC subscription colour'} and PL value pressure.`; break;
+      case 'styling':
+        e1 = `${leadBrand} styling is exposed; rotate facings toward dry shampoo, texture sprays and the between-wash occasion.`; break;
+      case 'fragrance_scent':
+        e1 = `${leadBrand} is exposed; redirect into bio-based / conscious-fragrance claims where the consumer narrative is moving.`; break;
+      case 'repair_treatment':
+        e1 = `${leadBrand} is exposed; redeploy treatment innovation budget into the multi-step routine basket where the trade-up is happening.`; break;
+      case 'private_label':
+        e1 = `Branded share is the exposure; defend Persil/${leadBrand} premium with demonstrable superiority claims and use Weißer Riese/Spee/all/Purex as PL-trade-down shields.`; break;
+      case 'ai_smart':
+        e1 = `${leadBrand}'s legacy interface is the exposure; ship the connected/app replacement before the demand is fully reabsorbed by the OEM ecosystem.`; break;
+      default:
+        e1 = `${leadBrand} carries the exposure; harvest the cash and redirect the trade and media envelope into the adjacent ${stageLc}-stage expansion segment.`;
+    }
   }
 
-  const summary = `${opening} ${mechanism} ${directionSentence} ${hcbHook}`;
-
-  // ════════════════════════════════════════════════════════════════════════
-  // 2. STRATEGIC EVALUATION — bespoke executive paragraph
-  // ════════════════════════════════════════════════════════════════════════
-
-  // Why the profit pool moves the way it does — pull data inline
-  let poolMechanism: string;
-  if (direction === 'expansion') {
-    if (primary && secondary) {
-      poolMechanism = `The pool deepens at ${entryName} because ${primary.name} and ${secondary.name} hit this point of the journey at the same time. The hardest single read is ${primary.code}: ${primary.text}; ${secondary.code} adds the second vector — ${secondary.text} — and what looks like a single trend on a slide is, inside the model, two reinforcing curves landing on one entry.`;
-    } else if (primary) {
-      poolMechanism = `The pool deepens at ${entryName} because ${primary.name} is doing concrete work at the ${stageLc} stage: ${primary.text}. That demand attaches to this entry rather than to an adjacent SKU because ${entryName} is the ${typeLabel} positioned at the moment of consumer choice the trend is reshaping.`;
-    } else {
-      poolMechanism = `The pool deepens at ${entryName} because ${forcesPhrase} are creating new consumer occasions at the ${stageLc} stage rather than redistributing existing ones — a pattern the model only flags when the multi-trend overlap is durable across cycles.`;
-    }
-    if (stageOppNumber) {
-      poolMechanism += ` The stage-level frame: ${stageOppNumber}`;
-    }
-  } else {
-    if (primary && secondary) {
-      poolMechanism = `The pool compresses at ${entryName} because ${primary.name} and ${secondary.name} converge on the same demand basis. ${primary.code} carries the most pointed evidence: ${primary.text}. ${secondary.code} reinforces from a second angle — ${secondary.text} — and the segment loses demand to adjacent ${stageLc}-stage pools the model carries as expansion entries.`;
-    } else if (primary) {
-      poolMechanism = `The pool compresses at ${entryName} because ${primary.name} attacks the demand basis directly: ${primary.text}. The dollars do not disappear from the journey — they migrate into the adjacent ${stageLc}-stage segments the model carries as expansion entries.`;
-    } else {
-      poolMechanism = `The pool compresses at ${entryName} because the stage-level forces stack against the entry rather than around it, and consumer dollars migrate into adjacent ${stageLc}-stage pools rather than recovering inside this one.`;
-    }
-    if (stageOppNumber) {
-      poolMechanism += ` The stage-level frame the migration is moving toward: ${stageOppNumber}`;
-    }
-  }
-
-  // Competitive landscape — verbatim from stage CTX (already cite-rich)
-  const competitorLine = ctx?.competitors?.trim()
-    ? `The competitive map at this stage is unambiguous. ${ctx.competitors.trim()}`
-    : '';
-
-  // HCB position — references brand routing
-  let hcbPositionLine: string;
-  if (whiteSpace) {
-    hcbPositionLine = direction === 'expansion'
-      ? `${bu} has no defended position on ${entryName} today, which is precisely what makes the entry economical now — there is no anchored consumer default to displace, no incumbent media weight to overcome, and no internal SKU cannibalisation to manage. ${brandRouting} is the natural platform inside the existing portfolio, but the same conditions that make a clean entry possible reverse fast once the first credible scaled offer lands and the share map is drawn.`
-      : `${bu} is uncommitted on ${entryName}, which is the cleanest available read in the model: there is no legacy P&L to defend here, so the strategic value of this card is purely the read-across into the adjacent ${stageLc}-stage expansion vectors that ${leadBrand} can credibly anchor as the consumer demand migrates.`;
-  } else {
-    hcbPositionLine = direction === 'expansion'
-      ? `${bu}'s right-to-win on ${entryName} runs through ${brandRouting}. The assets are present, the formulation IP is in place, and the trade and ${isHair ? 'salon' : 'OEM and discount-channel'} relationships needed to scale the segment are already live. The bottleneck is internal cadence, not external capability — that advantage decays inside two product cycles if the segment is left to compete with everything else in the portfolio for media and shelf attention.`
-      : `${bu}'s exposure on ${entryName} runs through ${brandRouting}, which is why the contraction is a real margin line and a real budget source — not just a market observation. The defensible move is sequenced: harvest the cash this cycle, redirect the trade and media envelope into the expansion segments at the same ${stageLc} stage, and avoid the historical FMCG pattern of reinvesting in the legacy SKU to slow a decline the model treats as already set.`;
-  }
-
-  // Posture for top management — intensity-aware, named entry, sharp implication
-  let postureLine: string;
-  if (direction === 'expansion') {
-    if (entry.intensity === 3) {
-      postureLine = `For top management the call on ${entryName} is binary at this conviction level: claim the segment now — listing, claim language, ${isHair ? 'creator and salon endorsement' : 'OEM and trade exclusivity'}, NPD pipeline, retail-media weight — or accept paying a premium to acquire the eventual category leader through M&A once the share map is drawn. Pools that compound at this rate solidify their share ranking inside one product cycle; second movers permanently discount to hold a number-two slot, third movers fund everyone else's growth.`;
-    } else if (entry.intensity === 2) {
-      postureLine = `For top management ${entryName} is the most dangerous tier on the model — strong enough to demand action, weak enough to be deprioritised in a quarterly review. The window is roughly 24-36 months: inside it, the shelf can still be earned with claim, format and execution; outside it, every additional point of share has to be paid back to retailers and platforms in trade investment rather than won on product. The historical FMCG pattern in segments like this is concession by inertia, not by competition.`;
-    } else {
-      postureLine = `For top management ${entryName} is a cheap-optionality call at this signal strength: a small claim, a test SKU or a creator pilot now preserves the right to scale once the curve steepens, and that optionality costs a fraction of what it costs to re-enter once a competitor has legitimised the category narrative.`;
-    }
-  } else {
-    if (entry.intensity === 3) {
-      postureLine = `For top management ${entryName} is no longer a "should we defend" debate but a sequencing question: how aggressively does ${bu} harvest the remaining margin while moving capacity, shelf space and trade-promo into the adjacent ${stageLc}-stage expansion vector? Every cycle of inaction is a real opportunity cost against the redeployment, and the slope only hardens from here.`;
-    } else if (entry.intensity === 2) {
-      postureLine = `For top management the window for a value-preserving rotation on ${entryName} is open today and meaningfully tighter every quarter. The right move is sequenced — protect cash flow this year, redeploy capacity and budget next year — before the segment becomes a stranded asset and the model's central case (slope tightens toward the harder side, not the softer) plays out.`;
-    } else {
-      postureLine = `For top management ${entryName} is, at this stage, an informational signal more than a portfolio decision: the entry's strategic weight is in the rotation it precedes at the ${stageLc} stage, not in the current P&L line. The cheapest moment to begin the rotation is exactly while the data still allows debate.`;
-    }
-  }
-
-  const strategicEvaluation = [poolMechanism, competitorLine, hcbPositionLine, postureLine].filter(Boolean).join(' ');
-
-  return `**1. Summary.** ${summary}\n\n**2. Strategic Evaluation.** ${strategicEvaluation}`;
+  return `**1. Summary.** ${summary}\n\n**2. Strategic Evaluation.** ${e1}`;
 }
 
 // Trend context mapping — enriched descriptions for each trend code
