@@ -20,7 +20,7 @@
  *   • Force decomposition — horizontal bars at the selected year
  *   • Contributing trends — list with force tag and direction
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   X, Activity, Zap, Layers, LineChart, Sparkles,
@@ -677,6 +677,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     );
   }, [categoryId, data]);
 
+  // ─── Path Δ hover tooltip state ──────────────────────────────────
+  // Mirrors the Matrix cell-tooltip pattern in ProfitPoolAnalysis2: track
+  // the cursor anchor (top-center of the KPI tile) and render a fixed-
+  // positioned, navy/white tooltip with the same shadow + arrow language
+  // so the design is consistent across the dashboard.
+  const [pathHover, setPathHover] = useState<{ x: number; y: number } | null>(null);
+
   const pathData: PathData = useMemo(() => {
     if (!data?.shifts_path?.[categoryId]) return {};
     return data.shifts_path[categoryId];
@@ -901,8 +908,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
             {/* Velocity (horizon-end minus horizon-start) */}
             <div
-              title="Path Δ — the velocity of the profit-pool shift across the horizon (horizon-end minus horizon-start). Positive = accelerating expansion, negative = accelerating contraction."
+              onMouseEnter={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setPathHover({ x: r.left + r.width / 2, y: r.top });
+              }}
+              onMouseLeave={() => setPathHover(null)}
               style={{
+                position: 'relative',
                 padding: '12px 14px',
                 borderRadius: 12,
                 backgroundColor: S.surfaceLow,
@@ -1175,6 +1187,64 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </footer>
         </div>
       </motion.aside>
+
+      {/* ── Path Δ hover tooltip ─────────────────────────────────
+          Visual language is identical to the Matrix cell tooltip in
+          ProfitPoolAnalysis2 — fixed position, navy fill, white text,
+          uppercase eyebrow, downward arrow. */}
+      {pathHover && (
+        <div
+          className="fixed z-50 pointer-events-none rounded-xl shadow-2xl"
+          style={{
+            left: pathHover.x,
+            top: pathHover.y - 10,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: S.onSurface,
+            color: '#ffffff',
+            padding: '10px 14px',
+            fontFamily: BODY_FONT,
+            fontSize: 12,
+            maxWidth: 280,
+            boxShadow: '0 16px 40px -8px rgba(0, 52, 94, 0.35)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              opacity: 0.75,
+              marginBottom: 6,
+              fontFamily: HEADLINE_FONT,
+            }}
+          >
+            Path Δ · What this means
+          </div>
+          <div style={{ lineHeight: 1.5, opacity: 0.92 }}>
+            Velocity of the profit-pool shift across the horizon —
+            <span style={{ fontFamily: MONO_FONT, fontWeight: 600, opacity: 0.95 }}>
+              {' '}horizon-end − horizon-start{' '}
+            </span>
+            of the MC median path.
+          </div>
+          <div style={{ marginTop: 6, opacity: 0.65, fontSize: 10.5 }}>
+            Positive = accelerating expansion · Negative = accelerating contraction
+          </div>
+          {/* Pointer arrow */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: -5,
+              width: 10,
+              height: 10,
+              backgroundColor: S.onSurface,
+              transform: 'translateX(-50%) rotate(45deg)',
+            }}
+          />
+        </div>
+      )}
     </motion.div>
   );
 };
