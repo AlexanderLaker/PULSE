@@ -52,7 +52,7 @@ import type {
   ForceName, Scenario,
   PercentileDistribution, ShiftPath,
   DiagnosticsResult,
-  Trend, TriggerStatus, AllocationRecommendation,
+  Trend,
 } from '@/types';
 import CategoryDetailPanel from './CategoryDetailPanel';
 
@@ -500,7 +500,7 @@ const Matrix: FC<MatrixProps> = ({
                         e.currentTarget.style.backgroundColor = S.surface;
                         e.currentTarget.style.color = S.primary;
                       } : undefined}
-                      title={onRowClick ? `Open ${row.label} detail — fan chart, triggers, allocation` : undefined}
+                      title={onRowClick ? `Open ${row.label} detail — fan chart and contributing trends` : undefined}
                       role={onRowClick ? 'button' : undefined}
                       tabIndex={onRowClick ? 0 : undefined}
                       onKeyDown={onRowClick ? (e) => {
@@ -827,7 +827,7 @@ const PeakStressTooltip: FC = () => {
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC = () => {
   const {
-    simulation, scenarios, config, trends, triggers,
+    simulation, scenarios, config, trends,
     loading, error, backendAvailable,
     activeScenario, setActiveScenario, reconnect,
   } = usePrism();
@@ -1119,10 +1119,6 @@ const ProfitPoolAnalysis2: FC = () => {
       categories: cats,
     };
   }, [simulation, trends, selectedYear]);
-
-  const allocationForPanel: AllocationRecommendation | null =
-    simulation?.allocation_recommendation ?? null;
-  const triggersForPanel: TriggerStatus[] = triggers ?? [];
 
   const scenarioList: Scenario[] = scenarios ?? [];
   const meta = VIEW_META[view];
@@ -1504,17 +1500,14 @@ const ProfitPoolAnalysis2: FC = () => {
 
         {/* ── Category Detail Panel (drill-down) ────────────────────
             Slides in from the right when a category row is clicked.
-            Shows fan chart, force decomposition, trigger status,
-            allocation recommendation, and contributing trends for
-            the single selected category. */}
+            Shows fan chart, force decomposition, and contributing
+            trends for the single selected category. */}
         <AnimatePresence>
           {selectedCategoryId && (
             <CategoryDetailPanel
               data={panelData}
               categoryId={selectedCategoryId}
               onClose={() => setSelectedCategoryId(null)}
-              triggers={triggersForPanel}
-              allocation={allocationForPanel}
             />
           )}
         </AnimatePresence>

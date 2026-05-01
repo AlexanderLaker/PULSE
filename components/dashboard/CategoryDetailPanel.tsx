@@ -18,15 +18,12 @@
  * Content (unchanged from v1):
  *   • Fan chart — p10/p90 band + median line across 2026–2036
  *   • Force decomposition — horizontal bars at the selected year
- *   • Allocation recommendation — stance pill + weight + optimizer rationale
- *   • Trigger status — per-category triggers sorted fired → active → dismissed
  *   • Contributing trends — list with force tag and direction
  */
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Bell, BellOff, AlertCircle, TrendingUp, Shield, ArrowDownCircle,
-  Activity, Zap, Layers, LineChart, Sparkles,
+  X, Activity, Zap, Layers, LineChart, Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -34,7 +31,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { FORCES, FORCE_COLORS, FORCE_ICONS, YEARS, fmtShift, fmtPct } from '@/lib/format';
-import type { ForceName, ProjectionYear, TriggerStatus, AllocationRecommendation } from '@/types';
+import type { ForceName, ProjectionYear } from '@/types';
 
 // ─── Editorial design tokens — identical to ProfitPoolAnalysis2 ──────
 const S = {
@@ -116,11 +113,6 @@ interface CategoryDetailPanelProps {
   data: CategoryDetailPanelData;
   categoryId: string;
   onClose: () => void;
-  /** Optional: early-warning triggers. Panel filters them by category and
-   *  renders one row per trigger with status, year, threshold, and action text. */
-  triggers?: TriggerStatus[];
-  /** Optional: allocation recommendation from the mean-variance optimizer. */
-  allocation?: AllocationRecommendation | null;
 }
 
 interface ChartDataPoint {
@@ -676,7 +668,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
 // ─── CategoryDetailPanel ───────────────────────────────────────────────────
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
-  data, categoryId, onClose, triggers, allocation,
+  data, categoryId, onClose,
 }) => {
   const category = useMemo(() => {
     if (!categoryId || !data) return null;
@@ -684,42 +676,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       data.categories?.find((c) => c.id === categoryId) ?? { id: categoryId, name: categoryId }
     );
   }, [categoryId, data]);
-
-  // ── Filter triggers to this category ─────────────────────────────
-  // Triggers persist with `category` either as the display name or snake_case
-  // id. Match both shapes so nothing is silently dropped.
-  const catTriggers = useMemo(() => {
-    if (!triggers || triggers.length === 0) return [];
-    const displayName = category?.name;
-    return triggers
-      .filter((t) => t.category === displayName || t.category === categoryId)
-      .sort((a, b) => {
-        const statusRank = (s: string): number =>
-          s === 'fired' ? 0 : s === 'active' ? 1 : 2;
-        const dr = statusRank(a.status) - statusRank(b.status);
-        if (dr !== 0) return dr;
-        return (a.target_year ?? 0) - (b.target_year ?? 0);
-      });
-  }, [triggers, category, categoryId]);
-
-  // ── Resolve allocation stance for this category ──────────────────
-  const allocStance = useMemo<'invest_more' | 'defend' | 'harvest' | null>(() => {
-    if (!allocation) return null;
-    const key = category?.name ?? categoryId;
-    const inList = (xs?: string[]): boolean =>
-      !!xs && (xs.includes(key) || xs.includes(categoryId));
-    if (inList(allocation.invest_more)) return 'invest_more';
-    if (inList(allocation.defend)) return 'defend';
-    if (inList(allocation.harvest)) return 'harvest';
-    return null;
-  }, [allocation, category, categoryId]);
-
-  const allocWeight = useMemo<number | null>(() => {
-    if (!allocation?.weights) return null;
-    const key = category?.name ?? categoryId;
-    const w = allocation.weights[key] ?? allocation.weights[categoryId];
-    return typeof w === 'number' && isFinite(w) ? w : null;
-  }, [allocation, category, categoryId]);
 
   const pathData: PathData = useMemo(() => {
     if (!data?.shifts_path?.[categoryId]) return {};
@@ -776,18 +732,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const shiftEnd = pathData[horizonEnd!]?.median ?? 0;
   const shiftStart = pathData[horizonStart!]?.median ?? 0;
   const velocity = shiftEnd - shiftStart;
-
-  // Stance pill meta — soft editorial palette mirroring pill buttons on the page
-  const stanceMeta: Record<
-    'invest_more' | 'defend' | 'harvest',
-    { label: string; color: string; bg: string; Icon: LucideIcon }
-  > = {
-    invest_more: { label: 'Invest more', color: S.expansionInk,  bg: S.expansionDim,    Icon: TrendingUp },
-    defend:      { label: 'Defend',      color: S.onPrimaryContainer, bg: S.primaryContainer, Icon: Shield },
-    harvest:     { label: 'Harvest',     color: S.amber,         bg: S.amberDim,        Icon: ArrowDownCircle },
-  };
-  const sMeta = allocStance ? stanceMeta[allocStance] : null;
-  const StanceIcon = sMeta?.Icon;
 
   return (
     <motion.div
@@ -957,11 +901,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
             {/* Velocity (horizon-end minus horizon-start) */}
             <div
+              title="Path Δ — the velocity of the profit-pool shift across the horizon (horizon-end minus horizon-start). Positive = accelerating expansion, negative = accelerating contraction."
               style={{
                 padding: '12px 14px',
                 borderRadius: 12,
                 backgroundColor: S.surfaceLow,
                 border: `1px solid ${S.cardBorder}`,
+                cursor: 'help',
               }}
             >
               <div
@@ -1069,231 +1015,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           <Section title="Force Decomposition" icon={Zap}>
             <ForceDecomposition decomposition={forceDecomposition} />
           </Section>
-
-          {/* Allocation recommendation */}
-          {(allocStance || allocWeight != null || allocation?.rationale) && (
-            <Section
-              title="Allocation Recommendation"
-              icon={Sparkles}
-              trailing={
-                allocWeight != null ? (
-                  <span
-                    style={{
-                      fontFamily: MONO_FONT,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: S.onBg,
-                      textTransform: 'none',
-                      letterSpacing: 0,
-                    }}
-                  >
-                    {fmtPct(allocWeight, 1)}
-                    <span
-                      style={{
-                        marginLeft: 4,
-                        fontSize: 10,
-                        color: S.mutedText,
-                        fontWeight: 500,
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        fontFamily: HEADLINE_FONT,
-                      }}
-                    >
-                      weight
-                    </span>
-                  </span>
-                ) : null
-              }
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {sMeta && StanceIcon ? (
-                  <span
-                    style={{
-                      alignSelf: 'flex-start',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      backgroundColor: sMeta.bg,
-                      color: sMeta.color,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      letterSpacing: '0.02em',
-                      fontFamily: BODY_FONT,
-                    }}
-                  >
-                    <StanceIcon size={13} strokeWidth={2.4} />
-                    {sMeta.label}
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: S.mutedText,
-                      fontStyle: 'italic',
-                      fontFamily: BODY_FONT,
-                    }}
-                  >
-                    Not assigned by the optimizer
-                  </span>
-                )}
-                {allocation?.rationale && (
-                  <p
-                    style={{
-                      fontSize: 12.5,
-                      color: S.onSurfaceVariant,
-                      lineHeight: 1.55,
-                      margin: 0,
-                      fontFamily: BODY_FONT,
-                    }}
-                  >
-                    {allocation.rationale}
-                  </p>
-                )}
-              </div>
-            </Section>
-          )}
-
-          {/* Trigger status */}
-          {triggers && (
-            <Section
-              title="Trigger Status"
-              icon={Bell}
-              trailing={
-                catTriggers.length > 0 ? (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: S.onSurfaceVariant,
-                      letterSpacing: '0.06em',
-                      fontFamily: HEADLINE_FONT,
-                    }}
-                  >
-                    {catTriggers.length} WIRED
-                  </span>
-                ) : null
-              }
-            >
-              {catTriggers.length === 0 ? (
-                <div
-                  style={{
-                    padding: '14px 16px',
-                    backgroundColor: S.surfaceLow,
-                    borderRadius: 10,
-                    border: `1px dashed ${S.outlineVariant}`,
-                    color: S.mutedText,
-                    fontSize: 12.5,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontFamily: BODY_FONT,
-                  }}
-                >
-                  <BellOff size={14} />
-                  No triggers wired for this category
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {catTriggers.map((trig) => {
-                    const isFired = trig.status === 'fired';
-                    const isActive = trig.status === 'active';
-                    const statusColor = isFired
-                      ? S.contractionInk
-                      : isActive
-                      ? S.amber
-                      : S.mutedText;
-                    const statusBg = isFired
-                      ? S.contractionDim
-                      : isActive
-                      ? S.amberDim
-                      : S.surfaceLow;
-                    const leftBorder = isFired
-                      ? S.contraction
-                      : isActive
-                      ? S.amber
-                      : S.outlineVariant;
-
-                    return (
-                      <div
-                        key={trig.id}
-                        style={{
-                          padding: '12px 14px',
-                          backgroundColor: S.surface,
-                          borderRadius: 10,
-                          border: `1px solid ${S.cardBorder}`,
-                          borderLeft: `3px solid ${leftBorder}`,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 8,
-                            marginBottom: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              padding: '3px 9px',
-                              borderRadius: 999,
-                              backgroundColor: statusBg,
-                              color: statusColor,
-                              fontSize: 9.5,
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.08em',
-                              fontFamily: HEADLINE_FONT,
-                            }}
-                          >
-                            <AlertCircle size={10} strokeWidth={2.4} />
-                            {trig.status}
-                          </span>
-                          <span
-                            style={{
-                              fontFamily: MONO_FONT,
-                              fontSize: 11,
-                              color: S.onSurfaceVariant,
-                              fontWeight: 600,
-                            }}
-                          >
-                            {trig.condition_type} {fmtShift(trig.threshold, 1)} · {trig.target_year}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12.5,
-                            color: S.onSurface,
-                            lineHeight: 1.5,
-                            fontFamily: BODY_FONT,
-                          }}
-                        >
-                          {trig.action_text}
-                        </div>
-                        {trig.fired_date && (
-                          <div
-                            style={{
-                              marginTop: 6,
-                              fontSize: 10,
-                              color: S.mutedText,
-                              fontFamily: MONO_FONT,
-                            }}
-                          >
-                            Fired {new Date(trig.fired_date).toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Section>
-          )}
 
           {/* Contributing trends — ranked by scaled attribution share */}
           {trendList.length > 0 && (
