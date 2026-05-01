@@ -747,8 +747,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       exit={{ opacity: 0 }}
       onClick={onClose}
       style={{
+        // top = 64px keeps the global sticky nav (h-16) visible and
+        // interactive while the drawer is open.
         position: 'fixed',
-        inset: 0,
+        top: 64,
+        right: 0,
+        bottom: 0,
+        left: 0,
         backgroundColor: 'rgba(0, 52, 94, 0.22)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
@@ -770,8 +775,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           // position:sticky so it stays pinned while the rest scrolls.
           // Simpler than the nested flex pattern -- no min-height auto
           // flex-child bug, no dependence on parent box propagation.
+          // top = 64px so the drawer starts BELOW the global sticky
+          // nav (h-16 in app/dashboard/page.tsx). zIndex stays below the
+          // nav (z-50) so the menu remains visible while drilling down.
           position: 'fixed',
-          top: 0,
+          top: 64,
           right: 0,
           bottom: 0,
           width: 'min(480px, 100vw)',
@@ -782,7 +790,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
-          zIndex: 50,
+          zIndex: 45,
         }}
       >
         {/* ─── Header (sticky) ─────────────────────────────────────── */}
@@ -910,7 +918,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             <div
               onMouseEnter={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();
-                setPathHover({ x: r.left + r.width / 2, y: r.top });
+                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
               }}
               onMouseLeave={() => setPathHover(null)}
               style={{
@@ -1197,8 +1205,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           className="fixed z-50 pointer-events-none rounded-xl shadow-2xl"
           style={{
             left: pathHover.x,
-            top: pathHover.y - 10,
-            transform: 'translate(-50%, -100%)',
+            top: pathHover.y + 10,
+            transform: 'translate(-50%, 0)',
             backgroundColor: S.onSurface,
             color: '#ffffff',
             padding: '10px 14px',
@@ -1231,12 +1239,12 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           <div style={{ marginTop: 6, opacity: 0.65, fontSize: 10.5 }}>
             Positive = accelerating expansion · Negative = accelerating contraction
           </div>
-          {/* Pointer arrow */}
+          {/* Pointer arrow — points up because the bubble sits below the tile */}
           <div
             style={{
               position: 'absolute',
               left: '50%',
-              bottom: -5,
+              top: -5,
               width: 10,
               height: 10,
               backgroundColor: S.onSurface,
