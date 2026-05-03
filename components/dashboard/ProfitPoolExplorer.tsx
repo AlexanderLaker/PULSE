@@ -13,12 +13,13 @@
  *   X = revenue share           |   Y = GP1 / Contribution Margin 1
  *   Area = profit pool           |   Order = descending GP1 margin
  *
- * PRISM integration:
- *   Each bar is colored RED (declining) or GREEN (increasing) based on
- *   the Monte Carlo median shift for the linked category at the selected
- *   year. Hover reveals a 0–3 intensity rating in the same visual
- *   style as the Innovation Explorer evaluation (Stable / Increasing +N
- *   / Declining –N), plus the source stack.
+ * Trend indicator:
+ *   Bars are rendered in a single neutral palette — the growth signal
+ *   above each bar is conveyed by CAGR arrows (1–3 green ▲ for positive,
+ *   1–3 red ▼ for negative, single grey ↔ for flat). The thresholds
+ *   that map a CAGR magnitude to 1, 2 or 3 arrows are defined once in
+ *   `lib/profitPoolData.ts` (CAGR_THRESHOLDS) so every view stays
+ *   consistent.
  *
  * Admin gating is enforced at the page level — this component assumes
  * the caller has already verified admin role.
@@ -35,12 +36,11 @@ import {
 import usePrism from '@/hooks/usePrism';
 import {
   PROFIT_POOL_SLIDES,
-  itemPrismShiftFor,
-  slidePrismShiftFor,
-  toTrendRating,
+  CAGR_THRESHOLDS,
+  toCagrRating,
   type ProfitPoolSlide,
   type SlideItem,
-  type TrendRating,
+  type CagrRating,
 } from '@/lib/profitPoolData';
 import type { SimulationResult } from '@/types';
 
@@ -80,48 +80,127 @@ const BODY_FONT = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 const YEARS = [2027, 2030, 2033, 2036] as const;
 type Year = (typeof YEARS)[number];
 
-// Map rating → bar fill & border
-function barFillFor(rating: TrendRating): { fill: string; stroke: string } {
-  if (rating.tone === 'green') {
-    const intensity = 0.55 + rating.score * 0.12;
-    return {
-      fill: `rgba(31, 157, 85, ${intensity.toFixed(2)})`,
-      stroke: S.greenStrong,
-    };
-  }
-  if (rating.tone === 'red') {
-    const intensity = 0.55 + rating.score * 0.12;
-    return {
-      fill: `rgba(179, 38, 30, ${intensity.toFixed(2)})`,
-      stroke: S.redStrong,
-    };
-  }
-  if (rating.tone === 'neutral') {
-    return { fill: 'rgba(148, 163, 184, 0.55)', stroke: '#475569' };
-  }
-  // muted — no PRISM signal
-  return { fill: 'rgba(214, 227, 255, 0.80)', stroke: S.primaryDim };
-}
+// Single neutral bar palette — direction is conveyed by CAGR arrows,
+// not by bar color anymore.
+const BAR_FILL = 'rgba(214, 227, 255, 0.85)';
+const BAR_STROKE = S.primaryDim;
 
-// Small 0–3 dot indicator, mirrors Innovation Explorer rating dots
-const ScoreDots: FC<{ score: 0 | 1 | 2 | 3; tone: TrendRating['tone'] }> = ({ score, tone }) => {
-  const active =
-    tone === 'green' ? S.green :
-    tone === 'red'   ? S.red :
-    tone === 'neutral' ? S.neutral : S.outlineVariant;
-  return (
-    <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
-      {[1, 2, 3].map(i => (
-        <span
-          key={i}
-          style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: i <= score ? active : S.surfaceHigh,
-            border: `1px solid ${i <= score ? active : S.outlineVariant}`,
-            transition: 'background 0.2s',
-          }}
+// Resolve a CagrRating tone to a concrete color.
+const arrowColorFor = (tone: CagrRating['tone']): string =>
+  tone === 'green' ? S.greenStrong : tone === 'red' ? S.redStrong : S.neutral;
+
+// SVG arrow stack drawn directly above a chart bar.
+//   • CAGR > +0.5 %  → 1-3 green ▲ (more arrows = stronger growth)
+//   • CAGR < -0.5 %  → 1-3 red ▼
+//   • |CAGR| < 0.5 % → single grey ↔
+// `cx` is the horizontal center of the bar; `cy` is the y where the
+// chevron stack should bottom out (just above the bar top).
+const CagrArrowsSVG: FC<{
+  rating: CagrRating;
+  cx: number;
+  cy: number;
+}> = ({ rating, cx, cy }) => {
+  const color = arrowColorFor(rating.tone);
+
+  if (rating.direction === 'flat') {
+    // Single horizontal double-headed arrow ↔
+    return (
+      <g transform={`translate(${cx}, ${cy - 6})`} aria-label="Flat CAGR">
+        <path
+          d="M -8 0 L -4 -4 M -8 0 L -4 4 M -8 0 L 8 0 M 8 0 L 4 -4 M 8 0 L 4 4"
+          stroke={color}
+          strokeWidth={1.7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
         />
+      </g>
+    );
+  }
+
+  const spacing = 5;          // gap between stacked chevrons
+  // Chevrons stack upward away from the bar in both up- and down-cases.
+  // The "first" chevron (i = 0) sits closest to the bar.
+  return (
+    <g
+      transform={`translate(${cx}, ${cy})`}
+      aria-label={`CAGR ${rating.direction === 'up' ? 'up' : 'down'} ${rating.arrows}/3`}
+    >
+      {Array.from({ length: rating.arrows }).map((_, i) => {
+        const yOff = -2 - i * spacing;
+        const path =
+          rating.direction === 'up'
+            ? `M -5 ${yOff + 3} L 0 ${yOff - 3} L 5 ${yOff + 3}`
+            : `M -5 ${yOff - 3} L 0 ${yOff + 3} L 5 ${yOff - 3}`;
+        return (
+          <path
+            key={i}
+            d={path}
+            fill="none"
+            stroke={color}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        );
+      })}
+    </g>
+  );
+};
+
+// HTML version of the same indicator — for the tooltip and the
+// slide-level summary badge. Uses the same threshold ladder.
+const CagrArrowsHTML: FC<{ rating: CagrRating; size?: number }> = ({
+  rating,
+  size = 12,
+}) => {
+  const color = arrowColorFor(rating.tone);
+  const w = size, h = size;
+  const stroke = Math.max(1.4, size / 7);
+
+  if (rating.direction === 'flat') {
+    return (
+      <svg width={w * 1.4} height={h} viewBox="-10 -6 20 12" aria-hidden>
+        <path
+          d="M -8 0 L -4 -4 M -8 0 L -4 4 M -8 0 L 8 0 M 8 0 L 4 -4 M 8 0 L 4 4"
+          stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          strokeLinejoin="round" fill="none"
+        />
+      </svg>
+    );
+  }
+  const totalW = w * rating.arrows + 2 * (rating.arrows - 1);
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 1,
+      }}
+    >
+      {Array.from({ length: rating.arrows }).map((_, i) => (
+        <svg
+          key={i}
+          width={w} height={h}
+          viewBox="-6 -6 12 12"
+          aria-hidden
+        >
+          <path
+            d={
+              rating.direction === 'up'
+                ? 'M -4 3 L 0 -3 L 4 3'
+                : 'M -4 -3 L 0 3 L 4 -3'
+            }
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </svg>
       ))}
+      {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
+      {void totalW}
     </span>
   );
 };
@@ -130,11 +209,11 @@ const ScoreDots: FC<{ score: 0 | 1 | 2 | 3; tone: TrendRating['tone'] }> = ({ sc
 interface TooltipProps {
   item: SlideItem;
   slide: ProfitPoolSlide;
-  rating: TrendRating;
+  cagrRating: CagrRating;
   x: number;
   y: number;
 }
-const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
+const PoolTooltip: FC<TooltipProps> = ({ item, slide, cagrRating, x, y }) => {
   const profitShare = item.revenueShare * item.gp1Margin;
   const revPct = (item.revenueShare * 100).toFixed(1);
   const gp1Pct = (item.gp1Margin * 100).toFixed(1);
@@ -216,7 +295,7 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
         <Metric label="Profit share" value={profitShareLbl} />
       </div>
 
-      {/* PRISM trend rating — 0-3 scale */}
+      {/* Forward CAGR — single growth signal, with shared-threshold arrows */}
       <div style={{ marginBottom: 10 }}>
         <div
           style={{
@@ -224,41 +303,36 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, rating, x, y }) => {
             textTransform: 'uppercase', color: S.outline, marginBottom: 6,
           }}
         >
-          PRISM Trend (0-3)
+          Forward CAGR
         </div>
         <div
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background:
-              rating.tone === 'green' ? S.greenSoft :
-              rating.tone === 'red'   ? S.redSoft :
-              rating.tone === 'neutral' ? S.neutralSoft : S.surfaceLow,
+            background: S.surfaceLow,
             padding: '8px 12px', borderRadius: 10,
+            gap: 10,
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <div
               style={{
                 fontSize: 13, fontWeight: 800,
-                color:
-                  rating.tone === 'green' ? S.greenStrong :
-                  rating.tone === 'red'   ? S.redStrong :
-                  rating.tone === 'neutral' ? '#475569' : S.mutedText,
+                color: arrowColorFor(cagrRating.tone),
+                fontFamily: HEADLINE_FONT,
               }}
             >
-              {rating.label}
+              {cagrSign}{cagrPct}%
             </div>
             <div style={{ fontSize: 10, color: S.mutedText }}>
-              Monte Carlo median vs. baseline
+              Market CAGR · {cagrRating.direction === 'flat'
+                ? 'flat (< 0.5 %)'
+                : cagrRating.direction === 'up'
+                  ? `growth · ${cagrRating.arrows}/3`
+                  : `decline · ${cagrRating.arrows}/3`}
             </div>
           </div>
-          <ScoreDots score={rating.score} tone={rating.tone} />
+          <CagrArrowsHTML rating={cagrRating} size={14} />
         </div>
-      </div>
-
-      {/* Forward CAGR */}
-      <div style={{ fontSize: 11, color: S.onSurfaceVariant, marginBottom: 4 }}>
-        Forward CAGR (market): <b>{cagrSign}{cagrPct}%</b>
       </div>
 
       {/* Per-item sources — revenue + margin, both publicly referenced */}
@@ -315,20 +389,22 @@ const Metric: FC<{ label: string; value: string }> = ({ label, value }) => (
 // ─── Pool Chart (SVG) ────────────────────────────────────────────
 interface PoolChartProps {
   slide: ProfitPoolSlide;
-  shifts: Record<string, Record<string | number, unknown>> | undefined;
-  year: number;
-  onHover: (item: SlideItem, rating: TrendRating, x: number, y: number) => void;
+  onHover: (item: SlideItem, cagrRating: CagrRating, x: number, y: number) => void;
   onLeave: () => void;
 }
 
-const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }) => {
+const PoolChart: FC<PoolChartProps> = ({ slide, onHover, onLeave }) => {
   // Order is authored: ValueChain runs raw→retail; Sub-segments follow format
   // logic (volume → specialty); Core+Adjacent keeps CORE first.
   const ordered = slide.items;
 
+  // Compact canvas — keeps the whole chart visible on a 768-900 px tall
+  // viewport without forcing the page to scroll. MT carries enough room
+  // for the CAGR arrow stack above the tallest bar; MB leaves space for
+  // rotated category labels and a single x-axis caption.
   const W = 960;
-  const H = 500;
-  const ML = 60, MR = 24, MT = 24, MB = 135;
+  const H = 420;
+  const ML = 56, MR = 20, MT = 32, MB = 104;
   const plotW = W - ML - MR;
   const plotH = H - MT - MB;
 
@@ -345,13 +421,13 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
     const x0 = cum;
     cum += it.revenueShare / totalShare;
     const x1 = cum;
-    const rating = toTrendRating(itemPrismShiftFor(shifts, slide, it, year));
+    const cagrRating = toCagrRating(it.forwardCAGR);
     return {
       item: it,
       xPx0: ML + x0 * plotW,
       xPx1: ML + x1 * plotW,
       hPx:  (it.gp1Margin / yMax) * plotH,
-      rating,
+      cagrRating,
     };
   });
 
@@ -391,38 +467,37 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
         GP1 / Contribution Margin 1
       </text>
       <text
-        x={ML + plotW / 2} y={H - 10}
-        fontSize={10} fill={S.outline} textAnchor="middle"
+        x={ML + plotW / 2} y={H - 6}
+        fontSize={11} fill={S.outline} textAnchor="middle"
         fontFamily={HEADLINE_FONT} fontWeight={700}
-        style={{ textTransform: 'uppercase', letterSpacing: 1.2 }}
       >
         Revenue share (% of category pool) — ordered by value chain / format sequence
       </text>
 
       {/* Bars */}
-      {bars.map((b, i) => {
-        const { fill, stroke } = barFillFor(b.rating);
+      {bars.map((b) => {
         const y = MT + plotH - b.hPx;
         const w = Math.max(2, b.xPx1 - b.xPx0);
+        const cx = b.xPx0 + w / 2;
         return (
           <g
             key={b.item.id}
             style={{ cursor: 'pointer' }}
-            onMouseEnter={(e) => onHover(b.item, b.rating, e.clientX, e.clientY)}
-            onMouseMove={(e) => onHover(b.item, b.rating, e.clientX, e.clientY)}
+            onMouseEnter={(e) => onHover(b.item, b.cagrRating, e.clientX, e.clientY)}
+            onMouseMove={(e) => onHover(b.item, b.cagrRating, e.clientX, e.clientY)}
             onMouseLeave={onLeave}
           >
             <rect
               x={b.xPx0} y={y} width={w} height={b.hPx}
-              fill={fill} stroke={stroke} strokeWidth={1.25}
+              fill={BAR_FILL} stroke={BAR_STROKE} strokeWidth={1.25}
               rx={2}
             />
             {/* Margin label inside bar */}
             {b.hPx > 22 && w > 28 && (
               <text
-                x={b.xPx0 + w / 2} y={y + 15}
+                x={cx} y={y + 15}
                 fontSize={11} fontWeight={800}
-                fill="#fff"
+                fill={S.onBg}
                 textAnchor="middle" fontFamily={HEADLINE_FONT}
               >
                 {(b.item.gp1Margin * 100).toFixed(0)}%
@@ -430,7 +505,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
             )}
             {/* Revenue share % — just below the axis */}
             <text
-              x={b.xPx0 + w / 2} y={MT + plotH + 14}
+              x={cx} y={MT + plotH + 14}
               fontSize={11} fill={S.primaryDim} fontWeight={700}
               textAnchor="middle" fontFamily={HEADLINE_FONT}
             >
@@ -438,8 +513,8 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
             </text>
             {/* Bar name — rotated −35° so long names stay legible */}
             {(() => {
-              const anchorX = b.xPx0 + w / 2;
-              const anchorY = MT + plotH + 30;
+              const anchorX = cx;
+              const anchorY = MT + plotH + 26;
               const full = b.item.sublabel
                 ? `${b.item.label} ${b.item.sublabel}`
                 : b.item.label;
@@ -454,36 +529,12 @@ const PoolChart: FC<PoolChartProps> = ({ slide, shifts, year, onHover, onLeave }
                 </text>
               );
             })()}
-            {/* 0-3 dots marker */}
-            {b.rating.score > 0 && (
-              <g transform={`translate(${b.xPx0 + w / 2 - 12}, ${y - 12})`}>
-                {[1, 2, 3].map(d => (
-                  <circle
-                    key={d}
-                    cx={d * 8} cy={0} r={3.5}
-                    fill={
-                      d <= b.rating.score
-                        ? (b.rating.tone === 'green' ? S.greenStrong : S.redStrong)
-                        : '#fff'
-                    }
-                    stroke={b.rating.tone === 'green' ? S.greenStrong : S.redStrong}
-                    strokeWidth={1}
-                  />
-                ))}
-              </g>
-            )}
+            {/* CAGR arrow stack — shared thresholds in CAGR_THRESHOLDS */}
+            <CagrArrowsSVG rating={b.cagrRating} cx={cx} cy={y} />
           </g>
         );
       })}
 
-      {/* X-axis caption */}
-      <text
-        x={ML + plotW / 2} y={H - 16}
-        fontSize={11} fill={S.outline}
-        textAnchor="middle" fontFamily={HEADLINE_FONT} fontWeight={700}
-      >
-        Revenue share (% of pool)
-      </text>
     </svg>
   );
 };
@@ -542,12 +593,12 @@ const SlideToggle: FC<{
 
 // ─── Main component ──────────────────────────────────────────────
 const ProfitPoolExplorer: FC = () => {
-  const { simulation, loading } = usePrism();
+  const { loading } = usePrism();
   const [slideId, setSlideId] = useState<string>(PROFIT_POOL_SLIDES[0].id);
   const [year, setYear] = useState<Year>(2030);
   const [hover, setHover] = useState<{
     item: SlideItem;
-    rating: TrendRating;
+    cagrRating: CagrRating;
     x: number;
     y: number;
   } | null>(null);
@@ -557,12 +608,16 @@ const ProfitPoolExplorer: FC = () => {
     [slideId],
   );
 
-  const shifts = simulation?.shifts as
-    | Record<string, Record<string | number, unknown>>
-    | undefined;
-
-  const slideAvgShift = slidePrismShiftFor(shifts, slide, year);
-  const slideRating = toTrendRating(slideAvgShift);
+  // Slide-level CAGR signal — revenue-share-weighted average of item
+  // forward CAGRs. Same threshold ladder as the per-bar arrows.
+  const slideCagrRating = useMemo(() => {
+    const total = slide.items.reduce((s, it) => s + it.revenueShare, 0);
+    if (total === 0) return toCagrRating(0);
+    const weighted =
+      slide.items.reduce((s, it) => s + it.forwardCAGR * it.revenueShare, 0) /
+      total;
+    return toCagrRating(weighted);
+  }, [slide]);
 
   const activeIdx = PROFIT_POOL_SLIDES.findIndex(s => s.id === slide.id);
   const go = (delta: number) => {
@@ -590,8 +645,9 @@ const ProfitPoolExplorer: FC = () => {
             Industry Profit Pools — HCB Lens
           </h1>
           <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 720 }}>
-            Six aligned views from the Henkel Profit Pool deck. Bars are colored red/green by PRISM
-            Monte Carlo direction at the selected year — hover for the 0–3 trend rating.
+            Six aligned views from the Henkel Profit Pool deck. Each bar carries
+            a CAGR arrow indicator (1-3 ▲ growth, 1-3 ▼ decline, ↔ flat) using a
+            single threshold ladder shared across all views.
             Y-axis = <b>GP1 / Contribution Margin 1</b>.
           </p>
         </div>
@@ -673,39 +729,29 @@ const ProfitPoolExplorer: FC = () => {
             </div>
           </div>
 
-          {/* Slide-level PRISM rating badge */}
+          {/* Slide-level CAGR badge — revenue-weighted average of items */}
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 14px', borderRadius: 12,
-              background:
-                slideRating.tone === 'green' ? S.greenSoft :
-                slideRating.tone === 'red'   ? S.redSoft :
-                slideRating.tone === 'neutral' ? S.neutralSoft : S.surfaceLow,
-              border: `1px solid ${
-                slideRating.tone === 'green' ? S.green :
-                slideRating.tone === 'red'   ? S.red :
-                S.cardBorder
-              }`,
+              background: S.surfaceLow,
+              border: `1px solid ${S.cardBorder}`,
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline }}>
-                Slide avg · {year}
+                Slide avg CAGR (rev-weighted)
               </div>
               <div
                 style={{
                   fontSize: 14, fontWeight: 800, fontFamily: HEADLINE_FONT,
-                  color:
-                    slideRating.tone === 'green' ? S.greenStrong :
-                    slideRating.tone === 'red'   ? S.redStrong :
-                    slideRating.tone === 'neutral' ? '#475569' : S.mutedText,
+                  color: arrowColorFor(slideCagrRating.tone),
                 }}
               >
-                {slideRating.label}
+                {slideCagrRating.label}
               </div>
             </div>
-            <ScoreDots score={slideRating.score} tone={slideRating.tone} />
+            <CagrArrowsHTML rating={slideCagrRating} size={14} />
           </div>
         </div>
 
@@ -718,21 +764,36 @@ const ProfitPoolExplorer: FC = () => {
           )}
           <PoolChart
             slide={slide}
-            shifts={shifts}
-            year={year}
-            onHover={(item, rating, x, y) => setHover({ item, rating, x, y })}
+            onHover={(item, cagrRating, x, y) => setHover({ item, cagrRating, x, y })}
             onLeave={() => setHover(null)}
           />
         </div>
 
-        {/* Legend */}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', padding: '14px 0 4px', borderTop: `1px solid ${S.surfaceHigh}`, marginTop: 18 }}>
-          <LegendSwatch color={S.green} label="Increasing — PRISM tailwind" />
-          <LegendSwatch color={S.red} label="Declining — PRISM headwind" />
-          <LegendSwatch color={S.neutral} label="Stable" />
-          <LegendSwatch color={S.primaryDim} label="No PRISM signal (adjacency / infra tier)" />
+        {/* Legend — CAGR arrow ladder, identical thresholds across views */}
+        <div
+          style={{
+            display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center',
+            padding: '14px 0 4px', borderTop: `1px solid ${S.surfaceHigh}`,
+            marginTop: 18,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+              textTransform: 'uppercase', color: S.outline,
+            }}
+          >
+            Forward CAGR
+          </span>
+          <ArrowLegend rating={toCagrRating(0.07)}  label={`≥ ${(CAGR_THRESHOLDS.two * 100).toFixed(0)}% growth`} />
+          <ArrowLegend rating={toCagrRating(0.03)}  label={`${(CAGR_THRESHOLDS.one * 100).toFixed(0)}–${(CAGR_THRESHOLDS.two * 100).toFixed(0)}% growth`} />
+          <ArrowLegend rating={toCagrRating(0.01)}  label={`${(CAGR_THRESHOLDS.flat * 100).toFixed(1)}–${(CAGR_THRESHOLDS.one * 100).toFixed(0)}% growth`} />
+          <ArrowLegend rating={toCagrRating(0)}     label={`Flat (< ${(CAGR_THRESHOLDS.flat * 100).toFixed(1)}%)`} />
+          <ArrowLegend rating={toCagrRating(-0.01)} label={`${(CAGR_THRESHOLDS.flat * 100).toFixed(1)}–${(CAGR_THRESHOLDS.one * 100).toFixed(0)}% decline`} />
+          <ArrowLegend rating={toCagrRating(-0.03)} label={`${(CAGR_THRESHOLDS.one * 100).toFixed(0)}–${(CAGR_THRESHOLDS.two * 100).toFixed(0)}% decline`} />
+          <ArrowLegend rating={toCagrRating(-0.07)} label={`≥ ${(CAGR_THRESHOLDS.two * 100).toFixed(0)}% decline`} />
           <div style={{ marginLeft: 'auto', fontSize: 10, color: S.mutedText }}>
-            Hover bars for sources, metrics & 0–3 trend rating.
+            Hover bars for sources, metrics & exact CAGR.
           </div>
         </div>
       </div>
@@ -770,7 +831,7 @@ const ProfitPoolExplorer: FC = () => {
           <PoolTooltip
             item={hover.item}
             slide={slide}
-            rating={hover.rating}
+            cagrRating={hover.cagrRating}
             x={hover.x}
             y={hover.y}
           />
@@ -780,14 +841,15 @@ const ProfitPoolExplorer: FC = () => {
   );
 };
 
-const LegendSwatch: FC<{ color: string; label: string }> = ({ color, label }) => (
+const ArrowLegend: FC<{ rating: CagrRating; label: string }> = ({ rating, label }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-    <span style={{ width: 12, height: 12, borderRadius: 3, background: color, display: 'inline-block' }} />
+    <CagrArrowsHTML rating={rating} size={11} />
     <span style={{ fontSize: 11, color: S.onSurfaceVariant, fontWeight: 600 }}>{label}</span>
   </div>
 );
 
-// Unused icon imports guard
+// Unused icon-import guard — kept here so existing lucide imports stay
+// part of the bundle if other parts of the file want to reference them.
 void TrendingUp; void TrendingDown; void Minus;
 
 export default ProfitPoolExplorer;

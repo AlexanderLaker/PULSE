@@ -92,6 +92,12 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // ─── Profit Pool Explorer mock-up notice ────────────────────────────
+  // The Explorer is a visualization mock-up — the underlying data sources
+  // have not yet been validated. Surface that fact every time the tab is
+  // opened so beta users don't mistake it for production data.
+  const [explorerNoticeOpen, setExplorerNoticeOpen] = useState(false);
+
   // ─── Welcome / MVP onboarding modal ─────────────────────────────────
   // Shown on every fresh login. We key sessionStorage by the active Clerk
   // session ID — once dismissed, the same session won't show it again
@@ -200,7 +206,12 @@ export default function DashboardPage() {
     return (
       <button
         key={tab.id}
-        onClick={() => setActiveTab(tab.id)}
+        onClick={() => {
+          setActiveTab(tab.id);
+          if (tab.id === 'profit-pool-explorer') {
+            setExplorerNoticeOpen(true);
+          }
+        }}
         className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
         style={{
           fontFamily: HEADLINE_FONT,
@@ -322,6 +333,60 @@ export default function DashboardPage() {
 
       {/* ─── Welcome / MVP modal — shown on every fresh login ──────── */}
       <WelcomeModal open={welcomeOpen} onClose={handleWelcomeClose} />
+
+      {/* ─── Profit Pool Explorer mock-up notice ─────────────────────
+          Beta disclaimer surfaced every time the Explorer tab is opened.
+          The Explorer is a visualization mock-up; data sources have not
+          yet been validated. Users acknowledge with "Got it" to proceed. */}
+      {explorerNoticeOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="explorer-notice-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          style={{ backgroundColor: 'rgba(0, 52, 94, 0.45)' }}
+          onClick={() => setExplorerNoticeOpen(false)}
+        >
+          <div
+            className="max-w-md w-full rounded-2xl bg-white shadow-2xl p-6"
+            style={{ fontFamily: HEADLINE_FONT }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="text-[11px] font-semibold uppercase tracking-[0.16em] mb-2"
+              style={{ color: NAV.betaActive }}
+            >
+              Beta · Mock-up
+            </div>
+            <h2
+              id="explorer-notice-title"
+              className="text-xl font-extrabold tracking-tight mb-2"
+              style={{ color: NAV.onBg }}
+            >
+              Profit Pool Explorer
+            </h2>
+            <p
+              className="text-sm leading-relaxed mb-5"
+              style={{ color: NAV.onSurfaceVariant }}
+            >
+              This is a visualization mock-up. The data sources are not yet
+              validated.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setExplorerNoticeOpen(false)}
+                className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+                style={{
+                  backgroundColor: NAV.surfaceLow,
+                  color: NAV.primary,
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
