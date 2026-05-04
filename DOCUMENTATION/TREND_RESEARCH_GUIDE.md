@@ -280,7 +280,7 @@ GET /api/v1/scanner/results
 GNEWS_API_KEY=your_key_here          # https://gnews.io (free tier: 100 req/day)
 CURRENTSAPI_KEY=your_key_here        # https://currentsapi.services (free: 200 req/day)
 NEWSAPI_API_KEY=your_key_here        # https://newsapi.org (free: 100 req/day)
-NCBI_API_KEY=75a7ab95426bd984590af6d681f4a8497008  # NCBI E-utilities
+NCBI_API_KEY=<set in Vercel project settings — see DEPLOY.md>  # NCBI E-utilities
 FRED_API_KEY=your_key_here           # https://fred.stlouisfed.org (optional, increases rate limit)
 YOUTUBE_API_KEY=your_key_here        # Google Cloud Console (10,000 units/day free)
 REDDIT_CLIENT_ID=your_id_here        # https://www.reddit.com/prefs/apps
