@@ -98,6 +98,14 @@ export default function DashboardPage() {
   // opened so beta users don't mistake it for production data.
   const [explorerNoticeOpen, setExplorerNoticeOpen] = useState(false);
 
+  // ─── Innovation Explorer beta notice ────────────────────────────────
+  // The Innovation Explorer surfaces *innovation ideas* synthesized from
+  // the underlying trend and profit-pool signals — they are directional
+  // hypotheses, not validated launches. We show that framing every time
+  // the tab is opened so beta users read the output through the right
+  // lens.
+  const [innovationNoticeOpen, setInnovationNoticeOpen] = useState(false);
+
   // ─── Welcome / MVP onboarding modal ─────────────────────────────────
   // Shown on every fresh login. We key sessionStorage by the active Clerk
   // session ID — once dismissed, the same session won't show it again
@@ -210,6 +218,9 @@ export default function DashboardPage() {
           setActiveTab(tab.id);
           if (tab.id === 'profit-pool-explorer') {
             setExplorerNoticeOpen(true);
+          }
+          if (tab.id === 'innovation-explorer-3') {
+            setInnovationNoticeOpen(true);
           }
         }}
         className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
@@ -375,6 +386,61 @@ export default function DashboardPage() {
             <div className="flex justify-end">
               <button
                 onClick={() => setExplorerNoticeOpen(false)}
+                className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+                style={{
+                  backgroundColor: NAV.surfaceLow,
+                  color: NAV.primary,
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Innovation Explorer beta notice ──────────────────────────
+          Same dialog surface as the Profit Pool Explorer notice, but
+          framed for innovation hypotheses rather than mock-up data. */}
+      {innovationNoticeOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="innovation-notice-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          style={{ backgroundColor: 'rgba(0, 52, 94, 0.45)' }}
+          onClick={() => setInnovationNoticeOpen(false)}
+        >
+          <div
+            className="max-w-md w-full rounded-2xl bg-white shadow-2xl p-6"
+            style={{ fontFamily: HEADLINE_FONT }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="text-[11px] font-semibold uppercase tracking-[0.16em] mb-2"
+              style={{ color: NAV.betaActive }}
+            >
+              Beta · Innovation Ideas
+            </div>
+            <h2
+              id="innovation-notice-title"
+              className="text-xl font-extrabold tracking-tight mb-2"
+              style={{ color: NAV.onBg }}
+            >
+              Innovation Explorer
+            </h2>
+            <p
+              className="text-sm leading-relaxed mb-5"
+              style={{ color: NAV.onSurfaceVariant }}
+            >
+              The concepts shown here are innovation ideas synthesized from
+              the underlying trend signals and profit-pool impact — they
+              are directional hypotheses to inspire portfolio thinking,
+              not validated launches.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setInnovationNoticeOpen(false)}
                 className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-colors"
                 style={{
                   backgroundColor: NAV.surfaceLow,
