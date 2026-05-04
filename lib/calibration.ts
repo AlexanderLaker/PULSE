@@ -43,36 +43,36 @@ export const ATTENUATION_SOURCE = 'calibrated_v3.5_april2026';
 
 export const BASE_YEAR = 2025;
 
-/** Full 11-year projection horizon (2026–2036). Matches
+/** Full 10-year projection horizon (2026–2035). Matches
  *  DEFAULT_PATH_YEARS in pulse/config.py. */
 export const PATH_YEARS: readonly number[] = [
-  2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036,
+  2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035,
 ];
 
 // ─── Default materialization schedules ─────────────────────────
 /** Default S-curve schedule. Mirror of DEFAULT_MATERIALIZATION. */
 export const DEFAULT_MATERIALIZATION: Record<number, number> = {
   2026: 0.08, 2027: 0.18, 2028: 0.32, 2029: 0.48, 2030: 0.62,
-  2031: 0.74, 2032: 0.84, 2033: 0.91, 2034: 0.96, 2035: 0.99, 2036: 1.00,
+  2031: 0.74, 2032: 0.84, 2033: 0.91, 2034: 0.97, 2035: 1.00,
 };
 
 /** Regulatory force override — Government trends materialize slower
  *  in early years but catch up fast (back-loaded). */
 export const REGULATORY_MATERIALIZATION: Record<number, number> = {
   2026: 0.05, 2027: 0.15, 2028: 0.40, 2029: 0.60, 2030: 0.75,
-  2031: 0.85, 2032: 0.92, 2033: 0.97, 2034: 0.99, 2035: 1.00, 2036: 1.00,
+  2031: 0.85, 2032: 0.92, 2033: 0.97, 2034: 0.99, 2035: 1.00,
 };
 
 /** Technology force override — even slower early, steeper finish. */
 export const TECHNOLOGY_MATERIALIZATION: Record<number, number> = {
   2026: 0.04, 2027: 0.10, 2028: 0.22, 2029: 0.40, 2030: 0.58,
-  2031: 0.72, 2032: 0.83, 2033: 0.91, 2034: 0.96, 2035: 0.99, 2036: 1.00,
+  2031: 0.72, 2032: 0.83, 2033: 0.91, 2034: 0.98, 2035: 1.00,
 };
 
 /** Consumer force override — more front-loaded than the default. */
 export const CONSUMER_MATERIALIZATION: Record<number, number> = {
   2026: 0.10, 2027: 0.22, 2028: 0.38, 2029: 0.54, 2030: 0.68,
-  2031: 0.79, 2032: 0.87, 2033: 0.93, 2034: 0.97, 2035: 0.99, 2036: 1.00,
+  2031: 0.79, 2032: 0.87, 2033: 0.93, 2034: 0.98, 2035: 1.00,
 };
 
 /** Legacy fallback when a trend has no diffusion_curve. */

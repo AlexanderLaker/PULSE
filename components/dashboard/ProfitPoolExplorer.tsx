@@ -77,7 +77,7 @@ const S = {
 const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 const BODY_FONT = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
-const YEARS = [2027, 2030, 2033, 2036] as const;
+const YEARS = [2027, 2030, 2032, 2035] as const;
 type Year = (typeof YEARS)[number];
 
 // Single neutral bar palette — direction is conveyed by CAGR arrows,

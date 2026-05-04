@@ -425,7 +425,7 @@ const InnovationExplorer3: FC<InnovationExplorer3Props> = ({
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
               A curated list of the {INNOVATIONS.length} strategic product
-              concepts shaping Henkel Consumer Brands through 2036.
+              concepts shaping Henkel Consumer Brands through 2035.
             </p>
           </div>
 
@@ -459,7 +459,7 @@ const InnovationExplorer3: FC<InnovationExplorer3Props> = ({
             { label: 'Concepts',         value: String(filtered.length),   Icon: Sparkles },
             { label: 'Tier 1 Priority',  value: String(tier1Count),        Icon: Target },
             { label: 'Avg. Market Score', value: `${avgMarketScore}%`,     Icon: Star },
-            { label: 'Horizon',          value: '2026–2036',               Icon: Layers },
+            { label: 'Horizon',          value: '2026–2035',               Icon: Layers },
           ].map((stat) => {
             const Icon = stat.Icon;
             return (

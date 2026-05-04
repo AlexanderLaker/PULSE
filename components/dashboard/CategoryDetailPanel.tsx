@@ -16,7 +16,7 @@
  *     replacing the old black 50% backdrop that felt jarring on a light page
  *
  * Content (unchanged from v1):
- *   • Fan chart — p10/p90 band + median line across 2026–2036
+ *   • Fan chart — p10/p90 band + median line across 2026–2035
  *   • Force decomposition — horizontal bars at the selected year
  *   • Contributing trends — list with force tag and direction
  */

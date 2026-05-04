@@ -594,7 +594,7 @@ const Trends2: FC = () => {
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
               A curated lens on the {trends?.length ?? 0} signals driving
-              profit-pool reallocation across categories through 2036.
+              profit-pool reallocation across categories through 2035.
             </p>
           </div>
 

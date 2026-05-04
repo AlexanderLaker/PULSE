@@ -117,7 +117,7 @@ const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 type ViewMode = 'time' | 'force' | 'vc' | 'region';
 
 const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
-  time:   { label: 'Time Path',   description: 'MC median shifts 2026→2036, cumulative vs 2025', Icon: Calendar },
+  time:   { label: 'Time Path',   description: 'MC median shifts 2026→2035, cumulative vs 2025', Icon: Calendar },
   force:  { label: 'Force',       description: 'Force decomposition at the selected year',       Icon: Zap },
   vc:     { label: 'Value Chain', description: 'Value-chain decomposition at the selected year', Icon: Layers },
   region: { label: 'Region',      description: 'Regional decomposition at the selected year',    Icon: Globe2 },
