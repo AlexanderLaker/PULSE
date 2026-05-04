@@ -89,121 +89,68 @@ const BAR_STROKE = S.primaryDim;
 const arrowColorFor = (tone: CagrRating['tone']): string =>
   tone === 'green' ? S.greenStrong : tone === 'red' ? S.redStrong : S.neutral;
 
-// SVG arrow stack drawn directly above a chart bar.
-//   • CAGR > +0.5 %  → 1-3 green ▲ (more arrows = stronger growth)
-//   • CAGR < -0.5 %  → 1-3 red ▼
-//   • |CAGR| < 0.5 % → single grey ↔
-// `cx` is the horizontal center of the bar; `cy` is the y where the
-// chevron stack should bottom out (just above the bar top).
+// Unicode arrow vocabulary — same glyphs the Consumer Journey detail
+// slides use for direction × intensity. Single-line text rendering
+// avoids the overlap issues of stacked SVG chevrons.
+//   • Positive CAGR → '↑'.repeat(arrows)
+//   • Negative CAGR → '↓'.repeat(arrows)
+//   • Flat          → '↔'
+const arrowGlyphs = (rating: CagrRating): string =>
+  rating.direction === 'flat' ? '↔' :
+  rating.direction === 'up'   ? '↑'.repeat(rating.arrows) :
+                                '↓'.repeat(rating.arrows);
+
+// SVG arrow text drawn just above a chart bar — one compact text
+// element, no overlap with adjacent bars or the in-bar margin label.
 const CagrArrowsSVG: FC<{
   rating: CagrRating;
   cx: number;
-  cy: number;
-}> = ({ rating, cx, cy }) => {
-  const color = arrowColorFor(rating.tone);
+  cy: number;  // y where the bar TOP sits — arrows render just above
+}> = ({ rating, cx, cy }) => (
+  <text
+    x={cx}
+    y={cy - 5}
+    fontSize={14}
+    fontWeight={800}
+    fill={arrowColorFor(rating.tone)}
+    textAnchor="middle"
+    fontFamily={HEADLINE_FONT}
+    style={{ letterSpacing: -1 }}
+    aria-label={
+      rating.direction === 'flat'
+        ? 'Flat CAGR'
+        : `CAGR ${rating.direction} ${rating.arrows}/3`
+    }
+  >
+    {arrowGlyphs(rating)}
+  </text>
+);
 
-  if (rating.direction === 'flat') {
-    // Single horizontal double-headed arrow ↔
-    return (
-      <g transform={`translate(${cx}, ${cy - 6})`} aria-label="Flat CAGR">
-        <path
-          d="M -8 0 L -4 -4 M -8 0 L -4 4 M -8 0 L 8 0 M 8 0 L 4 -4 M 8 0 L 4 4"
-          stroke={color}
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </g>
-    );
-  }
-
-  const spacing = 5;          // gap between stacked chevrons
-  // Chevrons stack upward away from the bar in both up- and down-cases.
-  // The "first" chevron (i = 0) sits closest to the bar.
-  return (
-    <g
-      transform={`translate(${cx}, ${cy})`}
-      aria-label={`CAGR ${rating.direction === 'up' ? 'up' : 'down'} ${rating.arrows}/3`}
-    >
-      {Array.from({ length: rating.arrows }).map((_, i) => {
-        const yOff = -2 - i * spacing;
-        const path =
-          rating.direction === 'up'
-            ? `M -5 ${yOff + 3} L 0 ${yOff - 3} L 5 ${yOff + 3}`
-            : `M -5 ${yOff - 3} L 0 ${yOff + 3} L 5 ${yOff - 3}`;
-        return (
-          <path
-            key={i}
-            d={path}
-            fill="none"
-            stroke={color}
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        );
-      })}
-    </g>
-  );
-};
-
-// HTML version of the same indicator — for the tooltip and the
-// slide-level summary badge. Uses the same threshold ladder.
+// HTML version — for the tooltip and the slide-level summary badge.
+// Mirrors the Consumer Journey detail-slide treatment exactly:
+// `fontSize: 15, letterSpacing: -1`, weight 700+, tone-colored.
 const CagrArrowsHTML: FC<{ rating: CagrRating; size?: number }> = ({
   rating,
-  size = 12,
-}) => {
-  const color = arrowColorFor(rating.tone);
-  const w = size, h = size;
-  const stroke = Math.max(1.4, size / 7);
-
-  if (rating.direction === 'flat') {
-    return (
-      <svg width={w * 1.4} height={h} viewBox="-10 -6 20 12" aria-hidden>
-        <path
-          d="M -8 0 L -4 -4 M -8 0 L -4 4 M -8 0 L 8 0 M 8 0 L 4 -4 M 8 0 L 4 4"
-          stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeLinejoin="round" fill="none"
-        />
-      </svg>
-    );
-  }
-  const totalW = w * rating.arrows + 2 * (rating.arrows - 1);
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 1,
-      }}
-    >
-      {Array.from({ length: rating.arrows }).map((_, i) => (
-        <svg
-          key={i}
-          width={w} height={h}
-          viewBox="-6 -6 12 12"
-          aria-hidden
-        >
-          <path
-            d={
-              rating.direction === 'up'
-                ? 'M -4 3 L 0 -3 L 4 3'
-                : 'M -4 -3 L 0 3 L 4 -3'
-            }
-            stroke={color}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
-      ))}
-      {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
-      {void totalW}
-    </span>
-  );
-};
+  size = 15,
+}) => (
+  <span
+    style={{
+      fontSize: size,
+      fontWeight: 800,
+      color: arrowColorFor(rating.tone),
+      letterSpacing: -1,
+      fontFamily: HEADLINE_FONT,
+      lineHeight: 1,
+    }}
+    aria-label={
+      rating.direction === 'flat'
+        ? 'Flat CAGR'
+        : `CAGR ${rating.direction} ${rating.arrows}/3`
+    }
+  >
+    {arrowGlyphs(rating)}
+  </span>
+);
 
 // ─── Tooltip ─────────────────────────────────────────────────────
 interface TooltipProps {
@@ -331,7 +278,7 @@ const PoolTooltip: FC<TooltipProps> = ({ item, slide, cagrRating, x, y }) => {
                   : `decline · ${cagrRating.arrows}/3`}
             </div>
           </div>
-          <CagrArrowsHTML rating={cagrRating} size={14} />
+          <CagrArrowsHTML rating={cagrRating} />
         </div>
       </div>
 
@@ -751,7 +698,7 @@ const ProfitPoolExplorer: FC = () => {
                 {slideCagrRating.label}
               </div>
             </div>
-            <CagrArrowsHTML rating={slideCagrRating} size={14} />
+            <CagrArrowsHTML rating={slideCagrRating} />
           </div>
         </div>
 
