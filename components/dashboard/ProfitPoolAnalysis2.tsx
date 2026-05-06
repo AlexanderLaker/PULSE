@@ -43,6 +43,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
   Sparkles, Info, Database,
+  TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -121,6 +122,21 @@ const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: Lu
   force:  { label: 'Force',       description: 'Force decomposition at the selected year',       Icon: Zap },
   vc:     { label: 'Value Chain', description: 'Value-chain decomposition at the selected year', Icon: Layers },
   region: { label: 'Region',      description: 'Regional decomposition at the selected year',    Icon: Globe2 },
+};
+
+// ─── Impact filter ───────────────────────────────────────────────
+// Subdivides the matrix into the expansion-only / contraction-only
+// portion of each cell. Implementation re-uses the same per-trend
+// contribution math the row-detail panel already runs (gp1_shift ×
+// exposure/5), then sums by sign per category and applies the
+// resulting fraction to the backend-computed cells. Total is the
+// default (no transformation — backend MC numbers as-is).
+type ImpactFilter = 'total' | 'expansion' | 'contraction';
+
+const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
+  total:       { label: 'Total',       description: 'All trend impacts — net of expansion and contraction',  Icon: Activity },
+  expansion:   { label: 'Expansion',   description: 'Positive trend impacts only — upside share of each cell', Icon: TrendingUp },
+  contraction: { label: 'Contraction', description: 'Negative trend impacts only — downside share of each cell', Icon: TrendingDown },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -833,6 +849,7 @@ const ProfitPoolAnalysis2: FC = () => {
   } = usePrism();
 
   const [view, setView] = useState<ViewMode>('time');
+  const [impactFilter, setImpactFilter] = useState<ImpactFilter>('total');
   const [selectedYear, setSelectedYear] = useState<number>(YEARS[YEARS.length - 1]!);
 
   // ── Drill-down state ─────────────────────────────────────────────
@@ -865,6 +882,55 @@ const ProfitPoolAnalysis2: FC = () => {
   // backend and are superseded by the frontend weighted-avg computation.
   // Row totals remain the MC median per (cat, year) so they reconcile
   // cell-by-cell with the Time Path view.
+  // ── Per-category expansion / contraction fractions ─────────────
+  // For each category c:
+  //   rawPos_c = Σ(gp1_shift × exposure/5) over trends touching c, where >0
+  //   rawNeg_c = Σ(gp1_shift × exposure/5) over trends touching c, where <0
+  //   rawTotal_c = rawPos_c + rawNeg_c
+  //   expansionFrac_c   = rawPos_c / rawTotal_c
+  //   contractionFrac_c = rawNeg_c / rawTotal_c
+  // Sum to 1 by construction (when rawTotal ≠ 0). Multiplying every
+  // backend cell, row total, and col total by this fraction yields
+  // the expansion-only / contraction-only matrix while preserving
+  // the cell-shape the backend produced. Year-independent because
+  // gp1_shift × exposure scales the year-shape proportionally.
+  const impactFractions = useMemo(() => {
+    const out: Record<string, { expansion: number; contraction: number }> = {};
+    CATEGORIES.forEach((cat) => {
+      const cidName = cat.name;
+      const cidSnake = cat.id;
+      let rawPos = 0;
+      let rawNeg = 0;
+      (trends ?? []).forEach((t) => {
+        const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
+        const exp = exposureRaw[cidName] ?? exposureRaw[cidSnake] ?? 0;
+        if (!(exp > 0)) return;
+        const gp1 = (t as { gp1_shift?: number; normalized_score?: number }).gp1_shift
+          ?? t.normalized_score
+          ?? 0;
+        const contrib = gp1 * (Math.max(0, Math.min(5, exp)) / 5);
+        if (contrib > 0) rawPos += contrib;
+        else if (contrib < 0) rawNeg += contrib;
+      });
+      const rawTotal = rawPos + rawNeg;
+      if (Math.abs(rawTotal) < 1e-9) {
+        // Edge: positives exactly cancel negatives, or no trends touch
+        // the category. Fall back to magnitude shares so the filter is
+        // still meaningful.
+        const mag = rawPos + Math.abs(rawNeg);
+        const eFrac = mag > 1e-9 ? rawPos / mag : 0;
+        const cFrac = mag > 1e-9 ? -Math.abs(rawNeg) / mag : 0;
+        out[cidName] = { expansion: eFrac, contraction: cFrac };
+      } else {
+        out[cidName] = {
+          expansion:   rawPos / rawTotal,
+          contraction: rawNeg / rawTotal,
+        };
+      }
+    });
+    return out;
+  }, [trends]);
+
   const matrixData = useMemo(() => {
     const rows = CATEGORIES.map((c) => ({
       id: c.name,
@@ -1004,7 +1070,78 @@ const ProfitPoolAnalysis2: FC = () => {
     return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
   }, [view, simulation, selectedYear, config]);
 
-  // ── Category Detail Panel data ─────────────────────────────────
+  // ── Apply impact filter to the matrix ──────────────────────────
+  // Multiplies every cell, row total, and col total by the chosen
+  // category-level fraction. Total → identity (backend numbers as-is).
+  // Expansion → backend × expansionFrac. Contraction → backend × contractionFrac.
+  // Cell-detail percentile bands are dropped in non-Total mode because
+  // they're MC artifacts of the unfiltered distribution and don't
+  // translate cleanly to a sign-filtered view.
+  const filteredMatrix = useMemo(() => {
+    if (impactFilter === 'total') return matrixData;
+    const fracKey = impactFilter; // 'expansion' | 'contraction'
+    const fracFor = (rowId: string): number => {
+      const f = impactFractions[rowId];
+      if (!f) return 1;
+      return f[fracKey];
+    };
+    const scaled = (v: number | null | undefined, frac: number): number | null => {
+      if (v == null || !isFinite(v)) return null;
+      return v * frac;
+    };
+
+    const newData: Record<string, Record<string, number | null>> = {};
+    matrixData.rows.forEach((r) => {
+      const frac = fracFor(r.id);
+      const rowSrc = matrixData.data[r.id] ?? {};
+      newData[r.id] = {};
+      Object.keys(rowSrc).forEach((k) => {
+        newData[r.id][k] = scaled(rowSrc[k], frac);
+      });
+    });
+
+    const newRowTotals: Record<string, number | null> | undefined =
+      matrixData.rowTotals
+        ? Object.fromEntries(
+            matrixData.rows.map((r) => [r.id, scaled(matrixData.rowTotals![r.id], fracFor(r.id))]),
+          )
+        : undefined;
+
+    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    const catWeightFor = (catName: string, fallbackId: string): number => {
+      if (!catWeightsRaw) return 1;
+      const byName = catWeightsRaw[catName];
+      if (typeof byName === 'number' && isFinite(byName)) return byName;
+      const byId = catWeightsRaw[fallbackId];
+      if (typeof byId === 'number' && isFinite(byId)) return byId;
+      return 0;
+    };
+    const rowWeights = matrixData.rows.map((r) => catWeightFor(r.id, r.fallbackId));
+    const newColTotals: Record<string, number | null> = {};
+    Object.keys(matrixData.colTotals ?? {}).forEach((k) => {
+      const vals = matrixData.rows.map((r) => newData[r.id]![k] ?? null);
+      newColTotals[k] = weightedAvg(vals, rowWeights);
+    });
+
+    let newGrand: number | null = null;
+    if (newRowTotals) {
+      const vals = matrixData.rows.map((r) => newRowTotals[r.id] ?? null);
+      newGrand = weightedAvg(vals, rowWeights);
+    } else {
+      newGrand = matrixData.grandTotal ?? null;
+    }
+
+    return {
+      ...matrixData,
+      data: newData,
+      rowTotals: newRowTotals,
+      colTotals: newColTotals,
+      grandTotal: newGrand,
+      cellDetails: undefined as typeof matrixData.cellDetails,
+    };
+  }, [matrixData, impactFilter, impactFractions, config]);
+
+    // ── Category Detail Panel data ─────────────────────────────────
   // Rebuilds only when the underlying simulation / trends / selected year
   // changes. Category keys follow the display-name convention
   // ("Hair: Color") to match `simulation.shifts` and the row.id used in the
@@ -1328,6 +1465,31 @@ const ProfitPoolAnalysis2: FC = () => {
           </div>
         </section>
 
+        {/* ── Impact filter (Total / Expansion / Contraction) ─────
+            Subdivides the matrix into the upside-only or downside-only
+            portion of each cell. Total is the unfiltered backend view. */}
+        <section className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => (
+              <PillButton
+                key={f}
+                active={impactFilter === f}
+                onClick={() => setImpactFilter(f)}
+                icon={IMPACT_META[f].Icon}
+              >
+                {IMPACT_META[f].label}
+              </PillButton>
+            ))}
+          </div>
+          <div
+            className="flex items-center gap-2 text-[12px]"
+            style={{ color: S.mutedText }}
+          >
+            <Info size={14} style={{ color: S.primary }} />
+            <span>{IMPACT_META[impactFilter].description}</span>
+          </div>
+        </section>
+
         {/* ── Year selector (lens views only) ───────────────────── */}
         {view !== 'time' && (
           <section className="mb-6">
@@ -1474,25 +1636,25 @@ const ProfitPoolAnalysis2: FC = () => {
             })()
           ) : (
             <Matrix
-              columns={matrixData.columns}
-              rows={matrixData.rows}
-              data={matrixData.data}
+              columns={filteredMatrix.columns}
+              rows={filteredMatrix.rows}
+              data={filteredMatrix.data}
               subtitle={
                 view === 'time'
-                  ? `${meta.label} · ${meta.description}`
-                  : `${meta.label} · ${selectedYear} · ${meta.description}`
+                  ? `${meta.label} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label} only` : ''}`
+                  : `${meta.label} · ${selectedYear} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label} only` : ''}`
               }
               emptyMessage={
                 view === 'time'
                   ? 'Simulation result contains no shift data for these years.'
                   : 'No decomposition data for this year. Re-run the simulation on the v2.5+ engine.'
               }
-              rowTotals={matrixData.showRowTotals ? matrixData.rowTotals : undefined}
-              colTotals={matrixData.colTotals}
-              grandTotal={matrixData.grandTotal}
-              showTotals={matrixData.showTotals}
+              rowTotals={filteredMatrix.showRowTotals ? filteredMatrix.rowTotals : undefined}
+              colTotals={filteredMatrix.colTotals}
+              grandTotal={filteredMatrix.grandTotal}
+              showTotals={filteredMatrix.showTotals}
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
-              cellDetails={matrixData.cellDetails}
+              cellDetails={filteredMatrix.cellDetails}
               onRowClick={setSelectedCategoryId}
             />
           )}
