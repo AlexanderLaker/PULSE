@@ -1078,7 +1078,10 @@ const ProfitPoolAnalysis2: FC = () => {
   // they're MC artifacts of the unfiltered distribution and don't
   // translate cleanly to a sign-filtered view.
   const filteredMatrix = useMemo(() => {
-    if (impactFilter === 'total') return matrixData;
+    // Restricted to the Time Path lens. Force / VC / Region views
+    // would require per-trend × per-axis attribution we don't have at
+    // the frontend, so we deliberately bypass the filter there.
+    if (impactFilter === 'total' || view !== 'time') return matrixData;
     const fracKey = impactFilter; // 'expansion' | 'contraction'
     const fracFor = (rowId: string): number => {
       const f = impactFractions[rowId];
@@ -1139,7 +1142,7 @@ const ProfitPoolAnalysis2: FC = () => {
       grandTotal: newGrand,
       cellDetails: undefined as typeof matrixData.cellDetails,
     };
-  }, [matrixData, impactFilter, impactFractions, config]);
+  }, [matrixData, impactFilter, impactFractions, config, view]);
 
     // ── Category Detail Panel data ─────────────────────────────────
   // Rebuilds only when the underlying simulation / trends / selected year
@@ -1467,7 +1470,12 @@ const ProfitPoolAnalysis2: FC = () => {
 
         {/* ── Impact filter (Total / Expansion / Contraction) ─────
             Subdivides the matrix into the upside-only or downside-only
-            portion of each cell. Total is the unfiltered backend view. */}
+            portion of each cell. Restricted to the Time Path lens — the
+            per-trend × per-axis attribution required for clean
+            sign-filtering of Force / VC / Region cells doesn't exist at
+            the frontend, so we hide the toggle on those views. State is
+            preserved so returning to Time Path keeps the prior choice. */}
+        {view === 'time' && (
         <section className="mb-6 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex flex-wrap gap-2">
             {(Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => (
@@ -1489,6 +1497,7 @@ const ProfitPoolAnalysis2: FC = () => {
             <span>{IMPACT_META[impactFilter].description}</span>
           </div>
         </section>
+        )}
 
         {/* ── Year selector (lens views only) ───────────────────── */}
         {view !== 'time' && (
@@ -1642,7 +1651,7 @@ const ProfitPoolAnalysis2: FC = () => {
               subtitle={
                 view === 'time'
                   ? `${meta.label} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label} only` : ''}`
-                  : `${meta.label} · ${selectedYear} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label} only` : ''}`
+                  : `${meta.label} · ${selectedYear} · ${meta.description}`
               }
               emptyMessage={
                 view === 'time'
