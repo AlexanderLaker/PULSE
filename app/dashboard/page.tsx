@@ -54,6 +54,10 @@ interface TabDef {
   adminOnly?: boolean;
   /** Render in a muted gray to signal "(Beta)" status. */
   beta?: boolean;
+  /** Excluded from the top nav. Kept in TABS so the component, type, and
+   *  render branch remain wired — useful for keeping a working backup
+   *  page out of sight without deleting the code. */
+  hidden?: boolean;
 }
 
 const TABS: TabDef[] = [
@@ -61,7 +65,7 @@ const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
-  { id: 'profit-pool-2-backup',  label: 'Profit Pool Shift Analysis (Backup)' },
+  { id: 'profit-pool-2-backup',  label: 'Profit Pool Shift Analysis (Backup)', hidden: true },
   // Beta views — pinned to the right side of the top nav, in muted gray.
   { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',  beta: true },
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
@@ -165,7 +169,7 @@ export default function DashboardPage() {
 
   const isAdmin = role === 'admin';
   // All tabs visible to all users; the `adminOnly` flag is no longer used.
-  const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && !t.hidden);
   // Split for layout: production tabs anchor to the brand on the left,
   // Beta tabs are pinned to the right of the nav next to the Settings icon.
   const mainTabs = visibleTabs.filter((t) => !t.beta);
