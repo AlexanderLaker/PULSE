@@ -134,9 +134,9 @@ const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: Lu
 type ImpactFilter = 'total' | 'expansion' | 'contraction';
 
 const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
-  total:       { label: 'Total',       description: 'All trend impacts — net of expansion and contraction',  Icon: Activity },
-  expansion:   { label: 'Expansion',   description: 'Positive trend impacts only — upside share of each cell', Icon: TrendingUp },
-  contraction: { label: 'Contraction', description: 'Negative trend impacts only — downside share of each cell', Icon: TrendingDown },
+  total:       { label: 'Total',          description: 'Net shift — positive and negative trend impacts combined.', Icon: Activity },
+  expansion:   { label: 'Upside Share',   description: 'Portion of each year\'s net shift attributable to positive-impact trends. Year-shape inherits from the net simulation; not equivalent to a positive-only re-run.', Icon: TrendingUp },
+  contraction: { label: 'Downside Share', description: 'Portion of each year\'s net shift attributable to negative-impact trends. Year-shape inherits from the net simulation; not equivalent to a negative-only re-run.', Icon: TrendingDown },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -1650,7 +1650,7 @@ const ProfitPoolAnalysis2: FC = () => {
               data={filteredMatrix.data}
               subtitle={
                 view === 'time'
-                  ? `${meta.label} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label} only` : ''}`
+                  ? `${meta.label} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label}` : ''}`
                   : `${meta.label} · ${selectedYear} · ${meta.description}`
               }
               emptyMessage={
