@@ -30,6 +30,7 @@ import { useEffect, useState } from 'react';
 import { LogOut, Settings } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
+import ProfitPoolAnalysis2Backup from '@/components/dashboard/ProfitPoolAnalysis2Backup';
 import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
@@ -41,6 +42,7 @@ import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 
 type DashboardTab =
   | 'profit-pool-2'
+  | 'profit-pool-2-backup'
   | 'trends-2'
   | 'consumer-journey-2'
   | 'innovation-explorer-3'
@@ -59,6 +61,7 @@ const TABS: TabDef[] = [
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
+  { id: 'profit-pool-2-backup',  label: 'Profit Pool Shift Analysis (Backup)' },
   // Beta views — pinned to the right side of the top nav, in muted gray.
   { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',  beta: true },
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
@@ -319,6 +322,7 @@ export default function DashboardPage() {
       <div className="relative">
         <ErrorBoundary>
           {activeTab === 'profit-pool-2' && <ProfitPoolAnalysis2 />}
+          {activeTab === 'profit-pool-2-backup' && <ProfitPoolAnalysis2Backup />}
           {activeTab === 'trends-2' && <Trends2 />}
           {activeTab === 'consumer-journey-2' && (
             <ConsumerJourney2
