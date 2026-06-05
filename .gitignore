@@ -36,3 +36,8 @@ DEPLOY_TOKEN_HIER_EINFUEGEN.txt
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Handover-Cleanup 2026-06-05
+.claude/worktrees/
+pulse_server.log
+*.tsbuildinfo

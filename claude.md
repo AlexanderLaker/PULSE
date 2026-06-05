@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.2
+## Project Specification & Architecture — v3.3
 
 ---
 
@@ -11,6 +11,31 @@ PRISM is an **AI-augmented profit pool simulation engine** that transforms a sta
 
 ### The Core Innovation
 PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2036, 11-year horizon). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+
+### What Changed in v3.3 (vs. v3.2) — Strategic Trend Review, April 2026
+
+v3.3 is a content release following a deep MECE-coverage review of the trend database with a 20-analyst strategic team (Bain / McKinsey / BCG / L'Oréal / P&G / Unilever / Henkel / Statista / Euromonitor / Circana):
+
+1. **14 new trends** filling structurally under-covered gap areas:
+   - *Demographics:* `consumer_r25` (Birth-rate collapse / household atomisation), `consumer_r26` (Gen Alpha category entry)
+   - *Regulatory:* `government_r13` (MoCRA + US state cosmetics regulation — compliance cliff)
+   - *Retailer vertical integration:* `competitive_r13` (Walmart / Costco / Aldi vertical manufacturing)
+   - *Emerging-market category shift:* `consumer_r27` (HDW → ADW conversion in HG markets)
+   - *LHC premium pools:* `consumer_r28` (Laundry scent boosters structural premium), `consumer_r29` (Delicates / performance-fabric wash revival)
+   - *Channel disruption:* `customer_r10` (Chinese live-commerce / Douyin exports), `customer_r11` (Retailer loyalty program cannibalisation of trade spend)
+   - *R&D / IoT:* `technology_r17` (Neurocosmetics & sensory science), `technology_r18` (Bathroom & laundry-room IoT)
+   - *Longevity split:* `consumer_r30` (Longevity economy — LHC / home-hygiene dimension)
+   - *Cohort fluency:* `consumer_r31` (Cleaning-fluency generational decline)
+   - *DTC hair-care:* `consumer_r32` (Beauty-as-medicine / tele-derm DTC)
+2. **8 re-scorings** (upgrades where April 2026 market data corroborated a stronger signal; downgrades where double-counting was corrected):
+   - *Upgrades:* `competitive_r05` prob 3→4, gp1 0.04→0.06 (US/EU PL accelerating); `technology_r10` peak 2029→2028, curve s-curve→front-loaded, gp1 0.06→0.08 (Gen-AI creative commoditisation faster than modelled); `customer_r08` gp1 0.18→0.20 (US retail-media extraction surpassing projections); `government_r07` gp1 0.03→0.05 (EU DPP mandate extension)
+   - *Downgrades / double-count corrections:* `consumer_r04` 0.10→0.08; `consumer_r09` 0.12→0.10 (split with new consumer_r28); `consumer_r13` 0.07→0.05 (refill realism reset)
+3. **1 consolidation** — `technology_r09` (generic ML-formulation) retired; fully superseded by `technology_r13` (hyper-personalised formulation) which captures the same vector at higher resolution and with stronger consumer-facing mechanism.
+4. **Force-distribution rebalanced:** Consumer 31 / Technology 17 / Government 13 / Competitive 13 / Environmental 11 / Customer 10. Customer force now at 11% (up from 10%) addressing the review's under-weighting flag.
+5. **Direction split:** 50 Contraction / 45 Expansion (95 active) — preserves the honest bear-bias of the v3.1 base rather than forcing parity.
+6. **MODEL_VERSION bumped to 2.6.0** to reflect the expanded trend base.
+
+No architectural or schema changes in v3.3. Re-simulation required to rebuild the Shift Matrix against the expanded prior set.
 
 ### What Changed in v3.2 (vs. v3.1) — Dead-Code Cleanup, April 2026
 
@@ -864,7 +889,7 @@ PROFIT_POOL_ENGINE/
 │   ├── database.py                    # Dual-mode DB (Postgres/SQLite)
 │   ├── env_loader.py                  # Environment variable loading
 │   ├── backup.py                      # Database backup utilities
-│   ├── seed_trends.py                 # 99 trend definitions (v3.5 — v3.3 base + Gemini additions)
+│   ├── seed_trends.py                 # 82 trend definitions (v3.1 Bain review)
 │   │
 │   ├── simulation/
 │   │   ├── bayesian_mc.py             # Bayesian MC with copulas (PRODUCTION)
