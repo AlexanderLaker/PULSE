@@ -1,5 +1,6 @@
 /**
- * Clerk middleware.
+ * Clerk proxy (Next.js 16: ehemals middleware.ts — siehe
+ * https://nextjs.org/docs/messages/middleware-to-proxy).
  *
  * Runs on every request (except static assets). Authenticates the session
  * cookie and redirects unauthenticated users to /sign-in when they hit a

@@ -31,19 +31,20 @@ export const dynamic = 'force-dynamic';
  *  (Vercel rewrites /api/v1/* to the Python function). Locally it falls
  *  back to BACKEND_URL (typically http://localhost:8000) so developers
  *  can run FastAPI on a different port during npm run dev. */
-function resolveBackendUrl(path: string): string {
+async function resolveBackendUrl(path: string): Promise<string> {
   const override = process.env.BACKEND_URL;
   if (override) return `${override.replace(/\/$/, '')}${path}`;
   // Same-origin — rely on Vercel's rewrite from /api/v1/* → api/index.py.
-  const host = headers().get('host') ?? 'localhost:3000';
-  const proto = headers().get('x-forwarded-proto') ?? 'http';
+  const hdrs = await headers();
+  const host = hdrs.get('host') ?? 'localhost:3000';
+  const proto = hdrs.get('x-forwarded-proto') ?? 'http';
   return `${proto}://${host}${path}`;
 }
 
 export async function GET() {
   try {
     const me = await requireAuth();
-    const backendUrl = resolveBackendUrl('/api/v1/config');
+    const backendUrl = await resolveBackendUrl('/api/v1/config');
     // GET /api/v1/config is public on the Python side, but we still send
     // a bearer token so the backend's access log attributes the read to
     // the right user when it's later tightened.
@@ -101,7 +102,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    const backendUrl = resolveBackendUrl('/api/v1/config');
+    const backendUrl = await resolveBackendUrl('/api/v1/config');
     const res = await fetch(backendUrl, {
       method: 'PUT',
       headers: {
