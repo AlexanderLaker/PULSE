@@ -127,10 +127,10 @@ asyncio.run(generate_narrative())
 
 ```python
 import asyncio
-from pulse.ai import PrismChat, ChatContext
+from pulse.ai import PulseChat, ChatContext
 
 async def chat():
-    chat = PrismChat()
+    chat = PulseChat()
 
     # Set context
     context = ChatContext(
@@ -248,9 +248,9 @@ async def create_executive_briefing():
 
 ```python
 async def interactive_analysis():
-    from pulse.ai import PrismChat
+    from pulse.ai import PulseChat
 
-    chat = PrismChat()
+    chat = PulseChat()
 
     # Questions to ask in sequence
     questions = [
@@ -269,7 +269,7 @@ async def interactive_analysis():
 
 ```python
 async def full_analysis_pipeline():
-    from pulse.ai import TrendScanner, ScoreCalibrator, ScenarioNarrator, PrismChat
+    from pulse.ai import TrendScanner, ScoreCalibrator, ScenarioNarrator, PulseChat
 
     # Step 1: Scan for new trends
     scanner = TrendScanner()
@@ -289,7 +289,7 @@ async def full_analysis_pipeline():
     print(f"Executive summary:\n{narrative}")
 
     # Step 4: Answer strategic questions
-    chat = PrismChat()
+    chat = PulseChat()
     chat.set_context(build_chat_context())
     strategic_question = "What's our allocation recommendation?"
     recommendation = await chat.ask(strategic_question)
@@ -354,7 +354,7 @@ narrator.generate_executive_summary()  # 2-3 paragraph brief
 narrator.generate_force_briefing()   # Single force analysis
 ```
 
-### PrismChat
+### PulseChat
 ```python
 chat.ask()                          # Single question
 chat.ask_multi_turn()              # Multiple questions

@@ -110,6 +110,10 @@ Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
 
 ## Further documentation
 
-Start with `CLAUDE.md` (developer handbook) and `DOCUMENTATION/` (methodology,
-module references, audit reports). The 2026-06 handover audit incl. refactoring
-roadmap: `PRISM_Handover_Audit_2026-06-05.md`.
+Start with `CLAUDE.md` (developer handbook) and `DOCUMENTATION/` — see
+`DOCUMENTATION/INDEX.md` for a table of contents. The 2026-06 handover audit
+incl. refactoring roadmap: `PRISM_Handover_Audit_2026-06-05.md`.
+
+Strategy decks, management reports and historical audits are NOT part of this
+repository — they live in the `_ARCHIVE/` folder next to the repo (git-ignored,
+see `_ARCHIVE/INDEX.md`).

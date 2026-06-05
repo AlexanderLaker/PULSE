@@ -41,3 +41,6 @@ DEPLOY_TOKEN_HIER_EINFUEGEN.txt
 .claude/worktrees/
 pulse_server.log
 *.tsbuildinfo
+
+# Nicht-App-Dateien (Decks, Reports, Audits) — nur lokal/OneDrive
+_ARCHIVE/
