@@ -1556,6 +1556,9 @@ const ProductPill: FC<{ entry: ProductEntry; direction: 'expansion' | 'contracti
           fontFamily: BODY_FONT,
           flex: 1,
           minWidth: 0,
+          // Lange Einzeltokens (z. B. "(concentrated)") dürfen die Pill nie
+          // sprengen — bricht nur, wenn ein Wort breiter als die Box ist.
+          overflowWrap: 'break-word',
         }}
       >
         {entry.name}
