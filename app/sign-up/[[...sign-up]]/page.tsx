@@ -24,6 +24,7 @@
  */
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
 
@@ -350,13 +351,13 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
         style={{ color: S.onSurfaceVariant }}
       >
         Already have an account?{' '}
-        <a
+        <Link
           href="/sign-in"
           className="font-semibold underline"
           style={{ color: S.primary }}
         >
           Sign in
-        </a>
+        </Link>
       </div>
     </form>
   );

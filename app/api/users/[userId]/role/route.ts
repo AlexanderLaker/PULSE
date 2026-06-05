@@ -29,13 +29,13 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 interface Params {
-  params: { userId: string };
+  params: Promise<{ userId: string }>;
 }
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const admin = await requireAdmin();
-    const targetUserId = params.userId;
+    const { userId: targetUserId } = await params;
 
     if (!targetUserId) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
