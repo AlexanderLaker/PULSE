@@ -192,8 +192,8 @@ const TierBadge: FC<{ level: Innovation['tierLevel'] }> = ({ level }) => {
     <span
       className="inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[10px] font-bold uppercase tracking-wide"
       style={{
-        backgroundColor: '#fde68a',
-        color: '#92400e',
+        backgroundColor: S.primaryContainer,
+        color: S.onPrimaryContainer,
       }}
     >
       <Star size={10} strokeWidth={2.5} /> Tier 1
@@ -549,10 +549,16 @@ const InnovationExplorer3: FC<InnovationExplorer3Props> = ({
           {/* Rows */}
           <div>
             {sorted.length === 0 && (
-              <EmptyRow
-                text="No innovations match the current filter."
-                icon={<Sparkles size={20} />}
-              />
+              <div className="flex flex-col items-center">
+                <EmptyRow text="No innovations match the current filter." icon={<Sparkles size={20} />} />
+                {(search !== '' || activeCategory !== 'all') && (
+                  <button type="button" onClick={() => { setSearch(''); setActiveCategory('all'); }}
+                    className="mb-8 px-4 py-2 rounded-full text-[12px] font-semibold"
+                    style={{ backgroundColor: S.surfaceLow, color: S.primary, border: 'none', cursor: 'pointer' }}>
+                    Clear filters
+                  </button>
+                )}
+              </div>
             )}
             {sorted.map((innovation, idx) => (
               <InnovationRow

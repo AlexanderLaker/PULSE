@@ -1,325 +1,71 @@
 /**
- * LoadingSkeleton — Shimmer loading skeletons matching Apple design
- * Light mode, subtle animations
+ * LoadingSkeleton — shimmer placeholder shown while Clerk hydrates.
+ *
+ * June 2026: rewritten to sketch the ACTUAL shell (top nav + editorial
+ * header + headline tiles + matrix card) in the maritime palette. The
+ * previous version mimicked the decommissioned v1 dashboard (KPI band /
+ * timeline / waterfall) in the old Apple palette.
  */
 
-import { motion } from 'framer-motion';
 import React from 'react';
 
-/**
- * Shimmer gradient animation
- */
-const shimmerGradient = 'linear-gradient(90deg, #FFFFFF 0%, #F5F5F7 50%, #FFFFFF 100%)';
-
-interface SkeletonBaseProps {
-  width?: string | number;
-  height?: string | number;
-  borderRadius?: string | number;
-  delay?: number;
-}
+const shimmer = 'linear-gradient(90deg, #eff4ff 0%, #dce9ff 50%, #eff4ff 100%)';
 
 function SkeletonBase({
-  width = '100%',
-  height = 16,
-  borderRadius = 8,
-  delay = 0
-}: SkeletonBaseProps) {
-  const skeletonStyle: React.CSSProperties = {
-    width,
-    height,
-    borderRadius,
-    background: shimmerGradient,
-    backgroundSize: '200% 100%',
-    animation: 'shimmer 1.5s infinite',
-  };
-
+  width = '100%', height = 16, borderRadius = 8,
+}: { width?: string | number; height?: string | number; borderRadius?: string | number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0.5 }}
-      animate={{ opacity: 1 }}
-      transition={{
-        duration: 1.5,
-        delay,
-        repeat: Infinity,
-        repeatType: 'reverse',
-        ease: 'easeInOut',
-      }}
-      style={skeletonStyle}
-    />
+    <div style={{ width, height, borderRadius, background: shimmer,
+      backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite linear' }} />
   );
 }
 
-/**
- * KPI Card Skeleton
- */
-export function KPICardSkeleton() {
-  const cardStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-    padding: 18,
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-    backgroundColor: '#F5F5F7',
-  };
-
+/** Full-page skeleton mirroring the live shell: nav, header, matrix card. */
+export function FullPageSkeleton() {
   return (
-    <div style={cardStyle}>
-      <SkeletonBase width={28} height={28} borderRadius={8} />
-      <SkeletonBase width="80%" height={10} />
-      <SkeletonBase width="60%" height={28} />
-      <SkeletonBase width="90%" height={10} />
-    </div>
-  );
-}
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9ff' }}>
+      <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+      {/* Top nav */}
+      <div style={{ height: 64, backgroundColor: 'rgba(255,255,255,0.75)', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          <SkeletonBase width={96} height={24} borderRadius={6} />
+          <div style={{ display: 'flex', gap: 24 }}>
+            <SkeletonBase width={64} height={14} />
+            <SkeletonBase width={120} height={14} />
+            <SkeletonBase width={170} height={14} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SkeletonBase width={160} height={14} />
+          <SkeletonBase width={88} height={30} borderRadius={999} />
+        </div>
+      </div>
 
-/**
- * Headline KPI Skeleton (4 cards)
- */
-export function HeadlineKPISkeleton() {
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 16,
-  };
+      {/* Editorial header + headline tiles + matrix card */}
+      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '40px 32px' }}>
+        <div style={{ borderLeft: '4px solid #d6e3ff', paddingLeft: 20, marginBottom: 32 }}>
+          <SkeletonBase width={220} height={11} />
+          <div style={{ height: 12 }} />
+          <SkeletonBase width={420} height={36} borderRadius={10} />
+          <div style={{ height: 12 }} />
+          <SkeletonBase width={560} height={14} />
+        </div>
 
-  return (
-    <div style={gridStyle}>
-      {[0, 1, 2, 3].map((i) => (
-        <KPICardSkeleton key={i} />
-      ))}
-    </div>
-  );
-}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 32, flexWrap: 'wrap' }}>
+          <SkeletonBase width={200} height={104} borderRadius={16} />
+          <SkeletonBase width={200} height={104} borderRadius={16} />
+          <SkeletonBase width={200} height={104} borderRadius={16} />
+        </div>
 
-/**
- * Heatmap Cell Skeleton
- */
-function HeatmapCellSkeleton() {
-  return (
-    <SkeletonBase
-      width="100%"
-      height={40}
-      borderRadius={4}
-      delay={Math.random() * 0.3}
-    />
-  );
-}
-
-/**
- * Heatmap Skeleton (grid of cells)
- */
-export function HeatmapSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-  };
-
-  const headerColumnsStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 8,
-    flex: 1,
-  };
-
-  const rowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-  };
-
-  const rowColumnsStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 8,
-    flex: 1,
-  };
-
-  return (
-    <div style={containerStyle}>
-      {/* Header */}
-      <div style={headerStyle}>
-        <SkeletonBase width={120} height={14} />
-        <div style={headerColumnsStyle}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <SkeletonBase key={i} width={60} height={14} />
+        <div style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24,
+          boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+          display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonBase key={i} height={22} borderRadius={6} />
           ))}
         </div>
       </div>
-
-      {/* Rows */}
-      {[0, 1, 2, 3, 4].map((row) => (
-        <div key={row} style={rowStyle}>
-          <SkeletonBase width={100} height={40} />
-          <div style={rowColumnsStyle}>
-            {[0, 1, 2, 3, 4].map((col) => (
-              <HeatmapCellSkeleton key={col} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Path Timeline Skeleton
- */
-export function PathTimelineSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  const legendStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 24,
-  };
-
-  return (
-    <div style={containerStyle}>
-      {/* Title */}
-      <SkeletonBase width={200} height={16} />
-
-      {/* Chart area */}
-      <SkeletonBase width="100%" height={250} borderRadius={8} />
-
-      {/* Legend */}
-      <div style={legendStyle}>
-        {[0, 1, 2, 3].map((i) => (
-          <SkeletonBase key={i} width={80} height={12} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Panel Skeleton
- */
-export function PanelSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  };
-
-  const contentRowStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  };
-
-  return (
-    <div style={containerStyle}>
-      {/* Header */}
-      <div style={headerStyle}>
-        <SkeletonBase width={150} height={18} />
-        <SkeletonBase width={24} height={24} borderRadius={6} />
-      </div>
-
-      {/* Content rows */}
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} style={contentRowStyle}>
-          <SkeletonBase width="70%" height={14} />
-          <SkeletonBase width="100%" height={40} borderRadius={8} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Allocation Chart Skeleton
- */
-export function AllocationSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  return (
-    <div style={containerStyle}>
-      <SkeletonBase width={140} height={14} />
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <SkeletonBase width={60} height={10} borderRadius={4} />
-          <SkeletonBase width="100%" height={6} borderRadius={3} />
-          <SkeletonBase width={32} height={10} borderRadius={4} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Force Waterfall Skeleton
- */
-export function ForceWaterfallSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-    padding: 20,
-    backgroundColor: '#FBFBFD',
-    borderRadius: 12,
-    border: '1px solid rgba(0,0,0,0.06)',
-  };
-
-  return (
-    <div style={containerStyle}>
-      <SkeletonBase width={140} height={14} />
-      <SkeletonBase width="100%" height={220} borderRadius={8} />
-    </div>
-  );
-}
-
-/**
- * Full Page Skeleton
- */
-export function FullPageSkeleton() {
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 24,
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-  };
-
-  return (
-    <div style={containerStyle}>
-      <HeadlineKPISkeleton />
-      <HeatmapSkeleton />
-      <PathTimelineSkeleton />
     </div>
   );
 }

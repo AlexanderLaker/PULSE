@@ -22,13 +22,20 @@
  *   Profit Pool Explorer tab is admin-gated.
  *
  * Tab navigation (constant across all pages):
- *   Profit Pool Shift Analysis | Trends | Consumer Journey | Innovation Explorer
- *   [+ Profit Pool Explorer — admin-only, appended to the right]
+ *   Trends | Consumer Journey | Profit Pool Shift Analysis
+ *   [+ Innovation Explorer / Profit Pool Explorer — Beta, pinned right]
+ *   Below md: a menu button opens the same tab list as a sheet.
+ *
+ * Data (single store): one <PrismProvider> wraps all tabs, so the data
+ * layer loads once and is shared. Tabs are mounted on first visit and
+ * then KEPT MOUNTED (hidden via display:none), so in-view state — lens,
+ * year, filters, open drill-down, scroll — survives tab switches and no
+ * refetch is triggered on switch.
  */
 
 import { useEffect, useState } from 'react';
-import { LogOut, Settings } from 'lucide-react';
-import { useUser, useClerk, useSession } from '@clerk/nextjs';
+import { LogOut, Settings, Menu, X } from 'lucide-react';
+import { useUser, useClerk } from '@clerk/nextjs';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
@@ -38,6 +45,7 @@ import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
+import { PrismProvider } from '@/hooks/usePrism';
 
 type DashboardTab =
   | 'profit-pool-2'
@@ -88,11 +96,17 @@ export default function DashboardPage() {
   // fetch, no race condition against middleware.
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
-  const { session } = useSession();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // ─── Keep-alive tabs ─────────────────────────────────────────────
+  // A tab is mounted the first time it is visited and stays mounted
+  // afterwards (hidden with display:none). In-view state — lens, year,
+  // filters, open drill-down, scroll — survives tab switches.
+  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['profit-pool-2']);
 
   // ─── Profit Pool Explorer mock-up notice ────────────────────────────
   // The Explorer is a visualization mock-up — the underlying data sources
@@ -109,37 +123,44 @@ export default function DashboardPage() {
   const [innovationNoticeOpen, setInnovationNoticeOpen] = useState(false);
 
   // ─── Welcome / MVP onboarding modal ─────────────────────────────────
-  // Shown on every fresh login. We key sessionStorage by the active Clerk
-  // session ID — once dismissed, the same session won't show it again
-  // (so a tab refresh inside an active session stays silent), but a new
-  // sign-in produces a new session ID and the modal re-appears.
+  // Shown ONCE per user (localStorage, keyed by Clerk user id). A repeat
+  // visitor — especially a senior one — shouldn't re-acknowledge the MVP
+  // disclaimer on every sign-in.
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   useEffect(() => {
-    if (!isSignedIn || !session?.id) return;
+    if (!isSignedIn || !user?.id) return;
     if (typeof window === 'undefined') return;
-    const key = `prism.welcomeSeen.${session.id}`;
+    const key = `prism.welcomeSeen.${user.id}`;
     try {
-      if (!window.sessionStorage.getItem(key)) {
+      if (!window.localStorage.getItem(key)) {
         setWelcomeOpen(true);
       }
     } catch {
-      // sessionStorage unavailable (e.g. privacy mode) — show anyway.
+      // localStorage unavailable (e.g. privacy mode) — show anyway.
       setWelcomeOpen(true);
     }
-  }, [isSignedIn, session?.id]);
+  }, [isSignedIn, user?.id]);
 
   const handleWelcomeClose = () => {
     setWelcomeOpen(false);
-    if (typeof window !== 'undefined' && session?.id) {
+    if (typeof window !== 'undefined' && user?.id) {
       try {
-        window.sessionStorage.setItem(
-          `prism.welcomeSeen.${session.id}`,
-          '1',
-        );
+        window.localStorage.setItem(`prism.welcomeSeen.${user.id}`, '1');
       } catch {
         /* noop */
       }
     }
+  };
+
+  // Central tab opener — marks the tab visited (keep-alive), fires the
+  // beta notice on the two Beta tabs (unchanged behaviour), and closes
+  // the mobile sheet.
+  const openTab = (id: DashboardTab) => {
+    setActiveTab(id);
+    setVisitedTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    if (id === 'profit-pool-explorer') setExplorerNoticeOpen(true);
+    if (id === 'innovation-explorer-3') setInnovationNoticeOpen(true);
+    setMobileNavOpen(false);
   };
 
   // Authorization — same pattern as SettingsModal.tsx. 'unknown' until fetched;
@@ -216,15 +237,7 @@ export default function DashboardPage() {
     return (
       <button
         key={tab.id}
-        onClick={() => {
-          setActiveTab(tab.id);
-          if (tab.id === 'profit-pool-explorer') {
-            setExplorerNoticeOpen(true);
-          }
-          if (tab.id === 'innovation-explorer-3') {
-            setInnovationNoticeOpen(true);
-          }
-        }}
+        onClick={() => openTab(tab.id)}
         className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
         style={{
           fontFamily: HEADLINE_FONT,
@@ -242,7 +255,36 @@ export default function DashboardPage() {
     );
   };
 
+  // Mobile sheet row — full-width tap target (below md).
+  const renderMobileTabRow = (tab: TabDef) => {
+    const isActive = activeTab === tab.id;
+    const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
+    const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onBg;
+    return (
+      <button
+        key={tab.id}
+        onClick={() => openTab(tab.id)}
+        className="w-full text-left px-6 py-3.5 text-[15px] font-semibold"
+        style={{
+          fontFamily: HEADLINE_FONT,
+          color: isActive ? activeColor : inactiveColor,
+          backgroundColor: isActive ? NAV.surfaceLow : 'transparent',
+        }}
+      >
+        {tab.label}
+      </button>
+    );
+  };
+
+  // Keep-alive wrapper: mounted once visited, hidden when inactive.
+  const tabPane = (id: DashboardTab, node: React.ReactNode) => (
+    <div style={{ display: activeTab === id ? undefined : 'none' }}>
+      {visitedTabs.includes(id) && <ErrorBoundary>{node}</ErrorBoundary>}
+    </div>
+  );
+
   return (
+    <PrismProvider>
     <div className="min-h-screen" style={{ backgroundColor: '#f8f9ff' }}>
       {/* ─── Editorial Top Navigation (constant across all tabs) ─── */}
       <nav
@@ -252,9 +294,20 @@ export default function DashboardPage() {
           boxShadow: '0 32px 64px -15px rgba(0, 52, 94, 0.06)',
         }}
       >
-        <div className="max-w-[1440px] mx-auto px-8 h-16 flex items-center justify-between gap-6">
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-4 md:gap-6">
           {/* Brand + tabs */}
-          <div className="flex items-center gap-8 min-w-0">
+          <div className="flex items-center gap-4 md:gap-8 min-w-0">
+            {/* Mobile menu toggle — the only tab access below md. */}
+            <button
+              onClick={() => setMobileNavOpen((v) => !v)}
+              aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={mobileNavOpen}
+              className="md:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-black/5"
+              style={{ color: NAV.onBg }}
+            >
+              {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+
             <div
               className="text-2xl font-extrabold tracking-tighter uppercase"
               style={{ fontFamily: HEADLINE_FONT, color: NAV.onBg }}
@@ -293,9 +346,6 @@ export default function DashboardPage() {
               style={{ color: NAV.onBg }}
             >
               <span className="text-xs font-semibold">{userEmail}</span>
-              <span className="text-[11px]" style={{ color: NAV.onSurfaceVariant }}>
-                Connected
-              </span>
             </div>
 
             <button
@@ -315,30 +365,54 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* ── Mobile nav sheet (below md) ─────────────────────────── */}
+        {mobileNavOpen && (
+          <div
+            className="md:hidden border-t"
+            style={{
+              backgroundColor: '#ffffff',
+              borderColor: 'rgba(0, 52, 94, 0.10)',
+              boxShadow: '0 24px 48px -12px rgba(0, 52, 94, 0.18)',
+            }}
+          >
+            {mainTabs.map((tab) => renderMobileTabRow(tab))}
+            {betaTabs.length > 0 && (
+              <>
+                <div
+                  className="px-6 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+                  style={{ color: NAV.betaInactive, fontFamily: HEADLINE_FONT }}
+                >
+                  Beta
+                </div>
+                {betaTabs.map((tab) => renderMobileTabRow(tab))}
+              </>
+            )}
+            <div className="h-2" />
+          </div>
+        )}
       </nav>
 
-      {/* ─── Main Content — Tab-Switched ─────────────────────────── */}
+      {/* ─── Main Content — keep-alive panes ──────────────────────
+          Every visited tab stays mounted; only the active one is
+          displayed. Switching back is instant and stateful. */}
       <div className="relative">
-        <ErrorBoundary>
-          {activeTab === 'profit-pool-2' && <ProfitPoolAnalysis2 />}
-          {activeTab === 'trends-2' && <Trends2 />}
-          {activeTab === 'consumer-journey-2' && (
-            <ConsumerJourney2
-              onNavigateProfitPoolShiftModel={() => setActiveTab('profit-pool-2')}
-              onNavigateTrends={() => setActiveTab('trends-2')}
-              onNavigateInnovation={() => setActiveTab('innovation-explorer-3')}
-            />
-          )}
-          {activeTab === 'innovation-explorer-3' && (
-            <InnovationExplorer3
-              onNavigateToTrend={() => setActiveTab('trends-2')}
-              onNavigateToConsumerJourney={() => setActiveTab('consumer-journey-2')}
-            />
-          )}
-          {activeTab === 'profit-pool-explorer' && (
-            <ProfitPoolExplorer />
-          )}
-        </ErrorBoundary>
+        {tabPane('profit-pool-2', <ProfitPoolAnalysis2 isAdmin={isAdmin} />)}
+        {tabPane('trends-2', <Trends2 />)}
+        {tabPane('consumer-journey-2', (
+          <ConsumerJourney2
+            onNavigateProfitPoolShiftModel={() => openTab('profit-pool-2')}
+            onNavigateTrends={() => openTab('trends-2')}
+            onNavigateInnovation={() => openTab('innovation-explorer-3')}
+          />
+        ))}
+        {tabPane('innovation-explorer-3', (
+          <InnovationExplorer3
+            onNavigateToTrend={() => openTab('trends-2')}
+            onNavigateToConsumerJourney={() => openTab('consumer-journey-2')}
+          />
+        ))}
+        {tabPane('profit-pool-explorer', <ProfitPoolExplorer />)}
       </div>
 
       {/* ─── Settings Modal (gear icon in top nav) ─────────────────── */}
@@ -456,5 +530,6 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+    </PrismProvider>
   );
 }

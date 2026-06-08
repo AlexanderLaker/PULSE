@@ -42,7 +42,7 @@ import React, { useMemo, useState, useEffect, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
-  Sparkles, Info, Database,
+  Sparkles, Info, Database, ChevronDown, Eye,
   TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -50,7 +50,7 @@ import usePrism from '@/hooks/usePrism';
 import * as api from '@/api/client';
 import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
 import type {
-  ForceName, Scenario,
+  ForceName,
   PercentileDistribution, ShiftPath,
   DiagnosticsResult,
   Trend,
@@ -221,10 +221,10 @@ function heatFillScaled(v: number | null, scale: number): string {
   const mag = Math.min(Math.abs(v) / s, 1);
   if (v > 0) {
     const a = 0.14 + mag * 0.62;
-    return `rgba(34, 197, 94, ${a.toFixed(2)})`;
+    return `rgba(16, 185, 129, ${a.toFixed(2)})`; // CJ expansion green (#10b981)
   }
   const a = 0.14 + mag * 0.62;
-  return `rgba(239, 68, 68, ${a.toFixed(2)})`;
+  return `rgba(220, 38, 38, ${a.toFixed(2)})`; // CJ contraction red (#dc2626)
 }
 
 function heatTextColorScaled(v: number | null, scale: number): string {
@@ -232,7 +232,7 @@ function heatTextColorScaled(v: number | null, scale: number): string {
   const s = Math.max(scale, 0.005);
   const mag = Math.min(Math.abs(v) / s, 1);
   if (mag > 0.45) return '#ffffff';
-  return v > 0 ? '#14532d' : '#7f1d1d';
+  return v > 0 ? '#064e3b' : '#7f1d1d';
 }
 
 // Default 5% scale for the main grid cells and the bottom-row column totals
@@ -269,7 +269,7 @@ const PillButton: FC<{
   </button>
 );
 
-const ScenarioPill: FC<{
+const YearPill: FC<{
   active: boolean;
   onClick: () => void;
   label: string;
@@ -323,6 +323,10 @@ interface MatrixProps {
       Detail Panel with the fan chart, trigger status, and allocation
       recommendation for that single category. */
   onRowClick?: (rowId: string) => void;
+  /** Render the P10…P90 band under each median (Time Path, Total only). */
+  showRanges?: boolean;
+  /** Shown in the hover tooltip when no per-cell bands exist. */
+  noBandsNote?: string;
 }
 
 const Matrix: FC<MatrixProps> = ({
@@ -331,6 +335,8 @@ const Matrix: FC<MatrixProps> = ({
   rowTotalLabel = 'Total',
   cellDetails,
   onRowClick,
+  showRanges = false,
+  noBandsNote,
 }) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
@@ -511,10 +517,13 @@ const Matrix: FC<MatrixProps> = ({
                       onMouseEnter={onRowClick ? (e) => {
                         e.currentTarget.style.backgroundColor = S.surfaceLow;
                         e.currentTarget.style.color = S.primaryDim;
+                        e.currentTarget.style.textDecoration = 'underline';
+                        e.currentTarget.style.textUnderlineOffset = '3px';
                       } : undefined}
                       onMouseLeave={onRowClick ? (e) => {
                         e.currentTarget.style.backgroundColor = S.surface;
                         e.currentTarget.style.color = S.primary;
+                        e.currentTarget.style.textDecoration = 'none';
                       } : undefined}
                       title={onRowClick ? `Open ${row.label} detail — fan chart and contributing trends` : undefined}
                       role={onRowClick ? 'button' : undefined}
@@ -529,7 +538,7 @@ const Matrix: FC<MatrixProps> = ({
                       {onRowClick ? (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {row.label}
-                          <span aria-hidden style={{ opacity: 0.5, fontSize: 11 }}>›</span>
+                          <span aria-hidden style={{ opacity: 0.85, fontSize: 11 }}>›</span>
                         </span>
                       ) : (
                         row.label
@@ -552,7 +561,29 @@ const Matrix: FC<MatrixProps> = ({
                           onMouseEnter={v != null ? (e) => onCellEnter(e, row.id, col.id, row.label, col.label) : undefined}
                           onMouseLeave={v != null ? onCellLeave : undefined}
                         >
-                          {v == null ? '—' : fmtShift(v, 1)}
+                          {v == null ? '—' : (
+                            <>
+                              {fmtShift(v, 1)}
+                              {showRanges && (() => {
+                                const d = cellDetails?.[row.id]?.[col.id];
+                                if (d?.p10 == null || d?.p90 == null) return null;
+                                return (
+                                  <span
+                                    style={{
+                                      display: 'block',
+                                      fontSize: 9.5,
+                                      fontWeight: 500,
+                                      opacity: 0.78,
+                                      letterSpacing: '-0.01em',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {fmtShift(d.p10, 1)} … {fmtShift(d.p90, 1)}
+                                  </span>
+                                );
+                              })()}
+                            </>
+                          )}
                         </td>
                       );
                     })}
@@ -643,11 +674,11 @@ const Matrix: FC<MatrixProps> = ({
         <div className="flex items-center gap-3">
           <span>−5%</span>
           <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
-            <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.76)' }} />
-            <div style={{ flex: 1, background: 'rgba(239, 68, 68, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(220, 38, 38, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(220, 38, 38, 0.36)' }} />
             <div style={{ flex: 0.2, background: S.surfaceLow }} />
-            <div style={{ flex: 1, background: 'rgba(34, 197, 94, 0.36)' }} />
-            <div style={{ flex: 1, background: 'rgba(34, 197, 94, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.76)' }} />
           </div>
           <span>+5%</span>
         </div>
@@ -748,9 +779,9 @@ const Matrix: FC<MatrixProps> = ({
                 P10 / P90 not available for this cell
               </div>
             )}
-            {!cellDetails && (
+            {!cellDetails && noBandsNote && (
               <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
-                Switch to Time Path for P10 / P90 bands
+                {noBandsNote}
               </div>
             )}
             {/* Pointer arrow */}
@@ -840,12 +871,73 @@ const PeakStressTooltip: FC = () => {
   );
 };
 
+// ─── Run details popover ─────────────────────────────────────────
+// Audit metadata (convergence, seed, git SHA, engine version) stays one
+// click away instead of printing terminal strings into the header.
+interface RunMetaShape {
+  iterations?: number | null;
+  chains?: number | null;
+  converged_categories?: number | null;
+  total_categories?: number | null;
+  seed?: number | null;
+  git_sha?: string | null;
+  model_version?: string | null;
+}
+
+const RunDetailsPopover: FC<{ meta: RunMetaShape }> = ({ meta }) => {
+  const [open, setOpen] = useState(false);
+  const rows: Array<[string, string]> = [];
+  if (meta.iterations != null) {
+    rows.push(['Iterations', `${(meta.iterations / 1000).toFixed(0)}k${meta.chains != null ? ` × ${meta.chains} chains` : ''}`]);
+  }
+  if (meta.converged_categories != null && meta.total_categories != null) {
+    rows.push(['Convergence (R̂ < 1.05)', `${meta.converged_categories}/${meta.total_categories} categories`]);
+  }
+  if (meta.seed != null) rows.push(['Seed', String(meta.seed)]);
+  if (meta.git_sha && meta.git_sha !== 'unknown') rows.push(['Engine build', meta.git_sha]);
+  if (meta.model_version) rows.push(['Model', meta.model_version]);
+  if (rows.length === 0) return null;
+  return (
+    <div className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setOpen(false)}
+        aria-label="Run details — convergence, seed, engine build"
+        aria-expanded={open}
+        className="inline-flex items-center justify-center rounded-full"
+        style={{ width: 24, height: 24, border: 'none', cursor: 'pointer',
+          backgroundColor: S.surfaceLow, color: S.onSurfaceVariant }}
+      >
+        <Info size={12} strokeWidth={2.3} />
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-2 z-30 rounded-xl p-4 shadow-lg text-left"
+          style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorderStrong}`,
+            boxShadow: '0 12px 40px -8px rgba(0, 52, 94, 0.22)', minWidth: 260, fontFamily: BODY_FONT }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
+            style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Run details</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 16, rowGap: 4 }}>
+            {rows.map(([k, v]) => (
+              <React.Fragment key={k}>
+                <span style={{ fontSize: 11.5, color: S.mutedText }}>{k}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: 'right', color: S.onSurface,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{v}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Component ──────────────────────────────────────────────
-const ProfitPoolAnalysis2: FC = () => {
+const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => {
   const {
-    simulation, scenarios, config, trends,
+    simulation, config, trends,
     loading, error, backendAvailable,
-    activeScenario, setActiveScenario, reconnect,
+    reconnect,
   } = usePrism();
 
   const [view, setView] = useState<ViewMode>('time');
@@ -858,6 +950,12 @@ const ProfitPoolAnalysis2: FC = () => {
   // force decomposition, contributing trends, trigger status, and
   // allocation recommendation for that one category.
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  // ── Show-ranges mode ─────────────────────────────────────────────
+  const [showRanges, setShowRanges] = useState(false);
+
+  // ── Collapsible methodology footer ───────────────────────────────
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // ─── Diagnostics — fetched only when the dashboard is empty so
   // we can show the user *why* (no rows in DB vs DB unreachable vs
@@ -1260,9 +1358,46 @@ const ProfitPoolAnalysis2: FC = () => {
     };
   }, [simulation, trends, selectedYear]);
 
-  const scenarioList: Scenario[] = scenarios ?? [];
   const meta = VIEW_META[view];
   const MetaIcon = meta.Icon;
+
+  // ── Headline takeaway ─────────────────────────────────────────────
+  // The answer of the tool, stated above the evidence: portfolio-weighted
+  // shift at horizon end (with its category-weighted P10–P90 band) plus
+  // the single largest expansion and contraction.
+  const headline = useMemo(() => {
+    const shifts = simulation?.shifts;
+    if (!shifts) return null;
+    const horizon = YEARS[YEARS.length - 1]!;
+    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    const wFor = (name: string, id: string): number => {
+      if (!catWeightsRaw) return 1;
+      const byName = catWeightsRaw[name];
+      if (typeof byName === 'number' && isFinite(byName)) return byName;
+      const byId = catWeightsRaw[id];
+      if (typeof byId === 'number' && isFinite(byId)) return byId;
+      return 0;
+    };
+    const meds: Array<number | null> = [];
+    const p10s: Array<number | null> = [];
+    const p90s: Array<number | null> = [];
+    const ws: number[] = [];
+    const catVals: Array<{ name: string; v: number }> = [];
+    CATEGORIES.forEach((c) => {
+      const pct = getYearPercentiles(shifts, c.name, c.id, horizon);
+      const m = pct?.median ?? null;
+      meds.push(m);
+      p10s.push(pct?.p10 ?? null);
+      p90s.push(pct?.p90 ?? null);
+      ws.push(wFor(c.name, c.id));
+      if (m != null && isFinite(m)) catVals.push({ name: c.name, v: m });
+    });
+    const med = weightedAvg(meds, ws);
+    if (med == null) return null;
+    const maxCat = catVals.length ? catVals.reduce((a, b) => (b.v > a.v ? b : a)) : null;
+    const minCat = catVals.length ? catVals.reduce((a, b) => (b.v < a.v ? b : a)) : null;
+    return { horizon, med, p10: weightedAvg(p10s, ws), p90: weightedAvg(p90s, ws), maxCat, minCat };
+  }, [simulation, config]);
 
   // ─── Empty / error banners ────────────────────────────────────
   const showBackendOffline = !loading && !backendAvailable;
@@ -1318,43 +1453,27 @@ const ProfitPoolAnalysis2: FC = () => {
           <div className="flex flex-col items-end gap-1 text-right">
             {simulation?.run_meta?.run_id != null ? (
               <>
-                <span
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
-                  style={{
-                    backgroundColor: S.surfaceContainer,
-                    color: S.onPrimaryContainer,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  <Database size={12} />
-                  <span>Run #{simulation.run_meta.run_id}</span>
-                  {simulation.run_meta.scenario && (
-                    <span style={{ opacity: 0.75 }}>· {simulation.run_meta.scenario}</span>
-                  )}
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+                    style={{ backgroundColor: S.surfaceContainer, color: S.onPrimaryContainer,
+                      fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
+                    <Database size={12} />
+                    <span>Run #{simulation.run_meta.run_id}</span>
+                    {simulation.run_meta.scenario && (
+                      <span style={{ opacity: 0.75 }}>· {simulation.run_meta.scenario}</span>
+                    )}
+                  </span>
+                  <RunDetailsPopover meta={simulation.run_meta} />
                 </span>
-                <span style={{ color: S.mutedText, fontSize: 11, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                <span style={{ color: S.mutedText, fontSize: 11 }}>
                   {simulation.run_meta.run_date
                     ? new Date(simulation.run_meta.run_date).toLocaleString()
                     : simulation.generated
                     ? new Date(simulation.generated).toLocaleString()
                     : '—'}
                   {simulation.run_meta.iterations != null &&
-                    ` · ${(simulation.run_meta.iterations / 1000).toFixed(0)}k iter`}
-                  {simulation.run_meta.chains != null &&
-                    ` × ${simulation.run_meta.chains}`}
-                  {simulation.run_meta.converged_categories != null &&
-                    simulation.run_meta.total_categories != null &&
-                    ` · R̂<1.05 ${simulation.run_meta.converged_categories}/${simulation.run_meta.total_categories}`}
+                    ` · ${(simulation.run_meta.iterations / 1000).toFixed(0)}k iterations`}
                 </span>
-                {simulation.run_meta.git_sha && simulation.run_meta.git_sha !== 'unknown' && (
-                  <span style={{ color: S.mutedText, fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                    {simulation.run_meta.git_sha}
-                    {simulation.run_meta.seed != null && ` · seed ${simulation.run_meta.seed}`}
-                    {simulation.run_meta.model_version && ` · ${simulation.run_meta.model_version}`}
-                  </span>
-                )}
               </>
             ) : simulation?.generated ? (
               <span style={{ color: S.mutedText, fontSize: 11 }}>
@@ -1412,32 +1531,89 @@ const ProfitPoolAnalysis2: FC = () => {
             >
               <AlertTriangle size={16} style={{ color: S.primary }} />
               <span>
-                This simulation was generated before the v2.5 engine update and doesn&apos;t
-                carry the per-year Force / VC / Region decomposition blocks yet. Re-run the
-                simulation to populate these lenses.
+                {isAdmin ? (
+                  <>This simulation was generated before the v2.5 engine update and doesn&apos;t
+                  carry the per-year Force / VC / Region decomposition blocks yet. Re-run the
+                  simulation to populate these lenses.</>
+                ) : (
+                  <>This run doesn&apos;t include the Force / Value Chain / Region breakdowns
+                  yet — they&apos;ll appear with the next published simulation run.</>
+                )}
               </span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ── Scenario row ─────────────────────────────────────── */}
-        {scenarioList.length > 0 && (
-          <section className="mb-6">
-            <div
-              className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
-              style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}
-            >
-              Scenario
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {scenarioList.map((s) => (
-                <ScenarioPill
-                  key={s.id}
-                  active={activeScenario === s.id}
-                  onClick={() => setActiveScenario(s.id)}
-                  label={s.name}
-                />
-              ))}
+        {/* ── Headline takeaway ─────────────────────────────────
+            The decision-relevant numbers, stated before the matrix.
+            P10–P90 are category-weighted averages of per-category bands
+            (a display aggregate, not a joint portfolio percentile). */}
+        {headline && (
+          <section className="mb-8">
+            <div className="flex flex-wrap gap-3">
+              <div className="rounded-2xl px-5 py-4 min-w-[200px]"
+                style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
+                  style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                  Portfolio · {headline.horizon}
+                </div>
+                <div className="font-extrabold tabular-nums"
+                  style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1,
+                    color: headline.med >= 0 ? '#059669' : '#dc2626' }}>
+                  {fmtShift(headline.med, 1)}
+                </div>
+                {headline.p10 != null && headline.p90 != null && (
+                  <div className="text-[11px] mt-1 tabular-nums" style={{ color: S.mutedText }}>
+                    {fmtShift(headline.p10, 1)} … {fmtShift(headline.p90, 1)}
+                    <span style={{ opacity: 0.75 }}> · P10–P90, cat-weighted</span>
+                  </div>
+                )}
+              </div>
+              {headline.maxCat && headline.maxCat.v > 0 && (
+                <div className="rounded-2xl px-5 py-4 min-w-[200px]"
+                  style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
+                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Largest expansion</div>
+                  <div className="font-extrabold tabular-nums"
+                    style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1, color: '#059669' }}>
+                    {fmtShift(headline.maxCat.v, 1)}
+                  </div>
+                  <div className="text-[12px] mt-1 font-semibold" style={{ color: S.onSurface }}>{headline.maxCat.name}</div>
+                </div>
+              )}
+              {headline.minCat && headline.minCat.v < 0 && (
+                <div className="rounded-2xl px-5 py-4 min-w-[200px]"
+                  style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
+                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Deepest contraction</div>
+                  <div className="font-extrabold tabular-nums"
+                    style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1, color: '#dc2626' }}>
+                    {fmtShift(headline.minCat.v, 1)}
+                  </div>
+                  <div className="text-[12px] mt-1 font-semibold" style={{ color: S.onSurface }}>{headline.minCat.name}</div>
+                </div>
+              )}
+              <div className="rounded-2xl px-5 py-4 flex-1 min-w-[260px] flex items-center"
+                style={{ backgroundColor: S.surfaceLow }}>
+                <p className="text-[13.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
+                  By {headline.horizon}, the weighted portfolio shift is{' '}
+                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.med, 1)}</strong>
+                  {headline.p10 != null && headline.p90 != null && (
+                    <> (P10 {fmtShift(headline.p10, 1)}, P90 {fmtShift(headline.p90, 1)})</>
+                  )}
+                  {headline.maxCat && headline.maxCat.v > 0 && (
+                    <>. Expansion concentrates in{' '}
+                    <strong style={{ color: S.onSurface }}>{headline.maxCat.name}</strong>{' '}
+                    ({fmtShift(headline.maxCat.v, 1)})</>
+                  )}
+                  {headline.minCat && headline.minCat.v < 0 && (
+                    <>; the deepest contraction is{' '}
+                    <strong style={{ color: S.onSurface }}>{headline.minCat.name}</strong>{' '}
+                    ({fmtShift(headline.minCat.v, 1)})</>
+                  )}
+                  . Cumulative vs 2025, MC median.
+                </p>
+              </div>
             </div>
           </section>
         )}
@@ -1488,6 +1664,13 @@ const ProfitPoolAnalysis2: FC = () => {
                 {IMPACT_META[f].label}
               </PillButton>
             ))}
+            {impactFilter === 'total' && (
+              <span className="inline-flex items-center pl-2 ml-1" style={{ borderLeft: `1px solid ${S.cardBorder}` }}>
+                <PillButton active={showRanges} onClick={() => setShowRanges((v) => !v)} icon={Eye}>
+                  Show ranges
+                </PillButton>
+              </span>
+            )}
           </div>
           <div
             className="flex items-center gap-2 text-[12px]"
@@ -1510,7 +1693,7 @@ const ProfitPoolAnalysis2: FC = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               {YEARS.map((y) => (
-                <ScenarioPill
+                <YearPill
                   key={y}
                   active={selectedYear === y}
                   onClick={() => setSelectedYear(y)}
@@ -1551,7 +1734,15 @@ const ProfitPoolAnalysis2: FC = () => {
               const iconBg = isDbError || isMalformed ? S.errorContainer ?? S.primaryContainer : S.primaryContainer;
               const iconFg = isDbError || isMalformed ? S.error ?? S.primary : S.primary;
 
-              const title = isDbError
+              // Viewers get plain-language titles; operational phrasing is
+              // reserved for admins, who can act on it.
+              const title = !isAdmin
+                ? (isDbError
+                  ? 'Data connection issue'
+                  : isMalformed
+                  ? 'Latest run needs a refresh'
+                  : 'No simulation available yet')
+                : isDbError
                 ? 'Backend cannot reach the database'
                 : isMalformed
                 ? 'Latest run has incompatible shape'
@@ -1578,7 +1769,13 @@ const ProfitPoolAnalysis2: FC = () => {
                     className="max-w-xl text-[14px] space-y-3"
                     style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}
                   >
-                    {isDbError ? (
+                    {!isAdmin ? (
+                      <p>
+                        {reason === 'no_rows' || reason == null
+                          ? 'No simulation run has been published yet. Results appear here automatically as soon as the PRISM team publishes the first run.'
+                          : 'The simulation engine isn\u2019t serving results right now. Please check back shortly — if this persists, contact the PRISM team (Alexander Laker).'}
+                      </p>
+                    ) : isDbError ? (
                       <>
                         <p>
                           The FastAPI backend is running but cannot query the Neon
@@ -1656,7 +1853,9 @@ const ProfitPoolAnalysis2: FC = () => {
               emptyMessage={
                 view === 'time'
                   ? 'Simulation result contains no shift data for these years.'
-                  : 'No decomposition data for this year. Re-run the simulation on the v2.5+ engine.'
+                  : isAdmin
+                  ? 'No decomposition data for this year. Re-run the simulation on the v2.5+ engine.'
+                  : 'No breakdown data for this year yet — it will appear with the next published run.'
               }
               rowTotals={filteredMatrix.showRowTotals ? filteredMatrix.rowTotals : undefined}
               colTotals={filteredMatrix.colTotals}
@@ -1665,6 +1864,14 @@ const ProfitPoolAnalysis2: FC = () => {
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
               cellDetails={filteredMatrix.cellDetails}
               onRowClick={setSelectedCategoryId}
+              showRanges={showRanges && view === 'time' && impactFilter === 'total'}
+              noBandsNote={
+                view !== 'time'
+                  ? 'Switch to Time Path for P10 / P90 bands'
+                  : impactFilter !== 'total'
+                  ? 'Ranges unavailable in Upside/Downside view — bands describe the unfiltered distribution'
+                  : undefined
+              }
             />
           )}
         </motion.section>
@@ -1683,12 +1890,55 @@ const ProfitPoolAnalysis2: FC = () => {
           )}
         </AnimatePresence>
 
-        {/* ── Footer note ─────────────────────────────────────── */}
-        <footer
-          className="mt-8 text-[12px]"
-          style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}
-        >
-          <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
+        {/* ── About this model — collapsible methodology + glossary ── */}
+        <footer className="mt-8">
+          <button type="button" onClick={() => setAboutOpen((v) => !v)} aria-expanded={aboutOpen}
+            className="w-full flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl text-left"
+            style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`, cursor: 'pointer' }}>
+            <span className="flex items-center gap-3">
+              <Info size={14} style={{ color: S.primary }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT }}>About this model</span>
+              <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
+                Bayesian Monte Carlo · 50,000 iterations · 99 trends · methodology &amp; glossary
+              </span>
+            </span>
+            <ChevronDown size={16} style={{ color: S.onSurfaceVariant,
+              transform: aboutOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+          </button>
+          {aboutOpen && (
+            <div className="mt-2 px-5 py-5 rounded-2xl" style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}` }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
+                style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Glossary</div>
+              <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>GP1</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Gross Profit 1 (contribution after cost of goods) — the profit layer whose shifts the model projects.</div>
+              </div>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>MC median</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>The middle outcome of the 50,000 Monte Carlo paths — the central estimate shown in every cell.</div>
+              </div>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>P10 / P90</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.</div>
+              </div>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>R̂ (R-hat)</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Convergence diagnostic across simulation chains; values below 1.05 mean the chains agree.</div>
+              </div>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Attenuation</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Dampening factor applied to overlapping trends so co-occurring effects are not double-counted.</div>
+              </div>
+              <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Cumulative shift</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Each cell is the compounded level vs 2025 at that year — not a year-over-year change.</div>
+              </div>
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+                style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Methodology</div>
+              <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
+                          <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.6'}</code>,
           50,000 iterations, Gaussian / t-copula dependencies, 99 v3.5 trends). Each cell is a{' '}
@@ -1707,6 +1957,9 @@ const ProfitPoolAnalysis2: FC = () => {
           given year is identical across Time Path, Force, Value Chain and Region views.
           No frontend calibration or anchoring of cells — only the portfolio-weighted
           aggregation is computed client-side from the Config weights.
+              </p>
+            </div>
+          )}
         </footer>
       </main>
     </div>
