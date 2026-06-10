@@ -1,0 +1,51 @@
+========================================================================
+0. TREND POPULATION
+========================================================================
+n_trends=99  by force: {'Consumer': 32, 'Government': 14, 'Technology': 18, 'Environmental': 11, 'Competitive': 14, 'Customer': 10}
+trends missing gp1_pct_affected: 0
+
+========================================================================
+1. CLAIM 2 — CORRELATION MATRIX PSD (old v3.5 vs current v3.6 defaults)
+========================================================================
+OLD v3.5 (pre-June-2026): shape=(99, 99), min eig = -1.6835 -> non-PSD, repair fires
+   repair shrink factor = 0.3713 (within-force 0.3 -> 0.111; shrink = 2.69x)
+CURRENT v3.6 default: shape=(99, 99), min eig = 0.1428 -> PSD, no repair
+engine on CURRENT defaults: integrity_events = []
+engine R within-force sample value (t0,t1 same force?) check: forces Consumer,Consumer -> R[0,1]=0.300
+
+========================================================================
+2. CLAIM 3 — SCIPY-FALLBACK ACCURACY (prod path vs scipy)
+========================================================================
+Beta(5,1) ppf   q: [0.5  0.9  0.95 0.99]
+  scipy (dev):     [0.8706 0.9791 0.9898 0.998 ]
+  fallback (prod): [0.8333 0.999  0.999  0.999 ]
+  fraction of draws piling at 0.999 clip in prod: 12.0%
+Beta(3,3) ppf  scipy: [0.5    0.7534 0.8107 0.8944]  fallback: [0.5    0.7422 0.8108 0.9396]
+t_cdf(-3.0, df=8): scipy=0.008536  fallback=0.001829  tail mispricing=4.67x
+t_cdf(-4.0, df=8): scipy=0.001975  fallback=0.000053  tail mispricing=37.03x
+same seed, 2035 medians: max |dev-prod| diff = 0.00115 (1.8% rel)
+same seed, 2035 p90:     max |dev-prod| diff = 0.00069
+result dict records scipy path? keys with 'scipy': []; integrity_events=[]
+
+========================================================================
+3. CLAIM 1 — FRACTIONAL vs BERNOULLI (event-mode) BANDS, same copula
+========================================================================
+fractional (current)   P5=-0.0539 p10=-0.0522 median=-0.0458 p90=-0.0382 band(p10-p90)=0.0140
+bernoulli (event)      P5=-0.0666 p10=-0.0625 median=-0.0461 p90=-0.0277 band(p10-p90)=0.0348
+band ratio bernoulli/fractional = 2.48x  (claim: ~2.7x)
+per-category band ratio: min=2.13x median=2.50x max=2.68x
+
+========================================================================
+4. CLAIM 8 — R-HAT / ESS ON IID DRAWS
+========================================================================
+single-chain: r_hat range [0.9999, 1.0000]  converged: True  ess range [9768, 10000] of 10000
+multi-chain(3): r_hat range [0.9998, 1.0002]  converged: True
+example MCSE on Hair: Color terminal median ≈ 0.00008 (vs median -0.0373)
+
+========================================================================
+5. CLAIM 6 — HIDDEN INTENSITY PARAMETER
+========================================================================
+force weight = 0.1667, per-force attenuation mean = 0.4403
+effective intensity multiplier (weight x attenuation) = 0.0734  (claim: ~0.075)
+
+DONE
