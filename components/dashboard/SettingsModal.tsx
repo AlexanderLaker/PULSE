@@ -761,11 +761,15 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
-                  silent no-op — the engine consumes six calibrated per-force
-                  values. They are displayed read-only here with their source. */}
+                  silent no-op — the engine consumes six per-force values.
+                  They are displayed read-only here with their source.
+                  D17 (owner decision): the source is labeled "structured-
+                  judgment overlap correction", not "calibrated" — the values
+                  rest on a weighted-Jaccard exposure proxy plus documented
+                  judgment adjustments, not on measured outcomes (F-19). */}
               <Field
-                label="Per-force attenuation (calibrated, read-only)"
-                hint={`Effective multiplier on each force's contribution. Source: ${draft.attenuation_source ?? 'calibrated_v3.5_april2026'}. Changed only via a calibration release.`}
+                label="Per-force attenuation (read-only)"
+                hint={`Effective multiplier on each force's contribution. Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {Object.entries(draft.per_force_attenuation ?? {}).map(([f, v]) => (
@@ -779,8 +783,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 </div>
               </Field>
               <Field
-                label="Within-force overlap (calibrated, read-only)"
-                hint="Dampens summed trends inside one force (mechanism redundancy). Same calibration release."
+                label="Within-force overlap (read-only)"
+                hint="Dampens summed trends inside one force (mechanism redundancy). Source: structured-judgment overlap correction (v3.5, Apr-2026)."
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {Object.entries(draft.within_force_overlap ?? {}).map(([f, v]) => (

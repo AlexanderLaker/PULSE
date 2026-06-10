@@ -758,12 +758,39 @@ class BayesianMonteCarloEngine:
                 "years":     [int(y) for y in years],
             },
         }
+        # ── Joint portfolio band (D3 / audit F-16) ──────────────────────
+        # True joint percentiles of the category-weighted portfolio shift,
+        # computed per iteration from the raw samples. NOT the category-
+        # weighted average of per-category bands — that construction is
+        # narrower than the truth by construction and was exactly the
+        # honesty failure F-16 flagged. Weights: config.category_weights
+        # (normalized), falling back to equal weights.
+        cw = getattr(self.config, "category_weights", None) or {}
+        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
+        if w.sum() <= 0:
+            w = np.full(n_cats, 1.0 / n_cats)
+        else:
+            w = w / w.sum()
+        port = np.tensordot(samples, w, axes=([1], [0]))  # (n_iter, n_years)
+        portfolio_path = {}
+        for y_idx, year in enumerate(self.config.path_years):
+            ys = port[:, y_idx]
+            cell = {f"p{p}": float(np.percentile(ys, p)) for p in percentiles}
+            cell["median"] = cell["p50"]
+            cell["mean"] = float(np.mean(ys))
+            cell["std"] = float(np.std(ys))
+            portfolio_path[int(year)] = cell
+
         totals = {
             "category_path":  category_path_totals,  # row totals
             "by_force":       by_force_totals,       # column totals (Force lens)
             "by_vc":          by_vc_totals,          # column totals (VC lens)
             "by_region":      by_region_totals,      # column totals (Region lens)
             "grand":          grand_totals,          # cross-category grand total
+            # Joint portfolio percentiles (category-weighted mean per
+            # iteration). The headline band reads THIS, not an average of
+            # per-category bands.
+            "portfolio":      portfolio_path,
         }
 
         return {
@@ -921,6 +948,30 @@ class BayesianMonteCarloEngine:
              "median_2030": float(np.median(per_chain_samples[i][:, :, last_idx].sum(axis=1)))}
             for i in range(n_chains)
         ]
+
+        # ── Seed stability (D3 / audit F-13) ────────────────────────────
+        # R̂ on i.i.d. Monte-Carlo draws is ≈1.0 by construction and reads
+        # as theater to a quant. The honest, defensible quantity is how
+        # much the headline moves across independently-seeded chains —
+        # report that spread directly so the UI can show "seed stability"
+        # instead of an MCMC badge.
+        cw = getattr(self.config, "category_weights", None) or {}
+        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
+        w = (w / w.sum()) if w.sum() > 0 else np.full(len(self.config.category_names), 1.0 / len(self.config.category_names))
+        chain_headlines = []
+        max_cat_spread = 0.0
+        per_cat_medians = np.array([
+            [float(np.median(s[:, c_idx, last_idx])) for c_idx in range(s.shape[1])]
+            for s in per_chain_samples
+        ])  # (n_chains, n_cats)
+        chain_headlines = per_cat_medians @ w  # (n_chains,)
+        max_cat_spread = float((per_cat_medians.max(axis=0) - per_cat_medians.min(axis=0)).max())
+        result["seed_stability"] = {
+            "n_chains": int(n_chains),
+            "chain_seeds": [int(s) for s in seeds],
+            "headline_median_spread": float(chain_headlines.max() - chain_headlines.min()),
+            "max_category_median_spread": max_cat_spread,
+        }
         return result
 
     # ── F3: Attenuation sensitivity band ────────────────────────────

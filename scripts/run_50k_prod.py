@@ -100,6 +100,26 @@ def main() -> int:
     # ── 4) Allocation optimizer removed (D4, June 2026) ─────────────
     allocation = None
 
+    # ── 4b) Input-drift integrity event (D19, June 2026) ─────────────
+    # Diff this run's trend scoring state against the previous accepted
+    # run's persisted fingerprint; the event lands in integrity_events and
+    # is persisted with the run so the dashboard surfaces it.
+    from pulse.audit.input_drift import (
+        trend_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
+    )
+    current_fp = trend_fingerprint(trend_db.trends)
+    try:
+        from pulse.database import load_simulation_runs
+        prev_fp, prev_id, prev_date = previous_fingerprint_from_runs(load_simulation_runs(limit=1))
+        drift_event = compute_input_drift_event(current_fp, prev_fp, prev_id, prev_date)
+        if drift_event:
+            result.setdefault("integrity_events", []).append(drift_event)
+            log.info("      %s", drift_event["message"])
+        elif prev_id is not None:
+            log.info("      Input drift: previous run #%s has no fingerprint (pre-D19) — baseline starts now.", prev_id)
+    except Exception as e:
+        log.warning("Input-drift check skipped: %s", e)
+
     # ── 5) Persist to prod Neon ──────────────────────────────────────
     # Save the full results bundle (shift_matrix + decompositions + totals +
     # vc_decomposition) so the dashboard's "Trends 2" and
@@ -113,6 +133,10 @@ def main() -> int:
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
+            # D19: integrity events (incl. input drift) + seed stability
+            # persist with the run so the read-only dashboard can show them.
+            "integrity_events": result.get("integrity_events", []),
+            "seed_stability": result.get("seed_stability"),
             # F2: every persisted run carries its engine fidelity. D13: the
             # engine itself is scipy-only now (it refuses to import without
             # scipy), so reaching this line implies exact numerics; the
@@ -125,6 +149,9 @@ def main() -> int:
                 "model_version": result.get("model_version"),
                 "engine_name": result.get("engine_name"),
                 "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
+                # D19: fingerprint of THIS run's inputs — next run diffs itself
+                # against it.
+                "trend_fingerprint": current_fp,
             },
         }
         run_id = save_simulation_run(

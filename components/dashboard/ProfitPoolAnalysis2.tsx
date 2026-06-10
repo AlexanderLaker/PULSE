@@ -834,8 +834,12 @@ const PeakStressTooltip: FC = () => {
 };
 
 // ─── Run details popover ─────────────────────────────────────────
-// Audit metadata (convergence, seed, git SHA, engine version) stays one
-// click away instead of printing terminal strings into the header.
+// Audit metadata (seed stability, seed, numerics backend, git SHA, engine
+// version) stays one click away instead of printing terminal strings into
+// the header. D3/F-13 (June 2026): the R̂ row was replaced by the honest
+// quantity — how much the headline moves across independently-seeded
+// chains. R̂ on i.i.d. MC draws is ≈1.0 by construction and reads as
+// theater to a quant reviewer.
 interface RunMetaShape {
   iterations?: number | null;
   chains?: number | null;
@@ -844,18 +848,34 @@ interface RunMetaShape {
   seed?: number | null;
   git_sha?: string | null;
   model_version?: string | null;
+  numerics_backend?: string | null;
 }
 
-const RunDetailsPopover: FC<{ meta: RunMetaShape }> = ({ meta }) => {
+interface SeedStabilityShape {
+  n_chains: number;
+  headline_median_spread: number;
+  max_category_median_spread?: number;
+}
+
+const RunDetailsPopover: FC<{ meta: RunMetaShape; stability?: SeedStabilityShape | null }> = ({ meta, stability }) => {
   const [open, setOpen] = useState(false);
   const rows: Array<[string, string]> = [];
   if (meta.iterations != null) {
     rows.push(['Iterations', `${(meta.iterations / 1000).toFixed(0)}k${meta.chains != null ? ` × ${meta.chains} chains` : ''}`]);
   }
-  if (meta.converged_categories != null && meta.total_categories != null) {
-    rows.push(['Convergence (R̂ < 1.05)', `${meta.converged_categories}/${meta.total_categories} categories`]);
+  if (stability && stability.headline_median_spread != null) {
+    // Seed-stability line (D3): spread of the headline median across
+    // independently-seeded chains — the defensible reproducibility claim.
+    rows.push([
+      `Seed stability (${stability.n_chains} chains)`,
+      `headline ±${(stability.headline_median_spread * 100 / 2).toFixed(2)}pp`,
+    ]);
+    if (stability.max_category_median_spread != null) {
+      rows.push(['Max category spread', `${(stability.max_category_median_spread * 100).toFixed(2)}pp`]);
+    }
   }
   if (meta.seed != null) rows.push(['Seed', String(meta.seed)]);
+  if (meta.numerics_backend) rows.push(['Numerics', meta.numerics_backend]);  // D13 audit trail
   if (meta.git_sha && meta.git_sha !== 'unknown') rows.push(['Engine build', meta.git_sha]);
   if (meta.model_version) rows.push(['Model', meta.model_version]);
   if (rows.length === 0) return null;
@@ -888,6 +908,61 @@ const RunDetailsPopover: FC<{ meta: RunMetaShape }> = ({ meta }) => {
               </React.Fragment>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Integrity chip (D19, June 2026) ─────────────────────────────
+// Surfaces the run's integrity events — input drift vs the previous
+// accepted run, runtime repairs — next to the run ribbon. The events are
+// computed at run time, persisted with the run, and rehydrated read-only;
+// this chip is the "integrity drawer" surface for the live dashboard.
+interface IntegrityEventShape {
+  type: string;
+  severity: string;
+  message: string;
+}
+
+const IntegrityChip: FC<{ events: IntegrityEventShape[] }> = ({ events }) => {
+  const [open, setOpen] = useState(false);
+  const hasWarning = events.some((e) => e.severity === 'warning' || e.severity === 'error');
+  const tone = hasWarning
+    ? { bg: '#FEF3C7', fg: '#92400E', dot: '#D97706' }   // amber
+    : { bg: S.surfaceLow, fg: S.onSurfaceVariant, dot: S.primary };
+  return (
+    <div className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setOpen(false)}
+        aria-label={`${events.length} integrity event(s) for this run`}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+        style={{ backgroundColor: tone.bg, color: tone.fg, border: 'none',
+          cursor: 'pointer', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.03em' }}
+      >
+        <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: tone.dot }} />
+        {events.length} integrity {events.length === 1 ? 'event' : 'events'}
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-2 z-30 rounded-xl p-4 shadow-lg text-left"
+          style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorderStrong}`,
+            boxShadow: '0 12px 40px -8px rgba(0, 52, 94, 0.22)', width: 360, fontFamily: BODY_FONT }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
+            style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+            Run integrity
+          </div>
+          <ul style={{ display: 'grid', rowGap: 8, margin: 0, padding: 0, listStyle: 'none' }}>
+            {events.map((e, i) => (
+              <li key={`${e.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
+                  backgroundColor: e.severity === 'warning' || e.severity === 'error' ? '#D97706' : S.primary }} />
+                <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>{e.message}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -1319,7 +1394,24 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
     if (med == null) return null;
     const maxCat = catVals.length ? catVals.reduce((a, b) => (b.v > a.v ? b : a)) : null;
     const minCat = catVals.length ? catVals.reduce((a, b) => (b.v < a.v ? b : a)) : null;
-    return { horizon, med, p10: weightedAvg(p10s, ws), p90: weightedAvg(p90s, ws), maxCat, minCat };
+
+    // D3 / audit F-16 (June 2026): prefer the TRUE joint portfolio band the
+    // engine computes per-iteration from raw samples (totals.portfolio,
+    // 2.8.0+ runs). The category-weighted average of per-category bands is
+    // narrower than the truth by construction and remains only as the
+    // fallback for pre-2.8.0 persisted runs — labeled as such.
+    const port = simulation?.totals?.portfolio?.[String(horizon)]
+      ?? simulation?.totals?.portfolio?.[horizon as unknown as string];
+    if (port && typeof port === 'object' && port.p10 != null && port.p90 != null) {
+      return {
+        horizon,
+        med: port.median ?? med,
+        p10: port.p10, p90: port.p90,
+        joint: true as const,
+        maxCat, minCat,
+      };
+    }
+    return { horizon, med, p10: weightedAvg(p10s, ws), p90: weightedAvg(p90s, ws), joint: false as const, maxCat, minCat };
   }, [simulation, config]);
 
   // ─── Empty / error banners ────────────────────────────────────
@@ -1386,7 +1478,7 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                       <span style={{ opacity: 0.75 }}>· {simulation.run_meta.scenario}</span>
                     )}
                   </span>
-                  <RunDetailsPopover meta={simulation.run_meta} />
+                  <RunDetailsPopover meta={simulation.run_meta} stability={simulation.seed_stability} />
                 </span>
                 <span style={{ color: S.mutedText, fontSize: 11 }}>
                   {simulation.run_meta.run_date
@@ -1397,6 +1489,9 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                   {simulation.run_meta.iterations != null &&
                     ` · ${(simulation.run_meta.iterations / 1000).toFixed(0)}k iterations`}
                 </span>
+                {(simulation.integrity_events?.length ?? 0) > 0 && (
+                  <IntegrityChip events={simulation.integrity_events!} />
+                )}
               </>
             ) : simulation?.generated ? (
               <span style={{ color: S.mutedText, fontSize: 11 }}>
@@ -1469,8 +1564,10 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
 
         {/* ── Headline takeaway ─────────────────────────────────
             The decision-relevant numbers, stated before the matrix.
-            P10–P90 are category-weighted averages of per-category bands
-            (a display aggregate, not a joint portfolio percentile). */}
+            P10–P90 is the engine's joint portfolio band (per-iteration
+            category-weighted mean over raw samples, 2.8.0+); for older
+            persisted runs it falls back to the category-weighted average
+            of per-category bands and is labeled accordingly (D3/F-16). */}
         {headline && (
           <section className="mb-8">
             <div className="flex flex-wrap gap-3">
@@ -1488,7 +1585,9 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                 {headline.p10 != null && headline.p90 != null && (
                   <div className="text-[11px] mt-1 tabular-nums" style={{ color: S.mutedText }}>
                     {fmtShift(headline.p10, 1)} … {fmtShift(headline.p90, 1)}
-                    <span style={{ opacity: 0.75 }}> · P10–P90, cat-weighted</span>
+                    <span style={{ opacity: 0.75 }}>
+                      {' '}· P10–P90, {headline.joint ? 'joint portfolio' : 'cat-weighted (pre-2.8 run)'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1538,6 +1637,13 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                 </p>
               </div>
             </div>
+            {/* D16 (owner decision, June 2026): the model's design assumption,
+                stated where the totals are read. Exact owner wording. */}
+            <p className="mt-3 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.55, maxWidth: 1000 }}>
+              Ceteris paribus: assumes no management response — no pricing moves, innovation, or
+              competitive reaction by Henkel or competitors. Totals read as exposure if nobody acts,
+              not as forecast outcomes.
+            </p>
           </section>
         )}
 
@@ -1839,8 +1945,8 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                 <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
-                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>R̂ (R-hat)</div>
-                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Convergence diagnostic across simulation chains; values below 1.05 mean the chains agree.</div>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Seed stability</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>How much the headline moves across independently-seeded simulation chains — the honest reproducibility measure (same seed reproduces bit-identically; the spread shows RNG sensitivity).</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Attenuation</div>
@@ -1852,12 +1958,22 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
               </div>
               </div>
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+                style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>What the model holds constant</div>
+              {/* D16 (owner decision, June 2026) — exact owner wording. */}
+              <p className="text-[12px] mb-4" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
+                PRISM holds strategy constant. The simulation propagates external trends only and
+                deliberately excludes management response — price increases, innovation launches,
+                mix shifts, competitive reaction. A negative total therefore means &ldquo;headwind to
+                today&rsquo;s business if nothing changes&rdquo;, not &ldquo;this pool will shrink&rdquo;.
+                Strategic response belongs to the reader, not the engine.
+              </p>
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Methodology</div>
               <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
                           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
-          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula_v2.6'}</code>,
-          50,000 iterations, Gaussian / t-copula dependencies, 99 v3.5 trends). Each cell is a{' '}
+          (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula'}</code>,
+          50,000 iterations, Gaussian-copula dependencies, 99 v3.5 trends). Each cell is a{' '}
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by

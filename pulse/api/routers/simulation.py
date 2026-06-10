@@ -63,6 +63,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
                         "decompositions": results_blob.get("decompositions"),
                         "totals": results_blob.get("totals"),
                         "vc_decomposition": results_blob.get("vc_decomposition"),
+                        # D19/D3: rehydrate integrity events + seed stability
+                        "integrity_events": results_blob.get("integrity_events") or [],
+                        "seed_stability": results_blob.get("seed_stability"),
                         "convergence": latest.get("convergence_diagnostics", {}),
                         "iterations": latest.get("iterations", 5000),
                         "model_type": latest.get("model_type", "bayesian_copula"),
@@ -117,6 +120,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "vc_decomposition": mc.get("vc_decomposition"),
         "decompositions": mc.get("decompositions"),
         "totals": mc.get("totals"),
+        # D19/D3: integrity events (incl. input drift) + seed stability
+        "integrity_events": mc.get("integrity_events") or [],
+        "seed_stability": mc.get("seed_stability"),
         # Run metadata the dashboard's "Showing run #N · date · scenario"
         # ribbon consumes. Safe to expose (no credentials, no €M).
         "run_meta": run_meta or None,
@@ -235,6 +241,21 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
         _state["simulation_stale"] = False
         _state.pop("stale_reason", None)
 
+        # D19: input-drift integrity event — diff this run's trend scoring
+        # state against the previous accepted run's persisted fingerprint.
+        from pulse.audit.input_drift import (
+            trend_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
+        )
+        current_fp = trend_fingerprint(db.trends)
+        try:
+            from pulse.database import load_simulation_runs
+            prev_fp, prev_id, prev_date = previous_fingerprint_from_runs(load_simulation_runs(limit=1))
+            drift_event = compute_input_drift_event(current_fp, prev_fp, prev_id, prev_date)
+            if drift_event:
+                mc_result.setdefault("integrity_events", []).append(drift_event)
+        except Exception as e:
+            logger.warning(f"Input-drift check skipped: {e}")
+
         # Persist simulation run to database (must succeed).
         # Store the full result bundle (shift_matrix + decompositions +
         # totals + vc_decomposition) under `results` so cold-start reloads
@@ -248,6 +269,9 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                # D19/D3: persist integrity events + seed stability with the run
+                "integrity_events": mc_result.get("integrity_events", []),
+                "seed_stability": mc_result.get("seed_stability"),
                 "meta": {
                     "engine_fidelity": "scipy",  # guarded above
                     # D13: numerics backend recorded for the audit trail
@@ -256,6 +280,8 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                     "model_version": mc_result.get("model_version"),
                     "engine_name": mc_result.get("engine_name"),
                     "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
+                    # D19: fingerprint of THIS run's inputs for the next diff
+                    "trend_fingerprint": current_fp,
                 },
             }
             save_simulation_run(
@@ -280,6 +306,8 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "vc_decomposition": mc_result.get("vc_decomposition"),
             "decompositions": mc_result.get("decompositions"),
             "totals": mc_result.get("totals"),
+            "integrity_events": mc_result.get("integrity_events") or [],
+            "seed_stability": mc_result.get("seed_stability"),
             "seed": mc_result.get("seed"),
             "seed_wobble": mc_result.get("seed_wobble"),
             "attenuation_band": mc_result.get("attenuation_band"),
