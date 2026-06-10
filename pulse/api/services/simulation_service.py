@@ -76,6 +76,8 @@ def load_latest_run_into_state() -> bool:
         "git_sha": inner_meta.get("git_sha"),
         "model_version": inner_meta.get("model_version"),
         "engine_name": inner_meta.get("engine_name"),
+        "engine_fidelity": inner_meta.get("engine_fidelity"),
+        "numerics_backend": inner_meta.get("numerics_backend"),  # D13 audit trail
         "converged_categories": inner_meta.get("converged_categories"),
         "total_categories": inner_meta.get("total_categories"),
         "persisted_at_utc": inner_meta.get("persisted_at_utc"),

@@ -108,16 +108,18 @@ def main() -> int:
     log.info("[5/5] Persisting to Neon PROD…")
     try:
         from datetime import timezone
-        from pulse.simulation._scipy_compat import HAS_SCIPY
         results_bundle = {
             "shift_matrix": result.get("shift_matrix"),
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
-            # F2: every persisted run carries its engine fidelity so an
-            # approximate run can never masquerade as canonical.
+            # F2: every persisted run carries its engine fidelity. D13: the
+            # engine itself is scipy-only now (it refuses to import without
+            # scipy), so reaching this line implies exact numerics; the
+            # numerics_backend records the exact versions for the audit trail.
             "meta": {
-                "engine_fidelity": "scipy" if HAS_SCIPY else "numpy_approx",
+                "engine_fidelity": "scipy",
+                "numerics_backend": result.get("numerics_backend"),
                 "seed": result.get("seed"),
                 "chains": 3,
                 "model_version": result.get("model_version"),

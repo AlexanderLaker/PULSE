@@ -11,12 +11,28 @@ from typing import Optional
 
 import numpy as np
 
-# Use scipy-compat layer so the engine works on Vercel serverless (no scipy)
-from pulse.simulation._scipy_compat import (
-    cholesky,
-    beta_ppf,
-    t_cdf,
-)
+# D13 (June 2026, owner decision): exact scipy math is the ONLY math.
+# scipy is a hard engine requirement — this module fails loudly at import
+# if scipy is absent. The former _scipy_compat numpy-approximation layer
+# was deleted; deployed/serverless surfaces never compute (F2: read-only
+# over persisted runs), so nothing legitimate imports the engine without
+# scipy. There is deliberately no fallback.
+try:
+    import scipy as _scipy
+    from scipy.linalg import cholesky
+    from scipy.stats import beta as _beta_dist, t as _t_dist
+except ImportError as _e:  # pragma: no cover — exercised only in broken envs
+    raise ImportError(
+        "PRISM engine requires scipy (D13: exact numerics only; the numpy "
+        "approximation fallback was removed June 2026). Install scipy, or "
+        "use the read-only API service which never imports the engine."
+    ) from _e
+
+beta_ppf = _beta_dist.ppf
+t_cdf = _t_dist.cdf
+
+#: Recorded in every result + persisted run_meta for the audit trail (D13).
+NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 
 from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
                            DEFAULT_WITHIN_FORCE_RHO,
@@ -745,6 +761,7 @@ class BayesianMonteCarloEngine:
             "model_type": "bayesian_copula",
             "model_version": self.MODEL_VERSION,
             "engine_name": self.ENGINE_NAME,
+            "numerics_backend": NUMERICS_BACKEND,
             "seed": self.seed,
             "integrity_events": list(self._integrity_events),
         }

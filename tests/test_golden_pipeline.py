@@ -5,15 +5,14 @@ in 96809a4 when category mappings changed, and never re-pinned — leaving
 the engine without an end-to-end reproducibility lock).
 
 Three layers of protection:
-  1. Determinism: same seed → bit-identical results (any environment).
+  1. Determinism: same seed → bit-identical results.
   2. Golden pins: seed=42 on the conftest fixture DB must reproduce the
-     exact values below. Pinned WITH scipy — skipped when scipy is absent
-     because _scipy_compat falls back to a normal approximation of the
-     Beta ppf and produces (deliberately) different numbers. See
-     review finding 7 / pulse/simulation/_scipy_compat.py.
-  3. Structural identities that hold in every environment: the Layer-B
-     force decomposition must reconcile row-by-row to the MC median
-     (PPA2's lenses depend on this invariant).
+     exact values below. D13 (June 2026): scipy is a hard engine
+     requirement — the _scipy_compat approximation layer was deleted, so
+     the pins now run unconditionally (exact numerics is the only path).
+  3. Structural identities: the Layer-B force decomposition must
+     reconcile row-by-row to the MC median (PPA2's lenses depend on
+     this invariant).
 
 If a deliberate model change breaks the pins: re-generate them with the
 snippet in this file's docstring history (run engine on the fixtures,
@@ -23,7 +22,6 @@ pinned values in the same commit.
 
 import pytest
 
-from pulse.simulation._scipy_compat import HAS_SCIPY
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 ITER = 500
@@ -66,11 +64,6 @@ class TestDeterminism:
         assert r1["shift_matrix"][cat] == r2["shift_matrix"][cat]
 
 
-@pytest.mark.skipif(not HAS_SCIPY, reason=(
-    "Golden pins are valid only with scipy. Without scipy, _scipy_compat "
-    "approximates the Beta ppf (normal approximation) and produces "
-    "different numbers by design — see review finding 7."
-))
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 

@@ -92,6 +92,8 @@ async def get_simulation(user: dict = Depends(require_auth)):
                     "git_sha": inner_meta.get("git_sha"),
                     "model_version": inner_meta.get("model_version"),
                     "engine_name": inner_meta.get("engine_name"),
+                    "engine_fidelity": inner_meta.get("engine_fidelity"),
+                    "numerics_backend": inner_meta.get("numerics_backend"),  # D13
                     "converged_categories": inner_meta.get("converged_categories"),
                     "total_categories": inner_meta.get("total_categories"),
                     "persisted_at_utc": inner_meta.get("persisted_at_utc"),
@@ -122,12 +124,22 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "model_version": (run_meta or {}).get("model_version"),
     })
 
+def _scipy_available() -> bool:
+    """Environment probe for the F2 guard (patchable in tests).
+
+    D13 (June 2026): scipy is a hard engine requirement — the numpy
+    approximation layer was deleted. This probe only decides whether this
+    runtime is ALLOWED to compute at all; it is never a math fallback.
+    """
+    from importlib.util import find_spec
+    return find_spec("scipy") is not None
+
+
 @router.post("/api/v1/simulate")
 async def run_simulation(req: SimulationRequest, user: dict = Depends(require_admin)):
     # F2 (owner decision): numbers must be consistent — only the scipy
     # engine may generate runs. Serverless (no scipy) is read-only.
-    from pulse.simulation._scipy_compat import HAS_SCIPY
-    if not HAS_SCIPY:
+    if not _scipy_available():
         raise HTTPException(
             409,
             "Simulation runs are produced offline with the scipy engine "
@@ -238,6 +250,8 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "vc_decomposition": mc_result.get("vc_decomposition"),
                 "meta": {
                     "engine_fidelity": "scipy",  # guarded above
+                    # D13: numerics backend recorded for the audit trail
+                    "numerics_backend": mc_result.get("numerics_backend"),
                     "seed": mc_result.get("seed"),
                     "model_version": mc_result.get("model_version"),
                     "engine_name": mc_result.get("engine_name"),
