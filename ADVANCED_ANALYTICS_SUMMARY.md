@@ -1,3 +1,5 @@
+> **⚠ OBSOLETE (June 2026):** the capability documented in this file was **removed** from PRISM (advanced analytics: D14 + Sobol rider · Delphi: D10 — see `audit/strategy-review/06_DECISION_LOG_AND_WORK_ORDER.md`). Kept for historical reference only.
+
 # Advanced Analytics Modules - Complete Implementation Summary
 
 ## Overview
