@@ -135,8 +135,12 @@ Manual follow-ups for the owner:
 - `/simulate` + `GET /simulation` response shape verified against `types/simulation.ts` (incl. `totals.portfolio`, `integrity_events`, `seed_stability`, `run_meta.numerics_backend`); PUT /config spectral gate verified live (ρ=0.25 → 400 with min-eigenvalue −0.518 message; ρ=0.35 dry-run validates).
 - Frontend `tsc --noEmit` + vitest: recorded separately below once the sandbox npm install completes.
 
+**Deploy status (2026-06-10, this session):**
+- **Vercel preview deployed and verified healthy**: `dpl_6q8BF4khG6mrdCNnYjUp9by1xD2w` (CLI upload of the exact v3.7 tree; build READY; nodejs×3 + python×1 lambdas). `/api/v1/health` on the preview returns `{status: ok, trend_count: 99, has_simulation: true, latest_run_id: 91}` — the v3.7 service imports cleanly without scipy/analytics and reads prod Neon read-only. **Production deployment untouched** (still d279ce4); prod run row #91 (2.7.0) intact for diff.
+- **GitHub push blocked from the sandbox**: the `.env.deploy` PAT lacks the `workflow` scope and v3.7 modifies `.github/workflows/ci.yml` (engine-lite removal). All work is committed locally — branch `remediation/v3.7-d12-d21` and `main` both at the v3.7 merge.
+
 **Owner runbook to production:**
-1. Push `remediation/v3.7-d12-d21` → Vercel **preview**; verify headline band ("joint portfolio" label appears only after a 2.8.0 run is persisted), integrity chip, Settings copula section (no df field), D16 captions.
-2. Merge to `main` → production deploy.
-3. `python3 scripts/run_50k_prod.py` — persists the first 2.8.0 run (Gaussian copula; expect small median changes vs the 2.7.0 row — version-stamped honesty correction, the previous row stays for diff). The run will emit the first input-drift baseline event.
-4. Optional: re-run `scripts/migrate_drop_delphi.py` against prod if not yet done (Part E follow-up 3).
+1. Push from the Mac (normal credentials) or add the `workflow` scope to the PAT, then: `git push origin remediation/v3.7-d12-d21 main`.
+2. Eyeball the preview (Vercel login): headline band + D16 caption, integrity chip (appears once a run carries events), Settings copula section (no df field), run popover (seed stability + numerics backend). Note: the "joint portfolio" band label appears only after step 3 persists a 2.8.0 run.
+3. After the production deploy: `python3 scripts/run_50k_prod.py` — persists the first 2.8.0 run (Gaussian copula; expect small median changes vs the 2.7.0 row — version-stamped honesty correction; the previous row stays for diff). The run also writes the first input-drift fingerprint baseline.
+4. Optional: `scripts/migrate_drop_delphi.py` against prod if not yet done (Part E follow-up 3).
