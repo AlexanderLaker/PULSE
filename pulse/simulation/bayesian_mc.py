@@ -42,7 +42,7 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
-    MODEL_VERSION = "2.5.0"
+    MODEL_VERSION = "2.7.0"  # v3.6 June 2026: PSD-valid default correlations (D1); allocation removed from result contract (D4)
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):

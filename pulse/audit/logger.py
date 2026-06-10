@@ -122,10 +122,6 @@ class AuditLogger:
         self.log("simulation_run", "simulation", scenario,
                  new_value=json.dumps({"iterations": iterations, "model": model_type}))
 
-    def log_delphi_round(self, trend_id: str, round_num: int, scorer_id: str, scores: dict):
-        self.log("delphi_round", "elicitation", trend_id,
-                 new_value=json.dumps({"round": round_num, "scorer": scorer_id, **scores}))
-
     def save_snapshot(self, config_json: str, label: str = ""):
         """Save a configuration snapshot for reproducibility."""
         p = placeholder()

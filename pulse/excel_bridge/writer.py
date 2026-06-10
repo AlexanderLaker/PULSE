@@ -47,8 +47,7 @@ class ShiftMatrixWriter:
         Creates sheets:
         1. Shift Matrix — continuous paths with percentiles
         2. Velocity & Triggers — path dynamics
-        3. Allocation — resource allocation recommendations
-        4. Metadata — run configuration and diagnostics
+        3. Metadata — run configuration and diagnostics
         """
         wb = openpyxl.Workbook()
 
@@ -58,11 +57,7 @@ class ShiftMatrixWriter:
         # Sheet 2: Velocity & Triggers
         self._write_velocity(wb, mc_result)
 
-        # Sheet 3: Allocation (if available)
-        if allocation:
-            self._write_allocation(wb, allocation)
-
-        # Sheet 4: Metadata
+        # Sheet 3: Metadata
         self._write_metadata(wb, mc_result, metadata)
 
         # Remove default sheet if extra sheets were created
@@ -181,39 +176,6 @@ class ShiftMatrixWriter:
                 cell = ws.cell(row=row, column=j, value=round(val, 6))
                 cell.number_format = "0.00%"
             row += 1
-
-    def _write_allocation(self, wb, allocation):
-        """Write resource allocation recommendations."""
-        ws = wb.create_sheet("Allocation")
-
-        headers = ["Category", "Recommended Weight", "Signal"]
-        for j, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=j, value=h)
-            cell.font = HEADER_FONT
-            cell.fill = HEADER_FILL
-
-        weights = allocation.get("weights", {})
-        equal_w = 1.0 / max(len(weights), 1)
-
-        row = 2
-        for cat, weight in sorted(weights.items(), key=lambda x: x[1], reverse=True):
-            ws.cell(row=row, column=1, value=cat)
-            cell = ws.cell(row=row, column=2, value=round(weight, 4))
-            cell.number_format = "0.00%"
-
-            signal = "INVEST MORE" if weight > equal_w + 0.02 else \
-                     "REDUCE" if weight < equal_w - 0.02 else "MAINTAIN"
-            ws.cell(row=row, column=3, value=signal)
-            row += 1
-
-        # Summary
-        row += 1
-        ws.cell(row=row, column=1, value="Risk Aversion Used").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=allocation.get("risk_aversion_used", 1.0))
-        row += 1
-        ws.cell(row=row, column=1, value="Expected Pool Shift").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=allocation.get("expected_pool_shift", 0))
-        ws.cell(row=row, column=2).number_format = "0.00%"
 
     def _write_metadata(self, wb, mc_result, extra_metadata=None):
         """Write run metadata and configuration."""

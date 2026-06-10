@@ -42,7 +42,7 @@ const ConvergenceBadge: FC<ConvergenceBadgeProps> = ({ simulation }) => {
       }`}
     >
       {converged ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-      {converged ? 'Converged' : 'Low convergence'}
+      {converged ? 'MC stable (seed-checked)' : 'MC unstable — rerun advised'}
       {rHat != null && (
         <span className="font-mono opacity-70">R̂={rHat.toFixed(3)}</span>
       )}

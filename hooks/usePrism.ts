@@ -190,7 +190,6 @@ export default function usePrism(): UsePrismReturn {
       const result = await api.runSimulation({
         scenario: activeScenario,
         iterations: 5000,
-        include_allocation: true,
         ...params,
       });
       if (mounted.current) {

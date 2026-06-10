@@ -1,7 +1,7 @@
 """SQLite backup & restore utility for the local PRISM database (F2).
 
 The local PRISM database is the system of record for trends, scores,
-Delphi rounds, simulation runs, audit log entries, and config snapshots.
+simulation runs, audit log entries, and config snapshots.
 A corrupt or accidentally-deleted file in `data/prism.db` is therefore a
 serious incident — months of expert scoring can vanish.
 

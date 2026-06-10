@@ -121,7 +121,10 @@ class TippingPointDetector:
                 })
 
         # ─── Inflection point: max rate of change ───
-        if len(velocity) > 0:
+        # D2/F-05 (June 2026): only report the inflection when it clears the
+        # acceleration threshold — the unconditional version produced one
+        # "tipping point" per category per run (alert inflation).
+        if len(velocity) > 0 and np.max(np.abs(velocity)) >= self.acceleration_threshold:
             max_vel_idx = np.argmax(np.abs(velocity))
             year_at_max_vel = years[max_vel_idx + 1]
             tipping_points.append({

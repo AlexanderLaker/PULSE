@@ -56,7 +56,7 @@ DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.5_april2026"  # valid sources: "cali
 DEFAULT_NEUTRAL_THRESHOLD = 0.001
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
-DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036]
+DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
 
 # Materialization schedule: S-curve for how much of total impact has materialized
 DEFAULT_MATERIALIZATION = {
@@ -69,22 +69,21 @@ DEFAULT_MATERIALIZATION = {
     2032: 0.84,
     2033: 0.91,
     2034: 0.96,
-    2035: 0.99,
-    2036: 1.00,
+    2035: 1.00,
 }
 
 # Force-specific materialization overrides (legacy — used when trend has no diffusion_curve)
 REGULATORY_MATERIALIZATION = {
     2026: 0.05, 2027: 0.15, 2028: 0.40, 2029: 0.60, 2030: 0.75,
-    2031: 0.85, 2032: 0.92, 2033: 0.97, 2034: 0.99, 2035: 1.00, 2036: 1.00,
+    2031: 0.85, 2032: 0.92, 2033: 0.97, 2034: 0.99, 2035: 1.00,
 }
 TECHNOLOGY_MATERIALIZATION = {
     2026: 0.04, 2027: 0.10, 2028: 0.22, 2029: 0.40, 2030: 0.58,
-    2031: 0.72, 2032: 0.83, 2033: 0.91, 2034: 0.96, 2035: 0.99, 2036: 1.00,
+    2031: 0.72, 2032: 0.83, 2033: 0.91, 2034: 0.98, 2035: 1.00,
 }
 CONSUMER_MATERIALIZATION = {
     2026: 0.10, 2027: 0.22, 2028: 0.38, 2029: 0.54, 2030: 0.68,
-    2031: 0.79, 2032: 0.87, 2033: 0.93, 2034: 0.97, 2035: 0.99, 2036: 1.00,
+    2031: 0.79, 2032: 0.87, 2033: 0.93, 2034: 0.98, 2035: 1.00,
 }
 
 FORCE_MATERIALIZATION_OVERRIDES = {
@@ -323,15 +322,24 @@ DEFAULT_WITHIN_FORCE_OVERLAP = {
 }
 
 # ── Force correlation matrix (cross-force correlations for copula) ──────
-# Replaces DAG-based correlation for Monte Carlo sampling.
-# Diagonal is always 1.0, off-diagonal values from DAG weights × 0.5.
+# v3.6 RECALIBRATION (June 2026, audit finding F-01): the previous matrix
+# (off-diagonals 0.05-0.30, "DAG weights × 0.5") was NOT positive semi-
+# definite once expanded to the 99-trend population with within-force
+# rho = 0.3 (min eigenvalue -1.68). The engine silently repaired it on every
+# run, rescaling ALL correlations to ~0.37x their configured values — so the
+# configured dependence was never the effective dependence.
+# Fix: the same relative coupling structure scaled by 0.73 (the largest
+# uniform scale keeping the implied 99-trend matrix comfortably PSD,
+# min eigenvalue ~0.14). These values are now valid AS ENTERED: the engine's
+# PSD repair no longer fires on defaults, and PUT /api/v1/config rejects
+# settings that would make the implied matrix invalid (spectral gate).
 DEFAULT_FORCE_CORRELATIONS = {
-    "Consumer": {"Consumer": 1.0, "Customer": 0.25, "Technology": 0.15, "Government": 0.05, "Environmental": 0.20, "Competitive": 0.20},
-    "Customer": {"Consumer": 0.25, "Customer": 1.0, "Technology": 0.15, "Government": 0.20, "Environmental": 0.05, "Competitive": 0.25},
-    "Technology": {"Consumer": 0.15, "Customer": 0.15, "Technology": 1.0, "Government": 0.30, "Environmental": 0.15, "Competitive": 0.25},
-    "Government": {"Consumer": 0.05, "Customer": 0.20, "Technology": 0.30, "Government": 1.0, "Environmental": 0.30, "Competitive": 0.05},
-    "Environmental": {"Consumer": 0.20, "Customer": 0.05, "Technology": 0.15, "Government": 0.30, "Environmental": 1.0, "Competitive": 0.05},
-    "Competitive": {"Consumer": 0.20, "Customer": 0.25, "Technology": 0.25, "Government": 0.05, "Environmental": 0.05, "Competitive": 1.0},
+    "Consumer":      {"Consumer": 1.0,  "Customer": 0.18, "Technology": 0.11, "Government": 0.04, "Environmental": 0.15, "Competitive": 0.15},
+    "Customer":      {"Consumer": 0.18, "Customer": 1.0,  "Technology": 0.11, "Government": 0.15, "Environmental": 0.04, "Competitive": 0.18},
+    "Technology":    {"Consumer": 0.11, "Customer": 0.11, "Technology": 1.0,  "Government": 0.22, "Environmental": 0.11, "Competitive": 0.18},
+    "Government":    {"Consumer": 0.04, "Customer": 0.15, "Technology": 0.22, "Government": 1.0,  "Environmental": 0.22, "Competitive": 0.04},
+    "Environmental": {"Consumer": 0.15, "Customer": 0.04, "Technology": 0.11, "Government": 0.22, "Environmental": 1.0,  "Competitive": 0.04},
+    "Competitive":   {"Consumer": 0.15, "Customer": 0.18, "Technology": 0.18, "Government": 0.04, "Environmental": 0.04, "Competitive": 1.0},
 }
 
 @dataclass(frozen=True)

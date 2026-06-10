@@ -1,0 +1,17 @@
+(1) MANIPULATION SURFACE — target Hair: Color @2030 (default -0.0429)
+  achievable range with VALIDATOR-LEGAL weights+attenuation: -0.3388 .. +0.2386
+  most favourable: fw={'Consumer': 1.0}, att=1.0 -> +0.2386
+  most damaging:  fw={'Competitive': 1.0}, att=1.0 -> -0.3388
+  'plausible-looking' fw {'Consumer': 0.4, 'Customer': 0.02, 'Technology': 0.3, 'Government': 0.02, 'Environmental': 0.16, 'Competitive': 0.1}:
+   Hair: Color +0.0227 vs LHC: HSC -0.0087  -> flipped=True (default: -0.0429 vs -0.0335)
+
+(2) GARBAGE-IN (shuffled probs, 30% directions flipped) — Hair: Color @2030:
+  real data:    med=-0.0431  band width=0.0144
+  garbage data: med=-0.0278  band width=0.0153
+  integrity_events on garbage run: ['correlation_pd_repair']
+  -> output formats identically 'confident'; nothing flags the corrupted inputs
+
+(3) ADVERSARIAL (rho=.9, df=2, att=1.0, overlap=0) — Hair: Color @2030: med=-0.1413 p10=-0.1641 p90=-0.1115
+  vs default med=-0.0431 -> headline x3.3
+  integrity_events: []
+  grand 2030 total: default -0.544 vs adversarial -1.773

@@ -1,0 +1,28 @@
+PRE-REPAIR: lambda_min=-1.6835, lambda_max=20.42  (config rho_within=0.3)
+POST-REPAIR effective rho: within-force mean=0.1114 (configured 0.30), cross-force mean=0.0654 (configured 0.05-0.30)
+=> dependence shrink factor ~0.37x
+ALT (rho=0.3 within, flat 0.05 cross): lambda_min=0.7000
+DEFAULT (repaired):   portfolio2035 p5=-0.0536 p50=-0.0457 p95=-0.0363 width=0.0173 events=['correlation_pd_repair']
+VALID rho=0.3 matrix: portfolio2035 p5=-0.0543 p50=-0.0457 p95=-0.0355 width=0.0187 events=[]
+=> band width understated by repair: 1.08x
+df= 3: p5=-0.0539 p50=-0.0458 p95=-0.0355 width=0.0184
+df= 8: p5=-0.0543 p50=-0.0457 p95=-0.0355 width=0.0187
+df=30: p5=-0.0544 p50=-0.0456 p95=-0.0358 width=0.0186
+
+Beta PPF parity (a=5,b=1  i.e. probability=5):
+  q=0.01: scipy=0.3981 prod_fallback=0.5056 err=+0.1075
+  q=0.05: scipy=0.5493 prod_fallback=0.6016 err=+0.0524
+  q=0.25: scipy=0.7579 prod_fallback=0.7383 err=-0.0195
+  q=0.50: scipy=0.8706 prod_fallback=0.8333 err=-0.0372
+  q=0.75: scipy=0.9441 prod_fallback=0.9283 err=-0.0157
+  q=0.95: scipy=0.9898 prod_fallback=0.9990 err=+0.0092
+  q=0.99: scipy=0.9980 prod_fallback=0.9990 err=+0.0010
+t CDF parity (df=8) at x=-4..-1:
+  x=-4: scipy=0.00197 prod_fallback=0.00005 ratio=0.03
+  x=-3: scipy=0.00854 prod_fallback=0.00183 ratio=0.21
+  x=-2: scipy=0.04026 prod_fallback=0.02634 ratio=0.65
+  x=-1: scipy=0.17330 prod_fallback=0.16633 ratio=0.96
+
+SAME SEED, Hair:Color 2030 — local(scipy): med=-0.0431 p10=-0.0499 p90=-0.0356
+                              prod(fallback): med=-0.0425 p10=-0.0495 p90=-0.0354
+max |median delta| across categories: 0.0009; mean: 0.0007

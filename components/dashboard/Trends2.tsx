@@ -594,7 +594,7 @@ const Trends2: FC = () => {
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
               A curated lens on the {trends?.length ?? 0} signals driving
-              profit-pool reallocation across categories through 2036.
+              profit-pool reallocation across categories through 2035.
             </p>
           </div>
 
@@ -1271,8 +1271,13 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
           </>
         )}
-        {trend.ai_suggested && (
-          <span style={{
+        {/* D7 (June 2026): score provenance. Baseline values are AI-preset;
+            an admin edit via this editor marks the trend expert-reviewed. */}
+        <span
+          title={trend.user_override
+            ? 'Scores were AI-preset and have been reviewed/adjusted by an expert via the Trend editor.'
+            : 'Scores are AI-preset from the evidence base — not yet expert-reviewed.'}
+          style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '4px 12px', borderRadius: 999,
             fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
@@ -1280,9 +1285,9 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             color: S.onTertiaryContainer,
             textTransform: 'uppercase',
           }}>
-            <Sparkles size={12} /> AI Suggested
-          </span>
-        )}
+          <Sparkles size={12} />
+          {trend.user_override ? 'AI suggestion · expert-reviewed' : 'AI suggestion'}
+        </span>
         {!isEditing && dataSource && <MetaChip label={dataSource} />}
       </div>
 

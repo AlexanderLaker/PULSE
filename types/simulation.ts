@@ -51,15 +51,6 @@ export interface ForceAttribution {
   direct_effects?: Record<string, number>;
 }
 
-/** Allocation recommendation from the optimizer. */
-export interface AllocationRecommendation {
-  invest_more?: string[];
-  defend?: string[];
-  harvest?: string[];
-  rationale?: string;
-  weights?: Record<string, number>;
-}
-
 /** Convergence diagnostics from Monte Carlo simulation. */
 export interface ConvergenceDiagnostics {
   converged: boolean;
@@ -140,7 +131,6 @@ export interface SimulationResult {
   decompositions?: DecompositionMatrix;
   /** Per-year row/column/grand totals — matching the decompositions. */
   totals?: TotalsMatrix;
-  allocation_recommendation?: AllocationRecommendation;
   convergence?: ConvergenceDiagnostics;
   scenario?: ScenarioId;
   generated?: string;
@@ -153,7 +143,6 @@ export interface SimulationResult {
 export interface SimulationParams {
   scenario?: ScenarioId;
   iterations?: number;
-  include_allocation?: boolean;
   include_sensitivity?: boolean;
 }
 

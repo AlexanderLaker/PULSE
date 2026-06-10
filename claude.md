@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.2
+## Project Specification & Architecture — v3.3
 
 ---
 
@@ -11,6 +11,43 @@ PRISM is an **AI-augmented profit pool simulation engine** that transforms a sta
 
 ### The Core Innovation
 PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2036, 11-year horizon). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+
+### What Changed in v3.6 (vs. v3.3) — Audit Remediation, June 2026
+
+Executed against the independent strategy review & model validation in `audit/strategy-review/` (decisions D1–D11, see `06_DECISION_LOG_AND_WORK_ORDER.md`). MODEL_VERSION bumped to **2.7.0**.
+
+1. **PSD-valid default correlations (D1, audit F-01).** The old `DEFAULT_FORCE_CORRELATIONS` produced a non-PSD 99-trend matrix (min eigenvalue −1.68) that the engine silently repaired, rescaling all correlations ×0.37. Defaults recalibrated (same coupling structure × 0.73, min eigenvalue ≈ +0.14, valid as entered); `PUT /api/v1/config` now spectrally rejects invalid correlation settings (`config_validation.correlation_lambda_min`). Golden pins regenerated in the same commit.
+2. **Allocation optimizer removed (D4).** `pulse/optimizer/` retired; no `/api/v1/optimize/allocation`; no `include_allocation`/allocation in `/simulate`; allocation stripped from Excel/PPTX exports, types, and state. It ranked dimensionless shifts with no € pools or Henkel position — not a resource-allocation tool.
+3. **Delphi capability removed (D10).** `pulse/elicitation/` + delphi routes/DDL/types/UI retired; expert consensus is entered live via the admin Trend editor. `scripts/migrate_drop_delphi.py` archives-then-drops existing `delphi_*` tables.
+4. **Analytics endpoints fixed (D2, F-02/04/05/22).** Sobol: correct result accessor (was reading a non-existent key → NaN indices), seeded inner runs, deep-copied DB in trend mode. CVaR: terminal-year tail (was mean-over-years, understating tails ~20%), asymptotic SE, honest worst-5. Tipping points: correct path shape, inflection alarm now conditional. These endpoints remain **unexposed** in the UI; do not present Sobol externally until the X3 redesign (Shapley effects).
+5. **Provenance & display honesty (D3/D6/D7/D8, F-13/16/27).** Matrix lenses relabeled "Force / Value chain / Region **attribution**"; one-decimal percentages everywhere; P10…P90 ranges visible by default in Time-Path cells; trend chips show "AI suggestion" / "AI suggestion · expert-reviewed" (admin edits set `user_override`); Settings config sheet no longer shows the dead scalar attenuation field — per-force attenuation + within-force overlap displayed read-only (GET /config now returns both); `GET /config` no longer crashes on the removed `attenuation` attribute.
+6. **Profit Pool Explorer is GP1-only (D5).** The unused EBIT-margin category dataset and € conversion helpers (`PROFIT_POOL_DATA`, `shiftedProfitBn`, …) were removed from `lib/profitPoolData.ts`; the explorer keeps its sourced GP1 slide views (absolute revenue/pool figures allowed there — owner decision). The Profit Pool Shift Analysis remains relative-% only.
+7. **Housekeeping.** Sync-conflict duplicate files and orphaned components (ScenarioSelectorPanel, AllocationChart, Delphi*) neutralized as tombstones (the sync layer blocks deletion — delete manually at will); stale `.git/index.lock` from May 4 diagnosed (remove manually to restore git).
+
+### What Changed in v3.3 (vs. v3.2) — Strategic Trend Review, April 2026
+
+v3.3 is a content release following a deep MECE-coverage review of the trend database with a 20-analyst strategic team (Bain / McKinsey / BCG / L'Oréal / P&G / Unilever / Henkel / Statista / Euromonitor / Circana):
+
+1. **14 new trends** filling structurally under-covered gap areas:
+   - *Demographics:* `consumer_r25` (Birth-rate collapse / household atomisation), `consumer_r26` (Gen Alpha category entry)
+   - *Regulatory:* `government_r13` (MoCRA + US state cosmetics regulation — compliance cliff)
+   - *Retailer vertical integration:* `competitive_r13` (Walmart / Costco / Aldi vertical manufacturing)
+   - *Emerging-market category shift:* `consumer_r27` (HDW → ADW conversion in HG markets)
+   - *LHC premium pools:* `consumer_r28` (Laundry scent boosters structural premium), `consumer_r29` (Delicates / performance-fabric wash revival)
+   - *Channel disruption:* `customer_r10` (Chinese live-commerce / Douyin exports), `customer_r11` (Retailer loyalty program cannibalisation of trade spend)
+   - *R&D / IoT:* `technology_r17` (Neurocosmetics & sensory science), `technology_r18` (Bathroom & laundry-room IoT)
+   - *Longevity split:* `consumer_r30` (Longevity economy — LHC / home-hygiene dimension)
+   - *Cohort fluency:* `consumer_r31` (Cleaning-fluency generational decline)
+   - *DTC hair-care:* `consumer_r32` (Beauty-as-medicine / tele-derm DTC)
+2. **8 re-scorings** (upgrades where April 2026 market data corroborated a stronger signal; downgrades where double-counting was corrected):
+   - *Upgrades:* `competitive_r05` prob 3→4, gp1 0.04→0.06 (US/EU PL accelerating); `technology_r10` peak 2029→2028, curve s-curve→front-loaded, gp1 0.06→0.08 (Gen-AI creative commoditisation faster than modelled); `customer_r08` gp1 0.18→0.20 (US retail-media extraction surpassing projections); `government_r07` gp1 0.03→0.05 (EU DPP mandate extension)
+   - *Downgrades / double-count corrections:* `consumer_r04` 0.10→0.08; `consumer_r09` 0.12→0.10 (split with new consumer_r28); `consumer_r13` 0.07→0.05 (refill realism reset)
+3. **1 consolidation** — `technology_r09` (generic ML-formulation) retired; fully superseded by `technology_r13` (hyper-personalised formulation) which captures the same vector at higher resolution and with stronger consumer-facing mechanism.
+4. **Force-distribution rebalanced:** Consumer 31 / Technology 17 / Government 13 / Competitive 13 / Environmental 11 / Customer 10. Customer force now at 11% (up from 10%) addressing the review's under-weighting flag.
+5. **Direction split:** 50 Contraction / 45 Expansion (95 active) — preserves the honest bear-bias of the v3.1 base rather than forcing parity.
+6. **MODEL_VERSION bumped to 2.6.0** to reflect the expanded trend base.
+
+No architectural or schema changes in v3.3. Re-simulation required to rebuild the Shift Matrix against the expanded prior set.
 
 ### What Changed in v3.2 (vs. v3.1) — Dead-Code Cleanup, April 2026
 
@@ -93,8 +130,8 @@ All previous improvements carry forward:
 | Bayesian Monte Carlo with copulas | **Production** | Gaussian copula + t-copula tails, Beta priors |
 | Continuous path modeling | **Production** | 5 diffusion curve types, velocity/acceleration tracking |
 | CVaR / Sobol / Reverse stress / Tipping points | **Production** | Full advanced analytics suite |
-| Resource allocation optimizer | **Production** | Mean-variance optimization with efficient frontier |
-| Delphi expert elicitation | **Production** | Multi-round with DB persistence |
+| Resource allocation optimizer | **Removed (v3.6, D4)** | Ranked dimensionless shifts without € pools/position — retired |
+| Delphi expert elicitation | **Removed (v3.6, D10)** | Replaced by live expert sessions + admin Trend editor (`user_override`) |
 | AI layer (scanner, narrator, calibrator, chat) | **Production** | Provider-agnostic (Claude / Azure OpenAI / Ollama) |
 | Excel / PowerPoint / Power BI export | **Production** | Professional Henkel-branded outputs |
 | War Room dashboard (Next.js) | **Production** | 29+ components, auth, dark mode, Consumer Journey lens |
@@ -238,7 +275,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 
 ### Module 3: DELPHI EXPERT ELICITATION (`pulse/elicitation/`)
 
-**delphi.py** — Structured scoring protocol (PRODUCTION)
+**delphi.py** — REMOVED (v3.6, D10) — tombstone only
 - Multi-round scoring: Round 1 (blind) → Round 2 (shared distribution) → Round 3 (outlier discussion)
 - ScoringRound and CalibrationExercise dataclasses
 - Inter-rater reliability (Krippendorff's alpha)
@@ -301,7 +338,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - PostgreSQL via @neondatabase/serverless (production on Vercel)
 - SQLite via stdlib sqlite3 (local development)
 - Connection pooling with cold-start retry logic
-- Tables: trends, trend_category_exposure, trend_vc_exposure, simulation_runs, config_snapshots, delphi_rounds, triggers, ai_suggestions, audit_log, users
+- Tables: trends, trend_category_exposure, trend_vc_exposure, simulation_runs, config_snapshots, triggers, ai_suggestions, audit_log, users (delphi_* dropped in v3.6 — see scripts/migrate_drop_delphi.py)
 
 **seed_trends.py** — Trend seeding (PRODUCTION)
 - 82 fully specified trends (55 original + 6 regional + 21 net v3.1 expansion)
@@ -330,10 +367,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - `POST /analytics/tipping-points` — Tipping point detection
 - `POST /analytics/reverse-stress` — Reverse stress testing
 
-**routes/delphi.py** — Delphi protocol endpoints (PRODUCTION)
-- `POST /delphi/sessions` — Create Delphi sessions
-- `POST /delphi/score` — Submit expert scores
-- `GET /delphi/calibration` — Calibration exercises
+**routes/delphi.py** — REMOVED (v3.6, D10) — tombstone only
 
 **routes/auth.py** — Authentication (PRODUCTION)
 - `POST /auth/register`, `/auth/login`
@@ -418,7 +452,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`
 - `simulation.ts` — Shift matrix, path, scenario types
 - `trends.ts` — Trend, force, category types
 - `config.ts` — Configuration types
-- `delphi.ts` — Delphi protocol types
+- `delphi.ts` — tombstone (Delphi removed v3.6)
 
 ### Embedded Vite Dashboard (`pulse/dashboard/`)
 A secondary React dashboard built with Vite, served by FastAPI for local development. Contains 45+ components mirroring the Next.js dashboard but optimized for the `python -m pulse --serve` workflow.
@@ -864,7 +898,7 @@ PROFIT_POOL_ENGINE/
 │   ├── database.py                    # Dual-mode DB (Postgres/SQLite)
 │   ├── env_loader.py                  # Environment variable loading
 │   ├── backup.py                      # Database backup utilities
-│   ├── seed_trends.py                 # 99 trend definitions (v3.5 — v3.3 base + Gemini additions)
+│   ├── seed_trends.py                 # 82 trend definitions (v3.1 Bain review)
 │   │
 │   ├── simulation/
 │   │   ├── bayesian_mc.py             # Bayesian MC with copulas (PRODUCTION)

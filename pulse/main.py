@@ -16,7 +16,6 @@ from pulse import __version__
 from pulse.config import ModelConfig
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 from pulse.simulation.paths import PathAnalyzer
-from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.excel_bridge.writer import ShiftMatrixWriter
 from pulse.audit.logger import AuditLogger
 
@@ -37,10 +36,6 @@ def create_parser():
                         default="shift_matrix.xlsx")
     parser.add_argument("--iterations", type=int, default=None,
                         help="Number of Monte Carlo iterations")
-    parser.add_argument("--no-allocation", action="store_true",
-                        help="Disable allocation optimization")
-    parser.add_argument("--risk-aversion", type=float, default=1.0,
-                        help="Risk aversion for allocation optimizer (0-3)")
     parser.add_argument("--serve", action="store_true",
                         help="Launch Profit Pool Shift Model dashboard")
     parser.add_argument("--audit", action="store_true",
@@ -65,7 +60,7 @@ def main():
 
     print(f"\n{'═' * 60}")
     print(f"  PRISM v{__version__} — Profit Pool Simulation Engine")
-    print(f"  Bayesian MC · Copula Dependencies · Allocation Optimizer")
+    print(f"  Bayesian MC · Copula Dependencies")
     print(f"{'═' * 60}\n")
 
     # Audit trail
@@ -145,19 +140,7 @@ def main():
     n_chains = mc_result.get("n_chains", 1)
     print(f"      Convergence: {converged}/{total} categories (R̂ < 1.05, n_chains={n_chains})")
 
-    # ── Step 4: Optimizer ───────────────────────────────────────────
-    allocation = None
-
-    if not args.no_allocation:
-        print("[3/5] Running allocation optimizer...")
-        optimizer = AllocationOptimizer(config)
-        allocation = optimizer.optimize(
-            mc_result["shift_matrix"],
-            risk_aversion=args.risk_aversion,
-            raw_samples=mc_result.get("raw_samples"),
-            category_order=config.category_names,
-        )
-        print(f"      Sharpe proxy: {allocation.get('sharpe_proxy', 'N/A')}")
+    allocation = None  # optimizer removed (D4, June 2026)
 
     # ── Step 5: Path analysis & triggers ────────────────────────────
     print("[4/5] Analyzing paths and triggers...")
@@ -213,13 +196,6 @@ def main():
         bar = "█" * int(abs(median) * 200)
         sign = "▲" if median > 0 else "▼" if median < 0 else "─"
         print(f"    {cat:20s} {sign} {median:+.2%}  {bar}")
-
-    if allocation:
-        print("\n  Allocation Recommendations:")
-        for cat in sorted(allocation.get("weights", {}),
-                          key=lambda c: allocation["weights"][c], reverse=True)[:5]:
-            w = allocation["weights"][cat]
-            print(f"    {cat:20s} → {w:.1%} weight")
 
     print(f"\n  All outputs contain relative % shifts.\n")
 

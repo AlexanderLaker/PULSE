@@ -36,3 +36,4 @@ DEPLOY_TOKEN_HIER_EINFUEGEN.txt
 *.db-journal
 *.db-wal
 *.db-shm
+_RETIRED_2026-06/

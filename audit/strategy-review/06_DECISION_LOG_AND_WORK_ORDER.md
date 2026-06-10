@@ -1,0 +1,89 @@
+# 06 — Decision Log & Execution Work Order
+**Owner decisions of 2026-06-10 on the remediation roadmap (03/03a), with the verified facts behind each, and the precise file-by-file execution plan.**
+
+---
+
+## Part A — Decisions (recorded)
+
+| # | Topic | Decision | Notes / consequences accepted |
+|---|---|---|---|
+| D1 | P1 correlation table | **Option 3** — reject invalid matrices at config entry; recalibrate defaults so they are valid as entered; surface configured = effective. | Next 50k run will differ slightly from the last; version-stamp + one changelog line. |
+| D2 | P2 broken analytics | **Option 2** — fix CVaR (terminal-year + SE), tipping points (shape + conditional alarm), Sobol plumbing; retire every "Production" claim until each fix lands. | Per D11, Sobol stays **unexposed** to any audience even after the plumbing fix. |
+| D3 | P3 honest display | **Option 2**, plus **one decimal everywhere in the tool** (cells, tooltips, row/column/grand totals, headline, drill-down, exports). Real joint portfolio band for the headline; replace the R̂ badge with the seed-stability line. | Screens look "fuzzier"; prepared answer documented in 03a. |
+| D4 | P4a allocation optimizer | **Delete entirely** (backend module, endpoints, request flags, response fields, Excel/PPTX allocation sections, types, orphaned chart component, tests). | Verified before deciding: **not rendered in any live view** — `app/dashboard/page.tsx` imports no allocation UI; the Jun-09 UX walk of every screen found none. It runs backend-side inside `/simulate` (`include_allocation: bool = True`) and exists as `/api/v1/optimize/allocation`, in the Excel "Allocation" sheet, the PPTX strategic-implications slide, and as AI-chat context. All of that goes. |
+| D5 | P4b/P7 € values | **Remove all absolute € values and conversions from the live app and the code.** PRISM outputs relative shifts only (restores the original "two-audience" doctrine: € belongs to finance's own systems, not this tool). | What this deletes is explained in Part B below. Includes the Beta "Profit Pool Explorer" tab. |
+| D6 | P4c region/VC views | **Keep, relabel truthfully as attribution.** New on-screen wording (exact): lens label "Force / Value-chain / Region **attribution**"; caption: *"Distributes each category's simulated shift across {forces/chain steps/regions} by exposure. One number per category, repainted — not an independent simulation of {regions/chain steps}."* | Apply in the matrix lens toggle, lens captions, exports, and CLAUDE.md §lenses. |
+| D7 | P5 parameter governance | **Option 2** with owner-specified provenance labels at trend level: values carry **"AI suggestion"** (ai_suggested, no user_override) or **"AI suggestion · expert-reviewed"** (edited via the admin Trend editor → user_override=true). Config-level (weights/attenuation/copula) keeps the separate "Defaults / Modified (n)" chip with reason logging. | Interpretation note: the AI-labels apply to **trend scores** (gp1, probability, exposures — the fields the Trend editor touches; flags already exist in the data model, `models.py:28-29`). Model-level dials aren't AI-suggested, so they keep the Defaults/Modified chip. If one single label system is preferred instead, say so before execution. |
+| D8 | P5-addendum attenuation visibility | **Show the attenuation system read-only on the config sheet**: six per-force effective attenuations + six within-force overlaps, each with source tag ("calibrated v3.5 Apr-2026"); full 6×6 cross-force matrix + 6×6 correlation matrix in a collapsible "Advanced (read-only)" section. **Remove the stale scalar "Attenuation (base)" field** — it edits a parameter the engine no longer reads (new finding F-27, register updated). | Verified: today **nothing** of the attenuation system is visible anywhere — worse, `SettingsModal.tsx:762-770` still offers a scalar attenuation field ("Default 0.5") that the v3.2+ engine ignores (engine consumes only `per_force_attenuation`). |
+| D9 | P6 hindcast | **Skipped by owner decision.** | Consequence recorded: F-08 stays open; PRISM's positioning must remain "structured judgment", never "validated forecaster"; revisit trigger: the moment any PRISM output is cited in a board-level document. |
+| D10 | Delphi | **Remove the entire Delphi capability** (backend module, API routes, DB tables, types, orphaned UI components, doc claims). Owner runs expert sessions live in meetings and enters consensus via the admin Trend editor. | Sensible simplification: the audit found the Delphi mechanics methodologically naive anyway (F-14) — deleting beats repairing for a one-team tool. The D7 "expert-reviewed" label becomes the provenance trail for those live-meeting edits. Trend fields `scorer_count`/`score_variance`/`debiasing_applied` stay in the data model (harmless, avoids a data migration) but nothing writes them anymore. Existing `delphi_*` DB tables: archive (export) then drop. |
+| D11 | X3 sensitivity redesign | **No change for now.** Suggestion stands on record (see Part C): per-trend-cluster **Shapley effects** under the copula when/if sensitivity is ever rebuilt; until then Sobol remains unexposed and unclaimed. | — |
+
+---
+
+## Part B — The two things you asked to have explained
+
+### What the "€ conversion" is (and why deleting it is clean)
+Two pieces, both frontend-only, both added with the Beta "Profit Pool Explorer" tab:
+1. **A hand-entered € dataset** — `lib/profitPoolData.ts` contains, for each of the 12 categories: global category revenue in €bn, an industry margin percentage, Henkel's share, and growth rates. The file itself labels these "INDICATIVE model values… triangulation" (sources tagged A–D). These numbers are *content typed into the code*, not something the engine computes.
+2. **A multiplication** — `shiftedProfitBn()` (`profitPoolData.ts:383-390`) takes a category's € pool (revenue × margin) and multiplies it by (1 + simulated shift) to show a "future pool in €bn" bubble chart.
+The audit flagged this multiplication as unsound (F-06): the simulated shift is anchored to **GP1** (the product-margin definition your trend scoring uses) and its absolute size is compressed by arbitrary constants, while the € pool in that file is built on a *different, broader margin definition* — so the resulting €bn deltas aren't defensible. (The "EBIT" in my report referred to that margin field in this file — `ebitMargin`, `profitPoolData.ts:16` — not to anything you specified. It arrived with this dataset.) Since only the Beta explorer uses the file (verified: sole importer is `ProfitPoolExplorer.tsx`), removal is a clean cut: delete the tab, the component, the data file, done. The live Shift-Matrix views never touch €.
+
+### How the Region / Value-chain views actually work
+The engine computes **one** shift distribution per category. The Region and VC views then *distribute* that one number: for each category, every trend's |score| × category-exposure × region-exposure (or VC-exposure) × layer weight is summed into shares per region/step, the shares are normalized to 100%, and each region/step is shown as share × the category's median (`bayesian_mc.py:603-690`). Three honest consequences: the regional/VC columns always re-add to exactly the category total (that's by construction, not a result); no region or chain step is ever simulated independently; and the signs are erased in the share calculation (a region exposed only to negative trends and one exposed to offsetting trends can show the same share). It is a *"where do the driving trends touch"* breakdown — useful, but an attribution, which is exactly what D6 now labels it.
+
+---
+
+## Part C — X3 suggestion, on record (no action)
+When sensitivity is rebuilt someday: don't rank *dials* (force weights — that's what the current Sobol does, and it rewards one-sidedness, F-03); rank *uncertainties*. The standard method for inputs that move together (which PRISM's copula asserts) is **Shapley effects**: like fairly splitting a shared taxi fare, each trend-cluster gets credited its fair share of the output variance, including the part it shares with correlated trends. Output reads "Cluster X explains ~Y% of the uncertainty in category Z" — the sentence leadership actually wants. Costs: more computation, needs the copula fixed first (D1), and ~1–2 weeks of work. Until then: no sensitivity exhibit exists, and none is claimed.
+
+---
+
+## Part D — Execution work order (file-by-file)
+
+**⚠ Execution status: BLOCKED by OneDrive file dehydration, not by complexity.** The decisive files are cloud-only placeholders right now and physically unreadable/uneditable from here — including the one file almost every change runs through (`pulse/api/app.py`) and the main view component. **Unblock (one minute, on the Mac): in Finder, right-click the `PROFIT_POOL_ENGINE` folder → OneDrive → "Always keep on this device", wait for the sync badge to finish.** Then the whole package below is executable and verifiable (typecheck + pytest) in one session. Also confirm `git status` works in that folder first — these are product-code deletions and want a branch + revert path (the audit found `.git` partially dehydrated too).
+
+Currently blocked files (verified just now): `pulse/api/app.py`, `hooks/usePrism.ts`, `api/client.ts`, `components/dashboard/ProfitPoolAnalysis2.tsx` (+Backup), `components/dashboard/Trends2.tsx`, `components/dashboard/CategoryDetailPanel.tsx` (fluctuating), `package.json`.
+
+### Step 1 — Backend detachment (app.py first — nothing else may be deleted before this)
+- `pulse/api/app.py`: remove `from pulse.api.routes.delphi import router…` (≈line 74) and `app.include_router(delphi_router…)` (≈517); remove all `AllocationOptimizer` imports/uses (≈297, 445, 631, 1493 in the conflict copy's numbering — re-locate in the live file); remove `include_allocation`/`risk_aversion` from `SimulationRequest` (≈132), the allocation block in `/simulate`, the `"allocation"` key in its response, and the whole `/api/v1/optimize/allocation` endpoint; remove allocation from the DB-persist call and the cold-start restore path.
+- D2 fixes in the same pass: `pulse/api/routes/analytics.py` — Sobol accessor `["path"][2030]["median"]`, real seed, deep-copy DB in trend mode (F-22); CVaR terminal-year + bootstrap SE + true top-5; tipping-point shape fix + conditional inflection.
+- D1: `pulse/config_validation.py` — add PSD/symmetry validation for `force_correlation_matrix` (+ validate `within_force_overlap`, `category_weights`, `region_weights`); recalibrate `DEFAULT_FORCE_CORRELATIONS`/ρ in `pulse/config.py` to a valid-as-entered set; reject invalid PUT /config with a nearest-PSD suggestion.
+### Step 2 — Module deletions (after Step 1 only)
+- Delete `pulse/optimizer/` (entire), `pulse/elicitation/` (entire), `pulse/api/routes/delphi.py`.
+- `pulse/database.py`: remove delphi DDL + helpers; write `scripts/migrate_drop_delphi.py` (archive `delphi_*` tables to JSON, then drop). `pulse/backup.py`, `pulse/audit/logger.py`: remove delphi references.
+- `pulse/excel_bridge/writer.py`: remove Allocation sheet (≈lines 42-62 signature + Sheet 3). `pulse/api/export_pptx.py`: remove allocation from the strategic-implications slide.
+### Step 3 — Frontend
+- `app/dashboard/page.tsx`: remove `ProfitPoolExplorer` import + tab entry + render branch.
+- Delete: `components/dashboard/ProfitPoolExplorer.tsx`, `lib/profitPoolData.ts`, `components/dashboard/{DelphiPanel,DelphiScoreCard,DelphiDistribution,AllocationChart,ScenarioSelectorPanel}.tsx` (orphans — re-verify importers once hydrated), `archive/InnovationExplorer.tsx` stays (already archived).
+- `types/`: delete `delphi.ts`; remove delphi exports from `index.ts` and delphi fields from `trends.ts`; remove `AllocationRecommendation` + `allocation*` fields from `simulation.ts`; remove allocation context from `AIChatPanel.tsx`.
+- `hooks/usePrism.ts`, `api/client.ts`: strip allocation/delphi calls + state (re-locate once hydrated).
+- `components/dashboard/ProfitPoolAnalysis2.tsx`: D6 relabels (lens toggle + captions); D3 one-decimal sweep (`toFixed(1)` everywhere incl. tooltips/totals); ranges visible by default; headline joint band (from per-run percentiles) + seed-stability line replacing the R̂ badge.
+- `components/dashboard/Trends2.tsx` + `CategoryDetailPanel.tsx`: D7 provenance chips ("AI suggestion" / "AI suggestion · expert-reviewed" from `ai_suggested`/`user_override`); ensure the admin Trend editor sets `user_override=true` on save (verify in `app.py` PUT /trends handler).
+- `components/dashboard/SettingsModal.tsx`: remove the stale scalar "Attenuation (base)" field (F-27); add read-only per-force attenuation (6) + within-force overlap (6) with source tags; collapsible advanced read-only view of the two 6×6 matrices; "Modified (n)" chip data plumbed from config diff vs defaults.
+### Step 4 — Tests, docs, claims
+- Delete `tests/test_optimizer.py`; update `tests/test_api.py` (allocation/delphi endpoints → 404 assertions or removal); add endpoint tests asserting Sobol non-NaN (kept unexposed), CVaR terminal-year, tipping no-crash; add PSD-rejection test.
+- `CLAUDE.md`: module table (Delphi/optimizer rows → removed; analytics rows → fixed-not-exposed), horizon text, two-audience doctrine restored (no € in tool), lens wording per D6.
+- Bump MODEL_VERSION (engine contract changes: simulate response loses `allocation`) and add one changelog block covering D1-D10.
+### Step 5 — Verify before deploy
+- `npx tsc -p tsconfig.check.json --noEmit` clean; `pytest` green (after fixture updates); one local 10k run: integrity events must show **no** `correlation_pd_repair` on defaults (D1 success criterion); spot-check `/simulate` response shape against `types/simulation.ts`.
+- Deploy to a Vercel preview before production; keep the previous production run row in the DB for diff.
+
+---
+
+## Part E — Execution record (2026-06-10)
+
+**Status: EXECUTED** on branch `remediation-now-package` (off `main`), with the Profit-Pool-Explorer decision updated per owner: **remodeled to GP1-only and kept** (absolute revenue/pool figures allowed there), instead of deleted.
+
+Verification at completion:
+- `npx tsc -p tsconfig.check.json --noEmit` → **0 errors**.
+- `pytest` (engine, excl. `test_scanner_routes.py`) → **118 passed**; 10 remaining failures are **pre-existing** auth-era tests (`test_api.py` asserts 4xx-without-401 on endpoints that have required admin auth since before this remediation; same assertions fail identically on `main`). `test_scanner_routes.py` is also pre-existing breakage (imports `_scan_source`, removed when external scanning was disabled).
+- Default engine run (seed 42): **integrity_events = []** — the D1 success criterion; the PSD repair no longer fires.
+- Golden pins regenerated for v3.6 defaults in the same commit, as the test's own policy requires; MODEL_VERSION → **2.7.0**.
+- Frontend vitest could not launch in the audit sandbox (node/vitest ESM mismatch, pre-existing) — run `npx vitest run` locally once for the two frontend test files.
+
+Manual follow-ups for the owner:
+1. `git` in this repo was wedged by a stale `index.lock` dated **May 4** (removable only outside the sandbox): delete `.git/index.lock`, then review/commit the branch. Until then the changes exist as working-tree edits on `remediation-now-package`.
+2. Tombstoned files (sync layer blocked deletion) — safe to delete manually: `pulse/optimizer/`, `pulse/elicitation/`, `pulse/api/routes/delphi.py`, `tests/test_optimizer.py`, `types/delphi.ts` (tombstone), `components/dashboard/{AllocationChart,DelphiPanel,DelphiScoreCard,DelphiDistribution,ScenarioSelectorPanel}.tsx`, and every `*-MacBook Air von Alexander.*` duplicate.
+3. Run `python scripts/migrate_drop_delphi.py --dry-run` then live against prod Neon to archive+drop `delphi_*` tables.
+4. Deploy to a **Vercel preview** first; re-run `scripts/run_50k_prod.py` so the persisted run reflects v3.6 defaults (expect small median changes; that is the D1 honesty correction, version-stamped).

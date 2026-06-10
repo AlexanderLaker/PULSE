@@ -1,0 +1,14 @@
+  iters  CVaR(term yr)  bootstrap SE
+   1000        -0.0814       0.00055
+  10000        -0.0820       0.00014
+  50000        -0.0818       0.00006
+
+category        CVaR mean-yrs (endpoint)  CVaR 2035 (true tail)  understated by
+Hair: Color                      -0.0516                -0.0492         -0.0024
+LHC: ADW                         -0.0676                -0.0820         +0.0144
+LHC: HSC                         -0.0380                -0.0435         +0.0055
+df= 3: portfolio CVaR5% = -0.0556
+df= 8: portfolio CVaR5% = -0.0558
+df=30: portfolio CVaR5% = -0.0558
+
+index convention check (n=1000, alpha=.95): var_index=50 -> VaR=0.051 (P5 would be 0.050); n_tail=51

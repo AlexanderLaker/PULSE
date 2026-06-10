@@ -1,0 +1,19 @@
+MODEL 2.5.0 bayesian_copula seed 42 iters 10000
+integrity_events: [{'type': 'correlation_pd_repair', 'severity': 'warning', 'message': 'Correlation matrix was not positive-definite (min eigenvalue=-1.6835); repaired via diagonal shift + renormalization.'}]
+category            2030 p10  2030 med  2030 p90  2035 med
+Hair: Color          -0.0499   -0.0431   -0.0356   -0.0371
+Hair: Care           -0.0450   -0.0370   -0.0285   -0.0285
+Hair: Styling        -0.0452   -0.0389   -0.0317   -0.0376
+Hair: Body           -0.0476   -0.0412   -0.0341   -0.0357
+LHC: FCN             -0.0641   -0.0572   -0.0490   -0.0611
+LHC: FCA             -0.0575   -0.0510   -0.0433   -0.0549
+LHC: FFI             -0.0435   -0.0384   -0.0324   -0.0398
+LHC: LAD             -0.0607   -0.0533   -0.0447   -0.0586
+LHC: HDW             -0.0542   -0.0489   -0.0424   -0.0521
+LHC: ADW             -0.0687   -0.0625   -0.0550   -0.0705
+LHC: HSC             -0.0382   -0.0337   -0.0286   -0.0353
+LHC: IC              -0.0430   -0.0384   -0.0330   -0.0377
+grand totals (sum of cat medians): {2026: -0.3291, 2029: -0.5466, 2032: -0.5752, 2035: -0.5489}
+force decomp sum vs median: -0.043098 vs -0.043098
+convergence (Hair: Color): {'r_hat': 0.9999162004476728, 'ess': 10000, 'converged': True, 'n_chains': 1, 'method': 'single_chain_split_rhat_approximate'}
+portfolio(equal-wt mean) 2035: mean=-0.0454 p5=-0.0536 p95=-0.0363

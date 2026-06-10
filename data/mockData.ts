@@ -20,7 +20,6 @@ import type {
   ConvergenceDiagnostics,
   ShiftMatrix,
   ForceContribution,
-  AllocationRecommendation,
   ForceName,
 } from '@/types';
 import { CATEGORIES, YEARS, FORCES } from '@/lib/format';
@@ -39,6 +38,16 @@ export interface TrendWithSources extends Trend {
 }
 
 /** Allocation with rationale for display. */
+// Local copy — the optimizer (and its shared type) were removed in June 2026 (D4);
+// this DEPRECATED mock file keeps a private equivalent so it still compiles.
+interface AllocationRecommendation {
+  invest_more?: string[];
+  defend?: string[];
+  harvest?: string[];
+  rationale?: string;
+  weights?: Record<string, number>;
+}
+
 export interface AllocationWithRationale extends AllocationRecommendation {
   category: string;
   currentWeight: number;

@@ -90,12 +90,13 @@ async def compute_cvar(request: CVaRRequest, user: dict = Depends(require_auth))
                 "note": "Run simulation with sufficient iterations"
             }
 
-        # Aggregate samples across years to get overall category shift distribution
+        # D2/F-04 (June 2026): CVaR is computed on the TERMINAL-YEAR samples,
+        # consistent with the shift matrix shown on screen. The previous
+        # mean-over-years aggregation understated tails by up to ~20%.
         categories = list(shift_matrix.keys())
         all_samples = {}
         for cat_idx, cat in enumerate(categories):
-            # Sum across years (total portfolio impact per iteration)
-            cat_samples = np.mean(raw_samples[:, cat_idx, :], axis=1)  # Mean over years
+            cat_samples = raw_samples[:, cat_idx, -1]  # terminal year
             all_samples[cat] = cat_samples
 
         # Compute portfolio CVaR
@@ -107,7 +108,10 @@ async def compute_cvar(request: CVaRRequest, user: dict = Depends(require_auth))
         return {
             "status": "success",
             "confidence_level": request.confidence_level,
-            "category_cvar": {cat: result["category_cvar"][cat] for cat in categories[:5]},  # Top 5
+            # Worst five by CVaR (ascending = most negative first) — was list-order
+            "category_cvar": {cat: result["category_cvar"][cat]
+                              for cat in sorted(categories,
+                                                key=lambda c: result["category_cvar"][c]["cvar"])[:5]},
             "portfolio_cvar": result["portfolio_cvar"],
             "risk_contributions": result["risk_contributions"],
             "diversification_ratio": result["diversification_ratio"],
@@ -191,13 +195,17 @@ async def compute_sobol(request: SobolRequest, user: dict = Depends(require_auth
             def force_model(weights_dict):
                 # Simulate with these force weights (B4: frozen — clone, don't mutate)
                 _cfg = config.copy_with(force_weights=dict(weights_dict))
-                mc = BayesianMonteCarloEngine(_cfg, state.get("dag"))
+                # F-02 fix: fixed seed (common random numbers across Saltelli
+                # samples); second positional arg used to receive a non-seed.
+                mc = BayesianMonteCarloEngine(_cfg, seed=42)
                 result = mc.run(db, iterations=analytics_iters)
                 shift_matrix = result.get("shift_matrix", {})
-                # Return portfolio shift at 2030
+                # F-02 fix: v2.5 result shape is {cat: {"path": {year: {"median": ...}}}};
+                # the old accessor [cat][2030][0.5] always returned 0 -> NaN indices.
+                last_year = max(int(y) for cd in shift_matrix.values() for y in cd.get("path", {}))
                 total_shift = sum(
-                    shift_matrix.get(cat, {}).get(2030, {}).get(0.5, 0)
-                    for cat in shift_matrix.keys()
+                    cd.get("path", {}).get(last_year, {}).get("median", 0.0)
+                    for cd in shift_matrix.values()
                 )
                 return total_shift
 
@@ -224,18 +232,22 @@ async def compute_sobol(request: SobolRequest, user: dict = Depends(require_auth
 
             # Wrapper for trend scores
             def trend_model(score_dict):
-                # Temporarily update trend probability scores
-                for trend in db.trends:
+                # F-22 fix: sweep a deep copy — the live trend DB must never
+                # be mutated by an analytics request.
+                import copy as _copy
+                _db = _copy.deepcopy(db)
+                for trend in _db.trends:
                     if trend.id in score_dict:
                         trend.probability = max(1, min(5, int(score_dict[trend.id])))
                         trend.__post_init__()
 
-                mc = BayesianMonteCarloEngine(config, state.get("dag"))
-                result = mc.run(db, iterations=analytics_iters)
+                mc = BayesianMonteCarloEngine(config, seed=42)
+                result = mc.run(_db, iterations=analytics_iters)
                 shift_matrix = result.get("shift_matrix", {})
+                last_year = max(int(y) for cd in shift_matrix.values() for y in cd.get("path", {}))
                 total_shift = sum(
-                    shift_matrix.get(cat, {}).get(2030, {}).get(0.5, 0)
-                    for cat in shift_matrix.keys()
+                    cd.get("path", {}).get(last_year, {}).get("median", 0.0)
+                    for cd in shift_matrix.values()
                 )
                 return total_shift
 
@@ -299,7 +311,12 @@ async def detect_tipping_points(request: TippingPointRequest, user: dict = Depen
         median_paths = {}
         for cat, data in shift_matrix.items():
             if isinstance(data, dict) and "path" in data:
-                median_paths[cat] = data["path"]
+                # F-05 fix: extract scalar medians — the detector expects
+                # {year: float}, not {year: {percentile: value}}.
+                median_paths[cat] = {
+                    int(y): (v.get("median", 0.0) if isinstance(v, dict) else float(v))
+                    for y, v in data["path"].items()
+                }
             else:
                 # Legacy format: {year: {percentile: value}}
                 median_paths[cat] = {

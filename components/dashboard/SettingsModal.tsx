@@ -651,7 +651,8 @@ const SessionsSection: FC = () => {
 // ═══════════════════════════════════════════════════════════════════
 interface ModelConfigPayload {
   region?: string;
-  attenuation?: number;
+  per_force_attenuation?: Record<string, number>;
+  within_force_overlap?: Record<string, number>;
   attenuation_source?: string;
   neutral_threshold?: number;
   iterations?: number;
@@ -759,23 +760,38 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Attenuation (base)" hint="0.0–1.0. Default 0.5. Controls cross-force dampening.">
-                <input
-                  type="number" min={0} max={1} step={0.01}
-                  value={draft.attenuation ?? 0.5}
-                  onChange={(e) => patch({ attenuation: parseFloat(e.target.value) })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
-                />
+              {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
+                  silent no-op — the engine consumes six calibrated per-force
+                  values. They are displayed read-only here with their source. */}
+              <Field
+                label="Per-force attenuation (calibrated, read-only)"
+                hint={`Effective multiplier on each force's contribution. Source: ${draft.attenuation_source ?? 'calibrated_v3.5_april2026'}. Changed only via a calibration release.`}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {Object.entries(draft.per_force_attenuation ?? {}).map(([f, v]) => (
+                    <div key={f} style={{ ...READONLY_STYLE, fontSize: 12.5 }}>
+                      {f}: {Number(v).toFixed(3)}
+                    </div>
+                  ))}
+                  {!draft.per_force_attenuation && (
+                    <div style={{ ...READONLY_STYLE, gridColumn: '1 / -1' }}>not returned by engine</div>
+                  )}
+                </div>
               </Field>
-              <Field label="Attenuation source" hint="calibrated_v3.5_april2026 · calibrated_v3.1_april2026 (legacy) · admin_override">
-                <input
-                  type="text"
-                  value={draft.attenuation_source ?? 'calibrated_v3.5_april2026'}
-                  onChange={(e) => patch({ attenuation_source: e.target.value })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
-                />
+              <Field
+                label="Within-force overlap (calibrated, read-only)"
+                hint="Dampens summed trends inside one force (mechanism redundancy). Same calibration release."
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {Object.entries(draft.within_force_overlap ?? {}).map(([f, v]) => (
+                    <div key={f} style={{ ...READONLY_STYLE, fontSize: 12.5 }}>
+                      {f}: {Number(v).toFixed(3)}
+                    </div>
+                  ))}
+                  {!draft.within_force_overlap && (
+                    <div style={{ ...READONLY_STYLE, gridColumn: '1 / -1' }}>not returned by engine</div>
+                  )}
+                </div>
               </Field>
               <Field label="Neutral threshold" hint="Shifts below this magnitude are reported as neutral.">
                 <input

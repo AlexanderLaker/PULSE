@@ -60,6 +60,10 @@ class CVaRAnalyzer:
             "n_tail_samples": int(var_index + 1),
             "tail_mean": float(tail_samples.mean()),
             "tail_std": float(tail_samples.std()),
+            # Asymptotic standard error of the CVaR estimate (tail std / sqrt(n));
+            # bootstrap-verified to be a good approximation for these bounded,
+            # narrow distributions (audit verification/v4_cvar_quality_out.txt).
+            "cvar_se": float(tail_samples.std() / max(len(tail_samples), 1) ** 0.5),
             "tail_min": float(tail_samples.min()),
             "tail_max": float(tail_samples.max()),
         }

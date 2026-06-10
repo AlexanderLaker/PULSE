@@ -201,10 +201,10 @@ class SobolAnalyzer:
             "ranking": [{"trend": name, "S1": first_order[name], "ST": val, "rank": i+1}
                        for i, (name, val) in enumerate(ranked)],
             "n_evaluations": len(Y),
-            "top_trends": [r["trend"] for r in ranked[:5]],
+            "top_trends": [name for name, _ in ranked[:5]],
             "interpretation": (
                 f"Top 5 most influential trends (by total-order Sobol): "
-                f"{', '.join([r['trend'] for r in ranked[:5]])}. "
+                f"{', '.join(name for name, _ in ranked[:5])}. "
                 f"Total-order > First-order indicates interaction effects."
             )
         }

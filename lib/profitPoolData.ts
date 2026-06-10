@@ -1,392 +1,26 @@
 /**
- * PRISM — Profit Pool Explorer data (Bain-style: X = revenue, Y = profitability, area = profit)
+ * PRISM — Profit Pool Explorer data (GP1 basis).
  *
- * Source philosophy (see Profit_Pool_Explorer_Concept.docx, Section 5 "Source Library"):
- *   • Tier A (HIGH):  Henkel Annual Report 2025, capital-markets slides, HCB segment disclosure
- *   • Tier B (MED):   Euromonitor (2024/25), Nielsen, Kantar Worldpanel, Circana
- *   • Tier C (MED-LO):Company filings of peers (P&G, Unilever, L'Oréal, Reckitt, Church & Dwight)
- *   • Tier D (LO):    Triangulation / Bain-internal benchmarks / expert interviews
+ * D5 REMODEL (June 2026): this file is GP1-only. The former EBIT-margin
+ * category dataset (PROFIT_POOL_DATA: revenueBn x ebitMargin x henkelShare)
+ * and its € conversion helpers (profitBn, shiftedProfitBn, ...) were removed:
+ * they mixed margin stacks (engine scores are GP1-anchored, the pools were
+ * EBIT-based) and were dead code — no live view imported them.
  *
- * All numbers are INDICATIVE model values for the dashboard narrative — they are
- * the output of a triangulation across Tier A/B/C/D sources (see `sources` array
- * on each category). Final numbers should be reconciled with Henkel MTP.
+ * What remains is the sourced, PPTX-aligned slide dataset used by the
+ * Profit Pool Explorer (Beta): revenue shares and pool sizes with
+ * GP1 / Contribution Margin 1 margins, every figure carrying an explicit
+ * public reference. Absolute revenue/pool figures are permitted here
+ * (owner decision D5); the Profit Pool Shift Analysis remains relative-%.
  *
- * Units:
- *   • revenueBn   — global category revenue in €bn (end-consumer / RSP basis)
- *   • ebitMargin  — category EBIT margin (decimal). Proxy for "profitability" on Y-axis.
- *                   This is INDUSTRY POOL profitability, not Henkel's realized margin.
- *   • henkelShare — Henkel's estimated global value share in the category (decimal)
- *
- * Derived:
- *   • profitBn  = revenueBn × ebitMargin          → area on the Bain chart
- *   • henkelRevenueBn  = revenueBn × henkelShare  → Henkel footprint overlay
+ * CURRENCY (owner decision, June 2026): all tool-authored display figures
+ * are stated in EUR, converted from the underlying USD sources at a
+ * planning rate of EUR/USD 1.15 (ECB-area spot ~1.155 on 2026-06-09;
+ * tradingeconomics.com). Source-citation strings keep the original USD
+ * figures exactly as published — converting a quote would misquote it.
  */
 
 import type { CategoryId } from '@/types';
-
-// ─── Source citation type ─────────────────────────────────────────
-export interface ProfitPoolSource {
-  /** Short handle shown in tooltip — e.g. "Henkel AR 2025" */
-  label: string;
-  /** A | B | C | D confidence tier (per concept doc §5) */
-  tier: 'A' | 'B' | 'C' | 'D';
-  /** What this source contributed — "revenue", "margin", "share", "triangulation" */
-  contributes: 'revenue' | 'margin' | 'share' | 'triangulation';
-  /** Optional public reference */
-  ref?: string;
-}
-
-// ─── Per-category profit-pool datum ───────────────────────────────
-export interface CategoryProfitPool {
-  id: CategoryId;
-  /** Full display label — "Hair: Color" */
-  name: string;
-  /** One-liner for tooltip */
-  shortDescription: string;
-  /** Business unit — drives Hair/Laundry toggle */
-  group: 'Hair' | 'LHC';
-  /** X axis — global category revenue in €bn (2025 basis) */
-  revenueBn: number;
-  /** Y axis — industry EBIT margin proxy (decimal) */
-  ebitMargin: number;
-  /** Henkel global value share (decimal) — for Henkel footprint overlay */
-  henkelShare: number;
-  /** 5y CAGR historical (decimal) — context only */
-  historical5yCAGR: number;
-  /** Forward-looking CAGR point estimate (decimal) — narrative only, NOT used for shift */
-  forwardCAGR: number;
-  /** Stack of sources behind this cell */
-  sources: ProfitPoolSource[];
-}
-
-// Default source refs — reused across many categories
-const SRC = {
-  henkelAR:    { label: 'Henkel AR 2025',        tier: 'A' as const, ref: 'Henkel Annual Report 2025 (HCB segment)' },
-  henkelCMS:   { label: 'Henkel CMD 2025',       tier: 'A' as const, ref: 'Henkel Capital Markets Day 2025' },
-  euromonitor: { label: 'Euromonitor 2024/25',   tier: 'B' as const, ref: 'Euromonitor International — global category sizing, 2024/25 release' },
-  nielsen:     { label: 'Nielsen 2024',          tier: 'B' as const, ref: 'NielsenIQ — global track, 2024' },
-  kantar:      { label: 'Kantar Worldpanel 2024',tier: 'B' as const, ref: 'Kantar Worldpanel — household panel 2024' },
-  circana:     { label: 'Circana 2024',          tier: 'B' as const, ref: 'Circana — US retail scan, 2024' },
-  pgAR:        { label: 'P&G AR 2025',           tier: 'C' as const, ref: 'Procter & Gamble 10-K FY25' },
-  ulAR:        { label: 'Unilever AR 2024',      tier: 'C' as const, ref: 'Unilever Annual Report 2024' },
-  lorealAR:    { label: "L'Oréal AR 2024",       tier: 'C' as const, ref: "L'Oréal Annual Financial Report 2024" },
-  reckittAR:   { label: 'Reckitt AR 2024',       tier: 'C' as const, ref: 'Reckitt Benckiser Annual Report 2024' },
-  colgateAR:   { label: 'Colgate AR 2024',       tier: 'C' as const, ref: 'Colgate-Palmolive 10-K 2024' },
-  churchAR:    { label: 'Church & Dwight AR',    tier: 'C' as const, ref: 'Church & Dwight 10-K 2024' },
-  bain:        { label: 'Bain triangulation',    tier: 'D' as const, ref: 'Bain internal benchmark & expert interviews, Apr 2026' },
-};
-
-// ─── Category data ────────────────────────────────────────────────
-//
-// Revenue figures are global industry pool sizes (RSP basis). EBIT margins
-// are industry-average — they are the Y-axis value for the Bain pool chart.
-// Henkel's realized margin differs; we show Henkel footprint as an overlay.
-
-export const PROFIT_POOL_DATA: CategoryProfitPool[] = [
-  // ── HAIR (4 cats) ──────────────────────────────────────────────
-  {
-    id: 'hair_color',
-    name: 'Hair: Color',
-    shortDescription: 'Permanent, semi-perm, root touch-up — consumer & professional',
-    group: 'Hair',
-    revenueBn: 24.5,
-    ebitMargin: 0.185,
-    henkelShare: 0.235,
-    historical5yCAGR: 0.028,
-    forwardCAGR: 0.036,
-    sources: [
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.lorealAR,    contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'hair_care',
-    name: 'Hair: Care',
-    shortDescription: 'Shampoo, conditioner, treatments, scalp care',
-    group: 'Hair',
-    revenueBn: 38.2,
-    ebitMargin: 0.168,
-    henkelShare: 0.076,
-    historical5yCAGR: 0.041,
-    forwardCAGR: 0.048,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.ulAR,        contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'hair_styling',
-    name: 'Hair: Styling',
-    shortDescription: 'Mousse, gel, spray, wax — finishing & hold products',
-    group: 'Hair',
-    revenueBn: 9.8,
-    ebitMargin: 0.152,
-    henkelShare: 0.115,
-    historical5yCAGR: -0.008,
-    forwardCAGR: 0.012,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.lorealAR,    contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'hair_body',
-    name: 'Hair: Body (Shower & Bath)',
-    shortDescription: 'Body wash, shower gel, bar soap',
-    group: 'Hair',
-    revenueBn: 28.6,
-    ebitMargin: 0.145,
-    henkelShare: 0.062,
-    historical5yCAGR: 0.032,
-    forwardCAGR: 0.037,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.ulAR,        contributes: 'margin' },
-      { ...SRC.colgateAR,   contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-
-  // ── LHC (8 cats) ───────────────────────────────────────────────
-  {
-    id: 'lhc_fcn',
-    name: 'LHC: Fabric Cleaning — Non-concentrated (Liquid)',
-    shortDescription: 'Mainstream liquid laundry detergent (non-compacted)',
-    group: 'LHC',
-    revenueBn: 34.8,
-    ebitMargin: 0.165,
-    henkelShare: 0.112,
-    historical5yCAGR: -0.014,
-    forwardCAGR: -0.008,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_fca',
-    name: 'LHC: Fabric Cleaning — Advanced (Pods/Capsules)',
-    shortDescription: 'Unit-dose laundry — pods, capsules, sheets',
-    group: 'LHC',
-    revenueBn: 13.4,
-    ebitMargin: 0.225,
-    henkelShare: 0.098,
-    historical5yCAGR: 0.082,
-    forwardCAGR: 0.076,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.circana,     contributes: 'revenue' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_ffi',
-    name: 'LHC: Fabric Finishing (Softener, Boosters, Scents)',
-    shortDescription: 'Fabric softener, scent boosters, in-wash boosters',
-    group: 'LHC',
-    revenueBn: 15.2,
-    ebitMargin: 0.178,
-    henkelShare: 0.058,
-    historical5yCAGR: 0.018,
-    forwardCAGR: 0.024,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.ulAR,        contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_lad',
-    name: 'LHC: Laundry Additives',
-    shortDescription: 'Stain removers, bleach, pre-wash, boosters (non-softener)',
-    group: 'LHC',
-    revenueBn: 7.6,
-    ebitMargin: 0.192,
-    henkelShare: 0.125,
-    historical5yCAGR: 0.022,
-    forwardCAGR: 0.028,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.churchAR,    contributes: 'margin' },
-      { ...SRC.reckittAR,   contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_hdw',
-    name: 'LHC: Hand Dishwash',
-    shortDescription: 'Manual dishwashing liquid',
-    group: 'LHC',
-    revenueBn: 14.8,
-    ebitMargin: 0.158,
-    henkelShare: 0.048,
-    historical5yCAGR: 0.015,
-    forwardCAGR: 0.012,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.colgateAR,   contributes: 'margin' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_adw',
-    name: 'LHC: Automatic Dishwash (ADW)',
-    shortDescription: 'Dishwasher tabs, gels, rinse aid, salt',
-    group: 'LHC',
-    revenueBn: 7.8,
-    ebitMargin: 0.235,
-    henkelShare: 0.215,
-    historical5yCAGR: 0.048,
-    forwardCAGR: 0.052,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.reckittAR,   contributes: 'margin' },
-      { ...SRC.pgAR,        contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_hsc',
-    name: 'LHC: Home & Surface Care',
-    shortDescription: 'All-purpose cleaners, bathroom, kitchen, glass, floor',
-    group: 'LHC',
-    revenueBn: 18.4,
-    ebitMargin: 0.175,
-    henkelShare: 0.038,
-    historical5yCAGR: 0.026,
-    forwardCAGR: 0.030,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.reckittAR,   contributes: 'margin' },
-      { ...SRC.churchAR,    contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-  {
-    id: 'lhc_ic',
-    name: 'LHC: Insect Control',
-    shortDescription: 'Repellents, sprays, traps (household)',
-    group: 'LHC',
-    revenueBn: 5.2,
-    ebitMargin: 0.218,
-    henkelShare: 0.032,
-    historical5yCAGR: 0.038,
-    forwardCAGR: 0.045,
-    sources: [
-      { ...SRC.euromonitor, contributes: 'revenue' },
-      { ...SRC.henkelAR,    contributes: 'share' },
-      { ...SRC.reckittAR,   contributes: 'margin' },
-      { ...SRC.bain,        contributes: 'triangulation' },
-    ],
-  },
-];
-
-// ─── Derived helpers ──────────────────────────────────────────────
-
-/** Profit pool (€bn) for a category = revenue × EBIT margin. */
-export function profitBn(cat: CategoryProfitPool): number {
-  return cat.revenueBn * cat.ebitMargin;
-}
-
-/** Henkel revenue footprint (€bn) = global revenue × Henkel share. */
-export function henkelRevenueBn(cat: CategoryProfitPool): number {
-  return cat.revenueBn * cat.henkelShare;
-}
-
-/** Henkel profit footprint (€bn) — indicative, assumes industry avg margin. */
-export function henkelProfitBn(cat: CategoryProfitPool): number {
-  return henkelRevenueBn(cat) * cat.ebitMargin;
-}
-
-/** Total BU profit pool. */
-export function totalProfitBn(cats: CategoryProfitPool[]): number {
-  return cats.reduce((s, c) => s + profitBn(c), 0);
-}
-
-/** Total BU revenue pool. */
-export function totalRevenueBn(cats: CategoryProfitPool[]): number {
-  return cats.reduce((s, c) => s + c.revenueBn, 0);
-}
-
-// ─── View / toggle types ──────────────────────────────────────────
-
-export type BuFilter = 'Both' | 'Hair' | 'LHC';
-export type ViewMode = 'Category' | 'ValueChain' | 'Region';
-
-/** Filter categories by business unit toggle. */
-export function filterByBu(
-  cats: CategoryProfitPool[],
-  bu: BuFilter,
-): CategoryProfitPool[] {
-  if (bu === 'Both') return cats;
-  if (bu === 'Hair') return cats.filter(c => c.group === 'Hair');
-  return cats.filter(c => c.group === 'LHC');
-}
-
-// ─── PRISM shift integration ──────────────────────────────────────
-
-type Shiftish = { median?: number } | number | undefined;
-
-/** Pull the MC median shift (decimal) for a category at `year` from
- *  SimulationResult.shifts — tolerates string|number year keys and the
- *  dual "Hair: Color" / "hair_color" lookup convention used elsewhere
- *  in the codebase (see ProfitPoolAnalysis2.tsx::getYearShift). */
-export function prismShiftFor(
-  shifts: Record<string, Record<string | number, unknown>> | undefined,
-  cat: CategoryProfitPool,
-  year: number,
-): number | null {
-  if (!shifts) return null;
-  const path = shifts[cat.name] ?? shifts[cat.id];
-  if (!path) return null;
-  const raw = (path[year] ?? path[String(year)]) as Shiftish;
-  if (raw == null) return null;
-  if (typeof raw === 'number') return raw;
-  return typeof raw.median === 'number' ? raw.median : null;
-}
-
-/** Classify a shift into a qualitative direction label. */
-export function classifyDirection(shift: number | null): {
-  label: 'Strong tailwind' | 'Tailwind' | 'Neutral' | 'Headwind' | 'Strong headwind' | 'n/a';
-  arrow: '↑↑' | '↑' | '→' | '↓' | '↓↓' | '—';
-  tone: 'green-strong' | 'green' | 'neutral' | 'red' | 'red-strong' | 'muted';
-} {
-  if (shift == null || !isFinite(shift)) {
-    return { label: 'n/a', arrow: '—', tone: 'muted' };
-  }
-  if (shift >=  0.030) return { label: 'Strong tailwind',  arrow: '↑↑', tone: 'green-strong' };
-  if (shift >=  0.010) return { label: 'Tailwind',         arrow: '↑',  tone: 'green' };
-  if (shift <= -0.030) return { label: 'Strong headwind',  arrow: '↓↓', tone: 'red-strong' };
-  if (shift <= -0.010) return { label: 'Headwind',         arrow: '↓',  tone: 'red' };
-  return { label: 'Neutral', arrow: '→', tone: 'neutral' };
-}
-
-/** Apply a PRISM shift (decimal) to today's profit pool to get the
- *  forward pool in €bn. `shift` is the relative change vs. today's baseline. */
-export function shiftedProfitBn(cat: CategoryProfitPool, shift: number | null): number {
-  const base = profitBn(cat);
-  if (shift == null || !isFinite(shift)) return base;
-  return base * (1 + shift);
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // PPTX-Aligned Slide Views  (6 toggles, one per slide in the deck)
@@ -451,8 +85,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'hair_value_chain',
     title: 'Hair Care — Industry Value Chain Profit Pool',
-    subtitle: 'GP1 margins from public filings | Global ~$85B end-consumer | FY 2024',
-    poolSize: '~$85B',
+    subtitle: 'GP1 margins from public filings | Global ~€74bn end-consumer | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€74bn',
     group: 'Hair',
     kind: 'ValueChain',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
@@ -551,8 +185,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'laundry_value_chain',
     title: 'Laundry Care — Industry Value Chain Profit Pool',
-    subtitle: 'GP1 margins from public filings | Global ~$140B end-consumer | FY 2024',
-    poolSize: '~$140B',
+    subtitle: 'GP1 margins from public filings | Global ~€122bn end-consumer | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€122bn',
     group: 'LHC',
     kind: 'ValueChain',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
@@ -651,8 +285,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'hair_sub_segments',
     title: 'Hair Care — Sub-Segment Profit Pools',
-    subtitle: 'Brand Owner GP1 by format | Global ~$85B | FY 2024',
-    poolSize: '~$85B',
+    subtitle: 'Brand Owner GP1 by format | Global ~€74bn | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€74bn',
     group: 'Hair',
     kind: 'SubSegment',
     prismProxyCategories: ['hair_care', 'hair_color', 'hair_styling'],
@@ -742,8 +376,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'hair_core_adjacent',
     title: 'Hair Care — Core + Adjacent Profit Pools',
-    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~$130B | FY 2024',
-    poolSize: '~$130B',
+    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~€113bn | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€113bn',
     group: 'Hair',
     kind: 'CoreAdjacent',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
@@ -832,7 +466,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     ],
     sources: 'Euromonitor 2024, L\u2019Oréal FR 2024, P&G 10-K FY24, Henkel AR 2024, Helen of Troy 10-K FY24, Dyson AR 2024, Nutrafol / Unilever FY24, OLLY FY24, Regis Corp 10-K FY24, Edgewell 10-K FY24, CB Insights 2024, IBISWorld 2024, Grand View Research 2024',
     insights: [
-      'CORE branded Hair Care (~$85B, 50% GP1) anchors the pool — adjacencies add ~$45B at divergent GP1',
+      'CORE branded Hair Care (~€74bn, 50% GP1) anchors the pool — adjacencies add ~€39bn at divergent GP1',
       'Richest adjacencies: Supplements 70%, Scalp Dermo 66%, Salon Pro 58% — small today, fast-growing',
       'Salon Services is the largest adjacent pool by revenue (10%) but lowest GP1 (42%) — labor-intensive',
       'Henkel opportunity: Scalp Dermo + Supplements are natural Schwarzkopf extensions at 66-70% GP1',
@@ -842,8 +476,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'laundry_sub_segments',
     title: 'Laundry Care — Sub-Segment Profit Pools',
-    subtitle: 'Brand Owner GP1 by format | Global ~$140B | FY 2024',
-    poolSize: '~$140B',
+    subtitle: 'Brand Owner GP1 by format | Global ~€122bn | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€122bn',
     group: 'LHC',
     kind: 'SubSegment',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
@@ -942,8 +576,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'laundry_core_adjacent',
     title: 'Laundry Care — Core + Adjacent Profit Pools',
-    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~$260B | FY 2024',
-    poolSize: '~$260B',
+    subtitle: 'Core branded vs. adjacencies | Revenue share vs. total ~€226bn | FY 2024 (€ at 1.15 USD)',
+    poolSize: '~€226bn',
     group: 'LHC',
     kind: 'CoreAdjacent',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_adw', 'lhc_hsc'],
@@ -1041,7 +675,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     ],
     sources: 'Euromonitor 2024, NielsenIQ 2024, Mintel 2024, Circana 2024, P&G 10-K FY24, Unilever AR 2024, Henkel AR 2024, Reckitt AR 2024, Colgate 10-K FY24, Ecolab 10-K FY24, Whirlpool 10-K FY24, SharkNinja 10-K FY24, iRobot 10-K FY24, IBISWorld 2024, CB Insights 2024, IDC 2024',
     insights: [
-      'CORE branded Laundry (~$140B, 44% GP1) anchors the pool — adjacencies add ~$120B at divergent GP1',
+      'CORE branded Laundry (~€122bn, 44% GP1) anchors the pool — adjacencies add ~€104bn at divergent GP1',
       'Air Care (58% GP1, 6% CAGR) is the highest-margin adjacent pool — fragrance-driven, Henkel white spot',
       'Auto Dishwashing (50% GP1) is the natural synergy play — pods/tabs format bridges directly from laundry',
       'Henkel strong in ADW (Somat) and HSC (Bref). Air Care = largest untapped GP1 opportunity.',
@@ -1077,41 +711,57 @@ export function toTrendRating(shift: number | null | undefined): TrendRating {
   return { direction: 'declining', score, label: `Declining -${score}`, tone: 'red' };
 }
 
-export function slidePrismShiftFor(
-  shifts: Record<string, Record<string | number, unknown>> | undefined,
-  slide: ProfitPoolSlide,
-  year: number,
-): number | null {
-  if (!shifts || !slide.prismProxyCategories.length) return null;
-  const values: number[] = [];
-  for (const catId of slide.prismProxyCategories) {
-    const dummy: CategoryProfitPool = {
-      id: catId,
-      name: catId,
-      shortDescription: '',
-      group: slide.group,
-      revenueBn: 0, ebitMargin: 0, henkelShare: 0,
-      historical5yCAGR: 0, forwardCAGR: 0, sources: [],
-    };
-    const raw = prismShiftFor(shifts, dummy, year);
-    if (raw != null) values.push(raw);
-  }
-  if (!values.length) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+
+// ─── CAGR-based arrow rating (shared across all views) ─────────────
+//
+// A single source of truth for "how strong is this growth signal?" so
+// every view that visualizes CAGR — Profit Pool Explorer, future
+// dashboards, etc. — uses the same thresholds and the same arrow
+// vocabulary.
+//
+// Threshold ladder, calibrated against typical FMCG category growth:
+//   |CAGR| < 0.5 %    →  flat       (single grey ↔)
+//   0.5 – 2 %          →  1 arrow    (slow / sub-market growth)
+//   2 – 5 %            →  2 arrows   (steady, market-pace growth)
+//   ≥ 5 %              →  3 arrows   (accelerating, above-market)
+// The negative side mirrors the same magnitude bands.
+export const CAGR_THRESHOLDS = {
+  /** Below this absolute CAGR, the category is treated as flat. */
+  flat: 0.005,
+  /** Boundary between 1-arrow and 2-arrow ratings. */
+  one: 0.020,
+  /** Boundary between 2-arrow and 3-arrow ratings. */
+  two: 0.050,
+} as const;
+
+export interface CagrRating {
+  /** Direction of the indicator. */
+  direction: 'up' | 'down' | 'flat';
+  /** Number of arrows to render (0 for flat = single ↔ glyph). */
+  arrows: 0 | 1 | 2 | 3;
+  /** Pre-formatted human label, e.g. "+3.6 %". */
+  label: string;
+  /** Color tone — green (positive), red (negative), grey (flat / n/a). */
+  tone: 'green' | 'red' | 'grey';
 }
 
-export function itemPrismShiftFor(
-  shifts: Record<string, Record<string | number, unknown>> | undefined,
-  slide: ProfitPoolSlide,
-  item: SlideItem,
-  year: number,
-): number | null {
-  if (item.linkedCategoryId) {
-    const cat = PROFIT_POOL_DATA.find(c => c.id === item.linkedCategoryId);
-    if (cat) {
-      const direct = prismShiftFor(shifts, cat, year);
-      if (direct != null) return direct;
-    }
+/** Convert a forward CAGR (decimal, e.g. 0.036 = 3.6 %) into a CagrRating. */
+export function toCagrRating(cagr: number | null | undefined): CagrRating {
+  if (cagr == null || !isFinite(cagr)) {
+    return { direction: 'flat', arrows: 0, label: 'n/a', tone: 'grey' };
   }
-  return slidePrismShiftFor(shifts, slide, year);
+  const abs = Math.abs(cagr);
+  const sign = cagr > 0 ? '+' : '';
+  const label = `${sign}${(cagr * 100).toFixed(1)}%`;
+
+  if (abs < CAGR_THRESHOLDS.flat) {
+    return { direction: 'flat', arrows: 0, label, tone: 'grey' };
+  }
+  let arrows: 1 | 2 | 3;
+  if (abs < CAGR_THRESHOLDS.one)      arrows = 1;
+  else if (abs < CAGR_THRESHOLDS.two) arrows = 2;
+  else                                arrows = 3;
+  return cagr > 0
+    ? { direction: 'up',   arrows, label, tone: 'green' }
+    : { direction: 'down', arrows, label, tone: 'red'   };
 }

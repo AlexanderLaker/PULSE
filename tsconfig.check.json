@@ -1,4 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", ".next", "next-env.d.ts", "pulse", "archive"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "next-env.d.ts",
+    "pulse",
+    "archive",
+    "_RETIRED_2026-06"
+  ]
 }

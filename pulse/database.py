@@ -5,9 +5,9 @@ Otherwise falls back to SQLite for local development.
 
 Implements all tables from the CLAUDE.md specification:
 - trends, trend_category_exposure, trend_vc_exposure
-- config_snapshots, simulation_runs, delphi_rounds
+- config_snapshots, simulation_runs
 - triggers, ai_suggestions, audit_log
-- users (auth), delphi_sessions, delphi_calibration
+- users (auth)
 
 NOTE: causal_edges, competitors, and backtest_results tables were removed in v2.4
 as the underlying modules (causal DAG, game theory, backtesting) were not implemented.
@@ -463,66 +463,11 @@ def init_db() -> None:
         # NOTE: backtest_results table removed in v2.4
         # (backtesting module not implemented)
 
-        # ── Delphi elicitation rounds ────────────────────────────────
-        # gp1_pct_affected_score is the per-scorer estimate of the
-        # economic-scope variable (E3). It's elicited alongside the
-        # probability score so the Delphi consensus can produce both
-        # values via the same calibration-weighted process.
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS delphi_rounds (
-                id {serial},
-                session_id TEXT,
-                round_number INTEGER,
-                round_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                trend_id TEXT,
-                scorer_id TEXT,
-                probability_score INTEGER,
-                gp1_pct_affected_score REAL,
-                rationale TEXT,
-                calibration_factor REAL DEFAULT 1.0,
-                bias_flags TEXT
-            )
-        """)
-        # Backfill column on pre-existing tables (idempotent best-effort)
-        try:
-            if POSTGRES_URL:
-                cursor.execute("SAVEPOINT sp_delphi_col")
-            cursor.execute("ALTER TABLE delphi_rounds ADD COLUMN gp1_pct_affected_score REAL")
-            if POSTGRES_URL:
-                cursor.execute("RELEASE SAVEPOINT sp_delphi_col")
-        except Exception:
-            if POSTGRES_URL:
-                cursor.execute("ROLLBACK TO SAVEPOINT sp_delphi_col")
-            pass  # column already exists
-
-        # ── Delphi sessions ─────────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS delphi_sessions (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                status TEXT DEFAULT 'active',
-                current_round INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                completed_at TIMESTAMP,
-                trend_ids TEXT,
-                scorer_ids TEXT
-            )
-        """)
-
-        # ── Delphi calibration ───────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS delphi_calibration (
-                id {serial},
-                session_id TEXT,
-                scorer_id TEXT NOT NULL,
-                calibration_factor REAL DEFAULT 1.0,
-                bias_flags TEXT,
-                mean_impact_error REAL DEFAULT 0,
-                mean_prob_error REAL DEFAULT 0,
-                calibrated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # ── Delphi tables removed (D10, June 2026) ──────────────────
+        # The Delphi elicitation capability was retired; expert consensus
+        # is entered live via the admin Trend editor (user_override=true).
+        # Existing delphi_* tables are archived+dropped by
+        # scripts/migrate_drop_delphi.py — no DDL is created here anymore.
 
         # ── Early-warning triggers ───────────────────────────────────
         cursor.execute(f"""
@@ -625,7 +570,6 @@ def init_db() -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_delphi_rounds_session ON delphi_rounds(session_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_status ON scanned_trends(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_force ON scanned_trends(force)")
@@ -1072,8 +1016,8 @@ def get_db_stats() -> Dict[str, int]:
 
         tables = [
             "trends", "simulation_runs",
-            "delphi_rounds", "triggers", "ai_suggestions",
-            "audit_log", "users", "delphi_sessions", "session_snapshots",
+            "triggers", "ai_suggestions",
+            "audit_log", "users", "session_snapshots",
         ]
 
         stats = {}

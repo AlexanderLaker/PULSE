@@ -13,7 +13,7 @@ Requirements:
 What it does:
     1. Loads the 99 v3.5 trends from prod Neon via pulse.database.load_trends
     2. Runs BayesianMonteCarloEngine.run_multichain(n_chains=3, iterations=50_000)
-    3. Persists the shift matrix + allocation + convergence to prod Neon
+    3. Persists the shift matrix + convergence to prod Neon
     4. Writes a QA Excel alongside the repo root
 """
 
@@ -35,7 +35,6 @@ from pulse.config import ModelConfig, CATEGORIES, FORCES
 from pulse.database import load_trends, save_simulation_run
 from pulse.ingestion.models import TrendDatabase
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.optimizer.allocation import AllocationOptimizer
 from pulse.excel_bridge.writer import ShiftMatrixWriter
 
 logging.basicConfig(
@@ -98,15 +97,8 @@ def main() -> int:
     total_cats = len(result["convergence"])
     log.info("      Convergence: %d/%d categories R̂ < 1.05", converged, total_cats)
 
-    # ── 4) Allocation optimizer ──────────────────────────────────────
-    log.info("[4/5] Running allocation optimizer…")
-    optimizer = AllocationOptimizer(config)
-    allocation = optimizer.optimize(
-        result["shift_matrix"],
-        risk_aversion=1.0,
-        raw_samples=result.get("raw_samples"),
-        category_order=config.category_names,
-    )
+    # ── 4) Allocation optimizer removed (D4, June 2026) ─────────────
+    allocation = None
 
     # ── 5) Persist to prod Neon ──────────────────────────────────────
     # Save the full results bundle (shift_matrix + decompositions + totals +
@@ -126,7 +118,7 @@ def main() -> int:
             model_type="bayesian_copula_multichain",
             results=results_bundle,
             force_attribution=result.get("force_attribution"),
-            allocation_recommendation=allocation,
+            allocation_recommendation=None,
             convergence_diagnostics=result.get("convergence"),
         )
         log.info("      Saved simulation_run id=%s", run_id)
@@ -142,7 +134,7 @@ def main() -> int:
         writer.write(
             str(out_path),
             result,
-            allocation=allocation,
+            allocation=None,
             metadata={
                 "model_version": result.get("model_version"),
                 "engine_name": result.get("engine_name"),

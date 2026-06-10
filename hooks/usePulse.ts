@@ -37,7 +37,6 @@ function generateMockSimulation(): SimulationResult {
 
   return {
     shifts: mock,
-    allocation_recommendation: {},
     convergence: { converged: true, r_hat: 1.03 }
   };
 }
@@ -222,7 +221,6 @@ export default function usePulse(): UsePulseReturn {
       const result = await api.runSimulation({
         scenario: activeScenario,
         iterations: 5000,
-        include_allocation: true,
         ...params,
       });
       if (mounted.current) {

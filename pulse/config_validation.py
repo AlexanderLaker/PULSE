@@ -296,7 +296,7 @@ class ModelConfigValidator(BaseModel):
         if v < 100:
             raise ValueError(
                 f"iterations must be >= 100 for meaningful Bayesian sampling "
-                f"(got {v}). Default is 50,000"
+                f"(got {v}). Default is 10,000"
             )
 
         if v > 1_000_000:
@@ -325,7 +325,7 @@ class ModelConfigValidator(BaseModel):
         if v <= 0:
             raise ValueError(
                 f"t_copula_df must be > 0 (got {v}). "
-                f"Default is 4 (heavy tails for crisis correlation)"
+                f"Default is 8 (moderate tails)"
             )
 
         if v > 100:
@@ -382,3 +382,31 @@ def validate_model_config(config_dict: dict) -> ModelConfigValidator:
         >>> validated = validate_model_config(config.__dict__)
     """
     return ModelConfigValidator(**config_dict)
+
+
+def correlation_lambda_min(force_correlation_matrix: dict,
+                           within_force_rho: float,
+                           trend_forces: list) -> float:
+    """Minimum eigenvalue of the trend-level correlation matrix implied by
+    (within_force_rho, force_correlation_matrix) for a given trend population.
+
+    D1 / audit F-01 (June 2026): the engine builds an N-trend matrix from
+    these settings; if it is not positive semi-definite the engine silently
+    repairs it by shrinking ALL correlations (configured != effective).
+    Callers (PUT /api/v1/config) reject settings where this returns < 0.
+    """
+    import numpy as np
+    n = len(trend_forces)
+    if n == 0:
+        return 1.0
+    R = np.eye(n)
+    for i in range(n):
+        fi = trend_forces[i]
+        row = force_correlation_matrix.get(fi, {})
+        for j in range(i + 1, n):
+            if fi == trend_forces[j]:
+                r = within_force_rho
+            else:
+                r = row.get(trend_forces[j], 0.05)
+            R[i, j] = R[j, i] = r
+    return float(np.linalg.eigvalsh(R).min())

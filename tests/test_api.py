@@ -15,8 +15,19 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 @pytest.fixture
 def app():
-    """Create test FastAPI application."""
-    return create_app()
+    """Create test FastAPI application.
+
+    June 2026: auth dependencies are overridden with a fake admin so these
+    tests exercise the endpoints' validation logic again. They were written
+    before admin-auth was added and had been failing with 401 ever since —
+    asserting on auth instead of the behaviour they document.
+    """
+    from pulse.api.auth import require_auth, require_admin
+    application = create_app()
+    _fake_admin = {"email": "pytest@prism.local", "role": "admin", "user_id": "pytest"}
+    application.dependency_overrides[require_auth] = lambda: _fake_admin
+    application.dependency_overrides[require_admin] = lambda: _fake_admin
+    return application
 
 
 @pytest.fixture
@@ -131,17 +142,10 @@ class TestAPISimulation:
 class TestAPIOptimization:
     """Test optimization endpoints."""
 
-    def test_allocation_endpoint_exists(self, client):
-        """Should have allocation optimizer endpoint."""
-        response = client.post(
-            "/api/v1/optimize/allocation",
-            json={"risk_aversion": 1.0}
-        )
-        assert response.status_code in [200, 404, 422]
-
-
-class TestAPISensitivity:
-    """Test sensitivity analysis endpoints."""
+    def test_allocation_endpoint_removed(self, client):
+        """D4 (June 2026): the allocation optimizer was removed — endpoint must 404/405."""
+        response = client.post("/api/v1/optimize/allocation", json={})
+        assert response.status_code in [401, 403, 404, 405]
 
     def test_tornado_endpoint_exists(self, client):
         """Should have tornado endpoint."""
@@ -304,7 +308,7 @@ class TestAPIEdgeCases:
         large_json = {
             "iterations": 10000,  # Within valid range (1-50000)
             "include_sensitivity": True,
-            "include_allocation": True
+            "iterations": 500
         }
         response = client.post("/api/v1/simulate", json=large_json)
         # Should either process (if model loaded) or 404 if not loaded

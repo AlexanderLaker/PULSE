@@ -11,9 +11,6 @@ import type {
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
   HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
-  DelphiSessionSummary, DelphiSession, DelphiScoreSubmission, DelphiScore,
-  DelphiRoundSummary, CalibrationResult, DelphiConsensus, ScorerView,
-  CreateDelphiSessionPayload,
 } from '@/types';
 
 // ── Base Request ─────────────────────────────────────────────────
@@ -106,7 +103,6 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
  *   {
  *     shift_matrix: { [cat]: { path: { [year]: {p10,p25,median,p75,p90,mean,std} }, velocity: {...} } },
  *     convergence: {...},
- *     allocation: {...},            // weights + frontier + defense_ranking
  *     force_attribution?: {...},
  *     iterations, model_type, ...
  *   }
@@ -114,14 +110,13 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
  * Frontend type `SimulationResult` expects:
  *   {
  *     shifts: { [cat]: { [year]: PercentileDistribution } },    // flat, no `.path`
- *     allocation_recommendation: {...},
  *     convergence: {...},
  *     force_attribution: {...}
  *   }
  *
  * This normalizer accepts either shape (idempotent).
  */
-function normalizeSimulation(raw: unknown): SimulationResult {
+export function normalizeSimulation(raw: unknown): SimulationResult {
   const r = (raw ?? {}) as Record<string, unknown>;
 
   // shifts: prefer `shifts` if already normalized, else unwrap `shift_matrix[cat].path`
@@ -138,13 +133,9 @@ function normalizeSimulation(raw: unknown): SimulationResult {
     }
   }
 
-  // allocation: prefer `allocation_recommendation`, else use `allocation`
-  const allocation = (r.allocation_recommendation ?? r.allocation) as unknown;
-
   return {
     ...(r as Partial<SimulationResult>),
     shifts: (shifts ?? {}) as SimulationResult['shifts'],
-    allocation_recommendation: allocation as SimulationResult['allocation_recommendation'],
     convergence: r.convergence as SimulationResult['convergence'],
     force_attribution: r.force_attribution as SimulationResult['force_attribution'],
     // v3.1: pass through the per-year decompositions and totals blocks.
@@ -170,14 +161,6 @@ export const getScenarios = (): Promise<Scenario[]> =>
 
 export const createScenario = (data: Partial<Scenario>): Promise<Scenario> =>
   request('/scenarios', { method: 'POST', body: JSON.stringify(data) });
-
-// ── Optimizer ────────────────────────────────────────────────────
-
-export const optimizeAllocation = (data: {
-  risk_aversion?: number;
-  constraints?: Record<string, { min?: number; max?: number }>;
-}): Promise<{ weights: Record<string, number>; frontier?: Array<{ risk: number; return: number }> }> =>
-  request('/optimize/allocation', { method: 'POST', body: JSON.stringify(data) });
 
 // ── Forces ───────────────────────────────────────────────────────
 
@@ -223,48 +206,5 @@ export const createTrigger = (data: {
 }): Promise<TriggerStatus> =>
   request('/triggers', { method: 'POST', body: JSON.stringify(data) });
 
-// ── Delphi Expert Elicitation ────────────────────────────────────
+// ── Delphi client removed (D10, June 2026) ──────────────────────
 
-export const getDelphiSessions = (): Promise<DelphiSessionSummary[]> =>
-  request('/delphi/sessions');
-
-export const createDelphiSession = (data: CreateDelphiSessionPayload): Promise<{ session_id: string }> =>
-  request('/delphi/sessions', { method: 'POST', body: JSON.stringify(data) });
-
-export const getDelphiSession = (id: string): Promise<DelphiSession> =>
-  request(`/delphi/sessions/${id}`);
-
-export const advanceDelphiRound = (id: string): Promise<DelphiRoundSummary> =>
-  request(`/delphi/sessions/${id}/advance`, { method: 'POST' });
-
-export const completeDelphiSession = (id: string): Promise<DelphiConsensus> =>
-  request(`/delphi/sessions/${id}/complete`, { method: 'POST' });
-
-export const submitDelphiScore = (sessionId: string, data: DelphiScoreSubmission): Promise<{ status: string }> =>
-  request(`/delphi/sessions/${sessionId}/score`, { method: 'POST', body: JSON.stringify(data) });
-
-export const getDelphiScores = (sessionId: string, params: Record<string, string> = {}): Promise<DelphiScore[]> => {
-  const qs = new URLSearchParams(params).toString();
-  return request(`/delphi/sessions/${sessionId}/scores${qs ? '?' + qs : ''}`);
-};
-
-export const calibrateScorer = (sessionId: string, data: { scorer_id: string }): Promise<CalibrationResult> =>
-  request(`/delphi/sessions/${sessionId}/calibrate`, { method: 'POST', body: JSON.stringify(data) });
-
-export const getDelphiSummary = (sessionId: string): Promise<DelphiRoundSummary> =>
-  request(`/delphi/sessions/${sessionId}/summary`);
-
-export const getDelphiConsensus = (sessionId: string): Promise<DelphiConsensus> =>
-  request(`/delphi/sessions/${sessionId}/consensus`);
-
-export const getDelphiScorerView = (sessionId: string, scorerId: string): Promise<ScorerView> =>
-  request(`/delphi/sessions/${sessionId}/scorer/${scorerId}/view`);
-
-export const getDelphiScorers = (sessionId: string): Promise<string[]> =>
-  request(`/delphi/sessions/${sessionId}/scorers`);
-
-export const getDelphiCalibration = (sessionId: string): Promise<CalibrationResult[]> =>
-  request(`/delphi/sessions/${sessionId}/calibration`);
-
-export const getDelphiAudit = (sessionId: string): Promise<AuditEntry[]> =>
-  request(`/delphi/sessions/${sessionId}/audit`);

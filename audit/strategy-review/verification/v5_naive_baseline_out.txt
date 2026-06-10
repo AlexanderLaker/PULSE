@@ -1,0 +1,32 @@
+category        A: MC median  B: determ.  C: Excel raw
+Hair: Color          -0.0432     -0.0429       -0.8583
+Hair: Care           -0.0371     -0.0368       -0.7638
+Hair: Styling        -0.0389     -0.0386       -0.7684
+Hair: Body           -0.0412     -0.0410       -0.8394
+LHC: FCN             -0.0573     -0.0568       -1.1355
+LHC: FCA             -0.0511     -0.0507       -1.0392
+LHC: FFI             -0.0385     -0.0382       -0.7747
+LHC: LAD             -0.0534     -0.0529       -1.0929
+LHC: HDW             -0.0489     -0.0485       -0.9457
+LHC: ADW             -0.0625     -0.0621       -1.2189
+LHC: HSC             -0.0338     -0.0335       -0.6983
+LHC: IC              -0.0385     -0.0382       -0.7800
+
+Spearman rank corr: MC vs deterministic replica = 0.9930; MC vs Excel-raw = 0.9790
+rank (worst→best):
+  A MC    : LHC: ADW > LHC: FCN > LHC: LAD > LHC: FCA > LHC: HDW > Hair: Color > Hair: Body > Hair: Styling > LHC: IC > LHC: FFI > Hair: Care > LHC: HSC
+  B determ: LHC: ADW > LHC: FCN > LHC: LAD > LHC: FCA > LHC: HDW > Hair: Color > Hair: Body > Hair: Styling > LHC: FFI > LHC: IC > Hair: Care > LHC: HSC
+  C excel : LHC: ADW > LHC: FCN > LHC: LAD > LHC: FCA > LHC: HDW > Hair: Color > Hair: Body > LHC: IC > LHC: FFI > Hair: Styling > Hair: Care > LHC: HSC
+
+Band-overlap (p10..p90) between adjacent-ranked categories at 2030 (MC):
+  LHC: ADW       vs LHC: FCN      : band overlap=+0.0090  P(worse)=0.99
+  LHC: FCN       vs LHC: LAD      : band overlap=+0.0115  P(worse)=1.00
+  LHC: LAD       vs LHC: FCA      : band overlap=+0.0127  P(worse)=0.91
+  LHC: FCA       vs LHC: HDW      : band overlap=+0.0107  P(worse)=0.87
+  LHC: HDW       vs Hair: Color   : band overlap=+0.0073  P(worse)=0.93
+  Hair: Color    vs Hair: Body    : band overlap=+0.0119  P(worse)=0.82
+  Hair: Body     vs Hair: Styling : band overlap=+0.0109  P(worse)=0.90
+  Hair: Styling  vs LHC: IC       : band overlap=+0.0100  P(worse)=0.55
+  LHC: IC        vs LHC: FFI      : band overlap=+0.0100  P(worse)=0.51
+  LHC: FFI       vs Hair: Care    : band overlap=+0.0110  P(worse)=0.61
+  Hair: Care     vs LHC: HSC      : band overlap=+0.0096  P(worse)=0.75

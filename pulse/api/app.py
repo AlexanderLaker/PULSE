@@ -71,7 +71,6 @@ from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
-from pulse.api.routes.delphi import router as delphi_router
 from pulse.api.routes.auth import router as auth_router
 
 # ── Lazy imports for scipy-dependent modules ─────────────────────
@@ -81,8 +80,6 @@ from pulse.api.routes.auth import router as auth_router
 # cold start.  Import them inside the functions that need them:
 #   from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 #   from pulse.simulation.paths import PathAnalyzer
-#   from pulse.optimizer.allocation import AllocationOptimizer
-
 logger = logging.getLogger(__name__)
 
 # ── Global state (loaded once on startup) ───────────────────────────
@@ -90,9 +87,7 @@ _state = {
     "db": None,
     "config": None,
     "mc_result": None,
-    "allocation": None,
     "audit": None,
-    "delphi": None,
 }
 _state_lock = asyncio.Lock()  # Protect concurrent mutations
 
@@ -130,8 +125,6 @@ def _load_trend_database() -> TrendDatabase:
 class SimulationRequest(BaseModel):
     iterations: int = Field(5000, ge=1, le=100000)  # 1 to 100k iterations
     include_sensitivity: bool = False
-    include_allocation: bool = True
-    risk_aversion: float = Field(1.0, ge=0.1, le=10.0)
     # B6: RNG seed control. `seed` runs once with that seed (reproducible).
     # `seeds` runs the engine once per seed and reports seed-wobble (the
     # spread of the headline shift across runs) so leadership can see how
@@ -221,10 +214,6 @@ class ShockRequest(BaseModel):
     magnitude: float = Field(0.3)
     years: int = Field(5, ge=1, le=10)
 
-class AllocationRequest(BaseModel):
-    risk_aversion: float = Field(1.0, ge=0.1, le=10.0)
-    min_weight: float = Field(0.02, ge=0.0, le=0.5)
-    max_weight: float = Field(0.25, ge=0.0, le=1.0)
 
 class ChatRequest(BaseModel):
     question: str
@@ -295,7 +284,6 @@ def create_app(args=None) -> FastAPI:
 
             # A5: Default to multichain (n_chains=3) for proper convergence diagnostics
             from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-            from pulse.optimizer.allocation import AllocationOptimizer
             mc = BayesianMonteCarloEngine(config)
             if n_chains > 1:
                 mc_result = mc.run_multichain(db, n_chains=n_chains, iterations=iterations)
@@ -305,13 +293,6 @@ def create_app(args=None) -> FastAPI:
                 logger.info(f"_run_simulation: single-chain mode")
             _state["mc_result"] = mc_result
 
-            # Allocation — pass MC samples so covariance is empirical, not guessed
-            opt = AllocationOptimizer(config)
-            _state["allocation"] = opt.optimize(
-                mc_result["shift_matrix"],
-                raw_samples=mc_result.get("raw_samples"),
-                category_order=config.category_names,
-            )
 
             # Persist to database as a full bundle so cold-start reloads
             # rehydrate decompositions and totals (not just the shift matrix).
@@ -328,7 +309,7 @@ def create_app(args=None) -> FastAPI:
                     model_type="bayesian_copula",
                     results=results_bundle,
                     force_attribution=mc_result.get("force_attribution"),
-                    allocation_recommendation=_state.get("allocation"),
+                    allocation_recommendation=None,
                     convergence_diagnostics=mc_result.get("convergence"),
                 )
             except Exception as e:
@@ -349,10 +330,6 @@ def create_app(args=None) -> FastAPI:
             except Exception as e:
                 logger.warning(f"Database initialization failed: {e}")
 
-            # Initialize Delphi protocol
-            from pulse.elicitation.delphi import DelphiProtocol
-            _state["delphi"] = DelphiProtocol()
-            _state["delphi"]._ensure_tables_exist()
 
             # Load from database (seeds if empty)
             try:
@@ -375,9 +352,6 @@ def create_app(args=None) -> FastAPI:
                     results = latest.get("results")
                     if isinstance(results, str):
                         results = json.loads(results)
-                    alloc = latest.get("allocation_recommendation")
-                    if isinstance(alloc, str):
-                        alloc = json.loads(alloc)
                     conv = latest.get("convergence_diagnostics")
                     if isinstance(conv, str):
                         conv = json.loads(conv)
@@ -424,7 +398,6 @@ def create_app(args=None) -> FastAPI:
                         "iterations": latest.get("iterations"),
                         "model_type": latest.get("model_type"),
                     }
-                    _state["allocation"] = alloc
                     logger.info(
                         "Loaded latest simulation from database on startup "
                         "(run_id=%s, shape=%s)",
@@ -443,18 +416,10 @@ def create_app(args=None) -> FastAPI:
 
                 # A5: Default to multichain (3 chains) for proper convergence diagnostics
                 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-                from pulse.optimizer.allocation import AllocationOptimizer
                 mc = BayesianMonteCarloEngine(config)
                 mc_result = mc.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                 _state["mc_result"] = mc_result
 
-                opt = AllocationOptimizer(config)
-                _state["allocation"] = opt.optimize(
-                    mc_result["shift_matrix"],
-                    risk_aversion=1.0,
-                    raw_samples=mc_result.get("raw_samples"),
-                    category_order=config.category_names,
-                )
 
                 _state["simulation_stale"] = False
 
@@ -474,7 +439,7 @@ def create_app(args=None) -> FastAPI:
                     model_type="bayesian_copula",
                     results=_sanitize(results_bundle),
                     force_attribution=_sanitize(mc_result.get("force_attribution")),
-                    allocation_recommendation=_sanitize(_state.get("allocation")),
+                    allocation_recommendation=None,
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
                 logger.info(f"Auto-simulation completed (multichain, 3 chains) and persisted to database")
@@ -514,8 +479,6 @@ def create_app(args=None) -> FastAPI:
     # Include advanced analytics routes
     app.include_router(analytics_router, prefix="/api/v1")
 
-    # Include Delphi expert elicitation routes
-    app.include_router(delphi_router, prefix="/api/v1")
 
     # Include auth routes
     app.include_router(auth_router, prefix="/api/v1")
@@ -554,12 +517,6 @@ def create_app(args=None) -> FastAPI:
                     _state["audit"] = AuditLogger()
                     _state["config"] = ModelConfig()
         
-                    # Initialize Delphi (uses shared database, non-critical)
-                    try:
-                        from pulse.elicitation.delphi import DelphiProtocol
-                        _state["delphi"] = DelphiProtocol()
-                    except Exception as e:
-                        logger.warning(f"Delphi init failed (non-critical): {e}")
 
                     # Seed default auth users if needed (non-critical)
                     try:
@@ -589,9 +546,6 @@ def create_app(args=None) -> FastAPI:
                                 results = latest.get("results")
                                 if isinstance(results, str):
                                     results = json.loads(results)
-                                alloc = latest.get("allocation_recommendation")
-                                if isinstance(alloc, str):
-                                    alloc = json.loads(alloc)
                                 conv = latest.get("convergence_diagnostics")
                                 if isinstance(conv, str):
                                     conv = json.loads(conv)
@@ -626,7 +580,6 @@ def create_app(args=None) -> FastAPI:
                                     "iterations": latest.get("iterations"),
                                     "model_type": latest.get("model_type"),
                                 }
-                                _state["allocation"] = alloc
                                 _state["simulation_stale"] = False
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
@@ -638,18 +591,10 @@ def create_app(args=None) -> FastAPI:
 
                                     # A5: Default to multichain (3 chains) for proper convergence diagnostics
                                     from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-                                    from pulse.optimizer.allocation import AllocationOptimizer
                                     mc_engine = BayesianMonteCarloEngine(config)
                                     mc_result = mc_engine.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
                                     _state["mc_result"] = mc_result
 
-                                    opt = AllocationOptimizer(config)
-                                    _state["allocation"] = opt.optimize(
-                                        mc_result["shift_matrix"],
-                                        risk_aversion=1.0,
-                                        raw_samples=mc_result.get("raw_samples"),
-                                        category_order=config.category_names,
-                                    )
                                     _state["simulation_stale"] = False
 
                                     # Persist to database for next cold start as
@@ -667,7 +612,7 @@ def create_app(args=None) -> FastAPI:
                                         model_type="bayesian_copula",
                                         results=_sanitize(results_bundle),
                                         force_attribution=_sanitize(mc_result.get("force_attribution")),
-                                        allocation_recommendation=_sanitize(_state.get("allocation")),
+                                        allocation_recommendation=None,
                                         convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                                     )
                                     print("[PRISM] Auto-simulation completed (multichain, 3 chains) and persisted to database", flush=True)
@@ -1013,7 +958,7 @@ def create_app(args=None) -> FastAPI:
     async def revert_trends_to_seed(user: dict = Depends(require_admin)):
         """Revert ALL trend probability scores back to seed_trends.py original values.
 
-        This undoes any Delphi consensus application or manual edits to probability.
+        This undoes any manual edits to probability.
         Also resets debiasing_applied to False and score_variance to 0.
         """
         from pulse.seed_trends import get_report_trends
@@ -1067,7 +1012,7 @@ def create_app(args=None) -> FastAPI:
                 "all",
                 old_value=f"{len(changes)} trends had modified probabilities",
                 new_value="All probabilities reset to seed_trends.py",
-                reason="User requested Delphi consensus revert",
+                reason="User requested revert to seed scores",
             )
         except Exception:
             pass
@@ -1228,6 +1173,13 @@ def create_app(args=None) -> FastAPI:
             if update.diffusion_curve not in VALID_DIFFUSION_CURVES:
                 raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
             trend.diffusion_curve = update.diffusion_curve
+        # D7 (June 2026): any score-bearing admin edit marks the trend as
+        # expert-reviewed — drives the "AI suggestion · expert-reviewed" chip.
+        if any(v is not None for v in (update.probability, update.direction,
+                                       update.gp1_pct_affected, update.category_exposure,
+                                       update.vc_exposure, update.regional_exposure,
+                                       update.peak_year, update.diffusion_curve)):
+            trend.user_override = True
         trend.__post_init__()
 
         # Persist updated exposures
@@ -1453,8 +1405,6 @@ def create_app(args=None) -> FastAPI:
                     }
                     _state["mc_result"] = mc
                     _state["run_meta"] = run_meta
-                    if latest.get("allocation_recommendation"):
-                        _state["allocation"] = latest["allocation_recommendation"]
                     logger.info(
                         "Restored simulation from database (run_id=%s, scenario=%s)",
                         run_meta.get("run_id"), run_meta.get("scenario"),
@@ -1469,7 +1419,6 @@ def create_app(args=None) -> FastAPI:
             "convergence": _summarize_convergence(mc.get("convergence", {})),
             "iterations": mc.get("iterations", 5000),
             "model_type": mc.get("model_type", "bayesian_copula"),
-            "allocation": _state.get("allocation"),
             "vc_decomposition": mc.get("vc_decomposition"),
             "decompositions": mc.get("decompositions"),
             "totals": mc.get("totals"),
@@ -1500,7 +1449,6 @@ def create_app(args=None) -> FastAPI:
             primary_seed = req.seed if req.seed is not None else 42
             seed_wobble = None
             from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-            from pulse.optimizer.allocation import AllocationOptimizer
             if req.seeds and len(req.seeds) > 1:
                 import numpy as _np
                 medians_2030 = []
@@ -1565,15 +1513,6 @@ def create_app(args=None) -> FastAPI:
 
             _state["mc_result"] = mc_result
 
-            # Allocation optimizer
-            if req.include_allocation:
-                opt = AllocationOptimizer(config)
-                _state["allocation"] = opt.optimize(
-                    mc_result["shift_matrix"],
-                    risk_aversion=req.risk_aversion,
-                    raw_samples=mc_result.get("raw_samples"),
-                    category_order=config.category_names,
-                )
 
             _state["audit"].log_simulation_run("base", req.iterations, "bayesian_copula")
 
@@ -1599,7 +1538,7 @@ def create_app(args=None) -> FastAPI:
                     model_type="bayesian_copula",
                     results=_sanitize(results_bundle),
                     force_attribution=_sanitize(mc_result.get("force_attribution")),
-                    allocation_recommendation=_sanitize(_state.get("allocation")),
+                    allocation_recommendation=None,
                     convergence_diagnostics=_sanitize(mc_result.get("convergence")),
                 )
                 logger.info(f"Simulation persisted ({req.iterations} iterations)")
@@ -1612,7 +1551,6 @@ def create_app(args=None) -> FastAPI:
                 "convergence": _summarize_convergence(mc_result.get("convergence", {})),
                 "iterations": mc_result["iterations"],
                 "model_type": mc_result["model_type"],
-                "allocation": _state.get("allocation"),
                 "competitive": _state.get("competitive"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
                 "decompositions": mc_result.get("decompositions"),
@@ -1622,27 +1560,6 @@ def create_app(args=None) -> FastAPI:
                 "attenuation_band": mc_result.get("attenuation_band"),
             })
 
-    # ── Optimizer ───────────────────────────────────────────────────
-    @app.post("/api/v1/optimize/allocation")
-    async def optimize_allocation(req: AllocationRequest, user: dict = Depends(require_auth)):
-        mc = _state.get("mc_result")
-        if not mc:
-            raise HTTPException(404, "No simulation results")
-
-        async with _state_lock:
-            cfg = _state["config"]
-            from pulse.optimizer.allocation import AllocationOptimizer
-            opt = AllocationOptimizer(cfg)
-            result = opt.optimize(
-                mc["shift_matrix"],
-                risk_aversion=req.risk_aversion,
-                min_weight=req.min_weight,
-                max_weight=req.max_weight,
-                raw_samples=mc.get("raw_samples"),
-                category_order=cfg.category_names,
-            )
-            _state["allocation"] = result
-            return _sanitize(result)
 
     # ── Config ──────────────────────────────────────────────────────
     @app.get("/api/v1/config")
@@ -1651,7 +1568,8 @@ def create_app(args=None) -> FastAPI:
         if not config:
             return {}
         return {
-            "attenuation": config.attenuation,
+            "per_force_attenuation": dict(config.per_force_attenuation),
+            "within_force_overlap": dict(getattr(config, "within_force_overlap", {})),
             "attenuation_source": config.attenuation_source,
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
@@ -1667,10 +1585,6 @@ def create_app(args=None) -> FastAPI:
         }
 
     class ConfigUpdate(BaseModel):
-        attenuation: Optional[float] = Field(None, ge=0.05, le=1.0,
-            description="Attenuation factor (0.05-1.0). Controls how much raw "
-                        "force scores translate to GP1 shifts. Lower = more "
-                        "conservative output. Default 0.5.")
         attenuation_source: Optional[str] = Field(None,
             description="'assumed' | 'admin_override'")
         force_weights: Optional[dict] = None
@@ -1721,12 +1635,6 @@ def create_app(args=None) -> FastAPI:
         # only swap it into state on success. No half-mutated state ever.
         overrides: dict = {}
 
-        if req.attenuation is not None:
-            changes["attenuation"] = {"old": config.attenuation, "new": req.attenuation}
-            overrides["attenuation"] = req.attenuation
-            overrides["attenuation_source"] = req.attenuation_source or "admin_override"
-            changes["attenuation_source"] = {"old": config.attenuation_source,
-                                              "new": overrides["attenuation_source"]}
 
         if req.force_weights is not None:
             total = sum(req.force_weights.values())
@@ -1837,6 +1745,28 @@ def create_app(args=None) -> FastAPI:
         # Build the candidate (new) config without touching the live one
         candidate = config.copy_with(**overrides) if overrides else config
 
+        # D1 (June 2026, F-01): spectral gate. The trend-level correlation
+        # matrix induced by (within_force_rho, force_correlation_matrix) must
+        # be positive semi-definite for the CURRENT trend population --
+        # otherwise the engine silently repairs-and-rescales every correlation
+        # (configured != effective). Reject invalid settings instead.
+        if ("within_force_rho" in overrides) or ("force_correlation_matrix" in overrides):
+            db_now = _state.get("db")
+            if db_now and db_now.trends:
+                from pulse.config_validation import correlation_lambda_min
+                lam = correlation_lambda_min(
+                    candidate.force_correlation_matrix,
+                    candidate.within_force_rho,
+                    [t.force for t in db_now.trends],
+                )
+                if lam < -1e-9:
+                    raise HTTPException(400,
+                        f"Correlation settings rejected: the implied "
+                        f"{len(db_now.trends)}-trend matrix is not positive "
+                        f"semi-definite (min eigenvalue {lam:.3f}). The engine "
+                        f"would silently weaken all correlations to compensate. "
+                        f"Lower cross-force correlations and/or within-force rho.")
+
         # ── Pydantic gate: validate the FULL proposed config ──────────
         # The bespoke checks above catch field-local issues (sums, ranges)
         # but the pydantic ModelConfigValidator enforces cross-field
@@ -1900,7 +1830,8 @@ def create_app(args=None) -> FastAPI:
         _state.pop("simulation_results", None)
 
         return {"updated": list(changes.keys()), "config": {
-            "attenuation": config.attenuation,
+            "per_force_attenuation": dict(config.per_force_attenuation),
+            "within_force_overlap": dict(getattr(config, "within_force_overlap", {})),
             "attenuation_source": config.attenuation_source,
             "force_weights": config.force_weights,
             "vc_weights": config.vc_weights,
@@ -2047,7 +1978,7 @@ def create_app(args=None) -> FastAPI:
             os.makedirs(out_dir, exist_ok=True)
             out_file = os.path.join(out_dir, "shift_matrix.xlsx")
             writer = ShiftMatrixWriter(out_file)
-            writer.write(mc, _state.get("config"), det, _state.get("allocation"))
+            writer.write(mc, _state.get("config"), det)
             return {"status": "exported", "path": out_file}
         except Exception as e:
             raise HTTPException(500, f"Export failed: {e}")
@@ -2091,7 +2022,7 @@ def create_app(args=None) -> FastAPI:
                 shifts=mc.get("shift_matrix", {}),
                 trends=trends_list,
                 convergence=mc.get("convergence"),
-                allocation=_state.get("allocation"),
+                allocation=None,
                 model_version=__version__,
             )
 
