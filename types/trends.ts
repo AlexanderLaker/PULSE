@@ -55,7 +55,7 @@ export interface Trend {
   gp1_pct_affected?: number;
   /** Year by which 100% of impact has materialized (0 = default). */
   peak_year?: number;
-  /** MECE diffusion curve shape — see lib/calibration.ts. */
+  /** MECE diffusion curve shape — see pulse/config.py (diffusion curves). */
   diffusion_curve?: string;
   strategic_implication?: string;
   category_exposure?: CategoryExposure;

@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . && bash scripts/check_shiftmatrix_single_source.sh",
     "typecheck": "tsc -p tsconfig.check.json --noEmit",
     "test": "vitest run",
     "test:py": "python3 -m pytest tests/ -q",
