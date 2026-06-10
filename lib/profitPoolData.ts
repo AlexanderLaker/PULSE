@@ -765,3 +765,57 @@ export function toCagrRating(cagr: number | null | undefined): CagrRating {
     ? { direction: 'up',   arrows, label, tone: 'green' }
     : { direction: 'down', arrows, label, tone: 'red'   };
 }
+
+// ─── CAGR-based arrow rating (shared across all views) ─────────────
+//
+// A single source of truth for "how strong is this growth signal?" so
+// every view that visualizes CAGR — Profit Pool Explorer, future
+// dashboards, etc. — uses the same thresholds and the same arrow
+// vocabulary.
+//
+// Threshold ladder, calibrated against typical FMCG category growth:
+//   |CAGR| < 0.5 %    →  flat       (single grey ↔)
+//   0.5 – 2 %          →  1 arrow    (slow / sub-market growth)
+//   2 – 5 %            →  2 arrows   (steady, market-pace growth)
+//   ≥ 5 %              →  3 arrows   (accelerating, above-market)
+// The negative side mirrors the same magnitude bands.
+export const CAGR_THRESHOLDS = {
+  /** Below this absolute CAGR, the category is treated as flat. */
+  flat: 0.005,
+  /** Boundary between 1-arrow and 2-arrow ratings. */
+  one: 0.020,
+  /** Boundary between 2-arrow and 3-arrow ratings. */
+  two: 0.050,
+} as const;
+
+export interface CagrRating {
+  /** Direction of the indicator. */
+  direction: 'up' | 'down' | 'flat';
+  /** Number of arrows to render (0 for flat = single ↔ glyph). */
+  arrows: 0 | 1 | 2 | 3;
+  /** Pre-formatted human label, e.g. "+3.6 %". */
+  label: string;
+  /** Color tone — green (positive), red (negative), grey (flat / n/a). */
+  tone: 'green' | 'red' | 'grey';
+}
+
+/** Convert a forward CAGR (decimal, e.g. 0.036 = 3.6 %) into a CagrRating. */
+export function toCagrRating(cagr: number | null | undefined): CagrRating {
+  if (cagr == null || !isFinite(cagr)) {
+    return { direction: 'flat', arrows: 0, label: 'n/a', tone: 'grey' };
+  }
+  const abs = Math.abs(cagr);
+  const sign = cagr > 0 ? '+' : '';
+  const label = `${sign}${(cagr * 100).toFixed(1)}%`;
+
+  if (abs < CAGR_THRESHOLDS.flat) {
+    return { direction: 'flat', arrows: 0, label, tone: 'grey' };
+  }
+  let arrows: 1 | 2 | 3;
+  if (abs < CAGR_THRESHOLDS.one)      arrows = 1;
+  else if (abs < CAGR_THRESHOLDS.two) arrows = 2;
+  else                                arrows = 3;
+  return cagr > 0
+    ? { direction: 'up',   arrows, label, tone: 'green' }
+    : { direction: 'down', arrows, label, tone: 'red'   };
+}

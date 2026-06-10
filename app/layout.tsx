@@ -97,20 +97,14 @@ export default function RootLayout({
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin="anonymous"
-          />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-            rel="stylesheet"
-          />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap"
-            rel="stylesheet"
-          />
+          {/* Schrift-Entscheidung (Handover 2026-06): Die App rendert bewusst
+              den System-Font-Stack. Die früheren Google-Fonts-Links (Inter/
+              Manrope) wurden unter Next 14/React 18 nie tatsächlich geladen —
+              das gewohnte Erscheinungsbild IST die Systemschrift. React 19
+              hätte die Links erstmals aktiviert (breitere Glyphen → Text-
+              überlauf in dichten Layouts wie der Consumer Journey). Daher
+              entfernt; die font-family-Stacks ('Inter', 'Manrope', …) bleiben
+              als Fallback-Ketten unverändert. Siehe PRISM_Handover_Audit. */}
         </head>
         <body
           style={{

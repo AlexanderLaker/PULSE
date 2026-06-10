@@ -116,6 +116,7 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
  *
  * This normalizer accepts either shape (idempotent).
  */
+// Exported so the normalization rules can be unit-tested (tests/frontend/normalizeSimulation.test.ts).
 export function normalizeSimulation(raw: unknown): SimulationResult {
   const r = (raw ?? {}) as Record<string, unknown>;
 

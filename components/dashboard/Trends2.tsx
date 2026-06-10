@@ -26,7 +26,7 @@ import {
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
   ArrowUp, ArrowDown, ArrowUpDown,
-  Plus, Trash2,
+  Plus, Trash2, Info, Lock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -661,7 +661,10 @@ const Trends2: FC = () => {
             <SortHeader label="Trend"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
-            <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+            <span className="inline-flex items-center justify-end w-full">
+              <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+              <Gp1InfoTip />
+            </span>
             <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
           </div>
 
@@ -743,6 +746,34 @@ const SortHeader: FC<{
       <span>{label}</span>
       <Icon size={12} style={{ opacity: isActive ? 1 : 0.45 }} />
     </button>
+  );
+};
+
+// ─── GP1 column header tooltip ─────────────────────────────────────
+const Gp1InfoTip: FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button type="button" aria-label="What does GP1 % Affected mean?"
+        onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', border: 'none', padding: 0, marginLeft: 6,
+          color: S.onSurfaceVariant, cursor: 'help' }}>
+        <Info size={11} strokeWidth={2.4} />
+      </button>
+      {open && (
+        <span role="tooltip" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 40,
+          width: 280, padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
+          fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500, textTransform: 'none',
+          letterSpacing: 0, textAlign: 'left', boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
+          pointerEvents: 'none', whiteSpace: 'normal' }}>
+          <b>GP1 % Affected</b> — the share of a category&apos;s GP1 (gross profit after cost of goods)
+          that this trend can realistically move at full materialization. Multiplied by probability and
+          direction, it produces the Shift column.
+        </span>
+      )}
+    </span>
   );
 };
 
@@ -1646,6 +1677,20 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
           </SectionCard>
         </div>
       </div>
+
+      {/* Viewer affordance — values above are admin-editable; make the
+          read-only state explicit instead of silently inert. */}
+      {!canEdit && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 24 }}>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+            style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
+              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+            title="Trend inputs are maintained by PRISM admins. Ask an administrator for changes.">
+            <Lock size={11} strokeWidth={2.4} />
+            Read-only · admin-maintained
+          </span>
+        </div>
+      )}
 
       {/* Admin toolbar — lower-right pill buttons matching the editorial
           language of FilterChip / DirectionPill / MetaChip. No icons. */}

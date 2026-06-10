@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.3
+## Project Specification & Architecture — v3.6
 
 ---
 
@@ -11,6 +11,18 @@ PRISM is an **AI-augmented profit pool simulation engine** that transforms a sta
 
 ### The Core Innovation
 PRISM operates on a **probabilistic profit pool shifting architecture**: the simulation, AI, and optimization layer works with directional scores, percentage shifts, copula-modeled dependencies, and market intelligence to produce a **Shift Matrix** — a table of percentage impacts by category × force × time path (2026–2036, 11-year horizon). Users apply these shifts to their financial models in Excel or consume them through Power BI integration.
+
+### What Changed in v3.6 (vs. v3.3) — Audit Remediation, June 2026
+
+Executed against the independent strategy review & model validation in `audit/strategy-review/` (decisions D1–D11, see `06_DECISION_LOG_AND_WORK_ORDER.md`). MODEL_VERSION bumped to **2.7.0**.
+
+1. **PSD-valid default correlations (D1, audit F-01).** The old `DEFAULT_FORCE_CORRELATIONS` produced a non-PSD 99-trend matrix (min eigenvalue −1.68) that the engine silently repaired, rescaling all correlations ×0.37. Defaults recalibrated (same coupling structure × 0.73, min eigenvalue ≈ +0.14, valid as entered); `PUT /api/v1/config` now spectrally rejects invalid correlation settings (`config_validation.correlation_lambda_min`). Golden pins regenerated in the same commit.
+2. **Allocation optimizer removed (D4).** `pulse/optimizer/` retired; no `/api/v1/optimize/allocation`; no `include_allocation`/allocation in `/simulate`; allocation stripped from Excel/PPTX exports, types, and state. It ranked dimensionless shifts with no € pools or Henkel position — not a resource-allocation tool.
+3. **Delphi capability removed (D10).** `pulse/elicitation/` + delphi routes/DDL/types/UI retired; expert consensus is entered live via the admin Trend editor. `scripts/migrate_drop_delphi.py` archives-then-drops existing `delphi_*` tables.
+4. **Analytics endpoints fixed (D2, F-02/04/05/22).** Sobol: correct result accessor (was reading a non-existent key → NaN indices), seeded inner runs, deep-copied DB in trend mode. CVaR: terminal-year tail (was mean-over-years, understating tails ~20%), asymptotic SE, honest worst-5. Tipping points: correct path shape, inflection alarm now conditional. These endpoints remain **unexposed** in the UI; do not present Sobol externally until the X3 redesign (Shapley effects).
+5. **Provenance & display honesty (D3/D6/D7/D8, F-13/16/27).** Matrix lenses relabeled "Force / Value chain / Region **attribution**"; one-decimal percentages everywhere; P10…P90 ranges visible by default in Time-Path cells; trend chips show "AI suggestion" / "AI suggestion · expert-reviewed" (admin edits set `user_override`); Settings config sheet no longer shows the dead scalar attenuation field — per-force attenuation + within-force overlap displayed read-only (GET /config now returns both); `GET /config` no longer crashes on the removed `attenuation` attribute.
+6. **Profit Pool Explorer is GP1-only (D5).** The unused EBIT-margin category dataset and € conversion helpers (`PROFIT_POOL_DATA`, `shiftedProfitBn`, …) were removed from `lib/profitPoolData.ts`; the explorer keeps its sourced GP1 slide views (absolute revenue/pool figures allowed there — owner decision). The Profit Pool Shift Analysis remains relative-% only.
+7. **Housekeeping.** Sync-conflict duplicate files and orphaned components (ScenarioSelectorPanel, AllocationChart, Delphi*) neutralized as tombstones (the sync layer blocks deletion — delete manually at will); stale `.git/index.lock` from May 4 diagnosed (remove manually to restore git).
 
 ### What Changed in v3.3 (vs. v3.2) — Strategic Trend Review, April 2026
 

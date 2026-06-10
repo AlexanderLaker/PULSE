@@ -71,7 +71,6 @@ from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.audit.logger import AuditLogger
 from pulse.api.routes.analytics import router as analytics_router
-from pulse.api.routes.auth import router as auth_router
 
 # ── Lazy imports for scipy-dependent modules ─────────────────────
 # These are NOT imported at module load time so that the Vercel
@@ -480,9 +479,6 @@ def create_app(args=None) -> FastAPI:
     app.include_router(analytics_router, prefix="/api/v1")
 
 
-    # Include auth routes
-    app.include_router(auth_router, prefix="/api/v1")
-
     # Scanner routes removed (Emerging Trends disabled)
     # app.include_router(scanner_router, prefix="/api/v1")
 
@@ -518,12 +514,6 @@ def create_app(args=None) -> FastAPI:
                     _state["config"] = ModelConfig()
         
 
-                    # Seed default auth users if needed (non-critical)
-                    try:
-                        from pulse.api.auth import ensure_auth_tables
-                        ensure_auth_tables()
-                    except Exception as e:
-                        logger.warning(f"Auth tables init failed (non-critical): {e}")
 
                     # Load trends from database (auto-seeds if empty)
                     if not _state["db"]:

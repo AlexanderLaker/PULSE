@@ -37,3 +37,11 @@ DEPLOY_TOKEN_HIER_EINFUEGEN.txt
 *.db-wal
 *.db-shm
 _RETIRED_2026-06/
+
+# Handover-Cleanup 2026-06-05
+.claude/worktrees/
+pulse_server.log
+*.tsbuildinfo
+
+# Nicht-App-Dateien (Decks, Reports, Audits) — nur lokal/OneDrive
+_ARCHIVE/

@@ -184,7 +184,7 @@ Network Error (TypeError: "Failed to fetch")
        ▼
 ApiError(0, "Backend unavailable or network error")
        ▼
-catch handler in usePrism.ts
+catch handler in usePulse.ts
        ▼
 setConnectionState('offline')
 generateMockSimulation()
@@ -346,9 +346,9 @@ describe('ConnectionStatus', () => {
   });
 });
 
-describe('usePrism hook', () => {
+describe('usePulse hook', () => {
   it('tracks connection state changes', async () => {
-    const { result } = renderHook(() => usePrism());
+    const { result } = renderHook(() => usePulse());
     expect(result.current.connectionState).toBe('reconnecting');
 
     await waitFor(() => {
@@ -357,7 +357,7 @@ describe('usePrism hook', () => {
   });
 
   it('reconnect function updates connection state', async () => {
-    const { result } = renderHook(() => usePrism());
+    const { result } = renderHook(() => usePulse());
     await result.current.reconnect();
     await waitFor(() => {
       expect(result.current.connectionState).toBe('connected');
@@ -403,7 +403,7 @@ describe('usePrism hook', () => {
 
 ## Related Files
 
-- **Main implementation**: `hooks/usePrism.ts`, `components/dashboard/ConnectionStatus.tsx`
+- **Main implementation**: `hooks/usePulse.ts`, `components/dashboard/ConnectionStatus.tsx`
 - **Integration**: `components/dashboard/WarRoom.tsx`
 - **Backend**: `pulse/api/app.py`, `api/client.ts`
 - **Types**: `types/index.ts` (HealthStatus type)

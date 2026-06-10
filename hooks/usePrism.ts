@@ -1,62 +1,60 @@
 /**
  * Central state hook for PRISM Profit Pool Shift Model.
- * Single source of truth — all components read from here.
- * Connects to real FastAPI backend with graceful fallback to mock data.
+ *
+ * June 2026 refactor:
+ *   - Single shared instance: `PrismProvider` (mounted once in
+ *     app/dashboard/page.tsx) runs the data lifecycle; every tab reads the
+ *     same store via `usePrism()`. Previously each tab mounted its own copy
+ *     of this hook, so every tab switch re-fetched the entire world and
+ *     dropped all in-view state.
+ *   - Pruned to what the live UI consumes. The analytics endpoints
+ *     (CVaR / Sobol / tipping points / AI insights / triggers), scenario
+ *     list, force summaries and the in-app `simulate()` belonged to the
+ *     v1 dashboard, which no longer exists. Simulations are CLI-only
+ *     (scripts/run_50k_prod.py); the UI renders the latest persisted run.
+ *
+ * Kept as a .ts file (no JSX) so the module specifier `@/hooks/usePrism`
+ * is untouched; the provider is built with React.createElement.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+'use client';
+
+import {
+  createContext, createElement, useContext, useState, useEffect,
+  useCallback, useRef, type ReactNode, type FC,
+} from 'react';
 import * as api from '@/api/client';
 import type {
-  HealthStatus, Trend, ForceSummary, SimulationResult, Scenario,
-  ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
-  ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
-  TrendUpdate,
+  HealthStatus, Trend, SimulationResult, ModelConfig, TrendUpdate,
 } from '@/types';
 
 /** Return type for the usePrism hook. */
 export interface UsePrismReturn {
   health: HealthStatus | null;
   trends: Trend[];
-  forces: ForceSummary[];
   simulation: SimulationResult | null;
-  scenarios: Scenario[];
   config: ModelConfig | null;
-  analytics: AnalyticsState | null;
-  aiSuggestions: AISuggestion[];
-  triggers: TriggerStatus[];
   loading: boolean;
-  simulating: boolean;
   error: string | null;
   backendAvailable: boolean;
   connectionState: 'connected' | 'reconnecting' | 'offline';
-  activeScenario: string;
-  setActiveScenario: (scenario: string) => void;
-  simulate: (params?: SimulationParams) => Promise<void>;
   updateTrend: (trendId: string, updates: TrendUpdate) => Promise<void>;
   reload: () => Promise<void>;
   reconnect: () => Promise<void>;
-  loadAnalytics: () => Promise<void>;
 }
 
-export default function usePrism(): UsePrismReturn {
+function usePrismStore(): UsePrismReturn {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
-  const [forces, setForces] = useState<ForceSummary[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [config, setConfig] = useState<ModelConfig | null>(null);
-  const [analytics, setAnalytics] = useState<AnalyticsState | null>(null);
-  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
-  const [triggers, setTriggers] = useState<TriggerStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [simulating, setSimulating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
-  const [activeScenario, setActiveScenario] = useState('base');
   const mounted = useRef(true);
   const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Health check with reconnect logic ───────────────────────
+  // -- Health check with reconnect logic ------------------------
   const performHealthCheck = useCallback(async () => {
     try {
       await api.getHealth();
@@ -65,7 +63,7 @@ export default function usePrism(): UsePrismReturn {
         setConnectionState('connected');
         setError(null);
       }
-    } catch (e) {
+    } catch {
       if (mounted.current) {
         setBackendAvailable(false);
         setConnectionState('offline');
@@ -73,28 +71,18 @@ export default function usePrism(): UsePrismReturn {
     }
   }, []);
 
-  // ── Schedule periodic health checks ──────────────────────────
+  // -- Schedule periodic health checks --------------------------
   const scheduleHealthCheck = useCallback(() => {
-    // Clear any existing interval
     if (healthCheckIntervalRef.current) {
       clearInterval(healthCheckIntervalRef.current);
     }
-
-    // Set new interval based on connection state
-    if (connectionState === 'connected') {
-      // Check every 60 seconds when connected
-      healthCheckIntervalRef.current = setInterval(() => {
-        void performHealthCheck();
-      }, 60000);
-    } else {
-      // Check every 30 seconds when offline/reconnecting
-      healthCheckIntervalRef.current = setInterval(() => {
-        void performHealthCheck();
-      }, 30000);
-    }
+    // 60 s when connected, 30 s while offline/reconnecting.
+    const intervalMs = connectionState === 'connected' ? 60000 : 30000;
+    healthCheckIntervalRef.current = setInterval(() => {
+      void performHealthCheck();
+    }, intervalMs);
   }, [connectionState, performHealthCheck]);
 
-  // ── Update schedule when connection state changes ────────────
   useEffect(() => {
     scheduleHealthCheck();
     return () => {
@@ -104,17 +92,15 @@ export default function usePrism(): UsePrismReturn {
     };
   }, [scheduleHealthCheck]);
 
-  // ── Initial load with graceful degradation ─────────────────
+  // -- Initial load with graceful degradation -------------------
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     setConnectionState('reconnecting');
     try {
-      const [h, t, f, sc, c] = await Promise.all([
+      const [h, t, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
         api.getTrends().catch((): Trend[] => []),
-        api.getForces().catch((): ForceSummary[] => []),
-        api.getScenarios().catch((): Scenario[] => []),
         api.getConfig().catch((): null => null),
       ]);
 
@@ -124,18 +110,6 @@ export default function usePrism(): UsePrismReturn {
       setConnectionState('connected');
       setHealth(h);
       setTrends(Array.isArray(t) ? t : []);
-
-      // Handle forces — API may return array or { forces: string[] }
-      if (Array.isArray(f)) {
-        setForces(f as ForceSummary[]);
-      } else if (f && typeof f === 'object' && 'forces' in f) {
-        const forceObj = f as { forces: string[] };
-        setForces(forceObj.forces.map(n => ({ name: n as ForceSummary['name'] })));
-      } else {
-        setForces([]);
-      }
-
-      setScenarios(Array.isArray(sc) ? sc : []);
       setConfig(c);
 
       // Load stored simulation if available
@@ -143,22 +117,7 @@ export default function usePrism(): UsePrismReturn {
         const sim = await api.getSimulation().catch((): null => null);
         if (sim && mounted.current) setSimulation(sim);
       }
-      // If no stored simulation, leave simulation as null — dashboard will prompt user to run one
-
-      // Load analytics endpoints
-      void Promise.all([
-        api.getCVaR().catch((): null => null),
-        api.getSobol().catch((): null => null),
-        api.getTippingPoints().catch((): null => null),
-        api.getAIInsights().catch((): AISuggestion[] => []),
-        api.getTriggers().catch((): TriggerStatus[] => []),
-      ]).then(([cvar, sobol, tips, aiSugg, trig]) => {
-        if (mounted.current) {
-          setAnalytics({ cvar, sobol, tips });
-          setAiSuggestions(aiSugg ?? []);
-          setTriggers(trig ?? []);
-        }
-      });
+      // If no stored simulation, leave it null -- the dashboard explains why.
     } catch (e) {
       if (mounted.current) {
         setBackendAvailable(false);
@@ -177,36 +136,7 @@ export default function usePrism(): UsePrismReturn {
     return () => { mounted.current = false; };
   }, [loadAll]);
 
-  // ── Run simulation ──────────────────────────────────────────
-  const simulate = useCallback(async (params: SimulationParams = {}) => {
-    setSimulating(true);
-    setError(null);
-    try {
-      if (!backendAvailable) {
-        if (mounted.current) setError('Cannot simulate — backend is offline.');
-        return;
-      }
-
-      const result = await api.runSimulation({
-        scenario: activeScenario,
-        iterations: 5000,
-        ...params,
-      });
-      if (mounted.current) {
-        setSimulation(result);
-        const t = await api.getTrends().catch((): Trend[] => []);
-        if (mounted.current) setTrends(t);
-      }
-    } catch (e) {
-      if (mounted.current) {
-        setError(`Simulation failed: ${(e as Error).message}`);
-      }
-    } finally {
-      if (mounted.current) setSimulating(false);
-    }
-  }, [activeScenario, backendAvailable]);
-
-  // ── Update trend score ──────────────────────────────────────
+  // -- Update trend score ----------------------------------------
   const updateTrend = useCallback(async (trendId: string, updates: TrendUpdate) => {
     try {
       if (!backendAvailable) return;
@@ -218,32 +148,33 @@ export default function usePrism(): UsePrismReturn {
     }
   }, [backendAvailable]);
 
-  // ── Load analytics data ─────────────────────────────────────
-  const loadAnalytics = useCallback(async () => {
-    if (!backendAvailable) return;
-    try {
-      const [cvar, sobol, tips] = await Promise.all([
-        api.getCVaR().catch((): null => null),
-        api.getSobol().catch((): null => null),
-        api.getTippingPoints().catch((): null => null),
-      ]);
-      if (mounted.current) setAnalytics({ cvar, sobol, tips });
-    } catch (e) {
-      if (mounted.current) setError((e as Error).message);
-    }
-  }, [backendAvailable]);
-
-  // ── Explicit reconnect function ──────────────────────────────
+  // -- Explicit reconnect function --------------------------------
   const reconnect = useCallback(async () => {
     setConnectionState('reconnecting');
     await loadAll();
   }, [loadAll]);
 
   return {
-    health, trends, forces, simulation, scenarios, config,
-    analytics, aiSuggestions, triggers,
-    loading, simulating, error, backendAvailable, connectionState,
-    activeScenario, setActiveScenario,
-    simulate, updateTrend, reload: loadAll, reconnect, loadAnalytics,
+    health, trends, simulation, config,
+    loading, error, backendAvailable, connectionState,
+    updateTrend, reload: loadAll, reconnect,
   };
+}
+
+// --- Context plumbing -------------------------------------------
+const PrismContext = createContext<UsePrismReturn | null>(null);
+
+/** Mount once (dashboard page). All tabs share this single store. */
+export const PrismProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const value = usePrismStore();
+  return createElement(PrismContext.Provider, { value }, children);
+};
+
+/** Read the shared PRISM store. Must be used inside <PrismProvider>. */
+export default function usePrism(): UsePrismReturn {
+  const ctx = useContext(PrismContext);
+  if (!ctx) {
+    throw new Error('usePrism must be used within <PrismProvider> (see app/dashboard/page.tsx)');
+  }
+  return ctx;
 }
