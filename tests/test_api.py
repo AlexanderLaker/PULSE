@@ -307,7 +307,6 @@ class TestAPIEdgeCases:
         """Should handle large payloads gracefully."""
         large_json = {
             "iterations": 10000,  # Within valid range (1-50000)
-            "include_sensitivity": True,
             "iterations": 500
         }
         response = client.post("/api/v1/simulate", json=large_json)
@@ -341,7 +340,9 @@ class TestAPIEdgeCases:
 class TestF2OnlineNeverSimulates:
     """F2 (June 2026, owner decision): the online service never generates
     numbers. Without scipy, POST /simulate must refuse with 409 before
-    touching the engine — consistency with the offline calibrated runs."""
+    touching the engine — consistency with the offline calibrated runs.
+    D13: the probe is an environment check, never a math fallback — the
+    _scipy_compat approximation layer was deleted."""
 
     def test_simulate_409_without_scipy(self, client, monkeypatch):
         import hmac, hashlib, json as _json, time, base64, os
@@ -354,12 +355,19 @@ class TestF2OnlineNeverSimulates:
         sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
         token = f"{h}.{p}.{sig}"
 
-        import pulse.simulation._scipy_compat as compat
-        monkeypatch.setattr(compat, "HAS_SCIPY", False)
+        import pulse.api.routers.simulation as sim_router
+        monkeypatch.setattr(sim_router, "_scipy_available", lambda: False)
         r = client.post("/api/v1/simulate", json={"iterations": 1000},
                         headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 409
         assert "offline" in r.json()["detail"]
+
+    def test_engine_hard_requires_scipy(self):
+        """D13: the engine module must carry a non-empty scipy-versioned
+        numerics backend tag — proof the exact-math import path is live."""
+        from pulse.simulation.bayesian_mc import NUMERICS_BACKEND
+        assert NUMERICS_BACKEND.startswith("scipy ")
+        assert "numpy" in NUMERICS_BACKEND
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '../api/client';
 import type {
   HealthStatus, Trend, ForceSummary, SimulationResult,
-  ModelConfig, AnalyticsState, AISuggestion, TriggerStatus,
+  ModelConfig, AISuggestion, TriggerStatus,
   ShiftMatrix, ConvergenceDiagnostics, SimulationParams,
   TrendUpdate,
 } from '../types';
@@ -19,7 +19,6 @@ export interface UsePulseReturn {
   forces: ForceSummary[];
   simulation: SimulationResult | null;
   config: ModelConfig | null;
-  analytics: AnalyticsState | null;
   aiSuggestions: AISuggestion[];
   triggers: TriggerStatus[];
   loading: boolean;
@@ -31,7 +30,6 @@ export interface UsePulseReturn {
   simulate: (params?: SimulationParams) => Promise<void>;
   updateTrend: (trendId: string, updates: TrendUpdate) => Promise<void>;
   reload: () => Promise<void>;
-  loadAnalytics: () => Promise<void>;
 }
 
 export default function usePulse(): UsePulseReturn {
@@ -40,7 +38,6 @@ export default function usePulse(): UsePulseReturn {
   const [forces, setForces] = useState<ForceSummary[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
-  const [analytics, setAnalytics] = useState<AnalyticsState | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [triggers, setTriggers] = useState<TriggerStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,16 +91,12 @@ export default function usePulse(): UsePulseReturn {
         setStaleReason(status.reason || '');
       }
 
-      // Load analytics endpoints
+      // AI insights + triggers (analytics suite deleted, D14 June 2026)
       void Promise.all([
-        api.getCVaR().catch((): null => null),
-        api.getSobol().catch((): null => null),
-        api.getTippingPoints().catch((): null => null),
         api.getAIInsights().catch((): AISuggestion[] => []),
         api.getTriggers().catch((): TriggerStatus[] => []),
-      ]).then(([cvar, sobol, tips, aiSugg, trig]) => {
+      ]).then(([aiSugg, trig]) => {
         if (mounted.current) {
-          setAnalytics({ cvar, sobol, tips });
           setAiSuggestions(aiSugg ?? []);
           setTriggers(trig ?? []);
         }
@@ -201,26 +194,11 @@ export default function usePulse(): UsePulseReturn {
     }
   }, [backendAvailable]);
 
-  // ── Load analytics data ─────────────────────────────────────
-  const loadAnalytics = useCallback(async () => {
-    if (!backendAvailable) return;
-    try {
-      const [cvar, sobol, tips] = await Promise.all([
-        api.getCVaR().catch((): null => null),
-        api.getSobol().catch((): null => null),
-        api.getTippingPoints().catch((): null => null),
-      ]);
-      if (mounted.current) setAnalytics({ cvar, sobol, tips });
-    } catch (e) {
-      if (mounted.current) setError((e as Error).message);
-    }
-  }, [backendAvailable]);
-
   return {
     health, trends, forces, simulation, config,
-    analytics, aiSuggestions, triggers,
+    aiSuggestions, triggers,
     loading, simulating, simulationStale, staleReason,
     error, backendAvailable,
-    simulate, updateTrend, reload: loadAll, loadAnalytics,
+    simulate, updateTrend, reload: loadAll,
   };
 }

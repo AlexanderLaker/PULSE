@@ -174,8 +174,11 @@ DEFAULT_REGION_WEIGHTS = {r: 1.0 / len(REGIONS) for r in REGIONS}  # Equal: 25%
 DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equal: ~8.3%
 
 # ── Copula parameters ──────────────────────────────────────────────
+# D20 (June 2026): DEFAULT_T_COPULA_DF deleted with the t-copula tail layer.
+# Post-D1 re-test showed the df dial inert (<2% portfolio band effect across
+# df 4 → ∞); the engine runs a Gaussian copula. See
+# audit/strategy-review/verification/v8_d20_tcopula_df_out.txt.
 DEFAULT_WITHIN_FORCE_RHO = 0.3
-DEFAULT_T_COPULA_DF = 8  # Moderate tails; admin-configurable via PUT /api/v1/config (range 2-30)
 DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 
 # ── Force Overlap Matrix (replaces flat attenuation) ────────────────
@@ -370,7 +373,6 @@ class ModelConfig:
     category_weights: dict = field(default_factory=lambda: dict(DEFAULT_CATEGORY_WEIGHTS))
     iterations: int = DEFAULT_ITERATIONS
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
-    t_copula_df: int = DEFAULT_T_COPULA_DF
     force_correlation_matrix: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_CORRELATIONS))
     force_overlap_matrix: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_OVERLAP_MATRIX))
     within_force_overlap: dict = field(default_factory=lambda: dict(DEFAULT_WITHIN_FORCE_OVERLAP))
@@ -380,7 +382,16 @@ class ModelConfig:
 
     @classmethod
     def from_json(cls, s: str) -> "ModelConfig":
-        return cls(**json.loads(s))
+        """Reconstruct from a JSON snapshot, tolerating retired fields.
+
+        Older config snapshots may carry fields the model no longer has
+        (e.g. ``t_copula_df``, deleted in D20, or the v3.2-retired scalar
+        ``attenuation``). Unknown keys are dropped rather than crashing.
+        """
+        from dataclasses import fields as _fields
+        data = json.loads(s)
+        known = {f.name for f in _fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in known})
 
     def copy_with(self, **overrides) -> "ModelConfig":
         """Return a new ModelConfig with the given fields replaced.

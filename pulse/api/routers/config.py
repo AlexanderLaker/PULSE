@@ -41,11 +41,9 @@ async def get_config(user: dict = Depends(require_auth)):
         "category_weights": getattr(config, 'category_weights', {}),
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
-        "within_force_overlap": getattr(config, 'within_force_overlap', {}),
         "path_years": config.path_years,
         "iterations": config.iterations,
         "within_force_rho": config.within_force_rho,
-        "t_copula_df": config.t_copula_df,
     }
 
 @router.put("/api/v1/config")
@@ -175,9 +173,7 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         changes["within_force_rho"] = {"old": config.within_force_rho, "new": req.within_force_rho}
         overrides["within_force_rho"] = req.within_force_rho
 
-    if req.t_copula_df is not None:
-        changes["t_copula_df"] = {"old": config.t_copula_df, "new": req.t_copula_df}
-        overrides["t_copula_df"] = req.t_copula_df
+    # D20 (June 2026): t_copula_df removed — the engine runs a Gaussian copula.
 
     # Build the candidate (new) config without touching the live one
     candidate = config.copy_with(**overrides) if overrides else config
@@ -215,10 +211,13 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
     from pydantic import ValidationError as _PydValidationError
 
     try:
+        # D21: every layer the engine consumes goes through the validator.
+        # (This call previously read `candidate.attenuation` — an attribute
+        # deleted in v3.2 — so every PUT /config 500ed before validation.)
         ModelConfigValidator(
             region=getattr(candidate, "region", "Global"),
             aggregation_method=getattr(candidate, "aggregation_method", "Multiplicative"),
-            attenuation=candidate.attenuation,
+            per_force_attenuation=dict(candidate.per_force_attenuation),
             attenuation_source=candidate.attenuation_source,
             neutral_threshold=candidate.neutral_threshold,
             base_year=candidate.base_year,
@@ -226,18 +225,29 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             materialization=dict(candidate.materialization),
             force_weights=dict(candidate.force_weights),
             vc_weights=dict(candidate.vc_weights),
+            region_weights=dict(candidate.region_weights),
             category_names=list(candidate.category_names),
+            category_weights=dict(candidate.category_weights),
             iterations=candidate.iterations,
             within_force_rho=candidate.within_force_rho,
-            t_copula_df=candidate.t_copula_df,
+            force_correlation_matrix=dict(candidate.force_correlation_matrix),
+            force_overlap_matrix=dict(candidate.force_overlap_matrix),
+            within_force_overlap=dict(candidate.within_force_overlap),
         )
     except _PydValidationError as ve:
-        # No rollback needed — we never mutated the live config
+        # No rollback needed — we never mutated the live config.
+        # D21: strip ctx/input/url from the pydantic error list — pydantic v2
+        # puts the raw ValueError object into ctx, which is not JSON
+        # serializable and turned every validation 400 into a 500.
+        issues = [
+            {"type": e.get("type"), "loc": list(e.get("loc", ())), "msg": e.get("msg")}
+            for e in ve.errors(include_url=False, include_context=False, include_input=False)
+        ]
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "Proposed config failed validation",
-                "issues": ve.errors(),
+                "issues": issues,
                 "rolled_back": list(changes.keys()),
             },
         )
@@ -276,10 +286,8 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         "category_weights": getattr(config, 'category_weights', {}),
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
-        "within_force_overlap": getattr(config, 'within_force_overlap', {}),
         "iterations": config.iterations,
         "within_force_rho": config.within_force_rho,
-        "t_copula_df": config.t_copula_df,
     }}
 
 # ── Audit ───────────────────────────────────────────────────────

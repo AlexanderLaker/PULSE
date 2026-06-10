@@ -1,12 +1,13 @@
 # PRISM CI — the safety net the June 2026 review found missing (finding 2).
 #
-# Three jobs:
-#   frontend    — typecheck + eslint + vitest (pure-function tests)
-#   engine      — full pytest suite WITH scipy (exact numerics, golden pins)
-#   engine-lite — engine tests WITHOUT scipy, exercising the numpy fallback
-#                 path that runs on Vercel serverless (_scipy_compat.py).
-#                 Golden pins auto-skip there; determinism + structural
-#                 identities must still hold (review finding 7).
+# Two jobs:
+#   frontend — typecheck + eslint + vitest (pure-function tests)
+#   engine   — full pytest suite WITH scipy (exact numerics, golden pins)
+#
+# D13 (owner decision, 2026-06-10): the scipy-less "engine-lite" job was
+# removed together with the _scipy_compat numpy-fallback layer. Exact
+# scipy math is the only math; environments without scipy never compute
+# (the deployed service is read-only over persisted runs, F2).
 name: ci
 
 on:
@@ -38,22 +39,3 @@ jobs:
           cache: pip
       - run: pip install numpy scipy fastapi pydantic pytest hypothesis httpx python-dotenv
       - run: python -m pytest tests/ -q
-
-  engine-lite:
-    # Mirrors the Vercel serverless runtime: api/requirements.txt has no
-    # scipy (250 MB limit), so the engine runs on _scipy_compat fallbacks.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-          cache: pip
-      - run: pip install numpy fastapi pydantic pytest hypothesis httpx python-dotenv
-      - run: >
-          python -m pytest -q
-          tests/test_bayesian_mc.py
-          tests/test_cvar.py
-          tests/test_tipping_points.py
-          tests/test_properties.py
-          tests/test_golden_pipeline.py

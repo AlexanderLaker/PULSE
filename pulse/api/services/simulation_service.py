@@ -45,6 +45,10 @@ def load_latest_run_into_state() -> bool:
             "decompositions": results.get("decompositions"),
             "totals": results.get("totals"),
             "vc_decomposition": results.get("vc_decomposition"),
+            # D19/D3 (June 2026): integrity events + seed stability persist
+            # with the run and must survive rehydration.
+            "integrity_events": results.get("integrity_events") or [],
+            "seed_stability": results.get("seed_stability"),
             "force_attribution": results.get("force_attribution") or force_attr,
             "convergence": conv or results.get("convergence") or {},
             "iterations": latest.get("iterations") or results.get("iterations") or 1000,
@@ -76,6 +80,8 @@ def load_latest_run_into_state() -> bool:
         "git_sha": inner_meta.get("git_sha"),
         "model_version": inner_meta.get("model_version"),
         "engine_name": inner_meta.get("engine_name"),
+        "engine_fidelity": inner_meta.get("engine_fidelity"),
+        "numerics_backend": inner_meta.get("numerics_backend"),  # D13 audit trail
         "converged_categories": inner_meta.get("converged_categories"),
         "total_categories": inner_meta.get("total_categories"),
         "persisted_at_utc": inner_meta.get("persisted_at_utc"),

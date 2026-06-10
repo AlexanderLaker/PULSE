@@ -1,8 +1,9 @@
 """Shift Matrix Excel writer — exports PRISM results to Excel.
 
 Writes continuous path shift matrices with percentile distributions,
-causal decomposition, velocity data, and allocation recommendations.
-All values are percentages — no financial data.
+force attribution and velocity data. All values are percentages — no
+financial data. (The allocation sheet was removed with the optimizer,
+D4 June 2026.)
 """
 
 import logging
@@ -39,7 +40,7 @@ class ShiftMatrixWriter:
         self.config = config
 
     def write(self, output_path: str, mc_result: dict,
-              allocation: dict = None,
+              allocation: dict = None,  # retired (D4); accepted+ignored for caller compat
               metadata: dict = None):
         """
         Write complete PRISM output to Excel.
@@ -181,10 +182,10 @@ class ShiftMatrixWriter:
         """Write run metadata and configuration."""
         ws = wb.create_sheet("Metadata")
 
-        # v3.2: per-force calibrated attenuation. No flat 0.5 default exists
-        # anywhere. The Config sheet (built separately) carries the full
-        # overlap detail; here we surface each force's calibrated value plus
-        # the trend-weighted mean for at-a-glance context.
+        # v3.2: per-force attenuation. No flat 0.5 default exists anywhere.
+        # The Config sheet (built separately) carries the full overlap
+        # detail; here we surface each force's effective value plus the
+        # unweighted mean for at-a-glance context.
         pfa = dict(getattr(self.config, "per_force_attenuation", {}))
         force_order = ["Consumer", "Customer", "Technology", "Government",
                        "Environmental", "Competitive"]
@@ -195,16 +196,36 @@ class ShiftMatrixWriter:
             sum(pfa.values()) / len(pfa) if pfa else 0.0
         )
 
+        # D17 (owner decision, June 2026): the attenuation provenance is
+        # labeled "structured-judgment overlap correction", never
+        # "calibrated" — the values rest on an exposure-overlap proxy plus
+        # documented judgment adjustments, not measured outcomes (F-19).
+        att_source = (
+            "admin override"
+            if getattr(self.config, "attenuation_source", "") == "admin_override"
+            else "structured-judgment overlap correction (v3.5, Apr-2026)"
+        )
+
         data = [
             ("PRISM Shift Matrix", ""),
             ("Generated", datetime.now().isoformat()),
-            ("Model Version", "2.5.0 — Bayesian Copula (v3.2 cleanup)"),
+            # D21 sweep: version comes from the engine result — the previous
+            # hardcoded "2.5.0" string had drifted three releases behind.
+            ("Model Version", str(mc_result.get("model_version", "unknown"))
+                              + " — Bayesian MC, Gaussian copula"),
+            ("Numerics Backend", str(mc_result.get("numerics_backend", "n/a"))),  # D13
             ("Iterations", mc_result.get("iterations", "N/A")),
             ("Model Type", mc_result.get("model_type", "N/A")),
-            ("Attenuation Source", self.config.attenuation_source),
+            ("Attenuation Source", att_source),
             ("Per-Force Attenuation", pfa_str),
             ("Per-Force Mean (unweighted)", f"{pfa_mean:.3f}"),
             ("Path Years", str(self.config.path_years)),
+            ("", ""),
+            # D16 (owner decision, June 2026): design assumption travels with
+            # every export of the matrix.
+            ("READING NOTE", "Ceteris paribus: assumes no management response — no pricing"),
+            ("", "moves, innovation, or competitive reaction by Henkel or competitors."),
+            ("", "Totals read as exposure if nobody acts, not as forecast outcomes."),
             ("", ""),
             ("SECURITY NOTE", "This file contains ONLY percentage shifts."),
             ("", "No company financial data (NES, GP1, GP2) is present."),

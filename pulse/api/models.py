@@ -9,7 +9,8 @@ from pulse.config import FORCES, CATEGORIES
 
 class SimulationRequest(BaseModel):
     iterations: int = Field(5000, ge=1, le=100000)  # 1 to 100k iterations
-    include_sensitivity: bool = False
+    # D21 sweep: `include_sensitivity` removed — the SensitivityEngine it
+    # toggled was deleted in v3.2; the flag has been a silent no-op since.
     # B6: RNG seed control. `seed` runs once with that seed (reproducible).
     # `seeds` runs the engine once per seed and reports seed-wobble (the
     # spread of the headline shift across runs) so leadership can see how
@@ -102,7 +103,9 @@ class ShockRequest(BaseModel):
 
 class ConfigUpdate(BaseModel):
     attenuation_source: Optional[str] = Field(None,
-        description="'assumed' | 'admin_override'")
+        description="'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' "
+                    "(legacy) | 'admin_override'. ('assumed' was retired with "
+                    "the v3.5 structured-judgment overlap correction.)")
     force_weights: Optional[dict] = None
     vc_weights: Optional[dict] = None
     region_weights: Optional[dict] = None
@@ -121,7 +124,7 @@ class ConfigUpdate(BaseModel):
                     "Dict mapping each of the 6 forces to a float in [0, 0.5].")
     iterations: Optional[int] = Field(None, ge=1000, le=100000)
     within_force_rho: Optional[float] = Field(None, ge=0.0, le=0.9)
-    t_copula_df: Optional[int] = Field(None, ge=2, le=30)
+    # D20 (June 2026): t_copula_df removed — Gaussian copula only.
     dry_run: Optional[bool] = Field(False,
         description="If true, validate the proposed config and return the "
                     "diff without applying it. Useful for previewing admin "

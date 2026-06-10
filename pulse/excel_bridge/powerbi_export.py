@@ -325,7 +325,8 @@ class PowerBIExporter:
         Returns:
             Dictionary with metadata information
         """
-        # v3.2: per-force calibrated attenuation. Power BI semantic models
+        # v3.2: per-force attenuation (structured-judgment overlap correction,
+        # v3.5 Apr-2026 — D17). Power BI semantic models
         # consume the dict; downstream measures can flatten or pivot as needed.
         pfa = {
             f: round(float(v), 4)
@@ -334,7 +335,7 @@ class PowerBIExporter:
         return {
             "export_type": "Power BI Flat Table",
             "generated": self.export_timestamp,
-            "model_version": "2.5.0 — Bayesian Copula (v3.2 cleanup)",
+            "model_version": mc_result.get("model_version", "unknown"),
             "iterations": mc_result.get("iterations", "N/A"),
             "model_type": mc_result.get("model_type", "N/A"),
             "per_force_attenuation": pfa,

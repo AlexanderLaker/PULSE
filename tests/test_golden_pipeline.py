@@ -5,15 +5,14 @@ in 96809a4 when category mappings changed, and never re-pinned — leaving
 the engine without an end-to-end reproducibility lock).
 
 Three layers of protection:
-  1. Determinism: same seed → bit-identical results (any environment).
+  1. Determinism: same seed → bit-identical results.
   2. Golden pins: seed=42 on the conftest fixture DB must reproduce the
-     exact values below. Pinned WITH scipy — skipped when scipy is absent
-     because _scipy_compat falls back to a normal approximation of the
-     Beta ppf and produces (deliberately) different numbers. See
-     review finding 7 / pulse/simulation/_scipy_compat.py.
-  3. Structural identities that hold in every environment: the Layer-B
-     force decomposition must reconcile row-by-row to the MC median
-     (PPA2's lenses depend on this invariant).
+     exact values below. D13 (June 2026): scipy is a hard engine
+     requirement — the _scipy_compat approximation layer was deleted, so
+     the pins now run unconditionally (exact numerics is the only path).
+  3. Structural identities: the Layer-B force decomposition must
+     reconcile row-by-row to the MC median (PPA2's lenses depend on
+     this invariant).
 
 If a deliberate model change breaks the pins: re-generate them with the
 snippet in this file's docstring history (run engine on the fixtures,
@@ -23,7 +22,6 @@ pinned values in the same commit.
 
 import pytest
 
-from pulse.simulation._scipy_compat import HAS_SCIPY
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 ITER = 500
@@ -66,35 +64,35 @@ class TestDeterminism:
         assert r1["shift_matrix"][cat] == r2["shift_matrix"][cat]
 
 
-@pytest.mark.skipif(not HAS_SCIPY, reason=(
-    "Golden pins are valid only with scipy. Without scipy, _scipy_compat "
-    "approximates the Beta ppf (normal approximation) and produces "
-    "different numbers by design — see review finding 7."
-))
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 
-    Engine: bayesian_copula MODEL_VERSION 2.7.0. Regenerate pins ONLY for
+    Engine: bayesian_copula MODEL_VERSION 2.8.0. Regenerate pins ONLY for
     deliberate model changes, in the same commit as the change.
 
-    Regenerated June 2026 (v3.6 / D1): DEFAULT_FORCE_CORRELATIONS were
-    recalibrated to be PSD-valid as entered (audit finding F-01 — the old
-    defaults were silently repaired and rescaled by the engine on every
-    run). Same seed, same fixtures, honestly-valid dependence structure.
+    Regenerated June 2026 (v3.7 / D20): the inert t-copula tail layer was
+    deleted — the engine now runs a Gaussian copula (post-D1 re-test showed
+    the df dial moved the portfolio band <2% across df 4 → ∞; see
+    audit/strategy-review/verification/v8_d20_tcopula_df_out.txt).
+    Same seed, same fixtures, simpler honest dependence structure.
+
+    Previously regenerated June 2026 (v3.6 / D1): DEFAULT_FORCE_CORRELATIONS
+    recalibrated to be PSD-valid as entered (audit finding F-01).
     """
 
     PINS = {
         # cat:               (median,            p10,                p90)
-        "Hair: Color": (-0.003428643176, -0.005758534704, -0.000906596942),
-        "Hair: Care":  (-0.003428643176, -0.005758534704, -0.000906596942),
-        "LHC: FCN":    (-0.006407636941, -0.008252814110, -0.004017618504),
+        "Hair: Color": (-0.003422863703, -0.005734252803, -0.000904137187),
+        "Hair: Care":  (-0.003422863703, -0.005734252803, -0.000904137187),
+        "LHC: FCN":    (-0.006407226038, -0.008360061365, -0.003994312450),
     }
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.7.0"
+        assert r["model_version"] == "2.8.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
+        assert r["numerics_backend"].startswith("scipy ")  # D13
 
     def test_golden_values_seed42(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)

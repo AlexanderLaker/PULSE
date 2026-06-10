@@ -812,7 +812,7 @@ Security:
 
         features = [
             "• Bayesian sampling with Beta posteriors over trend probabilities",
-            "• Copula-based dependency structures (Gaussian + t-copula tails)",
+            "• Copula-based dependency structure (Gaussian copula; the t-copula tail dial was removed June 2026 after testing inert)",
             "• Force attribution per category (static, scaled to MC median)",
             "• Continuous paths (2026-2030) with annual granularity",
             "• Velocity tracking and early-warning triggers",

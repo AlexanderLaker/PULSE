@@ -8,7 +8,8 @@
  *     of this hook, so every tab switch re-fetched the entire world and
  *     dropped all in-view state.
  *   - Pruned to what the live UI consumes. The analytics endpoints
- *     (CVaR / Sobol / tipping points / AI insights / triggers), scenario
+ *     (CVaR / Sobol / tipping points — deleted from the backend entirely,
+ *     D14 + Sobol rider June 2026), AI insights / triggers, scenario
  *     list, force summaries and the in-app `simulate()` belonged to the
  *     v1 dashboard, which no longer exists. Simulations are CLI-only
  *     (scripts/run_50k_prod.py); the UI renders the latest persisted run.

@@ -1,0 +1,11 @@
+df=      4: portfolio P10-P90 width=0.013841  P5=-0.053760  integrity=0  (0.6s)
+df=      8: portfolio P10-P90 width=0.014043  P5=-0.053908  integrity=0  (0.6s)
+df=     30: portfolio P10-P90 width=0.014180  P5=-0.053997  integrity=0  (0.6s)
+df=1000000: portfolio P10-P90 width=0.014302  P5=-0.054080  integrity=0  (0.6s)
+
+relative deltas vs df=8 default:
+df=      4: portfolio width delta=-1.440%  cat width delta mean=2.121% max=2.819%  P5 delta=+0.274%
+df=     30: portfolio width delta=+0.973%  cat width delta mean=1.032% max=2.032%  P5 delta=-0.165%
+df=1000000: portfolio width delta=+1.847%  cat width delta mean=1.601% max=3.684%  P5 delta=-0.318%
+
+VERDICT: df dial INERT (<2% band effect) -> D20 says replace with Gaussian copula

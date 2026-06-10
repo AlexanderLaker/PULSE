@@ -97,6 +97,29 @@ export interface TotalsMatrix {
   by_region:     Record<string, Record<string, number>>;         // year → region → total
   /** Grand total per year (sum of category row totals; same as sum of any lens's column totals). */
   grand:         Record<string, number>;                         // year → total
+  /**
+   * Joint portfolio percentiles (D3 / audit F-16, June 2026): true joint
+   * band of the category-weighted portfolio shift, computed per iteration
+   * from the raw MC samples — NOT an average of per-category bands. The
+   * headline band reads this when present (2.8.0+ runs).
+   */
+  portfolio?:    Record<string, PercentileDistribution & { mean?: number; std?: number }>;
+}
+
+/** Integrity event emitted by the engine or the run orchestrator (D19). */
+export interface IntegrityEvent {
+  type: string;            // e.g. 'input_drift', 'correlation_pd_repair'
+  severity: 'info' | 'warning' | 'error' | string;
+  message: string;
+  detail?: Record<string, unknown>;
+}
+
+/** Seed-stability summary across independently-seeded chains (D3 / F-13). */
+export interface SeedStability {
+  n_chains: number;
+  chain_seeds?: number[];
+  headline_median_spread: number;
+  max_category_median_spread?: number;
 }
 
 /** Per-run audit metadata attached to every persisted simulation.
@@ -118,6 +141,10 @@ export interface RunMeta {
   git_sha?: string | null;
   model_version?: string | null;
   engine_name?: string | null;
+  /** D13: 'scipy' — only the exact-numerics engine may produce runs. */
+  engine_fidelity?: string | null;
+  /** D13: exact library versions, e.g. 'scipy 1.15.3 · numpy 2.2.6'. */
+  numerics_backend?: string | null;
   converged_categories?: number | null;
   total_categories?: number | null;
   persisted_at_utc?: string | null;
@@ -137,13 +164,16 @@ export interface SimulationResult {
   model_version?: string;
   /** Audit metadata about the persisted run — drives the dashboard ribbon. */
   run_meta?: RunMeta | null;
+  /** D19: integrity events (input drift, runtime repairs) persisted with the run. */
+  integrity_events?: IntegrityEvent[];
+  /** D3/F-13: cross-chain headline spread — replaces the R̂ badge. */
+  seed_stability?: SeedStability | null;
 }
 
 /** Parameters for running a simulation. */
 export interface SimulationParams {
   scenario?: ScenarioId;
   iterations?: number;
-  include_sensitivity?: boolean;
 }
 
 /** Scenario definition. */

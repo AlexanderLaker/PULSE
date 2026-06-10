@@ -63,6 +63,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
                         "decompositions": results_blob.get("decompositions"),
                         "totals": results_blob.get("totals"),
                         "vc_decomposition": results_blob.get("vc_decomposition"),
+                        # D19/D3: rehydrate integrity events + seed stability
+                        "integrity_events": results_blob.get("integrity_events") or [],
+                        "seed_stability": results_blob.get("seed_stability"),
                         "convergence": latest.get("convergence_diagnostics", {}),
                         "iterations": latest.get("iterations", 5000),
                         "model_type": latest.get("model_type", "bayesian_copula"),
@@ -92,6 +95,8 @@ async def get_simulation(user: dict = Depends(require_auth)):
                     "git_sha": inner_meta.get("git_sha"),
                     "model_version": inner_meta.get("model_version"),
                     "engine_name": inner_meta.get("engine_name"),
+                    "engine_fidelity": inner_meta.get("engine_fidelity"),
+                    "numerics_backend": inner_meta.get("numerics_backend"),  # D13
                     "converged_categories": inner_meta.get("converged_categories"),
                     "total_categories": inner_meta.get("total_categories"),
                     "persisted_at_utc": inner_meta.get("persisted_at_utc"),
@@ -115,6 +120,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "vc_decomposition": mc.get("vc_decomposition"),
         "decompositions": mc.get("decompositions"),
         "totals": mc.get("totals"),
+        # D19/D3: integrity events (incl. input drift) + seed stability
+        "integrity_events": mc.get("integrity_events") or [],
+        "seed_stability": mc.get("seed_stability"),
         # Run metadata the dashboard's "Showing run #N · date · scenario"
         # ribbon consumes. Safe to expose (no credentials, no €M).
         "run_meta": run_meta or None,
@@ -122,12 +130,22 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "model_version": (run_meta or {}).get("model_version"),
     })
 
+def _scipy_available() -> bool:
+    """Environment probe for the F2 guard (patchable in tests).
+
+    D13 (June 2026): scipy is a hard engine requirement — the numpy
+    approximation layer was deleted. This probe only decides whether this
+    runtime is ALLOWED to compute at all; it is never a math fallback.
+    """
+    from importlib.util import find_spec
+    return find_spec("scipy") is not None
+
+
 @router.post("/api/v1/simulate")
 async def run_simulation(req: SimulationRequest, user: dict = Depends(require_admin)):
     # F2 (owner decision): numbers must be consistent — only the scipy
     # engine may generate runs. Serverless (no scipy) is read-only.
-    from pulse.simulation._scipy_compat import HAS_SCIPY
-    if not HAS_SCIPY:
+    if not _scipy_available():
         raise HTTPException(
             409,
             "Simulation runs are produced offline with the scipy engine "
@@ -223,6 +241,21 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
         _state["simulation_stale"] = False
         _state.pop("stale_reason", None)
 
+        # D19: input-drift integrity event — diff this run's trend scoring
+        # state against the previous accepted run's persisted fingerprint.
+        from pulse.audit.input_drift import (
+            trend_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
+        )
+        current_fp = trend_fingerprint(db.trends)
+        try:
+            from pulse.database import load_simulation_runs
+            prev_fp, prev_id, prev_date = previous_fingerprint_from_runs(load_simulation_runs(limit=1))
+            drift_event = compute_input_drift_event(current_fp, prev_fp, prev_id, prev_date)
+            if drift_event:
+                mc_result.setdefault("integrity_events", []).append(drift_event)
+        except Exception as e:
+            logger.warning(f"Input-drift check skipped: {e}")
+
         # Persist simulation run to database (must succeed).
         # Store the full result bundle (shift_matrix + decompositions +
         # totals + vc_decomposition) under `results` so cold-start reloads
@@ -236,15 +269,22 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                # D19/D3: persist integrity events + seed stability with the run
+                "integrity_events": mc_result.get("integrity_events", []),
+                "seed_stability": mc_result.get("seed_stability"),
                 "meta": {
                     "engine_fidelity": "scipy",  # guarded above
+                    # D13: numerics backend recorded for the audit trail
+                    "numerics_backend": mc_result.get("numerics_backend"),
                     "seed": mc_result.get("seed"),
                     "model_version": mc_result.get("model_version"),
                     "engine_name": mc_result.get("engine_name"),
                     "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
+                    # D19: fingerprint of THIS run's inputs for the next diff
+                    "trend_fingerprint": current_fp,
                 },
             }
-            save_simulation_run(
+            run_id = save_simulation_run(
                 iterations=req.iterations,
                 model_type="bayesian_copula",
                 results=_sanitize(results_bundle),
@@ -252,7 +292,24 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 allocation_recommendation=None,
                 convergence_diagnostics=_sanitize(mc_result.get("convergence")),
             )
-            logger.info(f"Simulation persisted ({req.iterations} iterations)")
+            # Refresh the in-memory run_meta so GET /simulation immediately
+            # describes THIS run (previously it kept showing the prior run's
+            # ribbon meta until the next cold-start rehydration).
+            _meta = results_bundle["meta"]
+            _state["run_meta"] = {
+                "run_id": run_id,
+                "run_date": _meta.get("persisted_at_utc"),
+                "iterations": req.iterations,
+                "model_type": "bayesian_copula",
+                "seed": mc_result.get("seed"),
+                "chains": mc_result.get("n_chains"),
+                "model_version": mc_result.get("model_version"),
+                "engine_name": mc_result.get("engine_name"),
+                "engine_fidelity": _meta.get("engine_fidelity"),
+                "numerics_backend": _meta.get("numerics_backend"),
+                "persisted_at_utc": _meta.get("persisted_at_utc"),
+            }
+            logger.info(f"Simulation persisted ({req.iterations} iterations, run_id={run_id})")
         except Exception as e:
             logger.error(f"CRITICAL: Failed to persist simulation run: {e}")
             # Don't fail the request — results are still in memory
@@ -266,6 +323,8 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "vc_decomposition": mc_result.get("vc_decomposition"),
             "decompositions": mc_result.get("decompositions"),
             "totals": mc_result.get("totals"),
+            "integrity_events": mc_result.get("integrity_events") or [],
+            "seed_stability": mc_result.get("seed_stability"),
             "seed": mc_result.get("seed"),
             "seed_wobble": mc_result.get("seed_wobble"),
             "attenuation_band": mc_result.get("attenuation_band"),

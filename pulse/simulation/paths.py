@@ -71,10 +71,10 @@ class PathAnalyzer:
         Returns a year-keyed dict of scalar deltas for trigger evaluation and
         path-shape classification.
 
-        NOTE: A list-based numerical primitive for inflection/tipping-point
-        detection lives in ``pulse.simulation.tipping_points``. The split is
-        intentional: that code operates on flattened ``np.ndarray`` value
-        sequences so it can use ``np.argmax`` / np.diff algorithmic tools.
+        NOTE: the former list-based inflection/tipping-point detector
+        (``pulse.simulation.tipping_points``) was deleted with the rest of
+        the advanced-analytics suite (D14, June 2026); this velocity is the
+        only rate-of-change quantity the engine reports.
         """
         years = sorted(path.keys())
         velocity = {}
