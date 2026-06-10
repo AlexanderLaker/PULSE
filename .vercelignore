@@ -10,3 +10,5 @@ data/prism.db
 *.db
 api/public/
 _RETIRED_2026-06
+# Next 16: proxy.ts replaced middleware.ts — keep stale stub out of builds
+middleware.ts
