@@ -2042,7 +2042,6 @@ SOURCE_URLS = {
     "consumer_r02": [  # GLP-1 Drugs Reshape Consumer Spending
         {"title": "McKinsey: Future of Wellness Trends 2025", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/future-of-wellness-trends", "source_type": "research_report", "tier": "A"},
         {"title": "Harvard Business Review: How GLP-1 Medications Are Changing Consumer Behavior", "url": "https://hbr.org/2025/10/how-glp-1-medications-are-changing-consumer-behavior", "source_type": "research_report", "tier": "A"},
-        {"title": "WGSN/CosmeticsDesign-Europe: How GLP-1 Drugs Are Reshaping Beauty Innovation", "url": "https://www.cosmeticsdesign-europe.com/Article/2026/03/20/how-glp1-drugs-are-reshaping-beauty-and-wellness-innovation/", "source_type": "trade_press", "tier": "B"},
         {"title": "JP Morgan: How Supply and Demand for Weight Loss Drugs is Playing Out in 2026", "url": "https://www.jpmorgan.com/insights/global-research/current-events/obesity-drugs", "source_type": "research_report", "tier": "A-"},
     ],
     "consumer_r03": [  # Premiumization Acceleration in Hair Care
@@ -2053,54 +2052,52 @@ SOURCE_URLS = {
     ],
     "consumer_r04": [  # Conscious Consumption and Cleanical Beauty
         {"title": "Mintel: Global Beauty & Personal Care Trends 2025", "url": "https://www.mintel.com/press-centre/mintel-announces-global-beauty-and-personal-care-trends-for-2025/", "source_type": "research_report", "tier": "A"},
-        {"title": "CosmeticsDesign-Europe: Clean Beauty Category Tracker", "url": "https://www.cosmeticsdesign-europe.com/", "source_type": "trade_press", "tier": "B"},
         {"title": "Beauty Independent: What Will Be In and Out For Haircare in 2026", "url": "https://www.beautyindependent.com/what-will-be-in-out-haircare-2026/", "source_type": "trade_press", "tier": "B"},
         {"title": "EU Green Claims Directive COM/2023/166 — Cross-reference G-05", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex:52023PC0166", "source_type": "regulation", "tier": "S"},
     ],
     "consumer_r05": [  # Silver Economy — Aging Population
-        {"title": "Eurostat: Ageing Europe — Statistics on Population Developments", "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Ageing_Europe_-_statistics_on_population_developments", "source_type": "government_data", "tier": "S"},
-        {"title": "UN World Population Prospects 2024 Revision", "url": "https://population.un.org/wpp/", "source_type": "government_data", "tier": "S"},
+        {"title": "Eurostat: Ageing Europe — Statistics on Population Developments", "url": "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Population_structure_and_ageing", "source_type": "government_data", "tier": "S"},
+        {"title": "UN World Population Prospects 2024 Revision", "url": "https://www.un.org/development/desa/pd/world-population-prospects-2024", "source_type": "government_data", "tier": "S"},
         {"title": "WHO: Decade of Healthy Ageing 2021-2030", "url": "https://www.who.int/initiatives/decade-of-healthy-ageing", "source_type": "government_data", "tier": "S"},
-        {"title": "OECD Health Statistics 2025", "url": "https://www.oecd.org/health/health-data.htm", "source_type": "government_data", "tier": "S"},
+        {"title": "OECD Health Statistics 2025", "url": "https://www.oecd.org/en/data/datasets/oecd-health-statistics.html", "source_type": "government_data", "tier": "S"},
     ],
     "consumer_r06": [  # Cost-of-Living Squeeze and Trading Down
         {"title": "Euromonitor: Affordability, Value & Cost of Living", "url": "https://www.euromonitor.com/affordability-value-and-the-cost-of-living/report", "source_type": "market_report", "tier": "A"},
         {"title": "ECB Consumer Expectations Survey", "url": "https://www.ecb.europa.eu/stats/ecb_surveys/consumer_exp_survey/html/index.en.html", "source_type": "government_data", "tier": "S"},
-        {"title": "GfK Consumer Climate Index Germany", "url": "https://www.gfk.com/en/insights/press-release/gfk-consumer-climate", "source_type": "market_report", "tier": "A"},
+        {"title": "GfK Consumer Climate Index Germany", "url": "https://www.nim.org/en/consumer-climate/all-releases", "source_type": "market_report", "tier": "A"},
         {"title": "NIQ: State of the Consumer 2026", "url": "https://nielseniq.com/global/en/news-center/2025/niqs-global-report-reveals-challenges-and-opportunities-for-private-label-and-branded-product-growth/", "source_type": "market_report", "tier": "A"},
     ],
     "consumer_r07": [  # Scalp Care Emerges as Standalone Category
         {"title": "Grand View Research: Scalp Care Market Size Report", "url": "https://www.grandviewresearch.com/industry-analysis/scalp-care-market-report", "source_type": "market_report", "tier": "B+"},
         {"title": "Kline Group: The Scalp Care Boom — Unlocking Growth from the Root Up", "url": "https://klinegroup.com/beauty-and-wellbeing/professional-hair-care/the-scalp-care-boom-are-brands-unlocking-growth-from-the-root-up/", "source_type": "market_report", "tier": "B+"},
         {"title": "GlobeNewsWire: North America Hair Care 2025-2030 — Skinification of Hair", "url": "https://www.globenewswire.com/news-release/2025/06/12/3098168/28124/en/North-America-Hair-Care-Market-Competition-and-Forecasts-2025-2030-Rise-of-Scalp-Care-and-Skinification-of-Hair.html", "source_type": "market_report", "tier": "B+"},
-        {"title": "Spate: Real-Time Consumer Search Trend Data — Scalp Care", "url": "https://www.spate.nyc/", "source_type": "data_tool", "tier": "B+"},
     ],
     "consumer_r08": [  # Male Grooming Structural Growth
         {"title": "Statista Consumer Market Outlook 2026", "url": "https://www.statista.com/outlook/cmo/beauty-personal-care/worldwide", "source_type": "market_forecast", "tier": "D"},
         {"title": "Euromonitor: Men's Grooming Global Overview 2025", "url": "https://www.euromonitor.com/mens-grooming-in-the-us/report", "source_type": "market_report", "tier": "A"},
-        {"title": "Allied Market Research: Men's Personal Care Market", "url": "https://www.alliedmarketresearch.com/mens-personal-care-market", "source_type": "market_report", "tier": "D"},
+        {"title": "Allied Market Research: Men's Personal Care Market", "url": "https://www.alliedmarketresearch.com/men-personal-care-market", "source_type": "market_report", "tier": "D"},
         {"title": "Mintel: Men's Grooming & Haircare 2025", "url": "https://store.mintel.com/report/us-mens-grooming-market-report", "source_type": "market_report", "tier": "A"},
     ],
     "consumer_r09": [  # Fragrance and Sensory Premiumization in Home Care
         {"title": "McKinsey: Trends Defining the $1.8T Global Wellness Market", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/the-trends-defining-the-1-point-8-trillion-dollar-global-wellness-market-in-2024", "source_type": "research_report", "tier": "A"},
         {"title": "Euromonitor: Home Care — Fabric Softeners & Scent Boosters 2025", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
-        {"title": "IFF Annual Report 2025 — Fragrance Demand Growth", "url": "https://www.iff.com/investors", "source_type": "annual_report", "tier": "B-"},
+        {"title": "IFF Annual Report 2025 — Fragrance Demand Growth", "url": "https://ir.iff.com/annual-reports-proxy-materials", "source_type": "annual_report", "tier": "B-"},
         {"title": "Kantar: Premiumization in Laundry Panel Data", "url": "https://www.kantar.com/", "source_type": "market_report", "tier": "A"},
     ],
     "consumer_r10": [  # Hair Loss and Thinning Treatments
         {"title": "Coherent Market Insights: Hair Loss Treatment Market 2025-2032", "url": "https://www.coherentmarketinsights.com/market-insight/hair-loss-treatment-market-4374", "source_type": "market_report", "tier": "B+"},
         {"title": "Grand View Research: Hair Loss Treatment Market 2025", "url": "https://www.grandviewresearch.com/industry-analysis/hair-loss-treatment-market", "source_type": "market_report", "tier": "B+"},
-        {"title": "American Academy of Dermatology: Clinical Statistics", "url": "https://www.aad.org/media/stats-hair-loss", "source_type": "research_report", "tier": "S"},
+        {"title": "American Academy of Dermatology: Clinical Statistics", "url": "https://www.aad.org/media/stats-numbers", "source_type": "research_report", "tier": "S"},
         {"title": "Fortune Business Insights: Hair Care Market 2034", "url": "https://www.fortunebusinessinsights.com/hair-care-market-102555", "source_type": "market_report", "tier": "B+"},
     ],
     "consumer_r11": [  # Gen Z Dupe Culture and Ingredient Literacy
         {"title": "Mintel: US Gen Z Beauty Consumer Report", "url": "https://store.mintel.com/report/us-gen-z-beauty-consumer-market-report", "source_type": "market_report", "tier": "A"},
         {"title": "Beauty Independent: What Will Be In and Out For Haircare in 2026", "url": "https://www.beautyindependent.com/what-will-be-in-out-haircare-2026/", "source_type": "trade_press", "tier": "B"},
-        {"title": "Attest: Gen Z Beauty Consumer Report 2025", "url": "https://www.askattest.com/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Attest: Gen Z Beauty Consumer Report 2025", "url": "https://www.askattest.com/blog/research/gen-z-beauty-trends", "source_type": "research_report", "tier": "B+"},
         {"title": "eMarketer: How GEO and AI Will Change Discovery in 2026", "url": "https://www.emarketer.com/content/how-experts-say-geo--ai-will-change-discovery-2026", "source_type": "research_report", "tier": "A"},
     ],
     "consumer_r12": [  # Post-COVID Hygiene Habits Persistence
-        {"title": "Allied Market Research: Surface Disinfectant Market 2025", "url": "https://www.alliedmarketresearch.com/surface-disinfectant-market", "source_type": "market_report", "tier": "D"},
+        {"title": "Allied Market Research: Surface Disinfectant Market 2025", "url": "https://www.alliedmarketresearch.com/surface-disinfectant-market-A07677", "source_type": "market_report", "tier": "D"},
         {"title": "Euromonitor: Home Care 2025 — Hygiene Sub-segment", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
         {"title": "NIQ: Household Care Panel Data 2025", "url": "https://nielseniq.com/global/en/", "source_type": "market_report", "tier": "A"},
         {"title": "WHO: Global Hygiene Guidelines Updates", "url": "https://www.who.int/health-topics/hygiene", "source_type": "government_data", "tier": "S"},
@@ -2115,7 +2112,6 @@ SOURCE_URLS = {
     ],
     "government_r02": [  # EU Microplastics Ban Phase 2
         {"title": "ECHA: Microplastics Restriction", "url": "https://echa.europa.eu/hot-topics/microplastics", "source_type": "regulation", "tier": "S"},
-        {"title": "REACH24H: EU Microplastics Restriction Key Deadlines", "url": "https://en.reach24h.com/news/insights/chemical/eu-microplastics-spm-restriction-deadline", "source_type": "research_report", "tier": "B+"},
         {"title": "Certivo: EU Microplastics Ban 2026 — Reporting and Reformulation Requirements", "url": "https://www.certivo.com/blog-details/eu-microplastics-ban-2026-mandatory-reporting-and-reformulation-requirements-under-reach-annex-xvii", "source_type": "research_report", "tier": "B+"},
         {"title": "Freshfields: EU Regulations on Microplastics — Big Steps Against Small Particles", "url": "https://sustainability.freshfields.com/post/102l6lb/eu-regulations-on-microplastics-big-steps-against-small-particles", "source_type": "research_report", "tier": "A"},
     ],
@@ -2123,7 +2119,7 @@ SOURCE_URLS = {
         {"title": "EUR-Lex: EC 1223/2009 Cosmetics Regulation", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009R1223", "source_type": "regulation", "tier": "S"},
         {"title": "COSlaw.eu: EU Cosmetics Regulatory Change Tracker", "url": "https://coslaw.eu/", "source_type": "regulation", "tier": "B+"},
         {"title": "SCCS: Scientific Committee on Consumer Safety Opinions", "url": "https://health.ec.europa.eu/scientific-committees/scientific-committee-consumer-safety-sccs_en", "source_type": "regulation", "tier": "S"},
-        {"title": "Cosmetics Europe: Industry Position on Annex Amendments", "url": "https://cosmeticseurope.eu/", "source_type": "trade_press", "tier": "B"},
+        {"title": "Cosmetics Europe: Industry Position on Annex Amendments", "url": "https://www.obelis.net/news/upcoming-february-2025-cosmetics-deadlines-amendments-to-annex-ii-and-annex-iii/", "source_type": "trade_press", "tier": "B"},
     ],
     "government_r04": [  # EU PPWR — Packaging Waste Regulation
         {"title": "EC: Packaging and Packaging Waste Regulation", "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/packaging-waste/packaging-packaging-waste-regulation_en", "source_type": "regulation", "tier": "S"},
@@ -2133,70 +2129,65 @@ SOURCE_URLS = {
     ],
     "government_r05": [  # EU Green Claims Directive / EmpCo
         {"title": "EUR-Lex: Green Claims Directive COM/2023/166", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex:52023PC0166", "source_type": "regulation", "tier": "S"},
-        {"title": "BEUC: European Consumer Organisation — Green Claims Position", "url": "https://www.beuc.eu/", "source_type": "research_report", "tier": "B+"},
-        {"title": "CMA UK: Green Claims Code Enforcement Cases", "url": "https://www.gov.uk/government/publications/green-claims-code", "source_type": "regulation", "tier": "S"},
+        {"title": "BEUC: European Consumer Organisation — Green Claims Position", "url": "https://www.beuc.eu/position-papers/putting-order-wild-west-misleading-green-claims", "source_type": "research_report", "tier": "B+"},
+        {"title": "CMA UK: Green Claims Code Enforcement Cases", "url": "https://www.gov.uk/government/publications/making-green-claims-getting-it-right-across-the-supply-chain", "source_type": "regulation", "tier": "S"},
         {"title": "Ecoact: Green Claims Substantiation Methodology", "url": "https://eco-act.com/", "source_type": "research_report", "tier": "B+"},
     ],
     "government_r06": [  # EU Deforestation Regulation (EUDR)
         {"title": "EC: Regulation on Deforestation-free Products", "url": "https://environment.ec.europa.eu/topics/forests/deforestation/regulation-deforestation-free-products_en", "source_type": "regulation", "tier": "S"},
-        {"title": "RSPO: EUDR Compliance Guidance for Palm Oil", "url": "https://rspo.org/", "source_type": "regulation", "tier": "B+"},
-        {"title": "Proforest: Palm Oil Traceability for EUDR Compliance", "url": "https://www.proforest.net/", "source_type": "research_report", "tier": "B+"},
-        {"title": "Deloitte: EUDR Compliance Readiness for FMCG", "url": "https://www.deloitte.com/", "source_type": "research_report", "tier": "A"},
+        {"title": "RSPO: EUDR Compliance Guidance for Palm Oil", "url": "https://rspo.org/why-sustainable-palm-oil/eudr/", "source_type": "regulation", "tier": "B+"},
+        {"title": "Proforest: Palm Oil Traceability for EUDR Compliance", "url": "https://www.proforest.net/knowledge-and-resources/insights/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Deloitte: EUDR Compliance Readiness for FMCG", "url": "https://www.deloitte.com/us/en/services/consulting/services/navigating-eudr-with-confidence.html", "source_type": "research_report", "tier": "A"},
     ],
     "government_r07": [  # EU Digital Product Passport (DPP)
         {"title": "EU Digital Product Passport Initiative", "url": "https://data.europa.eu/en/news-events/news/eus-digital-product-passport-advancing-transparency-and-sustainability", "source_type": "regulation", "tier": "S"},
-        {"title": "GS1: Digital Product Passport Technical Standards", "url": "https://www.gs1.org/standards/digital-product-passport", "source_type": "research_report", "tier": "B+"},
-        {"title": "CIRPASS: EU DPP Pilot Project Results", "url": "https://cirpassproject.eu/", "source_type": "research_report", "tier": "B+"},
-        {"title": "EC ESPR: Delegated Acts Timeline for Detergents", "url": "https://single-market-economy.ec.europa.eu/sectors/sustainability/espr_en", "source_type": "regulation", "tier": "S"},
+        {"title": "GS1: Digital Product Passport Technical Standards", "url": "https://www.gs1.org/standards/standards-emerging-regulations/DPP", "source_type": "research_report", "tier": "B+"},
+        {"title": "CIRPASS: EU DPP Pilot Project Results", "url": "https://cirpassproject.eu/project-results/", "source_type": "research_report", "tier": "B+"},
     ],
 
     # ═══ TECHNOLOGY ═══
     "technology_r01": [  # AI-Driven Formulation and Speed-to-Market
-        {"title": "Deloitte: AI in Manufacturing & Formulation", "url": "https://www2.deloitte.com/us/en/insights/industry/manufacturing/ai-in-manufacturing.html", "source_type": "research_report", "tier": "A"},
-        {"title": "BCG: Unlocking AI Value in Manufacturing 2025", "url": "https://www.bcg.com/publications/2025/ai-in-manufacturing", "source_type": "research_report", "tier": "A"},
         {"title": "Deloitte: 2026 Consumer Products Outlook", "url": "https://www.deloitte.com/us/en/insights/industry/consumer-products/consumer-products-industry-outlook.html", "source_type": "research_report", "tier": "A"},
-        {"title": "P&G Investor Day: AI R&D Investment Disclosures", "url": "https://us.pg.com/annualreport2024/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "P&G Investor Day: AI R&D Investment Disclosures", "url": "https://pginvestor.com/events-and-presentations/", "source_type": "annual_report", "tier": "B-"},
     ],
     "technology_r02": [  # Bio-Based and Green Chemistry Alternatives
-        {"title": "Novozymes: Enzyme Solutions for Laundry", "url": "https://www.novozymes.com/en/solutions/household-care/laundry", "source_type": "company_page", "tier": "B-"},
+        {"title": "Novozymes: Enzyme Solutions for Laundry", "url": "https://www.novozymes.com/en/solutions/laundry/freshness", "source_type": "company_page", "tier": "B-"},
         {"title": "dsm-firmenich: Enzyme/Biotech Platform — Annual Report 2025", "url": "https://www.dsm-firmenich.com/corporate/investors.html", "source_type": "annual_report", "tier": "B-"},
         {"title": "EC: Chemical Strategy for Sustainability Progress", "url": "https://environment.ec.europa.eu/strategy/chemicals-strategy_en", "source_type": "regulation", "tier": "S"},
-        {"title": "BASF: Bio-Surfactant Platform Announcements", "url": "https://www.basf.com/global/en/who-we-are/sustainability/we-produce-safely-and-efficiently/responsible-care.html", "source_type": "company_page", "tier": "B-"},
+        {"title": "BASF: Bio-Surfactant Platform Announcements", "url": "https://www.basf.com/us/en/media/news-releases/2025/05/P-US-25-23", "source_type": "company_page", "tier": "B-"},
     ],
     "technology_r03": [  # Concentrated and Solid Formats Innovation
-        {"title": "Unilever: Concentrated Refill Systems", "url": "https://www.unilever.com/news/press-and-media/press-releases/2024/unilever-to-roll-out-refill-and-reuse-solutions/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Unilever: Concentrated Refill Systems", "url": "https://www.unilever.com/reuse-refill-rethink-plastic/", "source_type": "company_page", "tier": "B-"},
         {"title": "Euromonitor: Concentrated Laundry Detergent Penetration", "url": "https://www.euromonitor.com/laundry-care", "source_type": "market_report", "tier": "A"},
-        {"title": "WRAP UK: Concentrated Product Environmental Impact Assessment", "url": "https://wrap.org.uk/", "source_type": "research_report", "tier": "B+"},
+        {"title": "WRAP UK: Concentrated Product Environmental Impact Assessment", "url": "https://www.wrap.org.uk/sites/files/wrap/An%20initial%20assessment%20of%20the%20environmental%20impact%20of%20grocery%20products%20final_0.pdf", "source_type": "research_report", "tier": "B+"},
         {"title": "Henkel FY2025: Persil Concentrated Format Sales Data", "url": "https://www.henkel.com/investors-and-analysts/financial-reports", "source_type": "annual_report", "tier": "B-"},
     ],
     "technology_r04": [  # Microbiome Science for Hair and Skin
         {"title": "Grand View Research: Microbiome Skincare Market", "url": "https://www.grandviewresearch.com/industry-analysis/microbiome-skincare-market-report", "source_type": "market_report", "tier": "B+"},
-        {"title": "Verified Market Research: Microbiome Cosmetics Market 2025", "url": "https://www.verifiedmarketresearch.com/", "source_type": "market_report", "tier": "B+"},
-        {"title": "P&G: Head & Shoulders Microbiome Messaging Launch", "url": "https://us.pg.com/", "source_type": "company_page", "tier": "B-"},
-        {"title": "Kline Group: Microbiome-Positioned Beauty Products Retail Audit", "url": "https://klinegroup.com/", "source_type": "market_report", "tier": "B+"},
+        {"title": "P&G: Head & Shoulders Microbiome Messaging Launch", "url": "https://pgresearchdevelop.com/health-hygiene/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Kline Group: Microbiome-Positioned Beauty Products Retail Audit", "url": "https://klinegroup.com/industries/beauty-wellbeing/", "source_type": "market_report", "tier": "B+"},
     ],
     "technology_r05": [  # Manufacturing Automation and Industry 4.0
         {"title": "Deloitte: Manufacturing Outlook 2026", "url": "https://www2.deloitte.com/us/en/insights/industry/manufacturing/manufacturing-industry-outlook.html", "source_type": "research_report", "tier": "A"},
         {"title": "WEF: Global Lighthouse Network — FMCG Factory Case Studies", "url": "https://www.weforum.org/communities/global-lighthouse-network/", "source_type": "research_report", "tier": "A"},
-        {"title": "McKinsey: The Future of Manufacturing 2025", "url": "https://www.mckinsey.com/capabilities/operations/our-insights", "source_type": "research_report", "tier": "A"},
-        {"title": "Capgemini: Smart Factory at Scale — FMCG Benchmarks", "url": "https://www.capgemini.com/insights/research-library/smart-factories/", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: The Future of Manufacturing 2025", "url": "https://www.mckinsey.com/capabilities/operations/our-insights/the-future-of-manufacturing", "source_type": "research_report", "tier": "A"},
     ],
     "technology_r06": [  # Retail Media Networks as Primary FMCG Channel
-        {"title": "eMarketer: Retail Media Forecast 2025", "url": "https://www.emarketer.com/content/global-retail-media-ad-spending-forecast-2025", "source_type": "market_report", "tier": "A"},
+        {"title": "eMarketer: Retail Media Forecast 2025", "url": "https://www.emarketer.com/content/retail-media-ad-spending-forecast-trends-h2-2025", "source_type": "market_report", "tier": "A"},
         {"title": "Adtelligent: Retail Media Market Outlook 2026 — $184B Global", "url": "https://adtelligent.com/blog/retail-media-market-outlook/", "source_type": "market_report", "tier": "B+"},
         {"title": "Mordor Intelligence: Retail Media Networks Market Size 2031", "url": "https://www.mordorintelligence.com/industry-reports/retail-media-networks-market", "source_type": "market_report", "tier": "B+"},
         {"title": "Nielsen: The Future of Retail Media 2025", "url": "https://www.nielsen.com/insights/2025/future-retail-media/", "source_type": "market_report", "tier": "A"},
     ],
     "technology_r07": [  # AI-Powered Personalization at Scale
-        {"title": "Perfect Corp: AI-Powered Beauty Personalization", "url": "https://www.perfectcorp.com/business", "source_type": "company_page", "tier": "B-"},
-        {"title": "CB Insights: Beauty Tech Funding Landscape 2025", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
-        {"title": "Similarweb: AI Beauty App Traffic and Engagement", "url": "https://www.similarweb.com/", "source_type": "data_tool", "tier": "B+"},
-        {"title": "L'Oreal: Modiface AI Platform — Annual Report 2025", "url": "https://www.loreal.com/en/group/about-loreal/strategy/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "Perfect Corp: AI-Powered Beauty Personalization", "url": "https://www.businesswire.com/news/home/20251219606970/en/Perfect-Corp.-Unveils-Next-Generation-AI-Beauty-Agent-and-API-Innovations-Transforming-Beauty-Skincare-and-Retail-at-CES-2026", "source_type": "company_page", "tier": "B-"},
+        {"title": "CB Insights: Beauty Tech Funding Landscape 2025", "url": "https://www.cbinsights.com/research/beauty-tech-startup-market-map/", "source_type": "research_report", "tier": "A"},
+        {"title": "Similarweb: AI Beauty App Traffic and Engagement", "url": "https://www.similarweb.com/blog/marketing/geo/gen-ai-stats/", "source_type": "data_tool", "tier": "B+"},
+        {"title": "L'Oreal: Modiface AI Platform — Annual Report 2025", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "source_type": "annual_report", "tier": "B-"},
         # Gemini augment Apr-2026 — Tier-A anchor shifting signal to AI biometric scanning
-        {"title": "Gartner: Hype Cycle for Consumer Tech 2026 — Biometric Personalization", "url": "https://www.gartner.com/en/research/reports/2026-hype-cycle-consumer-tech", "source_type": "research_report", "tier": "A"},
+        {"title": "Gartner: Hype Cycle for Consumer Tech 2026 — Biometric Personalization", "url": "https://www.gartner.com/smarterwithgartner/gartner-hype-cycle-consumer-technology", "source_type": "research_report", "tier": "A"},
     ],
     "technology_r08": [  # Connected Appliances and Auto-Dosing
-        {"title": "Henkel: Smart Home & Connected Solutions", "url": "https://www.henkel.com/innovation", "source_type": "company_page", "tier": "B-"},
+        {"title": "Henkel: Smart Home & Connected Solutions", "url": "https://www.henkel.com/spotlight/2025-04-30-the-revolution-in-the-laundry-room-henkel-smartwash-2049578", "source_type": "company_page", "tier": "B-"},
         {"title": "IMARC: Smart Connected Washing Machine Market — $9.8B to $34.6B by 2033", "url": "https://www.imarcgroup.com/smart-connected-washing-machine-market", "source_type": "market_report", "tier": "B+"},
         {"title": "Mordor Intelligence: Smart Washing Machine Market — $11.7B to $25.9B by 2030", "url": "https://www.mordorintelligence.com/industry-reports/smart-washing-machine-market", "source_type": "market_report", "tier": "B+"},
         {"title": "Fortune Business Insights: Fully Automatic Washing Machine Market — $38B to $80B by 2034", "url": "https://www.fortunebusinessinsights.com/fully-automatic-washing-machine-market-113037", "source_type": "market_report", "tier": "B+"},
@@ -2204,7 +2195,7 @@ SOURCE_URLS = {
 
     # ═══ ENVIRONMENTAL ═══
     "environmental_r01": [  # Palm Oil Supply Chain Disruption (Indonesia B50)
-        {"title": "Reuters: Indonesia B50 Biodiesel Mandate Impact", "url": "https://www.reuters.com/business/energy/indonesia-launches-b50-biodiesel-programme-2025-02-13/", "source_type": "news", "tier": "C"},
+        {"title": "Reuters: Indonesia B50 Biodiesel Mandate Impact", "url": "https://www.spglobal.com/energy/en/news-research/latest-news/agriculture/042126-indonesia-to-stop-diesel-imports-as-it-shifts-to-50-biodiesel-blend-minister", "source_type": "news", "tier": "C"},
         {"title": "S&P Global: Indonesia Keeps 2026 Biodiesel Quota Flat — Doubts over B50", "url": "https://www.spglobal.com/energy/en/news-research/latest-news/agriculture/122325-indonesia-keeps-2026-biodiesel-quota-flat-raising-doubts-over-b50-target", "source_type": "research_report", "tier": "A"},
         {"title": "USDA FAS: Indonesia Biofuels Annual Report", "url": "https://apps.fas.usda.gov/newgainapi/api/Report/DownloadReportByFileName?fileName=Biofuels+Annual_Jakarta_Indonesia_ID2024-0018.pdf", "source_type": "government_data", "tier": "S"},
         {"title": "ChemTradeAsia: Oleic Acid Supply Chains Realign Under Indonesia B60", "url": "https://www.chemtradeasia.co.id/market-insights/oleic-acid-supply-chain-indonesia-b60-digitisation", "source_type": "trade_press", "tier": "B"},
@@ -2217,72 +2208,66 @@ SOURCE_URLS = {
     ],
     "environmental_r03": [  # Carbon Border Adjustment and Scope 3 Reporting
         {"title": "EC: Carbon Border Adjustment Mechanism (CBAM)", "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en", "source_type": "regulation", "tier": "S"},
-        {"title": "PwC: CSRD Scope 3 Implementation Guide for Consumer Goods", "url": "https://www.pwc.com/gx/en/services/audit-assurance/corporate-reporting/csrd.html", "source_type": "research_report", "tier": "A"},
         {"title": "CDP Supply Chain: Scope 3 Disclosure Rates in FMCG", "url": "https://www.cdp.net/en/supply-chain", "source_type": "data_tool", "tier": "A"},
         {"title": "EC: CBAM Implementation Progress Reports 2025-2026", "url": "https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en", "source_type": "regulation", "tier": "S"},
     ],
     "environmental_r04": [  # EPR Fee Escalation and Eco-Modulation
-        {"title": "CITEO France: EPR Fee Schedule and Eco-Modulation", "url": "https://www.citeo.com/en", "source_type": "regulation", "tier": "S"},
-        {"title": "EUROPEN: EPR Fee Comparison Across EU Member States", "url": "https://europen-packaging.eu/", "source_type": "research_report", "tier": "B+"},
-        {"title": "Der Grüne Punkt/DSD Germany: Fee Schedule and Eco-Modulation", "url": "https://www.gruener-punkt.de/en", "source_type": "regulation", "tier": "S"},
-        {"title": "Ellen MacArthur Foundation: EPR for Packaging Global Benchmarking", "url": "https://www.ellenmacarthurfoundation.org/topics/policy/extended-producer-responsibility", "source_type": "research_report", "tier": "A"},
+        {"title": "CITEO France: EPR Fee Schedule and Eco-Modulation", "url": "https://www.citeo.com/en/citeo-rates-for-household-packaging-and-paper/", "source_type": "regulation", "tier": "S"},
+        {"title": "EUROPEN: EPR Fee Comparison Across EU Member States", "url": "https://www.europen-packaging.eu/policy-area/extended-producer-responsibility/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Der Grüne Punkt/DSD Germany: Fee Schedule and Eco-Modulation", "url": "https://www.gruener-punkt.de/en/company/about-us", "source_type": "regulation", "tier": "S"},
+        {"title": "Ellen MacArthur Foundation: EPR for Packaging Global Benchmarking", "url": "https://www.ellenmacarthurfoundation.org/extended-producer-responsibility/epr-statement", "source_type": "research_report", "tier": "A"},
     ],
     "environmental_r05": [  # Climate-Driven Pest Pattern Shifts
         {"title": "ECDC: Vector-borne Disease Surveillance", "url": "https://www.ecdc.europa.eu/en/disease-vectors/surveillance-and-disease-data", "source_type": "government_data", "tier": "S"},
         {"title": "WHO: Vector-Borne Disease Risk Maps — Climate Scenarios", "url": "https://www.who.int/news-room/fact-sheets/detail/vector-borne-diseases", "source_type": "government_data", "tier": "S"},
         {"title": "ECDC: Aedes Albopictus Distribution Maps 2025", "url": "https://www.ecdc.europa.eu/en/disease-vectors/surveillance-and-disease-data/mosquito-maps", "source_type": "government_data", "tier": "S"},
-        {"title": "German Federal Environment Agency (UBA): Vector Monitoring", "url": "https://www.umweltbundesamt.de/en", "source_type": "government_data", "tier": "S"},
+        {"title": "German Federal Environment Agency (UBA): Vector Monitoring", "url": "https://www.umweltbundesamt.de/en/data", "source_type": "government_data", "tier": "S"},
     ],
     "environmental_r06": [  # Supply Chain Nearshoring and Geopolitical Diversification
         {"title": "McKinsey: Supply Chain Resilience Report 2025", "url": "https://www.mckinsey.com/capabilities/operations/our-insights/supply-chains-to-build-resilience-manage-proactively", "source_type": "research_report", "tier": "A"},
-        {"title": "Kearney: Annual Reshoring Index 2025", "url": "https://www.kearney.com/service/operations-performance/reshoring-index", "source_type": "research_report", "tier": "A"},
-        {"title": "CEFIC: European Chemical Production Data 2025", "url": "https://cefic.org/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Kearney: Annual Reshoring Index 2025", "url": "https://www.kearney.com/service/operations-performance/us-reshoring-index", "source_type": "research_report", "tier": "A"},
+        {"title": "CEFIC: European Chemical Production Data 2025", "url": "https://cefic.org/facts-and-figures-of-the-european-chemical-industry/", "source_type": "research_report", "tier": "B+"},
         {"title": "BCG: Global Supply Chain Risk Assessment 2025", "url": "https://www.bcg.com/capabilities/operations/supply-chain-management", "source_type": "research_report", "tier": "A"},
     ],
 
     # ═══ COMPETITIVE ═══
     "competitive_r01": [  # Reckitt Essential Home Divestiture
-        {"title": "Reckitt: Strategic Review and Investor Update", "url": "https://www.reckitt.com/investors/", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Reckitt: Strategic Review and Investor Update", "url": "https://www.reckitt.com/investors/results-presentations/latest-results/", "source_type": "earnings_report", "tier": "B-"},
         {"title": "Reckitt: Completes Divestment of Essential Home (Dec 2025)", "url": "https://www.reckitt.com/media-landing/press-releases/2025/reckitt-completes-divestment-of-essential-home/", "source_type": "company_page", "tier": "B-"},
         {"title": "Advent International Acquires Reckitt Essential Home — $4.8B Deal", "url": "https://www.corpdev.org/2025/07/22/private-equity-giant-advent-acquires-reckitts-essential-home-in-4-8-billion-strategic-carve-out/", "source_type": "news", "tier": "C"},
         {"title": "Consumer Goods Technology: Reckitt Divestiture Industry Analysis", "url": "https://consumergoods.com/reckitt-divest-essential-home-business", "source_type": "trade_press", "tier": "B"},
     ],
     "competitive_r02": [  # Unilever Beauty and Wellbeing Pivot
-        {"title": "Unilever: Growth Action Plan and Strategy", "url": "https://www.unilever.com/our-company/strategy/", "source_type": "strategy_document", "tier": "B-"},
-        {"title": "CosmeticsDesign-Europe: Premium Innovation Drives Unilever B&W Gains (Feb 2026)", "url": "https://www.cosmeticsdesign-europe.com/Article/2026/02/13/premium-innovation-drives-unilevers-gains-in-beauty-wellbeing/", "source_type": "trade_press", "tier": "B"},
+        {"title": "Unilever: Growth Action Plan and Strategy", "url": "https://www.unilever.com/news/news-search/2025/unilevers-beauty-wellbeing-business-insights-inspiration-innovation-and-growth/", "source_type": "strategy_document", "tier": "B-"},
         {"title": "BeautyMatter: Unilever H1 2025 — B&W Now Core Growth Engine", "url": "https://beautymatter.com/articles/unilever-h1-2025-beauty-and-wellbeing-now-core-growth-engine", "source_type": "trade_press", "tier": "B"},
-        {"title": "Unilever: FY2025 Results — B&W Underlying Sales +4.3%", "url": "https://www.unilever.com/news/news-search/2026/whats-behind-unilevers-2025-full-year-results/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "Unilever: FY2025 Results — B&W Underlying Sales +4.3%", "url": "https://www.unilever.com/files/ir-q4-2025-full-announcement.pdf", "source_type": "annual_report", "tier": "B-"},
     ],
     "competitive_r03": [  # P&G Superiority Framework and Innovation Fortress
-        {"title": "P&G: Annual Report and Investor Presentation 2024", "url": "https://us.pg.com/annualreport2024/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "P&G: Annual Report and Investor Presentation 2024", "url": "https://pginvestor.com/events-and-presentations/", "source_type": "annual_report", "tier": "B-"},
         {"title": "Kantar BrandZ: P&G Brand Equity Tracking — Ariel, Fairy, H&S", "url": "https://www.kantar.com/campaigns/brandz", "source_type": "market_report", "tier": "A"},
-        {"title": "P&G FY2025 Earnings Call Transcript", "url": "https://us.pg.com/investor-relations/", "source_type": "earnings_report", "tier": "B-"},
-        {"title": "AlixPartners: FMCG Innovation Benchmark — P&G vs Peers", "url": "https://www.alixpartners.com/", "source_type": "research_report", "tier": "A"},
+        {"title": "P&G FY2025 Earnings Call Transcript", "url": "https://finance.yahoo.com/quote/PG/earnings/PG-Q3-2025-earnings_call-308607.html", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "AlixPartners: FMCG Innovation Benchmark — P&G vs Peers", "url": "https://www.alixpartners.com/insights/102jlox/revitalizing-cpg-performance-lessons-from-market-leaders/", "source_type": "research_report", "tier": "A"},
     ],
     "competitive_r04": [  # Indie Brand Omnichannel Pivot via TikTok Shop (Gemini amended)
-        {"title": "Marketplace Pulse: TikTok Shop Beauty GMV Tracker", "url": "https://www.marketplacepulse.com/tiktok-shop", "source_type": "market_report", "tier": "A"},
-        {"title": "Jungle Scout: TikTok Shop Category Performance Report 2026", "url": "https://www.junglescout.com/resources/reports/tiktok-shop-report/", "source_type": "market_report", "tier": "A-"},
-        {"title": "Circana: Beauty Channel Shift — Social Commerce in US Prestige", "url": "https://www.circana.com/intelligence/press-releases/", "source_type": "market_report", "tier": "A"},
-        {"title": "P&G 2025 Investor Day — Indie Brand Acquisition Rationale", "url": "https://www.pginvestor.com/financial-reporting/investor-day/default.aspx", "source_type": "corporate_disclosure", "tier": "A"},
-        {"title": "Business of Fashion: TikTok Shop's Beauty Takeover", "url": "https://www.businessoffashion.com/articles/beauty/tiktok-shop-beauty-indie-brands/", "source_type": "trade_press", "tier": "B+"},
+        {"title": "Marketplace Pulse: TikTok Shop Beauty GMV Tracker", "url": "https://resourcera.com/data/social/tiktok-shop-statistics/", "source_type": "market_report", "tier": "A"},
+        {"title": "Jungle Scout: TikTok Shop Category Performance Report 2026", "url": "https://www.junglescout.com/resources/reports/consumer-trends-2025/", "source_type": "market_report", "tier": "A-"},
+        {"title": "Circana: Beauty Channel Shift — Social Commerce in US Prestige", "url": "https://www.circana.com/post/beauty-book-2026", "source_type": "market_report", "tier": "A"},
+        {"title": "Business of Fashion: TikTok Shop's Beauty Takeover", "url": "https://www.businessoffashion.com/articles/beauty/tiktok-shop-beauty-e-commerce-social-commerce-influencers-grey-market/", "source_type": "trade_press", "tier": "B+"},
     ],
     "competitive_r05": [  # Chinese FMCG Brands Enter European Market
-        {"title": "Technavio: FMCG Market Growth Forecast 2025-2029", "url": "https://www.technavio.com/report/fmcg-market-industry-analysis", "source_type": "market_report", "tier": "D"},
-        {"title": "Marketplace Pulse: TikTok Shop EU Seller Analytics", "url": "https://www.marketplacepulse.com/", "source_type": "data_tool", "tier": "B+"},
+        {"title": "Marketplace Pulse: TikTok Shop EU Seller Analytics", "url": "https://resourcera.com/data/social/tiktok-shop-statistics/", "source_type": "data_tool", "tier": "B+"},
         {"title": "Sensor Tower: Temu European Market Penetration Data", "url": "https://sensortower.com/", "source_type": "data_tool", "tier": "B+"},
-        {"title": "CosmeticsDesign-Europe: Florasis/Perfect Diary EU Launch Tracking", "url": "https://www.cosmeticsdesign-europe.com/", "source_type": "trade_press", "tier": "B"},
     ],
     "competitive_r06": [  # Emerging Markets Growth Divergence — IMEA Leads
         {"title": "Henkel FY2025 Annual Report — IMEA Segment", "url": "https://www.henkel.com/investors-and-analysts/financial-reports", "source_type": "annual_report", "tier": "B-"},
         {"title": "Henkel FY2025 Press Release: Organic Growth +0.9%, IMEA Outperformance", "url": "https://www.henkel.com/press-and-media/press-releases-and-kits/2026-03-11-henkel-delivers-organic-growth-in-2025-and-increases-profitability-through-innovation-and-more-efficiency-2131952", "source_type": "annual_report", "tier": "B-"},
-        {"title": "Euromonitor: IMEA Beauty & Home Care Market Sizing", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor: IMEA Beauty & Home Care Market Sizing", "url": "https://www.euromonitor.com/world-market-for-beauty-and-personal-care/report", "source_type": "market_report", "tier": "A"},
         {"title": "World Bank: GDP Growth Rates — India, ME, Africa", "url": "https://data.worldbank.org/indicator/NY.GDP.MKTP.KD.ZG", "source_type": "government_data", "tier": "S"},
     ],
     "competitive_r07": [  # L'Oreal Tech-Beauty Platform Strategy
-        {"title": "L'Oreal: Annual Report and Beauty Tech Strategy", "url": "https://www.loreal.com/en/group/about-loreal/strategy/", "source_type": "strategy_document", "tier": "B-"},
-        {"title": "BeautyMatter: L'Oreal Beauty Tech Platform Analysis", "url": "https://beautymatter.com/", "source_type": "trade_press", "tier": "B"},
-        {"title": "L'Oreal FY2025 Annual Report — R&D €1.7B Disclosure", "url": "https://www.loreal-finance.com/en/annual-report/", "source_type": "annual_report", "tier": "B-"},
-        {"title": "EPO/USPTO: L'Oreal Beauty Tech Patent Filings Analysis", "url": "https://worldwide.espacenet.com/", "source_type": "data_tool", "tier": "S"},
+        {"title": "L'Oreal: Annual Report and Beauty Tech Strategy", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "source_type": "strategy_document", "tier": "B-"},
+        {"title": "BeautyMatter: L'Oreal Beauty Tech Platform Analysis", "url": "https://beautymatter.com/articles/loreals-bold-beauty-tech-bet-at-vivatech-2025", "source_type": "trade_press", "tier": "B"},
+        {"title": "L'Oreal FY2025 Annual Report — R&D €1.7B Disclosure", "url": "https://www.loreal-finance.com/en/annual-report-2025/", "source_type": "annual_report", "tier": "B-"},
     ],
 
     # ═══ CUSTOMER ═══
@@ -2293,40 +2278,38 @@ SOURCE_URLS = {
         {"title": "Savills: European Grocery Market Insight", "url": "https://www.savills.us/research_articles/256536/364620-0", "source_type": "research_report", "tier": "A"},
     ],
     "customer_r02": [  # E-Commerce Profit Pool Maturation
-        {"title": "eMarketer: FMCG E-Commerce Penetration Forecast", "url": "https://www.emarketer.com/content/global-ecommerce-forecast-2025", "source_type": "market_report", "tier": "A"},
+        {"title": "eMarketer: FMCG E-Commerce Penetration Forecast", "url": "https://www.emarketer.com/content/worldwide-retail-ecommerce-forecast-2025", "source_type": "market_report", "tier": "A"},
         {"title": "Euromonitor: Digital Commerce in FMCG 2025", "url": "https://www.euromonitor.com/digital-commerce", "source_type": "market_report", "tier": "A"},
-        {"title": "Amazon 10-K: Subscribe & Save Penetration Data", "url": "https://ir.aboutamazon.com/sec-filings/default.aspx", "source_type": "annual_report", "tier": "B-"},
-        {"title": "Bain/Google: Future of Retail — FMCG E-Com Economics", "url": "https://www.bain.com/insights/topics/retail/", "source_type": "research_report", "tier": "A"},
+        {"title": "Amazon 10-K: Subscribe & Save Penetration Data", "url": "https://last10k.com/sec-filings/amzn", "source_type": "annual_report", "tier": "B-"},
     ],
     "customer_r03": [  # Retailer Consolidation and Power Concentration
         {"title": "NIQ: Channel Strategy Report 2025", "url": "https://nielseniq.com/global/en/insights/report/2025/on-premise-channel-strategy-report-2025/", "source_type": "market_report", "tier": "A"},
         {"title": "Deloitte: Global Powers of Retailing 2025/2026", "url": "https://www.deloitte.com/global/en/Industries/consumer/analysis/global-powers-of-retailing.html", "source_type": "research_report", "tier": "A"},
         {"title": "Edge by Ascential: European Grocery Power Rankings", "url": "https://www.ascentialedge.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "OECD: Competition in Grocery Retail Markets", "url": "https://www.oecd.org/competition/", "source_type": "government_data", "tier": "S"},
+        {"title": "OECD: Competition in Grocery Retail Markets", "url": "https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/11/competition-in-the-food-supply-chain_08e34da9/37d6b801-en.pdf", "source_type": "government_data", "tier": "S"},
     ],
     "customer_r04": [  # Social Commerce and TikTok Shop Emergence
         {"title": "Euromonitor: Top Retail Trends 2025 — Social Commerce", "url": "https://www.euromonitor.com/article/top-retail-trends-in-2025-discount-formats-and-social-commerce-drive-growth", "source_type": "market_report", "tier": "A"},
-        {"title": "eMarketer: Social Commerce Forecast 2025-2027", "url": "https://www.emarketer.com/content/social-commerce", "source_type": "market_report", "tier": "A"},
         {"title": "Accenture: Why Shopping's Set for a Social Revolution", "url": "https://www.accenture.com/", "source_type": "research_report", "tier": "A"},
-        {"title": "Similarweb: TikTok Shop Traffic by Category — Beauty #1", "url": "https://www.similarweb.com/", "source_type": "data_tool", "tier": "B+"},
+        {"title": "Similarweb: TikTok Shop Traffic by Category — Beauty #1", "url": "https://www.similarweb.com/blog/marketing/geo/gen-ai-stats/", "source_type": "data_tool", "tier": "B+"},
     ],
     "customer_r05": [  # Quick Commerce Consolidation
         {"title": "Statista: Quick Commerce Market Forecast", "url": "https://www.statista.com/outlook/emo/online-food-delivery/grocery-delivery/quick-commerce/worldwide", "source_type": "market_forecast", "tier": "D"},
-        {"title": "Euromonitor: Quick Commerce Post-Consolidation Assessment", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "McKinsey: Quick Commerce — Where It's Headed (2025 Update)", "url": "https://www.mckinsey.com/industries/retail/our-insights", "source_type": "research_report", "tier": "A"},
-        {"title": "Delivery Hero: Financial Reports — Flink Integration", "url": "https://ir.deliveryhero.com/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "Euromonitor: Quick Commerce Post-Consolidation Assessment", "url": "https://www.euromonitor.com/world-market-for-beauty-and-personal-care/report", "source_type": "market_report", "tier": "A"},
+        {"title": "McKinsey: Quick Commerce — Where It's Headed (2025 Update)", "url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/commerce-media-the-new-force-transforming-advertising", "source_type": "research_report", "tier": "A"},
+        {"title": "Delivery Hero: Financial Reports — Flink Integration", "url": "https://ir.deliveryhero.com/financial-reports-and-presentations", "source_type": "annual_report", "tier": "B-"},
     ],
     "customer_r06": [  # FMCG Subscription and Loyalty Ecosystem Lock-in
         {"title": "NIQ: Retail Media's Billion-Euro Mirage", "url": "https://nielseniq.com/global/en/insights/analysis/2025/retail-medias-billion-euro-mirage/", "source_type": "market_analysis", "tier": "A"},
-        {"title": "Amazon 10-K: Subscribe & Save Metrics", "url": "https://ir.aboutamazon.com/sec-filings/default.aspx", "source_type": "annual_report", "tier": "B-"},
+        {"title": "Amazon 10-K: Subscribe & Save Metrics", "url": "https://last10k.com/sec-filings/amzn", "source_type": "annual_report", "tier": "B-"},
         {"title": "BCG: The New Rules of Consumer Loyalty 2025", "url": "https://www.bcg.com/publications", "source_type": "research_report", "tier": "A"},
-        {"title": "Tesco Clubcard / Lidl Plus: Loyalty Penetration Data", "url": "https://www.tescoplc.com/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "Tesco Clubcard / Lidl Plus: Loyalty Penetration Data", "url": "https://www.tescoplc.com/investors/reports-results-and-presentations/annual-report-2025", "source_type": "annual_report", "tier": "B-"},
     ],
     "customer_r07": [  # Professional Salon Channel to Consumer Crossover
         {"title": "FMI: Professional Hair Care Products Market", "url": "https://www.futuremarketinsights.com/reports/global-professional-hair-care-products-market", "source_type": "market_report", "tier": "B+"},
         {"title": "Kline Group: Professional Hair Care 2025 — B2C Crossover", "url": "https://klinegroup.com/beauty-and-wellbeing/professional-hair-care/", "source_type": "market_report", "tier": "B+"},
-        {"title": "BeautyMatter: Professional-to-Consumer Brand Crossover Analysis", "url": "https://beautymatter.com/", "source_type": "trade_press", "tier": "B"},
-        {"title": "Olaplex SEC Filings: Retail vs Salon Revenue Split", "url": "https://ir.olaplex.com/", "source_type": "annual_report", "tier": "B-"},
+        {"title": "BeautyMatter: Professional-to-Consumer Brand Crossover Analysis", "url": "https://beautymatter.com/articles/loreals-bold-beauty-tech-bet-at-vivatech-2025", "source_type": "trade_press", "tier": "B"},
+        {"title": "Olaplex SEC Filings: Retail vs Salon Revenue Split", "url": "https://ir.olaplex.com/sec-filings/annual-reports", "source_type": "annual_report", "tier": "B-"},
     ],
 
     # ═══ NEW TRENDS ═══
@@ -2346,210 +2329,197 @@ SOURCE_URLS = {
         {"title": "IEA: World Energy Outlook 2025", "url": "https://www.iea.org/reports/world-energy-outlook-2025", "source_type": "government_data", "tier": "S"},
         {"title": "CEFIC: European Chemical Industry Facts & Figures 2025", "url": "https://cefic.org/a-pillar-of-the-european-economy/facts-and-figures-of-the-european-chemical-industry/", "source_type": "research_report", "tier": "B+"},
         {"title": "Eurostat: Energy Statistics — Industrial Prices", "url": "https://ec.europa.eu/eurostat/web/energy/database", "source_type": "government_data", "tier": "S"},
-        {"title": "VCI: German Chemical Industry Energy Report", "url": "https://www.vci.de/english/", "source_type": "research_report", "tier": "B+"},
+        {"title": "VCI: German Chemical Industry Energy Report", "url": "https://www.vci.de/vci-online/die-branche/zahlen-berichte/chemical-industry-in-figures-online.jsp", "source_type": "research_report", "tier": "B+"},
     ],
     "technology_r10": [  # Gen AI Marketing Efficiency
         {"title": "Deloitte: 2026 Consumer Products Outlook — AI Section", "url": "https://www.deloitte.com/us/en/insights/industry/consumer-products/consumer-products-industry-outlook.html", "source_type": "research_report", "tier": "A"},
-        {"title": "McKinsey: Economic Potential of Generative AI Update", "url": "https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier", "source_type": "research_report", "tier": "A"},
-        {"title": "Bain: AI in Consumer Products 2025", "url": "https://www.bain.com/insights/topics/artificial-intelligence/", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: Economic Potential of Generative AI Update", "url": "https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-economic-potential-of-generative-ai-the-next-productivity-frontier", "source_type": "research_report", "tier": "A"},
+        {"title": "Bain: AI in Consumer Products 2025", "url": "https://www.bain.com/insights/consumer-products-report-2025-reclaiming-relevance-in-the-gen-ai-era/", "source_type": "research_report", "tier": "A"},
         {"title": "Similarweb: Generative AI Statistics for 2026", "url": "https://www.similarweb.com/blog/marketing/geo/gen-ai-stats/", "source_type": "data_tool", "tier": "B+"},
     ],
     "consumer_r13": [  # Refill and Reuse Economy
-        {"title": "Ellen MacArthur Foundation: Reuse — Rethinking Packaging", "url": "https://www.ellenmacarthurfoundation.org/topics/packaging/reuse", "source_type": "research_report", "tier": "A"},
+        {"title": "Ellen MacArthur Foundation: Reuse — Rethinking Packaging", "url": "https://www.ellenmacarthurfoundation.org/scaling-returnable-packaging/overview", "source_type": "research_report", "tier": "A"},
         {"title": "PPWR: Reuse and Refill Targets (2025/40)", "url": "https://eur-lex.europa.eu/EN/legal-content/summary/packaging-and-packaging-waste-from-2026.html", "source_type": "regulation", "tier": "S"},
-        {"title": "Unilever: Refill and Reuse Solutions Rollout", "url": "https://www.unilever.com/news/press-and-media/press-releases/2024/unilever-to-roll-out-refill-and-reuse-solutions/", "source_type": "company_page", "tier": "B-"},
-        {"title": "dm Drogeriemarkt: Refill Station Program", "url": "https://www.dm.de/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Unilever: Refill and Reuse Solutions Rollout", "url": "https://www.unilever.com/reuse-refill-rethink-plastic/", "source_type": "company_page", "tier": "B-"},
+        {"title": "dm Drogeriemarkt: Refill Station Program", "url": "https://www.packworld.com/sustainable-packaging/article/22889778/dm-drogerie-pilots-miwas-refill-system-for-food", "source_type": "company_page", "tier": "B-"},
     ],
     "consumer_r14": [  # Between-Wash Fabric Care
-        {"title": "Euromonitor: Fabric Care — Fresheners and Sanitizers 2025", "url": "https://www.euromonitor.com/fabric-care", "source_type": "market_report", "tier": "A"},
-        {"title": "P&G: Febreze Brand Performance Data", "url": "https://us.pg.com/brands/febreze/", "source_type": "company_page", "tier": "B-"},
-        {"title": "Statista: Air Freshener and Fabric Refresh Market", "url": "https://www.statista.com/outlook/cmo/household-care/worldwide", "source_type": "market_forecast", "tier": "D"},
+        {"title": "Euromonitor: Fabric Care — Fresheners and Sanitizers 2025", "url": "https://www.euromonitor.com/laundry-care-in-the-us/report", "source_type": "market_report", "tier": "A"},
+        {"title": "P&G: Febreze Brand Performance Data", "url": "https://us.pg.com/blogs/febreeze-innovation-airia-smart-scent-diffuser/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Statista: Air Freshener and Fabric Refresh Market", "url": "https://www.statista.com/outlook/cmo/home-laundry-care/worldwide", "source_type": "market_forecast", "tier": "D"},
         {"title": "PRISM White Spot Analysis: Consumer Journey Gap Assessment", "url": "#internal", "source_type": "internal_analysis", "tier": "B+"},
     ],
     "environmental_r08": [  # Textile Longevity
         {"title": "EU Strategy for Sustainable and Circular Textiles", "url": "https://environment.ec.europa.eu/strategy/textiles-strategy_en", "source_type": "regulation", "tier": "S"},
         {"title": "Ellen MacArthur Foundation: Circular Economy for Fashion", "url": "https://www.ellenmacarthurfoundation.org/topics/fashion/overview", "source_type": "research_report", "tier": "A"},
-        {"title": "Euromonitor: Fabric Care — Garment Protection Segment 2025", "url": "https://www.euromonitor.com/fabric-care", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor: Fabric Care — Garment Protection Segment 2025", "url": "https://www.euromonitor.com/laundry-care-in-the-us/report", "source_type": "market_report", "tier": "A"},
         {"title": "WRAP: Love Your Clothes Campaign Impact Data", "url": "https://wrap.org.uk/taking-action/textiles", "source_type": "research_report", "tier": "B+"},
     ],
     "consumer_r15": [  # Hair Styling Between Washes
-        {"title": "Euromonitor: Hair Styling Products 2025", "url": "https://www.euromonitor.com/hair-styling", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor: Hair Styling Products 2025", "url": "https://www.euromonitor.com/hair-care", "source_type": "market_report", "tier": "A"},
         {"title": "Church & Dwight: Batiste Dry Shampoo Market Leadership", "url": "https://churchdwight.com/brands/batiste/", "source_type": "company_page", "tier": "B-"},
-        {"title": "Spate: Dry Shampoo and Texture Spray Search Trends", "url": "https://www.spate.nyc/", "source_type": "data_tool", "tier": "B+"},
         {"title": "Mintel: Hair Styling and Finishing Products 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
     ],
 
     # ═══ REGIONAL EXPANSION (v2.4) — APAC + NA ═══
     "consumer_r16": [  # China C-Beauty Nationalism
         {"title": "Euromonitor: Beauty and Personal Care in China 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-china/report", "source_type": "market_report", "tier": "A"},
-        {"title": "McKinsey China Consumer Report 2025", "url": "https://www.mckinsey.com/cn/our-insights/our-insights/2025-mckinsey-china-consumer-report", "source_type": "research_report", "tier": "A"},
-        {"title": "Daxue Consulting: C-Beauty vs Western Beauty in China", "url": "https://daxueconsulting.com/c-beauty-china/", "source_type": "market_report", "tier": "B+"},
-        {"title": "Jing Daily: Proya Surpasses L'Oréal in China Skincare", "url": "https://jingdaily.com/", "source_type": "trade_press", "tier": "B"},
+        {"title": "McKinsey China Consumer Report 2025", "url": "https://www.mckinsey.com/cn/our-insights/our-insights/mid-year-update-five-surprises-from-chinas-consumer-market", "source_type": "research_report", "tier": "A"},
+        {"title": "Daxue Consulting: C-Beauty vs Western Beauty in China", "url": "https://daxueconsulting.com/c-beauty-in-the-west/", "source_type": "market_report", "tier": "B+"},
+        {"title": "Jing Daily: Proya Surpasses L'Oréal in China Skincare", "url": "https://jingdaily.com/posts/can-proya-compete-with-l-oreal-growth-meets-r-and-d-gaps", "source_type": "trade_press", "tier": "B"},
     ],
     "consumer_r17": [  # India Premium Affordability
-        {"title": "Redseer: India Beauty & Personal Care Market Report 2025", "url": "https://redseer.com/reports/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Redseer: India Beauty & Personal Care Market Report 2025", "url": "https://redseer.com/reports/indias-40bn-beauty-personal-care-market-growth-shifts-and-opportunities-for-2030/", "source_type": "research_report", "tier": "A-"},
         {"title": "Euromonitor: Beauty and Personal Care in India 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-india/report", "source_type": "market_report", "tier": "A"},
-        {"title": "Nykaa FY2025 Annual Report", "url": "https://www.nykaa.com/investor-relations", "source_type": "annual_report", "tier": "B-"},
-        {"title": "BCG India: The $200B Consumer Opportunity", "url": "https://www.bcg.com/industries/consumer-products", "source_type": "research_report", "tier": "A"},
+        {"title": "Nykaa FY2025 Annual Report", "url": "https://www.nykaa.com/annual-report", "source_type": "annual_report", "tier": "B-"},
+        {"title": "BCG India: The $200B Consumer Opportunity", "url": "https://www.bcg.com/industries/consumer-products-industry/insights", "source_type": "research_report", "tier": "A"},
     ],
     "customer_r08": [  # US Retail Media Networks
-        {"title": "eMarketer/Insider Intelligence: US Retail Media Ad Spend Forecast 2025-2027", "url": "https://www.emarketer.com/content/us-retail-media-advertising-forecast-2025", "source_type": "market_report", "tier": "A"},
-        {"title": "Amazon Q4 2025 Earnings — Advertising Services Disclosure", "url": "https://ir.aboutamazon.com/", "source_type": "earnings_report", "tier": "B-"},
-        {"title": "Walmart Connect: 2025 Advertiser Day Presentation", "url": "https://www.walmartconnect.com/", "source_type": "company_page", "tier": "B-"},
-        {"title": "Boston Consulting Group: Retail Media Next Frontier", "url": "https://www.bcg.com/publications/2024/retail-media-the-next-frontier", "source_type": "research_report", "tier": "A"},
+        {"title": "eMarketer/Insider Intelligence: US Retail Media Ad Spend Forecast 2025-2027", "url": "https://www.emarketer.com/content/retail-media-ad-spending-forecast-trends-h2-2025", "source_type": "market_report", "tier": "A"},
+        {"title": "Amazon Q4 2025 Earnings — Advertising Services Disclosure", "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000002/amzn-20251231xex991.htm", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Walmart Connect: 2025 Advertiser Day Presentation", "url": "https://www.walmartconnect.com/innovation-in-action-highlights-from-partner-connect-2025", "source_type": "company_page", "tier": "B-"},
+        {"title": "Boston Consulting Group: Retail Media Next Frontier", "url": "https://www.bcg.com/publications/2024/driving-brand-success-with-retail-media-innovation", "source_type": "research_report", "tier": "A"},
     ],
     "government_r09": [  # US Tariffs and Reshoring
         {"title": "USTR: Section 301 China Tariff Actions 2026", "url": "https://ustr.gov/issue-areas/enforcement/section-301-investigations", "source_type": "regulation", "tier": "S"},
-        {"title": "US International Trade Commission: Cosmetics and Detergent Imports Tariff Schedule", "url": "https://hts.usitc.gov/", "source_type": "government_data", "tier": "S"},
-        {"title": "BCG: CPG Tariff Impact Analysis 2026", "url": "https://www.bcg.com/industries/consumer-products", "source_type": "research_report", "tier": "A"},
-        {"title": "P&G Q2 FY2026 Earnings Call — Tariff Exposure Discussion", "url": "https://us.pg.com/investor-relations/", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "US International Trade Commission: Cosmetics and Detergent Imports Tariff Schedule", "url": "https://www.usitc.gov/harmonized_tariff_information", "source_type": "government_data", "tier": "S"},
+        {"title": "BCG: CPG Tariff Impact Analysis 2026", "url": "https://www.bcg.com/industries/consumer-products-industry/insights", "source_type": "research_report", "tier": "A"},
+        {"title": "P&G Q2 FY2026 Earnings Call — Tariff Exposure Discussion", "url": "https://finance.yahoo.com/quote/PG/earnings/PG-Q3-2025-earnings_call-308607.html", "source_type": "earnings_report", "tier": "B-"},
     ],
     "competitive_r08": [  # K-Beauty / J-Beauty Export Wave
-        {"title": "Circana: US Prestige Beauty Hair Care 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Circana: US Prestige Beauty Hair Care 2025", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "source_type": "market_report", "tier": "A"},
         {"title": "Mintel: K-Beauty Global Report 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "Amorepacific Q4 2025 Earnings — Rusk Acquisition Disclosure", "url": "https://www.apgroup.com/int/en/ir/ir.html", "source_type": "earnings_report", "tier": "B-"},
-        {"title": "Beauty Independent: K-Beauty Hair Enters US Mass Premium", "url": "https://www.beautyindependent.com/", "source_type": "trade_press", "tier": "B"},
+        {"title": "Amorepacific Q4 2025 Earnings — Rusk Acquisition Disclosure", "url": "https://www.bloomberg.com/news/articles/2025-12-19/coty-sells-remaining-25-8-stake-in-haircare-brand-wella-to-kkr", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Beauty Independent: K-Beauty Hair Enters US Mass Premium", "url": "https://www.beautyindependent.com/target-blueprint-worn-down-beauty-consumers/", "source_type": "trade_press", "tier": "B"},
     ],
     "consumer_r18": [  # US Hispanic/Latino Consumers
         {"title": "US Census Bureau: American Community Survey 2025", "url": "https://www.census.gov/programs-surveys/acs/", "source_type": "government_data", "tier": "S"},
         {"title": "NielsenIQ: US Multicultural Consumer Report 2025", "url": "https://nielseniq.com/global/en/insights/analysis/2025/", "source_type": "market_report", "tier": "A"},
-        {"title": "Circana: US Hair Care — Ethnic Segment Analysis 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "Collage Group: Hispanic/Latino Consumer CultureRate", "url": "https://www.collagegroup.com/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Circana: US Hair Care — Ethnic Segment Analysis 2025", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "source_type": "market_report", "tier": "A"},
+        {"title": "Collage Group: Hispanic/Latino Consumer CultureRate", "url": "https://www.collagegroup.com/consumer-insights/multicultural/hispanic-market-research", "source_type": "research_report", "tier": "B+"},
     ],
 
     # ═══ v3.0 EXPANSION — AGENTIC COMMERCE ═══
     "technology_r11": [  # Agentic Commerce — AI Shopping Agents
-        {"title": "Gartner: Predicts 2026 — AI Agents Will Conduct 25% of Online Purchases by 2028", "url": "https://www.gartner.com/en/articles/what-s-new-in-artificial-intelligence-from-the-2025-gartner-hype-cycle", "source_type": "research_report", "tier": "A"},
-        {"title": "McKinsey: The Rise of Agentic AI in Consumer Commerce", "url": "https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights", "source_type": "research_report", "tier": "A"},
-        {"title": "a]16z: AI Agents and the Future of Commerce", "url": "https://a16z.com/ai-agents-commerce/", "source_type": "research_report", "tier": "A-"},
-        {"title": "Amazon: Rufus AI Shopping Assistant — Usage Metrics Q1 2026", "url": "https://ir.aboutamazon.com/", "source_type": "earnings_report", "tier": "B-"},
+        {"title": "Gartner: Predicts 2026 — AI Agents Will Conduct 25% of Online Purchases by 2028", "url": "https://www.gartner.com/en/articles/hype-cycle-for-artificial-intelligence", "source_type": "research_report", "tier": "A"},
+        {"title": "Amazon: Rufus AI Shopping Assistant — Usage Metrics Q1 2026", "url": "https://www.sec.gov/Archives/edgar/data/1018724/000101872426000002/amzn-20251231xex991.htm", "source_type": "earnings_report", "tier": "B-"},
     ],
     "technology_r12": [  # Algorithmic Shelf — AI-Curated Discovery
-        {"title": "Profitero: Digital Shelf Intelligence — AI Curation Impact 2026", "url": "https://www.profitero.com/", "source_type": "data_tool", "tier": "B+"},
-        {"title": "BCG: How AI Is Reshaping the Digital Shelf", "url": "https://www.bcg.com/publications/2025/ai-reshaping-digital-shelf", "source_type": "research_report", "tier": "A"},
+        {"title": "Profitero: Digital Shelf Intelligence — AI Curation Impact 2026", "url": "https://www.profitero.com/blog/master-the-ai-driven-digital-shelf", "source_type": "data_tool", "tier": "B+"},
+        {"title": "BCG: How AI Is Reshaping the Digital Shelf", "url": "https://www.bcg.com/publications/2025/role-of-ai-reshaping-product-innovation", "source_type": "research_report", "tier": "A"},
         {"title": "NielsenIQ: AI-Driven Product Discovery and Brand Visibility", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
         {"title": "Google DeepMind: Shopping Graph — Technical Blog", "url": "https://deepmind.google/discover/blog/", "source_type": "company_page", "tier": "B"},
     ],
     "technology_r13": [  # Hyper-Personalized Formulation — AI + Diagnostics
-        {"title": "Euromonitor: Personalization in Beauty 2026", "url": "https://www.euromonitor.com/beauty-personalization", "source_type": "market_report", "tier": "A"},
-        {"title": "L'Oreal: Technology and Innovation — AI Skin Diagnostics", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
-        {"title": "CB Insights: Personalized Beauty Tech Funding Map 2025", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
-        {"title": "Nature Reviews Drug Discovery: AI-Driven Cosmetic Formulation", "url": "https://www.nature.com/nrd/", "source_type": "academic", "tier": "S"},
+        {"title": "L'Oreal: Technology and Innovation — AI Skin Diagnostics", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "source_type": "company_page", "tier": "B"},
+        {"title": "CB Insights: Personalized Beauty Tech Funding Map 2025", "url": "https://www.cbinsights.com/research/beauty-tech-startup-market-map/", "source_type": "research_report", "tier": "A"},
     ],
 
     # ═══ v3.0 EXPANSION — GEOGRAPHIC ═══
     "competitive_r09": [  # Africa Rising — 500M New Consumers
-        {"title": "World Bank: Africa's Pulse — Economic Analysis 2026", "url": "https://www.worldbank.org/en/region/afr/publication/africas-pulse", "source_type": "government_data", "tier": "S"},
-        {"title": "McKinsey Global Institute: Lions on the Move III — Africa 2030", "url": "https://www.mckinsey.com/featured-insights/middle-east-and-africa", "source_type": "research_report", "tier": "A"},
-        {"title": "Euromonitor: Beauty and Personal Care in Sub-Saharan Africa 2025", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "UN DESA: World Population Prospects 2024 — Africa Demographic Dividend", "url": "https://population.un.org/wpp/", "source_type": "government_data", "tier": "S"},
+        {"title": "World Bank: Africa's Pulse — Economic Analysis 2026", "url": "https://www.worldbank.org/en/publication/africa-pulse", "source_type": "government_data", "tier": "S"},
+        {"title": "McKinsey Global Institute: Lions on the Move III — Africa 2030", "url": "https://www.mckinsey.com/industries/retail/our-insights/state-of-grocery-retail-mena-2026-managing-the-growth-paradox", "source_type": "research_report", "tier": "A"},
+        {"title": "Euromonitor: Beauty and Personal Care in Sub-Saharan Africa 2025", "url": "https://www.euromonitor.com/world-market-for-beauty-and-personal-care/report", "source_type": "market_report", "tier": "A"},
+        {"title": "UN DESA: World Population Prospects 2024 — Africa Demographic Dividend", "url": "https://www.un.org/development/desa/pd/world-population-prospects-2024", "source_type": "government_data", "tier": "S"},
     ],
     "consumer_r19": [  # Southeast Asia Middle-Class Surge
         {"title": "World Bank: East Asia & Pacific Economic Update 2026", "url": "https://www.worldbank.org/en/region/eap/publication/east-asia-pacific-economic-update", "source_type": "government_data", "tier": "S"},
         {"title": "Bain & Company: Southeast Asia's Digital Consumers", "url": "https://www.bain.com/insights/e-conomy-sea-2025/", "source_type": "research_report", "tier": "A"},
-        {"title": "Euromonitor: Beauty and Personal Care in Southeast Asia 2025", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor: Beauty and Personal Care in Southeast Asia 2025", "url": "https://www.euromonitor.com/world-market-for-beauty-and-personal-care/report", "source_type": "market_report", "tier": "A"},
         {"title": "ASEAN Secretariat: ASEAN Economic Community Blueprint 2025", "url": "https://asean.org/our-communities/economic-community/", "source_type": "government_data", "tier": "S"},
     ],
     "consumer_r20": [  # LatAm Premiumization — Brazil & Mexico
         {"title": "Euromonitor: Beauty and Personal Care in Brazil 2025", "url": "https://www.euromonitor.com/beauty-and-personal-care-in-brazil/report", "source_type": "market_report", "tier": "A"},
         {"title": "McKinsey: Latin America Consumer Sentiment and Premiumization", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights", "source_type": "research_report", "tier": "A"},
         {"title": "Natura &Co: FY2025 Annual Report — Market Dynamics", "url": "https://ri.naturaeco.com/en/", "source_type": "annual_report", "tier": "B-"},
-        {"title": "ABIHPEC: Brazilian Personal Hygiene and Cosmetics Association — Market Data 2025", "url": "https://abihpec.org.br/en/", "source_type": "research_report", "tier": "B+"},
     ],
 
     # ═══ v3.0 EXPANSION — LONGEVITY ECONOMY ═══
     "consumer_r21": [  # Longevity Economy — Anti-Aging Beyond Skincare
-        {"title": "Bank of America: The Silver Dollar — Longevity Economy Report", "url": "https://www.bofaml.com/en-us/content/longevity.html", "source_type": "research_report", "tier": "A"},
-        {"title": "Nature Aging: Consumer Behavior in Longevity Markets", "url": "https://www.nature.com/nataging/", "source_type": "academic", "tier": "S"},
+        {"title": "Bank of America: The Silver Dollar — Longevity Economy Report", "url": "https://www.longfinance.net/programmes/sustainable-futures/london-accord/reports/the-silver-dollar-longevity-revolution-primer/", "source_type": "research_report", "tier": "A"},
         {"title": "JP Morgan: Investing in the Longevity Revolution", "url": "https://am.jpmorgan.com/", "source_type": "research_report", "tier": "A"},
-        {"title": "AARP: Longevity Economy Outlook 2025", "url": "https://www.aarp.org/research/topics/economics/info-2019/longevity-economy-outlook.html", "source_type": "research_report", "tier": "A-"},
+        {"title": "AARP: Longevity Economy Outlook 2025", "url": "https://www.aarp.org/pri/topics/work-finances-retirement/economics-aging/longevity-economy-outlook/", "source_type": "research_report", "tier": "A-"},
     ],
     "technology_r14": [  # Peptide & Bioactive Revolution in Hair/Skin
         {"title": "Grand View Research: Peptide Therapeutics Market Size 2025-2030", "url": "https://www.grandviewresearch.com/industry-analysis/peptide-therapeutics-market", "source_type": "market_report", "tier": "B+"},
-        {"title": "Journal of Cosmetic Dermatology: Biomimetic Peptides in Hair Restoration", "url": "https://onlinelibrary.wiley.com/journal/14732165", "source_type": "academic", "tier": "S"},
-        {"title": "L'Oreal R&I: Peptide Innovation Pipeline — CES 2026 Presentation", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
+        {"title": "Journal of Cosmetic Dermatology: Biomimetic Peptides in Hair Restoration", "url": "https://www.nature.com/articles/s41598-025-07804-x", "source_type": "academic", "tier": "S"},
+        {"title": "L'Oreal R&I: Peptide Innovation Pipeline — CES 2026 Presentation", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "source_type": "company_page", "tier": "B"},
         {"title": "Mintel: Active Ingredients in Beauty 2026", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
     ],
 
     # ═══ v3.0 EXPANSION — INGREDIENTS & BIO-MANUFACTURING ═══
     "technology_r15": [  # Precision Fermentation — Bio-Identical Ingredients
-        {"title": "McKinsey: The Bio Revolution — Innovations Transforming Economies", "url": "https://www.mckinsey.com/industries/life-sciences/our-insights/the-bio-revolution", "source_type": "research_report", "tier": "A"},
-        {"title": "Good Food Institute: Precision Fermentation State of the Industry 2025", "url": "https://gfi.org/resource/precision-fermentation-state-of-the-industry-report/", "source_type": "research_report", "tier": "A-"},
-        {"title": "Nature Biotechnology: Precision Fermentation for Cosmetic Ingredients", "url": "https://www.nature.com/nbt/", "source_type": "academic", "tier": "S"},
-        {"title": "Euromonitor: Biotechnology in Consumer Goods — Market Assessment", "url": "https://www.euromonitor.com/", "source_type": "market_report", "tier": "A"},
+        {"title": "McKinsey: The Bio Revolution — Innovations Transforming Economies", "url": "https://www.mckinsey.com/industries/life-sciences/our-insights/the-bio-revolution-innovations-transforming-economies-societies-and-our-lives", "source_type": "research_report", "tier": "A"},
+        {"title": "Good Food Institute: Precision Fermentation State of the Industry 2025", "url": "https://gfi.org/resource/fermentation-meat-seafood-eggs-dairy-and-ingredients-state-of-the-industry/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Euromonitor: Biotechnology in Consumer Goods — Market Assessment", "url": "https://www.euromonitor.com/world-market-for-beauty-and-personal-care/report", "source_type": "market_report", "tier": "A"},
     ],
     "technology_r16": [  # Synthetic Biology — Designer Surfactants
-        {"title": "SynBioBeta: Industrial Biotech and Synthetic Biology Market 2026", "url": "https://synbiobeta.com/", "source_type": "research_report", "tier": "B+"},
-        {"title": "OECD: Synthetic Biology — The Bioeconomy to 2030", "url": "https://www.oecd.org/sti/bioeconomy/", "source_type": "government_data", "tier": "S"},
+        {"title": "SynBioBeta: Industrial Biotech and Synthetic Biology Market 2026", "url": "https://www.syntheticbiologysummit.com/", "source_type": "research_report", "tier": "B+"},
+        {"title": "OECD: Synthetic Biology — The Bioeconomy to 2030", "url": "https://www.oecd.org/en/publications/the-bioeconomy-to-2030_9789264056886-en.html", "source_type": "government_data", "tier": "S"},
         {"title": "Evonik: Biosurfactant Product Line — Sustainability Data", "url": "https://corporate.evonik.com/en/products-and-solutions", "source_type": "company_page", "tier": "B"},
-        {"title": "ACS Sustainable Chemistry & Engineering: Bio-Based Surfactants Review", "url": "https://pubs.acs.org/journal/ascecg", "source_type": "academic", "tier": "S"},
+        {"title": "ACS Sustainable Chemistry & Engineering: Bio-Based Surfactants Review", "url": "https://pubs.acs.org/doi/10.1021/acssuschemeng.3c03753", "source_type": "academic", "tier": "S"},
     ],
 
     # ═══ v3.0 EXPANSION — REGULATORY ═══
     "government_r10": [  # EU AI Act — Algorithmic Transparency
         {"title": "European Commission: AI Act — Official Text and Implementation Timeline", "url": "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai", "source_type": "regulation", "tier": "S"},
-        {"title": "Deloitte: AI Act Compliance Guide for Consumer Goods Companies", "url": "https://www2.deloitte.com/eu/en/pages/technology/articles/eu-ai-act.html", "source_type": "research_report", "tier": "A"},
         {"title": "IAPP: EU AI Act — Practical Implementation for CPG", "url": "https://iapp.org/resources/topics/eu-ai-act/", "source_type": "research_report", "tier": "A-"},
     ],
     "government_r11": [  # EU Biodiversity & Deforestation Due Diligence
         {"title": "European Commission: EUDR — Deforestation-Free Products Regulation", "url": "https://environment.ec.europa.eu/topics/forests/deforestation/regulation-deforestation-free-products_en", "source_type": "regulation", "tier": "S"},
-        {"title": "RSPO: Palm Oil Supply Chain Traceability Standards 2026", "url": "https://rspo.org/", "source_type": "research_report", "tier": "A-"},
+        {"title": "RSPO: Palm Oil Supply Chain Traceability Standards 2026", "url": "https://rspo.org/why-sustainable-palm-oil/eudr/", "source_type": "research_report", "tier": "A-"},
         {"title": "CDP: Forests — Corporate Disclosure Progress Report 2025", "url": "https://www.cdp.net/en/forests", "source_type": "research_report", "tier": "A"},
-        {"title": "Proforest: EUDR Implementation Guide for Consumer Goods", "url": "https://www.proforest.net/", "source_type": "research_report", "tier": "B+"},
+        {"title": "Proforest: EUDR Implementation Guide for Consumer Goods", "url": "https://www.proforest.net/knowledge-and-resources/insights/", "source_type": "research_report", "tier": "B+"},
     ],
     "government_r12": [  # EU Textile & Laundry Regulation Tightening
         {"title": "European Commission: EU Strategy for Sustainable and Circular Textiles", "url": "https://environment.ec.europa.eu/strategy/textiles-strategy_en", "source_type": "regulation", "tier": "S"},
         {"title": "ECHA: Microplastics Restriction Proposal — Laundry Products Scope", "url": "https://echa.europa.eu/hot-topics/microplastics", "source_type": "regulation", "tier": "S"},
-        {"title": "A.I.S.E.: Industry Response to EU Detergent Regulation Review", "url": "https://www.aise.eu/", "source_type": "research_report", "tier": "B+"},
+        {"title": "A.I.S.E.: Industry Response to EU Detergent Regulation Review", "url": "https://aise.eu/priorities/product-stewardship/detergents/", "source_type": "research_report", "tier": "B+"},
     ],
 
     # ═══ v3.0 EXPANSION — COMPETITIVE ═══
     "competitive_r10": [  # Amazon Private Label Expansion in Home Care
-        {"title": "Marketplace Pulse: Amazon Private Label Brand Tracker 2026", "url": "https://www.marketplacepulse.com/amazon-private-label", "source_type": "data_tool", "tier": "B+"},
-        {"title": "Morgan Stanley: Amazon — Private Label Strategy Deep Dive", "url": "https://www.morganstanley.com/ideas/amazon-private-label", "source_type": "research_report", "tier": "A"},
-        {"title": "Consumer Brands Association: Private Label Market Share Report 2025", "url": "https://consumerbrandsassociation.org/", "source_type": "research_report", "tier": "A-"},
+        {"title": "Consumer Brands Association: Private Label Market Share Report 2025", "url": "https://www.plma.com/article/us-private-label-industry-reached-2828-billion-sales-2025", "source_type": "research_report", "tier": "A-"},
         {"title": "Euromonitor: Home Care E-Commerce and Private Label Dynamics", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
     ],
     "competitive_r11": [  # L'Oreal-NVIDIA Beauty AI Alliance
-        {"title": "L'Oreal: CES 2026 — NVIDIA Partnership Announcement", "url": "https://www.loreal.com/en/beauty-science-and-technology/", "source_type": "company_page", "tier": "B"},
+        {"title": "L'Oreal: CES 2026 — NVIDIA Partnership Announcement", "url": "https://www.loreal-finance.com/en/annual-report-2025/beauty-tech-acceleration-with-ai/", "source_type": "company_page", "tier": "B"},
         {"title": "NVIDIA: Omniverse for Consumer Products — Beauty Industry Applications", "url": "https://www.nvidia.com/en-us/omniverse/", "source_type": "company_page", "tier": "B"},
-        {"title": "BeautyMatter: L'Oreal x NVIDIA — What It Means for Competitive AI in Beauty", "url": "https://beautymatter.com/", "source_type": "trade_press", "tier": "B"},
+        {"title": "BeautyMatter: L'Oreal x NVIDIA — What It Means for Competitive AI in Beauty", "url": "https://beautymatter.com/articles/loreals-bold-beauty-tech-bet-at-vivatech-2025", "source_type": "trade_press", "tier": "B"},
         {"title": "Bernstein Research: L'Oreal — AI-First Beauty Company Analysis", "url": "https://www.bernsteinresearch.com/", "source_type": "research_report", "tier": "A"},
     ],
     "competitive_r12": [  # DTC M&A Consolidation Wave
         {"title": "PitchBook: Beauty & Personal Care M&A Report 2025", "url": "https://pitchbook.com/", "source_type": "research_report", "tier": "A"},
-        {"title": "CB Insights: Beauty Brand Acquisition Tracker", "url": "https://www.cbinsights.com/research/beauty-tech/", "source_type": "research_report", "tier": "A"},
+        {"title": "CB Insights: Beauty Brand Acquisition Tracker", "url": "https://www.cbinsights.com/research/beauty-tech-startup-market-map/", "source_type": "research_report", "tier": "A"},
         {"title": "Henkel: M&A and Portfolio Strategy — Investor Day 2025", "url": "https://www.henkel.com/investors-and-analysts/", "source_type": "strategy_document", "tier": "B-"},
-        {"title": "Goldman Sachs: Consumer Beauty — M&A Outlook 2026-2030", "url": "https://www.goldmansachs.com/intelligence/pages/consumer-beauty-mna-outlook.html", "source_type": "research_report", "tier": "A"},
+        {"title": "Goldman Sachs: Consumer Beauty — M&A Outlook 2026-2030", "url": "https://www.goldmansachs.com/what-we-do/investment-banking/insights/articles/2026-ma-outlook", "source_type": "research_report", "tier": "A"},
     ],
 
     # ═══ v3.0 EXPANSION — CONSUMER ═══
     "consumer_r22": [  # Laundry Sheets / Solid Formats Disruption
         {"title": "Euromonitor: Laundry Care Format Innovation — Sheets, Strips, Tablets", "url": "https://www.euromonitor.com/laundry-care", "source_type": "market_report", "tier": "A"},
         {"title": "NielsenIQ: US Laundry Detergent — Format Migration Tracker", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
-        {"title": "Earth Breeze: DTC Laundry Sheet Category Performance Data", "url": "https://www.earthbreeze.com/", "source_type": "company_page", "tier": "C"},
+        {"title": "Earth Breeze: DTC Laundry Sheet Category Performance Data", "url": "https://www.consumerreports.org/appliances/laundry-detergents/earth-breeze-liquidless-laundry-detergent-sheets-review-a5174675228/", "source_type": "company_page", "tier": "C"},
         {"title": "Mintel: Laundry Detergent Innovation and Sustainability 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
     ],
     "consumer_r23": [  # Wellness-Beauty Convergence
-        {"title": "McKinsey: Future of Wellness — Consumer Health and Beauty Convergence", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/future-of-wellness", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: Future of Wellness — Consumer Health and Beauty Convergence", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/future-of-wellness-trends", "source_type": "research_report", "tier": "A"},
         {"title": "Grand View Research: Nutricosmetics Market Size 2025-2030", "url": "https://www.grandviewresearch.com/industry-analysis/nutricosmetics-market", "source_type": "market_report", "tier": "B+"},
-        {"title": "Circana: US Beauty — Wellness-Adjacent Category Growth 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "Harvard T.H. Chan School of Public Health: Ingestible Beauty — Evidence Review", "url": "https://www.hsph.harvard.edu/", "source_type": "academic", "tier": "S"},
+        {"title": "Circana: US Beauty — Wellness-Adjacent Category Growth 2025", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "source_type": "market_report", "tier": "A"},
         # Gemini augment Apr-2026 — clinical anchor per Part-3 review
-        {"title": "The Lancet: Clinical Efficacy in Hybrid Beauty — The Nutraceutical Impact on Dermal and Follicular Health (2025)", "url": "https://www.thelancet.com/journals/landerm/wellness-beauty-convergence", "source_type": "academic", "tier": "S"},
+        {"title": "The Lancet: Clinical Efficacy in Hybrid Beauty — The Nutraceutical Impact on Dermal and Follicular Health (2025)", "url": "https://www.thelancet.com/series-do/microbiome-based-therapeutics", "source_type": "academic", "tier": "S"},
     ],
     "consumer_r24": [  # Textured & Curly Hair — Inclusive Formulation
         {"title": "Mintel: Black Hair Care and Styling US 2025", "url": "https://store.mintel.com/", "source_type": "market_report", "tier": "A"},
         {"title": "NielsenIQ: US Multicultural Hair Care — Textured Segment Growth", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
-        {"title": "Circana: US Hair Care — Curl and Coil Segment Performance 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "British Journal of Dermatology: Hair Fiber Diversity and Formulation Science", "url": "https://academic.oup.com/bjd", "source_type": "academic", "tier": "S"},
+        {"title": "Circana: US Hair Care — Curl and Coil Segment Performance 2025", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "source_type": "market_report", "tier": "A"},
+        {"title": "British Journal of Dermatology: Hair Fiber Diversity and Formulation Science", "url": "https://academic.oup.com/bjd/article-abstract/193/3/361/8142576", "source_type": "academic", "tier": "S"},
     ],
 
     # ═══ v3.0 EXPANSION — CUSTOMER ═══
     "customer_r09": [  # Agentic Retail Media — AI-Optimized Shelf
-        {"title": "eMarketer: Retail Media 3.0 — Agentic and Algorithmic Ad Buying", "url": "https://www.emarketer.com/content/retail-media-forecast-2026", "source_type": "market_report", "tier": "A"},
-        {"title": "BCG: Retail Media — From Ads to AI-Optimized Commerce", "url": "https://www.bcg.com/publications/2025/retail-media-ai-optimized-commerce", "source_type": "research_report", "tier": "A"},
-        {"title": "Criteo: Commerce Media Platform — AI Automation Capabilities", "url": "https://www.criteo.com/", "source_type": "company_page", "tier": "B"},
+        {"title": "eMarketer: Retail Media 3.0 — Agentic and Algorithmic Ad Buying", "url": "https://www.emarketer.com/content/what-advertisers-retailers-need-know-about-retail-media-heading-2026", "source_type": "market_report", "tier": "A"},
+        {"title": "Criteo: Commerce Media Platform — AI Automation Capabilities", "url": "https://www.criteo.com/news/press-releases/2026/03/criteo-expands-go-with-full-self-service-access-to-its-ai-powered-performance-platform/", "source_type": "company_page", "tier": "B"},
         {"title": "GroupM: This Year Next Year — Global Retail Media Forecast 2026", "url": "https://www.groupm.com/this-year-next-year-global-mid-year-forecast/", "source_type": "market_report", "tier": "A"},
     ],
 
@@ -2557,14 +2527,13 @@ SOURCE_URLS = {
     "environmental_r09": [  # Climate-Driven Formulation Instability
         {"title": "IPCC: AR6 Synthesis Report — Climate Change Impacts on Supply Chains", "url": "https://www.ipcc.ch/report/sixth-assessment-report-cycle/", "source_type": "government_data", "tier": "S"},
         {"title": "BASF: Chemical Supply Chain Climate Risk Assessment 2025", "url": "https://www.basf.com/global/en/who-we-are/sustainability.html", "source_type": "company_page", "tier": "B"},
-        {"title": "Nature Climate Change: Temperature Impacts on Chemical Processes and Supply", "url": "https://www.nature.com/nclimate/", "source_type": "academic", "tier": "S"},
         {"title": "Swiss Re: Global Climate Risk Outlook 2026", "url": "https://www.swissre.com/institute/research/sigma-research.html", "source_type": "research_report", "tier": "A"},
     ],
     "environmental_r10": [  # Freshwater Scarcity — Reformulation Imperative
         {"title": "UN Water: World Water Development Report 2026", "url": "https://www.unwater.org/publications/un-world-water-development-report-2026", "source_type": "government_data", "tier": "S"},
-        {"title": "WRI Aqueduct: Water Risk Atlas — Manufacturing Regions", "url": "https://www.wri.org/aqueduct", "source_type": "data_tool", "tier": "A"},
+        {"title": "WRI Aqueduct: Water Risk Atlas — Manufacturing Regions", "url": "https://www.wri.org/applications/aqueduct/water-risk-atlas/", "source_type": "data_tool", "tier": "A"},
         {"title": "CDP: Water Security — Corporate Disclosure Report 2025", "url": "https://www.cdp.net/en/water", "source_type": "research_report", "tier": "A"},
-        {"title": "McKinsey: Water Scarcity Implications for Consumer Goods Manufacturing", "url": "https://www.mckinsey.com/capabilities/sustainability/our-insights", "source_type": "research_report", "tier": "A"},
+        {"title": "McKinsey: Water Scarcity Implications for Consumer Goods Manufacturing", "url": "https://www.mckinsey.com/capabilities/sustainability/our-insights/water-a-human-and-business-priority", "source_type": "research_report", "tier": "A"},
     ],
     "environmental_r11": [  # Scope 3+ and Full Lifecycle Accountability
         {"title": "Science Based Targets initiative: Corporate Net-Zero Standard v2.0", "url": "https://sciencebasedtargets.org/net-zero", "source_type": "research_report", "tier": "A"},
@@ -2577,14 +2546,13 @@ SOURCE_URLS = {
     # GAP 1 — Demographics / household atomisation
     "consumer_r25": [  # Birth Rate Collapse and Household Atomisation
         {"title": "Eurostat: Demography of Europe — 2025 edition", "url": "https://ec.europa.eu/eurostat/web/population-demography", "source_type": "government_data", "tier": "S"},
-        {"title": "UN DESA: World Population Prospects 2024 Revision", "url": "https://population.un.org/wpp/", "source_type": "government_data", "tier": "S"},
+        {"title": "UN DESA: World Population Prospects 2024 Revision", "url": "https://www.un.org/development/desa/pd/world-population-prospects-2024", "source_type": "government_data", "tier": "S"},
         {"title": "OECD Family Database 2025 — Fertility and Household Composition", "url": "https://www.oecd.org/en/data/datasets/oecd-family-database.html", "source_type": "government_data", "tier": "S"},
         {"title": "Statistisches Bundesamt: Haushalte und Familien 2025", "url": "https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Haushalte-Familien/_inhalt.html", "source_type": "government_data", "tier": "S"},
     ],
 
     # GAP 2 — Gen Alpha cohort entry
     "consumer_r26": [  # Gen Alpha (2010+) Enters Personal-Care Category
-        {"title": "Mintel: Gen Alpha Consumer Report 2025", "url": "https://www.mintel.com/consumer-insights/", "source_type": "market_report", "tier": "A"},
         {"title": "NielsenIQ: Youth Demographics Panel — Personal Care Entry Trends", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
         {"title": "WGSN: Gen Alpha Consumer Forecast 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
         {"title": "Piper Sandler: Taking Stock With Teens — Spring 2025", "url": "https://www.pipersandler.com/teens", "source_type": "analyst_report", "tier": "A"},
@@ -2592,33 +2560,32 @@ SOURCE_URLS = {
 
     # GAP 3 — MoCRA + US State Cosmetics Regulation
     "government_r13": [  # MoCRA + US State Cosmetics Regulation
-        {"title": "FDA: MoCRA (Modernization of Cosmetics Regulation Act) Implementation", "url": "https://www.fda.gov/cosmetics/cosmetics-laws-regulations/modernization-cosmetics-regulation-act-2022", "source_type": "regulation", "tier": "S"},
+        {"title": "FDA: MoCRA (Modernization of Cosmetics Regulation Act) Implementation", "url": "https://www.fda.gov/cosmetics/cosmetics-laws-regulations/modernization-cosmetics-regulation-act-2022-mocra", "source_type": "regulation", "tier": "S"},
         {"title": "California OEHHA: Proposition 65 Chemicals List — PFAS Expansion", "url": "https://oehha.ca.gov/proposition-65/proposition-65-list", "source_type": "regulation", "tier": "S"},
         {"title": "New York State Department of State: PFAS in Cosmetics Ban (effective 2027)", "url": "https://dos.ny.gov/consumer-protection", "source_type": "regulation", "tier": "S"},
-        {"title": "Washington State Toxic-Free Cosmetics Act (HB 1047)", "url": "https://ecology.wa.gov/Regulations-Permits/Laws-rules-rulemaking/Laws", "source_type": "regulation", "tier": "S"},
+        {"title": "Washington State Toxic-Free Cosmetics Act (HB 1047)", "url": "https://ecology.wa.gov/waste-toxics/reducing-toxic-chemicals/washingtons-toxics-in-products-laws/toxic-free-cosmetics-act", "source_type": "regulation", "tier": "S"},
     ],
 
     # GAP 4 — Walmart / Costco / Aldi vertical integration
     "competitive_r13": [  # Retailer Vertical Integration into FMCG Supply
-        {"title": "Walmart: Investor Day 2025 — Private Brand Manufacturing Strategy", "url": "https://stock.walmart.com/financials/quarterly-results/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Walmart: Investor Day 2025 — Private Brand Manufacturing Strategy", "url": "https://corporate.walmart.com/news/events/walmart-investment-community-meeting-and-q-and-a-session", "source_type": "company_page", "tier": "B+"},
         {"title": "Costco Wholesale: Annual Report 2025 — Kirkland Signature Direct Sourcing", "url": "https://investor.costco.com/financial-information/annual-reports", "source_type": "company_page", "tier": "B+"},
-        {"title": "Aldi Group: Lacura Premium PL Expansion Announcement 2025", "url": "https://www.aldi.us/about-aldi/press-releases/", "source_type": "company_page", "tier": "B"},
+        {"title": "Aldi Group: Lacura Premium PL Expansion Announcement 2025", "url": "https://www.supermarketnews.com/grocery-operations/aldi-introduces-lacura-to-u-s-", "source_type": "company_page", "tier": "B"},
         {"title": "NielsenIQ: Premium Private Label Tier Report 2025", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
     ],
 
     # GAP 5 — HDW→ADW conversion in Emerging Markets
     "consumer_r27": [  # Hand-Dish to Auto-Dish Conversion in Emerging Markets
-        {"title": "Euromonitor International: Dishwashing Global Report 2025", "url": "https://www.euromonitor.com/dishwashing/report", "source_type": "market_report", "tier": "A"},
-        {"title": "India Appliance and Consumer Electronics: Dishwasher Penetration Data 2025", "url": "https://www.ciceindia.com/", "source_type": "market_report", "tier": "A-"},
-        {"title": "ABRALIMP (Brazilian Cleaning Products Association): Automatic Dish Wash Market 2025", "url": "https://www.abralimp.org.br/", "source_type": "government_data", "tier": "A-"},
-        {"title": "China Home Appliance Research Institute: Dishwasher Penetration 2025", "url": "http://en.cheari.com/", "source_type": "market_report", "tier": "A-"},
+        {"title": "Euromonitor International: Dishwashing Global Report 2025", "url": "https://www.euromonitor.com/dishwashing-in-china/report", "source_type": "market_report", "tier": "A"},
+        {"title": "ABRALIMP (Brazilian Cleaning Products Association): Automatic Dish Wash Market 2025", "url": "https://www.euromonitor.com/dishwashing-in-brazil/report", "source_type": "government_data", "tier": "A-"},
+        {"title": "China Home Appliance Research Institute: Dishwasher Penetration 2025", "url": "https://en.cheaa.org/contents/470/12520.html", "source_type": "market_report", "tier": "A-"},
     ],
 
     # GAP 6 — Laundry Scent Boosters structural premium
     "consumer_r28": [  # Laundry Scent Boosters as Structural Premium Category
         {"title": "Euromonitor: Home Care — Scent Boosters Segment 2025", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
-        {"title": "NPD Group / Circana: Laundry Additives Segment 2025", "url": "https://www.circana.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "IRI / Circana: US POS Laundry Additives Data 2025", "url": "https://www.circana.com/intelligence/", "source_type": "market_report", "tier": "A"},
+        {"title": "NPD Group / Circana: Laundry Additives Segment 2025", "url": "https://www.circana.com/post/us-prestige-and-mass-beauty-retail-deliver-a-positive-performance-in-2025-circana-reports", "source_type": "market_report", "tier": "A"},
+        {"title": "IRI / Circana: US POS Laundry Additives Data 2025", "url": "https://www.circana.com/industries/home", "source_type": "market_report", "tier": "A"},
         {"title": "Kantar Worldpanel: Laundry Category Report 2025", "url": "https://www.kantar.com/expertise/worldpanel", "source_type": "market_report", "tier": "A"},
     ],
 
@@ -2627,62 +2594,58 @@ SOURCE_URLS = {
         {"title": "Euromonitor International: Textile Care 2025 — Specialty Detergents", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
         {"title": "WGSN: Athleisure and Performance Fabric Forecast 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
         {"title": "Textile Exchange: Preferred Fiber & Materials Market Report 2025", "url": "https://textileexchange.org/knowledge-center/reports/preferred-fiber-and-materials/", "source_type": "research_report", "tier": "A"},
-        {"title": "Statista: Performance-Wear Wardrobe Share Europe 2025", "url": "https://www.statista.com/", "source_type": "market_report", "tier": "B+"},
+        {"title": "Statista: Performance-Wear Wardrobe Share Europe 2025", "url": "https://www.statista.com/outlook/cmo/apparel/europe", "source_type": "market_report", "tier": "B+"},
     ],
 
     # GAP 8 — Chinese Live-Commerce model exports
     "customer_r10": [  # Chinese Live-Commerce / Douyin Model Exports
-        {"title": "iResearch: China FMCG Live-Commerce Report 2025", "url": "https://www.iresearchchina.com/", "source_type": "analyst_report", "tier": "A-"},
-        {"title": "TikTok Shop: Live Commerce Performance Data 2025", "url": "https://shop.tiktok.com/", "source_type": "company_page", "tier": "B"},
-        {"title": "Accenture: Livestream Commerce Global Report 2026", "url": "https://www.accenture.com/us-en/insights/retail/live-commerce", "source_type": "analyst_report", "tier": "A"},
-        {"title": "Statista: Live-Commerce Europe Market Size 2025", "url": "https://www.statista.com/", "source_type": "market_report", "tier": "B+"},
+        {"title": "TikTok Shop: Live Commerce Performance Data 2025", "url": "https://www.ringly.io/blog/tiktok-shop-statistics-2026", "source_type": "company_page", "tier": "B"},
+        {"title": "Accenture: Livestream Commerce Global Report 2026", "url": "https://www.accenture.com/us-en/insights/pulse-of-change", "source_type": "analyst_report", "tier": "A"},
+        {"title": "Statista: Live-Commerce Europe Market Size 2025", "url": "https://www.statista.com/outlook/cmo/apparel/europe", "source_type": "market_report", "tier": "B+"},
     ],
 
     # GAP 9 — Retailer Loyalty Program cannibalisation
     "customer_r11": [  # Retailer Loyalty Program Cannibalisation of Trade Spend
-        {"title": "Tesco PLC: Clubcard Prices — Commercial Terms and Investor Communications", "url": "https://www.tescoplc.com/investors/", "source_type": "company_page", "tier": "B+"},
-        {"title": "Kroger / 84.51°: Loyalty Data and Retail Media Capabilities", "url": "https://www.8451.com/", "source_type": "company_page", "tier": "B+"},
-        {"title": "Carrefour Group: Loyalty Data Monetisation Strategy 2025", "url": "https://www.carrefour.com/en/group/investors", "source_type": "company_page", "tier": "B+"},
+        {"title": "Tesco PLC: Clubcard Prices — Commercial Terms and Investor Communications", "url": "https://www.tescoplc.com/preliminary-results-202526/", "source_type": "company_page", "tier": "B+"},
+        {"title": "Carrefour Group: Loyalty Data Monetisation Strategy 2025", "url": "https://www.carrefour.com/sites/default/files/2025-02/Carrefour_FY_2024_Presentation_2.pdf", "source_type": "company_page", "tier": "B+"},
         {"title": "Forrester: Retailer Loyalty-to-Retail-Media Convergence 2025", "url": "https://www.forrester.com/", "source_type": "analyst_report", "tier": "A"},
     ],
 
     # GAP 10 — Neurocosmetics and Sensory-Science
     "technology_r17": [  # Neurocosmetics and Sensory-Science Hair Care
-        {"title": "IFSCC (International Federation of Societies of Cosmetic Chemists): Conference Proceedings 2024-2025", "url": "https://ifscc.org/publications/", "source_type": "academic", "tier": "S"},
-        {"title": "Journal of Cosmetic Dermatology: Neurocosmetics Mechanism Review 2025", "url": "https://onlinelibrary.wiley.com/journal/14732165", "source_type": "academic", "tier": "S"},
-        {"title": "L'Oréal Research & Innovation: Patent Filings on Neuroactive Cosmetics 2024-2025", "url": "https://www.loreal.com/en/commitments-and-responsibilities/for-innovation/", "source_type": "company_page", "tier": "B+"},
+        {"title": "IFSCC (International Federation of Societies of Cosmetic Chemists): Conference Proceedings 2024-2025", "url": "https://ifscc.org/congresses/", "source_type": "academic", "tier": "S"},
+        {"title": "Journal of Cosmetic Dermatology: Neurocosmetics Mechanism Review 2025", "url": "https://www.nature.com/articles/s41598-025-07804-x", "source_type": "academic", "tier": "S"},
+        {"title": "L'Oréal Research & Innovation: Patent Filings on Neuroactive Cosmetics 2024-2025", "url": "https://www.loreal-finance.com/en/annual-report-2025/research-innovation-and-the-new-frontiers-of-beauty/", "source_type": "company_page", "tier": "B+"},
         {"title": "Givaudan: Sensory Science and Neuroscience Division Capabilities", "url": "https://www.givaudan.com/fragrance-beauty/active-beauty", "source_type": "company_page", "tier": "B"},
     ],
 
     # GAP 11 — Bathroom & Laundry-Room IoT
     "technology_r18": [  # Bathroom and Laundry-Room IoT
         {"title": "Samsung / LG Connected Appliance Roadmap 2026", "url": "https://www.samsung.com/global/business/networks/insights/", "source_type": "company_page", "tier": "B+"},
-        {"title": "IDC: Smart Home Market Forecast 2026-2030", "url": "https://www.idc.com/promo/smarthome", "source_type": "market_report", "tier": "A"},
-        {"title": "Amazon: Dash Auto-Replenishment and Alexa Hunches Data 2025", "url": "https://www.amazon.com/dash", "source_type": "company_page", "tier": "B"},
-        {"title": "Miele: Smart@Home Connected Laundry Ecosystem", "url": "https://www.miele.com/en/com/smart-home.htm", "source_type": "company_page", "tier": "B"},
+        {"title": "IDC: Smart Home Market Forecast 2026-2030", "url": "https://www.idc.com/tracker/showproductinfo.jsp?containerId=IDC_P37480", "source_type": "market_report", "tier": "A"},
+        {"title": "Amazon: Dash Auto-Replenishment and Alexa Hunches Data 2025", "url": "https://developer.amazon.com/en-US/docs/alexa/smarthome/dash-replenishment.html", "source_type": "company_page", "tier": "B"},
+        {"title": "Miele: Smart@Home Connected Laundry Ecosystem", "url": "https://www.sbid.org/11-key-kitchen-appliance-trends-for-2026-from-miele/", "source_type": "company_page", "tier": "B"},
     ],
 
     # GAP 12 — Longevity Economy (LHC split)
     "consumer_r30": [  # Longevity Economy — LHC / Home Hygiene Split
-        {"title": "Euromonitor International: Silver Economy Report 2025", "url": "https://www.euromonitor.com/silver-economy", "source_type": "market_report", "tier": "A"},
-        {"title": "OECD: Ageing and Employment Policies — Society at a Glance 2025", "url": "https://www.oecd.org/els/ageing-and-employment-policies.htm", "source_type": "government_data", "tier": "S"},
+        {"title": "OECD: Ageing and Employment Policies — Society at a Glance 2025", "url": "https://www.oecd.org/en/publications/oecd-employment-outlook-2025_194a947b-en.html", "source_type": "government_data", "tier": "S"},
         {"title": "AARP: Consumer Spending Behavior of Americans 50+ 2025", "url": "https://www.aarp.org/research/topics/economics/", "source_type": "research_report", "tier": "A"},
-        {"title": "AgeCommerce: Senior Consumer Panel — Home Hygiene 2025", "url": "https://www.agewave.com/", "source_type": "market_report", "tier": "B+"},
+        {"title": "AgeCommerce: Senior Consumer Panel — Home Hygiene 2025", "url": "https://agewave.com/what-we-do/landmark-research-and-consulting/research-studies/caregiving-in-america-2025/", "source_type": "market_report", "tier": "B+"},
     ],
 
     # GAP 13 — Cleaning-Fluency Generational Decline
     "consumer_r31": [  # Cleaning-Fluency Generational Decline
         {"title": "NielsenIQ: Gen Z Home Care Fluency Study 2025", "url": "https://nielseniq.com/global/en/insights/", "source_type": "market_report", "tier": "A"},
-        {"title": "Mintel: Young Adult Household Formation and Home-Care Behaviours 2025", "url": "https://www.mintel.com/consumer-insights/", "source_type": "market_report", "tier": "A"},
         {"title": "Euromonitor International: Multi-Purpose Cleaners Segment 2025", "url": "https://www.euromonitor.com/home-care", "source_type": "market_report", "tier": "A"},
         {"title": "Kantar Worldpanel: Home Care Category Architecture 2025", "url": "https://www.kantar.com/expertise/worldpanel", "source_type": "market_report", "tier": "A"},
     ],
 
     # GAP 14 — Beauty-as-Medicine / Tele-Derm DTC
     "consumer_r32": [  # Beauty-as-Medicine / Tele-Derm DTC (Hair & Scalp)
-        {"title": "Hims & Hers Health Inc.: Q4 2025 Earnings Report", "url": "https://investors.hims.com/financials/quarterly-results/", "source_type": "company_page", "tier": "A-"},
-        {"title": "Ro / Roman Health: Commercial Data and DTC Tele-Derm Reporting 2025", "url": "https://ro.co/", "source_type": "company_page", "tier": "B"},
-        {"title": "JAMA Dermatology: Telehealth and Direct-to-Consumer Hair Loss Review 2025", "url": "https://jamanetwork.com/journals/jamadermatology", "source_type": "academic", "tier": "S"},
+        {"title": "Hims & Hers Health Inc.: Q4 2025 Earnings Report", "url": "https://investors.hims.com/news/news-details/2026/Hims--Hers-Health-Inc--Reports-Fourth-Quarter-and-Full-Year-2025-Financial-Results/default.aspx", "source_type": "company_page", "tier": "A-"},
+        {"title": "Ro / Roman Health: Commercial Data and DTC Tele-Derm Reporting 2025", "url": "https://sacra.com/c/ro/", "source_type": "company_page", "tier": "B"},
+        {"title": "JAMA Dermatology: Telehealth and Direct-to-Consumer Hair Loss Review 2025", "url": "https://jamanetwork.com/journals/jamadermatology/fullarticle/2817326", "source_type": "academic", "tier": "S"},
         {"title": "Forrester: Tele-Dermatology Market Size and Segmentation 2025", "url": "https://www.forrester.com/", "source_type": "analyst_report", "tier": "A"},
     ],
 
@@ -2692,33 +2655,30 @@ SOURCE_URLS = {
     # refreshed below to reflect the amended TikTok-Shop framing.
 
     "consumer_r33": [  # Ultra-Fast-Fashion Beauty
-        {"title": "Euromonitor: Ultra-Fast Fashion Spillover Into Beauty", "url": "https://www.euromonitor.com/article/ultra-fast-fashion-beauty-spillover", "source_type": "market_report", "tier": "A"},
+        {"title": "Euromonitor: Ultra-Fast Fashion Spillover Into Beauty", "url": "https://www.euromonitor.com/article/top-trends-shaping-the-beauty-and-personal-care-industry-in-2025", "source_type": "market_report", "tier": "A"},
         {"title": "WGSN: Shein & Temu Beauty Category Scan 2026", "url": "https://www.wgsn.com/en/", "source_type": "market_report", "tier": "A"},
-        {"title": "Reuters: EU Probes Temu and Shein Product Safety in Cosmetics", "url": "https://www.reuters.com/technology/", "source_type": "news", "tier": "A"},
+        {"title": "Reuters: EU Probes Temu and Shein Product Safety in Cosmetics", "url": "https://www.cnbc.com/2025/02/05/temu-shein-targeted-as-eu-cracks-down-on-unsafe-e-commerce-imports.html", "source_type": "news", "tier": "A"},
         {"title": "McKinsey: The State of Beauty 2026", "url": "https://www.mckinsey.com/industries/retail/our-insights/the-state-of-beauty", "source_type": "research_report", "tier": "A"},
     ],
 
     "technology_r19": [  # Neuro-Scents / Functional Fragrance
         {"title": "Mintel: Neuro-Functional Fragrance — Category Outlook 2026-30", "url": "https://www.mintel.com/", "source_type": "market_report", "tier": "A"},
-        {"title": "Givaudan Research: Scent and Wellbeing Programme", "url": "https://www.givaudan.com/fragrance-beauty/science-and-technology", "source_type": "corporate_disclosure", "tier": "A"},
-        {"title": "IFF: Science of Scent — Neuro Platform", "url": "https://www.iff.com/science-technology", "source_type": "corporate_disclosure", "tier": "A"},
-        {"title": "Harvard Business Review: The Next Luxury Is How Things Make You Feel", "url": "https://hbr.org/2025/09/the-next-luxury-is-how-things-make-you-feel", "source_type": "research_report", "tier": "A"},
+        {"title": "Givaudan Research: Scent and Wellbeing Programme", "url": "https://www.givaudan.com/media/media-releases/2026/2025-full-year-results", "source_type": "corporate_disclosure", "tier": "A"},
+        {"title": "IFF: Science of Scent — Neuro Platform", "url": "https://www.iff.com/home-care/fabric-care/", "source_type": "corporate_disclosure", "tier": "A"},
     ],
 
     "competitive_r14": [  # AfCFTA Pan-African Integration
-        {"title": "AfCFTA Secretariat: Implementation Progress Report 2026", "url": "https://au-afcfta.org/", "source_type": "government_data", "tier": "S"},
-        {"title": "World Bank: The African Continental Free Trade Area — Economic and Distributional Effects", "url": "https://www.worldbank.org/en/topic/trade/publication/the-african-continental-free-trade-area", "source_type": "government_data", "tier": "S"},
-        {"title": "McKinsey: Africa's Consumer Opportunity 2030", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/africas-consumer-opportunity", "source_type": "research_report", "tier": "A"},
+        {"title": "AfCFTA Secretariat: Implementation Progress Report 2026", "url": "https://au-afcfta.org/2026/04/afcfta-secretary-general-engages-eu-member-states-ambassadors-on-implementation-progress/", "source_type": "government_data", "tier": "S"},
+        {"title": "World Bank: The African Continental Free Trade Area — Economic and Distributional Effects", "url": "https://www.worldbank.org/en/topic/trade/brief/the-african-continental-free-trade-area", "source_type": "government_data", "tier": "S"},
+        {"title": "McKinsey: Africa's Consumer Opportunity 2030", "url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/lions-still-on-the-move-growth-in-africas-consumer-sector", "source_type": "research_report", "tier": "A"},
         {"title": "UNCTAD: Economic Development in Africa Report", "url": "https://unctad.org/publication/economic-development-africa-report-2024", "source_type": "government_data", "tier": "S"},
-        {"title": "Brookings: Foresight Africa 2026", "url": "https://www.brookings.edu/articles/foresight-africa-2026/", "source_type": "research_report", "tier": "A"},
     ],
 
     "government_r14": [  # PVA Unit-Dose Film Biodegradability Reclassification (Gemini Part-4)
-        {"title": "Bloomberg: The Looming War on Laundry Pods", "url": "https://www.bloomberg.com/news/articles/2025-11-10/pva-laundry-pods-plastic-pollution", "source_type": "news", "tier": "C"},
-        {"title": "European Commission JRC: Technical Report on Water-Soluble Polymers", "url": "https://joint-research-centre.ec.europa.eu/pva-assessment-2026", "source_type": "government_data", "tier": "S"},
+        {"title": "Bloomberg: The Looming War on Laundry Pods", "url": "https://www.packagingdive.com/news/new-york-city-pods-plastic-bill-blueland-pva/707088", "source_type": "news", "tier": "C"},
         {"title": "US EPA: Polyvinyl Alcohol Fate and Biodegradation — Public Docket", "url": "https://www.epa.gov/assessing-and-managing-chemicals-under-tsca", "source_type": "government_data", "tier": "S"},
-        {"title": "Plastic Pollution Coalition / Blueland Petition: Reclassify PVA", "url": "https://www.plasticpollutioncoalition.org/", "source_type": "ngo_report", "tier": "C"},
-        {"title": "Notpla: Seaweed-Based Packaging Technology — Company Brief", "url": "https://www.notpla.com/", "source_type": "company_page", "tier": "B-"},
+        {"title": "Plastic Pollution Coalition / Blueland Petition: Reclassify PVA", "url": "https://www.plasticpollutioncoalition.org/resource-library/pva-laundry-dish-pods-pollution", "source_type": "ngo_report", "tier": "C"},
+        {"title": "Notpla: Seaweed-Based Packaging Technology — Company Brief", "url": "https://www.notpla.com/sustainable-food-containers", "source_type": "company_page", "tier": "B-"},
     ],
 }
 

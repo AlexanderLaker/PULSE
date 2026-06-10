@@ -2,9 +2,10 @@
  * WelcomeModal — Two-step welcome / orientation popup shown on every login.
  *
  * Step 1: MVP disclaimer + feedback channel (Alexander Laker).
- * Step 2: Brief explainer of the four views, in header order:
- *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis
- *           -> Innovation Explorer.
+ * Step 2: Brief explainer of the three production views, in header order:
+ *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis.
+ *           Beta tabs (Innovation Explorer, Profit Pool Explorer) are not
+ *           introduced here — they live to the right of the top nav.
  *
  * Design language mirrors SettingsModal / Trends2 / ProfitPoolAnalysis2
  * (Maritime blue editorial tokens, Manrope headlines, pill-shaped CTAs).
@@ -27,7 +28,6 @@ import {
   Activity,
   Route,
   TrendingUp,
-  Lightbulb,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -95,32 +95,46 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
             }}
           />
 
-          {/* Modal card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 12 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Welcome to PRISM"
+          {/* Centering wrapper — flex-centers the modal both vertically and
+              horizontally. We deliberately do NOT center via
+              `transform: translate(-50%, -50%)` on the motion card itself,
+              because Framer Motion's `animate` transform (scale/y) overwrites
+              the inline transform and pushes the card off-center. */}
+          <div
             style={{
               position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(620px, 92vw)',
-              maxHeight: '90vh',
+              inset: 0,
               zIndex: 201,
-              backgroundColor: S.surface,
-              borderRadius: 20,
-              boxShadow: '0 32px 96px -20px rgba(0, 52, 94, 0.45)',
-              overflow: 'hidden',
-              fontFamily: BODY_FONT,
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+              pointerEvents: 'none',
             }}
           >
+            {/* Modal card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 12 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Welcome to PRISM"
+              style={{
+                position: 'relative',
+                width: 'min(620px, 92vw)',
+                maxHeight: '90vh',
+                backgroundColor: S.surface,
+                borderRadius: 20,
+                boxShadow: '0 32px 96px -20px rgba(0, 52, 94, 0.45)',
+                overflow: 'hidden',
+                fontFamily: BODY_FONT,
+                display: 'flex',
+                flexDirection: 'column',
+                pointerEvents: 'auto',
+              }}
+            >
             {/* Close button */}
             <button
               onClick={onClose}
@@ -254,7 +268,8 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 )}
               </button>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
@@ -368,9 +383,9 @@ const Step2Views: FC = () => (
         color: S.onSurfaceVariant,
       }}
     >
-      Four views, in the order shown in the header.{' '}
+      Three views, in the order shown in the header.{' '}
       <strong style={{ color: S.onBg }}>Trends is the main input page</strong>{' '}
-      — the other three are output views built on top of it.
+      — the other two are output views built on top of it.
     </p>
 
     {/* INPUT */}
@@ -396,12 +411,6 @@ const Step2Views: FC = () => (
       title="Profit Pool Shift Analysis"
       body="Visualizes where value is migrating, sliced by time path, force, region, and value chain step."
       note="Values reflect the isolated trend impact on HCB's current business — excluding price moves, innovations, or competitor actions."
-    />
-    <ViewCard
-      number="4"
-      icon={Lightbulb}
-      title="Innovation Explorer"
-      body="Explores innovation white spaces and opportunities derived from the shifts above."
     />
   </div>
 );
