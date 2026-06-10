@@ -143,7 +143,6 @@ export interface SimulationResult {
 export interface SimulationParams {
   scenario?: ScenarioId;
   iterations?: number;
-  include_sensitivity?: boolean;
 }
 
 /** Scenario definition. */

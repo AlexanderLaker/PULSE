@@ -96,7 +96,6 @@ export interface SimulationResult {
 export interface SimulationParams {
   iterations?: number;
   include_allocation?: boolean;
-  include_sensitivity?: boolean;
 }
 
 /** Sensitivity tornado bar data. */

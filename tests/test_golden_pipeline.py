@@ -67,27 +67,32 @@ class TestDeterminism:
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 
-    Engine: bayesian_copula MODEL_VERSION 2.7.0. Regenerate pins ONLY for
+    Engine: bayesian_copula MODEL_VERSION 2.8.0. Regenerate pins ONLY for
     deliberate model changes, in the same commit as the change.
 
-    Regenerated June 2026 (v3.6 / D1): DEFAULT_FORCE_CORRELATIONS were
-    recalibrated to be PSD-valid as entered (audit finding F-01 — the old
-    defaults were silently repaired and rescaled by the engine on every
-    run). Same seed, same fixtures, honestly-valid dependence structure.
+    Regenerated June 2026 (v3.7 / D20): the inert t-copula tail layer was
+    deleted — the engine now runs a Gaussian copula (post-D1 re-test showed
+    the df dial moved the portfolio band <2% across df 4 → ∞; see
+    audit/strategy-review/verification/v8_d20_tcopula_df_out.txt).
+    Same seed, same fixtures, simpler honest dependence structure.
+
+    Previously regenerated June 2026 (v3.6 / D1): DEFAULT_FORCE_CORRELATIONS
+    recalibrated to be PSD-valid as entered (audit finding F-01).
     """
 
     PINS = {
         # cat:               (median,            p10,                p90)
-        "Hair: Color": (-0.003428643176, -0.005758534704, -0.000906596942),
-        "Hair: Care":  (-0.003428643176, -0.005758534704, -0.000906596942),
-        "LHC: FCN":    (-0.006407636941, -0.008252814110, -0.004017618504),
+        "Hair: Color": (-0.003422863703, -0.005734252803, -0.000904137187),
+        "Hair: Care":  (-0.003422863703, -0.005734252803, -0.000904137187),
+        "LHC: FCN":    (-0.006407226038, -0.008360061365, -0.003994312450),
     }
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.7.0"
+        assert r["model_version"] == "2.8.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
+        assert r["numerics_backend"].startswith("scipy ")  # D13
 
     def test_golden_values_seed42(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)

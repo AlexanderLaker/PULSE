@@ -307,7 +307,6 @@ class TestAPIEdgeCases:
         """Should handle large payloads gracefully."""
         large_json = {
             "iterations": 10000,  # Within valid range (1-50000)
-            "include_sensitivity": True,
             "iterations": 500
         }
         response = client.post("/api/v1/simulate", json=large_json)

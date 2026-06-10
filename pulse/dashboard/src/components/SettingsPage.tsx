@@ -7,7 +7,7 @@
  *   - Force weights
  *   - Value chain weights
  *   - Region weights
- *   - Copula parameters (within_force_rho, t_copula_df)
+ *   - Copula parameters (within_force_rho)
  *   - Editable 6×6 Force Correlation Matrix
  *   - Simulation settings (iterations)
  *
@@ -70,7 +70,7 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
     () => Object.fromEntries(REGIONS.map(r => [r, 0.25])) as Record<RegionKey, number>
   );
   const [withinForceRho, setWithinForceRho] = useState(0.3);
-  const [tCopulaDf, setTCopulaDf] = useState(4);
+  // t_copula_df removed (D20, June 2026): Gaussian copula only.
   const [iterations, setIterations] = useState(10000);
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>(
     () => {
@@ -111,7 +111,6 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
       if (data.vc_weights) setVCWeights(data.vc_weights);
       if (data.region_weights) setRegionWeights(data.region_weights);
       if (data.within_force_rho != null) setWithinForceRho(data.within_force_rho);
-      if (data.t_copula_df != null) setTCopulaDf(data.t_copula_df);
       if (data.iterations != null) setIterations(data.iterations);
       if (data.category_weights) setCategoryWeights(data.category_weights);
       if (data.force_correlation_matrix) setCorrelationMatrix(data.force_correlation_matrix);
@@ -174,7 +173,6 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
         region_weights: normalize(regionWeights),
         category_weights: normalize(categoryWeights),
         within_force_rho: +withinForceRho.toFixed(2),
-        t_copula_df: Math.round(tCopulaDf),
         iterations: Math.round(iterations),
       };
       if (Object.keys(correlationMatrix).length > 0) {
@@ -396,7 +394,6 @@ const SettingsPage: FC<SettingsPageProps> = ({ onBack }) => {
           {/* Copula Parameters */}
           <Card title="Copula Parameters">
             <SliderInput label="Within-Force Correlation (ρ)" value={withinForceRho} onChange={setWithinForceRho} min={0} max={0.9} step={0.05} />
-            <NumberInput label="Student-t Degrees of Freedom" value={tCopulaDf} onChange={setTCopulaDf} min={2} max={30} step={1} />
             <Hint>
               <strong style={{ color: T.text2 }}>ρ:</strong> Correlation between trends in the same force. Higher = tighter coupling.<br />
               <strong style={{ color: T.text2 }}>t-df:</strong> 2–4 = heavier tails (crisis correlation). Higher = normal dependence.

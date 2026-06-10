@@ -2,8 +2,13 @@
 
 Replaces simplistic triangular distributions with:
 - Beta-distributed priors that update with evidence (Bayesian hierarchical)
-- Gaussian copula with t-copula tails for dependency (captures crisis correlation)
-- Continuous path modeling (annual granularity 2026-2030)
+- Gaussian copula for cross-trend dependency (D20 June 2026: the t-copula
+  tail layer was deleted — its df dial was inert, <2% band effect)
+- Continuous path modeling (annual granularity across the config horizon)
+
+Quantile convention (D21): every percentile in this engine is computed with
+``np.percentile`` linear interpolation (the numpy default) — one convention,
+engine-wide, including velocity bands and any future band logic.
 """
 
 import logging
@@ -20,7 +25,7 @@ import numpy as np
 try:
     import scipy as _scipy
     from scipy.linalg import cholesky
-    from scipy.stats import beta as _beta_dist, t as _t_dist
+    from scipy.stats import beta as _beta_dist, norm as _norm_dist
 except ImportError as _e:  # pragma: no cover — exercised only in broken envs
     raise ImportError(
         "PRISM engine requires scipy (D13: exact numerics only; the numpy "
@@ -29,14 +34,14 @@ except ImportError as _e:  # pragma: no cover — exercised only in broken envs
     ) from _e
 
 beta_ppf = _beta_dist.ppf
-t_cdf = _t_dist.cdf
+norm_cdf = _norm_dist.cdf
 
 #: Recorded in every result + persisted run_meta for the audit trail (D13).
 NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 
 from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
                            DEFAULT_WITHIN_FORCE_RHO,
-                           DEFAULT_T_COPULA_DF, DEFAULT_RESIDUAL_CROSS_RHO,
+                           DEFAULT_RESIDUAL_CROSS_RHO,
                            FORCE_MATERIALIZATION_OVERRIDES,
                            compute_materialization_schedule,
                            DEFAULT_FORCE_OVERLAP_MATRIX,
@@ -58,7 +63,14 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
-    MODEL_VERSION = "2.7.0"  # v3.6 June 2026: PSD-valid default correlations (D1); allocation removed from result contract (D4)
+    # 2.8.0 — v3.7 June 2026 (second ruling round, D12–D21): Gaussian copula
+    #         replaces the inert t-copula (D20); scipy-only exact numerics with
+    #         numerics_backend in the result contract (D13); analytics suite
+    #         deleted (D14 + Sobol rider); input-drift integrity event (D19);
+    #         full config-layer validation (D21).
+    # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
+    #         removed from result contract (D4).
+    MODEL_VERSION = "2.8.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -195,12 +207,18 @@ class BayesianMonteCarloEngine:
     def _generate_copula_samples(self, trends: list, R: np.ndarray,
                                   n_iter: int) -> np.ndarray:
         """
-        Generate correlated probability samples using t-copula for tail dependence.
+        Generate correlated probability samples via a Gaussian copula.
 
         Each trend's probability of materialization is sampled from its Beta
-        posterior, correlated across trends via copula structure. The copula
-        captures "crisis correlation" — when things go wrong, they go wrong
-        together (t-copula with low df = heavy tails).
+        posterior, correlated across trends via the copula structure.
+
+        D20 (June 2026, owner decision): the former t-copula tail layer was
+        deleted. Post-D1 re-test (verification/v8_d20_tcopula_df_out.txt)
+        showed the df dial inert — portfolio P10–P90 band width moved <2%
+        across df 4 → ∞ on PSD-valid defaults (one-signed bounded marginals
+        and cross-category averaging wash the tail mixing out). Marketed
+        complexity with no observable output effect is deleted, not kept:
+        the Gaussian copula is what the engine honestly runs.
 
         Returns: (n_iter, n_trends) array of normalized_score samples
         """
@@ -215,8 +233,7 @@ class BayesianMonteCarloEngine:
             d = np.sqrt(np.diag(R))
             R = R / np.outer(d, d)
 
-        # Generate correlated uniform samples via t-copula
-        df = self.config.t_copula_df
+        # Generate correlated uniform samples via Gaussian copula
         try:
             L = cholesky(R, lower=True)
         except (np.linalg.LinAlgError, ValueError):
@@ -233,15 +250,11 @@ class BayesianMonteCarloEngine:
             R = eigvecs @ np.diag(eigvals) @ eigvecs.T
             L = cholesky(R, lower=True)
 
-        # t-copula: Z ~ N(0, R), chi2 ~ chi2(df), T = Z * sqrt(df/chi2)
+        # Gaussian copula: Z ~ N(0, R); U = Φ(Z)  (D20: t-copula deleted)
         Z = self.rng.standard_normal((n_iter, n_trends))
         Z_correlated = Z @ L.T
 
-        chi2_samples = self.rng.chisquare(df, size=(n_iter, 1))
-        T = Z_correlated * np.sqrt(df / chi2_samples)
-
-        # Transform to uniform via t-CDF
-        U = t_cdf(T, df=df)
+        U = norm_cdf(Z_correlated)
         U = np.clip(U, 0.001, 0.999)
 
         # Transform uniforms to Beta-distributed probability samples
@@ -420,10 +433,14 @@ class BayesianMonteCarloEngine:
             # Count active trends per category for this force
             # exposure_matrix[mask, :] > 0 → (n_force_trends, n_cats) boolean
             n_active_per_cat = (exposure_matrix[mask, :] > 0).sum(axis=0)  # (n_cats,)
-            # dampening: 1 - overlap × (n-1)/n, clipped to avoid negative
+            # dampening: 1 - overlap × (n-1)/n, clipped to avoid negative.
+            # F-25/D21: divide on a guarded denominator — np.where evaluates
+            # both branches, so a category with zero active trends used to
+            # emit a spurious divide-by-zero RuntimeWarning here.
+            n_safe = np.maximum(n_active_per_cat, 1)
             dampen = np.where(
                 n_active_per_cat > 1,
-                1.0 - wf * (n_active_per_cat - 1) / n_active_per_cat,
+                1.0 - wf * (n_active_per_cat - 1) / n_safe,
                 1.0
             )
             wf_dampen[f_idx, :] = np.clip(dampen, 0.1, 1.0)

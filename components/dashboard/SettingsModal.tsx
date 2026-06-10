@@ -659,7 +659,7 @@ interface ModelConfigPayload {
   base_year?: number;
   path_years?: number[];
   within_force_rho?: number;
-  t_copula_df?: number;
+  // t_copula_df removed (D20, June 2026): the engine runs a Gaussian copula.
   residual_cross_rho?: number;
   force_weights?: Record<string, number>;
   materialization_schedule?: Record<string, number>;
@@ -840,24 +840,15 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
       <SectionCard
         title="Copula parameters"
         icon={SlidersHorizontal}
-        description="Controls how trend correlations flow through the Monte Carlo. Defaults are calibrated empirically from the v3.1 trend database."
+        description="Controls how trend correlations flow through the Monte Carlo (Gaussian copula — the t-copula tail dial was removed June 2026 after testing inert, <2% band effect). Invalid correlation settings are rejected at save time rather than silently repaired."
       >
         {draft && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Within-force ρ" hint="Default 0.30">
               <input
                 type="number" min={0} max={1} step={0.01}
                 value={draft.within_force_rho ?? 0.3}
                 onChange={(e) => patch({ within_force_rho: parseFloat(e.target.value) })}
-                disabled={ro} readOnly={ro}
-                style={ro ? READONLY_STYLE : INPUT_STYLE}
-              />
-            </Field>
-            <Field label="t-copula df" hint="2–30. Lower = heavier tails.">
-              <input
-                type="number" min={2} max={30} step={1}
-                value={draft.t_copula_df ?? 8}
-                onChange={(e) => patch({ t_copula_df: parseInt(e.target.value, 10) })}
                 disabled={ro} readOnly={ro}
                 style={ro ? READONLY_STYLE : INPUT_STYLE}
               />

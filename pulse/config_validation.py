@@ -1,16 +1,24 @@
 """Pydantic v2 models for validating ModelConfig parameters.
 
 Ensures configuration parameters satisfy mathematical constraints:
-- Weights sum to 1.0 (with tolerance)
+- Weights sum to 1.0 (with tolerance) — force, VC, region, category layers
 - Per-force attenuation values within [0, 1] (one per force)
 - Materialization values ascending from 0 to 1
 - Positive iterations and valid category counts
+- Correlation matrix symmetric, unit-diagonal, PSD at the 6-force level
+  (the trend-population spectral gate lives in PUT /config, D1)
+- Overlap matrices complete and bounded
+
+D21 (June 2026): every config layer the engine consumes is now validated —
+``force_correlation_matrix``, ``force_overlap_matrix``,
+``within_force_overlap``, ``category_weights`` and ``region_weights`` had
+no validation at all (audit F-23).
 """
 
 from typing import Optional, List, Dict
 from pydantic import BaseModel, field_validator, model_validator
 
-from pulse.config import FORCES, CATEGORIES, VC_STEPS
+from pulse.config import FORCES, CATEGORIES, VC_STEPS, REGIONS
 
 
 class MaterializationSchedule(BaseModel):
@@ -87,10 +95,14 @@ class ModelConfigValidator(BaseModel):
     materialization: Dict[int, float]
     force_weights: Dict[str, float]
     vc_weights: Dict[str, float]
+    region_weights: Dict[str, float]
     category_names: List[str]
+    category_weights: Dict[str, float]
     iterations: int
     within_force_rho: float
-    t_copula_df: int
+    force_correlation_matrix: Dict[str, Dict[str, float]]
+    force_overlap_matrix: Dict[str, Dict[str, float]]
+    within_force_overlap: Dict[str, float]
 
     @field_validator("per_force_attenuation")
     @classmethod
@@ -318,23 +330,164 @@ class ModelConfigValidator(BaseModel):
             )
         return v
 
-    @field_validator("t_copula_df")
+    # D20 (June 2026): validate_t_copula_df removed with the t-copula layer.
+
+    @field_validator("region_weights")
     @classmethod
-    def validate_t_copula_df(cls, v: int) -> int:
-        """T-copula degrees of freedom must be > 0, typically 2-10."""
-        if v <= 0:
+    def validate_region_weights(cls, v: Dict[str, float]) -> Dict[str, float]:
+        """Region weights: all four regions, sum to 1.0, non-negative (D21)."""
+        if not v:
+            raise ValueError("region_weights cannot be empty")
+        provided, required = set(v.keys()), set(REGIONS)
+        if required - provided:
             raise ValueError(
-                f"t_copula_df must be > 0 (got {v}). "
-                f"Default is 8 (moderate tails)"
+                f"region_weights missing regions: {required - provided}. "
+                f"Required: {required}"
             )
-
-        if v > 100:
+        if provided - required:
             raise ValueError(
-                f"t_copula_df is very high ({v}). "
-                f"High df ≈ Gaussian copula (light tails). Typical: 2-10"
+                f"region_weights contains unknown regions: {provided - required}. "
+                f"Only these allowed: {required}"
             )
-
+        total = sum(v.values())
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"region_weights must sum to 1.0 (got {total:.4f}, tolerance ±0.01)"
+            )
+        for region, w in v.items():
+            if w < 0:
+                raise ValueError(f"region_weights['{region}'] is negative ({w})")
         return v
+
+    @field_validator("within_force_overlap")
+    @classmethod
+    def validate_within_force_overlap(cls, v: Dict[str, float]) -> Dict[str, float]:
+        """Within-force overlap: all six forces, each in [0, 0.5] (D21).
+
+        Upper bound 0.5 mirrors the PUT /config gate — at 0.5 a large force's
+        summed signal is halved, which is already an aggressive correction.
+        """
+        provided, required = set(v.keys()), set(FORCES)
+        if required - provided:
+            raise ValueError(
+                f"within_force_overlap missing forces: {required - provided}"
+            )
+        if provided - required:
+            raise ValueError(
+                f"within_force_overlap contains unknown forces: {provided - required}"
+            )
+        for force, val in v.items():
+            if not isinstance(val, (int, float)) or not (0.0 <= float(val) <= 0.5):
+                raise ValueError(
+                    f"within_force_overlap['{force}'] = {val!r} must be a number in [0, 0.5]"
+                )
+        return v
+
+    @field_validator("force_overlap_matrix")
+    @classmethod
+    def validate_force_overlap_matrix(cls, v: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+        """Cross-force overlap matrix: 6×6, zero diagonal, off-diagonal in
+        [0, 0.45] (D21). Asymmetry is allowed by design — "Government captures
+        40% of Environmental's signal" ≠ the reverse."""
+        provided, required = set(v.keys()), set(FORCES)
+        if required - provided:
+            raise ValueError(f"force_overlap_matrix missing rows: {required - provided}")
+        if provided - required:
+            raise ValueError(f"force_overlap_matrix has unknown rows: {provided - required}")
+        for f, row in v.items():
+            if set(row.keys()) != required:
+                raise ValueError(
+                    f"force_overlap_matrix['{f}'] must contain exactly the six forces"
+                )
+            diag = row.get(f, 0.0)
+            if abs(float(diag)) > 1e-9:
+                raise ValueError(
+                    f"force_overlap_matrix diagonal ({f},{f}) must be 0.0 "
+                    f"(within-force overlap is configured separately); got {diag}"
+                )
+            for g, val in row.items():
+                if g == f:
+                    continue
+                if not isinstance(val, (int, float)) or not (0.0 <= float(val) <= 0.45):
+                    raise ValueError(
+                        f"force_overlap_matrix ({f},{g}) = {val!r} must be a number in [0, 0.45]"
+                    )
+        return v
+
+    @field_validator("force_correlation_matrix")
+    @classmethod
+    def validate_force_correlation_matrix(cls, v: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+        """Force correlation matrix: 6×6, unit diagonal, symmetric,
+        off-diagonal in [0, 1], and PSD at the 6-force level (D21/D1).
+
+        The 6×6 PSD check is a necessary condition; the binding spectral
+        gate for the full trend-population matrix (within_force_rho +
+        cross-force values expanded to N trends) runs in PUT /api/v1/config
+        via ``correlation_lambda_min`` because it needs the live trend mix.
+        """
+        import numpy as np
+        provided, required = set(v.keys()), set(FORCES)
+        if required - provided:
+            raise ValueError(f"force_correlation_matrix missing rows: {required - provided}")
+        if provided - required:
+            raise ValueError(f"force_correlation_matrix has unknown rows: {provided - required}")
+        for f, row in v.items():
+            if set(row.keys()) != required:
+                raise ValueError(
+                    f"force_correlation_matrix['{f}'] must contain exactly the six forces"
+                )
+            if abs(float(row[f]) - 1.0) > 0.01:
+                raise ValueError(
+                    f"force_correlation_matrix diagonal ({f},{f}) must be 1.0; got {row[f]}"
+                )
+            for g, val in row.items():
+                if not isinstance(val, (int, float)) or not (0.0 <= float(val) <= 1.0):
+                    raise ValueError(
+                        f"force_correlation_matrix ({f},{g}) = {val!r} must be a number in [0, 1]"
+                    )
+        for f in FORCES:
+            for g in FORCES:
+                if abs(float(v[f][g]) - float(v[g][f])) > 0.001:
+                    raise ValueError(
+                        f"force_correlation_matrix not symmetric: ({f},{g})={v[f][g]} "
+                        f"but ({g},{f})={v[g][f]}"
+                    )
+        M = np.array([[float(v[f][g]) for g in FORCES] for f in FORCES])
+        lam_min = float(np.linalg.eigvalsh(M).min())
+        if lam_min < -1e-9:
+            raise ValueError(
+                f"force_correlation_matrix is not positive semi-definite at the "
+                f"6-force level (min eigenvalue {lam_min:.4f}). The engine would "
+                f"have to repair it, making configured ≠ effective (audit F-01). "
+                f"Lower the cross-force correlations."
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_category_weights_against_names(self) -> "ModelConfigValidator":
+        """Category weights: one weight per configured category, sum to 1.0,
+        non-negative (D21). Cross-field: keys must equal category_names."""
+        v = self.category_weights
+        if not v:
+            raise ValueError("category_weights cannot be empty")
+        provided, required = set(v.keys()), set(self.category_names)
+        if required - provided:
+            raise ValueError(
+                f"category_weights missing categories: {required - provided}"
+            )
+        if provided - required:
+            raise ValueError(
+                f"category_weights contains unknown categories: {provided - required}"
+            )
+        total = sum(v.values())
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"category_weights must sum to 1.0 (got {total:.4f}, tolerance ±0.01)"
+            )
+        for cat, w in v.items():
+            if w < 0:
+                raise ValueError(f"category_weights['{cat}'] is negative ({w})")
+        return self
 
     @model_validator(mode="after")
     def validate_materialization_schedule(self) -> "ModelConfigValidator":
