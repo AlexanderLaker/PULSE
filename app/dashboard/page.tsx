@@ -36,11 +36,22 @@
 import { useEffect, useState } from 'react';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
+import dynamic from 'next/dynamic';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
-import InnovationExplorer3 from '@/components/dashboard/InnovationExplorer3';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
-import ProfitPoolExplorer from '@/components/dashboard/ProfitPoolExplorer';
+// Beta tabs are dynamically imported (review F10): InnovationExplorer3
+// statically pulls data/innovations.ts (~212 KB) + images map, and the
+// Explorer pulls lib/profitPoolData — neither belongs in the initial
+// bundle of the three production tabs.
+const InnovationExplorer3 = dynamic(
+  () => import('@/components/dashboard/InnovationExplorer3'),
+  { loading: () => <FullPageSkeleton />, ssr: false },
+);
+const ProfitPoolExplorer = dynamic(
+  () => import('@/components/dashboard/ProfitPoolExplorer'),
+  { loading: () => <FullPageSkeleton />, ssr: false },
+);
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
