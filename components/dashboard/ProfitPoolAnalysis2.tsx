@@ -42,7 +42,7 @@ import React, { useMemo, useState, useEffect, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
-  Sparkles, Info, Database, ChevronDown, Eye,
+  Sparkles, Info, Database, ChevronDown,
   TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -914,7 +914,6 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // ── Show-ranges mode ─────────────────────────────────────────────
-  const [showRanges, setShowRanges] = useState(true); // v3.6 D7: ranges visible by default
 
   // ── Collapsible methodology footer ───────────────────────────────
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1588,13 +1587,6 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
                 {IMPACT_META[f].label}
               </PillButton>
             ))}
-            {impactFilter === 'total' && (
-              <span className="inline-flex items-center pl-2 ml-1" style={{ borderLeft: `1px solid ${S.cardBorder}` }}>
-                <PillButton active={showRanges} onClick={() => setShowRanges((v) => !v)} icon={Eye}>
-                  Show ranges
-                </PillButton>
-              </span>
-            )}
           </div>
           <div
             className="flex items-center gap-2 text-[12px]"
@@ -1788,7 +1780,7 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
               cellDetails={filteredMatrix.cellDetails}
               onRowClick={setSelectedCategoryId}
-              showRanges={showRanges && view === 'time' && impactFilter === 'total'}
+              showRanges={view === 'time' && impactFilter === 'total'}
               noBandsNote={
                 view !== 'time'
                   ? 'Switch to Time Path for P10 / P90 bands'
