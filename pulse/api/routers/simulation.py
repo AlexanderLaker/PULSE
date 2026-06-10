@@ -124,6 +124,16 @@ async def get_simulation():
 
 @router.post("/api/v1/simulate")
 async def run_simulation(req: SimulationRequest, user: dict = Depends(require_admin)):
+    # F2 (owner decision): numbers must be consistent — only the scipy
+    # engine may generate runs. Serverless (no scipy) is read-only.
+    from pulse.simulation._scipy_compat import HAS_SCIPY
+    if not HAS_SCIPY:
+        raise HTTPException(
+            409,
+            "Simulation runs are produced offline with the scipy engine "
+            "(scripts/run_50k_prod.py). This runtime has no scipy and would "
+            "generate inconsistent numbers — refusing to simulate.",
+        )
     async with _state_lock:
         # Reload trends from database so we always simulate with latest data
         try:
@@ -220,11 +230,19 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
         # views. Convergence + force_attribution live in their own columns.
         from pulse.database import save_simulation_run
         try:
+            from datetime import datetime, timezone
             results_bundle = {
                 "shift_matrix": mc_result.get("shift_matrix"),
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                "meta": {
+                    "engine_fidelity": "scipy",  # guarded above
+                    "seed": mc_result.get("seed"),
+                    "model_version": mc_result.get("model_version"),
+                    "engine_name": mc_result.get("engine_name"),
+                    "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
+                },
             }
             save_simulation_run(
                 iterations=req.iterations,
