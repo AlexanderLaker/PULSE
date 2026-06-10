@@ -150,8 +150,6 @@ export const getSimulation = async (): Promise<SimulationResult> =>
 export const runSimulation = async (params: SimulationParams = {}): Promise<SimulationResult> =>
   normalizeSimulation(await request<unknown>('/simulate', { method: 'POST', body: JSON.stringify(params) }));
 
-export const runDeterministic = async (): Promise<SimulationResult> =>
-  normalizeSimulation(await request<unknown>('/simulate/deterministic', { method: 'POST' }));
 // ── Forces ───────────────────────────────────────────────────────
 
 export const getForces = (): Promise<ForceSummary[] | { forces: string[] }> =>

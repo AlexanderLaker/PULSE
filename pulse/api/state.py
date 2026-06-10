@@ -4,7 +4,7 @@ Behavior-identical move; see app.py for assembly.
 import asyncio
 import logging
 
-from pulse.config import ModelConfig, CATEGORIES
+from pulse.config import ModelConfig, CATEGORIES, FORCES
 from pulse.ingestion.models import Trend, TrendDatabase
 
 logger = logging.getLogger(__name__)

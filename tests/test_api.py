@@ -336,3 +336,27 @@ class TestAPIEdgeCases:
         # Should handle Unicode gracefully in trend creation
         # May be 201, 200, or 404 if model not loaded
         assert response.status_code in [200, 400, 404, 422]
+
+
+class TestF2OnlineNeverSimulates:
+    """F2 (June 2026, owner decision): the online service never generates
+    numbers. Without scipy, POST /simulate must refuse with 409 before
+    touching the engine — consistency with the offline calibrated runs."""
+
+    def test_simulate_409_without_scipy(self, client, monkeypatch):
+        import hmac, hashlib, json as _json, time, base64, os
+        os.environ.setdefault("PRISM_JWT_SECRET", "x" * 48)
+        secret = os.environ["PRISM_JWT_SECRET"]
+        def b64(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+        h = b64(_json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+        p = b64(_json.dumps({"sub": "t", "email": "t@t", "role": "admin",
+                             "exp": int(time.time()) + 300}).encode())
+        sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
+        token = f"{h}.{p}.{sig}"
+
+        import pulse.simulation._scipy_compat as compat
+        monkeypatch.setattr(compat, "HAS_SCIPY", False)
+        r = client.post("/api/v1/simulate", json={"iterations": 1000},
+                        headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 409
+        assert "offline" in r.json()["detail"]

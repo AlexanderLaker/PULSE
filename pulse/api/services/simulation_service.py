@@ -92,42 +92,6 @@ def load_latest_run_into_state() -> bool:
     return True
 
 
-def auto_run_startup_simulation() -> None:
-    """Run + persist an initial multichain simulation when trends exist but
-    no run is persisted. Single implementation of the auto-run that
-    previously existed in two copies (lifespan + _lazy_init).
-
-    NOTE (review F2): on scipy-less serverless this produces
-    numpy-approximation numbers. Caller decides whether to invoke;
-    caller manages locking.
-    """
-    from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-    from pulse.database import save_simulation_run
-
-    config = _state["config"]
-    db = _state["db"]
-    mc = BayesianMonteCarloEngine(config)
-    mc_result = mc.run_multichain(db, n_chains=3, iterations=config.iterations or 5000)
-    _state["mc_result"] = mc_result
-    _state["simulation_stale"] = False
-
-    results_bundle = {
-        "shift_matrix": mc_result.get("shift_matrix", {}),
-        "decompositions": mc_result.get("decompositions"),
-        "totals": mc_result.get("totals"),
-        "vc_decomposition": mc_result.get("vc_decomposition"),
-    }
-    save_simulation_run(
-        iterations=config.iterations or 5000,
-        model_type="bayesian_copula",
-        results=_sanitize(results_bundle),
-        force_attribution=_sanitize(mc_result.get("force_attribution")),
-        allocation_recommendation=None,
-        convergence_diagnostics=_sanitize(mc_result.get("convergence")),
-    )
-    logger.info("Auto-simulation completed (multichain, 3 chains) and persisted to database")
-
-
 def _persisted_simulation_state() -> dict:
     """Detailed check for persisted runs — returns structured reason.
 

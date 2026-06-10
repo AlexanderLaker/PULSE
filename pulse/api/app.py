@@ -29,9 +29,7 @@ from pulse.api.state import (
     _state, _state_lock, _load_trend_database, _backfill_diffusion_fields,
     get_state_snapshot,  # noqa: F401  (re-export for back-compat)
 )
-from pulse.api.services.simulation_service import (
-    load_latest_run_into_state, auto_run_startup_simulation,
-)
+from pulse.api.services.simulation_service import load_latest_run_into_state
 from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routers.system import router as system_router
 from pulse.api.routers.trends import router as trends_router
@@ -73,19 +71,22 @@ def create_app(args=None) -> FastAPI:
             if _state.get("db"):
                 _backfill_diffusion_fields(_state["db"])
 
-        # Auto-load latest simulation from DB if available; if none persisted,
-        # auto-run one (single implementations live in simulation_service).
+        # Auto-load latest simulation from DB if available. F2 (June 2026,
+        # owner decision): the online service NEVER simulates on its own —
+        # it only serves runs persisted by the offline CLI (scipy engine).
+        # If nothing is persisted, the dashboard shows its "no simulation"
+        # state; numbers must be consistent with the calibrated engine.
         if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
             try:
-                load_latest_run_into_state()
+                if not load_latest_run_into_state():
+                    _state["simulation_stale"] = True
+                    _state["stale_reason"] = (
+                        "No persisted simulation found. Runs are produced offline "
+                        "(scripts/run_50k_prod.py) — the online service never simulates."
+                    )
+                    logger.info("No persisted simulation found — serving empty state (F2: no online auto-run)")
             except Exception as e:
                 logger.warning(f"Failed to load simulation from DB: {e}")
-        if _state.get("db") and _state["db"].trend_count > 0 and not _state.get("mc_result"):
-            try:
-                logger.info("No persisted simulation found — auto-running initial simulation (multichain)...")
-                auto_run_startup_simulation()
-            except Exception as e:
-                logger.warning(f"Auto-simulation on startup failed: {e}")
 
         yield
 
@@ -166,14 +167,13 @@ def create_app(args=None) -> FastAPI:
                             if load_latest_run_into_state():
                                 print("[PRISM] Loaded latest simulation from database", flush=True)
                             else:
-                                print("[PRISM] No simulation in DB — auto-running initial simulation (multichain)...", flush=True)
-                                try:
-                                    auto_run_startup_simulation()
-                                    print("[PRISM] Auto-simulation completed (multichain, 3 chains) and persisted to database", flush=True)
-                                except Exception as sim_err:
-                                    print(f"[PRISM] Auto-simulation failed: {sim_err}", flush=True)
-                                    _state["simulation_stale"] = True
-                                    _state["stale_reason"] = "No simulation has been run yet. Press Simulate to generate results."
+                                # F2: never auto-run online — read-only over persisted runs.
+                                print("[PRISM] No simulation in DB — serving empty state (F2: no online auto-run)", flush=True)
+                                _state["simulation_stale"] = True
+                                _state["stale_reason"] = (
+                                    "No persisted simulation found. Runs are produced offline "
+                                    "(scripts/run_50k_prod.py) — the online service never simulates."
+                                )
                         except Exception as e:
                             print(f"[PRISM] Failed to load/run simulation: {e}", flush=True)
         except Exception as e:

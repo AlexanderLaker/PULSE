@@ -17,7 +17,7 @@ from pulse.api.models import (
     ConfigUpdate, SnapshotCreate,
 )
 from pulse.api.services.simulation_service import (
-    load_latest_run_into_state, auto_run_startup_simulation,
+    load_latest_run_into_state,
     _persisted_simulation_state, _has_persisted_simulation,
 )
 

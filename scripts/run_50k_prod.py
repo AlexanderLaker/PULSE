@@ -107,11 +107,23 @@ def main() -> int:
     # match the bundle shape the FastAPI /api/v1/simulation endpoint expects.
     log.info("[5/5] Persisting to Neon PROD…")
     try:
+        from datetime import timezone
+        from pulse.simulation._scipy_compat import HAS_SCIPY
         results_bundle = {
             "shift_matrix": result.get("shift_matrix"),
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
+            # F2: every persisted run carries its engine fidelity so an
+            # approximate run can never masquerade as canonical.
+            "meta": {
+                "engine_fidelity": "scipy" if HAS_SCIPY else "numpy_approx",
+                "seed": result.get("seed"),
+                "chains": 3,
+                "model_version": result.get("model_version"),
+                "engine_name": result.get("engine_name"),
+                "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
         }
         run_id = save_simulation_run(
             iterations=config.iterations,
