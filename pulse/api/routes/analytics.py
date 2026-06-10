@@ -47,16 +47,7 @@ class ThresholdDefRequest(BaseModel):
 
 # ── Helper to extract from global state (module uses module-level injection) ────
 
-def get_state_snapshot() -> Dict[str, Any]:
-    """Get current PRISM state snapshot for analytics."""
-    from pulse.api.app import _state
-    return {
-        "db": _state.get("db"),
-        "config": _state.get("config"),
-        "dag": _state.get("dag"),
-        "mc_result": _state.get("mc_result"),
-    }
-
+from pulse.api.state import get_state_snapshot  # noqa: E402
 
 # ── CVaR Endpoints ─────────────────────────────────────────────────────
 
