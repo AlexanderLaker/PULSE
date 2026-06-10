@@ -1,4 +1,4 @@
-"""Chat + session snapshot routes — extracted from pulse/api/app.py (June 2026 split, review F4)."""
+"""Session snapshot routes — extracted from pulse/api/app.py (June 2026 split, review F4)."""
 import json
 import logging
 from typing import Optional, Any
@@ -13,7 +13,7 @@ from pulse.api.auth import require_auth, require_admin
 from pulse.api.serialization import _sanitize, _summarize_convergence
 from pulse.api.state import _state, _state_lock, _load_trend_database, _backfill_diffusion_fields
 from pulse.api.models import (
-    SimulationRequest, TrendCreate, TrendUpdate, ShockRequest, ChatRequest,
+    SimulationRequest, TrendCreate, TrendUpdate, ShockRequest,
     ConfigUpdate, SnapshotCreate,
 )
 from pulse.api.services.simulation_service import (
@@ -25,29 +25,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-@router.post("/api/v1/chat")
-async def chat(req: ChatRequest, user: dict = Depends(require_auth)):
-    """Natural language query interface."""
-    try:
-        from pulse.ai.chat import PrismChat
-        from pulse.ai.provider import get_provider
-        provider = get_provider()
-        chat_engine = PrismChat(provider)
-        context = {
-            "simulation": _state.get("mc_result"),
-            "trends": [{"id": t.id, "name": t.name, "force": t.force,
-                        "direction": t.direction,
-                        "probability": t.probability,
-                        "normalized_score": t.normalized_score}
-                       for t in (_state.get("db").trends if _state.get("db") else [])],
-        }
-        answer = await chat_engine.ask(req.question, context)
-        return {"answer": answer}
-    except ImportError:
-        return {"answer": "AI features require additional setup. Set ANTHROPIC_API_KEY or configure an AI provider."}
-    except Exception as e:
-        return {"answer": f"AI query failed: {str(e)}"}
 
 # ── Session Snapshots (Persistent History) ──────────────────────
 @router.get("/api/v1/snapshots")

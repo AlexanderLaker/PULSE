@@ -100,10 +100,6 @@ class ShockRequest(BaseModel):
     years: int = Field(5, ge=1, le=10)
 
 
-class ChatRequest(BaseModel):
-    question: str
-
-
 class ConfigUpdate(BaseModel):
     attenuation_source: Optional[str] = Field(None,
         description="'assumed' | 'admin_override'")

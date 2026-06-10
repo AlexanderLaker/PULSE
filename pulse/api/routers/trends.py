@@ -13,7 +13,7 @@ from pulse.api.auth import require_auth, require_admin
 from pulse.api.serialization import _sanitize, _summarize_convergence
 from pulse.api.state import _state, _state_lock, _load_trend_database, _backfill_diffusion_fields
 from pulse.api.models import (
-    SimulationRequest, TrendCreate, TrendUpdate, ShockRequest, ChatRequest,
+    SimulationRequest, TrendCreate, TrendUpdate, ShockRequest,
     ConfigUpdate, SnapshotCreate,
 )
 from pulse.api.services.simulation_service import (
