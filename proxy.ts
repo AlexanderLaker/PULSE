@@ -21,9 +21,11 @@ const isPublicRoute = createRouteMatcher([
   // Python FastAPI backend — the Next.js proxy routes under /api/* do a
   // same-origin fetch to /api/v1/*, which re-enters this middleware. Without
   // a Clerk session cookie on that server-side hop, it would 401 before the
-  // PRISM JWT Bearer reaches the Python adapter. The Python layer enforces
-  // its own admin gate on mutating endpoints (see pulse/api/app.py), so
-  // exposing /api/v1/* at the middleware level is safe.
+  // PRISM JWT Bearer reaches the Python adapter. Public at the EDGE only:
+  // since F3 (June 2026) the Python layer itself authenticates every data
+  // endpoint — reads need the httpOnly viewer cookie minted by
+  // /api/prism-cookie, mutations need an admin Bearer JWT. Only /health and
+  // /diagnostics are intentionally anonymous.
   '/api/v1/(.*)',
 ]);
 

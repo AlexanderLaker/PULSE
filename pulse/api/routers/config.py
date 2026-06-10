@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.get("/api/v1/config")
-async def get_config():
+async def get_config(user: dict = Depends(require_auth)):
     config = _state.get("config")
     if not config:
         return {}

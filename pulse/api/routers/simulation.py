@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.get("/api/v1/simulation/status")
-async def get_simulation_status():
+async def get_simulation_status(user: dict = Depends(require_auth)):
     """Check if the current simulation is stale (needs re-run)."""
     return {
         "stale": _state.get("simulation_stale", False),
@@ -37,7 +37,7 @@ async def get_simulation_status():
 
 # ── Simulation ──────────────────────────────────────────────────
 @router.get("/api/v1/simulation")
-async def get_simulation():
+async def get_simulation(user: dict = Depends(require_auth)):
     """Get current cached simulation results. Falls back to DB on serverless cold start."""
     mc = _state.get("mc_result")
     run_meta: dict = _state.get("run_meta") or {}

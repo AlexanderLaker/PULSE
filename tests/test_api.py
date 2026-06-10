@@ -360,3 +360,63 @@ class TestF2OnlineNeverSimulates:
                         headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 409
         assert "offline" in r.json()["detail"]
+
+
+@pytest.fixture
+def raw_client():
+    """TestClient WITHOUT the fake-admin dependency overrides — for tests
+    that assert on the real auth behavior (F3). Ensures a JWT secret is
+    present so token verification is exercised for real (CI has none)."""
+    import os
+    os.environ.setdefault("PRISM_JWT_SECRET", "pytest-secret-" + "x" * 36)
+    return TestClient(create_app())
+
+
+class TestF3ReadAuthentication:
+    """F3 (June 2026): every data endpoint authenticates. Reads accept the
+    httpOnly viewer cookie (pulse-token) or a Bearer token; /health and
+    /diagnostics stay anonymous by design."""
+
+    @staticmethod
+    def _jwt(role="viewer"):
+        import hmac, hashlib, json as _json, time, base64, os
+        secret = os.environ["PRISM_JWT_SECRET"]
+        def b64(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+        h = b64(_json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+        p = b64(_json.dumps({"sub": "t", "email": "t@t", "role": role,
+                             "exp": int(time.time()) + 300}).encode())
+        sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
+        return f"{h}.{p}.{sig}"
+
+    def test_reads_reject_anonymous(self, raw_client):
+        client = raw_client
+        for path in ["/api/v1/trends", "/api/v1/simulation",
+                     "/api/v1/simulation/status", "/api/v1/config"]:
+            r = client.get(path)
+            assert r.status_code == 401, (path, r.status_code)
+
+    def test_reads_accept_viewer_cookie(self, raw_client):
+        client = raw_client
+        token = self._jwt("viewer")
+        r = client.get("/api/v1/trends", cookies={"pulse-token": token})
+        assert r.status_code == 200
+        r = client.get("/api/v1/simulation/status", cookies={"pulse-token": token})
+        assert r.status_code == 200
+
+    def test_reads_accept_bearer(self, raw_client):
+        client = raw_client
+        token = self._jwt("viewer")
+        r = client.get("/api/v1/config", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+
+    def test_viewer_cookie_cannot_mutate(self, raw_client):
+        client = raw_client
+        token = self._jwt("viewer")
+        r = client.post("/api/v1/simulate", json={"iterations": 1000},
+                        cookies={"pulse-token": token})
+        assert r.status_code == 403  # require_admin rejects role=viewer
+
+    def test_health_and_diagnostics_stay_public(self, raw_client):
+        client = raw_client
+        assert client.get("/api/v1/health").status_code == 200
+        assert client.get("/api/v1/diagnostics").status_code == 200

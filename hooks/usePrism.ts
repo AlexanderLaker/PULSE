@@ -98,6 +98,10 @@ function usePrismStore(): UsePrismReturn {
     setError(null);
     setConnectionState('reconnecting');
     try {
+      // F3: prime the httpOnly engine cookie (pulse-token) so the
+      // authenticated /api/v1 reads succeed. Errors are non-fatal here —
+      // if priming failed, the reads below 401 and we surface offline.
+      await fetch('/api/prism-cookie', { credentials: 'include' }).catch(() => undefined);
       const [h, t, c] = await Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
         api.getTrends().catch((): Trend[] => []),

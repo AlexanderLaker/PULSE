@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.get("/api/v1/trends")
-async def list_trends(force: Optional[str] = None):
+async def list_trends(force: Optional[str] = None, user: dict = Depends(require_auth)):
     db = _state.get("db")
     if not db:
         raise HTTPException(404, "No model loaded")
@@ -331,7 +331,7 @@ async def full_reseed():
     }
 
 @router.get("/api/v1/trends/{trend_id}")
-async def get_trend(trend_id: str):
+async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
     db = _state.get("db")
     if not db:
         raise HTTPException(404, "No model loaded")
