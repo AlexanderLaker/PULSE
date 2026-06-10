@@ -7,9 +7,7 @@
 import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
-  Scenario,
   CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
-  AISuggestion, TriggerStatus,
   HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
 } from '@/types';
 
@@ -154,15 +152,6 @@ export const runSimulation = async (params: SimulationParams = {}): Promise<Simu
 
 export const runDeterministic = async (): Promise<SimulationResult> =>
   normalizeSimulation(await request<unknown>('/simulate/deterministic', { method: 'POST' }));
-
-// ── Scenarios ────────────────────────────────────────────────────
-
-export const getScenarios = (): Promise<Scenario[]> =>
-  request('/scenarios');
-
-export const createScenario = (data: Partial<Scenario>): Promise<Scenario> =>
-  request('/scenarios', { method: 'POST', body: JSON.stringify(data) });
-
 // ── Forces ───────────────────────────────────────────────────────
 
 export const getForces = (): Promise<ForceSummary[] | { forces: string[] }> =>
@@ -186,26 +175,5 @@ export const getTippingPoints = (): Promise<TippingPointsResult> =>
 
 export const reverseStress = (data: ReverseStressParams): Promise<ReverseStressResult> =>
   request('/analytics/reverse-stress', { method: 'POST', body: JSON.stringify(data) });
-
-// ── AI & Insights ────────────────────────────────────────────────
-
-export const getAIInsights = (): Promise<AISuggestion[]> =>
-  request('/ai/suggestions');
-
-export const scanTrends = (): Promise<{ status: string; new_trends: number }> =>
-  request('/ai/scan', { method: 'POST' });
-
-export const getTriggers = (): Promise<TriggerStatus[]> =>
-  request('/triggers');
-
-export const createTrigger = (data: {
-  category: string;
-  condition_type: string;
-  threshold: number;
-  target_year: number;
-  action_text: string;
-}): Promise<TriggerStatus> =>
-  request('/triggers', { method: 'POST', body: JSON.stringify(data) });
-
 // ── Delphi client removed (D10, June 2026) ──────────────────────
 
