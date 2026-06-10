@@ -284,7 +284,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                     "trend_fingerprint": current_fp,
                 },
             }
-            save_simulation_run(
+            run_id = save_simulation_run(
                 iterations=req.iterations,
                 model_type="bayesian_copula",
                 results=_sanitize(results_bundle),
@@ -292,7 +292,24 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 allocation_recommendation=None,
                 convergence_diagnostics=_sanitize(mc_result.get("convergence")),
             )
-            logger.info(f"Simulation persisted ({req.iterations} iterations)")
+            # Refresh the in-memory run_meta so GET /simulation immediately
+            # describes THIS run (previously it kept showing the prior run's
+            # ribbon meta until the next cold-start rehydration).
+            _meta = results_bundle["meta"]
+            _state["run_meta"] = {
+                "run_id": run_id,
+                "run_date": _meta.get("persisted_at_utc"),
+                "iterations": req.iterations,
+                "model_type": "bayesian_copula",
+                "seed": mc_result.get("seed"),
+                "chains": mc_result.get("n_chains"),
+                "model_version": mc_result.get("model_version"),
+                "engine_name": mc_result.get("engine_name"),
+                "engine_fidelity": _meta.get("engine_fidelity"),
+                "numerics_backend": _meta.get("numerics_backend"),
+                "persisted_at_utc": _meta.get("persisted_at_utc"),
+            }
+            logger.info(f"Simulation persisted ({req.iterations} iterations, run_id={run_id})")
         except Exception as e:
             logger.error(f"CRITICAL: Failed to persist simulation run: {e}")
             # Don't fail the request — results are still in memory

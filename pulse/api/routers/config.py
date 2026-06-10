@@ -235,12 +235,19 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             within_force_overlap=dict(candidate.within_force_overlap),
         )
     except _PydValidationError as ve:
-        # No rollback needed — we never mutated the live config
+        # No rollback needed — we never mutated the live config.
+        # D21: strip ctx/input/url from the pydantic error list — pydantic v2
+        # puts the raw ValueError object into ctx, which is not JSON
+        # serializable and turned every validation 400 into a 500.
+        issues = [
+            {"type": e.get("type"), "loc": list(e.get("loc", ())), "msg": e.get("msg")}
+            for e in ve.errors(include_url=False, include_context=False, include_input=False)
+        ]
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "Proposed config failed validation",
-                "issues": ve.errors(),
+                "issues": issues,
                 "rolled_back": list(changes.keys()),
             },
         )
