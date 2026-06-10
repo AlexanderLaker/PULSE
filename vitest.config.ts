@@ -6,7 +6,7 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, '.') },
   },
   test: {
-    environment: 'node',          // pure-function tests only — no DOM needed
-    include: ['tests/frontend/**/*.test.ts'],
+    environment: 'node',          // default — UI tests opt into jsdom per-file
+    include: ['tests/frontend/**/*.test.{ts,tsx}'],
   },
 });
