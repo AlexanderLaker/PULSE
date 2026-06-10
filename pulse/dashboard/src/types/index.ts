@@ -9,7 +9,6 @@
 // ── Re-exports ────────────────────────────────────────────────────
 export type * from './trends';
 export type * from './simulation';
-export type * from './analytics';
 export type * from './config';
 export type * from './api';
 export type * from './delphi';

@@ -8,7 +8,6 @@ import type {
   Trend, TrendUpdate,
   SimulationResult, SimulationParams,
   SensitivityResult,
-  CVaRResult, SobolResult, TippingPointsResult, ReverseStressResult, ReverseStressParams,
   AISuggestion, TriggerStatus,
   HealthStatus, ModelConfig, AuditEntry, ForceSummary,
   DelphiSessionSummary, DelphiSession, DelphiScoreSubmission, DelphiScore,
@@ -152,19 +151,7 @@ export const getForces = (): Promise<ForceSummary[] | { forces: string[] }> =>
 export const getAuditLog = (limit = 50): Promise<AuditEntry[]> =>
   request(`/audit/log?limit=${limit}`);
 
-// ── Analytics (Amendment M) ──────────────────────────────────────
-
-export const getCVaR = (): Promise<CVaRResult> =>
-  request('/analytics/cvar');
-
-export const getSobol = (): Promise<SobolResult> =>
-  request('/analytics/sobol');
-
-export const getTippingPoints = (): Promise<TippingPointsResult> =>
-  request('/analytics/tipping-points');
-
-export const reverseStress = (data: ReverseStressParams): Promise<ReverseStressResult> =>
-  request('/analytics/reverse-stress', { method: 'POST', body: JSON.stringify(data) });
+// ── Analytics client removed (D14 + Sobol rider, June 2026) ─────
 
 // ── AI & Insights ────────────────────────────────────────────────
 

@@ -7,9 +7,11 @@
  */
 
 // ── Re-exports ────────────────────────────────────────────────────
+// analytics.ts removed (D14 + Sobol rider, June 2026) — the advanced
+// analytics suite (CVaR / Sobol / tipping points / reverse stress) was
+// deleted end-to-end.
 export type * from './trends';
 export type * from './simulation';
-export type * from './analytics';
 export type * from './config';
 export type * from './api';
 

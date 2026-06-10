@@ -9,7 +9,6 @@ pieces live in:
     pulse/api/models.py                     Pydantic request models
     pulse/api/services/simulation_service.py  rehydrate / auto-run / persisted-state probe
     pulse/api/routers/{system,trends,simulation,config,competitors,misc}.py
-    pulse/api/routes/analytics.py           advanced analytics (pre-existing router)
 
 Behavior is intentionally identical to the pre-split monolith; the
 route table is fingerprint-tested in tests/test_api.py.
@@ -30,7 +29,6 @@ from pulse.api.state import (
     get_state_snapshot,  # noqa: F401  (re-export for back-compat)
 )
 from pulse.api.services.simulation_service import load_latest_run_into_state
-from pulse.api.routes.analytics import router as analytics_router
 from pulse.api.routers.system import router as system_router
 from pulse.api.routers.trends import router as trends_router
 from pulse.api.routers.simulation import router as simulation_router
@@ -117,7 +115,8 @@ def create_app(args=None) -> FastAPI:
     )
 
     # ── Routers (paths are absolute inside each router) ─────────
-    app.include_router(analytics_router, prefix="/api/v1")
+    # Analytics router removed (D14 + Sobol rider, June 2026): CVaR /
+    # Sobol / tipping-points / reverse-stress deleted end-to-end.
     app.include_router(system_router)
     app.include_router(trends_router)
     app.include_router(simulation_router)
