@@ -56,7 +56,7 @@ export interface StageContext {
   opportunity: string;
 }
 
-export const JOURNEY_CONTENT_VERSION = '2026-06-10';
+export const JOURNEY_CONTENT_VERSION = '2026-06-11';
 
 export const LHC_JOURNEY: JourneyStageDef[] = [
   {
@@ -447,7 +447,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-31: Gen Z enters household formation with materially lower cleaning fluency — the DB cites only 34% knowing basic garment-care tasks. Products that assume diagnostic skill (which stain, which treatment, which temperature) lose this cohort to single-step, mistake-proof alternatives or to not treating at all. The pre-treat stage is the most skill-dependent moment in the journey.\n\n**2. Strategic Evaluation.** Sil's answer is radical simplification: universal-stain claims, on-pack visual guidance, and app-assisted stain ID (camera → product instruction) that converts fluency decline from threat to lock-in. The same trend expands the addressable market for all-in-one formats (Discs) — capture the fluency-poor consumer at Add Products if pre-treat loses them.",
         "id": "lhc.pre_treating.con.skill-dependent-multi-step-treatment-products-cl"
@@ -789,7 +789,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-18 on the LHC side: Hispanic households are larger, wash more frequently, and over-index on scent-forward and value-premium laundry products — a structurally growing demand pool that Persil, all and Purex serve today without targeting. The pool expands fastest in scent boosters and fabric conditioner, linking to C-28.\n\n**2. Strategic Evaluation.** This is range and merchandising work, not invention: scent-forward variants, larger pack architecture, Spanish-language shelf presence in high-density DMAs. Measure via household-panel penetration in Hispanic-majority ZIPs, not national share. P&G (Gain) currently owns this segment's scent positioning — the gap is contestable with Persil's efficacy story plus Vernel-derived scent technology.",
         "id": "lhc.add_products.exp.hispanic-household-laundry-formats-us-growth-seg"
@@ -805,7 +805,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-22: detergent sheets (Earth Breeze, Tru Earth, Blueland) convert plastic-free positioning and shipping economics into a wedge format — small absolute pool today, but the format owns the 'zero-plastic laundry' claim and recruits eco-switchers from liquids. The DB scores this cautiously (gp1 6%, prob 3): efficacy perception and cost-per-wash still cap mainstream conversion.\n\n**2. Strategic Evaluation.** A fast-follow option, not a panic: hold a validated sheet formulation ready (Persil-branded efficacy would instantly out-credential DTC players) and trigger launch on category share signals rather than pre-emptively cannibalising Discs. Watch G-14 — sheets typically carry PVA too, so the 'plastic-free' claim is contestable on both sides.",
         "id": "lhc.add_products.exp.detergent-sheets-and-ultra-light-strips-earth-br"
@@ -821,7 +821,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-27: dishwasher penetration in India (4%), China (12%) and Brazil (9%) versus Germany's 71% defines a decade-long conversion runway — every converting household switches from hand-dish liquid to auto-dish tabs, a 3-4x value-per-occasion upgrade. Somat's pool expands with machine penetration, not market share. (Mapped into the laundry journey's product-choice stage as the nearest consumer moment; a dedicated dish journey would house it properly.)\n\n**2. Strategic Evaluation.** Win the first-tab moment: OEM partnerships (starter packs in new machines), conversion-targeted education content, and entry price-packs in EM channels. The analogue is Nespresso's machine-attach economics — the tab brand chosen at machine purchase persists. Reckitt's Finish currently owns this playbook (X-01 notes its post-divestiture overlap categories exclude Finish, which Reckitt kept and will defend).",
         "id": "lhc.add_products.exp.auto-dish-tabs-for-first-time-dishwasher-househo"
@@ -837,7 +837,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-28: scent boosters have graduated from novelty to structural premium segment — an add-on purchase at the detergent moment that expands basket value without cannibalising the base SKU. P&G's Lenor Unstoppables created and still owns the segment archetype; the DB split this trend out from generic premiumisation in v3.3 because the pool is now independently material (gp1 8%).\n\n**2. Strategic Evaluation.** Vernel's scent-technology credibility makes boosters the highest-probability premium extension in the LHC portfolio. Differentiate on conscious-freshness (bio-based encapsulation, C-04 alignment) against Unstoppables' synthetic-intensity positioning, and merchandise at the detergent shelf, not the softener shelf — the attach decision happens beside Persil, not beside Vernel.",
         "id": "lhc.add_products.exp.in-wash-scent-boosters-as-routine-add-on-unstopp"
@@ -853,7 +853,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-29: athleisure, merino and performance synthetics now make up 35%+ of the average European wardrobe, reviving a dedicated delicates/performance wash occasion that generic detergents serve badly (odour retention in synthetics, fibre damage in technical knits). The DB named this 'the Perwoll occasion' — Henkel owns the reference brand for it.\n\n**2. Strategic Evaluation.** Perwoll is positioned to convert this from a defensive niche into a growth platform: sport/performance variants, odour-technology claims, and care-instruction partnerships with apparel brands (G-12's garment-longevity mandates make apparel brands willing co-marketers). Defend against P&G entering with an Ariel sub-line by occupying the claim space first.",
         "id": "lhc.add_products.exp.specialist-delicates-and-performance-fabric-dete"
@@ -886,7 +886,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** T-15 + T-16 (grouped — collinear bio-manufacturing vectors): precision fermentation ($36B by 2030, 40%+ CAGR) and synthetic-biology ingredient design produce bio-identical surfactants and aroma molecules without agricultural supply chains. Consumer-visible as a new claims class — 'brewed, not drilled' — and structurally as price-stable, low-carbon, EUDR-immune inputs (counters E-03/E-11/G-11 cost loads).\n\n**2. Strategic Evaluation.** The strategic asset is offtake position: secure fermentation-capacity agreements for 1-2 hero surfactants before competitors lock supply (P&G and Unilever are already signing). Launch claim-led ('palm-free Persil' class) only when supply scales — premature claims with thin supply invite both stock-outs and greenwashing scrutiny under G-05.",
         "id": "lhc.add_products.exp.bio-manufactured-surfactant-and-fragrance-formul"
@@ -903,7 +903,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-14 expansion side: if biodegradability standards turn against PVA film, film-free unit-dose formats (coated tablets, compressed and moulded concentrates, water-jacket capsules) inherit the convenience pool that pods built. First credible mover converts a regulatory shock into format leadership — the same dynamic that built the pod category now runs in reverse.\n\n**2. Strategic Evaluation.** Stage-gate a film-free Discs successor to pilot readiness; trigger on regulatory signal (draft standard publication), not on competitor launch — by then the claim space ('first film-free 4-in-1') is gone. The R&D is dual-use: the same concentrate chemistry serves C-22 sheet/strip optionality.",
         "id": "lhc.add_products.exp.film-free-unit-dose-alternatives-coated-tablets-"
@@ -1087,7 +1087,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-03: Schwarz Group, Aldi and Edeka/Rewe together control an estimated 40-50% of European grocery volume relevant to Henkel, and consolidation is accelerating range rationalisation — fewer branded SKUs per category, more shelf handed to own-brand. The squeezed slice is the mid-tier: brands strong enough to pay for listing but too weak to be non-negotiable.\n\n**2. Strategic Evaluation.** Persil's #1/#2 positions are defensible; the exposure is second-line SKUs (variants, mid-tier sub-brands) that rationalisation delists first. Concentrate the portfolio on must-stock anchors and innovation SKUs with demonstrable rotation, and pre-negotiate category-captain positions where Henkel holds data leadership. Treat every tail SKU as a listing at risk.",
         "id": "lhc.add_products.con.mid-tier-branded-skus-under-retailer-range-ratio"
@@ -1106,7 +1106,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** Four converging cost trends (CBAM/Scope-3 reporting, supply-chain nearshoring, climate adaptation of European plants, downstream decarbonisation mandates) load structural cost onto formulated products. None is consumer-facing alone; together they widen the branded-vs-PL price gap at shelf — the consumer experiences them as price ladder inflation. Grouped into one tile deliberately: these are collinear cost vectors, not four separate consumer moments.\n\n**2. Strategic Evaluation.** The pass-through battle is won upstream: low-carbon surfactant sourcing (see T-15/T-16 bio-manufacturing tile) and EU-localised supply become margin defence, not CSR. Where pass-through is unavoidable, take it on pack architecture (count/size) before sticker price — PL closes the gap fastest when the branded sticker moves.",
         "id": "lhc.add_products.con.input-cost-and-compliance-pass-through-on-brande"
@@ -1122,7 +1122,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** E-04: EPR eco-modulation is expanding across EU member states, and fee schedules specifically penalise multi-material formats — trigger sprays (Bref, WC Frisch archetypes) carry the highest per-unit fee loading. The cost is invisible to consumers until it surfaces as price or format change; the profit pool shifts toward mono-material and refill formats.\n\n**2. Strategic Evaluation.** Accelerate mono-material trigger development and refill-pouch systems before fee escalation forces it. Eco-modulated fees are effectively a regulatory subsidy for whoever converts first — the same SKU in a compliant format gains a structural cents-per-unit advantage that compounds across the LHC aerosol/spray portfolio.",
         "id": "lhc.add_products.con.hard-to-recycle-trigger-sprays-and-multi-materia"
@@ -1138,7 +1138,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-08: US retail media reaches $69.3B in 2026 with Amazon and Walmart capturing ~89% of incremental spend — brand discovery at the digital shelf is now an auction, and the auctioneer is the retailer. The detergent aisle's first page is sold, not earned; trade economics shift from margin negotiation to media buying, with the DB scoring this the single largest customer-force pool transfer (gp1 20%, prob 5).\n\n**2. Strategic Evaluation.** Treat retail media as a P&L line with ROAS discipline, not a listing fee: concentrate spend on defensible search terms (brand + top category terms), starve the long tail, and negotiate media-inclusive JBPs so the spend buys data access, not just impressions. The structural answer is owned mental availability (E-B: brand salience built off-platform is the only discount on on-platform auctions).",
         "id": "lhc.add_products.con.retail-media-gated-shelf-and-search-placement-pa"
@@ -1154,7 +1154,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-09: when retailer-owned shopping agents assemble the weekly basket, the default detergent is whatever optimises the retailer's economics — private label or the brand paying for agent placement. The shelf fight becomes an algorithm fight, and the algorithm's owner is also a competitor (via PL). This is the retailer-side mirror of T-11's consumer-agent disruption.\n\n**2. Strategic Evaluation.** Secure 'named-brand default' status in the first wave of retailer agent programmes (Carrefour, Tesco, Walmart pilots) the way category captains were secured in planograms — early, contractually, with data sharing. Build the API-readable product data layer (G-07 DPP work doubles here) so agents can verify Persil claims machine-to-machine. Late entry means permanent PL default.",
         "id": "lhc.add_products.con.retailer-agent-baskets-defaulting-to-pl-and-marg"
@@ -1170,7 +1170,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-11: retailer loyalty programmes (Clubcard pricing, dm App, Carrefour Rewards) are evolving into data toll-booths — promotional discounts only reach consumers through the retailer's app, making the retailer the gatekeeper of price perception and harvesting the consumer data brands used to get from promotions. Trade spend buys less visibility and yields less learning.\n\n**2. Strategic Evaluation.** Negotiate loyalty-programme participation with explicit data-back clauses (segment-level redemption data minimum), shift a share of promo budget to owned-channel offers (Persil app/D2C sampling) to retain first-party signal, and price-pack architect so the loyalty-app price point is planned rather than conceded.",
         "id": "lhc.add_products.con.promo-economics-rerouted-through-retailer-loyalt"
@@ -1187,7 +1187,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** T-11 + T-12: when agents buy detergent autonomously, the browsing moment that drove variant discovery, impulse trade-up and scent-led switching disappears — the agent re-orders the proven SKU and optimises on price-per-wash and ratings. Brand equity is bypassed at exactly the moment it used to convert; the DB grades T-12's brand-invisibility risk at gp1 14%.\n\n**2. Strategic Evaluation.** Defend with subscription-native variety mechanics (rotating scent drops inside the auto-order; Vernel seasonal capsules as add-on prompts agents can offer) and structured data that makes Persil's superiority legible to algorithms, not just humans. The marketing budget shifts: less last-touch persuasion, more upstream salience (the human still sets the agent's first default) — pure Ehrenberg-Bass logic in an agentic wrapper.",
         "id": "lhc.add_products.con.branded-variety-and-impulse-purchasing-collapsed"
@@ -1203,7 +1203,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-09: confirmed US tariff escalation hits EU-manufactured premium SKUs and imported inputs into Henkel's US plants — the consumer-visible end is widening price gaps between imported premium (Persil) and domestically produced value tiers (all, Purex) on the same shelf. gp1 12% at probability 5 makes this the heaviest near-term regulatory load on the US portfolio.\n\n**2. Strategic Evaluation.** Accelerate US localisation of Persil production (the premium claim travels; the supply chain shouldn't), re-source tariffed inputs within USMCA where chemistry allows, and let the value tier absorb displaced demand rather than discounting the premium tier — a controlled trade-down inside the portfolio beats losing the consumer to P&G's domestic stack.",
         "id": "lhc.add_products.con.us-import-cost-pass-through-on-eu-made-premium-s"
@@ -1220,7 +1220,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-11 (+G-06 EUDR): biodiversity frameworks and deforestation regulation put palm-derived surfactant chains — the backbone of mainstream detergent formulation — under traceability and disclosure pressure. Consumer-visible as certification labels first, reformulation later; cost-visible immediately in compliance and segregated-supply premiums.\n\n**2. Strategic Evaluation.** The hedge is the same asset as the T-15/T-16 opportunity: bio-manufactured surfactants bypass the land-use question entirely. Sequence: certified-segregated palm (near term, claimable) → fermentation-derived substitution (structural). Move before the first NGO campaign makes palm content a shelf-level liability in DACH.",
         "id": "lhc.add_products.con.palm-derivative-surfactant-formulas-under-biodiv"
@@ -1236,7 +1236,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-14: polyvinyl-alcohol film — the wrapper of effectively all liquid unit-dose laundry and dish formats, including Persil Discs and Somat caps — faces tightening biodegradability standards and NGO-driven microplastic framing. The DB scores it gp1 18%: if PVA is reclassified adversely, the entire unit-dose premium architecture is exposed at once.\n\n**2. Strategic Evaluation.** Run a two-track defence: (1) fund and publish independent PVA biodegradation evidence now — the science is genuinely contested and silence cedes the framing; (2) hold film-free unit-dose R&D (coated tablets, moulded concentrates) at launch-ready. The asymmetry is brutal: Discs is the format innovation weapon (see Add Products context), so this is the portfolio's single most concentrated regulatory exposure.",
         "id": "lhc.add_products.con.pva-film-pods-and-discs-under-biodegradability-c"
@@ -1252,7 +1252,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** X-10: Amazon's FMCG private label differs in kind from retail PL — it is built on real-time search, basket and review data, launched against demand gaps the data reveals, and merchandised by the platform's own ranking algorithms. In replenishment categories like detergent, platform PL plus subscription defaults is a structural share harvester (gp1 10%).\n\n**2. Strategic Evaluation.** On-platform, fight for the subscription slot (Subscribe & Save share is the real shelf) and keep review velocity and rating above the PL attack threshold — Amazon targets weak-rated incumbents first. Off-platform, this is the strongest argument for the owned-channel and retail-diversification agenda: a brand whose US volume concentrates on Amazon is donating its demand curve to its next competitor.",
         "id": "lhc.add_products.con.data-driven-platform-private-label-in-replenishm"
@@ -1743,7 +1743,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** T-19: neuro-scents — fragrances engineered and clinically validated (EEG/fMRI) for measured cognitive-emotional effects — open a functional layer on top of laundry freshness: 'calm' bed linen, 'focus' workwear. Small pool today (gp1 6%, prob 3) but it premiumises the unloading/fresh-laundry moment where scent perception peaks.\n\n**2. Strategic Evaluation.** Vernel is the natural carrier; the differentiator is measured-benefit substantiation versus aromatherapy folklore — which also makes claims defensible under G-05 Green/wellness-claims scrutiny. Pilot as a limited premium line; the trend's value to Henkel is optionality on C-09 sensory premiumisation, not near-term volume.",
         "id": "lhc.unloading.exp.functional-neuro-scent-finishers-calm-focus-posi"
@@ -2599,7 +2599,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-12 (+E-08): the EU Textile Strategy's garment-longevity requirements make 'clothes that last' a regulated objective, not just a consumer preference — and fabric care is the use-phase enabler (colour protection, fibre care, low-temperature washing all measurably extend garment life). The wearing stage gains a regulatory tailwind for longevity-positioned care claims.\n\n**2. Strategic Evaluation.** Quantify it: 'Persil/Perwoll care extends garment life by X washes' substantiated to G-05 evidence standards, co-marketed with apparel brands now obligated to demonstrate longevity. This converts a compliance burden (theirs) into a claims platform (Henkel's) — the rare regulation that funds a marketing message.",
         "id": "lhc.wearing.exp.garment-longevity-care-claims-aligned-to-eu-text"
@@ -3034,7 +3034,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-19: Southeast Asia's 600M consumers discover beauty almost entirely inside Shopee, Lazada and TikTok Shop — the world's highest e-commerce growth rates with no offline discovery layer to disrupt. Inspiration, validation and checkout collapse into one in-app motion; brands without platform-native content operations are simply absent from the category entry point.\n\n**2. Strategic Evaluation.** SEA is a build-the-playbook market: platform-native content studios, livestream commerce capability and creator-affiliate economics that can later be exported to EU as Douyin-model commerce arrives (K-10). Indonesia and Vietnam first on population and growth; price-pack architecture must hit platform price points (bundle/flash-sale logic), not retail ladders.",
         "id": "hair.inspire.exp.shopee-tiktok-native-beauty-discovery-formats-se"
@@ -3050,7 +3050,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-26: the oldest Gen Alpha cohort turns 14-16 in 2026-2030 — the years in which lifetime category entry points form. Their entry is screen-native (discovery via short video), parent-mediated on safety, and brand-forming: whoever owns the 'first routine' owns disproportionate lifetime mental availability. Sephora-kids controversy proved both the demand and the safety-positioning requirement.\n\n**2. Strategic Evaluation.** Build the safe-by-design entry proposition (dermatologist-validated, age-appropriate actives, parent-legible labelling) under got2b or a dedicated young line — Schwarzkopf's safety heritage reassures the parent while the content reaches the teen. This is a CEP land-grab: the cost of entry now is trivial against the cost of re-acquiring the cohort at 25.",
         "id": "hair.inspire.exp.gen-alpha-first-routine-starter-lines-and-age-ga"
@@ -3066,7 +3066,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-10: live-commerce took 10-12% of Chinese FMCG retail and is now exporting westward through TikTok Shop's EU rollout. For hair care — demonstration-led, transformation-visual — shoppable streams are a natively suited format: colour results, styling tutorials and instant checkout collapse the inspire-to-purchase funnel into minutes.\n\n**2. Strategic Evaluation.** Build live-commerce capability now while EU competition is thin: dedicated streaming talent (in-house or agency), Schwarzkopf colour-transformation formats, and TikTok Shop DE/FR storefronts. The SEA playbook (C-19) is the template — re-use its content economics. The risk of waiting: live commerce concentrates fast around early category hosts, as Douyin's beauty verticals proved.",
         "id": "hair.inspire.exp.live-commerce-shoppable-streams-douyin-model-in-"
@@ -3181,7 +3181,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-16: domestic brands now take 56% of China beauty value on nationalism-inflected preference, livestream-native marketing and faster local innovation cycles. Western hair brands lose the inspiration moment to C-beauty players who own Douyin discovery end-to-end. Schwarzkopf China is comparatively small within Henkel, which caps absolute exposure but also strategic options.\n\n**2. Strategic Evaluation.** Do not fight for the mass inspiration moment against C-beauty on its home turf. Hold the professional/salon flank (where German heritage retains pricing power), localise NPD through China-based co-development, and treat Douyin-native content as table stakes for whatever consumer presence remains. The bigger play is defending against C-beauty model exports into SEA (C-19) and eventually EU (X-05).",
         "id": "hair.inspire.con.western-brand-colour-and-care-lines-in-china-ret"
@@ -3197,7 +3197,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** K-08 at the hair inspiration moment: beauty discovery on Amazon, Walmart and Sephora digital surfaces is increasingly sponsored-first — organic discovery (the moment indie and challenger brands historically won) is being colonised by paid placements. For incumbent brands the auction is a tax; for the inspiration stage itself it means the consumer's 'I found it myself' moment is increasingly manufactured.\n\n**2. Strategic Evaluation.** Schwarzkopf's counter is to own inspiration upstream of the retail surface: creator content, salon-channel credibility (K-07) and social commerce presence that arrives at the retail shelf pre-decided. Paying the auction is unavoidable for defence; winning it is not the strategy — arriving with pre-built salience is.",
         "id": "hair.inspire.con.organic-brand-discovery-displaced-by-sponsored-r"
@@ -3213,7 +3213,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** X-12: the 2025-26 acquisition wave (Rhode to e.l.f. at $1B+, Medik8 and Color Wow to L'Oréal, Dr Squatch to Unilever) re-arms indie brands with global distribution and supply chains while preserving their creator-native inspiration engines. The inspire stage fills with brands that have startup storytelling and incumbent logistics — the hardest competitive combination to counter.\n\n**2. Strategic Evaluation.** Henkel's M&A posture needs a thesis here: either compete for targets in defined white spaces (textured hair, scalp longevity — where organic build is slow) or accept the build path and fund got2b/Schwarzkopf creator programmes at acquisition-multiple-equivalent intensity. The non-strategy — neither buying nor matching the content engine — cedes the inspiration moment by default.",
         "id": "hair.inspire.con.post-acquisition-indie-brands-armed-with-big-fmc"
@@ -3384,7 +3384,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-21: the longevity economy ($120B anti-aging pool by 2030) is repositioning hair concerns from cosmetic to biomarker-led — follicle density scans, hormonal panels, scalp-age scoring. The diagnostic moment becomes a medicalised entry point that prescribes multi-month regimens rather than single SKUs.\n\n**2. Strategic Evaluation.** Henkel's dermatological R&D heritage supports a credible 'scalp longevity index' diagnostic — but the win condition is the regimen attach rate, not the scan. Partner with longevity clinics and tele-derm platforms (C-32) rather than building standalone hardware; own the consumable refill that the diagnostic prescribes.",
         "id": "hair.diagnose.exp.hair-longevity-diagnostics-and-biomarker-panels"
@@ -3400,7 +3400,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-32: tele-dermatology DTC platforms (Hims, Hers, Ro) have built $2B+ run-rates by medicalising hair concerns — prescription-grade diagnosis and treatment delivered by subscription, bypassing both retail shelf and salon chair. The diagnostic moment migrates to a telehealth intake form; the platform owns the regimen and the recurring revenue.\n\n**2. Strategic Evaluation.** Henkel cannot become a telehealth provider, but it can be the platforms' cosmetic-adjacent layer: clinically substantiated non-Rx scalp care that tele-derm platforms recommend alongside prescriptions (their AOV problem is Henkel's distribution opportunity). Negotiate ingredient/brand placement in 1-2 leading platforms' regimen bundles; exclusivity matters less than being in the default protocol.",
         "id": "hair.diagnose.exp.tele-derm-hair-and-scalp-prescription-platforms-"
@@ -3482,7 +3482,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-10: the EU AI Act is fully applicable from August 2026; consumer-facing AI diagnostics (scalp scanners, shade-matching, skin analysis) face transparency, data-governance and in some configurations conformity-assessment obligations. Compliance cost falls disproportionately on smaller diagnostic startups — and slows everyone's EU release cadence versus US/Asia.\n\n**2. Strategic Evaluation.** Treat compliance as a moat once crossed: an AI-Act-conformant Schwarzkopf diagnostic carries a trust mark indie tools will struggle to match, and salon deployment (professional context) eases some consumer-facing obligations. Budget legal/conformity into every AI feature roadmap now; retrofitting after August 2026 is the expensive path.",
         "id": "hair.diagnose.con.ai-diagnostic-tools-facing-eu-ai-act-conformity-"
@@ -3499,7 +3499,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** X-07 + X-11: L'Oréal is industrialising the diagnostic moment — K-SCAN scalp analysis, Modiface AR, 725 patents in 2025 and an NVIDIA partnership for AI molecule discovery (€1.7B R&D). When the category's diagnostic standard is competitor-owned, every scan funnels regimen recommendations toward Kérastase and L'Oréal Pro — the diagnosis IS the distribution.\n\n**2. Strategic Evaluation.** Henkel cannot out-spend this; it must out-position it: open diagnostics (salon tools that recommend by need, not by house brand) as the trust alternative for independent salons wary of L'Oréal lock-in, plus focused AI-formulation bets in segments where Schwarzkopf holds data advantage (colour — Igora's shade-formula corpus is a genuine asset). Concede the platform war; win named battles.",
         "id": "hair.diagnose.con.competitor-owned-diagnostic-ecosystems-set-the-c"
@@ -3652,7 +3652,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-17: India's $30B BPC market compounds at 11% — the fastest-growing top-10 market — and the entry mechanics are India-specific: affordable-premium positioning via sachets and small packs that put salon-quality formulas at street-retail price points. The wash/cleanse stage is where the volume sits; premiumisation happens within the sachet, not beyond it.\n\n**2. Strategic Evaluation.** Schwarzkopf's professional heritage is the differentiator P&G's mass brands cannot copy: 'salon formula in a ₹10 sachet' is the proposition. Distribution depth (general trade + quick-commerce) decides winners; partner-led routes beat owned infrastructure on speed. India is also the structural hedge against China softness (C-16) in the Asia portfolio.",
         "id": "hair.prepare.exp.india-affordable-premium-sachets-and-small-pack-"
@@ -3668,7 +3668,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-24: 65% of the world's population has textured hair, yet mainstream portfolios are engineered for straight hair — the structural mismatch the DB flags as a designed-in white space. The wash stage is where textured routines diverge most (co-washing, sulfate-free, moisture-first), making it the entry point for credible texture-first ranges.\n\n**2. Strategic Evaluation.** This is a portfolio-architecture decision, not a variant launch: texture-inclusive formulation across Gliss/Schwarzkopf with curl-pattern segmentation, validated by textured-hair communities (credibility is earned in community, not claimed in advertising — Shea Moisture's rise and stumble is the case study). Links directly to C-18 (US Hispanic) and X-09 (Africa) demand pools.",
         "id": "hair.prepare.exp.curl-and-coil-specific-cleansing-systems-co-wash"
@@ -3685,7 +3685,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** X-09 + X-14: Africa's FMCG pool reaches $200B by 2030 on 1.7B consumers, and AfCFTA's 2026-28 tariff harmonisation makes pan-African manufacturing scale economics viable for the first time. Hair is the beachhead category: textured-hair-first demand, strong local routines, and lighter PL pressure than Europe — but local champions and L'Oréal are moving on the same map.\n\n**2. Strategic Evaluation.** Anchor on textured-hair credibility (one platform with C-24, not a parallel stack), manufacture regionally under AfCFTA rules-of-origin (Nigeria/Kenya hubs), and price for general trade with sachet-led architecture borrowed from the India playbook (C-17). The window is the harmonisation period itself — distribution positions taken 2026-28 set the decade.",
         "id": "hair.prepare.exp.africa-first-hair-care-ranges-textured-hair-lead"
@@ -3921,7 +3921,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-18: Hispanic consumers are the demographic engine of US hair-category growth — higher spend per capita on care and styling, distinct texture and routine needs, and brand loyalty patterns that reward early movers. Henkel US (Schwarzkopf, got2b) has minimal Hispanic-specific range or merchandising today; the growth accrues to whoever shows up designed-for rather than translated-to.\n\n**2. Strategic Evaluation.** Build a designed-for range (texture-inclusive care, bilingual pack/merchandising, Hispanic creator partnerships) rather than a marketing overlay on existing SKUs. got2b's styling credibility is the bridgehead — its Hispanic Gen-Z following is already organic. Pair with the C-24 textured-hair platform to avoid building two parallel texture stacks.",
         "id": "hair.remedy.exp.us-hispanic-consumer-hair-care-ranges-and-biling"
@@ -3938,7 +3938,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-21 + T-14: longevity medicine's ingredient stack (NAD+ precursors, GHK-Cu peptides, senolytic-inspired actives) is crossing into consumer hair care with lab-to-shelf timelines compressed to 18-24 months. The pool premiumises: science-substantiated 'hair longevity' commands skincare-level price points in the treatment stage.\n\n**2. Strategic Evaluation.** Position at the cosmetic end of the claims spectrum to stay clear of quasi-pharma classification (G-03 risk flagged in the trend DB). Clinical substantiation is the gating asset — Schwarzkopf Professional's R&D can credibly produce it; mass-market 'longevity-washing' competitors cannot. Price against premium skincare serums, not against hair masks.",
         "id": "hair.remedy.exp.longevity-positioned-scalp-and-hair-actives-nad-"
@@ -3986,7 +3986,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** X-08: the K-beauty export wave has reached EU hair care ($2.7B, 6.4% CAGR, Amorepacific leading) and it enters through the treatment stage — scalp serums, glass-hair masks, multi-step regimens with skincare-grade ingredient stories. It expands the remedy pool (consumers add steps) while resetting expectations for texture, packaging and ingredient transparency.\n\n**2. Strategic Evaluation.** Treat K-beauty as a demand creator to ride, not only a competitor to block: K-inspired textures and actives under Gliss/Schwarzkopf reach the K-curious mainstream that won't buy import brands. Defend the pharmacy/drugstore shelf where Amorepacific's distribution is thinnest; in e-commerce the fight is content velocity, where Korean brands set the global pace.",
         "id": "hair.remedy.exp.k-beauty-scalp-serums-and-glass-hair-treatment-i"
@@ -4085,7 +4085,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-32 contraction side: as tele-derm platforms route hair-loss sufferers directly to prescription regimens, OTC retail hair-loss products lose their highest-intent customers — the segment most willing to pay premium prices exits the shelf channel entirely. Retail retains only the prevention-curious and price-constrained.\n\n**2. Strategic Evaluation.** Do not over-invest in OTC hair-loss SKUs positioned on efficacy claims that prescription alternatives now dominate; reposition retail offerings toward maintenance-between-prescriptions and cosmetic densifying (instant visual effect, a claim Rx cannot make). The defensible retail pool is appearance, not cure.",
         "id": "hair.remedy.con.otc-retail-hair-loss-products-prescription-bypas"
@@ -4254,7 +4254,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-20: Brazil is the world's #4 beauty market with a pronounced premiumisation trend in colour and treatments; Mexico adds nearshoring-driven income growth. Salon culture is strong and aspirational — at-home colour that credibly references salon technique premiumises rather than commoditises.\n\n**2. Strategic Evaluation.** Schwarzkopf's salon-to-retail crossover model (K-07) fits LatAm structurally: Igora's professional equity can anchor a consumer 'salon-inspired' tier above Palette. Brazil requires local manufacturing for price competitiveness (import duties); Mexico can serve as the NA-LatAm bridge plant. Watch L'Oréal's Garnier premiumisation moves — they define the reference price ladder.",
         "id": "hair.transform.exp.latam-salon-inspired-premium-colour-lines"
@@ -4388,7 +4388,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** G-13: MoCRA plus state-level regimes (CA Prop 65 listings, state fragrance-disclosure laws) impose facility registration, safety substantiation and ingredient-disclosure obligations that hit colour chemistry hardest — and hit hardest the import and indie brands without US regulatory infrastructure. Their forced exits and reformulation delays free US shelf and search positions in colour and treatment.\n\n**2. Strategic Evaluation.** For Schwarzkopf US this is a compliance-as-moat moment: full MoCRA conformity is table stakes Henkel can fund routinely, while sub-scale competitors cannot. Audit the US colour portfolio's state-level exposure now, then lean distribution into the gaps as non-compliant SKUs delist — the cheapest share gain in the US hair business, but time-bound to the enforcement ramp.",
         "id": "hair.transform.con.import-indie-colour-skus-lacking-mocra-compliance"
@@ -4525,7 +4525,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-24 at the styling stage: curl definition, frizz control and flexible hold for textured hair are chronically under-served by styling ranges built around straight-hair aesthetics. Styling is got2b's franchise — the brand's youth equity gives Henkel a faster route into texture-first styling than care-led competitors.\n\n**2. Strategic Evaluation.** Extend got2b with a definition/curl line co-developed with textured-hair creators; styling's lower regulatory and substantiation burden makes it the fastest credible entry into the C-24 demand space, building permission for the bigger care-stage play.",
         "id": "hair.lock_finish.exp.texture-first-styling-and-definition-lines"
@@ -4625,7 +4625,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
         "analysis": "**1. Summary.** C-33 + X-05: Shein, Temu and Pinduoduo-owned beauty lines are importing the ultra-fast-fashion model into mass hair and body care — direct-from-factory price points that reset the consumer's reference price for styling and body SKUs. Combined with early Chinese brand entry into EU (<2% today but tariff-redirected export pressure building), the mass tier's price floor is collapsing from below.\n\n**2. Strategic Evaluation.** got2b and Taft's value tiers cannot win a price war against factory-direct economics; the defence is efficacy substantiation, safety/compliance trust (EU cosmetics regulation as moat — G-03 cuts both ways) and speed-to-trend. Concede the absolute price floor; hold the 'cheapest brand I trust' position. Monitor for the inflection where platforms add EU-compliant beauty private label at scale.",
         "id": "hair.lock_finish.con.mass-styling-and-body-care-tiers-under-ultra-fas"
