@@ -218,7 +218,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 | `Trends2.tsx` | Trend explorer + admin editor; D7 provenance chips |
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
-| `ProfitPoolExplorer.tsx` | Beta, GP1-only sourced slide views (D5) |
+| `ProfitPoolExplorer.tsx` | Beta, GP1-only pool views (D5). v2 (2026-06-11): arrows = pool development (revenue × GP1 drift, FY2025→2030, derived in `lib/profitPoolData.ts`); Laundry/Hair toggle + view pills; click drill-down decomposes pool CAGR into revenue CAGR + GP1 drift with € pools; all sources clickable URLs verified vs. FY2025 filings, graded ✅ reported / ⚡ derived / ⚠️ estimate |
 | `InnovationExplorer3.tsx` / `InnovationDeepDive.tsx` / `InnovationProductImage.tsx` | Beta innovation surfaces |
 | `WhiteSpotAnalyzer.tsx` | White-spot exploration |
 | `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions |
