@@ -45,6 +45,7 @@ def load_latest_run_into_state() -> bool:
             "decompositions": results.get("decompositions"),
             "totals": results.get("totals"),
             "vc_decomposition": results.get("vc_decomposition"),
+            "journey_decomposition": results.get("journey_decomposition"),
             # D19/D3 (June 2026): integrity events + seed stability persist
             # with the run and must survive rehydration.
             "integrity_events": results.get("integrity_events") or [],

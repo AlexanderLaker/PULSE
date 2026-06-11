@@ -43,9 +43,54 @@ Executed against owner decisions **D12–D21** (ruled 2026-06-10; recorded with 
 
 **Open-by-decision (explicitly not bugs):** D9/F-08 (no hindcast), D15/F-09 (one-sided trend grammar), D18/F-20 (no Henkel-position overlay).
 
+### Consumer Journey layer (v3.6 block 8, restored & re-based 2026-06-10)
+
+The Consumer Journey de-blackboxing (audit + same-day implementation:
+`PRISM_Consumer_Journey_Audit_2026-06-10.md`, §7 addendum) was lost to a
+sync/parallel-session race before it could be committed (uncommitted edits to
+pre-existing files were wiped by a hard reset on the shared working tree; new
+files survived) and was **re-implemented onto the v3.7 / MODEL_VERSION 2.8.0
+architecture** the same day. Scope, unchanged from the audit ruling:
+
+1. **Honest labelling** — authored tile analyses render as *"Strategist Read —
+   authored, not simulated"* (never "PRISM Analysis"); per-tile provenance
+   chips ✍️ strategist-authored / ✨ AI-suggested (46 tiles, pending review)
+   with evidence grades ✅/⚡/⚠️; scope banner: the qualitative overlay does
+   not feed the Shift Matrix.
+2. **Content out of code** — 300 tiles + stage contexts live in
+   `data/consumerJourney.ts` (`JOURNEY_CONTENT_VERSION`); admin edits persist
+   via `GET|PUT /api/v1/journey` (Next proxy `/api/journey`) into the
+   versioned `journey_content` table.
+3. **Real trend linkage** — canonical code↔ID map `data/trendCodeMap.ts`
+   (C/T/G/K/E/X-rNN, 99 live codes; `RETIRED_CODES` C-12/K-05/T-09 must never
+   render as live drivers); evidence cards drill through to the live trend DB
+   (`Trends2` `initialSearch`).
+4. **Quantitative layer** — `journey_exposure` (99 trends × 260 stage scores,
+   `trend_journey_exposure`; seed `pulse/seed_journey_exposure.py`, derived
+   from tile intensities {1→2, 2→3, 3→5}; stage keys `"<journey>:<stage_id>"`
+   per `JOURNEY_STAGES` in `pulse/config.py`: LHC 13 / Hair 8) and
+   **`journey_decomposition`** in the engine — terminal-year MC-median per
+   category redistributed across its journey's stages (same construction as
+   `vc_decomposition`; per-category stage sums reconcile with the
+   terminal-year median exactly; redistributes, never changes totals). No
+   MODEL_VERSION bump: an additive attribution lens; 2.8.0 golden pins
+   unaffected.
+5. **White Spots (Beta)** — `WhiteSpotAnalyzer.tsx`, intentionally isolated
+   (one component + 4 wiring lines in `page.tsx`; footprint edits
+   localStorage-only; score = migration⁺ × (1 − presence/5)). Keep deletable.
+
+Activation requires `scripts/backfill_journey_exposure.py` (non-destructive)
+against prod, then a fresh `scripts/run_50k_prod.py` — until then the journey
+attribution chips and White Spots quadrant show their honest empty states.
+Open backlog (owner-gated): strategist review of the 46 ✨ tiles + 260
+exposure scores; internal validation of Henkel claims in stage contexts; Home
+Care journey (tab honestly reads "Laundry" until then); optional per-year
+journey decomposition; server-side footprint persistence if the beta
+graduates.
+
 ### Earlier release notes (condensed, still accurate)
 
-- **v3.6 (June 2026, audit remediation D1–D11):** PSD-valid correlations + spectral config gate; optimizer + Delphi deleted; analytics fixed-then-(v3.7)-deleted; attribution relabels; one-decimal display; provenance chips; GP1-only explorer; MODEL_VERSION 2.7.0. Full record: `audit/strategy-review/06` Part E.
+- **v3.6 (June 2026, audit remediation D1–D11):** PSD-valid correlations + spectral config gate; optimizer + Delphi deleted; analytics fixed-then-(v3.7)-deleted; attribution relabels; one-decimal display; provenance chips; GP1-only explorer; MODEL_VERSION 2.7.0. Full record: `audit/strategy-review/06` Part E. Block 8 of this round (Consumer Journey de-blackboxing) is documented in its own section above.
 - **Platform line (June 2026):** Next.js 14.2 → **16.2**, React 18 → **19**; Clerk-based auth pages (`app/sign-in`, `app/sign-up`) alongside JWT viewer cookies; repository handover cleanup; CI (GitHub Actions: frontend typecheck/lint/vitest + scipy engine pytest); F1 single source of truth for shift-matrix math (`lib/shiftMatrix.ts`); F4 split of the `app.py` monolith into routers + service + state; F2 read-only online service; F3 authenticated reads; F6 dead-endpoint removal; F10 dynamic-import Beta tabs; Maritime design-system unification.
 - **v3.5 (April 2026):** 99-trend base; attenuation + overlap matrices re-derived from the 99-trend exposure space (structured-judgment overlap correction); per-force attenuation replaces every scalar.
 - **v3.3 (April 2026):** 14 new trends, 8 re-scorings, 1 consolidation after the MECE coverage review.
@@ -76,6 +121,7 @@ Executed against owner decisions **D12–D21** (ruled 2026-06-10; recorded with 
 | Continuous path modeling | **Production** | 5 MECE diffusion curves, 2026–2035, velocity per iteration |
 | Joint portfolio band + seed stability | **Production** | `totals.portfolio` + `seed_stability` (D3) |
 | Input-drift telemetry | **Production** | `pulse/audit/input_drift.py` (D19) |
+| Consumer-journey decomposition + content store | **Production** | `journey_decomposition` (engine) + `journey_content` admin store; v3.6 block 8, restored 2026-06-10 |
 | AI layer (scanner, narrator, calibrator) | **Dormant** | Modules exist; scanner routes unmounted, chat endpoint removed |
 | Excel export (Shift Matrix QA workbook) | **Production** | Written by `run_50k_prod.py`; D16/D17 wording included |
 | PPTX / Power BI export modules | **Ad-hoc only** | No live API route; callable from Python directly |
@@ -127,7 +173,7 @@ LOCAL DEV: python -m pulse --serve (FastAPI :8000, SQLite data/prism.db)
 
 ### The Shift Matrix contract (per persisted run)
 
-`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability`, `meta` (`engine_fidelity`, `numerics_backend`, `seed`, `chains`, `model_version`, `engine_name`, `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
+`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year), `journey_decomposition` (terminal-year journey-stage attribution per category, v3.6 block 8), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability`, `meta` (`engine_fidelity`, `numerics_backend`, `seed`, `chains`, `model_version`, `engine_name`, `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
 
 Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
@@ -156,7 +202,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 **excel_bridge/** — `writer.py` (QA workbook with D16 READING NOTE + D17 provenance wording + D13 numerics backend; allocation sheet removed), `export_center.py` / `powerbi_export.py` + `api/export_pptx.py` (ad-hoc, no live route)
 
-**api/** — `app.py` (assembly only), `state.py`, `serialization.py`, `models.py`, `services/simulation_service.py` (single rehydration implementation incl. integrity events + seed stability), `auth.py` (JWT dependencies), `routers/{system,trends,simulation,config,competitors,misc}.py` (+ `journey.py`, currently unmounted), `routes/{auth,scanner}.py` (legacy, unmounted)
+**api/** — `app.py` (assembly only), `state.py`, `serialization.py`, `models.py`, `services/simulation_service.py` (single rehydration implementation incl. integrity events, seed stability + journey decomposition), `auth.py` (JWT dependencies), `routers/{system,trends,simulation,config,competitors,misc,journey}.py` (journey mounted since the 2026-06-10 restore: GET/PUT `/api/v1/journey` content store), `routes/{auth,scanner}.py` (legacy, unmounted)
 
 ---
 
@@ -171,7 +217,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 | `ProfitPoolAnalysis2.tsx` | Shift Matrix, four lenses; headline with joint band; D16 captions; run ribbon + `RunDetailsPopover` (seed stability, numerics backend) + `IntegrityChip` (D19) |
 | `Trends2.tsx` | Trend explorer + admin editor; D7 provenance chips |
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
-| `ConsumerJourney2.tsx` | 8-step value-chain lens with bespoke PRISM read-outs |
+| `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
 | `ProfitPoolExplorer.tsx` | Beta, GP1-only sourced slide views (D5) |
 | `InnovationExplorer3.tsx` / `InnovationDeepDive.tsx` / `InnovationProductImage.tsx` | Beta innovation surfaces |
 | `WhiteSpotAnalyzer.tsx` | White-spot exploration |
@@ -196,7 +242,7 @@ Serverless (`api/requirements.txt`): fastapi, pydantic, numpy, psycopg2-binary, 
 
 ## 6. DATABASE SCHEMA (production truth)
 
-Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `simulation_runs` (results bundle incl. integrity events + fingerprint; `allocation_recommendation` column legacy-NULL), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `users`, `session_snapshots`. `delphi_rounds` is **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first); `trends.scorer_count/score_variance/debiasing_applied` remain as harmless legacy columns nothing writes.
+Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_journey_exposure`, `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events + fingerprint; `allocation_recommendation` column legacy-NULL), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `users`, `session_snapshots`. `delphi_rounds` is **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first); `trends.scorer_count/score_variance/debiasing_applied` remain as harmless legacy columns nothing writes.
 
 ---
 
@@ -208,6 +254,7 @@ GET           /api/v1/simulation, /api/v1/simulation/status
 POST          /api/v1/simulate                            (admin; 409 without scipy — F2/D13)
 GET|POST|PUT|DELETE /api/v1/trends[/{id}|/sync|/full-reseed|/revert-to-seed]
 GET|PUT       /api/v1/config                              (PUT: admin; full-layer validation + spectral gate)
+GET|PUT       /api/v1/journey                            (GET via authed Next proxy /api/journey; PUT admin — journey content store)
 GET           /api/v1/forces, /api/v1/audit/log
 GET           /api/v1/competitors[/intelligence|/{id}]
 GET|POST      /api/v1/snapshots[/{id}]

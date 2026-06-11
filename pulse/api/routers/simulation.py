@@ -63,6 +63,7 @@ async def get_simulation(user: dict = Depends(require_auth)):
                         "decompositions": results_blob.get("decompositions"),
                         "totals": results_blob.get("totals"),
                         "vc_decomposition": results_blob.get("vc_decomposition"),
+                        "journey_decomposition": results_blob.get("journey_decomposition"),
                         # D19/D3: rehydrate integrity events + seed stability
                         "integrity_events": results_blob.get("integrity_events") or [],
                         "seed_stability": results_blob.get("seed_stability"),
@@ -118,6 +119,7 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "iterations": mc.get("iterations", 5000),
         "model_type": mc.get("model_type", "bayesian_copula"),
         "vc_decomposition": mc.get("vc_decomposition"),
+        "journey_decomposition": mc.get("journey_decomposition"),
         "decompositions": mc.get("decompositions"),
         "totals": mc.get("totals"),
         # D19/D3: integrity events (incl. input drift) + seed stability
@@ -269,6 +271,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                "journey_decomposition": mc_result.get("journey_decomposition"),
                 # D19/D3: persist integrity events + seed stability with the run
                 "integrity_events": mc_result.get("integrity_events", []),
                 "seed_stability": mc_result.get("seed_stability"),
@@ -321,6 +324,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "model_type": mc_result["model_type"],
             "competitive": _state.get("competitive"),
             "vc_decomposition": mc_result.get("vc_decomposition"),
+            "journey_decomposition": mc_result.get("journey_decomposition"),
             "decompositions": mc_result.get("decompositions"),
             "totals": mc_result.get("totals"),
             "integrity_events": mc_result.get("integrity_events") or [],

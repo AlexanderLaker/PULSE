@@ -133,6 +133,7 @@ def main() -> int:
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
+            "journey_decomposition": result.get("journey_decomposition"),
             # D19: integrity events (incl. input drift) + seed stability
             # persist with the run so the read-only dashboard can show them.
             "integrity_events": result.get("integrity_events", []),

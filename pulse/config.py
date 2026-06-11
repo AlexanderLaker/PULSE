@@ -23,6 +23,29 @@ VC_STEPS = [
 # ── Regional taxonomy ──────────────────────────────────────────────
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
+# ── Consumer-journey taxonomy (v3.6 journey layer) ──────────────────
+# Stage ids are the single source of truth shared with the frontend
+# journey content module (data/consumerJourney.ts) and the
+# trend_journey_exposure table. Exposure keys are namespaced
+# "<journey>:<stage_id>" (e.g. "lhc:add_products", "hair:diagnose").
+# The LHC journey is usage-stage (laundry; Home Care journey pending),
+# the Hair journey is hybrid (includes pre-purchase decision stages).
+LHC_JOURNEY_STAGES = [
+    "sorting", "pre_treating", "loading", "add_products", "select_wash",
+    "washing_cycle", "unloading", "drying", "ironing", "folding_storing",
+    "taking_out", "wearing", "between_washes",
+]
+HAIR_JOURNEY_STAGES = [
+    "inspire", "diagnose", "prepare", "remedy", "transform",
+    "lock_finish", "maintain_optimize", "refresh_between",
+]
+JOURNEY_STAGES = {"lhc": LHC_JOURNEY_STAGES, "hair": HAIR_JOURNEY_STAGES}
+# Category → journey routing: the four Hair categories read the hair
+# journey, the eight LHC categories the laundry journey.
+CATEGORY_JOURNEY = {
+    c: ("hair" if c.startswith("Hair") else "lhc") for c in CATEGORIES
+}
+
 # ── Default model parameters ────────────────────────────────────────
 # v3.5 recalibration (April 2026, 99-trend base). Each value equals what the
 # cross-force overlap matrix yields for that force via the identity
