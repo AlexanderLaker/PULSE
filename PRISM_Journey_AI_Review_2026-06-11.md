@@ -11,21 +11,26 @@
 | Slice | Tiles | Keep | Fix | Flag | → ⚡ estimate | stays ⚠️ |
 |---|---:|---:|---:|---:|---:|---:|
 | Hair journey | 23 | 23 | 0 | 0 | 21 | 2 |
-| Laundry journey | 23 | 21 | 0 | 2 | 21 | 2 |
-| **Total** | **46** | **44** | **0** | **2** | **42** | **4** |
+| Laundry journey | 23 | 21 | 0 | 2 | 23 | 0 |
+| **Total** | **46** | **44** | **0** | **2** | **44** | **2** |
+
+*(Updated same day after the owner delegated the ruling on the two flags — see §2.)*
 
 **Zero factual errors. Zero invalid or retired code citations. Zero text fixes required.** All 13 external checks confirmed tile claims, including the M&A class that produced the original Vanish/Advent error: Rhode→e.l.f., Dr Squatch→Unilever, Color Wow→L'Oréal, Reckitt *retaining* Finish, EU AI Act application dates, Morgan Stanley agentic-commerce sizing, US retail-media concentration ("incremental" correctly qualified), PVA reclassification framed conditionally (correct — the 2023 EPA petition was denied; the matter is unresolved).
 
 **gp1 figures verified mechanically:** 8 tiles cite "gp1 X%" — all 8 match the trend DB's `gp1_pct_affected` exactly (K-08 20%, G-14 18%, T-12 14%, G-09 12%, X-10 10%, C-28 8%, C-22 6%, T-19 6%).
 
-## 2. The 4 tiles kept at ⚠️ hypothesis (pending owner judgment)
+## 2. Flag dispositions (ruled 2026-06-11, owner-delegated)
 
-1. `hair.remedy` **Ingestible+topical combined regimens** (C-23) — sole driver is Low-confidence in the DB itself; the grade honestly mirrors the underlying evidence.
-2. `hair.remedy` **Peptide/bioactive repair lines** (T-14) — same Low-confidence reason; the tile itself discloses "evidence still accumulating".
-3. `lhc.add_products` **AI shopping agents & auto-replenishment** (T-11) — *flag:* places the model's single largest distribution threat (prob 5, Contraction) on the benefiting side. Defensible under the established tile semantics (benefiting = the product/tech type the trend lifts — here the agent layer itself; audit A4 documents exactly this green≠good-for-Henkel reading and the rebuilt UI carries the scope caption), but it is your call whether the optics serve the stakeholder conversation.
-4. `lhc.washing_cycle` **Low-water programs & waterless formats** (E-10) — same benefiting-side reframe of a Contraction trend (water scarcity lifts the *format*). Same disposition.
+**Stay ⚠️ hypothesis (2):**
 
-Items 3–4 were deliberately **not** promoted or moved: the ⚠️ chip keeps them visibly provisional until you rule. If you accept them, promote to ⚡ in the admin editor (or say the word).
+1. `hair.remedy` **Ingestible+topical combined regimens** (C-23) — sole driver is Low-confidence in the DB itself; the grade honestly mirrors the underlying evidence. Promoting would overstate it.
+2. `hair.remedy` **Peptide/bioactive repair lines** (T-14) — same Low-confidence reason; the tile itself discloses "evidence still accumulating". Re-grade only when the underlying trend's confidence moves.
+
+**Promoted ⚡ estimate with an added honesty cross-reference (2):**
+
+3. `lhc.add_products` **AI shopping agents & auto-replenishment** (T-11) — benefiting-side placement upheld: under the tile semantics (benefiting = the product/tech type the trend lifts) the *agent layer* genuinely benefits, the threat side is separately represented by the declining-side twin (`retailer-agent-baskets-defaulting-to-pl`), and every cited figure verified. One sentence added to the Summary stating explicitly that the trend itself remains the model's largest distribution threat and only the agent layer benefits here.
+4. `lhc.washing_cycle` **Low-water programs & waterless formats** (E-10) — same ruling: the water-light *format layer* benefits while the crisis stays a category headwind; sentence added making that explicit. Facts uncontested.
 
 ## 3. Secondary observations (no action taken)
 
@@ -41,8 +46,9 @@ The seeded `JOURNEY_EXPOSURE` (99 trends × 260 trend×stage rows) was **re-deri
 
 ## 5. Changes applied in this review
 
-- 42 tile grades promoted `hypothesis` → `estimate` in `data/consumerJourney.ts` (provenance author/date untouched; ✨ chips remain).
+- 44 tile grades promoted `hypothesis` → `estimate` in `data/consumerJourney.ts` (42 in the first pass, 2 on flag ruling; provenance author/date untouched; ✨ chips remain). 2 tiles remain ⚠️ by evidence rule.
+- One explicit headwind cross-reference sentence added to each of the two ruled tiles (T-11, E-10) — no other text, code, intensity, side, or stage changes.
 - `JOURNEY_CONTENT_VERSION` bumped `2026-06-10` → `2026-06-11`.
-- No text, code, intensity, side, or stage changes. No exposure changes — the engine input is unaffected (no re-run needed on account of this review).
+- No exposure changes — the engine input is unaffected (no re-run needed on account of this review; re-derivation parity re-confirmed 260/260 after every edit).
 
 *Full per-tile verdicts (machine-readable) were produced as working artifacts of this session; the durable record is this file plus the per-tile grades in `data/consumerJourney.ts`.*

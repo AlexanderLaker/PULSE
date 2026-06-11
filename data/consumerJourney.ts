@@ -869,9 +869,9 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
-        "analysis": "**1. Summary.** T-11: Morgan Stanley sizes AI shopping agents at $190-385B of US e-commerce by 2030. Replenishment categories go first — detergent is the canonical agent purchase (low consideration, predictable cadence, spec-comparable). The agent layer is a new product type at the Add Products moment: it is what the consumer now 'uses' to buy.\n\n**2. Strategic Evaluation.** Henkel's task is to be the default the agent inherits: machine-readable product data (efficacy, sustainability, price-per-wash), API-accessible availability, and brand salience strong enough that the human overrides toward Persil when the agent proposes alternatives. Pilot agent-optimised listings on Amazon's agentic surfaces in 2026 — learning compounds before the channel concentrates.",
+        "analysis": "**1. Summary.** T-11: Morgan Stanley sizes AI shopping agents at $190-385B of US e-commerce by 2030. Replenishment categories go first — detergent is the canonical agent purchase (low consideration, predictable cadence, spec-comparable). The agent layer is a new product type at the Add Products moment: it is what the consumer now 'uses' to buy. The trend itself remains the model's largest distribution threat — its margin and private-label consequences sit on the declining side of this stage; what benefits here is the agent layer itself.\n\n**2. Strategic Evaluation.** Henkel's task is to be the default the agent inherits: machine-readable product data (efficacy, sustainability, price-per-wash), API-accessible availability, and brand salience strong enough that the human overrides toward Persil when the agent proposes alternatives. Pilot agent-optimised listings on Amazon's agentic surfaces in 2026 — learning compounds before the channel concentrates.",
         "id": "lhc.add_products.exp.ai-shopping-agents-and-auto-replenishment-subscr"
       },
       {
@@ -1543,9 +1543,9 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "provenance": {
           "author": "ai",
           "date": "2026-06",
-          "grade": "hypothesis"
+          "grade": "estimate"
         },
-        "analysis": "**1. Summary.** E-10: with global freshwater demand projected to exceed supply by 40% by 2030 (UNEP), water-stressed markets are moving from voluntary eco-programs to mandated water efficiency — washing machines' low-water cycles need detergents formulated for low-dilution performance, and waterless/low-water cleaning formats gain regulatory tailwind in stressed regions.\n\n**2. Strategic Evaluation.** Formulate for the low-water cycle as a spec, not a variant: Persil chemistry validated at minimal dilution becomes the OEM-recommended detergent for eco-cycles (links T-08 partnerships). In water-stressed EM metros (India, Mexico City), low-water efficacy is a first-order purchase driver — lead claims there before global rollout.",
+        "analysis": "**1. Summary.** E-10: with global freshwater demand projected to exceed supply by 40% by 2030 (UNEP), water-stressed markets are moving from voluntary eco-programs to mandated water efficiency — washing machines' low-water cycles need detergents formulated for low-dilution performance, and waterless/low-water cleaning formats gain regulatory tailwind in stressed regions. The water crisis itself stays a category headwind (cost, reformulation, usage suppression) — what benefits here is the water-light format layer.\n\n**2. Strategic Evaluation.** Formulate for the low-water cycle as a spec, not a variant: Persil chemistry validated at minimal dilution becomes the OEM-recommended detergent for eco-cycles (links T-08 partnerships). In water-stressed EM metros (India, Mexico City), low-water efficacy is a first-order purchase driver — lead claims there before global rollout.",
         "id": "lhc.washing_cycle.exp.low-water-wash-programs-and-waterless-cleaning-f"
       }
     ],
