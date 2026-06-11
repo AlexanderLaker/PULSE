@@ -3,9 +3,8 @@
 /**
  * ShiftValue — the single, consistent way PRISM renders a profit-pool shift.
  *
- * Every shift number in the product (hero, headline cards, matrix totals,
- * drill-down, Executive Summary) goes through this component so the encoding is
- * uniform and accessible:
+ * Every shift number in the product (KPI strip, matrix totals, drill-down)
+ * goes through this component so the encoding is uniform and accessible:
  *   • a directional ▲ / ▼ arrow + a sign, so grow-vs-shrink never relies on
  *     colour alone (red-green colour deficiency, projector, greyscale print);
  *   • one unified expansion/contraction colour pair (lib/format);

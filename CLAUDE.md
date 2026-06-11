@@ -214,7 +214,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 | Component | Purpose |
 |-----------|---------|
-| `ProfitPoolAnalysis2.tsx` | Shift Matrix, four lenses; headline with joint band; D16 captions; run ribbon + `RunDetailsPopover` (seed stability, numerics backend) + `IntegrityChip` (D19) |
+| `ProfitPoolAnalysis2.tsx` | Shift Matrix, four lenses; lean KPI strip above the matrix (portfolio shift + least/most contracting category; P10–P90 on hover only — owner declutter 2026-06-11, replaces the hero block); short D16 caption under the section intro; run provenance, seed stability + integrity events (D19) rendered flat inside the About-this-model footer (header ribbon/popovers removed) |
 | `Trends2.tsx` | Trend explorer + admin editor; D7 provenance chips |
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |

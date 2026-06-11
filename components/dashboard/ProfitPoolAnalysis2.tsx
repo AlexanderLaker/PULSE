@@ -43,12 +43,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
   Sparkles, Info, Database, ChevronDown,
-  TrendingUp, TrendingDown, Activity, GitBranch, ArrowUpRight,
+  TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import * as api from '@/api/client';
-import { CATEGORIES, YEARS, fmtShift, shiftArrow, EXPANSION, CONTRACTION } from '@/lib/format';
+import { CATEGORIES, YEARS, fmtShift, shiftArrow } from '@/lib/format';
 import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
@@ -254,49 +254,84 @@ const YearPill: FC<{
   </button>
 );
 
-// ─── Mover tile — hero "largest expansion / deepest contraction" ──
-// Clickable (P3, June 2026): opens the same full-page category
-// drill-down as the matrix cells, so every number on the page that
-// names a category drills into it.
-const MoverTile: FC<{
+// ─── KPI tile — compact headline stat above the matrix ───────────
+// Lean replacement for the old hero block (June 2026 declutter): one
+// figure per tile, P10–P90 band revealed on hover only. Category
+// tiles open the same full-page drill-down as the matrix rows.
+const KpiTile: FC<{
   label: string;
-  name: string;
   value: number;
-  onOpen: () => void;
-}> = ({ label, name, value, onOpen }) => {
+  /** Category name (omitted on the portfolio tile). */
+  name?: string;
+  p10?: number | null;
+  p90?: number | null;
+  /** Short caption appended to the hover band, e.g. "80% of outcomes". */
+  bandNote?: string;
+  onOpen?: () => void;
+}> = ({ label, value, name, p10, p90, bandNote, onOpen }) => {
   const [hovered, setHovered] = useState(false);
-  return (
+  const hasBand = p10 != null && p90 != null;
+  const inner = (
+    <>
+      <div className="text-[10px] font-bold uppercase tracking-[0.12em]"
+        style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+        {label}
+      </div>
+      <div className="flex items-baseline justify-between gap-3 mt-1.5">
+        {name && (
+          <span className="text-[13px] font-semibold truncate"
+            style={{ color: onOpen && hovered ? S.primary : S.onSurface, transition: 'color 0.15s ease' }}>
+            {name}
+          </span>
+        )}
+        <ShiftValue value={value} size={24} fontFamily={HEADLINE_FONT} />
+      </div>
+      {hovered && hasBand && (
+        <div
+          className="absolute left-1/2 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 whitespace-nowrap pointer-events-none"
+          style={{
+            transform: 'translateX(-50%)',
+            backgroundColor: S.onSurface,
+            color: '#ffffff',
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: BODY_FONT,
+            fontVariantNumeric: 'tabular-nums',
+            boxShadow: '0 12px 32px -8px rgba(0, 52, 94, 0.35)',
+          }}
+        >
+          P10 {fmtShift(p10, 1)} … P90 {fmtShift(p90, 1)}
+          {bandNote ? <span style={{ opacity: 0.65 }}> · {bandNote}</span> : null}
+        </div>
+      )}
+    </>
+  );
+  const surface: React.CSSProperties = {
+    backgroundColor: S.surface,
+    border: `1px solid ${S.cardBorder}`,
+    fontFamily: BODY_FONT,
+  };
+  return onOpen ? (
     <button
       type="button"
       onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label={`Open ${name} drill-down — fan chart and contributing trends`}
-      className="flex items-center justify-between gap-5 rounded-2xl px-4 py-3 text-left w-full"
-      style={{
-        backgroundColor: hovered ? S.surfaceContainer : S.surfaceLow,
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'background-color 0.15s ease',
-        fontFamily: BODY_FONT,
-      }}
+      aria-label={`Open ${name ?? label} drill-down — fan chart and contributing trends`}
+      className="relative rounded-2xl px-5 py-3.5 text-left"
+      style={{ ...surface, cursor: 'pointer' }}
     >
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.12em]"
-          style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>{label}</div>
-        <div className="text-[13px] font-semibold mt-0.5 inline-flex items-center gap-1.5"
-          style={{ color: hovered ? S.primary : S.onSurface, transition: 'color 0.15s ease' }}>
-          {name}
-          <ArrowUpRight
-            size={13}
-            strokeWidth={2.4}
-            aria-hidden
-            style={{ color: S.primary, opacity: hovered ? 1 : 0.45, transition: 'opacity 0.15s ease' }}
-          />
-        </div>
-      </div>
-      <ShiftValue value={value} size={22} fontFamily={HEADLINE_FONT} />
+      {inner}
     </button>
+  ) : (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative rounded-2xl px-5 py-3.5"
+      style={surface}
+    >
+      {inner}
+    </div>
   );
 };
 
@@ -892,154 +927,14 @@ const PeakStressTooltip: FC = () => {
   );
 };
 
-// ─── Run details popover ─────────────────────────────────────────
-// Audit metadata (seed stability, seed, numerics backend, git SHA, engine
-// version) stays one click away instead of printing terminal strings into
-// the header. D3/F-13 (June 2026): the R̂ row was replaced by the honest
-// quantity — how much the headline moves across independently-seeded
-// chains. R̂ on i.i.d. MC draws is ≈1.0 by construction and reads as
-// theater to a quant reviewer.
-interface RunMetaShape {
-  iterations?: number | null;
-  chains?: number | null;
-  converged_categories?: number | null;
-  total_categories?: number | null;
-  seed?: number | null;
-  git_sha?: string | null;
-  model_version?: string | null;
-  numerics_backend?: string | null;
-}
-
-interface SeedStabilityShape {
-  n_chains: number;
-  headline_median_spread: number;
-  max_category_median_spread?: number;
-}
-
-const RunDetailsPopover: FC<{ meta: RunMetaShape; stability?: SeedStabilityShape | null }> = ({ meta, stability }) => {
-  const [open, setOpen] = useState(false);
-  const rows: Array<[string, string]> = [];
-  if (meta.iterations != null) {
-    rows.push(['Iterations', `${(meta.iterations / 1000).toFixed(0)}k${meta.chains != null ? ` × ${meta.chains} chains` : ''}`]);
-  }
-  if (stability && stability.headline_median_spread != null) {
-    // Seed-stability line (D3): spread of the headline median across
-    // independently-seeded chains — the defensible reproducibility claim.
-    rows.push([
-      `Seed stability (${stability.n_chains} chains)`,
-      `headline ±${(stability.headline_median_spread * 100 / 2).toFixed(2)}pp`,
-    ]);
-    if (stability.max_category_median_spread != null) {
-      rows.push(['Max category spread', `${(stability.max_category_median_spread * 100).toFixed(2)}pp`]);
-    }
-  }
-  if (meta.seed != null) rows.push(['Seed', String(meta.seed)]);
-  if (meta.numerics_backend) rows.push(['Numerics', meta.numerics_backend]);  // D13 audit trail
-  if (meta.git_sha && meta.git_sha !== 'unknown') rows.push(['Engine build', meta.git_sha]);
-  if (meta.model_version) rows.push(['Model', meta.model_version]);
-  if (rows.length === 0) return null;
-  return (
-    <div className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        onBlur={() => setOpen(false)}
-        aria-label="Run details — convergence, seed, engine build"
-        aria-expanded={open}
-        className="inline-flex items-center justify-center rounded-full"
-        style={{ width: 24, height: 24, border: 'none', cursor: 'pointer',
-          backgroundColor: S.surfaceLow, color: S.onSurfaceVariant }}
-      >
-        <Info size={12} strokeWidth={2.3} />
-      </button>
-      {open && (
-        <div className="absolute top-full right-0 mt-2 z-30 rounded-xl p-4 shadow-lg text-left"
-          style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorderStrong}`,
-            boxShadow: '0 12px 40px -8px rgba(0, 52, 94, 0.22)', minWidth: 260, fontFamily: BODY_FONT }}>
-          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
-            style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Run details</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 16, rowGap: 4 }}>
-            {rows.map(([k, v]) => (
-              <React.Fragment key={k}>
-                <span style={{ fontSize: 11.5, color: S.mutedText }}>{k}</span>
-                <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: 'right', color: S.onSurface,
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{v}</span>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Integrity chip (D19, June 2026) ─────────────────────────────
-// Surfaces the run's integrity events — input drift vs the previous
-// accepted run, runtime repairs — next to the run ribbon. The events are
-// computed at run time, persisted with the run, and rehydrated read-only;
-// this chip is the "integrity drawer" surface for the live dashboard.
-interface IntegrityEventShape {
-  type: string;
-  severity: string;
-  message: string;
-}
-
-const IntegrityChip: FC<{ events: IntegrityEventShape[] }> = ({ events }) => {
-  const [open, setOpen] = useState(false);
-  const hasWarning = events.some((e) => e.severity === 'warning' || e.severity === 'error');
-  const tone = hasWarning
-    ? { bg: '#FEF3C7', fg: '#92400E', dot: '#D97706' }   // amber
-    : { bg: S.surfaceLow, fg: S.onSurfaceVariant, dot: S.primary };
-  return (
-    <div className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        onBlur={() => setOpen(false)}
-        aria-label={`${events.length} integrity event(s) for this run`}
-        aria-expanded={open}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-        style={{ backgroundColor: tone.bg, color: tone.fg, border: 'none',
-          cursor: 'pointer', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.03em' }}
-      >
-        <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: tone.dot }} />
-        {events.length} integrity {events.length === 1 ? 'event' : 'events'}
-      </button>
-      {open && (
-        <div className="absolute top-full right-0 mt-2 z-30 rounded-xl p-4 shadow-lg text-left"
-          style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorderStrong}`,
-            boxShadow: '0 12px 40px -8px rgba(0, 52, 94, 0.22)', width: 360, fontFamily: BODY_FONT }}>
-          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
-            style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-            Run integrity
-          </div>
-          <ul style={{ display: 'grid', rowGap: 8, margin: 0, padding: 0, listStyle: 'none' }}>
-            {events.map((e, i) => (
-              <li key={`${e.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
-                  backgroundColor: e.severity === 'warning' || e.severity === 'error' ? '#D97706' : S.primary }} />
-                <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>{e.message}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC<{
   isAdmin?: boolean;
-  /** When set (e.g. from an Executive Summary mover), opens that category's
-      full-screen drill-down on mount/update; consumed via onConsumeOpenCategory. */
-  openCategoryId?: string | null;
-  onConsumeOpenCategory?: () => void;
   /** Drill-through to the Trends tab (same contract as ConsumerJourney2):
       receives a trend NAME, applied as the Trends-tab search query. Used by
       the Category Detail Panel's contributing-trend rows. */
   onNavigateToTrend?: (query: string) => void;
-}> = ({ isAdmin = false, openCategoryId = null, onConsumeOpenCategory, onNavigateToTrend }) => {
+}> = ({ isAdmin = false, onNavigateToTrend }) => {
   const {
     simulation, config, trends,
     loading, error, backendAvailable,
@@ -1051,19 +946,11 @@ const ProfitPoolAnalysis2: FC<{
   const [selectedYear, setSelectedYear] = useState<number>(YEARS[YEARS.length - 1]!);
 
   // ── Drill-down state ─────────────────────────────────────────────
-  // Null until the user clicks a category row; then the Category Detail
-  // Panel slides in from the right with the full percentile fan chart,
-  // force decomposition, contributing trends, trigger status, and
-  // allocation recommendation for that one category.
+  // Null until the user clicks a category row or KPI tile; then the
+  // Category Detail Panel slides in from the right with the full
+  // percentile fan chart, force decomposition and contributing trends
+  // for that one category.
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-
-  // Open a drill-down requested from outside (e.g. an Executive Summary
-  // mover). Consume the request so it fires once per click.
-  useEffect(() => {
-    if (!openCategoryId) return;
-    setSelectedCategoryId(openCategoryId);
-    onConsumeOpenCategory?.();
-  }, [openCategoryId, onConsumeOpenCategory]);
 
   // ── Collapsible methodology footer ───────────────────────────────
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1433,10 +1320,10 @@ const ProfitPoolAnalysis2: FC<{
 
   const meta = VIEW_META[view];
 
-  // ── Headline takeaway ─────────────────────────────────────────────
-  // The answer of the tool, stated above the evidence: portfolio-weighted
-  // shift at horizon end (with its category-weighted P10–P90 band) plus
-  // the single largest expansion and contraction.
+  // ── Headline KPIs ──────────────────────────────────────────────
+  // Feeds the lean KPI strip above the matrix: portfolio-weighted shift
+  // at horizon end (joint P10–P90 band on hover) plus the least- and
+  // most-contracting categories with their own bands.
   const headline = useMemo(() => {
     const shifts = simulation?.shifts;
     if (!shifts) return null;
@@ -1454,7 +1341,7 @@ const ProfitPoolAnalysis2: FC<{
     const p10s: Array<number | null> = [];
     const p90s: Array<number | null> = [];
     const ws: number[] = [];
-    const catVals: Array<{ name: string; v: number }> = [];
+    const catVals: Array<{ name: string; v: number; p10: number | null; p90: number | null }> = [];
     CATEGORIES.forEach((c) => {
       const pct = getYearPercentiles(shifts, c.name, c.id, horizon);
       const m = pct?.median ?? null;
@@ -1462,7 +1349,9 @@ const ProfitPoolAnalysis2: FC<{
       p10s.push(pct?.p10 ?? null);
       p90s.push(pct?.p90 ?? null);
       ws.push(wFor(c.name, c.id));
-      if (m != null && isFinite(m)) catVals.push({ name: c.name, v: m });
+      if (m != null && isFinite(m)) {
+        catVals.push({ name: c.name, v: m, p10: pct?.p10 ?? null, p90: pct?.p90 ?? null });
+      }
     });
     const med = weightedAvg(meds, ws);
     if (med == null) return null;
@@ -1545,8 +1434,10 @@ const ProfitPoolAnalysis2: FC<{
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
       <main className="max-w-[1440px] mx-auto px-8 py-10">
-        {/* ── Editorial Header ─────────────────────────────────── */}
-        <header className="mb-8 flex items-start justify-between gap-8 flex-wrap">
+        {/* ── Editorial Header ───────────────────────────────────
+            Run provenance (run #, seed, integrity events) lives in the
+            "About this model" footer — the header stays lean. */}
+        <header className="mb-8">
           <div
             className="pl-5"
             style={{ borderLeft: `4px solid ${S.primary}` }}
@@ -1563,46 +1454,6 @@ const ProfitPoolAnalysis2: FC<{
             >
               12 categories · 2026–2035 · Bayesian Monte Carlo
             </div>
-          </div>
-
-          {/* Run ribbon — tells the user exactly which persisted run is
-              on screen. Simulations are CLI-only (scripts/run_50k_prod.py),
-              so this is the only place the run_id, scenario tag, seed and
-              convergence count are surfaced to end users. */}
-          <div className="flex flex-col items-end gap-1 text-right">
-            {simulation?.run_meta?.run_id != null ? (
-              <>
-                <span className="inline-flex items-center gap-2">
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
-                    style={{ backgroundColor: S.surfaceContainer, color: S.onPrimaryContainer,
-                      fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
-                    <Database size={12} />
-                    <span>Run #{simulation.run_meta.run_id}</span>
-                    {simulation.run_meta.scenario && (
-                      <span style={{ opacity: 0.75 }}>· {simulation.run_meta.scenario}</span>
-                    )}
-                  </span>
-                  <RunDetailsPopover meta={simulation.run_meta} stability={simulation.seed_stability} />
-                </span>
-                <span style={{ color: S.mutedText, fontSize: 11 }}>
-                  {simulation.run_meta.run_date
-                    ? new Date(simulation.run_meta.run_date).toLocaleString()
-                    : simulation.generated
-                    ? new Date(simulation.generated).toLocaleString()
-                    : '—'}
-                  {simulation.run_meta.iterations != null &&
-                    ` · ${(simulation.run_meta.iterations / 1000).toFixed(0)}k iterations`}
-                </span>
-                {(simulation.integrity_events?.length ?? 0) > 0 && (
-                  <IntegrityChip events={simulation.integrity_events!} />
-                )}
-              </>
-            ) : simulation?.generated ? (
-              <span style={{ color: S.mutedText, fontSize: 11 }}>
-                Last run · {new Date(simulation.generated).toLocaleString()}
-                {simulation.model_version && ` · ${simulation.model_version}`}
-              </span>
-            ) : null}
           </div>
         </header>
 
@@ -1666,111 +1517,6 @@ const ProfitPoolAnalysis2: FC<{
           )}
         </AnimatePresence>
 
-        {/* ── Hero — the answer, stated before the matrix (S1 / S2) ──
-            One dominant figure: the portfolio profit-pool shift to the
-            horizon year, with its P10–P90 band always shown and freshness
-            + seed-stability beside it. P10–P90 is the engine's joint
-            portfolio band (per-iteration over raw samples, 2.8.0+); for
-            older persisted runs it falls back to the category-weighted
-            average of per-category bands and is labeled accordingly
-            (D3/F-16). The matrix below is the evidence. */}
-        {headline && (
-          <section className="mb-9">
-            <div
-              className="rounded-3xl px-7 py-7 md:px-9 md:py-8"
-              style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
-                boxShadow: '0 18px 60px -22px rgba(0, 52, 94, 0.22)' }}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
-                {/* The one number */}
-                <div className="min-w-[280px]">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] mb-2"
-                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                    Portfolio profit-pool shift · by {headline.horizon}
-                  </div>
-                  <ShiftValue
-                    value={headline.med}
-                    size={72}
-                    fontFamily={HEADLINE_FONT}
-                    range={headline.p10 != null && headline.p90 != null
-                      ? { low: headline.p10, high: headline.p90 } : null}
-                    rangeLabel={headline.joint
-                      ? 'P10–P90 · 80% of outcomes (joint portfolio)'
-                      : 'P10–P90 · cat-weighted (pre-2.8 run)'}
-                    rangeSize={14}
-                  />
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
-                    {/* Run date lives in the run ribbon (top right) only —
-                        the duplicate "As of" chip was removed (P2, June 2026). */}
-                    {/* Seed stability (D3): the honest reproducibility chip.
-                        Deliberately NOT a "Converged ✓" claim — R̂ on i.i.d. MC
-                        draws is ≈1.0 by construction; the defensible quantity
-                        is the headline spread across independently-seeded
-                        chains, mirrored from the run-details popover. */}
-                    {(() => {
-                      const st = simulation?.seed_stability;
-                      if (!st || st.headline_median_spread == null) return null;
-                      return (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                          style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11.5, fontWeight: 600 }}
-                          title={`Headline median spread across ${st.n_chains} independently-seeded chains`}>
-                          <GitBranch size={12} /> Seed-stable ±{(st.headline_median_spread * 100 / 2).toFixed(2)}pp · {st.n_chains} chains
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Supporting movers — drill straight into the category (P3) */}
-                <div className="flex flex-col gap-3 min-w-[230px]">
-                  {headline.maxCat && headline.maxCat.v > 0 && (
-                    <MoverTile
-                      label="Largest expansion"
-                      name={headline.maxCat.name}
-                      value={headline.maxCat.v}
-                      onOpen={() => setSelectedCategoryId(headline.maxCat!.name)}
-                    />
-                  )}
-                  {headline.minCat && headline.minCat.v < 0 && (
-                    <MoverTile
-                      label="Deepest contraction"
-                      name={headline.minCat.name}
-                      value={headline.minCat.v}
-                      onOpen={() => setSelectedCategoryId(headline.minCat!.name)}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Plain-language read */}
-              <p className="text-[14px] mt-6 pt-5"
-                style={{ color: S.onSurfaceVariant, lineHeight: 1.6, borderTop: `1px solid ${S.cardBorder}` }}>
-                By {headline.horizon}, the weighted portfolio profit pool is projected to{' '}
-                {headline.med >= 0 ? 'expand' : 'contract'} by{' '}
-                <strong style={{ color: headline.med >= 0 ? EXPANSION : CONTRACTION }}>{fmtShift(headline.med, 1)}</strong>{' '}
-                versus 2025
-                {headline.p10 != null && headline.p90 != null && (
-                  <> — with 80% of simulated outcomes between{' '}
-                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.p10, 1)}</strong> and{' '}
-                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.p90, 1)}</strong></>
-                )}
-                . Figures are MC medians, cumulative vs 2025;{' '}
-                {headline.joint
-                  ? 'the band is the joint portfolio P10–P90, computed per-iteration from raw samples.'
-                  : 'the band is the category-weighted P10–P90 of a pre-2.8 run — an indicative portfolio range, not a joint percentile.'}
-              </p>
-
-              {/* D16 (owner decision, June 2026): the model's design assumption,
-                  stated where the totals are read. Exact owner wording. */}
-              <p className="mt-3 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.55, maxWidth: 1000 }}>
-                Ceteris paribus: assumes no management response — no pricing moves, innovation, or
-                competitive reaction by Henkel or competitors. Totals read as exposure if nobody acts,
-                not as forecast outcomes.
-              </p>
-            </div>
-          </section>
-        )}
-
         {/* ── The evidence: the shift matrix ─────────────────────── */}
         <div className="mb-5 pl-5" style={{ borderLeft: `3px solid ${S.cardBorderStrong}` }}>
           <h2 className="font-extrabold tracking-tight"
@@ -1782,7 +1528,56 @@ const ProfitPoolAnalysis2: FC<{
             Row totals reconcile across all four.{' '}
             <span style={{ fontWeight: 600, color: S.onSurface }}>Click any value to open the category drill-down.</span>
           </p>
+          {/* D16 design assumption — short form (owner update 2026-06-11);
+              the full wording lives in "About this model" below. */}
+          <p className="mt-1.5 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.5 }}>
+            Ceteris paribus: assumes no management response — totals read as exposure
+            if nobody acts, not as forecast outcomes.
+          </p>
         </div>
+
+        {/* ── KPI strip — the three headline numbers (June 2026 declutter,
+            replaces the hero block). P10–P90 bands appear on hover only;
+            the portfolio band is the engine's joint percentile (2.8.0+),
+            falling back labeled for pre-2.8 runs (D3/F-16). */}
+        {headline && (
+          <div
+            className="mb-5 grid gap-3"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}
+          >
+            <KpiTile
+              label={`Portfolio shift · by ${headline.horizon}`}
+              value={headline.med}
+              p10={headline.p10}
+              p90={headline.p90}
+              bandNote={headline.joint
+                ? '80% of outcomes (joint portfolio)'
+                : 'cat-weighted (pre-2.8 run)'}
+            />
+            {headline.maxCat && (
+              <KpiTile
+                label={headline.maxCat.v > 0 ? 'Largest expansion' : 'Least contracting'}
+                name={headline.maxCat.name}
+                value={headline.maxCat.v}
+                p10={headline.maxCat.p10}
+                p90={headline.maxCat.p90}
+                bandNote="80% of outcomes"
+                onOpen={() => setSelectedCategoryId(headline.maxCat!.name)}
+              />
+            )}
+            {headline.minCat && (
+              <KpiTile
+                label={headline.minCat.v < 0 ? 'Most contracting' : 'Smallest expansion'}
+                name={headline.minCat.name}
+                value={headline.minCat.v}
+                p10={headline.minCat.p10}
+                p90={headline.minCat.p90}
+                bandNote="80% of outcomes"
+                onOpen={() => setSelectedCategoryId(headline.minCat!.name)}
+              />
+            )}
+          </div>
+        )}
 
         {/* ── Matrix ──────────────────────────────────────────── */}
         <motion.section
@@ -1973,7 +1768,9 @@ const ProfitPoolAnalysis2: FC<{
           )}
         </AnimatePresence>
 
-        {/* ── About this model — collapsible methodology + glossary ── */}
+        {/* ── About this model — collapsible methodology + glossary +
+            run provenance (run #, seed, integrity — moved here from the
+            page header, June 2026 declutter) ── */}
         <footer className="mt-8">
           <button type="button" onClick={() => setAboutOpen((v) => !v)} aria-expanded={aboutOpen}
             className="w-full flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl text-left"
@@ -1982,14 +1779,106 @@ const ProfitPoolAnalysis2: FC<{
               <Info size={14} style={{ color: S.primary }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT }}>About this model</span>
               <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
-                Bayesian Monte Carlo · 50,000 iterations · 99 trends · methodology &amp; glossary
+                Bayesian Monte Carlo · 50,000 iterations · 99 trends · run details &amp; methodology
               </span>
             </span>
-            <ChevronDown size={16} style={{ color: S.onSurfaceVariant,
-              transform: aboutOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+            <span className="flex items-center gap-3">
+              {simulation?.run_meta?.run_id != null ? (
+                <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
+                  Run #{simulation.run_meta.run_id}
+                  {simulation.run_meta.run_date
+                    ? ` · ${new Date(simulation.run_meta.run_date).toLocaleDateString()}`
+                    : ''}
+                </span>
+              ) : simulation?.generated ? (
+                <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
+                  Last run · {new Date(simulation.generated).toLocaleDateString()}
+                </span>
+              ) : null}
+              <ChevronDown size={16} style={{ color: S.onSurfaceVariant,
+                transform: aboutOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+            </span>
           </button>
           {aboutOpen && (
             <div className="mt-2 px-5 py-5 rounded-2xl" style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}` }}>
+              {/* ── This run — provenance + audit metadata + integrity events.
+                  Flat layout replaces the old header ribbon's popovers
+                  (RunDetailsPopover / IntegrityChip). D3: seed stability,
+                  not R̂ — the honest reproducibility quantity. D13: numerics
+                  backend on the audit trail. D19: integrity events surfaced
+                  with the run. */}
+              {simulation?.run_meta?.run_id != null && (() => {
+                const m = simulation.run_meta;
+                const st = simulation.seed_stability;
+                const events = simulation.integrity_events ?? [];
+                const rows: Array<[string, string]> = [];
+                if (m.iterations != null) {
+                  rows.push(['Iterations', `${(m.iterations / 1000).toFixed(0)}k${m.chains != null ? ` × ${m.chains} chains` : ''}`]);
+                }
+                if (st?.headline_median_spread != null) {
+                  rows.push([
+                    `Seed stability (${st.n_chains} chains)`,
+                    `headline ±${(st.headline_median_spread * 100 / 2).toFixed(2)}pp`,
+                  ]);
+                  if (st.max_category_median_spread != null) {
+                    rows.push(['Max category spread', `${(st.max_category_median_spread * 100).toFixed(2)}pp`]);
+                  }
+                }
+                if (m.seed != null) rows.push(['Seed', String(m.seed)]);
+                if (m.numerics_backend) rows.push(['Numerics', m.numerics_backend]);
+                if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
+                if (m.model_version) rows.push(['Model', m.model_version]);
+                return (
+                  <div className="mb-5 pb-5" style={{ borderBottom: `1px solid ${S.cardBorder}` }}>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+                      style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>This run</div>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+                        style={{ backgroundColor: S.surfaceContainer, color: S.onPrimaryContainer,
+                          fontSize: 11, fontWeight: 600, letterSpacing: '0.04em' }}>
+                        <Database size={12} />
+                        <span>Run #{m.run_id}</span>
+                        {m.scenario && <span style={{ opacity: 0.75 }}>· {m.scenario}</span>}
+                      </span>
+                      <span style={{ color: S.mutedText, fontSize: 11.5 }}>
+                        {m.run_date
+                          ? new Date(m.run_date).toLocaleString()
+                          : simulation.generated
+                          ? new Date(simulation.generated).toLocaleString()
+                          : '—'}
+                      </span>
+                    </div>
+                    {rows.length > 0 && (
+                      <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                        {rows.map(([k, v]) => (
+                          <span key={k} className="inline-flex items-baseline gap-2">
+                            <span style={{ fontSize: 11.5, color: S.mutedText }}>{k}</span>
+                            <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface,
+                              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{v}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {events.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1.5"
+                          style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                          Run integrity · {events.length} {events.length === 1 ? 'event' : 'events'}
+                        </div>
+                        <ul style={{ display: 'grid', rowGap: 6, margin: 0, padding: 0, listStyle: 'none' }}>
+                          {events.map((e, i) => (
+                            <li key={`${e.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <span style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
+                                backgroundColor: e.severity === 'warning' || e.severity === 'error' ? '#D97706' : S.primary }} />
+                              <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>{e.message}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Glossary</div>
               <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
