@@ -244,3 +244,41 @@ class TestBayesianMCBayesianPriors:
         assert raw_samples.shape[0] == config.iterations
         assert raw_samples.shape[1] == len(CATEGORIES)
         assert raw_samples.shape[2] == len(config.path_years)
+
+
+class TestJourneyDecomposition:
+    """v3.6 journey layer (block 8, restored 2026-06-10): terminal-year
+    journey-stage attribution. The lens redistributes each category's
+    terminal-year MC-median across its journey's stages — it must never
+    change totals."""
+
+    def test_journey_decomposition_reconciles_with_terminal_median(
+        self, mock_model_config, mock_trends_database
+    ):
+        from pulse.config import CATEGORY_JOURNEY, JOURNEY_STAGES
+
+        config = mock_model_config.copy_with(iterations=200)
+        # Exercise the exposure-weighted path on both journeys; categories
+        # whose trends carry no journey exposure fall back to equal shares.
+        mock_trends_database.trends[0].journey_exposure = {
+            "hair:diagnose": 5, "hair:transform": 3, "lhc:add_products": 4,
+        }
+        mock_trends_database.trends[1].journey_exposure = {
+            "lhc:pre_treating": 5, "lhc:washing_cycle": 2,
+        }
+        engine = BayesianMonteCarloEngine(config)
+        result = engine.run(mock_trends_database)
+
+        jd = result["journey_decomposition"]
+        assert set(jd.keys()) == set(CATEGORIES)
+
+        last_year = config.path_years[-1]
+        for cat in CATEGORIES:
+            journey = CATEGORY_JOURNEY[cat]
+            expected_keys = {f"{journey}:{s}" for s in JOURNEY_STAGES[journey]}
+            assert set(jd[cat].keys()) == expected_keys, cat
+            # Hair categories carry 8 stages, LHC categories 13.
+            assert len(jd[cat]) == (8 if journey == "hair" else 13)
+            median = result["shift_matrix"][cat]["path"][last_year]["median"]
+            residual = abs(sum(jd[cat].values()) - median)
+            assert residual <= 1e-12 * max(1.0, abs(median)), (cat, residual)

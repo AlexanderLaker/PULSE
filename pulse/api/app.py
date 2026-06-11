@@ -35,6 +35,7 @@ from pulse.api.routers.simulation import router as simulation_router
 from pulse.api.routers.config import router as config_router
 from pulse.api.routers.competitors import router as competitors_router
 from pulse.api.routers.misc import router as misc_router
+from pulse.api.routers.journey import router as journey_router
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,10 @@ def create_app(args=None) -> FastAPI:
     app.include_router(config_router)
     app.include_router(competitors_router)
     app.include_router(misc_router)
+    # Consumer Journey content store (v3.6 journey layer): GET is proxied
+    # through Next.js /api/journey (which enforces viewer auth); PUT is
+    # admin-only inside the router itself.
+    app.include_router(journey_router)
     # Scanner routes removed (Emerging Trends disabled)
 
     # ── Lazy Initialization (Vercel serverless compatibility) ─────

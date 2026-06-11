@@ -475,10 +475,24 @@ function sortValue(t: Trend, key: SortKey): string | number | null | undefined {
 }
 
 // ─── Main component ────────────────────────────────────────────────
-const Trends2: FC = () => {
+interface Trends2Props {
+  /** Drill-through search seed (v3.6 journey layer): when the Consumer
+   *  Journey navigates here with a trend name/code, the parent passes it
+   *  down and Trends2 adopts it as the active search query. */
+  initialSearch?: string | null;
+}
+
+const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
   const { trends, loading, backendAvailable, updateTrend } = usePrism();
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
   const [search, setSearch] = useState('');
+
+  // Adopt drill-through queries from the Consumer Journey whenever the
+  // parent hands down a new value (including re-navigations to the same
+  // trend — page.tsx resets state between navigations).
+  useEffect(() => {
+    if (initialSearch != null && initialSearch !== '') setSearch(initialSearch);
+  }, [initialSearch]);
   // Which trend row is currently expanded to show category + VC exposure.
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

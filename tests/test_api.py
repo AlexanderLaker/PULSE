@@ -428,3 +428,49 @@ class TestF3ReadAuthentication:
         client = raw_client
         assert client.get("/api/v1/health").status_code == 200
         assert client.get("/api/v1/diagnostics").status_code == 200
+
+
+class TestJourneyContentStore:
+    """v3.6 journey layer (block 8, restored 2026-06-10): the admin-managed
+    Consumer Journey content store. GET is anonymous at the FastAPI layer by
+    design — the Next.js /api/journey proxy enforces viewer auth — and PUT is
+    admin-only inside the router."""
+
+    def test_get_returns_404_when_store_empty(self, client, monkeypatch, tmp_path):
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_empty.db"))
+        r = client.get("/api/v1/journey")
+        assert r.status_code == 404
+
+    def test_put_then_get_roundtrip(self, client, monkeypatch, tmp_path):
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_rt.db"))
+        blob = {
+            "lhc": [{
+                "id": "sorting", "label": "Sorting",
+                "benefiting": [{
+                    "name": "AI stain recognition", "type": "tech",
+                    "trendCodes": ["T-01"], "driverNote": "test",
+                    "intensity": 2,
+                    "provenance": {"author": "strategist", "date": "2026-06", "grade": "estimate"},
+                    "analysis": None, "id": "lhc.sorting.exp.test",
+                }],
+                "negativelyImpacted": [],
+            }],
+            "hair": [],
+        }
+        r = client.put("/api/v1/journey", json=blob)
+        assert r.status_code == 200
+        assert r.json() == {"status": "saved", "tiles": 1}
+        r2 = client.get("/api/v1/journey")
+        assert r2.status_code == 200
+        assert r2.json()["lhc"][0]["id"] == "sorting"
+        assert r2.json()["lhc"][0]["benefiting"][0]["provenance"]["author"] == "strategist"
+
+    def test_put_rejects_malformed_body(self, client, monkeypatch, tmp_path):
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_bad.db"))
+        assert client.put("/api/v1/journey", json={"lhc": "not-a-list"}).status_code == 422
+        assert client.put("/api/v1/journey", json={"lhc": []}).status_code == 422  # hair missing
+
+    def test_put_requires_admin(self, raw_client):
+        # No token at all → the require_admin dependency rejects the write.
+        r = raw_client.put("/api/v1/journey", json={"lhc": [], "hair": []})
+        assert r.status_code in (401, 403)

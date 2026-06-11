@@ -36,6 +36,12 @@ export type VCExposure = Partial<Record<ValueChainStep, number>>;
  *  display names ("Europe", "North America", "Asia", "High Growth"). */
 export type RegionalExposure = Partial<Record<string, number>>;
 
+/** Consumer-journey exposure mapping (v3.6 journey layer). Keys are
+ *  namespaced "<journey>:<stage_id>" (e.g. "lhc:add_products",
+ *  "hair:diagnose") matching data/consumerJourney.ts stage ids and
+ *  pulse/config.py JOURNEY_STAGES. Values 0-5. */
+export type JourneyExposure = Partial<Record<string, number>>;
+
 /** Full trend object as returned by the API. */
 export interface Trend {
   id: string;
@@ -61,6 +67,7 @@ export interface Trend {
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
   regional_exposure?: RegionalExposure;
+  journey_exposure?: JourneyExposure;
   data_source?: string;
   source_type?: string;
   confidence?: Confidence;
@@ -90,6 +97,7 @@ export interface TrendUpdate {
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
   regional_exposure?: RegionalExposure;
+  journey_exposure?: JourneyExposure;
   gp1_pct_affected?: number;
   peak_year?: number;
   diffusion_curve?: string;

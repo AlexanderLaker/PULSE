@@ -4,7 +4,8 @@ When POSTGRES_URL is set (Vercel Postgres / Neon), uses psycopg2.
 Otherwise falls back to SQLite for local development.
 
 Implements all tables from the CLAUDE.md specification:
-- trends, trend_category_exposure, trend_vc_exposure
+- trends, trend_category_exposure, trend_vc_exposure, trend_journey_exposure
+- journey_content (admin-managed Consumer Journey tile map, versioned blob)
 - config_snapshots, simulation_runs
 - triggers, ai_suggestions, audit_log
 - users (auth)
@@ -376,6 +377,33 @@ def init_db() -> None:
             )
         """)
 
+        # ── Consumer-journey exposure (v3.6 journey layer) ──────────────
+        # journey_stage is namespaced "<journey>:<stage_id>"
+        # (see pulse/config.py JOURNEY_STAGES / data/consumerJourney.ts).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trend_journey_exposure (
+                trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
+                journey_stage TEXT NOT NULL,
+                exposure_score INTEGER,
+                PRIMARY KEY (trend_id, journey_stage)
+            )
+        """)
+
+        # ── Consumer-journey content store (admin tile map) ─────────────
+        # Versioned single-blob store for the {lhc, hair} journey tile map
+        # edited via the admin UI (PUT /api/v1/journey). The frontend falls
+        # back to its bundled seed module (data/consumerJourney.ts) when no
+        # server-managed content exists yet. Tile-level merging is done
+        # client-side; every save appends a new version row.
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS journey_content (
+                id {serial},
+                content TEXT NOT NULL,
+                updated_by TEXT DEFAULT '',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # ── Trend sources (evidence URLs) ────────────────────────────
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS trend_sources (
@@ -591,6 +619,7 @@ def save_trends(trends: List[Trend]) -> None:
             cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (trend.id,))
+            cursor.execute(f"DELETE FROM trend_journey_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend.id,))
 
             cursor.execute(
@@ -634,6 +663,12 @@ def save_trends(trends: List[Trend]) -> None:
                 cursor.execute(
                     f"INSERT INTO trend_regional_exposure (trend_id, region, exposure_score) VALUES ({ph(3)})",
                     (trend.id, region, score),
+                )
+
+            for journey_stage, score in (getattr(trend, 'journey_exposure', None) or {}).items():
+                cursor.execute(
+                    f"INSERT INTO trend_journey_exposure (trend_id, journey_stage, exposure_score) VALUES ({ph(3)})",
+                    (trend.id, journey_stage, score),
                 )
 
             # Save source URLs if available
@@ -686,6 +721,12 @@ def load_trends() -> List[Trend]:
             )
             regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
+            cursor.execute(
+                f"SELECT journey_stage, exposure_score FROM trend_journey_exposure WHERE trend_id = {p}",
+                (row["id"],),
+            )
+            journey_exposures = {_row_to_dict(r)["journey_stage"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+
             prob_posterior = (
                 tuple(json.loads(row["probability_posterior"]))
                 if row.get("probability_posterior")
@@ -719,6 +760,7 @@ def load_trends() -> List[Trend]:
                 category_exposure=cat_exposures,
                 vc_exposure=vc_exposures,
                 regional_exposure=regional_exposures,
+                journey_exposure=journey_exposures,
                 data_source=row.get("data_source"),
                 source_type=row.get("source_type"),
                 confidence=row.get("confidence", "Medium"),
@@ -772,6 +814,12 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
         )
         regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
+        cursor.execute(
+            f"SELECT journey_stage, exposure_score FROM trend_journey_exposure WHERE trend_id = {p}",
+            (trend_id,),
+        )
+        journey_exposures = {_row_to_dict(r)["journey_stage"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+
         prob_posterior = (
             tuple(json.loads(row["probability_posterior"]))
             if row.get("probability_posterior")
@@ -792,6 +840,7 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             category_exposure=cat_exposures,
             vc_exposure=vc_exposures,
             regional_exposure=regional_exposures,
+            journey_exposure=journey_exposures,
             data_source=row.get("data_source"),
             source_type=row.get("source_type"),
             confidence=row.get("confidence", "Medium"),
@@ -926,6 +975,43 @@ def load_simulation_runs(
 
         logger.info(f"Loaded {len(runs)} simulation runs from database")
         return runs
+
+
+# ── CONSUMER JOURNEY CONTENT (admin-managed tile map) ───────────────────
+
+def save_journey_content(content: dict, updated_by: str = "") -> None:
+    """Persist the full journey content blob ({lhc, hair} tile map).
+
+    Append-only versioning: every save inserts a new row; readers take the
+    latest. Validation of the {lhc: [...], hair: [...]} shape happens in
+    the API layer (pulse/api/routers/journey.py)."""
+    p = placeholder()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})",
+            (_safe_dumps(content), updated_by or ""),
+        )
+        conn.commit()
+        logger.info(f"Saved journey content version (by {updated_by or 'unknown'})")
+
+
+def load_journey_content() -> Optional[dict]:
+    """Load the latest admin-managed journey content blob, or None when no
+    server-managed content exists yet (frontend then uses its bundled
+    seed module data/consumerJourney.ts)."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        content = _row_to_dict(row).get("content")
+        if content is None:
+            return None
+        return json.loads(content) if isinstance(content, str) else content
 
 
 # ── AUDIT LOG ───────────────────────────────────────────────────────────
