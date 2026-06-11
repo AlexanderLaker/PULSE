@@ -41,6 +41,7 @@ import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 import WhiteSpotAnalyzer from '@/components/dashboard/WhiteSpotAnalyzer';
+import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
 // Beta tabs are dynamically imported (review F10): InnovationExplorer3
 // statically pulls data/innovations.ts (~212 KB) + images map, and the
 // Explorer pulls lib/profitPoolData — neither belongs in the initial
@@ -60,6 +61,7 @@ import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
 
 type DashboardTab =
+  | 'executive-summary'
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
@@ -79,6 +81,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   // Production views — left side of the top nav, in maritime blue.
+  { id: 'executive-summary',     label: 'Summary' },
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
@@ -113,9 +116,13 @@ export default function DashboardPage() {
   const { session } = useSession();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('executive-summary');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Category to auto-open in the Shift Matrix drill-down, set when a mover
+  // is clicked in the Executive Summary; consumed (cleared) by the matrix.
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null);
 
   // ─── Journey → Trends drill-through (v3.6 journey layer) ─────────
   // The Consumer Journey's evidence cards navigate to the Trends tab
@@ -127,7 +134,7 @@ export default function DashboardPage() {
   // A tab is mounted the first time it is visited and stays mounted
   // afterwards (hidden with display:none). In-view state — lens, year,
   // filters, open drill-down, scroll — survives tab switches.
-  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['profit-pool-2']);
+  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['executive-summary']);
 
   // ─── Profit Pool Explorer mock-up notice ────────────────────────────
   // The Explorer is a visualization mock-up — the underlying data sources
@@ -419,7 +426,26 @@ export default function DashboardPage() {
           Every visited tab stays mounted; only the active one is
           displayed. Switching back is instant and stateful. */}
       <div className="relative">
-        {tabPane('profit-pool-2', <ProfitPoolAnalysis2 isAdmin={isAdmin} />)}
+        {tabPane('executive-summary', (
+          <ExecutiveSummary
+            onNavigateMatrix={() => openTab('profit-pool-2')}
+            onNavigateTrends={() => openTab('trends-2')}
+            onNavigateJourney={() => openTab('consumer-journey-2')}
+            onNavigateInnovation={() => openTab('innovation-explorer-3')}
+            onOpenCategory={(catId) => { setPendingCategory(catId); openTab('profit-pool-2'); }}
+          />
+        ))}
+        {tabPane('profit-pool-2', (
+          <ProfitPoolAnalysis2
+            isAdmin={isAdmin}
+            openCategoryId={pendingCategory}
+            onConsumeOpenCategory={() => setPendingCategory(null)}
+            onNavigateToTrend={(query: string) => {
+              setTrendsSearch(query);
+              openTab('trends-2');
+            }}
+          />
+        ))}
         {tabPane('trends-2', <Trends2 initialSearch={trendsSearch} />)}
         {tabPane('consumer-journey-2', (
           <ConsumerJourney2

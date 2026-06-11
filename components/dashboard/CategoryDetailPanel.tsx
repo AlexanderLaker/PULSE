@@ -23,14 +23,14 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Activity, Zap, Layers, LineChart, Sparkles,
+  X, Activity, Zap, Layers, LineChart, ArrowUpRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Area, Line, ComposedChart, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FORCES, FORCE_COLORS, FORCE_ICONS, YEARS, fmtShift, fmtPct } from '@/lib/format';
+import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct } from '@/lib/format';
 import type { ForceName, ProjectionYear } from '@/types';
 
 // ─── Editorial design tokens — identical to ProfitPoolAnalysis2 ──────
@@ -61,12 +61,12 @@ const S = {
   cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
   mutedText:          '#64748B',
   // Semantic accents — matched to ProfitPoolAnalysis2 cell fills
-  expansion:          'rgb(34, 197, 94)',
-  expansionDim:       'rgba(34, 197, 94, 0.14)',
-  expansionInk:       '#14532d',
-  contraction:        'rgb(239, 68, 68)',
-  contractionDim:     'rgba(239, 68, 68, 0.14)',
-  contractionInk:     '#7f1d1d',
+  expansion:          'rgb(31, 122, 61)',
+  expansionDim:       'rgba(31, 122, 61, 0.14)',
+  expansionInk:       '#0f5132',
+  contraction:        'rgb(159, 64, 61)',
+  contractionDim:     'rgba(159, 64, 61, 0.14)',
+  contractionInk:     '#6a2a27',
   amber:              '#b45309',
   amberDim:           'rgba(180, 83, 9, 0.12)',
 };
@@ -113,6 +113,10 @@ interface CategoryDetailPanelProps {
   data: CategoryDetailPanelData;
   categoryId: string;
   onClose: () => void;
+  /** Drill-through to the Trends tab: receives the trend NAME (used as the
+      Trends search query — same contract as the Consumer Journey evidence
+      cards). When provided, every contributing-trend row becomes a link. */
+  onOpenTrend?: (name: string) => void;
 }
 
 interface ChartDataPoint {
@@ -175,7 +179,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
     return (
       <div
         style={{
-          height: 144,
+          height: 280,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -205,7 +209,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
   const yAxisDomain: [number, number] = [-maxAbs * 1.15, maxAbs * 1.15];
 
   return (
-    <div style={{ height: 160 }}>
+    <div style={{ height: 280 }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 6, bottom: 0 }}>
           <defs>
@@ -225,7 +229,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
             tick={{ fontSize: 10, fill: S.onSurfaceVariant, fontFamily: BODY_FONT }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
-            interval={1}
+            interval={0}
           />
           <YAxis
             domain={yAxisDomain}
@@ -465,9 +469,12 @@ interface TrendCardProps {
   trend: Trend;
   index: number;
   rank: number;
+  /** When provided, the card is a link into the Trends explorer. */
+  onOpen?: () => void;
 }
 
-const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
+const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => {
+  const [hovered, setHovered] = useState(false);
   const contribution = trend.contribution ?? 0;
   const share = trend.attribution_share ?? 0;
   const isExpansion = contribution !== 0
@@ -484,20 +491,34 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
   const shareLabel = share > 0 ? fmtPct(share, share >= 0.1 ? 0 : 1) : '—';
   const contribLabel = contribution !== 0 ? fmtShift(contribution, 1) : '—';
 
+  const interactive = !!onOpen;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.25, ease: 'easeOut' }}
+      onClick={onOpen}
+      onMouseEnter={interactive ? () => setHovered(true) : undefined}
+      onMouseLeave={interactive ? () => setHovered(false) : undefined}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `Open "${trend.name}" in the Trends explorer` : undefined}
+      onKeyDown={interactive ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(); }
+      } : undefined}
       style={{
         padding: '12px 14px',
         backgroundColor: S.surface,
         borderRadius: 12,
-        border: `1px solid ${S.cardBorder}`,
+        border: `1px solid ${hovered ? S.primary : S.cardBorder}`,
+        boxShadow: hovered ? '0 6px 20px -8px rgba(0, 93, 181, 0.35)' : 'none',
         display: 'grid',
-        gridTemplateColumns: '28px 1fr auto',
+        gridTemplateColumns: interactive ? '28px 1fr auto 18px' : '28px 1fr auto',
         columnGap: 12,
         alignItems: 'center',
+        cursor: interactive ? 'pointer' : 'default',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
       }}
     >
       {/* Rank */}
@@ -550,8 +571,9 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
             fontFamily: BODY_FONT,
           }}
         >
-          <span style={{ color: forceColor, fontWeight: 600 }}>
-            {FORCE_ICONS[trend.force]} {trend.force}
+          <span style={{ color: forceColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: forceColor, display: 'inline-block', flexShrink: 0 }} />
+            {trend.force}
           </span>
           {trend.exposure_level != null && (
             <span
@@ -661,6 +683,21 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
           {contribLabel}
         </div>
       </div>
+
+      {/* Link affordance — the card opens this trend in the Trends explorer */}
+      {interactive && (
+        <ArrowUpRight
+          size={15}
+          strokeWidth={2.4}
+          aria-hidden
+          style={{
+            color: S.primary,
+            opacity: hovered ? 1 : 0.4,
+            transition: 'opacity 0.15s ease',
+            flexShrink: 0,
+          }}
+        />
+      )}
     </motion.div>
   );
 };
@@ -668,7 +705,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank }) => {
 // ─── CategoryDetailPanel ───────────────────────────────────────────────────
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
-  data, categoryId, onClose,
+  data, categoryId, onClose, onOpenTrend,
 }) => {
   const category = useMemo(() => {
     if (!categoryId || !data) return null;
@@ -723,16 +760,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     );
     return sumTop / totalAttribution;
   }, [trendList, totalAttribution]);
-  const topDriver = trendList[0] ?? null;
-  const topForce = useMemo<ForceName | null>(() => {
-    const entries = Object.entries(forceDecomposition) as Array<[ForceName, number]>;
-    let best: [ForceName, number] | null = null;
-    for (const [k, v] of entries) {
-      if (!best || Math.abs(v) > Math.abs(best[1])) best = [k, v];
-    }
-    return best && Math.abs(best[1]) > 1e-9 ? best[0] : null;
-  }, [forceDecomposition]);
-
   // Horizon endpoints — summary KPIs
   const horizonEnd = YEARS[YEARS.length - 1];
   const horizonStart = YEARS[0];
@@ -748,44 +775,45 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       onClick={onClose}
       style={{
         // top = 64px keeps the global sticky nav (h-16) visible and
-        // interactive while the drawer is open.
+        // interactive while the full-screen drill-down is open.
         position: 'fixed',
         top: 64,
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(0, 52, 94, 0.22)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'center',
+        padding: 16,
+        backgroundColor: 'rgba(0, 52, 94, 0.34)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         zIndex: 40,
         fontFamily: BODY_FONT,
       }}
     >
-      {/* Drawer — slides in from the right */}
+      {/* Full-page modal — fills the viewport below the global nav.
+          The drill-down is a destination, not a side drawer. */}
       <motion.aside
-        initial={{ x: 480, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 480, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 280, damping: 32 }}
+        initial={{ opacity: 0, scale: 0.985, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.985, y: 8 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
+        aria-modal="true"
         aria-label={`${category?.name ?? 'Category'} drill-down`}
         style={{
-          // The aside IS the scroll container. Header below becomes
-          // position:sticky so it stays pinned while the rest scrolls.
-          // Simpler than the nested flex pattern -- no min-height auto
-          // flex-child bug, no dependence on parent box propagation.
-          // top = 64px so the drawer starts BELOW the global sticky
-          // nav (h-16 in app/dashboard/page.tsx). zIndex stays below the
-          // nav (z-50) so the menu remains visible while drilling down.
-          position: 'fixed',
-          top: 64,
-          right: 0,
-          bottom: 0,
-          width: 'min(480px, 100vw)',
+          // The aside IS the scroll container; the header below is
+          // position:sticky so it stays pinned while the body scrolls.
+          // Fills the full viewport below the global sticky nav (h-16).
+          position: 'relative',
+          width: '100%',
+          height: '100%',
           backgroundColor: S.bg,
-          borderLeft: `1px solid ${S.cardBorder}`,
-          boxShadow: '-24px 0 60px -15px rgba(0, 52, 94, 0.24)',
+          border: `1px solid ${S.cardBorder}`,
+          borderRadius: 20,
+          boxShadow: '0 40px 120px -30px rgba(0, 52, 94, 0.45)',
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
@@ -993,16 +1021,20 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </div>
         </header>
 
-        {/* ─── Scrollable content ────────────────────────────────── */}
+        {/* ─── Scrollable content ──────────────────────────────────
+            Full-page layout: two columns on large screens — simulation
+            evidence (fan chart + force decomposition) on the left, the
+            ranked contributing-trend drivers on the right. Stacks to a
+            single column below lg. */}
         <div
+          className="grid gap-4 items-start lg:grid-cols-2"
           style={{
             padding: '20px 20px 28px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
             backgroundColor: S.bg,
           }}
         >
+          {/* Left column — what the simulation says */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {/* Fan chart */}
           <Section
             title={`Shift Path · ${horizonStart}–${horizonEnd}`}
@@ -1035,7 +1067,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           <Section title="Force Decomposition" icon={Zap}>
             <ForceDecomposition decomposition={forceDecomposition} />
           </Section>
+          </div>
 
+          {/* Right column — the drivers behind the shift */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {/* Contributing trends — ranked by scaled attribution share */}
           {trendList.length > 0 && (
             <Section
@@ -1113,70 +1148,17 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                     trend={trend}
                     index={idx}
                     rank={idx + 1}
+                    onOpen={onOpenTrend ? () => onOpenTrend(trend.name) : undefined}
                   />
                 ))}
               </div>
             </Section>
           )}
-
-          {/* Strategic Read — auto-generated Bain narrative */}
-          {(trendList.length > 0 || Math.abs(shiftEnd) > 1e-9) && (
-            <Section title="Strategic Read" icon={Sparkles}>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                  fontSize: 13,
-                  lineHeight: 1.55,
-                  color: S.onSurface,
-                  fontFamily: BODY_FONT,
-                }}
-              >
-                <p style={{ margin: 0 }}>
-                  <strong style={{ fontWeight: 700 }}>
-                    {shiftEnd > 0 ? 'Expansion' : shiftEnd < 0 ? 'Contraction' : 'Flat'}
-                  </strong>
-                  {' '}to <strong style={{ fontFamily: MONO_FONT, fontWeight: 700 }}>{fmtShift(shiftEnd, 1)}</strong>
-                  {' '}by {horizonEnd}
-                  {topForce ? (
-                    <>
-                      , carried primarily by the{' '}
-                      <strong style={{ color: FORCE_COLORS[topForce], fontWeight: 700 }}>
-                        {topForce}
-                      </strong>{' '}force
-                    </>
-                  ) : null}
-                  {topDriver ? (
-                    <>
-                      {'. Single biggest driver: '}
-                      <strong style={{ fontWeight: 700 }}>{topDriver.name}</strong>
-                      {' ('}
-                      <span style={{ fontFamily: MONO_FONT }}>
-                        {fmtPct(topDriver.attribution_share ?? 0, 0)}
-                      </span>
-                      {' of movement)'}
-                    </>
-                  ) : null}
-                  .
-                </p>
-                <p style={{ margin: 0, color: S.onSurfaceVariant }}>
-                  {shiftEnd > 0 && topShare > 0.6
-                    ? 'Concentration is high — a handful of trends carries most of the upside. Defend and lean into those; don\u2019t spread investment thin.'
-                    : shiftEnd > 0
-                    ? 'Broad-based tailwind — multiple vectors push in the same direction, which de-risks the thesis.'
-                    : shiftEnd < 0 && topShare > 0.6
-                    ? 'Concentrated headwind — the shift is driven by a few large trends. Mitigate those specifically rather than across the full portfolio.'
-                    : shiftEnd < 0
-                    ? 'Broad-based contraction — the entire category is leaking; structural review of positioning is warranted.'
-                    : 'Directional balance — opposing trends roughly cancel. Watch for the tipping point rather than acting on the net.'}
-                </p>
-              </div>
-            </Section>
-          )}
+          </div>
 
           {/* Footer methodology line — mirrors ProfitPoolAnalysis2 footer */}
           <footer
+            className="lg:col-span-2"
             style={{
               marginTop: 4,
               padding: '0 4px',

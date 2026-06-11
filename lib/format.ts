@@ -1,74 +1,77 @@
 /**
- * PRISM Profit Pool Shift Model v3 — Formatting & Design Tokens
- * Apple × Bain × Goldman Sachs
+ * PRISM — Formatting & Shift-Semantic Tokens
+ * Maritime editorial system — the single source of truth for how a profit-pool
+ * shift is coloured, signed, and rounded across every dashboard view.
+ *
+ * June 2026 reconciliation:
+ *   • The legacy "Apple/Reno" token mirror (`T`) and its unused colour helpers
+ *     (`shiftColorHex`, `shiftBgHex`, `heatColor`, `pill`, `tooltipStyle`) were
+ *     removed — nothing imported them, and they carried the old #0071E3 palette.
+ *   • Expansion / contraction now resolve to ONE pair, matched to the maritime
+ *     semantic palette used by Trends, Consumer Journey, Profit Pool and the
+ *     drill-down. No more #10b981 / #22c55e / #2d7d3f / #059669 drift.
+ *   • Every shift value carries a directional ARROW (▲/▼) and a sign, so the
+ *     grow-vs-shrink signal never depends on colour alone (red-green colour
+ *     deficiency, projectors, greyscale print).
+ *   • Shift percentages render to AT MOST ONE decimal, everywhere — the
+ *     formatter clamps it so a stray `…, 2)` can never reintroduce false
+ *     precision on a Monte-Carlo median.
  */
 
-import type { DesignTokens, ForceDefinition, CategoryDefinition, ForceName } from '../types';
+import type { ForceDefinition, CategoryDefinition, ForceName } from '../types';
 
-// ─── Design Tokens (JS-side mirror of CSS vars) ────────────
-export const T: DesignTokens = {
-  bg:       '#FFFFFF',
-  bg1:      '#F5F5F7',
-  bg2:      '#FBFBFD',
-  bg3:      '#F9F9FB',
-  bg4:      '#EFEFEF',
-  border:   'rgba(0,0,0,0.06)',
-  border1:  'rgba(0,0,0,0.08)',
-  border2:  'rgba(0,0,0,0.12)',
-  accent:   '#0071E3',
-  accentDim:'rgba(0,113,227,0.08)',
-  gold:     '#D4A847',
-  goldDim:  'rgba(212,168,71,0.08)',
-  green:    '#30D158',
-  greenDim: 'rgba(48,209,88,0.08)',
-  red:      '#FF453A',
-  redDim:   'rgba(255,69,58,0.08)',
-  amber:    '#FF9F0A',
-  amberDim: 'rgba(255,159,10,0.08)',
-  purple:   '#7B61FF',
-  purpleDim:'rgba(123,97,255,0.08)',
-  cyan:     '#00B4D8',
-  cyanDim:  'rgba(0,180,216,0.08)',
-  text:     '#1D1D1F',
-  text2:    '#6E6E73',
-  text3:    '#999999',
-  text4:    '#ADADAD',
-  mono:     "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
-  sans:     "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
-};
+// ─── Shift semantics — the one expansion / contraction pair ──────────
+/** Profit pool expanding (positive shift) — maritime success green. */
+export const EXPANSION = '#1f7a3d';
+/** Profit pool contracting (negative shift) — maritime error red. */
+export const CONTRACTION = '#9f403d';
+/** Flat / negligible shift — muted slate. */
+export const NEUTRAL = '#64748b';
 
-// ─── Force Definitions ──────────────────────────────────────
+/** Tinted backgrounds for chips / cells. */
+export const EXPANSION_SOFT = 'rgba(31, 122, 61, 0.10)';
+export const CONTRACTION_SOFT = 'rgba(159, 64, 61, 0.10)';
+export const NEUTRAL_SOFT = 'rgba(100, 116, 139, 0.10)';
+
+/** Below this absolute shift, a value is treated as flat: no sign, no arrow, no colour. */
+export const FLAT_EPS = 0.0005;
+
+// ─── Force Definitions (6 strategic forces) ─────────────────────────
+// Distinct, maritime-harmonious categorical hues. The `emoji` field is part of
+// the type contract and kept for back-compat, but the UI no longer renders it —
+// forces are shown with a colour dot (see CategoryDetailPanel).
 export const FORCES: Record<ForceName, ForceDefinition> = {
-  Consumer:      { color: '#0071E3', label: 'Consumer',      emoji: '👤' },
-  Customer:      { color: '#7B61FF', label: 'Customer',      emoji: '🏪' },
-  Technology:    { color: '#00B4D8', label: 'Technology',     emoji: '⚡' },
-  Government:    { color: '#FF9F0A', label: 'Government',     emoji: '🏛' },
-  Environmental: { color: '#30D158', label: 'Environmental',  emoji: '🌱' },
-  Competitive:   { color: '#FF453A', label: 'Competitive',    emoji: '⚔' },
+  Consumer:      { color: '#005db5', label: 'Consumer',      emoji: '' },
+  Customer:      { color: '#6b4fc4', label: 'Customer',      emoji: '' },
+  Technology:    { color: '#0e8aa8', label: 'Technology',    emoji: '' },
+  Government:    { color: '#b07d2b', label: 'Government',     emoji: '' },
+  Environmental: { color: '#2f8f4e', label: 'Environmental', emoji: '' },
+  Competitive:   { color: '#b0504a', label: 'Competitive',   emoji: '' },
 };
 
 export const FORCE_COLORS: Record<ForceName, string> = Object.fromEntries(
   Object.entries(FORCES).map(([k, v]) => [k, v.color])
 ) as Record<ForceName, string>;
 
+// Retained for back-compat; no longer rendered.
 export const FORCE_ICONS: Record<ForceName, string> = Object.fromEntries(
   Object.entries(FORCES).map(([k, v]) => [k, v.emoji])
 ) as Record<ForceName, string>;
 
-// ─── Category Definitions ───────────────────────────────────
+// ─── Category Definitions ───────────────────────────────────────────
 export const CATEGORIES: CategoryDefinition[] = [
-  { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Hair', color: '#FF453A' },
-  { id: 'hair_care',    name: 'Hair: Care',     short: 'Care',    group: 'Hair', color: '#FF9F0A' },
-  { id: 'hair_styling', name: 'Hair: Styling',  short: 'Styling', group: 'Hair', color: '#FFB81D' },
-  { id: 'hair_body',    name: 'Hair: Body',     short: 'Body',    group: 'Hair', color: '#85C715' },
-  { id: 'lhc_fcn',      name: 'LHC: FCN',       short: 'FCN',     group: 'LHC',  color: '#30D158' },
-  { id: 'lhc_fca',      name: 'LHC: FCA',       short: 'FCA',     group: 'LHC',  color: '#00BFA5' },
-  { id: 'lhc_ffi',      name: 'LHC: FFI',       short: 'FFI',     group: 'LHC',  color: '#00B4D8' },
-  { id: 'lhc_lad',      name: 'LHC: LAD',       short: 'LAD',     group: 'LHC',  color: '#0071E3' },
-  { id: 'lhc_hdw',      name: 'LHC: HDW',       short: 'HDW',     group: 'LHC',  color: '#5856D6' },
-  { id: 'lhc_adw',      name: 'LHC: ADW',       short: 'ADW',     group: 'LHC',  color: '#7B61FF' },
-  { id: 'lhc_hsc',      name: 'LHC: HSC',       short: 'HSC',     group: 'LHC',  color: '#AF52DE' },
-  { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#FF00FF' },
+  { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Hair', color: '#b0504a' },
+  { id: 'hair_care',    name: 'Hair: Care',     short: 'Care',    group: 'Hair', color: '#b07d2b' },
+  { id: 'hair_styling', name: 'Hair: Styling',  short: 'Styling', group: 'Hair', color: '#c79a3a' },
+  { id: 'hair_body',    name: 'Hair: Body',     short: 'Body',    group: 'Hair', color: '#6f9c3a' },
+  { id: 'lhc_fcn',      name: 'LHC: FCN',       short: 'FCN',     group: 'LHC',  color: '#2f8f4e' },
+  { id: 'lhc_fca',      name: 'LHC: FCA',       short: 'FCA',     group: 'LHC',  color: '#0f9b8e' },
+  { id: 'lhc_ffi',      name: 'LHC: FFI',       short: 'FFI',     group: 'LHC',  color: '#0e8aa8' },
+  { id: 'lhc_lad',      name: 'LHC: LAD',       short: 'LAD',     group: 'LHC',  color: '#005db5' },
+  { id: 'lhc_hdw',      name: 'LHC: HDW',       short: 'HDW',     group: 'LHC',  color: '#3f4fb0' },
+  { id: 'lhc_adw',      name: 'LHC: ADW',       short: 'ADW',     group: 'LHC',  color: '#6b4fc4' },
+  { id: 'lhc_hsc',      name: 'LHC: HSC',       short: 'HSC',     group: 'LHC',  color: '#8a4fb8' },
+  { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#b0479e' },
 ];
 
 // 10-year strategic horizon (2026–2035), mirroring backend
@@ -81,19 +84,25 @@ export const YEARS: number[] = [
   2031, 2032, 2033, 2034, 2035,
 ];
 
-// ─── Formatting Functions ───────────────────────────────────
+// ─── Formatting Functions ───────────────────────────────────────────
 
-/** Format decimal as signed percentage: 0.032 → "+3.2%" */
+/**
+ * Format a decimal as a signed percentage: 0.032 → "+3.2%".
+ * Clamped to at most ONE decimal place (executive-legibility rule) — passing
+ * a higher `decimals` is silently capped so no view can show false precision.
+ */
 export function fmtShift(v: number | null | undefined, decimals = 1): string {
   if (v == null || isNaN(v)) return '—';
-  const pct = (v * 100).toFixed(decimals);
-  return v >= 0.0005 ? `+${pct}%` : `${pct}%`;
+  const d = Math.max(0, Math.min(decimals, 1));
+  const pct = (v * 100).toFixed(d);
+  return v >= FLAT_EPS ? `+${pct}%` : `${pct}%`;
 }
 
-/** Format decimal as absolute percentage (no sign) */
+/** Format a decimal as an absolute percentage (no sign). Clamped to ≤ 1 decimal. */
 export function fmtPct(v: number | null | undefined, decimals = 1): string {
   if (v == null || isNaN(v)) return '—';
-  return `${(v * 100).toFixed(decimals)}%`;
+  const d = Math.max(0, Math.min(decimals, 1));
+  return `${(v * 100).toFixed(d)}%`;
 }
 
 /** Short category name: "Hair: Color" → "Color" */
@@ -103,60 +112,36 @@ export function shortCat(cat: string | null | undefined): string {
   return parts.length > 1 ? (parts[1]?.trim() ?? cat) : cat;
 }
 
-// ─── Color Utilities ────────────────────────────────────────
+// ─── Shift colour / direction (single source of truth) ───────────────
 
-/** Hex color for positive/negative/neutral shift */
-export function shiftColorHex(v: number | null | undefined): string {
-  if (v == null || Math.abs(v) < 0.001) return T.text3;
-  return v > 0 ? T.green : T.red;
+/** Strong text colour for a shift value. */
+export function shiftColor(v: number | null | undefined): string {
+  if (v == null || Math.abs(v) < FLAT_EPS) return NEUTRAL;
+  return v > 0 ? EXPANSION : CONTRACTION;
 }
 
-/** Background color for shift badges */
-export function shiftBgHex(v: number | null | undefined): string {
-  if (v == null || Math.abs(v) < 0.001) return 'transparent';
-  return v > 0 ? T.greenDim : T.redDim;
+/** Tinted background for a shift chip / cell. */
+export function shiftSoft(v: number | null | undefined): string {
+  if (v == null || Math.abs(v) < FLAT_EPS) return NEUTRAL_SOFT;
+  return v > 0 ? EXPANSION_SOFT : CONTRACTION_SOFT;
 }
 
-/** Diverging heatmap color: green for positive, red for negative, intensity by magnitude */
-export function heatColor(v: number | null | undefined): string {
-  if (v == null) return T.bg3;
-  const clamp = (x: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, x));
-  const intensity = clamp(Math.abs(v) / 0.05, 0, 1);
-  if (v > 0) {
-    const r = Math.round(255 - (255 - 48) * intensity);
-    const g = Math.round(255 - (255 - 209) * intensity);
-    const b = Math.round(255 - (255 - 88) * intensity);
-    return `rgba(${r},${g},${b},${(0.2 + intensity * 0.5).toFixed(2)})`;
-  } else {
-    const r = Math.round(255 - (255 - 255) * intensity);
-    const g = Math.round(255 - (255 - 69) * intensity);
-    const b = Math.round(255 - (255 - 58) * intensity);
-    return `rgba(${r},${g},${b},${(0.2 + intensity * 0.5).toFixed(2)})`;
-  }
+/** Directional arrow for a shift: ▲ (up), ▼ (down), '' when flat. */
+export function shiftArrow(v: number | null | undefined): string {
+  if (v == null || Math.abs(v) < FLAT_EPS) return '';
+  return v > 0 ? '▲' : '▼';
 }
 
-// ─── Inline Style Helpers ───────────────────────────────────
-
-export const pill = (color: string, bg: string): React.CSSProperties => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  padding: '3px 8px',
-  borderRadius: 20,
-  fontSize: 11,
-  fontWeight: 600,
-  fontFamily: T.mono,
-  color,
-  background: bg,
-  lineHeight: 1,
-  whiteSpace: 'nowrap',
-});
-
-export const tooltipStyle: React.CSSProperties = {
-  background: T.bg1,
-  border: `1px solid ${T.border2}`,
-  borderRadius: 12,
-  padding: '10px 14px',
-  fontFamily: T.sans,
-  fontSize: 11,
-};
+/**
+ * Diverging heat fill over a white cell — same hue family as the semantic pair,
+ * intensity scaled by |v| up to `scale` (default ±5%).
+ *   expansion → rgb(31,122,61) · contraction → rgb(159,64,61)
+ */
+export function heatFill(v: number | null | undefined, scale = 0.05): string {
+  if (v == null) return 'transparent';
+  const intensity = Math.max(0, Math.min(Math.abs(v) / scale, 1));
+  const a = (0.06 + intensity * 0.5).toFixed(3);
+  return v > 0
+    ? `rgba(31, 122, 61, ${a})`
+    : `rgba(159, 64, 61, ${a})`;
+}

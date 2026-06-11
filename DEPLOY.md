@@ -1,5 +1,12 @@
 # PRISM — Deployment Guide
 
+> **⚠ Partially outdated (banner added 2026-06-11).** URLs, repo, env-var tables
+> and rollback steps remain valid. Sections describing an interactive
+> `/simulate`, allocation persistence, R̂ targets, `middleware.ts` or
+> `cowork-deploy.sh` predate v3.6/v3.7 — the deployed service is read-only
+> (F2/D13) and the helper scripts were retired. On conflict, `HANDOVER.md` and
+> `CLAUDE.md` win.
+
 ## Live deployment
 
 **Production URL:** https://prism-hcb.vercel.app

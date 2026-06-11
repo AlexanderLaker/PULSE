@@ -1,2 +1,0 @@
-REPRO: same seed identical: True | diff seed differs: True
-seed-43 vs seed-42 median delta (Hair: Color 2030): 9.425082048769573e-05

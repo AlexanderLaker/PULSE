@@ -62,7 +62,7 @@ const S = {
   primary: '#005db5', primaryDim: '#0052a0', primaryContainer: '#d6e3ff',
   onPrimaryContainer: '#00519e', onBg: '#00345e', onSurface: '#00345e',
   onSurfaceVariant: '#26619d',
-  expansionContainer: '#d6ecdb', onExpansionContainer: '#1e5f2e', expansion: '#2d7d3f',
+  expansionContainer: '#d6ecdb', onExpansionContainer: '#1e5f2e', expansion: '#1f7a3d',
   error: '#9f403d', errorContainer: '#fee3e1', onErrorContainer: '#752121',
   amberContainer: '#fdf0d5', onAmberContainer: '#7a5200',
   outline: '#477dbb', cardBorder: 'rgba(0, 52, 94, 0.10)',

@@ -46,3 +46,9 @@ pulse_server.log
 # Nicht-App-Dateien (Decks, Reports, Audits) — nur lokal/OneDrive
 _ARCHIVE/
 _BACKUP_pre_v3.7_2026-06-10.tar.gz
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# Handover quarantine 2026-06-11 — never commit, never ship
+_NOT_FOR_HANDOVER/

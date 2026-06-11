@@ -391,10 +391,10 @@ export default function InnovationDeepDive({
                     gap: 4,
                     fontSize: 11,
                     fontWeight: 700,
-                    color: trend.direction === 'Expansion' ? '#16a34a' : '#dc2626',
+                    color: trend.direction === 'Expansion' ? '#1f7a3d' : '#9f403d',
                     padding: '3px 8px',
                     borderRadius: 6,
-                    background: trend.direction === 'Expansion' ? '#dcfce7' : '#fee2e2',
+                    background: trend.direction === 'Expansion' ? '#d6ecdb' : '#fee3e1',
                   }}>
                     {trend.direction === 'Expansion' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                     {trend.direction}

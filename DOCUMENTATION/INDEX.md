@@ -1,29 +1,25 @@
-# DOCUMENTATION — Technische Doku (Index)
+# DOCUMENTATION — Technical Documentation (Index)
 
-Kanonischer Ort für technische Detail-Dokumentation. Einstieg ins Projekt: `README.md` im Repo-Root; Entwickler-Handbuch: `CLAUDE.md`.
+Canonical location for detailed technical documentation. Project entry point: `README.md` in the repo root; developer handbook: `CLAUDE.md`; takeover guide: `HANDOVER.md`.
 
-| Dokument | Inhalt |
+*Index regenerated 2026-06-11 (pre-handover cleanup: strategy decks, internal audits and docs for removed features were taken out of the repo).*
+
+| Document | Content |
 |---|---|
-| `ADVANCED_ANALYTICS_SUMMARY.md` | Überblick der Advanced-Analytics-Module (CVaR, Sobol, Tipping Points, Reverse Stress) |
-| `ADVANCED_MODULES_REFERENCE.md` | Referenz der erweiterten Engine-Module |
-| `AI_QUICKSTART.md` | Schnellstart AI-Schicht (Narrator, Chat, Kalibrator) |
-| `ANALYTICS_MODULES.md` | Detaildoku der Analytics-Module |
-| `ANALYTICS_QUICKSTART.md` | Schnellstart Analytics |
-| `AUTH_PAGES_REFERENCE.md` | — |
-| `Attenuation_Calibration_Methodology.md` | Methodik der Attenuation-Kalibrierung (v3.5) |
-| `COMPONENT_USAGE.md` | Verwendung der Dashboard-Komponenten |
-| `CONNECTION_STATUS_GUIDE.md` | Verhalten der Verbindungs-/Reconnect-Anzeige |
-| `CONSUMER_JOURNEY_BLUEPRINT.md` | Fachlicher Blueprint des Consumer-Journey-Moduls |
-| `DELPHI_COMPONENTS.md` | UI-Komponenten des Delphi-Moduls |
-| `DELPHI_IMPLEMENTATION.md` | Implementierung des Delphi-Protokolls |
-| `DELPHI_QUICK_START.md` | Schnellstart Delphi-Sessions |
-| `HENKEL_BRAND_CATEGORY_MAPPING.md` | Mapping Henkel-Marken ↔ Modell-Kategorien |
-| `INTEGRATION_MODULES_README.md` | Integrations-/Datenquellen-Module |
-| `QUICK_REFERENCE.md` | Kurzreferenz wichtigster Befehle/Endpoints |
-| `SCANNER_API.md` | API des (deaktivierten) Trend-Scanners |
-| `SEED_DATA_README.md` | Seed-Daten: Aufbau & Neuladen |
-| `TESTING.md` | Test-Strategie und Ausführung |
-| `TESTS_README.md` | Beschreibung der pytest-Suite |
-| `TEST_SUITE_SUMMARY.md` | Zusammenfassung Testabdeckung |
-| `TRENDS_VERIFICATION.md` | Verifikationsprozess der Trends |
-| `TREND_RESEARCH_GUIDE.md` | Anleitung: Trends recherchieren & pflegen |
+| `AI_QUICKSTART.md` | Quick start for the **dormant** AI layer (scanner, calibrator, narrator) — code exists under `pulse/ai/`, no live routes |
+| `AUTH_PAGES_REFERENCE.md` | Authentication pages (login/register/reset, Clerk sign-in/up) |
+| `Attenuation_Calibration_Methodology.md` | Methodology of the v3.5 attenuation/overlap derivation (provenance for engine defaults) |
+| `CONNECTION_STATUS_GUIDE.md` | Connection/reconnect indicator behavior |
+| `CONSUMER_JOURNEY_BLUEPRINT.md` | Functional blueprint of the Consumer Journey module |
+| `DEPLOY.md` | Pointer stub → root `DEPLOY.md` |
+| `HENKEL_BRAND_CATEGORY_MAPPING.md` | Mapping Henkel brands ↔ model categories |
+| `QUICK_REFERENCE.md` | Short reference of key commands/endpoints |
+| `SCANNER_API.md` | API of the (unmounted) trend scanner — relevant if the AI layer is reactivated |
+| `SEED_DATA_README.md` | Seed data: structure & reseeding |
+| `TESTING.md` | Test strategy and execution |
+| `TESTS_README.md` | pytest suite description |
+| `TEST_SUITE_SUMMARY.md` | Test coverage summary |
+| `TRENDS_VERIFICATION.md` | Trend verification process |
+| `TREND_AUDIT_APRIL_2026.md` | Trend source audit (April 2026) |
+| `TREND_RESEARCH_GUIDE.md` | Guide: researching & maintaining trends |
+| `TREND_SOURCE_AUDIT_AND_GAP_ANALYSIS.md` | Trend source audit & gap analysis |

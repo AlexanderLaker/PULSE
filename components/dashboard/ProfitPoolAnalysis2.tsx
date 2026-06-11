@@ -43,12 +43,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
   Sparkles, Info, Database, ChevronDown,
-  TrendingUp, TrendingDown, Activity,
+  TrendingUp, TrendingDown, Activity, GitBranch, ArrowUpRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import * as api from '@/api/client';
-import { CATEGORIES, YEARS, fmtShift } from '@/lib/format';
+import { CATEGORIES, YEARS, fmtShift, shiftArrow, EXPANSION, CONTRACTION } from '@/lib/format';
+import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
   catWeightFor as resolveCatWeight, computeImpactFractions,
@@ -183,10 +184,10 @@ function heatFillScaled(v: number | null, scale: number): string {
   const mag = Math.min(Math.abs(v) / s, 1);
   if (v > 0) {
     const a = 0.14 + mag * 0.62;
-    return `rgba(16, 185, 129, ${a.toFixed(2)})`; // CJ expansion green (#10b981)
+    return `rgba(31, 122, 61, ${a.toFixed(2)})`; // expansion (maritime #1f7a3d)
   }
   const a = 0.14 + mag * 0.62;
-  return `rgba(220, 38, 38, ${a.toFixed(2)})`; // CJ contraction red (#dc2626)
+  return `rgba(159, 64, 61, ${a.toFixed(2)})`; // contraction (maritime #9f403d)
 }
 
 function heatTextColorScaled(v: number | null, scale: number): string {
@@ -194,7 +195,7 @@ function heatTextColorScaled(v: number | null, scale: number): string {
   const s = Math.max(scale, 0.005);
   const mag = Math.min(Math.abs(v) / s, 1);
   if (mag > 0.45) return '#ffffff';
-  return v > 0 ? '#064e3b' : '#7f1d1d';
+  return v > 0 ? '#0f5132' : '#6a2a27';
 }
 
 // Default 5% scale for the main grid cells and the bottom-row column totals
@@ -253,6 +254,52 @@ const YearPill: FC<{
   </button>
 );
 
+// ─── Mover tile — hero "largest expansion / deepest contraction" ──
+// Clickable (P3, June 2026): opens the same full-page category
+// drill-down as the matrix cells, so every number on the page that
+// names a category drills into it.
+const MoverTile: FC<{
+  label: string;
+  name: string;
+  value: number;
+  onOpen: () => void;
+}> = ({ label, name, value, onOpen }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-label={`Open ${name} drill-down — fan chart and contributing trends`}
+      className="flex items-center justify-between gap-5 rounded-2xl px-4 py-3 text-left w-full"
+      style={{
+        backgroundColor: hovered ? S.surfaceContainer : S.surfaceLow,
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'background-color 0.15s ease',
+        fontFamily: BODY_FONT,
+      }}
+    >
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em]"
+          style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>{label}</div>
+        <div className="text-[13px] font-semibold mt-0.5 inline-flex items-center gap-1.5"
+          style={{ color: hovered ? S.primary : S.onSurface, transition: 'color 0.15s ease' }}>
+          {name}
+          <ArrowUpRight
+            size={13}
+            strokeWidth={2.4}
+            aria-hidden
+            style={{ color: S.primary, opacity: hovered ? 1 : 0.45, transition: 'opacity 0.15s ease' }}
+          />
+        </div>
+      </div>
+      <ShiftValue value={value} size={22} fontFamily={HEADLINE_FONT} />
+    </button>
+  );
+};
+
 // ─── Matrix Table Component ──────────────────────────────────────
 interface MatrixProps {
   columns: Array<{ id: string; label: string }>;
@@ -280,15 +327,17 @@ interface MatrixProps {
       Bayesian MC shift matrix; the Force / VC / Region lens decompositions
       are scalar per cell so cellDetails is omitted for those views. */
   cellDetails?: Record<string, Record<string, PercentileDistribution | null>>;
-  /** Optional: drill-down handler. When provided, the sticky-left category
-      label cell becomes an interactive button that opens the Category
-      Detail Panel with the fan chart, trigger status, and allocation
-      recommendation for that single category. */
+  /** Optional: drill-down handler. When provided, every cell in the row
+      (including the % values) is clickable and opens the Category Detail
+      Panel with the fan chart, force decomposition and contributing
+      trends for that single category. */
   onRowClick?: (rowId: string) => void;
-  /** Render the P10…P90 band under each median (Time Path, Total only). */
-  showRanges?: boolean;
   /** Shown in the hover tooltip when no per-cell bands exist. */
   noBandsNote?: string;
+  /** Control strip rendered as the card's top bar (lens pills, impact
+      filter / year selector) — keeps every control attached to the
+      evidence it manipulates instead of floating above the card. */
+  toolbar?: React.ReactNode;
 }
 
 const Matrix: FC<MatrixProps> = ({
@@ -297,8 +346,8 @@ const Matrix: FC<MatrixProps> = ({
   rowTotalLabel = 'Total',
   cellDetails,
   onRowClick,
-  showRanges = false,
   noBandsNote,
+  toolbar,
 }) => {
   // Group rows by group (Hair / LHC) for subtle sectioning
   const grouped = useMemo(() => {
@@ -340,6 +389,11 @@ const Matrix: FC<MatrixProps> = ({
   };
   const onCellLeave = () => setHover(null);
 
+  // Row-level hover — signals the whole row is an interactive drill-down
+  // target (any cell opens the Category Detail Panel) and powers the
+  // "View details →" reveal on the category label.
+  const [hoverRow, setHoverRow] = useState<string | null>(null);
+
   const hasAnyData = rows.some((r) => columns.some((c) => (data[r.id]?.[c.id] ?? null) !== null));
 
   // Total column gets its own conditional-formatting scale — the row totals
@@ -378,15 +432,26 @@ const Matrix: FC<MatrixProps> = ({
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
+      className="rounded-2xl"
       style={{
         backgroundColor: S.surface,
         boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
       }}
     >
+      {toolbar && (
+        <div
+          className="rounded-t-2xl px-6 py-4 flex items-center justify-between gap-x-6 gap-y-3 flex-wrap"
+          style={{
+            backgroundColor: S.surface,
+            borderBottom: `1px solid ${S.cardBorder}`,
+          }}
+        >
+          {toolbar}
+        </div>
+      )}
       {subtitle && (
         <div
-          className="px-6 py-4"
+          className={`px-6 py-4 ${toolbar ? '' : 'rounded-t-2xl'}`}
           style={{
             backgroundColor: S.surfaceLow,
             color: S.onSurfaceVariant,
@@ -464,43 +529,50 @@ const Matrix: FC<MatrixProps> = ({
                     </td>
                   </tr>
                 )}
-                {groupRows.map((row) => (
-                  <tr key={row.id}>
+                {groupRows.map((row) => {
+                  const isRowHover = hoverRow === row.id;
+                  const rt = rowTotals?.[row.id] ?? null;
+                  return (
+                  <tr
+                    key={row.id}
+                    onClick={onRowClick ? () => onRowClick(row.id) : undefined}
+                    onMouseEnter={onRowClick ? () => setHoverRow(row.id) : undefined}
+                    onMouseLeave={onRowClick ? () => setHoverRow(null) : undefined}
+                    role={onRowClick ? 'button' : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    aria-label={onRowClick ? `Open ${row.label} detail — fan chart and contributing trends` : undefined}
+                    onKeyDown={onRowClick ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(row.id); }
+                    } : undefined}
+                    style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                  >
                     <td
                       className="px-6 py-1 text-[13px] font-semibold sticky left-0 z-10"
                       style={{
-                        backgroundColor: S.surface,
+                        backgroundColor: isRowHover ? S.surfaceLow : S.surface,
                         color: onRowClick ? S.primary : S.onSurface,
                         fontFamily: BODY_FONT,
-                        cursor: onRowClick ? 'pointer' : 'default',
                         transition: 'color 0.15s ease, background-color 0.15s ease',
+                        boxShadow: isRowHover && onRowClick ? `inset 3px 0 0 ${S.primary}` : 'none',
                       }}
-                      onClick={onRowClick ? () => onRowClick(row.id) : undefined}
-                      onMouseEnter={onRowClick ? (e) => {
-                        e.currentTarget.style.backgroundColor = S.surfaceLow;
-                        e.currentTarget.style.color = S.primaryDim;
-                        e.currentTarget.style.textDecoration = 'underline';
-                        e.currentTarget.style.textUnderlineOffset = '3px';
-                      } : undefined}
-                      onMouseLeave={onRowClick ? (e) => {
-                        e.currentTarget.style.backgroundColor = S.surface;
-                        e.currentTarget.style.color = S.primary;
-                        e.currentTarget.style.textDecoration = 'none';
-                      } : undefined}
-                      title={onRowClick ? `Open ${row.label} detail — fan chart and contributing trends` : undefined}
-                      role={onRowClick ? 'button' : undefined}
-                      tabIndex={onRowClick ? 0 : undefined}
-                      onKeyDown={onRowClick ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onRowClick(row.id);
-                        }
-                      } : undefined}
                     >
                       {onRowClick ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                          {row.label}
-                          <span aria-hidden style={{ opacity: 0.85, fontSize: 11 }}>›</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ textDecoration: isRowHover ? 'underline' : 'none', textUnderlineOffset: '3px' }}>
+                            {row.label}
+                          </span>
+                          <span
+                            aria-hidden
+                            style={{
+                              display: 'inline-flex', alignItems: 'center',
+                              fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                              textTransform: 'uppercase', color: S.primary,
+                              opacity: isRowHover ? 1 : 0, transition: 'opacity 0.15s ease',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            View details →
+                          </span>
                         </span>
                       ) : (
                         row.label
@@ -508,6 +580,7 @@ const Matrix: FC<MatrixProps> = ({
                     </td>
                     {columns.map((col) => {
                       const v = data[row.id]?.[col.id] ?? null;
+                      const isCellHover = hover?.rowId === row.id && hover?.colId === col.id;
                       return (
                         <td
                           key={col.id}
@@ -517,41 +590,21 @@ const Matrix: FC<MatrixProps> = ({
                             color: heatTextColor(v),
                             fontWeight: v != null && Math.abs(v) > 0.02 ? 700 : 600,
                             fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
-                            transition: 'background-color 0.25s ease',
-                            cursor: v != null ? 'default' : 'inherit',
+                            transition: 'background-color 0.25s ease, box-shadow 0.15s ease',
+                            // Click affordance — the hovered % value reads as a
+                            // button (drill-down opens on click via the row handler).
+                            boxShadow: isCellHover && onRowClick
+                              ? `inset 0 0 0 2px ${S.primary}`
+                              : 'none',
                           }}
                           onMouseEnter={v != null ? (e) => onCellEnter(e, row.id, col.id, row.label, col.label) : undefined}
                           onMouseLeave={v != null ? onCellLeave : undefined}
                         >
-                          {v == null ? '—' : (
-                            <>
-                              {fmtShift(v, 1)}
-                              {showRanges && (() => {
-                                const d = cellDetails?.[row.id]?.[col.id];
-                                if (d?.p10 == null || d?.p90 == null) return null;
-                                return (
-                                  <span
-                                    style={{
-                                      display: 'block',
-                                      fontSize: 9.5,
-                                      fontWeight: 500,
-                                      opacity: 0.78,
-                                      letterSpacing: '-0.01em',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {fmtShift(d.p10, 1)} … {fmtShift(d.p90, 1)}
-                                  </span>
-                                );
-                              })()}
-                            </>
-                          )}
+                          {v == null ? '—' : fmtShift(v, 1)}
                         </td>
                       );
                     })}
-                    {showTotals && (() => {
-                      const rt = rowTotals?.[row.id] ?? null;
-                      return (
+                    {showTotals && (
                         <td
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
@@ -564,12 +617,12 @@ const Matrix: FC<MatrixProps> = ({
                           }}
                           title={rt != null ? `${row.label} — row total (MC median): ${fmtShift(rt, 1)}` : undefined}
                         >
-                          {rt == null ? '—' : fmtShift(rt, 1)}
+                          {rt == null ? '—' : `${shiftArrow(rt)} ${fmtShift(rt, 1)}`.trim()}
                         </td>
-                      );
-                    })()}
+                    )}
                   </tr>
-                ))}
+                  );
+                })}
               </React.Fragment>
             ))}
             {showTotals && (
@@ -600,7 +653,7 @@ const Matrix: FC<MatrixProps> = ({
                       }}
                       title={ct != null ? `${col.label} — column total: ${fmtShift(ct, 1)}` : undefined}
                     >
-                      {ct == null ? '—' : fmtShift(ct, 1)}
+                      {ct == null ? '—' : `${shiftArrow(ct)} ${fmtShift(ct, 1)}`.trim()}
                     </td>
                   );
                 })}
@@ -616,7 +669,7 @@ const Matrix: FC<MatrixProps> = ({
                   }}
                   title={grandTotal != null ? `Grand total: ${fmtShift(grandTotal, 1)}` : undefined}
                 >
-                  {grandTotal == null ? '—' : fmtShift(grandTotal, 1)}
+                  {grandTotal == null ? '—' : `${shiftArrow(grandTotal)} ${fmtShift(grandTotal, 1)}`.trim()}
                 </td>
               </tr>
             )}
@@ -624,23 +677,24 @@ const Matrix: FC<MatrixProps> = ({
         </table>
       </div>
 
-      {/* Legend */}
+      {/* Legend — short read; the full aggregation rules live in
+          "About this model" below (P4 declutter, June 2026). */}
       <div
-        className="flex items-center justify-between px-6 py-4 flex-wrap gap-3"
+        className="rounded-b-2xl flex items-center justify-between px-6 py-4 flex-wrap gap-3"
         style={{ backgroundColor: S.surfaceLow, color: S.mutedText, fontSize: 11 }}
       >
         <span style={{ fontFamily: BODY_FONT }}>
-          Signed percentages. Positive → profit-pool expansion. Negative → contraction.
-          {showTotals && ' Row totals equal the MC median shift per category (identical across all four lenses). Column and grand totals are category-weighted averages using the business-importance weights from the Config sheet.'}
+          Signed % vs 2025 · positive = expansion · negative = contraction
+          {showTotals && ' · totals are category-weighted'}
         </span>
         <div className="flex items-center gap-3">
           <span>−5%</span>
           <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
-            <div style={{ flex: 1, background: 'rgba(220, 38, 38, 0.76)' }} />
-            <div style={{ flex: 1, background: 'rgba(220, 38, 38, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.36)' }} />
             <div style={{ flex: 0.2, background: S.surfaceLow }} />
-            <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.36)' }} />
-            <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.76)' }} />
           </div>
           <span>+5%</span>
         </div>
@@ -744,6 +798,11 @@ const Matrix: FC<MatrixProps> = ({
             {!cellDetails && noBandsNote && (
               <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
                 {noBandsNote}
+              </div>
+            )}
+            {onRowClick && (
+              <div style={{ opacity: 0.6, fontSize: 10.5, marginTop: 6, fontWeight: 600 }}>
+                Click → {hover.rowLabel} drill-down
               </div>
             )}
             {/* Pointer arrow */}
@@ -970,7 +1029,17 @@ const IntegrityChip: FC<{ events: IntegrityEventShape[] }> = ({ events }) => {
 };
 
 // ─── Main Component ──────────────────────────────────────────────
-const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => {
+const ProfitPoolAnalysis2: FC<{
+  isAdmin?: boolean;
+  /** When set (e.g. from an Executive Summary mover), opens that category's
+      full-screen drill-down on mount/update; consumed via onConsumeOpenCategory. */
+  openCategoryId?: string | null;
+  onConsumeOpenCategory?: () => void;
+  /** Drill-through to the Trends tab (same contract as ConsumerJourney2):
+      receives a trend NAME, applied as the Trends-tab search query. Used by
+      the Category Detail Panel's contributing-trend rows. */
+  onNavigateToTrend?: (query: string) => void;
+}> = ({ isAdmin = false, openCategoryId = null, onConsumeOpenCategory, onNavigateToTrend }) => {
   const {
     simulation, config, trends,
     loading, error, backendAvailable,
@@ -988,7 +1057,13 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
   // allocation recommendation for that one category.
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  // ── Show-ranges mode ─────────────────────────────────────────────
+  // Open a drill-down requested from outside (e.g. an Executive Summary
+  // mover). Consume the request so it fires once per click.
+  useEffect(() => {
+    if (!openCategoryId) return;
+    setSelectedCategoryId(openCategoryId);
+    onConsumeOpenCategory?.();
+  }, [openCategoryId, onConsumeOpenCategory]);
 
   // ── Collapsible methodology footer ───────────────────────────────
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1357,7 +1432,6 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
   }, [simulation, trends, selectedYear]);
 
   const meta = VIEW_META[view];
-  const MetaIcon = meta.Icon;
 
   // ── Headline takeaway ─────────────────────────────────────────────
   // The answer of the tool, stated above the evidence: portfolio-weighted
@@ -1420,6 +1494,51 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
   const decompositionsMissing = view !== 'time' && simulation != null
     && simulation.decompositions == null;
 
+  // ─── Matrix toolbar (P1 declutter, June 2026) ──────────────────
+  // Every control that manipulates the matrix lives ON the matrix card:
+  // lens pills left; the contextual control right — impact filter on the
+  // Time Path lens, measurement-year pills on the attribution lenses.
+  // The impact-filter / year semantics are captioned in the subtitle
+  // strip directly below, so no floating description rows remain.
+  const matrixToolbar = (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        {(Object.keys(VIEW_META) as ViewMode[]).map((v) => (
+          <PillButton
+            key={v}
+            active={view === v}
+            onClick={() => setView(v)}
+            icon={VIEW_META[v].Icon}
+          >
+            {VIEW_META[v].label}
+          </PillButton>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {view === 'time'
+          ? (Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => (
+              <PillButton
+                key={f}
+                active={impactFilter === f}
+                onClick={() => setImpactFilter(f)}
+                icon={IMPACT_META[f].Icon}
+              >
+                {IMPACT_META[f].label}
+              </PillButton>
+            ))
+          : YEARS.map((y) => (
+              <YearPill
+                key={y}
+                active={selectedYear === y}
+                onClick={() => setSelectedYear(y)}
+                label={String(y)}
+              />
+            ))}
+        <PeakStressTooltip />
+      </div>
+    </>
+  );
+
   return (
     <div
       className="min-h-screen"
@@ -1433,32 +1552,17 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
             style={{ borderLeft: `4px solid ${S.primary}` }}
           >
             <div
-              className="text-xs font-semibold uppercase tracking-[0.18em] mb-2"
+              className="text-xs font-semibold uppercase tracking-[0.18em]"
               style={{ color: S.onSurfaceVariant }}
             >
-              Profit Pool Analysis · Shift Matrix
+              Henkel Consumer Brands · Profit Pool Outlook
             </div>
-            <h1
-              className="font-extrabold tracking-tight"
-              style={{
-                fontFamily: HEADLINE_FONT,
-                color: S.onBg,
-                fontSize: '2.5rem',
-                lineHeight: 1.1,
-              }}
+            <div
+              className="text-[11px] font-semibold uppercase tracking-[0.16em] mt-1"
+              style={{ color: S.mutedText }}
             >
-              The Shift Matrix, Four Lenses
-            </h1>
-            <p
-              className="mt-2 max-w-2xl text-[15px]"
-              style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
-            >
-              How the 12 Henkel Consumer Brands categories are projected to move —
-              read the same underlying MC output across time, strategic force,
-              value-chain step, and regional market. Row totals reconcile across
-              all four lenses; column and grand totals are category-weighted
-              averages using the Config-sheet weights.
-            </p>
+              12 categories · 2026–2035 · Bayesian Monte Carlo
+            </div>
           </div>
 
           {/* Run ribbon — tells the user exactly which persisted run is
@@ -1562,169 +1666,123 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
           )}
         </AnimatePresence>
 
-        {/* ── Headline takeaway ─────────────────────────────────
-            The decision-relevant numbers, stated before the matrix.
-            P10–P90 is the engine's joint portfolio band (per-iteration
-            category-weighted mean over raw samples, 2.8.0+); for older
-            persisted runs it falls back to the category-weighted average
-            of per-category bands and is labeled accordingly (D3/F-16). */}
+        {/* ── Hero — the answer, stated before the matrix (S1 / S2) ──
+            One dominant figure: the portfolio profit-pool shift to the
+            horizon year, with its P10–P90 band always shown and freshness
+            + seed-stability beside it. P10–P90 is the engine's joint
+            portfolio band (per-iteration over raw samples, 2.8.0+); for
+            older persisted runs it falls back to the category-weighted
+            average of per-category bands and is labeled accordingly
+            (D3/F-16). The matrix below is the evidence. */}
         {headline && (
-          <section className="mb-8">
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-2xl px-5 py-4 min-w-[200px]"
-                style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
-                  style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                  Portfolio · {headline.horizon}
-                </div>
-                <div className="font-extrabold tabular-nums"
-                  style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1,
-                    color: headline.med >= 0 ? '#059669' : '#dc2626' }}>
-                  {fmtShift(headline.med, 1)}
-                </div>
-                {headline.p10 != null && headline.p90 != null && (
-                  <div className="text-[11px] mt-1 tabular-nums" style={{ color: S.mutedText }}>
-                    {fmtShift(headline.p10, 1)} … {fmtShift(headline.p90, 1)}
-                    <span style={{ opacity: 0.75 }}>
-                      {' '}· P10–P90, {headline.joint ? 'joint portfolio' : 'cat-weighted (pre-2.8 run)'}
-                    </span>
+          <section className="mb-9">
+            <div
+              className="rounded-3xl px-7 py-7 md:px-9 md:py-8"
+              style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
+                boxShadow: '0 18px 60px -22px rgba(0, 52, 94, 0.22)' }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
+                {/* The one number */}
+                <div className="min-w-[280px]">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] mb-2"
+                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                    Portfolio profit-pool shift · by {headline.horizon}
                   </div>
-                )}
-              </div>
-              {headline.maxCat && headline.maxCat.v > 0 && (
-                <div className="rounded-2xl px-5 py-4 min-w-[200px]"
-                  style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
-                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Largest expansion</div>
-                  <div className="font-extrabold tabular-nums"
-                    style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1, color: '#059669' }}>
-                    {fmtShift(headline.maxCat.v, 1)}
+                  <ShiftValue
+                    value={headline.med}
+                    size={72}
+                    fontFamily={HEADLINE_FONT}
+                    range={headline.p10 != null && headline.p90 != null
+                      ? { low: headline.p10, high: headline.p90 } : null}
+                    rangeLabel={headline.joint
+                      ? 'P10–P90 · 80% of outcomes (joint portfolio)'
+                      : 'P10–P90 · cat-weighted (pre-2.8 run)'}
+                    rangeSize={14}
+                  />
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    {/* Run date lives in the run ribbon (top right) only —
+                        the duplicate "As of" chip was removed (P2, June 2026). */}
+                    {/* Seed stability (D3): the honest reproducibility chip.
+                        Deliberately NOT a "Converged ✓" claim — R̂ on i.i.d. MC
+                        draws is ≈1.0 by construction; the defensible quantity
+                        is the headline spread across independently-seeded
+                        chains, mirrored from the run-details popover. */}
+                    {(() => {
+                      const st = simulation?.seed_stability;
+                      if (!st || st.headline_median_spread == null) return null;
+                      return (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                          style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11.5, fontWeight: 600 }}
+                          title={`Headline median spread across ${st.n_chains} independently-seeded chains`}>
+                          <GitBranch size={12} /> Seed-stable ±{(st.headline_median_spread * 100 / 2).toFixed(2)}pp · {st.n_chains} chains
+                        </span>
+                      );
+                    })()}
                   </div>
-                  <div className="text-[12px] mt-1 font-semibold" style={{ color: S.onSurface }}>{headline.maxCat.name}</div>
                 </div>
-              )}
-              {headline.minCat && headline.minCat.v < 0 && (
-                <div className="rounded-2xl px-5 py-4 min-w-[200px]"
-                  style={{ backgroundColor: S.surface, boxShadow: '0 4px 40px -12px rgba(0, 52, 94, 0.10)' }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1"
-                    style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Deepest contraction</div>
-                  <div className="font-extrabold tabular-nums"
-                    style={{ fontFamily: HEADLINE_FONT, fontSize: 30, lineHeight: 1.1, color: '#dc2626' }}>
-                    {fmtShift(headline.minCat.v, 1)}
-                  </div>
-                  <div className="text-[12px] mt-1 font-semibold" style={{ color: S.onSurface }}>{headline.minCat.name}</div>
-                </div>
-              )}
-              <div className="rounded-2xl px-5 py-4 flex-1 min-w-[260px] flex items-center"
-                style={{ backgroundColor: S.surfaceLow }}>
-                <p className="text-[13.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
-                  By {headline.horizon}, the weighted portfolio shift is{' '}
-                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.med, 1)}</strong>
-                  {headline.p10 != null && headline.p90 != null && (
-                    <> (P10 {fmtShift(headline.p10, 1)}, P90 {fmtShift(headline.p90, 1)})</>
-                  )}
+
+                {/* Supporting movers — drill straight into the category (P3) */}
+                <div className="flex flex-col gap-3 min-w-[230px]">
                   {headline.maxCat && headline.maxCat.v > 0 && (
-                    <>. Expansion concentrates in{' '}
-                    <strong style={{ color: S.onSurface }}>{headline.maxCat.name}</strong>{' '}
-                    ({fmtShift(headline.maxCat.v, 1)})</>
+                    <MoverTile
+                      label="Largest expansion"
+                      name={headline.maxCat.name}
+                      value={headline.maxCat.v}
+                      onOpen={() => setSelectedCategoryId(headline.maxCat!.name)}
+                    />
                   )}
                   {headline.minCat && headline.minCat.v < 0 && (
-                    <>; the deepest contraction is{' '}
-                    <strong style={{ color: S.onSurface }}>{headline.minCat.name}</strong>{' '}
-                    ({fmtShift(headline.minCat.v, 1)})</>
+                    <MoverTile
+                      label="Deepest contraction"
+                      name={headline.minCat.name}
+                      value={headline.minCat.v}
+                      onOpen={() => setSelectedCategoryId(headline.minCat!.name)}
+                    />
                   )}
-                  . Cumulative vs 2025, MC median.
-                </p>
+                </div>
               </div>
+
+              {/* Plain-language read */}
+              <p className="text-[14px] mt-6 pt-5"
+                style={{ color: S.onSurfaceVariant, lineHeight: 1.6, borderTop: `1px solid ${S.cardBorder}` }}>
+                By {headline.horizon}, the weighted portfolio profit pool is projected to{' '}
+                {headline.med >= 0 ? 'expand' : 'contract'} by{' '}
+                <strong style={{ color: headline.med >= 0 ? EXPANSION : CONTRACTION }}>{fmtShift(headline.med, 1)}</strong>{' '}
+                versus 2025
+                {headline.p10 != null && headline.p90 != null && (
+                  <> — with 80% of simulated outcomes between{' '}
+                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.p10, 1)}</strong> and{' '}
+                  <strong style={{ color: S.onSurface }}>{fmtShift(headline.p90, 1)}</strong></>
+                )}
+                . Figures are MC medians, cumulative vs 2025;{' '}
+                {headline.joint
+                  ? 'the band is the joint portfolio P10–P90, computed per-iteration from raw samples.'
+                  : 'the band is the category-weighted P10–P90 of a pre-2.8 run — an indicative portfolio range, not a joint percentile.'}
+              </p>
+
+              {/* D16 (owner decision, June 2026): the model's design assumption,
+                  stated where the totals are read. Exact owner wording. */}
+              <p className="mt-3 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.55, maxWidth: 1000 }}>
+                Ceteris paribus: assumes no management response — no pricing moves, innovation, or
+                competitive reaction by Henkel or competitors. Totals read as exposure if nobody acts,
+                not as forecast outcomes.
+              </p>
             </div>
-            {/* D16 (owner decision, June 2026): the model's design assumption,
-                stated where the totals are read. Exact owner wording. */}
-            <p className="mt-3 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.55, maxWidth: 1000 }}>
-              Ceteris paribus: assumes no management response — no pricing moves, innovation, or
-              competitive reaction by Henkel or competitors. Totals read as exposure if nobody acts,
-              not as forecast outcomes.
-            </p>
           </section>
         )}
 
-        {/* ── View toggle ─────────────────────────────────────── */}
-        <section className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(VIEW_META) as ViewMode[]).map((v) => (
-              <PillButton
-                key={v}
-                active={view === v}
-                onClick={() => setView(v)}
-                icon={VIEW_META[v].Icon}
-              >
-                {VIEW_META[v].label}
-              </PillButton>
-            ))}
-          </div>
-          <div
-            className="flex items-center gap-3 flex-wrap"
-            style={{ color: S.mutedText }}
-          >
-            <div className="flex items-center gap-2 text-[12px]">
-              <MetaIcon size={14} style={{ color: S.primary }} />
-              <span>{meta.description}</span>
-            </div>
-            <PeakStressTooltip />
-          </div>
-        </section>
-
-        {/* ── Impact filter (Total / Expansion / Contraction) ─────
-            Subdivides the matrix into the upside-only or downside-only
-            portion of each cell. Restricted to the Time Path lens — the
-            per-trend × per-axis attribution required for clean
-            sign-filtering of Force / VC / Region cells doesn't exist at
-            the frontend, so we hide the toggle on those views. State is
-            preserved so returning to Time Path keeps the prior choice. */}
-        {view === 'time' && (
-        <section className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => (
-              <PillButton
-                key={f}
-                active={impactFilter === f}
-                onClick={() => setImpactFilter(f)}
-                icon={IMPACT_META[f].Icon}
-              >
-                {IMPACT_META[f].label}
-              </PillButton>
-            ))}
-          </div>
-          <div
-            className="flex items-center gap-2 text-[12px]"
-            style={{ color: S.mutedText }}
-          >
-            <Info size={14} style={{ color: S.primary }} />
-            <span>{IMPACT_META[impactFilter].description}</span>
-          </div>
-        </section>
-        )}
-
-        {/* ── Year selector (lens views only) ───────────────────── */}
-        {view !== 'time' && (
-          <section className="mb-6">
-            <div
-              className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
-              style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}
-            >
-              Measurement year · cumulative level vs 2025
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {YEARS.map((y) => (
-                <YearPill
-                  key={y}
-                  active={selectedYear === y}
-                  onClick={() => setSelectedYear(y)}
-                  label={String(y)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* ── The evidence: the shift matrix ─────────────────────── */}
+        <div className="mb-5 pl-5" style={{ borderLeft: `3px solid ${S.cardBorderStrong}` }}>
+          <h2 className="font-extrabold tracking-tight"
+            style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '1.5rem', lineHeight: 1.15 }}>
+            Where the profit pool moves
+          </h2>
+          <p className="mt-1.5 max-w-3xl text-[13.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
+            One simulation, four reads — over time, by force, along the value chain, across regions.
+            Row totals reconcile across all four.{' '}
+            <span style={{ fontWeight: 600, color: S.onSurface }}>Click any value to open the category drill-down.</span>
+          </p>
+        </div>
 
         {/* ── Matrix ──────────────────────────────────────────── */}
         <motion.section
@@ -1864,12 +1922,15 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
             })()
           ) : (
             <Matrix
+              toolbar={matrixToolbar}
               columns={filteredMatrix.columns}
               rows={filteredMatrix.rows}
               data={filteredMatrix.data}
               subtitle={
                 view === 'time'
-                  ? `${meta.label} · ${meta.description}${impactFilter !== 'total' ? ` · ${IMPACT_META[impactFilter].label}` : ''}`
+                  ? (impactFilter !== 'total'
+                      ? `${meta.label} · ${IMPACT_META[impactFilter].label} — ${IMPACT_META[impactFilter].description}`
+                      : `${meta.label} · ${meta.description}`)
                   : `${meta.label} · ${selectedYear} · ${meta.description}`
               }
               emptyMessage={
@@ -1886,7 +1947,6 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
               rowTotalLabel={view === 'time' ? 'Total' : `Total ${selectedYear}`}
               cellDetails={filteredMatrix.cellDetails}
               onRowClick={setSelectedCategoryId}
-              showRanges={view === 'time' && impactFilter === 'total'}
               noBandsNote={
                 view !== 'time'
                   ? 'Switch to Time Path for P10 / P90 bands'
@@ -1908,6 +1968,7 @@ const ProfitPoolAnalysis2: FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => 
               data={panelData}
               categoryId={selectedCategoryId}
               onClose={() => setSelectedCategoryId(null)}
+              onOpenTrend={onNavigateToTrend}
             />
           )}
         </AnimatePresence>

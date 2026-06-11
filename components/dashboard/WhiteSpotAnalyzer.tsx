@@ -18,8 +18,11 @@
  * app/dashboard/page.tsx (type union, TABS entry, import, render line).
  *
  * Method: white_spot_score = max(migration, 0) × (1 − presence/5)
- *   migration  = Σ over group categories of journey_decomposition[cat][stage]
- *                (terminal-year MC-median attribution, in pp — COMPUTED)
+ *   migration  = Σ over group categories of
+ *                journey_decomposition[cat][`${tab}:${stageId}`]
+ *                (terminal-year MC-median attribution, in pp — COMPUTED;
+ *                 stage keys are namespaced "<journey>:<stage_id>" by the
+ *                 engine — same parse as ConsumerJourney2's attribution)
  *   presence   = 0–5 judgment (blueprint / AI-suggested / user-adjusted)
  * Quadrants: presence ≥ 2.5 & migration ≥ 0 → defend & extend;
  *            presence ≥ 2.5 & migration < 0 → manage decline;
@@ -34,6 +37,7 @@ import {
   TrendingUp, Info, RotateCcw, Eye, EyeOff, Target,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
+import type { SimulationResult } from '@/types/simulation';
 import { LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX } from '@/data/consumerJourney';
 
 // ── Local style tokens (intentional copy — keeps this view deletable) ──
@@ -152,17 +156,21 @@ const WhiteSpotAnalyzer: FC = () => {
   const seed = tab === 'lhc' ? LAUNDRY_FOOTPRINT : HAIR_FOOTPRINT;
 
   // ── Modelled migration: real run data, else optional labelled preview ──
+  // journey_decomposition stage keys are namespaced "<journey>:<stage_id>"
+  // (e.g. "lhc:add_products") — strip the namespace so lookups by bare
+  // stage id work. Mirrors ConsumerJourney2's stage-attribution parse.
   const realMigration = useMemo(() => {
-    const decomp = (simulation as unknown as {
-      journey_decomposition?: Record<string, Record<string, number>>;
-    } | null)?.journey_decomposition;
+    const decomp = (simulation as SimulationResult | null)?.journey_decomposition;
     if (!decomp) return null;
     const prefix = tab === 'lhc' ? 'LHC' : 'Hair';
+    const nsPrefix = `${tab}:`;
     const sums: Record<string, number> = {};
     let any = false;
-    for (const [cat, st] of Object.entries(decomp)) {
+    for (const [cat, stageMap] of Object.entries(decomp)) {
       if (!cat.startsWith(prefix)) continue;
-      for (const [sid, v] of Object.entries(st)) {
+      for (const [stageKey, v] of Object.entries(stageMap)) {
+        if (!stageKey.startsWith(nsPrefix)) continue;
+        const sid = stageKey.slice(nsPrefix.length);
         sums[sid] = (sums[sid] ?? 0) + (typeof v === 'number' ? v : 0);
         any = true;
       }
