@@ -24,7 +24,7 @@
  * Horizon distribution: H1 Execution 24, H2 Disruption 19, H3 Transformation 7.
  */
 
-export type InnovationTier ='WHITE_SPOT' |'TRANSFORMATIONAL' |'ADJACENT_INNOVATION' |'BRAND_EXTENSION' |'CORE_INNOVATION' |'CATEGORY_EXPANSION' |'CHANNEL_CROSSOVER' |'REGULATORY_PROACTIVE' |'MARKET_EXPANSION' |'PREMIUMIZATION';
+export type InnovationTier ='MARKET_GAP' |'TRANSFORMATIONAL' |'ADJACENT_INNOVATION' |'BRAND_EXTENSION' |'CORE_INNOVATION' |'CATEGORY_EXPANSION' |'CHANNEL_CROSSOVER' |'REGULATORY_PROACTIVE' |'MARKET_EXPANSION' |'PREMIUMIZATION';
 
 export type InnovationTierLevel = 1 | 2;
 
@@ -132,8 +132,8 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Care (Scalp)',
  categoryShort:'Care',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 92,
  fitScore: 95,
@@ -157,7 +157,7 @@ export const INNOVATIONS: Innovation[] = [
       { region:'Asia', readiness: 'MEDIUM' }
     ],
  trendConnections: [
- { code:'C-07', name:'Scalp Care Emerges as Standalone Category', direction: 'Expansion', rationale:'Direct — this IS the white spot response' },
+ { code:'C-07', name:'Scalp Care Emerges as Standalone Category', direction: 'Expansion', rationale:'Direct — this IS the market gap response' },
  { code:'T-04', name:'Microbiome Science for Hair and Skin', direction: 'Expansion', rationale:'Core technology platform' },
  { code:'C-03', name:'Premiumization Acceleration in Hair Care', direction: 'Expansion', rationale:'Premium price architecture justified by clinical positioning' },
  { code:'K-07', name:'Professional Salon Channel to Consumer Crossover', direction: 'Expansion', rationale:'Technology bridge from professional to consumer' },
@@ -184,13 +184,13 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Care (Thinning/Loss)',
  categoryShort:'Care',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 94,
  fitScore: 88,
  horizon:'2027–2029',
- consumerNeed:'Hair thinning and loss affects over 50% of men by age 50 and 40% of women at some point in their lives, yet the consumer treatment market remains dominated by pharmaceutical-adjacent brands (Regaine/Rogaine, Nioxin) and DTC insurgents (Nutrafol, Hims/Hers, Vegamour). Most mainstream hair care portfolios have no dedicated thinning/loss brand — one of the most significant white spots in the industry. The opportunity is to create a cosmetic-grade (not pharmaceutical) density system that targets the 80% of thinning consumers who want visible results without prescription commitments.',
+ consumerNeed:'Hair thinning and loss affects over 50% of men by age 50 and 40% of women at some point in their lives, yet the consumer treatment market remains dominated by pharmaceutical-adjacent brands (Regaine/Rogaine, Nioxin) and DTC insurgents (Nutrafol, Hims/Hers, Vegamour). Most mainstream hair care portfolios have no dedicated thinning/loss brand — one of the most significant market gaps in the industry. The opportunity is to create a cosmetic-grade (not pharmaceutical) density system that targets the 80% of thinning consumers who want visible results without prescription commitments.',
  techSpecs: [
  { title:'Density Complex', description:'Caffeine + Biotin + Zinc PCA + Redensyl (DHQG + EGCG2) targeting hair follicle stem cells. Clinical studies showing 17% increase in hair density over 12 weeks.', icon:'science' },
  { title:'Multi-Modal System', description:'5-product architecture: Densifying Shampoo > Thickening Conditioner > Scalp Activation Serum > Overnight Root Treatment > Volume Finishing Spray.', icon:'layers' },
@@ -210,7 +210,7 @@ export const INNOVATIONS: Innovation[] = [
       { region:'High Growth', readiness: 'MEDIUM' }
     ],
  trendConnections: [
- { code:'C-10', name:'Hair Loss and Thinning Treatments Enter Consumer Mainstream', direction: 'Expansion', rationale:'Direct white spot response — $3B+ market' },
+ { code:'C-10', name:'Hair Loss and Thinning Treatments Enter Consumer Mainstream', direction: 'Expansion', rationale:'Direct market gap response — $3B+ market' },
  { code:'C-05', name:'Silver Economy — Aging Population Shifts Category Demand', direction: 'Expansion', rationale:'Structural demand driver from demographics' },
  { code:'C-03', name:'Premiumization Acceleration in Hair Care', direction: 'Expansion', rationale:'Super-premium price architecture' },
  { code:'T-04', name:'Microbiome Science for Hair and Skin', direction: 'Expansion', rationale:'Scalp microbiome health supports follicle function' },
@@ -285,17 +285,17 @@ export const INNOVATIONS: Innovation[] = [
  id:'inn_04',
  number: 4,
  name:'Premium Fabric Refresh Ecosystem',
- subtitle:'A premium fabric refresh system addressing the most critical LHC white spot — the between-wash occasion dominated by a single $1B+ incumbent.',
+ subtitle:'A premium fabric refresh system addressing the most critical LHC market gap — the between-wash occasion dominated by a single $1B+ incumbent.',
  category:'LHC: FCA / FFI (Between-Wash)',
  categoryShort:'FCA',
  categoryGroup:'LHC',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 95,
  fitScore: 92,
  horizon:'2027',
- consumerNeed:'The between-wash fabric care occasion represents one of the largest untapped profit pools in household care. P&G\'s Febreze generates over $1B in annual revenue with minimal competition. Most mainstream LHC portfolios have zero brand presence in this space — it is consistently identified as the #1 white spot. Consumer behavior data shows that 67% of garments worn between washes receive no treatment, and 78% of consumers express interest in \'refresh without rewash\' solutions. The trend convergence is powerful: C-14 (Between-Wash Fabric Care as Standalone Occasion), C-09 (Fragrance Premiumization in Home Care), and E-08 (Textile Longevity) all point toward a premium, multi-format fabric refresh ecosystem.',
+ consumerNeed:'The between-wash fabric care occasion represents one of the largest untapped profit pools in household care. P&G\'s Febreze generates over $1B in annual revenue with minimal competition. Most mainstream LHC portfolios have zero brand presence in this space — it is consistently identified as the #1 market gap. Consumer behavior data shows that 67% of garments worn between washes receive no treatment, and 78% of consumers express interest in \'refresh without rewash\' solutions. The trend convergence is powerful: C-14 (Between-Wash Fabric Care as Standalone Occasion), C-09 (Fragrance Premiumization in Home Care), and E-08 (Textile Longevity) all point toward a premium, multi-format fabric refresh ecosystem.',
  techSpecs: [
  { title:'Odor Neutralization', description:'Cyclodextrin-based molecular trapping technology (superior to masking). Eliminates cooking, smoke, and body odor molecules at the structural level.', icon:'air' },
  { title:'Premium Fragrance', description:'3-tier fragrance architecture: Fresh (citrus/aquatic), Luxe (amber/sandalwood/oud), Garden (botanical/floral). Fine-fragrance grade ingredients from major fragrance house partnership.', icon:'spa' },
@@ -314,7 +314,7 @@ export const INNOVATIONS: Innovation[] = [
       { region:'High Growth', readiness: 'MEDIUM' }
     ],
  trendConnections: [
- { code:'C-14', name:'Between-Wash Fabric Care as Standalone Occasion', direction: 'Expansion', rationale:'Direct white spot fill — #1 priority' },
+ { code:'C-14', name:'Between-Wash Fabric Care as Standalone Occasion', direction: 'Expansion', rationale:'Direct market gap fill — #1 priority' },
  { code:'C-09', name:'Fragrance and Sensory Premiumization in Home Care', direction: 'Expansion', rationale:'Premium fragrance justifies price architecture' },
  { code:'E-08', name:'Textile Longevity and Garment Life Extension', direction: 'Expansion', rationale:'Extends garment life = sustainability narrative' },
  { code:'C-03', name:'Premiumization Acceleration', direction: 'Expansion', rationale:'Premium positioning in commoditizing category' },
@@ -443,8 +443,8 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Styling + Body',
  categoryShort:'Styling',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 2,
  marketScore: 80,
  fitScore: 78,
@@ -468,7 +468,7 @@ export const INNOVATIONS: Innovation[] = [
       { region:'High Growth', readiness: 'MEDIUM' }
     ],
  trendConnections: [
- { code:'C-08', name:'Male Grooming Structural Growth', direction: 'Expansion', rationale:'Direct white spot response' },
+ { code:'C-08', name:'Male Grooming Structural Growth', direction: 'Expansion', rationale:'Direct market gap response' },
  { code:'C-03', name:'Premiumization Acceleration in Hair Care', direction: 'Expansion', rationale:'Masstige positioning in growing premium segment' },
  { code:'K-04', name:'Social Commerce and TikTok Shop', direction: 'Expansion', rationale:'TikTok-native marketing for male grooming discovery' },
  { code:'C-11', name:'Gen Z Dupe Culture and Ingredient Literacy', direction: 'Contraction', rationale:'Transparent ingredient lists, clinical claims to counter dupe risk' },
@@ -804,8 +804,8 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Styling',
  categoryShort:'Styling',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 2,
  marketScore: 78,
  fitScore: 82,
@@ -1066,8 +1066,8 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Care',
  categoryShort:'Care',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 91,
  fitScore: 82,
@@ -1801,8 +1801,8 @@ export const INNOVATIONS: Innovation[] = [
  category:'LHC: LAD',
  categoryShort:'LAD',
  categoryGroup:'LHC',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 81,
  fitScore: 84,
@@ -2289,13 +2289,13 @@ export const INNOVATIONS: Innovation[] = [
  category:'Hair: Styling',
  categoryShort:'Styling',
  categoryGroup:'Hair',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 84,
  fitScore: 81,
  horizon:'2027–2031',
- consumerNeed:'The first Gen Alpha cohort (born 2012+) enters the styling category (C-26) between 2026–2030 — and they do not shop like Gen Z. Their category entry point is livestream commerce (K-10 Douyin, TikTok Shop), their hero benefit is "visible on camera", and they treat hair color/texture as a daily identity layer rather than a salon decision. No mass styling portfolio currently has a dedicated Gen-Alpha-native brand — indie TikTok-born brands (Mielle, Ceremonia, Crown Affair) are filling the gap with DTC-only distribution. This creates an explicit white spot for a mass player that can combine scale manufacturing with a creator-owned go-to-market.',
+ consumerNeed:'The first Gen Alpha cohort (born 2012+) enters the styling category (C-26) between 2026–2030 — and they do not shop like Gen Z. Their category entry point is livestream commerce (K-10 Douyin, TikTok Shop), their hero benefit is "visible on camera", and they treat hair color/texture as a daily identity layer rather than a salon decision. No mass styling portfolio currently has a dedicated Gen-Alpha-native brand — indie TikTok-born brands (Mielle, Ceremonia, Crown Affair) are filling the gap with DTC-only distribution. This creates an explicit market gap for a mass player that can combine scale manufacturing with a creator-owned go-to-market.',
  techSpecs: [
  { title:'Camera-Optimised Finish Technology', description:'Reflectance-balanced polymers tuned for phone camera capture (0.7 lux to 50,000 lux range). Validated against TikTok/Instagram/Douyin front-camera sensors. Reduces greasy-halo artifact by 62%.', icon:'videocam' },
  { title:'Identity-Fluid Format Architecture', description:'Wash-out color gels (pH 5.5, 24-hour fade), texture pastes, shine sprays and glitters — all dermatologist-approved for daily use on 9–14 year olds. Fragrance-light, allergen-screened (G-13 MoCRA-grade).', icon:'palette' },
@@ -2701,13 +2701,13 @@ export const INNOVATIONS: Innovation[] = [
  category:'LHC: Toilet Care',
  categoryShort:'Toilet',
  categoryGroup:'LHC',
- type:'WHITE_SPOT',
- typeLabel:'White Spot',
+ type:'MARKET_GAP',
+ typeLabel:'Market Gap',
  tierLevel: 1,
  marketScore: 80,
  fitScore: 85,
  horizon:'2027–2029',
- consumerNeed:'Toilet care is one of the most chemically aggressive categories in household cleaning — bleach, quats, and strong acids dominate. Consumer concerns about septic system damage, drain-flora collapse, and skin/respiratory irritation are rising (reported by 46% of EU households, Mintel 2025). At the same time, microbiome science is mainstream (T-04) and the skinification of home-care is emerging. No mainstream mass-market toilet brand offers a probiotic-first system. A pre/probiotic formulation — live spore-forming bacteria that outcompete odor- and stain-causing species in the toilet, bowl, rim, cistern, and drain — is both a white-spot brand opportunity and a regulatory-proactive move ahead of potential EU quat/bleach restrictions (G-06). Distinct from inn_38\'s biodiversity positioning: this is the health/biome angle vs. the eco-footprint angle.',
+ consumerNeed:'Toilet care is one of the most chemically aggressive categories in household cleaning — bleach, quats, and strong acids dominate. Consumer concerns about septic system damage, drain-flora collapse, and skin/respiratory irritation are rising (reported by 46% of EU households, Mintel 2025). At the same time, microbiome science is mainstream (T-04) and the skinification of home-care is emerging. No mainstream mass-market toilet brand offers a probiotic-first system. A pre/probiotic formulation — live spore-forming bacteria that outcompete odor- and stain-causing species in the toilet, bowl, rim, cistern, and drain — is both a market-gap brand opportunity and a regulatory-proactive move ahead of potential EU quat/bleach restrictions (G-06). Distinct from inn_38\'s biodiversity positioning: this is the health/biome angle vs. the eco-footprint angle.',
  techSpecs: [
  { title:'Spore-Based Probiotic Core', description:'Encapsulated Bacillus subtilis and B. amyloliquefaciens spores germinate on contact with water, metabolizing organic soil, uric scale, and odor precursors in the bowl, rim, trap, and downstream drain. 72-hour activity per application.', icon:'biotech' },
  { title:'Prebiotic Matrix', description:'Plant-derived oligosaccharides feed the beneficial bacteria and shift the drain-biofilm community away from odor-producing strains (Propionibacterium, Desulfovibrio). Also protects septic-tank flora.', icon:'eco' },
@@ -2815,7 +2815,7 @@ export function getFilteredInnovations(categoryFilter: string): Innovation[] {
 // Get type color for badges
 export function getTypeColor(type: InnovationTier): { bg: string; text: string; border: string } {
  const colors: Record<string, { bg: string; text: string; border: string }> = {
-'WHITE_SPOT': { bg:'#dbeafe', text:'#1e40af', border:'#93c5fd' },
+'MARKET_GAP': { bg:'#dbeafe', text:'#1e40af', border:'#93c5fd' },
 'TRANSFORMATIONAL': { bg:'#fef3c7', text:'#92400e', border:'#fcd34d' },
 'ADJACENT_INNOVATION': { bg:'#d1fae5', text:'#065f46', border:'#6ee7b7' },
 'BRAND_EXTENSION': { bg:'#e0e7ff', text:'#3730a3', border:'#a5b4fc' },
@@ -2826,7 +2826,7 @@ export function getTypeColor(type: InnovationTier): { bg: string; text: string; 
 'MARKET_EXPANSION': { bg:'#fed7aa', text:'#9a3412', border:'#fdba74' },
 'PREMIUMIZATION': { bg:'#f3e8ff', text:'#6b21a8', border:'#c4b5fd' },
  };
- return colors[type] || colors['WHITE_SPOT'];
+ return colors[type] || colors['MARKET_GAP'];
 }
 
 // Get tier label with level

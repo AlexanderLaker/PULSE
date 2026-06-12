@@ -2818,7 +2818,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "trendCodes": [
           "C-14"
         ],
-        "driverNote": "C-14 Between-Wash Fabric Care (White Spot score 0.82)",
+        "driverNote": "C-14 Between-Wash Fabric Care (Market Gap score 0.82)",
         "intensity": 3,
         "provenance": {
           "author": "strategist",

@@ -170,7 +170,7 @@ export interface SimulationResult {
   /** Per-year row/column/grand totals — matching the decompositions. */
   totals?: TotalsMatrix;
   /** Terminal-year journey-stage attribution (v3.6 journey layer) — drives
-   *  the Consumer Journey attribution chips and the White Spots quadrant.
+   *  the Consumer Journey attribution chips.
    *  Absent on pre-journey runs: the UI shows an honest empty state. */
   journey_decomposition?: JourneyDecomposition;
   convergence?: ConvergenceDiagnostics;

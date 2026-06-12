@@ -276,7 +276,7 @@ const LHC_JOURNEY: JourneyStage[] = [
       { name: 'Dry shampoo for clothes (spray)', type: 'product', trendDrivers: 'T-03 Concentrated Formats + C-06 Cost-Saving', intensity: 2 },
       { name: 'Odor-elimination enzyme sprays', type: 'product', trendDrivers: 'T-02 Bio-Based Chemistry + T-01 enzyme optimization', intensity: 2 },
       { name: 'Smart garment freshness alerts (app)', type: 'tech', trendDrivers: 'T-08 Connected Appliances + T-07 AI tracking', intensity: 1 },
-      { name: 'Branded fabric refresh spray range', type: 'product', trendDrivers: 'C-14 Between-Wash Fabric Care (White Spot score 0.82)', intensity: 3 },
+      { name: 'Branded fabric refresh spray range', type: 'product', trendDrivers: 'C-14 Between-Wash Fabric Care (Market Gap score 0.82)', intensity: 3 },
       { name: 'Antibacterial garment hygiene sprays', type: 'product', trendDrivers: 'C-12 Post-COVID Hygiene Persistence + T-02 Bio-Based', intensity: 2 },
     ],
     negativelyImpacted: [

@@ -75,18 +75,14 @@ architecture** the same day. Scope, unchanged from the audit ruling:
    terminal-year median exactly; redistributes, never changes totals). No
    MODEL_VERSION bump: an additive attribution lens; 2.8.0 golden pins
    unaffected.
-5. **White Spots (Beta)** — `WhiteSpotAnalyzer.tsx`, intentionally isolated
-   (one component + 4 wiring lines in `page.tsx`; footprint edits
-   localStorage-only; score = migration⁺ × (1 − presence/5)). Keep deletable.
 
 Activation requires `scripts/backfill_journey_exposure.py` (non-destructive)
 against prod, then a fresh `scripts/run_50k_prod.py` — until then the journey
-attribution chips and White Spots quadrant show their honest empty states.
+attribution chips show their honest empty states.
 Open backlog (owner-gated): strategist review of the 46 ✨ tiles + 260
 exposure scores; internal validation of Henkel claims in stage contexts; Home
 Care journey (tab honestly reads "Laundry" until then); optional per-year
-journey decomposition; server-side footprint persistence if the beta
-graduates.
+journey decomposition.
 
 ### Earlier release notes (condensed, still accurate)
 
@@ -220,7 +216,6 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
 | `ProfitPoolExplorer.tsx` | Beta, GP1-only pool views (D5). v2 (2026-06-11): arrows = pool development (revenue × GP1 drift, FY2025→2030, derived in `lib/profitPoolData.ts`); Laundry/Hair toggle + view pills; click drill-down decomposes pool CAGR into revenue CAGR + GP1 drift with € pools; all sources clickable URLs verified vs. FY2025 filings, graded ✅ reported / ⚡ derived / ⚠️ estimate |
 | `InnovationExplorer3.tsx` / `InnovationDeepDive.tsx` / `InnovationProductImage.tsx` | Beta innovation surfaces |
-| `WhiteSpotAnalyzer.tsx` | White-spot exploration |
 | `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions |
 | `WelcomeModal.tsx`, `ErrorBoundary.tsx`, `LoadingSkeleton.tsx` | Shell |
 

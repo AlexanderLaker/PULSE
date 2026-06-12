@@ -145,22 +145,22 @@
 
 > The Schwarzkopf Professional portfolio is strategically central: it provides Henkel's **credential lever** in the K-07 Professional Salon Crossover trend. Any "Prepare / Bond / Diagnose / Premium Transform / Lock" recommendation can legitimately cite Fibreplex, BC Bonacure, SalonLab, Igora or Osis+.
 
-### 3.5 Explicit Hair White Spots (Henkel has no meaningful brand)
+### 3.5 Explicit Hair Market Gaps (Henkel has no meaningful brand)
 
 | Gap | Category | Competitor dominating | Strategic implication |
 |---|---|---|---|
-| **Scalp care specialist** (C-07) | Scalp serums, exfoliants, microbiome | The Ordinary (Estée Lauder), Nioxin (Wella), The Inkey List, Dr. Barbara Sturm | Gliss Scalp Kur line exists but sub-scale; no standalone scalp brand. **White Spot — Schwarzkopf Scalp/SKP Skin-of-Scalp extension candidate** |
-| **Hair loss / thinning** (C-10) | Growth serums, DHT blockers, minoxidil alternatives | Regaine/Rogaine (Kenvue), Nioxin (Wella), Nutrafol, Hims | Henkel has **no dedicated hair-loss brand**. **Major white spot** — C-10 is a $3B+ growing category |
+| **Scalp care specialist** (C-07) | Scalp serums, exfoliants, microbiome | The Ordinary (Estée Lauder), Nioxin (Wella), The Inkey List, Dr. Barbara Sturm | Gliss Scalp Kur line exists but sub-scale; no standalone scalp brand. **Market Gap — Schwarzkopf Scalp/SKP Skin-of-Scalp extension candidate** |
+| **Hair loss / thinning** (C-10) | Growth serums, DHT blockers, minoxidil alternatives | Regaine/Rogaine (Kenvue), Nioxin (Wella), Nutrafol, Hims | Henkel has **no dedicated hair-loss brand**. **Major market gap** — C-10 is a $3B+ growing category |
 | **Dry shampoo mass leader** (C-15) | Dry shampoo | **Batiste (Church & Dwight, 40%+ share), Klorane, Living Proof** | Syoss Dry Shampoo and got2b Fresh Dry Shampoo exist but low share. **Penetration-first opportunity — no Henkel brand has CEP ownership of "Day-2 refresh"** |
 | **Textured / curly hair** | Curl care | Shea Moisture, Cantu, Mielle, DevaCurl | Schwarzkopf Pro Mad About Curls exists at B2B; no consumer retail leader. **Relevant for US multicultural + IMEA** |
 | **DTC / Indie bond-builder** (X-04) | Retail bond-builders | **Olaplex No.3, K18, Virtue** | Fibreplex is B2B-only at retail. **Schwarzkopf Professional take-home extension opportunity** |
 | **Premium men's grooming** (C-08) | Male hair care | Axe (Unilever), Old Spice (P&G), Harry's, Manscaped | got2b serves youth-styling but no Henkel male-care master brand | 
 
-### 3.6 LHC White Spots (explicit gaps)
+### 3.6 LHC Market Gaps (explicit gaps)
 
 | Gap | Category | Competitor dominating | Strategic implication |
 |---|---|---|---|
-| **Fabric refresh spray** (C-14) | Between-wash refresh | **Febreze (P&G, $1B+)** | Henkel has **no brand** owning "refresh between washes" — **PRISM Impact Rankings already flag this as Top-5 White Spot** |
+| **Fabric refresh spray** (C-14) | Between-wash refresh | **Febreze (P&G, $1B+)** | Henkel has **no brand** owning "refresh between washes" — **PRISM Impact Rankings already flag this as Top-5 Market Gap** |
 | **Garment care devices** | Steam closets, portable steamers | LG Styler, Samsung AirDresser | Hardware, not Henkel territory — route to device partnerships / Persil co-branding |
 | **Smart dosing hardware** (T-08) | Connected cartridges for smart washers | Miele TwinDos, Bosch i-DOS | Persil Smart Dose pilot exists with Miele; **scale-up opportunity** |
 | **Discount-channel exclusive brands** (K-01) | PL-beating value tier | Aldi Almat, Lidl Formil, Rossmann Domol | Weißer Riese / Spee compete but are erode-ing. **Need explicit discounter-exclusive architecture** |
@@ -184,10 +184,10 @@ This section governs which brand a given product-element in the Consumer Journey
 | **Unloading** | Vernel/Silan (rinse fragrance), Snuggle, Sil (booster) | — | Downy, Lenor, Febreze |
 | **Drying** | Snuggle dryer sheets (US), Sil | — | Bounce, Downy |
 | **Ironing** | Sil (Kristall starch, Bügel-fix), Perwoll Refresh | Very limited Henkel play — this is a declining stage | N/A |
-| **Folding & Storing** | Vernel Aromatherapy, Silan Aromatherapy (scented closet sachets), Sil | White Spot: no moth-protection brand | Air Wick, Glade |
-| **Taking Out of Closet** | White Spot — Vernel Aroma as closet scent only | Route to C-14 opportunity narrative | Febreze |
+| **Folding & Storing** | Vernel Aromatherapy, Silan Aromatherapy (scented closet sachets), Sil | Market Gap: no moth-protection brand | Air Wick, Glade |
+| **Taking Out of Closet** | Market Gap — Vernel Aroma as closet scent only | Route to C-14 opportunity narrative | Febreze |
 | **Wearing** | No direct product — Persil/Sil reputation around fabric longevity | E-08 Textile Longevity play | Downy Wrinkle Releaser |
-| **Between Washes** | **MASSIVE WHITE SPOT — Henkel has no C-14 brand.** Analysis must explicitly flag the gap and cite Febreze competitor benchmark. Reference Vernel Aromatherapy as sub-scale adjacency. | — | Febreze |
+| **Between Washes** | **MASSIVE MARKET GAP — Henkel has no C-14 brand.** Analysis must explicitly flag the gap and cite Febreze competitor benchmark. Reference Vernel Aromatherapy as sub-scale adjacency. | — | Febreze |
 
 ### 4.2 Hair Journey Routing
 
@@ -196,7 +196,7 @@ This section governs which brand a given product-element in the Consumer Journey
 | **Inspire** | Schwarzkopf Palette, Live, Color Expert (inspiration collections); Schwarzkopf digital AR shade finder; got2b for Gen Z | K-04 Social Commerce → Schwarzkopf TikTok creator program | L'Oréal Paris, Garnier |
 | **Diagnose** | **Schwarzkopf Professional SalonLab** (hero asset); Syoss Scalp Line | C-07 Scalp Care white space — flag gap | Nioxin, The Ordinary |
 | **Prepare** | **Schwarzkopf Professional Fibreplex** (bond); Gliss Ultimate Repair pre-treatment; Keratin Color pre-bond | X-04 DTC benchmark Olaplex No.0/No.1 — Fibreplex as Henkel equivalent | Olaplex, K18 |
-| **Remedy** | **White Spot (C-10 hair loss)**; Gliss Ultimate Repair (damage); Schauma Anti-Schuppen (dandruff); Syoss Scalp Sensitive | Flag C-10/C-07 white spots explicitly | Nioxin, Regaine, Nutrafol, Revita |
+| **Remedy** | **Market Gap (C-10 hair loss)**; Gliss Ultimate Repair (damage); Schauma Anti-Schuppen (dandruff); Syoss Scalp Sensitive | Flag C-10/C-07 market gaps explicitly | Nioxin, Regaine, Nutrafol, Revita |
 | **Transform** | **Schwarzkopf Palette** (mass), **Schwarzkopf Keratin Color** (premium bond), **Color Expert**, **Brillance** (silver), **Perfect Mousse**, **Live** (fashion), Igora Pro (K-07 crossover); Gliss for treatment-during-transform | Syoss Color as affordable-pro color | L'Oréal Préférence, Casting, Garnier Olia, Clairol |
 | **Lock & Finish** | **Taft** (hairspray/fix), **got2b** (youth finish), **Schwarzkopf Osis+** (pro finish), Schwarzkopf Color Lock-In serum (post-color), Gliss Oil Elixir | K-07 Osis+ as salon credential | Tresemmé, Elnett |
 | **Maintain & Optimize** | **Gliss Kur** (primary treatment pillar), **Syoss** (affordable-pro care), Schauma (value), Schwarzkopf BC Bonacure (pro take-home), N.A.E. (natural) | Subscription: Schwarzkopf.com DTC lock-in | Pantene, Dove, TRESemmé |
@@ -209,7 +209,7 @@ When a product name does not uniquely map, apply in order:
 1. **Category keyword** (stain→Sil; color→Palette; softener→Vernel; dry shampoo→Syoss Dry/got2b Fresh; bond→Fibreplex; ...)
 2. **Stage default brand** (see 4.1 / 4.2)
 3. **Regional US override** (US-specific: Persil ProClean, Purex, all, Snuggle, got2b)
-4. **White-spot fallback** — if no Henkel brand exists for that element, the Strategic Recommendation must **explicitly flag the white spot** and frame the element as a defend/harvest or build-from-scratch decision.
+4. **Market-gap fallback** — if no Henkel brand exists for that element, the Strategic Recommendation must **explicitly flag the market gap** and frame the element as a defend/harvest or build-from-scratch decision.
 
 ---
 
@@ -262,7 +262,7 @@ Old structure (to be removed):
 
 New structure:
 1. **Trend Mechanism** — 2–3 sentences. Cites the specific trend(s) with **clickable trend codes**. States the economic mechanism (how the trend moves the profit pool for THIS specific product in THIS specific stage).
-2. **Strategic Recommendation** — 3–5 sentences. Integrates only the relevant elements of portfolio position + competition. Stage-specific, product-specific, brand-specific, data-grounded. Ends with a concrete action verb ("Reformulate...", "Acquire...", "Launch...", "Defend...", "Harvest...", "Build...", "Partner with..."). **Classification tag** in bold: Tier 1 / Tier 2 / Tier 3 / Defend / Reformulate / Harvest / White Spot / Watch.
+2. **Strategic Recommendation** — 3–5 sentences. Integrates only the relevant elements of portfolio position + competition. Stage-specific, product-specific, brand-specific, data-grounded. Ends with a concrete action verb ("Reformulate...", "Acquire...", "Launch...", "Defend...", "Harvest...", "Build...", "Partner with..."). **Classification tag** in bold: Tier 1 / Tier 2 / Tier 3 / Defend / Reformulate / Harvest / Market Gap / Watch.
 
 No generic phrases. No template filler. Every recommendation must survive the test: *"Could this exact sentence be used for a different product? If yes, rewrite."*
 
@@ -274,7 +274,7 @@ Alex — please confirm (or correct) the following before I proceed with the 254
 
 1. **Portfolio scope** — is this the right set of HCB brands? Missing anything critical (I've intentionally excluded Adhesives, and limited the US personal-care tail)?
 2. **Regional accuracy** — particularly: (a) Snuggle as US softener #2, (b) Perwoll as core specialist, (c) Silan/Vernel split, (d) Keratin Color vs. Color Expert positioning, (e) Schauma as value pillar.
-3. **White spots** — are the six white spots (C-14 fabric refresh, C-07 scalp, C-10 hair loss, C-15 dry shampoo, K-01 discounter exclusives, C-08 men's grooming) the ones you want flagged explicitly in the Strategic Recommendations?
+3. **Market gaps** — are the six market gaps (C-14 fabric refresh, C-07 scalp, C-10 hair loss, C-15 dry shampoo, K-01 discounter exclusives, C-08 men's grooming) the ones you want flagged explicitly in the Strategic Recommendations?
 4. **K-07 SalonLab** — confirmed OK to cite as Henkel's diagnostic hero for the Hair Diagnose stage?
 5. **Fibreplex as Olaplex answer** — confirmed OK to position Schwarzkopf Professional Fibreplex / Bondenzym as Henkel's retail bond-builder reference point (even though it's B2B), and propose a consumer extension?
 6. **New section structure** — confirmed: **Trend Mechanism → Strategic Recommendation** only, with clickable trend codes. No separate Portfolio Position or Competitive Dynamics sections.

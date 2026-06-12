@@ -14,7 +14,7 @@ The PRISM trend database (47 trends across 6 forces) achieves **Tier A methodolo
 
 1. **Source Diversity Gap**: 60% of trends rely on 3-4 major consulting/analyst firms. Tier B+ specialist research and investment bank validation are underweighted.
 2. **Emerging Trend Gap**: 10 material trends missing from the current set, representing est. 15-25pp of profit pool volatility not modeled.
-3. **Consumer Journey Gap**: 5 stages of the laundry and hair journeys have zero trend coverage despite being strategically material (e.g., "Between Washes" stage, white spot score 0.82).
+3. **Consumer Journey Gap**: 5 stages of the laundry and hair journeys have zero trend coverage despite being strategically material (e.g., "Between Washes" stage, market gap score 0.82).
 
 **Recommended Actions (Priority Order):**
 - **IMMEDIATE (Add to PRISM in April 2026 cycle)**: M-01 (Gen AI product discovery), M-02 (Tariffs/Trade), M-03 (Energy costs), M-04 (Gen AI marketing efficiency), CJ-01 (Between-wash care)
@@ -1630,11 +1630,11 @@ The Consumer Journey Blueprintdefines:
 - **Laundry Journey:** 13 stages (Sorting → Between Washes)
 - **Hair Journey:** 8 stages (Purchase → Maintain)
 
-**White Spot Analysis (from journey mapping):** "Between Washes" stage scores 0.82 (highest white-spot risk — no trend coverage, but material consumer occasion).
+**Market Gap Analysis (from journey mapping):** "Between Washes" stage scores 0.82 (highest market-gap risk — no trend coverage, but material consumer occasion).
 
 ### Journey Stages with Insufficient Trend Coverage
 
-#### Stage 1: "Between Washes" (Laundry) — SEVERITY: HIGH (0.82 white spot)
+#### Stage 1: "Between Washes" (Laundry) — SEVERITY: HIGH (0.82 market gap)
 
 **Current Coverage:** Only C-06 (cost-of-living squeeze) tangentially touches this stage. MAJOR GAP.
 
@@ -1648,7 +1648,7 @@ The Consumer Journey Blueprintdefines:
 - **Journey Stages Affected:** Between Washes (5), Taking Out (4), Wearing (3), Folding & Storing (3)
 
 **Why This Matters:**
-Febreze alone is a $1B+ brand globally. Fabric refresh, garment steamer, and between-wash care market growing at 8-10% CAGR (Euromonitor data). This is a DISTINCT consumption occasion from wash-day. Consumer chooses between: (1) wash the garment (high friction, resource cost), or (2) refresh (low friction, Febreze/steamer). Henkel has ZERO presence in fabric refresh category. This white spot represents 3-5pp of household care profit pool (estimated).
+Febreze alone is a $1B+ brand globally. Fabric refresh, garment steamer, and between-wash care market growing at 8-10% CAGR (Euromonitor data). This is a DISTINCT consumption occasion from wash-day. Consumer chooses between: (1) wash the garment (high friction, resource cost), or (2) refresh (low friction, Febreze/steamer). Henkel has ZERO presence in fabric refresh category. This market gap represents 3-5pp of household care profit pool (estimated).
 
 **Current Gaps:**
 - No Henkel branded fabric refresh product in core portfolio
@@ -1664,7 +1664,7 @@ Febreze alone is a $1B+ brand globally. Fabric refresh, garment steamer, and bet
 
 ---
 
-#### Stage 2: "Wearing" (Laundry) — SEVERITY: CRITICAL (0.89 white spot)
+#### Stage 2: "Wearing" (Laundry) — SEVERITY: CRITICAL (0.89 market gap)
 
 **Current Coverage:** ZERO trend coverage.
 
@@ -1697,7 +1697,7 @@ EU Strategy for Sustainable and Circular Textiles (published 2023) creates regul
 
 ---
 
-#### Stage 3: "Style" and "Maintain" (Hair) — SEVERITY: HIGH (0.71 white spot)
+#### Stage 3: "Style" and "Maintain" (Hair) — SEVERITY: HIGH (0.71 market gap)
 
 **Current Coverage:** Only C-07 (scalp care) tangentially addresses hair health; no trend covers styling/maintenance between washes.
 

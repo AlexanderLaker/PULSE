@@ -169,7 +169,7 @@ const ScoreBar: FC<{ value: number; tone?: 'emerald' | 'purple' }> = ({ value, t
   );
 };
 
-// ─── Type pill (WHITE_SPOT / TRANSFORMATIONAL / ...) ─────────────────
+// ─── Type pill (MARKET_GAP / TRANSFORMATIONAL / ...) ─────────────────
 const TypePill: FC<{ type: Innovation['type']; label: string }> = ({ type, label }) => {
   const tc = getTypeColor(type);
   return (

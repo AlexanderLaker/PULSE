@@ -163,7 +163,7 @@ Unchanged: trend scoring RACI (Category Leads R, Strategy VP A), admin-only audi
 | **1 — Lift & host** | Containerize Next.js + FastAPI; App Service + Front Door; Key Vault + managed identities; Neon-driver → `pg` swap; Entra ID SSO replacing Clerk; App Insights | Dashboard renders the migrated run inside Henkel network; smoke tests pass; old stack frozen | 2–4 wks |
 | **2 — Online compute** | Worker image (scipy pinned); Container Apps Job + queue; admin "Run simulation" → enqueue → status; monthly schedule; golden-pin pre-flight | Job-produced run **bit-identical** to a reference CLI run (same seed/versions); CLI demoted to break-glass | 2–3 wks |
 | **3 — Living intelligence** | Scanner job + suggestion inbox in Trends2; calibrator quarterly job; narrator on run completion; dual-provider config + failover test; prompt/response audit surfacing | First AI-suggested trend accepted by a human reviewer, visible drift event, reflected in the next run's narrative | 4–6 wks |
-| **4 — Backlog (owner-gated)** | Home-Care journey, per-year journey decomposition, White-Spot server persistence, PPTX export route, wider source integrations | — | as prioritized |
+| **4 — Backlog (owner-gated)** | Home-Care journey, per-year journey decomposition, PPTX export route, wider source integrations | — | as prioritized |
 
 \* one full-stack developer + part-time DevOps; grades are estimates, not quotes.
 

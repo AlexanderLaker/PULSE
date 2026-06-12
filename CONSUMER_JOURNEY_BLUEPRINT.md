@@ -12,11 +12,10 @@
 
 The internal FMCG team produced a "Value Chain Overview" that maps the full laundry consumer journey across 13 touchpoints — from Sorting through In Between Washes. This is fundamentally different from PRISM's current value chain exposure (Raw Materials → Consumer), which is a supply-side lens.
 
-This blueprint defines how to integrate the demand-side consumer journey into PRISM across three workstreams:
+This blueprint defines how to integrate the demand-side consumer journey into PRISM across two workstreams:
 
 1. **Journey Stage Exposure** — a new scoring dimension on each trend
-2. **White Spot Analyzer** — overlay Henkel's footprint against profit migration
-3. **Extended Competitive Model** — journey-stage-specific competitor sets
+2. **Extended Competitive Model** — journey-stage-specific competitor sets
 
 Each workstream maps to specific files, database tables, API endpoints, and dashboard components in the existing codebase.
 
@@ -188,178 +187,7 @@ The third view is the most novel: it shows which journey stages are most impacte
 
 ---
 
-## Workstream 2: White Spot Analyzer
-
-### What It Is
-
-A dedicated analytical view that overlays Henkel's current product footprint against the consumer journey to identify profit migration gaps — stages where the profit pool is growing but Henkel has zero or minimal presence.
-
-### Why It Matters
-
-PRISM currently answers: "How is the profit pool shifting across categories?" The White Spot Analyzer answers a different question: "Where is profit migrating to that we can't capture with our current portfolio?" This is the question that makes ExCo lean forward.
-
-### Henkel Footprint Data Model
-
-```python
-# pulse/config.py — new constant
-
-HENKEL_JOURNEY_FOOTPRINT = {
-    # stage: { "presence": 0-5, "brands": [...], "revenue_tier": "core|emerging|none" }
-    "Sorting":              {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-    "Pre-Treating":         {"presence": 4, "brands": ["Persil", "Pril"],          "revenue_tier": "core"},
-    "Loading":              {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-    "Add Products":         {"presence": 5, "brands": ["Persil", "Pril", "Somat"], "revenue_tier": "core"},
-    "Select Wash Settings": {"presence": 1, "brands": ["Persil (dosing cap)"],     "revenue_tier": "emerging"},
-    "Washing Cycle":        {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-    "Unloading":            {"presence": 1, "brands": ["Vernel"],                  "revenue_tier": "emerging"},
-    "Drying":               {"presence": 1, "brands": ["Vernel dryer sheets"],     "revenue_tier": "emerging"},
-    "Ironing":              {"presence": 1, "brands": ["Vernel"],                  "revenue_tier": "emerging"},
-    "Folding & Storing":    {"presence": 2, "brands": ["Bref (moth)"],             "revenue_tier": "emerging"},
-    "Taking Out":           {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-    "Wearing":              {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-    "Between Washes":       {"presence": 0, "brands": [],                          "revenue_tier": "none"},
-}
-```
-
-This is deliberately simple: a presence score (0-5), the brands that play there, and a tier classification. The presence scores should be admin-configurable via the dashboard — the team knows better than any model where Henkel actually plays.
-
-### White Spot Score Calculation
-
-For each journey stage, compute:
-
-```
-white_spot_score = profit_migration_to_stage × (1 - henkel_presence_normalized)
-```
-
-Where:
-- `profit_migration_to_stage` = the sum of positive (Expansion) trend impacts weighted by journey stage exposure. Essentially: how much profit is flowing toward this stage?
-- `henkel_presence_normalized` = `presence / 5` from the footprint data
-
-A high white_spot_score means: profit is flowing here AND Henkel isn't present. That's the strategic gap.
-
-### Categorization Framework
-
-Each journey stage gets classified into one of four quadrants:
-
-```
-                    HIGH Henkel Presence
-                           │
-        DEFEND             │           HARVEST
-   (Profit growing,        │      (Profit growing,
-    we're strong)           │       we're strong,
-                           │       mature stage)
-  ─────────────────────────┼───────────────────────
-        WATCH              │         WHITE SPOT
-   (Profit flat/declining, │      (Profit growing,
-    low presence —         │       low presence —
-    not urgent)            │       ACT NOW)
-                           │
-                    LOW Henkel Presence
-
-        LOW Profit Migration ──────── HIGH Profit Migration
-```
-
-### Database Schema
-
-```sql
-CREATE TABLE journey_footprint (
-    journey_stage TEXT PRIMARY KEY,
-    henkel_presence INTEGER CHECK(henkel_presence BETWEEN 0 AND 5),
-    brands TEXT,              -- JSON array
-    revenue_tier TEXT,        -- "core" | "emerging" | "none"
-    notes TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE white_spot_analysis (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    analysis_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    scenario TEXT,
-    journey_stage TEXT,
-    profit_migration_score REAL,
-    henkel_presence REAL,
-    white_spot_score REAL,
-    quadrant TEXT,            -- "defend" | "harvest" | "watch" | "white_spot"
-    recommended_action TEXT,
-    simulation_run_id INTEGER REFERENCES simulation_runs(id)
-);
-```
-
-### API Endpoints
-
-```
-GET  /white-spots                    → Current white spot analysis
-POST /white-spots/analyze            → Run analysis against latest simulation
-PUT  /journey-footprint/{stage}      → Update Henkel presence for a stage
-GET  /journey-footprint              → Current footprint data
-```
-
-### Dashboard: White Spot Panel
-
-This is a new contextual panel in the War Room, accessible by clicking a "White Spots" button in the headline KPI bar or as a dedicated toggle view.
-
-**Layout:**
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  WHITE SPOT ANALYZER                                [Close]  │
-│                                                              │
-│  ┌─── JOURNEY MAP (horizontal swim lane) ─────────────────┐ │
-│  │                                                         │ │
-│  │  [Sort] [Pre-Treat] [Load] [Add] [Settings] [Wash]     │ │
-│  │  [Unload] [Dry] [Iron] [Fold] [Take Out] [Wear] [Btw]  │ │
-│  │                                                         │ │
-│  │  Each stage is a card, color-coded:                     │ │
-│  │   Green border = Henkel strong (presence 4-5)           │ │
-│  │   Amber border = Henkel emerging (presence 1-3)         │ │
-│  │   Red border = Henkel absent (presence 0)               │ │
-│  │                                                         │ │
-│  │  Card size proportional to profit_migration_score       │ │
-│  │  Pulsing glow on WHITE SPOT quadrant stages             │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌─── QUADRANT SCATTER PLOT ──────────────────────────────┐ │
-│  │                                                         │ │
-│  │  Y-axis: Henkel Presence (0-5)                         │ │
-│  │  X-axis: Profit Migration Score                        │ │
-│  │  Bubbles: journey stages, sized by trend count          │ │
-│  │  Quadrant labels: DEFEND / HARVEST / WATCH / WHITE SPOT │ │
-│  │  Click bubble → shows contributing trends               │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌─── RECOMMENDATIONS TABLE ──────────────────────────────┐ │
-│  │  Rank | Stage          | Score | Action                 │ │
-│  │  1    | Between Washes | 0.82  | Evaluate fabric refresh│ │
-│  │  2    | Wearing        | 0.71  | Garment protection R&D │ │
-│  │  3    | Taking Out     | 0.65  | On-the-go refresh line │ │
-│  │  4    | Folding/Store  | 0.48  | Expand moth/fragrance  │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Key design decisions:**
-- The journey map is horizontal to match the team's original image (left-to-right flow)
-- Cards are interactive — click to see which trends drive profit toward that stage
-- The scatter plot is the executive summary — one glance shows where to act
-- The recommendations table is the "so what" — sorted by white_spot_score descending
-
-### Effort Estimate
-
-| Component | Files Changed | New Files | Complexity |
-|-----------|--------------|-----------|------------|
-| Footprint config | `config.py` | — | Trivial |
-| White spot calculation | — | `pulse/analyzer/white_spots.py` | Medium |
-| Database tables | `database.py` | — | Low |
-| API endpoints | — | `pulse/api/routes/white_spots.py` | Medium |
-| Journey map component | — | `WhiteSpotPanel.tsx` | High (new viz) |
-| Scatter plot | — | `WhiteSpotScatter.tsx` | Medium |
-| Footprint editor | — | `JourneyFootprintEditor.tsx` | Medium |
-
-**Total: ~5-7 days of development.** The white spot calculation itself is simple — the complexity is in the dashboard visualization.
-
----
-
-## Workstream 3: Extended Competitive Model
+## Workstream 2: Extended Competitive Model
 
 ### What It Is
 
@@ -599,7 +427,7 @@ POST /competitive/equilibrium
 
 ### Dashboard Integration
 
-**Competitive panel enhancement.** When the user clicks a journey stage (from Workstream 1's heatmap toggle or Workstream 2's white spot map), the contextual panel shows:
+**Competitive panel enhancement.** When the user clicks a journey stage (from Workstream 1's heatmap toggle), the contextual panel shows:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -644,52 +472,52 @@ The key insight visualized: at certain journey stages, the FMCG-only competitive
 
 ---
 
-## Integration: How the Three Workstreams Connect
+## Integration: How the Two Workstreams Connect
 
-The three workstreams are designed to be built sequentially but to create compounding value:
+The two workstreams are designed to be built sequentially but to create compounding value:
 
 ```
-Workstream 1                Workstream 2              Workstream 3
-(Journey Exposure)    →     (White Spots)       →     (Extended Competition)
+Workstream 1                Workstream 2
+(Journey Exposure)    →     (Extended Competition)
 
-Each trend gets             Overlay Henkel's           Journey-specific
-journey_exposure            footprint against          competitor sets
-scores (0-5 per stage)      profit migration           change the equilibrium
-                            per stage
-        ↓                          ↓                          ↓
-Journey decomposition       White spot scores          Adjusted competitive
-in shift matrix             per stage                  response per stage
-        ↓                          ↓                          ↓
-Heatmap toggle              Scatter plot +             Enhanced competitive
-in War Room                 journey map viz            panel with non-FMCG
-        ↓                          ↓                          ↓
-                    ┌──────────────┴──────────────┐
-                    │   COMBINED STRATEGIC VIEW    │
-                    │                              │
-                    │  "Between Washes is a HIGH   │
-                    │   white spot (score: 0.82)   │
-                    │   with D2C insurgents as     │
-                    │   primary competitive threat │
-                    │   — FMCG-only model misses   │
-                    │   67% of pool pressure here" │
-                    └─────────────────────────────┘
+Each trend gets             Journey-specific
+journey_exposure            competitor sets
+scores (0-5 per stage)      change the equilibrium
+        ↓                          ↓
+Journey decomposition       Adjusted competitive
+in shift matrix             response per stage
+        ↓                          ↓
+Heatmap toggle              Enhanced competitive
+in War Room                 panel with non-FMCG
+        ↓                          ↓
+        └────────────┬────────────┘
+                     ↓
+        ┌──────────────────────────────┐
+        │   COMBINED STRATEGIC VIEW    │
+        │                              │
+        │  "Between Washes is a HIGH   │
+        │   profit-migration stage     │
+        │   with D2C insurgents as     │
+        │   primary competitive threat │
+        │   — FMCG-only model misses   │
+        │   67% of pool pressure here" │
+        └──────────────────────────────┘
 ```
 
 ### War Room Toggle States
 
-After all three workstreams, the War Room heatmap supports these toggle combinations:
+After both workstreams, the War Room heatmap supports these toggle combinations:
 
 1. **Forces × Categories** (existing) — the default strategic force assessment
 2. **Forces × Journey Stages** (new) — which forces hit which consumer moments
 3. **Categories × Journey Stages** (new) — where does each category's shift land in the journey
-4. **White Spot Map** (new) — profit migration vs. Henkel presence, with quadrant classification
-5. **Competitive Landscape** (enhanced) — journey-stage-specific competitor sets overlay
+4. **Competitive Landscape** (enhanced) — journey-stage-specific competitor sets overlay
 
 ### The "Laundry Services" Question
 
 The team's image has "Laundry services" noted at the bottom left — suggesting an entire service economy layer. This doesn't fit neatly into any current PRISM category (LHC: LAD, FCN, etc. are all product categories). Two options:
 
-**Option A (recommended for now):** Model laundry services as a competitor, not a category. The `laundry_services` CompetitorProfile in Workstream 3 captures the competitive pressure from services on product categories. This is simpler and doesn't require restructuring the 12-category taxonomy.
+**Option A (recommended for now):** Model laundry services as a competitor, not a category. The `laundry_services` CompetitorProfile in Workstream 2 captures the competitive pressure from services on product categories. This is simpler and doesn't require restructuring the 12-category taxonomy.
 
 **Option B (future consideration):** Add "Laundry Services" as a 13th category in the LHC portfolio. This is structurally cleaner but requires significant model recalibration (all force weights, exposure scores, and simulation parameters assume 12 categories). Park this for the annual model review.
 
@@ -715,27 +543,21 @@ The architecture supports this — `JOURNEY_STAGES` can be extended to `JOURNEY_
 | 1 | WS1: Seed data | All 60 trends get journey_exposure scores |
 | 2 | WS1: MC engine + API | Journey decomposition in simulation output |
 | 2 | WS1: Dashboard | Heatmap toggle, detail panel, trend filter |
-| 3 | WS2: White spot calc + DB | White spot scores computed per stage |
-| 3 | WS2: API + Dashboard | Journey map, scatter plot, recommendations |
-| 4 | WS3: Competitor profiles | 4 non-FMCG competitors added |
-| 4 | WS3: Equilibrium + Dashboard | Journey-weighted competitive panel |
-| 5 | Integration + Testing | Combined view, end-to-end validation |
+| 3 | WS2: Competitor profiles | 4 non-FMCG competitors added |
+| 3 | WS2: Equilibrium + Dashboard | Journey-weighted competitive panel |
+| 4 | Integration + Testing | Combined view, end-to-end validation |
 
-**Total: ~5 weeks, parallelizable to ~3 weeks with two developers.**
+**Total: ~4 weeks, parallelizable to ~3 weeks with two developers.**
 
 ---
 
 ## Open Questions for the Team
 
-1. **Journey stage profit sizing:** Do we have any data (even directional estimates) on relative profit pool size per journey stage? Without this, the white spot analyzer uses trend-driven migration as a proxy — good enough for direction, but not for magnitude.
+1. **Journey stage profit sizing:** Do we have any data (even directional estimates) on relative profit pool size per journey stage? Without this, journey decomposition uses trend-driven migration as a proxy — good enough for direction, but not for magnitude.
 
 2. **Hair journey definition:** Has the Hair team done a similar consumer journey mapping? If so, we should integrate both simultaneously rather than retrofitting.
 
-3. **Admin-editable footprint:** Should the Henkel footprint scores be editable in the dashboard (recommended) or locked to a config file? Dashboard editing is more agile but requires access controls.
-
-4. **Non-FMCG competitor calibration:** The response pool effects for appliance manufacturers and tech platforms are estimated from market observation. Should we run a mini-Delphi with the Category Leads to calibrate these?
-
-5. **Power BI extension:** Should the White Spot view also appear in the Power BI dashboard (with €M sizing from Finance), or keep it React-only for now?
+3. **Non-FMCG competitor calibration:** The response pool effects for appliance manufacturers and tech platforms are estimated from market observation. Should we run a mini-Delphi with the Category Leads to calibrate these?
 
 ---
 

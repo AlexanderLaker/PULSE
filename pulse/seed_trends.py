@@ -1033,7 +1033,7 @@ TRENDS = [
         category_exposure=cat(0,0,0,0, 4,5,0,3,0,0,0,0),
         vc_exposure=vc(2,4,2,3,2,4,3,5),
         regional_exposure=reg(4,5,3,2),
-        data_source="P&G Febreze brand data; Euromonitor Fabric Care 2025; Consumer journey white spot analysis", source_type="market_report",
+        data_source="P&G Febreze brand data; Euromonitor Fabric Care 2025; Consumer journey market gap analysis", source_type="market_report",
         confidence="Medium",
     ),
     # ── CJ-02 integrated: Textile Longevity ──
@@ -2348,7 +2348,7 @@ SOURCE_URLS = {
         {"title": "Euromonitor: Fabric Care — Fresheners and Sanitizers 2025", "url": "https://www.euromonitor.com/laundry-care-in-the-us/report", "source_type": "market_report", "tier": "A"},
         {"title": "P&G: Febreze Brand Performance Data", "url": "https://us.pg.com/blogs/febreeze-innovation-airia-smart-scent-diffuser/", "source_type": "company_page", "tier": "B-"},
         {"title": "Statista: Air Freshener and Fabric Refresh Market", "url": "https://www.statista.com/outlook/cmo/home-laundry-care/worldwide", "source_type": "market_forecast", "tier": "D"},
-        {"title": "PRISM White Spot Analysis: Consumer Journey Gap Assessment", "url": "#internal", "source_type": "internal_analysis", "tier": "B+"},
+        {"title": "PRISM Market Gap Analysis: Consumer Journey Gap Assessment", "url": "#internal", "source_type": "internal_analysis", "tier": "B+"},
     ],
     "environmental_r08": [  # Textile Longevity
         {"title": "EU Strategy for Sustainable and Circular Textiles", "url": "https://environment.ec.europa.eu/strategy/textiles-strategy_en", "source_type": "regulation", "tier": "S"},

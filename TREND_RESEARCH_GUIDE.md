@@ -181,7 +181,7 @@ Each trend is scored for relevance (0-100%) based on:
 
 Beyond Henkel's current 12 categories, the scan pipeline monitors adjacent markets that represent potential expansion opportunities or competitive threats:
 
-### High-Adjacency White Spots (Henkel has capabilities to enter)
+### High-Adjacency Market Gaps (Henkel has capabilities to enter)
 
 | Adjacent Category | Why It Matters | HCB Capability Link | Market Size |
 |-------------------|---------------|---------------------|-------------|

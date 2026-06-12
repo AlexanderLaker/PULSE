@@ -40,7 +40,6 @@ import dynamic from 'next/dynamic';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
-import WhiteSpotAnalyzer from '@/components/dashboard/WhiteSpotAnalyzer';
 // Beta tabs are dynamically imported (review F10): InnovationExplorer3
 // statically pulls data/innovations.ts (~212 KB) + images map, and the
 // Explorer pulls lib/profitPoolData — neither belongs in the initial
@@ -64,8 +63,7 @@ type DashboardTab =
   | 'trends-2'
   | 'consumer-journey-2'
   | 'innovation-explorer-3'
-  | 'profit-pool-explorer'
-  | 'white-spot-analyzer';
+  | 'profit-pool-explorer';
 
 interface TabDef {
   id: DashboardTab;
@@ -85,7 +83,6 @@ const TABS: TabDef[] = [
   // Beta views — pinned to the right side of the top nav, in muted gray.
   { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',  beta: true },
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
-  { id: 'white-spot-analyzer',   label: 'White Spots (Beta)',          beta: true },
 ];
 
 // Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
@@ -441,7 +438,6 @@ export default function DashboardPage() {
             isAdmin={isAdmin}
           />
         ))}
-        {tabPane('white-spot-analyzer', <WhiteSpotAnalyzer />)}
         {tabPane('innovation-explorer-3', (
           <InnovationExplorer3
             onNavigateToTrend={() => openTab('trends-2')}

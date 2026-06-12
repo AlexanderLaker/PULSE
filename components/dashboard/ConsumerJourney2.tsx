@@ -17,8 +17,8 @@
  *     in usePrism().trends, with working "View in Trends →" drill-through
  *     (fix #3, B1/B3). Retired codes render muted, with no live-driver styling.
  *   • Per-stage QUANTITATIVE attribution (fix #7) reads the computed
- *     journey_decomposition off the latest persisted run (same pattern as the
- *     White Spot Analyzer); when a run lacks it, the chip is honest about the
+ *     journey_decomposition off the latest persisted run (same pattern as
+ *     vc_decomposition); when a run lacks it, the chip is honest about the
  *     empty state rather than faking numbers.
  *   • The "Laundry" tab is labelled honestly — it is laundry-only; a caption
  *     notes the Home Care journey is pending (fix #9 / A2).
@@ -53,8 +53,7 @@ import type { SimulationResult } from '@/types/simulation';
 
 // ════════════════════════════════════════════════════════════════════════
 // Style tokens — intentional local copy of the Maritime light editorial
-// system (mirrors WhiteSpotAnalyzer.tsx so the journey + white-spot views
-// read identically). Values match DESIGN.md.
+// system. Values match DESIGN.md.
 // ════════════════════════════════════════════════════════════════════════
 const S = {
   bg: '#f8f9ff', surface: '#ffffff', surfaceLow: '#eff4ff',
@@ -805,7 +804,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
     return m;
   }, [trends]);
 
-  // ── Computed stage attribution (fix #7) — mirrors WhiteSpotAnalyzer ──
+  // ── Computed stage attribution (fix #7) ──
   //   Σ over the journey's categories of journey_decomposition[cat][`${tab}:${stageId}`]
   const stageAttribution = useMemo<Record<string, number> | null>(() => {
     const decomp = (simulation as SimulationResult | null)?.journey_decomposition;
