@@ -154,7 +154,7 @@ class EnvConfig:
         #   - Otherwise → SQLite (local dev)
         # This path is only used for SQLite fallback.
         _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-        _default_db = "/tmp/pulse.db" if _is_vercel else "data/pulse.db"
+        _default_db = "/tmp/prism.db" if _is_vercel else "data/prism.db"
         self.db_path = get_env("PRISM_DB_PATH", default=_default_db)
 
         # ── Application Settings ────────────────────────────────────────
