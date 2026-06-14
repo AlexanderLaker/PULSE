@@ -25,7 +25,7 @@ export default [
       'data/**',
       '_ARCHIVE/**',
       'tests/**',
-      'Not in Live Version/**',   // relocated non-live files (legacy Vite app etc.)
+      '_NOT_FOR_HANDOVER/**',   // all non-live files consolidated here (gitignored, never shipped)
     ],
   },
 ];

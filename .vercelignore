@@ -24,5 +24,5 @@ pulse/dashboard/node_modules
 *.pptx
 *.jpg
 
-# Non-live files relocated 2026-06-14 — quarantined out of the deploy, kept in repo
-Not in Live Version/
+# Non-live files consolidated into the gitignored _NOT_FOR_HANDOVER/ (never committed, never deployed)
+_NOT_FOR_HANDOVER/
