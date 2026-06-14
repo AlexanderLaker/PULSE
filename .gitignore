@@ -41,6 +41,7 @@ _RETIRED_2026-06/
 # Handover-Cleanup 2026-06-05
 .claude/worktrees/
 pulse_server.log
+*.log
 *.tsbuildinfo
 
 # Nicht-App-Dateien (Decks, Reports, Audits) — nur lokal/OneDrive

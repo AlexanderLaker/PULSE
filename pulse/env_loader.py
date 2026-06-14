@@ -59,7 +59,7 @@ def get_env(key: str, default: Optional[str] = None) -> Optional[str]:
 
     Example:
         api_key = get_env("ANTHROPIC_API_KEY")
-        db_path = get_env("PRISM_DB_PATH", default="data/pulse.db")
+        db_path = get_env("PRISM_DB_PATH", default="data/prism.db")
     """
     value = os.getenv(key, default)
 
