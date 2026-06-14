@@ -288,7 +288,7 @@ Maritime light editorial system (June 2026 unification): light surfaces, deep-na
 
 ## 10. TESTING
 
-`tests/`: `conftest.py`, `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + **2.8.0 golden pins** + structural identities; pins regenerate ONLY with deliberate model changes, same commit), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_scanner_routes.py` (pre-existing breakage, excluded). Frontend: `tests/frontend/` via vitest (`normalizeSimulation`, shift-matrix math).
+`tests/`: `conftest.py`, `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + **2.8.0 golden pins** + structural identities; pins regenerate ONLY with deliberate model changes, same commit), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_scanner_routes.py` was relocated to the non-live quarantine (2026-06-14) — it imported scanner symbols that no longer exist and broke pytest collection under CI conditions (httpx present); rewrite it against the current scanner API when the AI layer is revived. Frontend: `tests/frontend/` via vitest (`normalizeSimulation`, shift-matrix math).
 
 ---
 

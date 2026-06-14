@@ -1,11 +1,11 @@
 # PRISM — Deployment Guide
 
-> **⚠ Partially outdated (banner added 2026-06-11).** URLs, repo, env-var tables
-> and rollback steps remain valid. Sections describing an interactive
-> `/simulate`, allocation persistence, R̂ targets, `middleware.ts` or
-> `cowork-deploy.sh` predate v3.6/v3.7 — the deployed service is read-only
-> (F2/D13) and the helper scripts were retired. On conflict, `HANDOVER.md` and
-> `CLAUDE.md` win.
+> Reconciled 2026-06-14 (handover review) against the live code. On any
+> conflict, `HANDOVER.md` and `CLAUDE.md` remain the source of truth.
+> Key facts: the deployed service is **read-only** (F2/D13 — it never
+> simulates); the canonical simulation runs **offline** via
+> `scripts/run_50k_prod.py`; auth is one shared secret (`PRISM_JWT_SECRET`)
+> used by both the Next.js proxy and the FastAPI backend.
 
 ## Live deployment
 
@@ -28,6 +28,9 @@ GitHub: [`AlexanderLaker/PULSE`](https://github.com/AlexanderLaker/PULSE) (branc
 Vercel project: `prism-profit-pool` (org: `lakeralexander-8859s-projects`)
 
 Pushing to `main` auto-triggers a Vercel build (~2 min). Monitor at https://vercel.com/dashboard.
+There is **no `next build` in CI** — the build runs only on Vercel (where the
+Clerk/Neon env vars are present). CI runs the `npm run verify` gates instead
+(typecheck + lint + vitest + pytest); see `.github/workflows/ci.yml`.
 
 ### Pushing from your Mac
 
@@ -38,15 +41,19 @@ git commit -m "<change>"
 git push origin main
 ```
 
-### Pushing from Cowork / sandbox
+### Pushing from Cowork / a sandbox
 
-Cowork has its own helper that bypasses the OneDrive `.git/index.lock` issue:
+The folder is often mounted from OneDrive/iCloud, whose `.git` can refuse
+`unlink` and leave stale `.git/index.lock` / `.git/HEAD.lock` files
+("Another git process seems to be running"). If `git` errors that way and no
+git process is actually running, clear the stale locks by **renaming** them
+(rename is permitted even when delete is not), then retry:
 
 ```bash
-bash scripts/cowork-deploy.sh "<commit subject>" path1 path2 ...
+[ -e .git/index.lock ] && mv -f .git/index.lock .git/_stale_index.lock
+[ -e .git/HEAD.lock ]  && mv -f .git/HEAD.lock  .git/_stale_HEAD.lock
+git commit -m "<change>" && git push origin main
 ```
-
-Requires `.env.deploy` at repo root with `GITHUB_TOKEN=<fine-grained PAT>` (gitignored, never committed).
 
 ## Environment variables
 
@@ -58,12 +65,15 @@ https://vercel.com/lakeralexander-8859s-projects/prism-profit-pool/settings/envi
 | Variable | Purpose |
 |----------|---------|
 | `POSTGRES_URL` | Neon serverless Postgres connection string (production database) |
-| `JWT_SECRET` | Next.js JWT signing secret (≥32 chars; see `DEPLOYMENT_NOTES.md`) |
-| `PRISM_JWT_SECRET` | FastAPI JWT signing secret — **must equal `JWT_SECRET`** |
+| `PRISM_JWT_SECRET` | Shared HS256 signing secret (≥32 chars). **The same value is read by the Next.js proxy (`lib/prismJwt.ts`) and the FastAPI backend (`pulse/api/auth.py`)** — there is only one secret. See `DEPLOYMENT_NOTES.md`. |
 | `CLERK_SECRET_KEY` | Clerk backend API key |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk frontend publishable key (use `pk_live_...` for production) |
-| `CLERK_WEBHOOK_SECRET` | svix signing secret for `/api/webhooks/clerk` |
-| `ANTHROPIC_API_KEY` | Claude API for AI scanner / chat / narrator (provider-agnostic) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk frontend publishable key (use `pk_live_...` for production). **Required at build time** — `next build` prerenders pages through `<ClerkProvider>` and fails without it. |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | svix signing secret for `/api/webhooks/clerk` |
+| `ANTHROPIC_API_KEY` | Claude API for the (currently dormant) AI scanner / narrator. Unset is fine in production — the AI layer is not mounted. |
+
+> Earlier docs referenced a separate `JWT_SECRET` that had to "equal"
+> `PRISM_JWT_SECRET`. The live code reads `PRISM_JWT_SECRET` on both sides;
+> `JWT_SECRET` is not used. Set `PRISM_JWT_SECRET` only.
 
 ### Optional / scaffold
 
@@ -83,21 +93,20 @@ If/when any of these is wired into the live ingestion path, add it here and docu
 
 ## Architecture
 
-Production is a **Next.js 14 + Python FastAPI** hybrid on Vercel:
+Production is a **Next.js 16 + Python FastAPI** hybrid on Vercel:
 
 ```
 Vercel project: prism-profit-pool
-├── app/                          ← Next.js 14 routes (Clerk-gated dashboard)
-├── components/dashboard/         ← 29+ War Room components (TS/React)
-├── lib/                          ← auth, calibration, format, db helpers
+├── app/                          ← Next.js 16 routes (Clerk-gated dashboard) + /api proxy routes
+├── components/dashboard/         ← 13 dashboard components (TS/React)
+├── lib/                          ← auth bridge (prismJwt, roles), shiftMatrix, format, helpers
 ├── api/index.py                  ← Python serverless adapter (cold-start retry)
-│   └── pulse/api/app.py          ← FastAPI app, 30+ endpoints
+│   └── pulse/api/app.py          ← FastAPI app (read-only data plane + admin writes)
 ├── pulse/                        ← Simulation engine + trend DB (Python)
-│   ├── seed_trends.py            ← 99 calibrated trends (v3.3 + Gemini)
-│   ├── simulation/bayesian_mc.py ← Bayesian MC + copula engine
+│   ├── seed_trends.py            ← 99 trends (v3.5 base)
+│   ├── simulation/bayesian_mc.py ← Bayesian MC + Gaussian copula engine (scipy-only, D13/D20)
 │   ├── ingestion/                ← Trend models
-│   ├── optimizer/                ← Allocation / mean-variance
-│   └── ai/                       ← Claude / Azure / Ollama provider abstraction
+│   └── ai/                       ← Claude / Azure / Ollama provider abstraction (dormant; not mounted)
 ├── public/                       ← Static images (innovation photos, favicon)
 └── vercel.json                   ← Routes /api/v1/* → api/index.py, rest → Next.js
 ```
@@ -107,7 +116,7 @@ Routing rules (`vercel.json`):
 - everything else → Next.js
 - `/images/*` cached `max-age=31536000, immutable`
 
-Auth: Clerk middleware (`middleware.ts`) gates everything except `/sign-in`, `/sign-up`, Clerk webhook routes, the bootstrap-admin endpoint, and `/api/v1/*` (which the Python adapter then auth-checks via JWT Bearer).
+Auth: Clerk gates the app via `proxy.ts` (Next.js 16's Clerk integration; replaced the old `middleware.ts`) for everything except `/sign-in`, `/sign-up`, the Clerk webhook route, the bootstrap-admin endpoint, and `/api/v1/*` (which the Python adapter auth-checks itself via JWT Bearer / viewer cookie).
 
 ## Local development
 
@@ -115,10 +124,13 @@ Auth: Clerk middleware (`middleware.ts`) gates everything except `/sign-in`, `/s
 
 ```bash
 cd PROFIT_POOL_ENGINE
-pip install -r api/requirements.txt
+pip install -r requirements-dev.txt   # full engine + API + tests (scipy required, D13)
 python -m uvicorn pulse.api.app:app --reload --port 8000
 # Health: http://localhost:8000/api/v1/health
 ```
+
+> `api/requirements.txt` is the *serverless* runtime set (no scipy by design).
+> For local dev and running the engine, use `requirements-dev.txt`.
 
 ### Frontend (Next.js on :3000)
 
@@ -132,20 +144,26 @@ The Next.js `next.config.js` proxies `/api/v1/*` to `http://127.0.0.1:8000` in d
 
 ### Required local `.env`
 
-Copy `.env.example` and fill in: `POSTGRES_URL` (or set `PULSE_DB_PATH=data/prism.db` for SQLite local mode), `JWT_SECRET`, `PRISM_JWT_SECRET`, Clerk keys, optional `ANTHROPIC_API_KEY`.
+Copy `.env.example` and fill in: `POSTGRES_URL` (or set `PRISM_DB_PATH=data/prism.db` for SQLite local mode), `PRISM_JWT_SECRET`, Clerk keys, optional `ANTHROPIC_API_KEY`.
 
 ## Production simulation (50k canonical run)
 
-The dashboard's interactive `/simulate` runs at 5k–10k iterations. The canonical production batch runs at 50k × 3 chains:
+The deployed service **never simulates** — `POST /api/v1/simulate` returns **409** on any runtime without scipy (F2/D13), and the dashboard only renders the latest persisted run. The canonical production batch runs **offline on a machine with scipy**:
 
 ```bash
 python3 scripts/run_50k_prod.py
-# Loads 99 trends from prod Neon, runs Bayesian MC at 50k×3,
-# persists shift_matrix + allocation + convergence to Neon,
-# writes a QA Excel alongside repo root.
+# Loads 99 trends from prod Neon, runs Bayesian MC at 50k × 3 chains,
+# persists the results bundle (shift_matrix + decompositions + totals.portfolio
+# + integrity_events + seed_stability + trend_fingerprint) to Neon,
+# and writes a QA Excel alongside the repo root.
 ```
 
-Convergence target: `r̂ < 1.01`, ESS > 1k per category. At production scale, ESS lands ~150k (essentially the full sample, near-zero autocorrelation).
+Quality signal (internal, not exposed in the UI): **seed stability** — the
+headline spread across independently-seeded chains (D3 replaced the R̂ badge,
+which is ≈1.0 by construction on i.i.d. Monte-Carlo draws).
+
+After an engine-version bump, re-run the CLI so the persisted run matches
+`MODEL_VERSION`; the dashboard renders whatever run is persisted.
 
 ## Smoke test after deploy
 
@@ -154,11 +172,14 @@ Convergence target: `r̂ < 1.01`, ESS > 1k per category. At production scale, ES
 curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count, .categories'
 # Expected: "ok"  99  12
 
-# 2. Trends endpoint shape
+# 2. Trends endpoint shape (auth required — get a JWT from a Clerk session)
 curl -s https://prism-hcb.vercel.app/api/v1/trends -H "Authorization: Bearer $JWT" | jq 'length'
-# Expected: 99 (auth required — get JWT from Clerk session)
+# Expected: 99
 
-# 3. (Authenticated) hit /api/v1/simulate, verify shift_matrix has 12 categories × 10 path years
+# 3. Persisted run (read-only): verify the shift matrix is 12 categories × 10 path years
+curl -s https://prism-hcb.vercel.app/api/v1/simulation -H "Authorization: Bearer $JWT" \
+  | jq '.results.shift_matrix | keys | length'
+# Expected: 12   (NOT /api/v1/simulate — that returns 409 by design on serverless)
 ```
 
 ## Rollback
@@ -173,7 +194,7 @@ Or roll back via the Vercel dashboard: Deployments → click prior healthy deplo
 
 ## Reference docs
 
+- `HANDOVER.md` — primary handover entry point (operate, deploy, landmines)
 - `DEPLOYMENT_NOTES.md` — JWT secret synchronization between Next.js and FastAPI
 - `CLERK_MIGRATION.md` — Clerk auth setup
-- `CLAUDE.md` — full project specification (v3.3, MODEL_VERSION 2.5.0)
-- `PRISM_PreDeployment_Audit_2026-05-04.md` — most recent audit
+- `CLAUDE.md` — full project specification (v3.7, MODEL_VERSION 2.8.0)

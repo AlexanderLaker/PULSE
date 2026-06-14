@@ -40,7 +40,7 @@ endpoints. The engine has no user store of its own.
 | `data/` | Seed/calibration data; `innovations.ts` (static innovation content) |
 | `tests/` | pytest suite for the engine |
 | `scripts/` | Build helpers (`download-images.mjs`) + one-off migrations |
-| `DOCUMENTATION/` | Deep-dive docs (methodology, modules, audits) |
+| `*.md` (repo root) | Spec + deep-dive docs (HANDOVER, CLAUDE, methodology, brand/trend audits) |
 
 ## Prerequisites
 
@@ -109,10 +109,10 @@ Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
 
 ## Further documentation
 
-Start with `HANDOVER.md` (takeover guide), then `CLAUDE.md` (developer
-handbook) and `DOCUMENTATION/` — see `DOCUMENTATION/INDEX.md` for a table of
-contents. Target-state concept for Henkel hosting + online AI:
-`CONCEPT_PRISM_ONLINE_AI.md`.
+Start with `HANDOVER.md` (takeover guide), then `CLAUDE.md` (full developer
+handbook / spec). Additional deep-dive docs live as `*.md` files at the repo
+root (methodology, brand/category mapping, trend audits). Target-state concept
+for Henkel hosting + online AI: `CONCEPT_PRISM_ONLINE_AI.md`.
 
 Strategy decks, management reports and historical audits are NOT part of this
 repository.
