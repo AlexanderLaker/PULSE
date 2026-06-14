@@ -38,6 +38,7 @@
   "exclude": [
     "node_modules",
     "pulse",
-    "archive"
+    "archive",
+    "Not in Live Version"
   ]
 }

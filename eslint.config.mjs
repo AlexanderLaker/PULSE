@@ -25,6 +25,7 @@ export default [
       'data/**',
       '_ARCHIVE/**',
       'tests/**',
+      'Not in Live Version/**',   // relocated non-live files (legacy Vite app etc.)
     ],
   },
 ];
