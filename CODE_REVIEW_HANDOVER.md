@@ -107,6 +107,7 @@ Seven atomic commits on `review/handover-perfection-pass` (oldest → newest). N
 | `da1803b` | Docs | Reconciled `DEPLOY.md` (correct env vars, Next 16, read-only model, real deploy mechanics), `README.md` (repointed relocated docs), `CLAUDE.md` (scanner-test line). |
 | `986740c` | Repo hygiene | Ignore `*.log`; untracked the stray `vite_server.log`; fixed the `env_loader` docstring. |
 | `63b214f` | Repo hygiene | Moved the internal review-prompt doc out of the shipped root into the quarantine. |
+| _(follow-up)_ | Repo hygiene | **Owner decision:** consolidated both non-live folders into the single **gitignored** `_NOT_FOR_HANDOVER/` and untracked them. The repo now tracks **only live product code**; confidential strategy decks (already gitignored) can never enter git. Re-pointed the eslint/tsconfig/.vercelignore excludes accordingly. |
 
 **Before → after metrics**
 
@@ -118,7 +119,7 @@ Seven atomic commits on `review/handover-perfection-pass` (oldest → newest). N
 | Unused dev dependencies | 13 | 0 |
 | Wrong/stale env-var names in deploy docs | 3 | 0 |
 | Tracked `.log` files | 1 | 0 |
-| Non-live files in the shipped tree | mixed in | 175 quarantined (excluded from deploy) |
+| Non-live files tracked in git | mixed in | 0 — all consolidated into the gitignored `_NOT_FOR_HANDOVER/` (local-only) |
 
 ---
 
@@ -174,7 +175,7 @@ python -m pytest tests/test_golden_pipeline.py -q      # golden pins (7 pass, un
 **Two environment caveats that are NOT code defects** (they shaped how this review verified things, and DX should know them):
 
 1. **SQLite on a network/OneDrive mount throws `disk I/O error`.** The API tests that touch the DB fail on a mounted filesystem because SQLite can't lock files there. Run them with the DB on a local path: `PRISM_DB_PATH=/tmp/prism.db python -m pytest tests/ -q`. On CI's normal filesystem this is a non-issue (76 pass).
-2. **`git` and `next build` on the mount can't `unlink`.** The mount permits `rename` but blocks `unlink`, so git leaves stale `.git/index.lock`/`HEAD.lock` and Turbopack/`next build` can't clean `.next/`. Commits still succeed (git finalizes via rename); clear a stuck lock by renaming it (`mv -f .git/index.lock .git/_stale.lock`), not deleting. **This is why dead code in this review was *relocated* into `Not in Live Version/` rather than `git rm`-deleted** — the established, mount-safe pattern. The full `next build` is exercised authoritatively on Vercel; `tsc` typecheck (which the build also runs) is green locally.
+2. **`git` and `next build` on the mount can't `unlink`.** The mount permits `rename` but blocks `unlink`, so git leaves stale `.git/index.lock`/`HEAD.lock` and Turbopack/`next build` can't clean `.next/`. Commits still succeed (git finalizes via rename); clear a stuck lock by renaming it (`mv -f .git/index.lock .git/_stale.lock`), not deleting. **This is why dead code in this review was *relocated* (into the gitignored `_NOT_FOR_HANDOVER/`) rather than `git rm`-deleted** — the established, mount-safe pattern. The full `next build` is exercised authoritatively on Vercel; `tsc` typecheck (which the build also runs) is green locally.
 
 **Independent verification:** a separate fresh-eyes agent re-ran all gates and audited the full `main...HEAD` diff against the guardrails (golden pins, no scipy fallback, no resurrected features, honesty-set copy, engine/config untouched, branch ≠ main) → **PASS**, no concerns beyond the sign-off items above.
 
