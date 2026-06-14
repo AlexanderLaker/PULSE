@@ -1,6 +1,6 @@
 {
-  "name": "pulse-profit-pool-shift-model",
-  "version": "2.1.0",
+  "name": "prism-profit-pool-engine",
+  "version": "2.8.0",
   "private": true,
   "engines": {
     "node": "22.x"

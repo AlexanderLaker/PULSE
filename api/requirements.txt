@@ -1,7 +1,10 @@
 # PULSE API — Vercel serverless runtime dependencies
-# Total must stay under 250MB unzipped
-# scipy (~150MB) removed — numpy fallbacks used instead
-# pandas (~60MB) removed — not needed at runtime (seed data used)
+# Total must stay under 250MB unzipped.
+# scipy (~150MB) is intentionally ABSENT — this runtime never computes.
+# The deployed service is read-only over persisted runs (F2/D13); the
+# scipy-only engine runs OFFLINE (scripts/run_50k_prod.py). No numpy
+# fallback exists anywhere (D13) — do not add scipy or a fallback here.
+# pandas (~60MB) absent — not needed at runtime (persisted/seed data only).
 fastapi>=0.110
 pydantic>=2.6
 numpy>=1.26

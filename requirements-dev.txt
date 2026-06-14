@@ -1,44 +1,40 @@
-# PULSE — Profit Pool Unified Landscape Simulation Engine
-# Requirements for Phase 1-3
+# PRISM — Profit Pool Risk & Intelligence Simulation Model
+# Local/offline-dev + CI dependencies (reconciled 2026-06, handover review).
+#
+# This file reflects what the code ACTUALLY imports. The serverless runtime
+# deps are separate (api/requirements.txt) and intentionally minimal — that
+# runtime never computes (F2/D13).
+#
+# Pruned (zero imports anywhere in the live tree): pandas, networkx, arviz,
+# statsmodels, newspaper3k, jinja2, gdeltdoc, praw, pytrends, fredapi,
+# openmeteo-requests, python-epo-ops-client, google-api-python-client.
+# These backed deleted or never-shipped research/diagnostic features.
 
-# Core
-pandas>=2.2
+# Core engine — scipy is a HARD requirement (D13); no fallback exists
 numpy>=1.26
 scipy>=1.12
 openpyxl>=3.1
-networkx>=3.2
 python-dotenv>=1.0
 
-# Bayesian / Statistical
-arviz>=0.17
-statsmodels>=0.14
-
-# API Server (Phase 2)
+# API server
 fastapi>=0.110
 uvicorn>=0.27
 pydantic>=2.6
 
-# AI Layer (Phase 3)
+# AI layer — dormant (modules present, routes unmounted) but kept revivable
+# per CONCEPT_PRISM_ONLINE_AI.md: scanner.py imports feedparser + bs4,
+# provider.py imports anthropic.
 anthropic>=0.40
 feedparser>=6.0
-newspaper3k>=0.2
 beautifulsoup4>=4.12
 
-# Export
+# Ad-hoc exports (no live API route; callable directly from Python)
 python-pptx>=0.6
 reportlab>=4.1
-jinja2>=3.1
 
-# API Integrations
-gdeltdoc>=1.4
-python-epo-ops-client>=4.1
-pytrends>=4.9
-praw>=7.7
-google-api-python-client>=2.100
-fredapi>=0.5
-openmeteo-requests>=1.2
-
-# Testing
+# Testing — httpx backs FastAPI's TestClient (CI installs it explicitly;
+# listed here to keep this file in sync with .github/workflows/ci.yml)
 pytest>=8.0
 pytest-cov>=4.1
 hypothesis>=6.98
+httpx>=0.27
