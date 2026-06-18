@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "node scripts/download-images.mjs && next build",
+  "buildCommand": "next build",
   "framework": "nextjs",
   "outputDirectory": ".next",
   "rewrites": [

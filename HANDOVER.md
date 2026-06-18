@@ -79,7 +79,6 @@ Local quirks worth knowing on day 1:
 - **`JWT_SECRET` must equal `PRISM_JWT_SECRET`** (Next.js side and FastAPI side of the same bridge — mismatch yields 401s on every data call).
 - Without Postgres, the engine falls back to SQLite. `pulse/env_loader.py` defaults to `data/pulse.db`; the convention used everywhere else is `data/prism.db` — set `PRISM_DB_PATH=data/prism.db` explicitly in `.env`.
 - `npm run lint` includes `scripts/check_shiftmatrix_single_source.sh` — it fails the build if shift-matrix aggregation math appears anywhere except `lib/shiftMatrix.ts`. That is intentional (F1).
-- The build step `node scripts/download-images.mjs` fetches Innovation-Explorer photos (Unsplash key optional; falls back to pinned IDs — never breaks the build).
 
 ## 5. Operations runbook
 

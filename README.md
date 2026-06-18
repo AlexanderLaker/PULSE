@@ -30,23 +30,23 @@ endpoints. The engine has no user store of its own.
 | Path | Purpose |
 |------|---------|
 | `app/` | Next.js pages + API routes (BFF: auth bridge, user/role admin) |
-| `components/dashboard/` | Dashboard views (Trends, Consumer Journey, Profit Pool, Innovation) |
+| `components/dashboard/` | Dashboard views (Trends, Consumer Journey, Profit Pool Shift Analysis, Profit Pool Explorer) |
 | `hooks/usePrism.ts` | Central data hook — single source of truth for engine state |
 | `api/client.ts` | Typed API client for all `/api/v1/*` calls |
 | `lib/` | Server-side helpers: roles, db, Clerk→PRISM JWT bridge, formatting |
 | `types/` | Shared TypeScript types |
 | `api/index.py` | Vercel serverless adapter wrapping the FastAPI app |
 | `pulse/` | Python simulation engine + FastAPI app |
-| `data/` | Seed/calibration data; `innovations.ts` (static innovation content) |
+| `data/` | Static front-end content (consumer journey tiles, trend code map) |
 | `tests/` | pytest suite for the engine |
-| `scripts/` | Build helpers (`download-images.mjs`) + one-off migrations |
+| `scripts/` | Production-run helpers + one-off migrations |
 | `*.md` (repo root) | Spec + deep-dive docs (HANDOVER, CLAUDE, methodology, brand/trend audits) |
 
 ## Prerequisites
 
 - **Node.js 22.x** (see `package.json` engines)
 - **Python 3.10+**
-- Accounts/keys: **Clerk** (auth), **Neon Postgres** (roles DB); optional: Resend, Unsplash, Anthropic
+- Accounts/keys: **Clerk** (auth), **Neon Postgres** (roles DB); optional: Resend, Anthropic
 
 ## Local setup
 
@@ -83,7 +83,6 @@ npm run dev                                                 # frontend on :3000
 | `ADMIN_BOOTSTRAP_SECRET` | optional | Next server | Shared secret for `/api/admin/bootstrap` (first admin) |
 | `BACKEND_URL` / `PRISM_BACKEND_URL` | dev only | Next server | Engine URL override (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | optional | engine | SQLite path for local runs without Postgres |
-| `UNSPLASH_ACCESS_KEY` | optional | build | Innovation images at build time (falls back to placeholders) |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | optional | engine | Transactional e-mail (currently unused after auth cleanup) |
 | `ANTHROPIC_API_KEY` | optional | engine | AI narration/chat features (`pulse/ai/`) |
 | `CORS_ORIGINS`, `PRISM_APP_URL` | optional | engine | CORS / absolute-URL overrides |
@@ -102,7 +101,7 @@ audits). Multi-chain convergence checks derive distinct seeds internally.
 
 ## Deployment (Vercel)
 
-`vercel.json` drives the build: `node scripts/download-images.mjs && next build`,
+`vercel.json` drives the build: `next build`,
 plus the `/api/v1/*` → `api/index.py` rewrite. Set all required env vars in the
 Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
 `CLERK_MIGRATION.md` for the auth setup history.

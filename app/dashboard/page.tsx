@@ -23,7 +23,7 @@
  *
  * Tab navigation (constant across all pages):
  *   Trends | Consumer Journey | Profit Pool Shift Analysis
- *   [+ Innovation Explorer / Profit Pool Explorer — Beta, pinned right]
+ *   [+ Profit Pool Explorer — Beta, pinned right]
  *   Below md: a menu button opens the same tab list as a sheet.
  *
  * Data (single store): one <PrismProvider> wraps all tabs, so the data
@@ -40,14 +40,9 @@ import dynamic from 'next/dynamic';
 import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
 import Trends2 from '@/components/dashboard/Trends2';
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
-// Beta tabs are dynamically imported (review F10): InnovationExplorer3
-// statically pulls data/innovations.ts (~212 KB) + images map, and the
-// Explorer pulls lib/profitPoolData — neither belongs in the initial
-// bundle of the three production tabs.
-const InnovationExplorer3 = dynamic(
-  () => import('@/components/dashboard/InnovationExplorer3'),
-  { loading: () => <FullPageSkeleton />, ssr: false },
-);
+// The Profit Pool Explorer (Beta) tab is dynamically imported (review
+// F10): it pulls lib/profitPoolData, which does not belong in the
+// initial bundle of the three production tabs.
 const ProfitPoolExplorer = dynamic(
   () => import('@/components/dashboard/ProfitPoolExplorer'),
   { loading: () => <FullPageSkeleton />, ssr: false },
@@ -62,7 +57,6 @@ type DashboardTab =
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
-  | 'innovation-explorer-3'
   | 'profit-pool-explorer';
 
 interface TabDef {
@@ -81,7 +75,6 @@ const TABS: TabDef[] = [
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   // Beta views — pinned to the right side of the top nav, in muted gray.
-  { id: 'innovation-explorer-3', label: 'Innovation Explorer (Beta)',  beta: true },
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
 
@@ -132,14 +125,6 @@ export default function DashboardPage() {
   // opened so beta users don't mistake it for production data.
   const [explorerNoticeOpen, setExplorerNoticeOpen] = useState(false);
 
-  // ─── Innovation Explorer beta notice ────────────────────────────────
-  // The Innovation Explorer surfaces *innovation ideas* synthesized from
-  // the underlying trend and profit-pool signals — they are directional
-  // hypotheses, not validated launches. We show that framing every time
-  // the tab is opened so beta users read the output through the right
-  // lens.
-  const [innovationNoticeOpen, setInnovationNoticeOpen] = useState(false);
-
   // ─── Welcome / MVP onboarding modal ─────────────────────────────────
   // Shown on every fresh login (v3.6 owner-verified semantics). Keyed by
   // the active Clerk session ID in sessionStorage — a tab refresh inside
@@ -178,7 +163,6 @@ export default function DashboardPage() {
     setActiveTab(id);
     setVisitedTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
     if (id === 'profit-pool-explorer') setExplorerNoticeOpen(true);
-    if (id === 'innovation-explorer-3') setInnovationNoticeOpen(true);
     setMobileNavOpen(false);
   };
 
@@ -430,18 +414,11 @@ export default function DashboardPage() {
           <ConsumerJourney2
             onNavigateProfitPoolShiftModel={() => openTab('profit-pool-2')}
             onNavigateTrends={() => openTab('trends-2')}
-            onNavigateInnovation={() => openTab('innovation-explorer-3')}
             onNavigateToTrend={(query: string) => {
               setTrendsSearch(query);
               openTab('trends-2');
             }}
             isAdmin={isAdmin}
-          />
-        ))}
-        {tabPane('innovation-explorer-3', (
-          <InnovationExplorer3
-            onNavigateToTrend={() => openTab('trends-2')}
-            onNavigateToConsumerJourney={() => openTab('consumer-journey-2')}
           />
         ))}
         {tabPane('profit-pool-explorer', <ProfitPoolExplorer />)}
@@ -507,60 +484,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ─── Innovation Explorer beta notice ──────────────────────────
-          Same dialog surface as the Profit Pool Explorer notice, but
-          framed for innovation hypotheses rather than mock-up data. */}
-      {innovationNoticeOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="innovation-notice-title"
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-          style={{ backgroundColor: 'rgba(0, 52, 94, 0.45)' }}
-          onClick={() => setInnovationNoticeOpen(false)}
-        >
-          <div
-            className="max-w-md w-full rounded-2xl bg-white shadow-2xl p-6"
-            style={{ fontFamily: HEADLINE_FONT }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="text-[11px] font-semibold uppercase tracking-[0.16em] mb-2"
-              style={{ color: NAV.betaActive }}
-            >
-              Beta · Innovation Ideas
-            </div>
-            <h2
-              id="innovation-notice-title"
-              className="text-xl font-extrabold tracking-tight mb-2"
-              style={{ color: NAV.onBg }}
-            >
-              Innovation Explorer
-            </h2>
-            <p
-              className="text-sm leading-relaxed mb-5"
-              style={{ color: NAV.onSurfaceVariant }}
-            >
-              The concepts shown here are innovation ideas synthesized from
-              the underlying trend signals and profit-pool impact — they
-              are directional hypotheses to inspire portfolio thinking,
-              not validated launches.
-            </p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setInnovationNoticeOpen(false)}
-                className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-colors"
-                style={{
-                  backgroundColor: NAV.surfaceLow,
-                  color: NAV.primary,
-                }}
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </PrismProvider>
   );

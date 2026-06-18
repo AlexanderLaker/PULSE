@@ -71,7 +71,6 @@ describe('production tab smoke renders', () => {
       <ConsumerJourney2
         onNavigateProfitPoolShiftModel={() => {}}
         onNavigateTrends={() => {}}
-        onNavigateInnovation={() => {}}
       />,
     );
     expect(container.textContent).toBeTruthy();

@@ -108,7 +108,6 @@ const CURRENT_YYYYMM = (() => {
 interface ConsumerJourney2Props {
   onNavigateProfitPoolShiftModel?: () => void;
   onNavigateTrends?: () => void;
-  onNavigateInnovation?: () => void;
   /** Receives a trend NAME, used as a Trends-tab search query. */
   onNavigateToTrend?: (query: string) => void;
   isAdmin?: boolean;
@@ -753,7 +752,6 @@ const TileEditor: FC<{
 const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   onNavigateProfitPoolShiftModel,
   onNavigateTrends,
-  onNavigateInnovation,
   onNavigateToTrend,
   isAdmin = false,
 }) => {
@@ -984,15 +982,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
               >
                 Shift Matrix <ArrowRight size={12} strokeWidth={2.5} />
-              </button>
-            )}
-            {onNavigateInnovation && (
-              <button
-                onClick={onNavigateInnovation}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold"
-                style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-              >
-                Innovation <ArrowRight size={12} strokeWidth={2.5} />
               </button>
             )}
           </div>

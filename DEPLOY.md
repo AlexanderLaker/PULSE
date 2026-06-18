@@ -87,10 +87,6 @@ The following keys appear in older docs and `.env.example` but are **not current
 
 If/when any of these is wired into the live ingestion path, add it here and document the path.
 
-### Image pipeline (build-time)
-
-- `UNSPLASH_ACCESS_KEY` — used by `scripts/download-images.mjs` at Vercel build time to fetch Innovation Explorer photography. If unset, the build falls back to hand-picked photo IDs (no broken builds).
-
 ## Architecture
 
 Production is a **Next.js 16 + Python FastAPI** hybrid on Vercel:
@@ -98,7 +94,7 @@ Production is a **Next.js 16 + Python FastAPI** hybrid on Vercel:
 ```
 Vercel project: prism-profit-pool
 ├── app/                          ← Next.js 16 routes (Clerk-gated dashboard) + /api proxy routes
-├── components/dashboard/         ← 13 dashboard components (TS/React)
+├── components/dashboard/         ← 10 dashboard components (TS/React)
 ├── lib/                          ← auth bridge (prismJwt, roles), shiftMatrix, format, helpers
 ├── api/index.py                  ← Python serverless adapter (cold-start retry)
 │   └── pulse/api/app.py          ← FastAPI app (read-only data plane + admin writes)
@@ -107,7 +103,7 @@ Vercel project: prism-profit-pool
 │   ├── simulation/bayesian_mc.py ← Bayesian MC + Gaussian copula engine (scipy-only, D13/D20)
 │   ├── ingestion/                ← Trend models
 │   └── ai/                       ← Claude / Azure / Ollama provider abstraction (dormant; not mounted)
-├── public/                       ← Static images (innovation photos, favicon)
+├── public/                       ← Static assets (favicon, etc.)
 └── vercel.json                   ← Routes /api/v1/* → api/index.py, rest → Next.js
 ```
 

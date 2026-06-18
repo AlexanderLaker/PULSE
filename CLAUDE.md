@@ -121,7 +121,7 @@ journey decomposition.
 | AI layer (scanner, narrator, calibrator) | **Dormant** | Modules exist; scanner routes unmounted, chat endpoint removed |
 | Excel export (Shift Matrix QA workbook) | **Production** | Written by `run_50k_prod.py`; D16/D17 wording included |
 | PPTX / Power BI export modules | **Ad-hoc only** | No live API route; callable from Python directly |
-| War Room dashboard (Next.js 16) | **Production** | 13 components; read-only over persisted runs |
+| War Room dashboard (Next.js 16) | **Production** | 10 components; read-only over persisted runs |
 | REST API (FastAPI) | **Production** | Read-only data plane + admin trend/config writes |
 | Advanced analytics (CVaR/Sobol/tipping/reverse-stress) | **Removed (D14)** | — |
 | Allocation optimizer | **Removed (D4)** | — |
@@ -206,7 +206,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 **Pages (`app/`):** dashboard, login/register + Clerk sign-in/sign-up, forgot/reset-password, `api/` proxy routes.
 
-**Dashboard components (`components/dashboard/`, 13):**
+**Dashboard components (`components/dashboard/`, 10):**
 
 | Component | Purpose |
 |-----------|---------|
@@ -215,7 +215,6 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
 | `ProfitPoolExplorer.tsx` | Beta, GP1-only pool views (D5). v2 (2026-06-11): arrows = pool development (revenue × GP1 drift, FY2025→2030, derived in `lib/profitPoolData.ts`); Laundry/Hair toggle + view pills; click drill-down decomposes pool CAGR into revenue CAGR + GP1 drift with € pools; all sources clickable URLs verified vs. FY2025 filings, graded ✅ reported / ⚡ derived / ⚠️ estimate |
-| `InnovationExplorer3.tsx` / `InnovationDeepDive.tsx` / `InnovationProductImage.tsx` | Beta innovation surfaces |
 | `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions |
 | `WelcomeModal.tsx`, `ErrorBoundary.tsx`, `LoadingSkeleton.tsx` | Shell |
 

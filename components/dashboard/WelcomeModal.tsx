@@ -4,8 +4,8 @@
  * Step 1: MVP disclaimer + feedback channel (Alexander Laker).
  * Step 2: Brief explainer of the three production views, in header order:
  *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis.
- *           Beta tabs (Innovation Explorer, Profit Pool Explorer) are not
- *           introduced here — they live to the right of the top nav.
+ *           The Profit Pool Explorer (Beta) tab is not introduced here —
+ *           it lives to the right of the top nav.
  *
  * Design language mirrors SettingsModal / Trends2 / ProfitPoolAnalysis2
  * (Maritime blue editorial tokens, Manrope headlines, pill-shaped CTAs).
