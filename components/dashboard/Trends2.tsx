@@ -2,7 +2,7 @@
  * Trends 2 — Editorial Intelligence View
  *
  * Alternative visualisation for the trends page, inspired by the Stitch
- * "Digital Curator" design language (DESIGN.md in stitch_fmcg_trend_navigator-3).
+ * "Digital Curator" design language (docs/DESIGN.md in stitch_fmcg_trend_navigator-3).
  *
  * Design principles applied:
  *   • Maritime blue palette with tonal layering (no 1px borders)
@@ -89,7 +89,7 @@ const SOURCE_ICON: Record<string, LucideIcon> = {
   Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
 };
 
-// ─── Editorial design tokens (from DESIGN.md) ────────────────────
+// ─── Editorial design tokens (from docs/DESIGN.md) ────────────────────
 const S = {
   bg:                 '#f8f9ff',
   surface:            '#ffffff',

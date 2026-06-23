@@ -74,8 +74,8 @@ pytest tests/ -v
 
 ## Documentation
 
-- **TEST_SUITE_SUMMARY.md** — Complete test suite overview & metrics
-- **TESTS_README.md** — Detailed test documentation by module
+This guide is the canonical testing reference for the suite.
+(The earlier TEST_SUITE_SUMMARY.md / TESTS_README.md write-ups were consolidated here in the June 2026 handover cleanup.)
 
 ## Fixtures Available
 

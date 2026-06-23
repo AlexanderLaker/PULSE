@@ -39,8 +39,9 @@ endpoints. The engine has no user store of its own.
 | `pulse/` | Python simulation engine + FastAPI app |
 | `data/` | Static front-end content (consumer journey tiles, trend code map) |
 | `tests/` | pytest suite for the engine |
-| `scripts/` | Production-run helpers + one-off migrations |
-| `*.md` (repo root) | Spec + deep-dive docs (HANDOVER, CLAUDE, methodology, brand/trend audits) |
+| `scripts/` | Production-run + ops helpers (`scripts/archive/` holds spent one-off migrations) |
+| `docs/` | Deep-dive docs: methodology, brand/category mapping, trend audits, testing, design system (`docs/INDEX.md`) |
+| `*.md` (repo root) | The five canonical docs: README, HANDOVER, CLAUDE, DEPLOY, CONCEPT_PRISM_ONLINE_AI |
 
 ## Prerequisites
 
@@ -104,14 +105,14 @@ audits). Multi-chain convergence checks derive distinct seeds internally.
 `vercel.json` drives the build: `next build`,
 plus the `/api/v1/*` → `api/index.py` rewrite. Set all required env vars in the
 Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
-`CLERK_MIGRATION.md` for the auth setup history.
+`docs/CLERK_MIGRATION.md` for the auth setup history.
 
 ## Further documentation
 
 Start with `HANDOVER.md` (takeover guide), then `CLAUDE.md` (full developer
-handbook / spec). Additional deep-dive docs live as `*.md` files at the repo
-root (methodology, brand/category mapping, trend audits). Target-state concept
-for Henkel hosting + online AI: `CONCEPT_PRISM_ONLINE_AI.md`.
+handbook / spec). Deep-dive docs (methodology, brand/category mapping, trend
+audits, testing, design system) live under `docs/` — see `docs/INDEX.md`.
+Target-state concept for Henkel hosting + online AI: `CONCEPT_PRISM_ONLINE_AI.md`.
 
 Strategy decks, management reports and historical audits are NOT part of this
 repository.

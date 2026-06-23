@@ -78,7 +78,7 @@ const TABS: TabDef[] = [
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
 
-// Editorial top-nav tokens (mirrors Trends2 / DESIGN.md palette)
+// Editorial top-nav tokens (mirrors Trends2 / docs/DESIGN.md palette)
 const NAV = {
   primary:          '#005db5',
   onBg:             '#00345e',

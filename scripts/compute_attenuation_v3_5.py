@@ -2,7 +2,7 @@
 """
 v3.5 Attenuation Calibration — empirical recalibration on the 99-trend base.
 
-Mirrors the v3.1 methodology documented in Attenuation_Calibration_Methodology.md:
+Mirrors the v3.1 methodology documented in docs/Attenuation_Calibration_Methodology.md:
   Step 1: pairwise weighted Jaccard on 12-category exposure vectors
   Step 2: excess-over-baseline transform (noise floor removed)
   Step 3a: asymmetric force-size normalization (cross-force only)

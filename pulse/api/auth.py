@@ -2,7 +2,7 @@
 
 History: this module once contained a full custom auth system (register,
 login, password reset, user CRUD). That system was superseded by Clerk
-(see CLERK_MIGRATION.md) and its HTTP routes were removed in the 2026-06
+(see docs/CLERK_MIGRATION.md) and its HTTP routes were removed in the 2026-06
 handover cleanup. What remains is the *verify side* of the auth bridge:
 
     Next.js (Clerk identity) ──▶ lib/prismJwt.ts mints a short-lived

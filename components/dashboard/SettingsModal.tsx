@@ -41,7 +41,7 @@ import {
   useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
 
-// ─── Editorial design tokens (mirrors Trends2 / DESIGN.md) ──────────
+// ─── Editorial design tokens (mirrors Trends2 / docs/DESIGN.md) ──────────
 const S = {
   bg:                  '#f8f9ff',
   surface:             '#ffffff',

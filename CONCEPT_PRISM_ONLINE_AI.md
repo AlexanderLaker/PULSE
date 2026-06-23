@@ -200,4 +200,4 @@ Unchanged: trend scoring RACI (Category Leads R, Strategy VP A), admin-only audi
 - [Gemini/Vertex AI data residency — Google Cloud Documentation](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/data-residency)
 - [Gemini Enterprise data residency locations — Google Cloud Documentation](https://docs.cloud.google.com/gemini/enterprise/docs/locations)
 
-*Internal references: `CLAUDE.md` (v3.7 spec), `HANDOVER.md`, `pulse/ai/` source, `docs/SCANNER_API.md`, `AI_QUICKSTART.md`.*
+*Internal references: `CLAUDE.md` (v3.7 spec), `HANDOVER.md`, `pulse/ai/` source, `docs/SCANNER_API.md`, `docs/AI_QUICKSTART.md`.*

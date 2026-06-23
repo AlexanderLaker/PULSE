@@ -65,7 +65,7 @@ https://vercel.com/lakeralexander-8859s-projects/prism-profit-pool/settings/envi
 | Variable | Purpose |
 |----------|---------|
 | `POSTGRES_URL` | Neon serverless Postgres connection string (production database) |
-| `PRISM_JWT_SECRET` | Shared HS256 signing secret (≥32 chars). **The same value is read by the Next.js proxy (`lib/prismJwt.ts`) and the FastAPI backend (`pulse/api/auth.py`)** — there is only one secret. See `DEPLOYMENT_NOTES.md`. |
+| `PRISM_JWT_SECRET` | Shared HS256 signing secret (≥32 chars). **The same value is read by the Next.js proxy (`lib/prismJwt.ts`) and the FastAPI backend (`pulse/api/auth.py`)** — there is only one secret. See `docs/DEPLOYMENT_NOTES.md`. |
 | `CLERK_SECRET_KEY` | Clerk backend API key |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk frontend publishable key (use `pk_live_...` for production). **Required at build time** — `next build` prerenders pages through `<ClerkProvider>` and fails without it. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | svix signing secret for `/api/webhooks/clerk` |
@@ -191,6 +191,6 @@ Or roll back via the Vercel dashboard: Deployments → click prior healthy deplo
 ## Reference docs
 
 - `HANDOVER.md` — primary handover entry point (operate, deploy, landmines)
-- `DEPLOYMENT_NOTES.md` — JWT secret synchronization between Next.js and FastAPI
-- `CLERK_MIGRATION.md` — Clerk auth setup
+- `docs/DEPLOYMENT_NOTES.md` — JWT secret synchronization between Next.js and FastAPI
+- `docs/CLERK_MIGRATION.md` — Clerk auth setup
 - `CLAUDE.md` — full project specification (v3.7, MODEL_VERSION 2.8.0)

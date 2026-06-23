@@ -53,7 +53,7 @@ import type { SimulationResult } from '@/types/simulation';
 
 // ════════════════════════════════════════════════════════════════════════
 // Style tokens — intentional local copy of the Maritime light editorial
-// system. Values match DESIGN.md.
+// system. Values match docs/DESIGN.md.
 // ════════════════════════════════════════════════════════════════════════
 const S = {
   bg: '#f8f9ff', surface: '#ffffff', surfaceLow: '#eff4ff',
@@ -279,42 +279,6 @@ const GradeChip: FC<{ grade: ProvenanceGrade; compact?: boolean }> = ({ grade, c
   );
 };
 
-/** A trend-code chip on a tile. Live codes are force-colored; retired codes
- *  render muted + struck with NO live-driver styling (fix B3). */
-const CodeChip: FC<{ code: string }> = ({ code }) => {
-  const retired = RETIRED_CODES[code];
-  if (retired) {
-    return (
-      <span
-        className="inline-flex items-center rounded-full font-bold"
-        style={{
-          fontSize: 10, padding: '1px 7px', backgroundColor: S.surfaceLow,
-          color: S.mutedText, textDecoration: 'line-through',
-          fontFamily: HEADLINE_FONT, opacity: 0.8,
-        }}
-        title={`Retired trend — ${retired}`}
-      >
-        {code}
-      </span>
-    );
-  }
-  const info = TREND_CODE_MAP[code];
-  const c = forceColor(info?.force);
-  return (
-    <span
-      className="inline-flex items-center rounded-full font-bold"
-      style={{
-        fontSize: 10, padding: '1px 7px',
-        backgroundColor: `${c}1a`, color: c,
-        fontFamily: HEADLINE_FONT,
-      }}
-      title={info ? `${info.name} · ${info.force} · ${info.direction}` : code}
-    >
-      {code}
-    </span>
-  );
-};
-
 /** Section header card used in the detail panel. */
 const SectionCard: FC<{ title: React.ReactNode; accent: string; children: React.ReactNode; subtitle?: React.ReactNode }> = ({ title, accent, children, subtitle }) => (
   <div className="rounded-2xl p-4" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
@@ -352,7 +316,7 @@ const TilePill: FC<{
       onClick={onClick}
       className="w-full text-left rounded-xl transition-all duration-150"
       style={{
-        display: 'block', padding: '8px 9px', marginBottom: 6,
+        display: 'block', padding: '7px 8px', marginBottom: 5,
         backgroundColor: selected ? S.surface : accentBg,
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -372,12 +336,9 @@ const TilePill: FC<{
         >
           {ts.label}
         </span>
-        {tile.trendCodes.slice(0, 3).map(code => <CodeChip key={code} code={code} />)}
-        {tile.trendCodes.length > 3 && (
-          <span style={{ fontSize: 9.5, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }}>
-            +{tile.trendCodes.length - 3}
-          </span>
-        )}
+        {/* Trend-code chips intentionally omitted from the tile (declutter,
+            2026-06-14). Linked trends remain on the detail panel's Evidence
+            cards; the tile stays scannable and the rail fits on one screen. */}
       </div>
       {isAi && (
         <div style={{ marginTop: 5 }}>
@@ -886,6 +847,22 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
     setEditing(false);
   }, [mutateTile, tab]);
 
+  // ── Approve an AI-suggested tile (promote ✨ AI → ✍️ strategist) ──
+  //   The reviewer accepts the mapping: the tile loses its "pending review"
+  //   treatment and becomes a regular strategist-authored read. Grade is
+  //   left as-is (review ≠ new hard evidence); the date is stamped now.
+  //   Persisted with the rest of the blob via "Save to server".
+  const approveAiTile = useCallback((sel: SelectedTile) => {
+    const updatedTile: JourneyTile = {
+      ...sel.tile,
+      provenance: { ...sel.tile.provenance, author: 'strategist', date: CURRENT_YYYYMM },
+    };
+    mutateTile(tab, sel.stageId, sel.direction, sel.tile.id, tiles =>
+      tiles.map(t => (t.id === sel.tile.id ? updatedTile : t)));
+    setSelected({ ...sel, tile: updatedTile });
+    setEditing(false);
+  }, [mutateTile, tab]);
+
   const removeTile = useCallback((sel: SelectedTile) => {
     mutateTile(tab, sel.stageId, sel.direction, sel.tile.id, tiles =>
       tiles.filter(t => t.id !== sel.tile.id));
@@ -1059,11 +1036,15 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           className="rounded-2xl overflow-hidden"
           style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}
         >
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div>
             <div
               className="grid"
               style={{
-                gridTemplateColumns: `repeat(${stages.length}, minmax(212px, 1fr))`,
+                // All stages fit on screen, no horizontal scroll (2026-06-14):
+                // minmax(0,1fr) lets the columns shrink to share the available
+                // width equally (Laundry 13 / Hair 8). Tiles are width:100% and
+                // their text wraps, so columns compress cleanly.
+                gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))`,
                 width: '100%', gap: 0,
               }}
             >
@@ -1072,7 +1053,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 <div
                   key={stage.id + '_h'}
                   style={{
-                    padding: '14px 12px 12px', backgroundColor: S.surfaceLow,
+                    padding: '14px 9px 12px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
                   }}
@@ -1096,7 +1077,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div
                     key={stage.id + '_b'}
                     style={{
-                      backgroundColor: 'rgba(45,125,63,0.04)', padding: '10px 8px',
+                      backgroundColor: 'rgba(45,125,63,0.04)', padding: '9px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       borderBottom: `1px solid ${S.cardBorder}`, minHeight: 160,
                     }}
@@ -1136,7 +1117,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div
                     key={stage.id + '_n'}
                     style={{
-                      backgroundColor: 'rgba(159,64,61,0.04)', padding: '10px 8px',
+                      backgroundColor: 'rgba(159,64,61,0.04)', padding: '9px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       minHeight: 130,
                     }}
@@ -1253,6 +1234,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 onCancelEdit={() => setEditing(false)}
                 onApplyEdits={edits => applyEdits(selected, edits)}
                 onRemove={() => removeTile(selected)}
+                onApprove={() => approveAiTile(selected)}
                 onNavigateToTrend={onNavigateToTrend}
               />
             </motion.aside>
@@ -1279,10 +1261,11 @@ const PanelBody: FC<{
   onCancelEdit: () => void;
   onApplyEdits: (edits: TileEdits) => void;
   onRemove: () => void;
+  onApprove: () => void;
   onNavigateToTrend?: (query: string) => void;
 }> = ({
   selected, journeyKey, trendsById, trendsLoaded, attribution,
-  isAdmin, editing, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onNavigateToTrend,
+  isAdmin, editing, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onApprove, onNavigateToTrend,
 }) => {
   const { tile, stageLabel, direction } = selected;
   const isExp = direction === 'benefiting';
@@ -1342,11 +1325,38 @@ const PanelBody: FC<{
       </div>
 
       {tile.provenance.author === 'ai' && (
-        <div className="flex items-start gap-2 rounded-xl px-3.5 py-2.5" style={{ backgroundColor: S.amberContainer }}>
-          <Sparkles size={13} strokeWidth={2.5} style={{ color: S.onAmberContainer, flexShrink: 0, marginTop: 1 }} />
-          <p style={{ fontSize: 11.5, color: S.onAmberContainer, lineHeight: 1.5, margin: 0 }}>
-            AI-suggested mapping ({tile.provenance.date}) — <strong style={{ fontFamily: HEADLINE_FONT }}>pending strategist review</strong>. Treat as a hypothesis until verified.
-          </p>
+        <div className="rounded-xl px-3.5 py-2.5" style={{ backgroundColor: S.amberContainer }}>
+          <div className="flex items-start gap-2">
+            <Sparkles size={13} strokeWidth={2.5} style={{ color: S.onAmberContainer, flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 11.5, color: S.onAmberContainer, lineHeight: 1.5, margin: 0 }}>
+              AI-suggested mapping ({tile.provenance.date}) — <strong style={{ fontFamily: HEADLINE_FONT }}>pending strategist review</strong>. Treat as a hypothesis until verified.
+            </p>
+          </div>
+          {isAdmin && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={onApprove}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
+                  style={{ backgroundColor: S.expansion, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+                  title="Approve — promote this AI suggestion to a regular strategist-reviewed read"
+                >
+                  <Check size={13} strokeWidth={2.5} /> Approve
+                </button>
+                <button
+                  onClick={onRemove}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
+                  style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+                  title="Discard — remove this AI suggestion from the journey"
+                >
+                  <Trash2 size={13} strokeWidth={2.5} /> Discard
+                </button>
+              </div>
+              <p style={{ fontSize: 10, color: S.onAmberContainer, margin: '6px 0 0', fontStyle: 'italic' }}>
+                Approve clears the review flag and makes it a regular read; Discard removes it. Either way, <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> to persist.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

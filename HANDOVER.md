@@ -52,7 +52,7 @@ Consequence for operations: after every engine-version bump, re-run the CLI so t
 | Engine | Python 3.10+, numpy + **scipy (hard req)** | `pulse/simulation/bayesian_mc.py` (MODEL_VERSION 2.8.0), `paths.py`, `pulse/audit/input_drift.py` |
 | Persistence | Neon Postgres (prod) / SQLite (local) — dual-mode | `pulse/database.py`; schema in `CLAUDE.md` §6 |
 | Exports | QA Excel written by the CLI run | `pulse/excel_bridge/writer.py` (PPTX/Power BI modules exist ad-hoc, no live route) |
-| AI layer | **Dormant** — provider abstraction (Claude/Azure/Ollama), scanner, narrator, calibrator | `pulse/ai/`, docs: `AI_QUICKSTART.md`, `docs/SCANNER_API.md` — see concept doc |
+| AI layer | **Dormant** — provider abstraction (Claude/Azure/Ollama), scanner, narrator, calibrator | `pulse/ai/`, docs: `docs/AI_QUICKSTART.md`, `docs/SCANNER_API.md` — see concept doc |
 | CI | GitHub Actions: frontend (typecheck/lint/vitest) + engine (pytest with scipy) | `.github/workflows/ci.yml` |
 
 Current production (to be migrated): Vercel project `prism-profit-pool` (org `lakeralexander-8859s-projects`), URL `https://prism-hcb.vercel.app`, GitHub `AlexanderLaker/PULSE`, DB Neon, auth Clerk. All four are personal accounts of the current owner — migration targets are in the concept document.
@@ -118,12 +118,12 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 9. **AI is suggest-only** (D7): `ai_suggested` / `user_override` drive provenance chips; nothing auto-applies. This governance carries into the online concept unchanged.
 10. **Open-by-decision, not bugs:** no hindcast (F-08), one-sided trend grammar (F-09), no Henkel-position overlay (F-20). Don't "fix" without the owner.
 
-## 7. State at handover (2026-06-11)
+## 7. State at handover (2026-06-23)
 
-- **WIP:** branch `feature/ui-exec-summary` carries uncommitted work (new `ExecutiveSummary.tsx` + `ShiftValue.tsx`, 12 modified files) — will be merged or handed over explicitly. `main` is the line of truth.
-- **Docs drift:** `README.md` and `DEPLOY.md` carry banners where they predate v3.6/v3.7 (Next 14 references, deleted modules, interactive `/simulate`). This file + `CLAUDE.md` win on conflict. `DOCUMENTATION/INDEX.md` is current.
-- **Day-one cleanup list** (recommended first PR; each item verified unreferenced — confirm with `npm run build` + `npm run verify`):
-  `public/assets/*` + `public/data/latest_mc_v3.1.json` + `public/index.html` (legacy Vite artifacts, currently publicly served), `pulse/dashboard/` (8 MB legacy Vite app), `assets/` (Vite leftovers), `pulse/backup.py` (unimported), `pulse/integrations/` (empty package), `pulse/api/routes/auth.py` (unmounted legacy; keep `scanner.py` — the AI concept remounts it), `data/pulse.db` (local relic), `tests/test_scanner_routes.py` (pre-existing breakage, excluded from CI — fix or delete when the scanner revives).
+- **Repo is clean.** A pre-handover review consolidated the tree so it tracks **only the live product + a slim canonical doc set**. Earlier day-one items are **done**: the legacy Vite dashboard (`pulse/dashboard/`), `public/` Vite artifacts, `assets/`, `pulse/backup.py`, `pulse/integrations/`, the broken `tests/test_scanner_routes.py`, and the dead duplicate `pulse/api/routes/auth.py` are all removed. The still-dormant scanner surface (`pulse/api/routes/scanner.py`) and AI layer (`pulse/ai/`) are deliberately **kept, fenced** for the online/AI concept (§3, `CONCEPT_PRISM_ONLINE_AI.md`) — they are not imported by the live app.
+- **Docs.** Root carries five canonical docs (`README`, `HANDOVER`, `CLAUDE`, `DEPLOY`, `CONCEPT_PRISM_ONLINE_AI`); all provenance/operational deep-dives now live under `docs/` (index: `docs/INDEX.md`). `README`/`DEPLOY` are reconciled to v3.7 / Next 16 / read-only reality; on any conflict this file + `CLAUDE.md` win.
+- **Scripts.** Spent one-time migrations (`migrate_prod_to_v3_1.py`, `migrate_prod_to_v3_5.py`, `import_report_trends.py`) are archived under `scripts/archive/` for provenance; active ops scripts stay in `scripts/`. `data/pulse.db` is a local relic (gitignored — delete locally).
+- **Quality gates** were green at this pass: typecheck clean, vitest 33, lint 0 errors (13 known `set-state-in-effect` advisories), shift-matrix single-source guard OK. Re-run the engine `pytest` + 2.8.0 golden pins on a scipy host as the final pre-deploy check — **no engine code changed in this pass**.
 - **Database:** you will receive a `pg_dump` (trends, simulation_runs, config_snapshots, journey_content, users, audit_log — schema in `CLAUDE.md` §6), not credentials. Journey activation: run `scripts/backfill_journey_exposure.py` once, then a fresh 50k run.
 - **Secrets:** every credential (Clerk, DB, JWT secret, signup code, API keys) is rotated at handover; nothing in the repo or its history contains secrets (verified).
 
@@ -138,6 +138,6 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 
 ## 9. Suggested first two weeks
 
-Week 1: local env running; read `CLAUDE.md` §§1–2, 6–8; click through every dashboard tab against `https://prism-hcb.vercel.app`; run the pytest + vitest suites; execute one 50k run against a **copy** of the DB and watch the run ribbon/integrity chip update. Week 2: day-one cleanup PR (§7); restore the `pg_dump` into a Henkel-managed Postgres and point a preview deployment at it; then start on the migration plan in `CONCEPT_PRISM_ONLINE_AI.md`.
+Week 1: local env running; read `CLAUDE.md` §§1–2, 6–8; click through every dashboard tab against `https://prism-hcb.vercel.app`; run the pytest + vitest suites; execute one 50k run against a **copy** of the DB and watch the run ribbon/integrity chip update. Week 2: review the §7 cleanup already applied; restore the `pg_dump` into a Henkel-managed Postgres and point a preview deployment at it; then start on the migration plan in `CONCEPT_PRISM_ONLINE_AI.md`.
 
 Questions that look like bugs are usually decisions — check `CLAUDE.md` §1 first, then ask Alex (laker.alexander@gmail.com / Henkel contact to be added at handover).
