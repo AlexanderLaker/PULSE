@@ -515,6 +515,16 @@ const aiGp1 = (t: Trend): number | undefined => {
   const g = (t as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   return t.ai_suggestion?.gp1_pct_affected ?? (t.user_override ? undefined : g);
 };
+const aiPeakOf = (t: Trend): number | undefined =>
+  t.ai_suggestion?.peak_year ?? (t.user_override ? undefined : (t as Trend & { peak_year?: number }).peak_year);
+const aiCurveOf = (t: Trend): string | undefined =>
+  t.ai_suggestion?.diffusion_curve ?? (t.user_override ? undefined : (t as Trend & { diffusion_curve?: string }).diffusion_curve);
+const aiExpoOf = (t: Trend, kind: 'category_exposure' | 'regional_exposure' | 'vc_exposure'): Record<string, number> | undefined => {
+  const snap = t.ai_suggestion?.[kind] as Record<string, number> | undefined;
+  if (snap) return snap;
+  if (t.user_override) return undefined;
+  return (t as unknown as Record<string, Record<string, number> | undefined>)[kind];
+};
 
 /** A trend is "reviewed & changed" (→ green dots, "Reviewed" chip) when it
  *  carries an admin override AND its truth differs from the AI baseline.
@@ -934,48 +944,58 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
 
 // ── Review compare row (expert ø over AI, with delta + who-scored) ──
 // Per-cell exposure comparison (expert ø vs AI) for the Review panel.
-const ExposureCompareBlock: FC<{ title: string; aiMap?: Record<string, number>; aggMap?: Record<string, { avg?: number; count: number }> }> = ({ title, aiMap, aggMap }) => {
-  const keys = aggMap ? Object.keys(aggMap) : [];
-  if (keys.length === 0) return null;
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant, margin: '8px 0 6px' }}>{title}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 8 }}>
-        {keys.map((k) => {
-          const e = aggMap![k]?.avg;
-          const a = aiMap?.[k];
-          const d = (e != null && a != null) ? e - a : null;
-          return (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 10px', border: `1px solid ${S.cardBorder}`, borderRadius: 8 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{shortCat(k)}</span>
-              <span className="inline-flex items-center gap-2">
-                <span style={{ fontSize: 12, fontWeight: 800, color: EXPERT_COLOR }} title={`${aggMap![k].count} scored`}>ø{e != null ? e.toFixed(1) : '—'}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: S.primary }}>AI {a ?? '—'}</span>
-                {d != null && <DeltaChip value={d} />}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+// ── Read-only 0–5 dot bar (6 bubbles incl. the "0" dot — mirrors EditableDots). ──
+const ReadDots: FC<{ value?: number; color: string }> = ({ value, color }) => (
+  <div className="flex gap-1" aria-label={value != null ? `${value} of 5` : 'unscored'}>
+    {[0, 1, 2, 3, 4, 5].map((d) => {
+      const filled = value != null && (d === 0 ? value === 0 : d <= value);
+      return (
+        <span key={d} className="inline-block rounded-full"
+          style={{ width: 14, height: 14, backgroundColor: filled ? color : S.surfaceHigh, opacity: d === 0 ? 0.4 : 1 }} />
+      );
+    })}
+  </div>
+);
 
-const CompareRow: FC<{ label: string; sub?: string; expert: React.ReactNode; ai: React.ReactNode; delta?: React.ReactNode; who?: string }> = ({ label, sub, expert, ai, delta, who }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr auto', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${S.surfaceLow}` }}>
-    <div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: S.mutedText }}>{sub}</div>}
+// ── Mini 0–100% bar (GP1% comparison). ──
+const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (
+  <div className="flex items-center gap-2" style={{ flex: 1 }}>
+    <div style={{ position: 'relative', height: 7, borderRadius: 7, backgroundColor: S.surfaceHigh, flex: 1, maxWidth: 150 }}>
+      {v != null && <div style={{ position: 'absolute', inset: 0, width: `${Math.min(100, Math.round(v * 100))}%`, backgroundColor: color, borderRadius: 7 }} />}
     </div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }} title={who}>
-      <div className="flex items-center gap-2" style={{ cursor: who ? 'help' : undefined }}>
-        <span style={{ fontSize: 9, fontWeight: 800, color: EXPERT_COLOR, width: 22 }}>ø</span>{expert}
-      </div>
-      <div className="flex items-center gap-2">
-        <span style={{ fontSize: 9, fontWeight: 800, color: S.primary, width: 22 }}>AI</span>{ai}
-      </div>
+    <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: v != null ? color : S.onSurfaceVariant }}>{v != null ? pctI(v) : '—'}</span>
+  </div>
+);
+
+// ── AI-over-expert comparison: AI row (ink) on top, expert ø row (green) below. ──
+const CompareStack: FC<{ ai: React.ReactNode; expert: React.ReactNode; who?: string }> = ({ ai, expert, who }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="flex items-center gap-2.5">
+      <span style={{ fontSize: 9, fontWeight: 800, color: S.onSurface, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>AI</span>
+      {ai}
     </div>
-    <div style={{ justifySelf: 'end' }}>{delta}</div>
+    <div className="flex items-center gap-2.5" title={who} style={{ cursor: who ? 'help' : undefined }}>
+      <span style={{ fontSize: 9, fontWeight: 800, color: REVIEWED_COLOR, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>ø</span>
+      {expert}
+    </div>
+  </div>
+);
+
+// ── One exposure cell: label + AI dot row (ink) over expert ø dot row (green). ──
+const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: number; count: number } }> = ({ label, aiVal, expert }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px', border: `1px solid ${S.cardBorder}`, borderRadius: 9, backgroundColor: S.surface }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{label}</span>
+      {expert?.count ? <span style={{ fontSize: 9.5, fontWeight: 700, color: S.mutedText }} title={`${expert.count} expert(s) scored`}>n{expert.count}</span> : null}
+    </div>
+    <div className="flex items-center gap-2">
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 14, flexShrink: 0 }}>AI</span>
+      <ReadDots value={aiVal} color={S.onSurface} />
+    </div>
+    <div className="flex items-center gap-2">
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 14, flexShrink: 0 }}>ø</span>
+      <ReadDots value={expert?.avg} color={REVIEWED_COLOR} />
+    </div>
   </div>
 );
 
@@ -989,15 +1009,23 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
 
   const agg = data?.aggregate;
   const scorers = data?.scorers ?? [];
-  const ai = trend.ai_suggestion ?? {};
   const count = scorers.length || (trend.proposal_summary?.count ?? 0);
+
+  // AI baseline (snapshot, else the current value for an un-overridden trend).
+  const aP = aiProb(trend), aG = aiGp1(trend), aPk = aiPeakOf(trend), aCv = aiCurveOf(trend);
+  const aiCat = aiExpoOf(trend, 'category_exposure');
+  const aiReg = aiExpoOf(trend, 'regional_exposure');
+  const aiVc = aiExpoOf(trend, 'vc_exposure');
+  // Expert aggregate.
+  const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
+  const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
+  const grpLabel: React.CSSProperties = { fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
     if (rows.length === 0) return undefined;
     return rows.map((s) => `${s.name}${s.role ? ` (${s.role})` : ''}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
   };
-
   const mapCells = (m?: Record<string, { avg?: number }>): Record<string, number> | undefined => {
     if (!m) return undefined;
     const out: Record<string, number> = {};
@@ -1006,20 +1034,26 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   };
   const buildExperts = (): TrendUpdate => {
     const u: TrendUpdate = {};
-    if (agg?.probability?.avg != null) u.probability = Math.round(agg.probability.avg);
-    if (agg?.gp1_pct_affected?.avg != null) u.gp1_pct_affected = Math.max(0, Math.min(1, agg.gp1_pct_affected.avg));
-    if (agg?.peak_year?.median != null) u.peak_year = Math.round(agg.peak_year.median);
-    if (agg?.diffusion_curve?.mode) u.diffusion_curve = agg.diffusion_curve.mode;
+    if (eP != null) u.probability = Math.round(eP);
+    if (eG != null) u.gp1_pct_affected = Math.max(0, Math.min(1, eG));
+    if (ePk != null) u.peak_year = Math.round(ePk);
+    if (eCv) u.diffusion_curve = eCv;
     const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c;
     const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r;
     const vc = mapCells(agg?.vc_exposure); if (vc) u.vc_exposure = vc;
     return u;
   };
-  const buildAi = (): TrendUpdate => ({
-    probability: ai.probability, gp1_pct_affected: ai.gp1_pct_affected, peak_year: ai.peak_year,
-    diffusion_curve: ai.diffusion_curve, category_exposure: ai.category_exposure,
-    regional_exposure: ai.regional_exposure, vc_exposure: ai.vc_exposure,
-  });
+  const buildAi = (): TrendUpdate => {
+    const u: TrendUpdate = {};
+    if (aP != null) u.probability = Math.round(aP);
+    if (aG != null) u.gp1_pct_affected = aG;
+    if (aPk != null) u.peak_year = aPk;
+    if (aCv) u.diffusion_curve = aCv;
+    if (aiCat) u.category_exposure = aiCat;
+    if (aiReg) u.regional_exposure = aiReg;
+    if (aiVc) u.vc_exposure = aiVc;
+    return u;
+  };
   const endorse = async () => {
     if (!updateTrend) return;
     setErr(null); setSaving(true);
@@ -1028,16 +1062,15 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     finally { setSaving(false); }
   };
 
-  const eProb = agg?.probability?.avg, aProb = ai.probability;
-  const eGp1 = agg?.gp1_pct_affected?.avg, aGp1 = ai.gp1_pct_affected;
-  const ePeak = agg?.peak_year?.median, aPeak = ai.peak_year;
-  const eCurve = agg?.diffusion_curve?.mode, aCurve = ai.diffusion_curve;
-
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 30px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <span className="inline-flex items-center gap-2" style={{ fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: EXPERT_COLOR }}>
           <Users size={13} strokeWidth={2.4} /> Review &amp; Endorse · {count} expert{count === 1 ? '' : 's'} scored
+        </span>
+        <span className="inline-flex items-center gap-3" style={{ fontSize: 11, fontWeight: 700 }}>
+          <span className="inline-flex items-center gap-1.5" style={{ color: S.onSurface }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: S.onSurface }} /> AI baseline</span>
+          <span className="inline-flex items-center gap-1.5" style={{ color: REVIEWED_COLOR }}><span style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: REVIEWED_COLOR }} /> Expert ø</span>
         </span>
       </div>
 
@@ -1048,39 +1081,78 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
         </div>
       ) : (
         <>
-          <div style={{ border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '2px 16px 6px', backgroundColor: S.surface }}>
-            <CompareRow label="Probability" sub="1–5"
-              expert={eProb != null ? <ColorDots value={Math.round(eProb)} color={EXPERT_COLOR} /> : <Dash />}
-              ai={aProb != null ? <ColorDots value={Math.round(aProb)} color={S.primary} /> : <Dash />}
-              delta={eProb != null && aProb != null ? <DeltaChip value={eProb - aProb} /> : undefined}
-              who={whoFor('probability')} />
-            <CompareRow label="Impact — GP1 %"
-              expert={<Val>{eGp1 != null ? pctI(eGp1) : '—'}</Val>} ai={<Val>{aGp1 != null ? pctI(aGp1) : '—'}</Val>}
-              delta={eGp1 != null && aGp1 != null ? <DeltaChip value={(eGp1 - aGp1) * 100} unit="pp" digits={0} /> : undefined}
-              who={whoFor('gp1_pct_affected')} />
-            <CompareRow label="Peak year"
-              expert={<Val>{ePeak != null ? Math.round(ePeak) : '—'}</Val>} ai={<Val>{aPeak != null ? aPeak : '—'}</Val>}
-              delta={ePeak != null && aPeak != null ? <DeltaChip value={ePeak - aPeak} unit="y" digits={0} /> : undefined}
-              who={whoFor('peak_year')} />
-            <CompareRow label="Diffusion curve" sub="mode of expert votes"
-              expert={<Val>{eCurve ? (DIFFUSION_LABELS[eCurve]?.label ?? eCurve) : '—'}</Val>}
-              ai={<Val>{aCurve ? (DIFFUSION_LABELS[aCurve]?.label ?? aCurve) : '—'}</Val>}
-              delta={eCurve ? <DeltaChip value={eCurve === aCurve ? 0 : 1} digits={0} /> : undefined}
-              who={whoFor('diffusion_curve')} />
-          </div>
+          {/* Mirrors the Expert Input layout — each element shows AI (ink) over expert ø (green). */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20 }}>
+            {/* LEFT — context + core scores + timing */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionCard title="Context" icon={FileText}>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
+                  {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
+                </p>
+              </SectionCard>
 
-          {/* Exposure comparison — expert ø vs AI, per cell */}
-          {(agg && (
-            (agg.category_exposure && Object.keys(agg.category_exposure).length > 0) ||
-            (agg.regional_exposure && Object.keys(agg.regional_exposure).length > 0) ||
-            (agg.vc_exposure && Object.keys(agg.vc_exposure).length > 0)
-          )) ? (
-            <div style={{ border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '4px 16px 12px', backgroundColor: S.surface, marginTop: 12 }}>
-              <ExposureCompareBlock title="Category exposure" aiMap={ai.category_exposure as Record<string, number> | undefined} aggMap={agg.category_exposure} />
-              <ExposureCompareBlock title="Regional exposure" aiMap={ai.regional_exposure as Record<string, number> | undefined} aggMap={agg.regional_exposure} />
-              <ExposureCompareBlock title="Value-chain exposure" aiMap={ai.vc_exposure as Record<string, number> | undefined} aggMap={agg.vc_exposure} />
+              <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain.">
+                <CompareStack who={whoFor('probability')}
+                  ai={<><ColorDots value={aP != null ? Math.round(aP) : 0} color={S.onSurface} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: S.onSurfaceVariant }}>{aP != null ? Math.round(aP) : '—'}</span></>}
+                  expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : '—'}</span>{eP != null && aP != null ? <DeltaChip value={eP - aP} /> : null}</>} />
+              </SectionCard>
+
+              <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this trend can move at full materialization.">
+                <CompareStack who={whoFor('gp1_pct_affected')}
+                  ai={<MiniBar v={aG} color={S.onSurface} />}
+                  expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && aG != null ? <DeltaChip value={(eG - aG) * 100} unit="pp" digits={0} /> : null}</>} />
+              </SectionCard>
+
+              <SectionCard title="Materialization timing" icon={Clock}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <FieldLabel>Peak Year</FieldLabel>
+                    <CompareStack who={whoFor('peak_year')}
+                      ai={<Val>{aPk != null ? aPk : '—'}</Val>}
+                      expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : '—'}</span>{ePk != null && aPk != null ? <DeltaChip value={ePk - aPk} unit="y" digits={0} /> : null}</>} />
+                  </div>
+                  <div>
+                    <FieldLabel>Diffusion Curve</FieldLabel>
+                    <CompareStack who={whoFor('diffusion_curve')}
+                      ai={<span className="inline-flex items-center gap-2">{aCv ? <DiffusionGlyph curve={aCv} color={S.onSurface} /> : null}<Val>{aCv ? (DIFFUSION_LABELS[aCv]?.label ?? aCv) : '—'}</Val></span>}
+                      expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? (DIFFUSION_LABELS[eCv]?.label ?? eCv) : '—'}</span>{eCv ? <DeltaChip value={eCv === aCv ? 0 : 1} digits={0} /> : null}</span>} />
+                  </div>
+                </div>
+              </SectionCard>
             </div>
-          ) : null}
+
+            {/* RIGHT — exposure comparison grids (AI ink over expert green, per cell) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <SectionCard title="Category Exposure" icon={Layers}>
+                <div style={grpLabel}>HAIR</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                  {grouped.Hair.map((c) => (
+                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]} />
+                  ))}
+                </div>
+                <div style={{ ...grpLabel, marginTop: 14 }}>LAUNDRY &amp; HOME CARE</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                  {grouped.LHC.map((c) => (
+                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]} />
+                  ))}
+                </div>
+              </SectionCard>
+              <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                  {REGIONS.map((r) => (
+                    <ExposureCompareCell key={r.id} label={r.label} aiVal={aiReg == null ? undefined : (aiReg[r.id] ?? 0)} expert={agg?.regional_exposure?.[r.id]} />
+                  ))}
+                </div>
+              </SectionCard>
+              <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                  {VC_STEPS.map((step) => (
+                    <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]} />
+                  ))}
+                </div>
+              </SectionCard>
+            </div>
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
             <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
