@@ -1446,13 +1446,7 @@ const ProfitPoolAnalysis2: FC<{
               className="text-xs font-semibold uppercase tracking-[0.18em]"
               style={{ color: S.onSurfaceVariant }}
             >
-              Henkel Consumer Brands · Relative Profit-Pool Exposure
-            </div>
-            <div
-              className="text-[11px] font-semibold uppercase tracking-[0.16em] mt-1"
-              style={{ color: S.mutedText }}
-            >
-              12 categories · 2026–2035 · relative exposure (assumes no action)
+              Henkel Consumer Brands · 12 categories · 2026–2035
             </div>
             {/* T10 (June 2026): show whether the trend inputs were edited since
                 the previous accepted run — driven by the D19 input-drift event
@@ -1476,7 +1470,7 @@ const ProfitPoolAnalysis2: FC<{
                 >
                   {edited
                     ? `⚠ Trend inputs edited — ${d.scores_changed ?? 0} score change(s), ${d.direction_flips ?? 0} direction flip(s) vs last run`
-                    : '✓ Trend inputs unchanged since last accepted run'}
+                    : '✓ Inputs unchanged since last run'}
                 </div>
               );
             })()}
@@ -1547,18 +1541,14 @@ const ProfitPoolAnalysis2: FC<{
         <div className="mb-5 pl-5" style={{ borderLeft: `3px solid ${S.cardBorderStrong}` }}>
           <h2 className="font-extrabold tracking-tight"
             style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '1.5rem', lineHeight: 1.15 }}>
-            Where the profit pool moves
+            Profit Pool Exposure
           </h2>
+          {/* Reduced header (owner request, June 2026): the relative-exposure /
+              ceteris-paribus framing is carried once here; the full D16 wording
+              still lives in "About this model" below. */}
           <p className="mt-1.5 max-w-3xl text-[13.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
-            One simulation, four reads — over time, by force, along the value chain, across regions.
-            Row totals reconcile across all four.{' '}
-            <span style={{ fontWeight: 600, color: S.onSurface }}>Click any value to open the category drill-down.</span>
-          </p>
-          {/* D16 design assumption — short form (owner update 2026-06-11);
-              the full wording lives in "About this model" below. */}
-          <p className="mt-1.5 text-[12px] italic" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-            Ceteris paribus: assumes no management response — totals read as exposure
-            if nobody acts, not as forecast outcomes.
+            Relative exposure if no one acts — not a forecast. Four lenses, one set of totals;{' '}
+            <span style={{ fontWeight: 600, color: S.onSurface }}>click any value to drill in.</span>
           </p>
         </div>
 
