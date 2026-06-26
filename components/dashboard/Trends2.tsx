@@ -1015,16 +1015,16 @@ const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: 
       {expert?.count ? <span style={{ fontSize: 9.5, fontWeight: 700, color: S.mutedText }} title={`${expert.count} expert(s) scored`}>n{expert.count}</span> : null}
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 17, flexShrink: 0 }}>AI</span>
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 38, flexShrink: 0, textAlign: 'right' }}>AI</span>
       <ReadDots value={aiVal} color={S.onSurface} />
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 17, flexShrink: 0 }}>ø</span>
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 38, flexShrink: 0, textAlign: 'right' }}>ø</span>
       <ReadDots value={expert?.avg} color={REVIEWED_COLOR} />
     </div>
     {onManual && (
       <div className="flex items-center gap-2" style={{ paddingTop: 5, borderTop: `1px solid ${S.surfaceLow}` }}>
-        <span style={{ fontSize: 8.5, fontWeight: 800, color: S.primary, width: 17, flexShrink: 0 }} title="Manual override — click a dot to set">Man</span>
+        <span style={{ fontSize: 8.5, fontWeight: 800, color: S.primary, width: 38, flexShrink: 0, textAlign: 'right' }} title="Manual override — click a dot to set">Manual</span>
         <EditableDots value={manualVal ?? 0} onChange={onManual} tone="emerald" />
       </div>
     )}
@@ -1262,14 +1262,14 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <SectionCard title="Category Exposure" icon={Layers}>
                 <div style={grpLabel}>HAIR</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {grouped.Hair.map((c) => (
                     <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]}
                       manualVal={manCell('category', c.name, aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), agg?.category_exposure?.[c.name]?.avg)} onManual={(v) => setManCell('category', c.name, v)} />
                   ))}
                 </div>
                 <div style={{ ...grpLabel, marginTop: 14 }}>LAUNDRY &amp; HOME CARE</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {grouped.LHC.map((c) => (
                     <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]}
                       manualVal={manCell('category', c.name, aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), agg?.category_exposure?.[c.name]?.avg)} onManual={(v) => setManCell('category', c.name, v)} />
@@ -1279,7 +1279,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                   result={srcOf('category', hasCatE) === 'ai' ? 'AI baseline' : srcOf('category', hasCatE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {REGIONS.map((r) => (
                     <ExposureCompareCell key={r.id} label={r.label} aiVal={aiReg == null ? undefined : (aiReg[r.id] ?? 0)} expert={agg?.regional_exposure?.[r.id]}
                       manualVal={manCell('region', r.id, aiReg == null ? undefined : (aiReg[r.id] ?? 0), agg?.regional_exposure?.[r.id]?.avg)} onManual={(v) => setManCell('region', r.id, v)} />
@@ -1289,7 +1289,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                   result={srcOf('region', hasRegE) === 'ai' ? 'AI baseline' : srcOf('region', hasRegE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
                   {VC_STEPS.map((step) => (
                     <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]}
                       manualVal={manCell('vc', step.id, aiVc == null ? undefined : readVCExposure(aiVc, step), agg?.vc_exposure?.[step.id]?.avg)} onManual={(v) => setManCell('vc', step.id, v)} />
