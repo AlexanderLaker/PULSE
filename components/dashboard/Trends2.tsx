@@ -745,7 +745,7 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
 const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; isAdmin: boolean }> = ({ mode, onChange, isAdmin }) => {
   const opts: Array<{ id: ScoringMode; label: string; dot: string }> = [
     { id: 'list', label: 'Trend List', dot: REVIEWED_COLOR },
-    { id: 'input', label: 'Expert Input', dot: S.primary },
+    { id: 'input', label: 'Expert Rating', dot: S.primary },
     ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
   ];
   return (
@@ -877,7 +877,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
     <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
         <span className="inline-flex items-center gap-2" style={{ fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.primary }}>
-          <PenLine size={13} strokeWidth={2.4} /> Expert Input · your proposal
+          <PenLine size={13} strokeWidth={2.4} /> Expert Rating · your proposal
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: status === 'error' ? S.error : status === 'saved' ? REVIEWED_COLOR : S.onSurfaceVariant }}>{statusText}</span>
       </div>
