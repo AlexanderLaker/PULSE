@@ -560,7 +560,7 @@ const Val: FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 // ── Collapsed-row cells (mode-aware, read-only — editing lives in the tab) ──
-const ProbCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+const ProbCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalPatch }> = ({ trend, mode, myProposal }) => {
   const ai = aiProb(trend);
   if (mode === 'list') {
     const dev = !!trend.user_override && ai != null && Math.round(trend.probability ?? 0) !== Math.round(ai);
@@ -570,7 +570,7 @@ const ProbCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
     );
   }
   if (mode === 'input') {
-    const my = trend.proposal_summary?.my?.probability;
+    const my = myProposal?.probability ?? trend.proposal_summary?.my?.probability;
     return (
       <ColorDots value={my != null ? Math.round(my) : 0} color={S.primary} muted={my == null}
         title={ai != null ? `AI suggests ${Math.round(ai)} / 5 — open the trend to score` : 'Open the trend to score'} />
@@ -588,7 +588,7 @@ const ProbCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
   );
 };
 
-const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalPatch }> = ({ trend, mode, myProposal }) => {
   const ai = aiGp1(trend);
   const cur = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   const big: React.CSSProperties = { fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.15rem' };
@@ -602,7 +602,7 @@ const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
     );
   }
   if (mode === 'input') {
-    const my = trend.proposal_summary?.my?.gp1_pct_affected;
+    const my = myProposal?.gp1_pct_affected ?? trend.proposal_summary?.my?.gp1_pct_affected;
     return (
       <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
         title={ai != null ? `AI suggests ${pctI(ai)} — open the trend to score` : 'Open the trend to score'}>
@@ -622,63 +622,102 @@ const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
   );
 };
 
-const RowEndCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+const RowEndCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalPatch }> = ({ trend, mode, myProposal }) => {
   const [tip, setTip] = useState(false);
-  if (mode === 'list') {
-    const shift = trend.gp1_shift;
-    const probClamped = Math.max(1, Math.min(5, Math.round(trend.probability ?? 0)));
-    const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0;
-    const dirSign = trend.direction === 'Contraction' ? -1 : 1;
+  const dirSign = trend.direction === 'Contraction' ? -1 : 1;
+
+  // Expert Input — the user's OWN shift from their own probability × GP1%.
+  if (mode === 'input') {
+    const my = myProposal ?? trend.proposal_summary?.my ?? undefined;
+    const p = my?.probability;
+    const g = my?.gp1_pct_affected;
+    if (p == null || g == null) {
+      return <span style={{ color: S.onSurfaceVariant, fontSize: 13, fontWeight: 700 }}>—</span>;
+    }
+    const myShift = dirSign * (Math.max(1, Math.min(5, p)) / 6) * g;
     return (
-      <div className="text-right" style={{ position: 'relative' }}
-        onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
-        <span className="font-bold text-[14px]" style={{
-          color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
-          borderBottom: `1px dotted ${S.onSurfaceVariant}66`, cursor: 'help',
-        }}>
-          {shift != null ? fmtShift(shift) : '—'}
-        </span>
-        {tip && shift != null && (
-          <div role="tooltip" onClick={(e) => e.stopPropagation()} style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 40, minWidth: 240, maxWidth: 320,
-            padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
-            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, lineHeight: 1.5, textAlign: 'left',
-            boxShadow: '0 10px 24px rgba(0,52,94,0.28)', pointerEvents: 'none',
-          }}>
-            Shift = (prob/6) × GP1% × direction
-            <br />= ({probClamped}/6) × {(gp1 * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(shift)}
-          </div>
-        )}
-      </div>
+      <span className="font-bold text-[14px]"
+        title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${pctI(g)} × ${dirSign > 0 ? '+1' : '−1'}`}
+        style={{ color: myShift < 0 ? S.error : S.onPrimaryContainer, cursor: 'help' }}>
+        {fmtShift(myShift)}
+      </span>
     );
   }
+
+  // Trend List & Review — the model's current (truth) shift, calc on hover.
+  const shift = trend.gp1_shift;
+  const probClamped = Math.max(1, Math.min(5, Math.round(trend.probability ?? 0)));
+  const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0;
+  return (
+    <div className="text-right" style={{ position: 'relative' }}
+      onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
+      <span className="font-bold text-[14px]" style={{
+        color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
+        borderBottom: `1px dotted ${S.onSurfaceVariant}66`, cursor: 'help',
+      }}>
+        {shift != null ? fmtShift(shift) : '—'}
+      </span>
+      {tip && shift != null && (
+        <div role="tooltip" onClick={(e) => e.stopPropagation()} style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 40, minWidth: 240, maxWidth: 320,
+          padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
+          fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, lineHeight: 1.5, textAlign: 'left',
+          boxShadow: '0 10px 24px rgba(0,52,94,0.28)', pointerEvents: 'none',
+        }}>
+          Shift = (prob/6) × GP1% × direction
+          <br />= ({probClamped}/6) × {(gp1 * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(shift)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Review-status cell (6th column) ──
+// list   → admin-endorsed indicator (truth differs from AI)
+// input  → "reviewed by you": probability + GP1% + ≥1 category exposure rated
+// review → how many experts have scored this trend
+const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalPatch }> = ({ trend, mode, myProposal }) => {
+  const pill: React.CSSProperties = {
+    fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+    textTransform: 'uppercase', padding: '4px 11px', borderRadius: 999,
+  };
   if (mode === 'input') {
-    const my = trend.proposal_summary?.my;
-    const scored = !!my && Object.keys(my).length > 0;
+    const my = myProposal ?? trend.proposal_summary?.my ?? undefined;
+    const hasProb = my?.probability != null;
+    const hasGp1 = my?.gp1_pct_affected != null;
+    const hasCat = !!my?.category_exposure && Object.keys(my.category_exposure).length > 0;
+    const done = hasProb && hasGp1 && hasCat;
     return (
       <div className="flex justify-end">
-        <span className="inline-flex items-center gap-1.5" style={{
-          fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-          padding: '4px 11px', borderRadius: 999,
-          backgroundColor: scored ? 'rgba(31,122,61,0.10)' : S.primaryContainer,
-          color: scored ? REVIEWED_COLOR : S.onPrimaryContainer,
-        }}>
-          {scored ? <><Check size={11} strokeWidth={2.6} /> Scored</> : <><PenLine size={11} strokeWidth={2.4} /> Score</>}
+        <span className="inline-flex items-center gap-1.5"
+          title={done
+            ? 'Reviewed — you rated probability, GP1% and at least one category exposure'
+            : 'To complete: rate probability, GP1% and at least one category exposure'}
+          style={{ ...pill, backgroundColor: done ? 'rgba(31,122,61,0.10)' : S.surfaceLow, color: done ? REVIEWED_COLOR : S.onSurfaceVariant }}>
+          {done ? <><Check size={11} strokeWidth={2.6} /> Reviewed</> : 'In progress'}
         </span>
       </div>
     );
   }
-  const count = trend.proposal_summary?.count ?? 0;
+  if (mode === 'review') {
+    const count = trend.proposal_summary?.count ?? 0;
+    return (
+      <div className="flex justify-end">
+        <span style={{ ...pill, backgroundColor: count > 0 ? 'rgba(107,79,196,0.10)' : S.surfaceLow, color: count > 0 ? EXPERT_COLOR : S.onSurfaceVariant }}>
+          {count > 0 ? `◆ ${count}` : '—'}
+        </span>
+      </div>
+    );
+  }
+  const reviewed = reviewedDeviates(trend);
   return (
     <div className="flex justify-end">
-      <span style={{
-        fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-        padding: '4px 11px', borderRadius: 999,
-        backgroundColor: count > 0 ? 'rgba(107,79,196,0.10)' : S.surfaceLow,
-        color: count > 0 ? EXPERT_COLOR : S.onSurfaceVariant,
-      }}>
-        {count > 0 ? `◆ ${count} · Review` : 'No proposals'}
-      </span>
+      {reviewed ? (
+        <span className="inline-flex items-center gap-1" title="Reviewed by an admin — differs from the AI baseline"
+          style={{ ...pill, color: REVIEWED_COLOR, backgroundColor: 'rgba(31,122,61,0.10)' }}>
+          <Check size={11} strokeWidth={2.6} /> Reviewed
+        </span>
+      ) : <span style={{ color: S.onSurfaceVariant, fontSize: 12 }}>—</span>}
     </div>
   );
 };
@@ -774,7 +813,7 @@ function useTrendProposals(trendId: string): { data: TrendProposalsResponse | nu
 }
 
 // ── Expert Input panel (trend tab) — blank scoring, auto-save, AI on hover ──
-const ExpertInputPanel: FC<{ trend: Trend }> = ({ trend }) => {
+const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: TrendProposalPatch) => void }> = ({ trend, onMyChange }) => {
   const { data, loaded } = useTrendProposals(trend.id);
   const [draft, setDraft] = useState<TrendProposalPatch>({});
   const [hydrated, setHydrated] = useState(false);
@@ -786,8 +825,9 @@ const ExpertInputPanel: FC<{ trend: Trend }> = ({ trend }) => {
     if (loaded && !hydrated) {
       const my = (data?.my ?? {}) as TrendProposalPatch;
       setDraft(my); draftRef.current = my; setHydrated(true);
+      onMyChange?.(trend.id, my);
     }
-  }, [loaded, hydrated, data]);
+  }, [loaded, hydrated, data, onMyChange, trend.id]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const flush = useCallback(() => {
@@ -798,9 +838,12 @@ const ExpertInputPanel: FC<{ trend: Trend }> = ({ trend }) => {
     }, 600);
   }, [trend.id]);
   const patch = useCallback((p: Partial<TrendProposalPatch>) => {
-    setDraft((prev) => { const next = { ...prev, ...p }; draftRef.current = next; return next; });
+    const next = { ...draftRef.current, ...p };
+    draftRef.current = next;
+    setDraft(next);
+    onMyChange?.(trend.id, next);
     flush();
-  }, [flush]);
+  }, [flush, onMyChange, trend.id]);
 
   const ai = trend.ai_suggestion ?? {};
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
@@ -890,6 +933,34 @@ const ExpertInputPanel: FC<{ trend: Trend }> = ({ trend }) => {
 };
 
 // ── Review compare row (expert ø over AI, with delta + who-scored) ──
+// Per-cell exposure comparison (expert ø vs AI) for the Review panel.
+const ExposureCompareBlock: FC<{ title: string; aiMap?: Record<string, number>; aggMap?: Record<string, { avg?: number; count: number }> }> = ({ title, aiMap, aggMap }) => {
+  const keys = aggMap ? Object.keys(aggMap) : [];
+  if (keys.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant, margin: '8px 0 6px' }}>{title}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 8 }}>
+        {keys.map((k) => {
+          const e = aggMap![k]?.avg;
+          const a = aiMap?.[k];
+          const d = (e != null && a != null) ? e - a : null;
+          return (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 10px', border: `1px solid ${S.cardBorder}`, borderRadius: 8 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{shortCat(k)}</span>
+              <span className="inline-flex items-center gap-2">
+                <span style={{ fontSize: 12, fontWeight: 800, color: EXPERT_COLOR }} title={`${aggMap![k].count} scored`}>ø{e != null ? e.toFixed(1) : '—'}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: S.primary }}>AI {a ?? '—'}</span>
+                {d != null && <DeltaChip value={d} />}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const CompareRow: FC<{ label: string; sub?: string; expert: React.ReactNode; ai: React.ReactNode; delta?: React.ReactNode; who?: string }> = ({ label, sub, expert, ai, delta, who }) => (
   <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr auto', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${S.surfaceLow}` }}>
     <div>
@@ -998,6 +1069,19 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
               who={whoFor('diffusion_curve')} />
           </div>
 
+          {/* Exposure comparison — expert ø vs AI, per cell */}
+          {(agg && (
+            (agg.category_exposure && Object.keys(agg.category_exposure).length > 0) ||
+            (agg.regional_exposure && Object.keys(agg.regional_exposure).length > 0) ||
+            (agg.vc_exposure && Object.keys(agg.vc_exposure).length > 0)
+          )) ? (
+            <div style={{ border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '4px 16px 12px', backgroundColor: S.surface, marginTop: 12 }}>
+              <ExposureCompareBlock title="Category exposure" aiMap={ai.category_exposure as Record<string, number> | undefined} aggMap={agg.category_exposure} />
+              <ExposureCompareBlock title="Regional exposure" aiMap={ai.regional_exposure as Record<string, number> | undefined} aggMap={agg.regional_exposure} />
+              <ExposureCompareBlock title="Value-chain exposure" aiMap={ai.vc_exposure as Record<string, number> | undefined} aggMap={agg.vc_exposure} />
+            </div>
+          ) : null}
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
             <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
               {(['experts', 'ai'] as const).map((c) => (
@@ -1076,6 +1160,25 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
   useEffect(() => {
     if (!isAdmin && mode === 'review') setMode('list');
   }, [isAdmin, mode]);
+
+  // Live "my proposal" per trend so a collapsed row reflects what the user just
+  // entered in the Expert Input tab (the trends-list payload only carries the
+  // proposal as of page load). Seeded from the server, updated on each edit.
+  const [myMap, setMyMap] = useState<Record<string, TrendProposalPatch>>({});
+  useEffect(() => {
+    setMyMap((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const t of trends) {
+        const m = t.proposal_summary?.my;
+        if (next[t.id] === undefined && m) { next[t.id] = m; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [trends]);
+  const setMyProposal = useCallback((trendId: string, my: TrendProposalPatch) => {
+    setMyMap((prev) => ({ ...prev, [trendId]: my }));
+  }, []);
 
   // Sort state — null means "backend order" (initial state).
   // Clicking a header sorts by that column; clicking the same column again
@@ -1242,7 +1345,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
           <div
             className="grid items-center px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
             style={{
-              gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
+              gridTemplateColumns: '2.2fr 0.9fr 1fr 0.9fr 0.8fr 0.95fr',
               backgroundColor: S.surfaceLow,
               color: S.onSurfaceVariant,
             }}
@@ -1255,6 +1358,9 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               <Gp1InfoTip />
             </span>
             <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+            <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
+              {mode === 'input' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Reviewed'}
+            </span>
           </div>
 
           {/* Rows */}
@@ -1279,6 +1385,8 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
                   expanded={expanded}
                   onToggle={() => setExpandedId(expanded ? null : key)}
                   mode={mode}
+                  myProposal={myMap[t.id]}
+                  onMyChange={setMyProposal}
                   isAdmin={isAdmin}
                   updateTrend={updateTrend}
                 />
@@ -1374,12 +1482,14 @@ interface TrendRowProps {
   expanded: boolean;
   onToggle: () => void;
   mode: ScoringMode;
+  myProposal?: TrendProposalPatch;
+  onMyChange?: (trendId: string, my: TrendProposalPatch) => void;
   isAdmin?: boolean;
   updateTrend?: (trendId: string, updates: Partial<Trend>) => Promise<void>;
 }
 
 const TrendRow: FC<TrendRowProps> = ({
-  trend, isLast, expanded, onToggle, mode, isAdmin = false, updateTrend,
+  trend, isLast, expanded, onToggle, mode, myProposal, onMyChange, isAdmin = false, updateTrend,
 }) => {
   const tile = FORCE_TILE[trend.force] ?? FORCE_TILE.Consumer;
   const { Icon } = tile;
@@ -1400,7 +1510,7 @@ const TrendRow: FC<TrendRowProps> = ({
         aria-expanded={expanded}
         className="w-full grid items-center px-8 py-2 text-left transition-colors"
         style={{
-          gridTemplateColumns: '2.3fr 1fr 1fr 0.9fr 0.8fr',
+          gridTemplateColumns: '2.2fr 0.9fr 1fr 0.9fr 0.8fr 0.95fr',
           backgroundColor: expanded ? S.surfaceLow : S.surface,
           cursor: 'pointer',
           border: 'none',
@@ -1420,14 +1530,6 @@ const TrendRow: FC<TrendRowProps> = ({
               style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
             >
               {trend.name}
-              {mode === 'list' && reviewedDeviates(trend) && (
-                <span className="inline-flex items-center gap-1 flex-shrink-0"
-                  title="Reviewed by an admin — differs from the AI baseline"
-                  style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
-                    color: REVIEWED_COLOR, backgroundColor: 'rgba(31,122,61,0.10)', padding: '2px 7px', borderRadius: 999 }}>
-                  <Check size={10} strokeWidth={2.6} /> Reviewed
-                </span>
-              )}
               <ChevronDown
                 size={14}
                 style={{
@@ -1444,16 +1546,21 @@ const TrendRow: FC<TrendRowProps> = ({
         <div><DirectionPill direction={trend.direction} /></div>
 
         {/* Probability — read-only here; scoring/endorsing happens in the trend tab */}
-        <div><ProbCell trend={trend} mode={mode} /></div>
+        <div><ProbCell trend={trend} mode={mode} myProposal={myProposal} /></div>
 
         {/* GP1 % — read-only here; editing happens in the trend tab */}
         <div className="text-right">
-          <Gp1Cell trend={trend} mode={mode} />
+          <Gp1Cell trend={trend} mode={mode} myProposal={myProposal} />
         </div>
 
-        {/* Shift (list) / scoring status (input) / review affordance (review) */}
+        {/* Shift — truth (list/review) or your own shift (input) */}
         <div className="text-right">
-          <RowEndCell trend={trend} mode={mode} />
+          <RowEndCell trend={trend} mode={mode} myProposal={myProposal} />
+        </div>
+
+        {/* Review status (6th column) */}
+        <div className="text-right">
+          <ReviewStatusCell trend={trend} mode={mode} myProposal={myProposal} />
         </div>
       </div>
 
@@ -1472,7 +1579,7 @@ const TrendRow: FC<TrendRowProps> = ({
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
             {mode === 'input' ? (
-              <ExpertInputPanel trend={trend} />
+              <ExpertInputPanel trend={trend} onMyChange={onMyChange} />
             ) : mode === 'review' ? (
               <ReviewPanel trend={trend} updateTrend={updateTrend} />
             ) : (
