@@ -325,6 +325,7 @@ def init_db() -> None:
                 gp1_pct_affected REAL DEFAULT 0.10,
                 peak_year INTEGER DEFAULT 0,
                 diffusion_curve TEXT DEFAULT 's_curve',
+                ai_suggestion TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -335,6 +336,10 @@ def init_db() -> None:
             "ALTER TABLE trends ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10",
             "ALTER TABLE trends ADD COLUMN peak_year INTEGER DEFAULT 0",
             "ALTER TABLE trends ADD COLUMN diffusion_curve TEXT DEFAULT 's_curve'",
+            # Multi-expert proposals layer (June 2026): immutable AI baseline
+            # snapshot of the originally-seeded scoreable fields, stored as a
+            # JSON blob so the "AI suggestion" reference survives admin edits.
+            "ALTER TABLE trends ADD COLUMN ai_suggestion TEXT",
             "ALTER TABLE trend_sources ADD COLUMN tier TEXT DEFAULT ''",
         ]:
             try:
@@ -386,6 +391,35 @@ def init_db() -> None:
                 journey_stage TEXT NOT NULL,
                 exposure_score INTEGER,
                 PRIMARY KEY (trend_id, journey_stage)
+            )
+        """)
+
+        # ── Multi-expert trend score proposals (June 2026) ──────────────
+        # One row per (trend, user): any authenticated user proposes scores
+        # for the 7 scoreable fields of a trend. Aggregates + a named
+        # "who scored what" breakdown are served back via
+        # GET /api/v1/trends/{id}/proposals. Endorsement is NOT a separate
+        # action — the frontend reuses PUT /trends/{id} with chosen values.
+        # Exposure maps are stored as JSON text (same approach as everywhere
+        # else), nullable so a partial proposal never wipes unspecified
+        # fields. UNIQUE(trend_id, user_id) enforces one row per scorer; the
+        # PUT handler upserts/merges into it.
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS trend_score_proposals (
+                id {serial},
+                trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL,
+                user_name TEXT,
+                user_role TEXT,
+                probability INTEGER,
+                gp1_pct_affected REAL,
+                peak_year INTEGER,
+                diffusion_curve TEXT,
+                category_exposure TEXT,
+                regional_exposure TEXT,
+                vc_exposure TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (trend_id, user_id)
             )
         """)
 
@@ -601,6 +635,7 @@ def init_db() -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_status ON scanned_trends(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_force ON scanned_trends(force)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trend_score_proposals_trend ON trend_score_proposals(trend_id)")
 
         conn.commit()
         logger.info(f"Database initialized (mode: {'postgres' if USE_POSTGRES else 'sqlite'})")
@@ -630,8 +665,8 @@ def save_trends(trends: List[Trend]) -> None:
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, scorer_count, score_variance,
                     debiasing_applied, probability_posterior,
-                    gp1_pct_affected, peak_year, diffusion_curve
-                ) VALUES ({ph(22)})
+                    gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion
+                ) VALUES ({ph(23)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -644,6 +679,12 @@ def save_trends(trends: List[Trend]) -> None:
                     getattr(trend, 'gp1_pct_affected', 0.10),
                     getattr(trend, 'peak_year', 0),
                     getattr(trend, 'diffusion_curve', 's_curve'),
+                    # ai_suggestion: immutable AI baseline snapshot (June 2026
+                    # proposals layer). Carried through delete-then-insert so an
+                    # admin edit or endorsement never erases the baseline. None
+                    # for legacy trends until scripts/backfill_ai_suggestion.py runs.
+                    (_safe_dumps(getattr(trend, 'ai_suggestion', None))
+                     if getattr(trend, 'ai_suggestion', None) else None),
                 ),
             )
 
@@ -691,6 +732,22 @@ def _row_to_dict(row) -> dict:
     return dict(row)
 
 
+def _parse_json_blob(val):
+    """Parse a JSON text column, or pass through dicts/lists.
+
+    SQLite stores JSON as TEXT; Postgres may return native dict/list for
+    JSONB-typed columns. Returns None for empty/None/invalid values.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    try:
+        return json.loads(val)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 def load_trends() -> List[Trend]:
     """Load all trends from database."""
     p = placeholder()
@@ -733,6 +790,8 @@ def load_trends() -> List[Trend]:
                 else None
             )
 
+            ai_suggestion = _parse_json_blob(row.get("ai_suggestion"))
+
             # Load source URLs
             try:
                 cursor.execute(
@@ -774,6 +833,7 @@ def load_trends() -> List[Trend]:
                 peak_year=row.get("peak_year", 0) or 0,
                 diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
                 probability_posterior=prob_posterior,
+                ai_suggestion=ai_suggestion,
             )
             # Attach sources as transient attribute (not in dataclass)
             trend.sources = sources
@@ -826,6 +886,8 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             else None
         )
 
+        ai_suggestion = _parse_json_blob(row.get("ai_suggestion"))
+
         return Trend(
             id=row["id"],
             force=row["force"],
@@ -851,6 +913,7 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             score_variance=row.get("score_variance", 0.0),
             debiasing_applied=row.get("debiasing_applied", False),
             probability_posterior=prob_posterior,
+            ai_suggestion=ai_suggestion,
         )
 
 
@@ -1012,6 +1075,184 @@ def load_journey_content() -> Optional[dict]:
         if content is None:
             return None
         return json.loads(content) if isinstance(content, str) else content
+
+
+# ── TREND SCORE PROPOSALS (multi-expert) ────────────────────────────────
+# One row per (trend, user). Exposure maps are stored as JSON text and
+# read back as dicts. A proposal is PARTIAL: any subset of the 7 scoreable
+# fields may be set; NULL/absent fields mean "this user did not score that".
+
+_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve")
+_PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
+
+
+def _proposal_row_to_dict(raw) -> dict:
+    """Normalize one trend_score_proposals row into a plain dict, decoding
+    the JSON exposure-map columns."""
+    row = _row_to_dict(raw)
+    return {
+        "user_id": row.get("user_id"),
+        "user_name": row.get("user_name"),
+        "user_role": row.get("user_role"),
+        "probability": row.get("probability"),
+        "gp1_pct_affected": row.get("gp1_pct_affected"),
+        "peak_year": row.get("peak_year"),
+        "diffusion_curve": row.get("diffusion_curve"),
+        "category_exposure": _parse_json_blob(row.get("category_exposure")),
+        "regional_exposure": _parse_json_blob(row.get("regional_exposure")),
+        "vc_exposure": _parse_json_blob(row.get("vc_exposure")),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def load_trend_proposals(trend_id: str) -> List[Dict[str, Any]]:
+    """Load all score proposals for a trend, decoded into dicts.
+
+    Returns [] if the table is empty for that trend. Never raises on a
+    missing table — callers may run before init_db on a fresh DB.
+    """
+    p = placeholder()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"""
+                SELECT user_id, user_name, user_role, probability,
+                       gp1_pct_affected, peak_year, diffusion_curve,
+                       category_exposure, regional_exposure, vc_exposure, updated_at
+                FROM trend_score_proposals
+                WHERE trend_id = {p}
+                ORDER BY updated_at ASC, user_id ASC
+                """,
+                (trend_id,),
+            )
+        except Exception as e:
+            logger.warning(f"load_trend_proposals: query failed ({e}) — returning []")
+            return []
+        return [_proposal_row_to_dict(r) for r in cursor.fetchall()]
+
+
+def load_all_trend_proposals() -> Dict[str, List[Dict[str, Any]]]:
+    """Load every score proposal grouped by trend_id (one DB round-trip).
+
+    Used to attach `proposal_summary` to the trend list cheaply. Returns
+    {} on a missing table.
+    """
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT trend_id, user_id, user_name, user_role, probability,
+                       gp1_pct_affected, peak_year, diffusion_curve,
+                       category_exposure, regional_exposure, vc_exposure, updated_at
+                FROM trend_score_proposals
+                ORDER BY updated_at ASC, user_id ASC
+                """
+            )
+        except Exception as e:
+            logger.warning(f"load_all_trend_proposals: query failed ({e}) — returning {{}}")
+            return {}
+        for raw in cursor.fetchall():
+            row = _row_to_dict(raw)
+            tid = row.get("trend_id")
+            if tid is None:
+                continue
+            out.setdefault(tid, []).append(_proposal_row_to_dict(row))
+    return out
+
+
+def upsert_trend_proposal(
+    trend_id: str,
+    user_id: str,
+    fields: Dict[str, Any],
+    user_name: str = "",
+    user_role: str = "",
+) -> Dict[str, Any]:
+    """Merge a partial proposal into this user's row (insert or update).
+
+    `fields` carries only the keys the caller is changing. Scalar fields are
+    written as-is; map fields (category/regional/vc exposure) are JSON-encoded.
+    Keys NOT present in `fields` are LEFT UNTOUCHED on an existing row (never
+    wiped). Returns the merged row as a dict.
+    """
+    p = placeholder()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        # Load any existing row for this (trend, user) to merge into.
+        cursor.execute(
+            f"""
+            SELECT user_id, user_name, user_role, probability, gp1_pct_affected,
+                   peak_year, diffusion_curve, category_exposure,
+                   regional_exposure, vc_exposure, updated_at
+            FROM trend_score_proposals
+            WHERE trend_id = {p} AND user_id = {p}
+            """,
+            (trend_id, user_id),
+        )
+        existing = cursor.fetchone()
+        merged = _proposal_row_to_dict(existing) if existing else {
+            "probability": None, "gp1_pct_affected": None, "peak_year": None,
+            "diffusion_curve": None, "category_exposure": None,
+            "regional_exposure": None, "vc_exposure": None,
+        }
+
+        # Apply the partial update (only keys present in `fields`).
+        for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS:
+            if k in fields:
+                merged[k] = fields[k]
+
+        def _enc(v):
+            return _safe_dumps(v) if v is not None else None
+
+        now = datetime.utcnow()
+        if existing:
+            cursor.execute(
+                f"""
+                UPDATE trend_score_proposals
+                SET user_name = {p}, user_role = {p}, probability = {p},
+                    gp1_pct_affected = {p}, peak_year = {p}, diffusion_curve = {p},
+                    category_exposure = {p}, regional_exposure = {p},
+                    vc_exposure = {p}, updated_at = {p}
+                WHERE trend_id = {p} AND user_id = {p}
+                """,
+                (
+                    user_name or "", user_role or "",
+                    merged.get("probability"), merged.get("gp1_pct_affected"),
+                    merged.get("peak_year"), merged.get("diffusion_curve"),
+                    _enc(merged.get("category_exposure")),
+                    _enc(merged.get("regional_exposure")),
+                    _enc(merged.get("vc_exposure")),
+                    now, trend_id, user_id,
+                ),
+            )
+        else:
+            cursor.execute(
+                f"""
+                INSERT INTO trend_score_proposals (
+                    trend_id, user_id, user_name, user_role, probability,
+                    gp1_pct_affected, peak_year, diffusion_curve,
+                    category_exposure, regional_exposure, vc_exposure, updated_at
+                ) VALUES ({ph(12)})
+                """,
+                (
+                    trend_id, user_id, user_name or "", user_role or "",
+                    merged.get("probability"), merged.get("gp1_pct_affected"),
+                    merged.get("peak_year"), merged.get("diffusion_curve"),
+                    _enc(merged.get("category_exposure")),
+                    _enc(merged.get("regional_exposure")),
+                    _enc(merged.get("vc_exposure")),
+                    now,
+                ),
+            )
+        conn.commit()
+
+    merged["user_id"] = user_id
+    merged["user_name"] = user_name or ""
+    merged["user_role"] = user_role or ""
+    return merged
 
 
 # ── AUDIT LOG ───────────────────────────────────────────────────────────

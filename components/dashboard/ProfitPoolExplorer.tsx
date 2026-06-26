@@ -68,8 +68,8 @@ const S = {
   cardBorder:          'rgba(0, 52, 94, 0.10)',
   cardBorderStrong:    'rgba(0, 52, 94, 0.16)',
   mutedText:           '#64748B',
-  greenStrong:         '#0F7A3D',
-  redStrong:           '#7F1D1D',
+  greenStrong:         '#1f7a3d',
+  redStrong:           '#9f403d',
   neutral:             '#94A3B8',
   amber:               '#B45309',
   amberSoft:           '#FEF3C7',
@@ -744,21 +744,25 @@ const ProfitPoolExplorer: FC = () => {
 
   return (
     <div
+      className="min-h-screen"
       style={{
-        padding: '0 8px',
+        // Shared maritime page shell — centered max-w-1440 with px-8 py-10,
+        // matching Profit Pool Exposure / Trends / Consumer Journey.
+        maxWidth: 1440,
+        margin: '0 auto',
+        padding: '40px 32px',
         fontFamily: BODY_FONT,
         color: S.onBg,
         background: S.bg,
-        minHeight: '100%',
       }}
     >
       {/* Header */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase', color: S.primary, marginBottom: 4 }}>
+        <div className="pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: S.onSurfaceVariant, marginBottom: 6 }}>
             Admin · Profit Pool Explorer
           </div>
-          <h1 style={{ fontFamily: HEADLINE_FONT, fontSize: 28, fontWeight: 800, color: S.onBg, margin: 0, letterSpacing: -0.5 }}>
+          <h1 className="font-extrabold tracking-tight" style={{ fontFamily: HEADLINE_FONT, fontSize: '2.4rem', lineHeight: 1.15, color: S.onBg, margin: 0 }}>
             Industry Profit Pools — HCB Lens
           </h1>
           <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 760 }}>
@@ -815,14 +819,13 @@ const ProfitPoolExplorer: FC = () => {
         <KindPills kind={kind} onSelect={(k) => { setKind(k); setSelectedId(null); }} />
       </div>
 
-      {/* Main card */}
+      {/* Main card — shared maritime card: borderless, rounded-2xl, soft shadow */}
       <div
+        className="rounded-2xl"
         style={{
           background: S.surface,
-          border: `1px solid ${S.cardBorder}`,
-          borderRadius: 20,
           padding: 28,
-          boxShadow: '0 24px 60px -30px rgba(0,52,94,0.18)',
+          boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)',
         }}
       >
         {/* Card title + pool summary */}

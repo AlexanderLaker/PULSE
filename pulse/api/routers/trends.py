@@ -14,8 +14,9 @@ from pulse.api.serialization import _sanitize, _summarize_convergence
 from pulse.api.state import _state, _state_lock, _load_trend_database, _backfill_diffusion_fields
 from pulse.api.models import (
     SimulationRequest, TrendCreate, TrendUpdate, ShockRequest,
-    ConfigUpdate, SnapshotCreate,
+    ConfigUpdate, SnapshotCreate, ProposalUpdate,
 )
+from pulse.api.proposals import build_proposals_response
 from pulse.api.services.simulation_service import (
     load_latest_run_into_state,
     _persisted_simulation_state, _has_persisted_simulation,
@@ -34,6 +35,18 @@ async def list_trends(force: Optional[str] = None, user: dict = Depends(require_
     trends = db.trends
     if force:
         trends = [t for t in trends if t.force == force]
+
+    # Multi-expert proposal summaries (June 2026): one DB round-trip for all
+    # trends; degrades to empty (no summaries) if the store is unavailable.
+    from pulse.api.proposals import build_proposal_summary
+    user_id, _, _ = _identity_from_user(user)
+    try:
+        from pulse.database import load_all_trend_proposals
+        proposals_by_trend = load_all_trend_proposals()
+    except Exception as e:
+        logger.warning(f"list_trends: proposal summaries unavailable ({e})")
+        proposals_by_trend = {}
+
     def _build_sources(t):
         """Get structured sources array with URLs from trend."""
         sources = getattr(t, 'sources', None) or []
@@ -97,6 +110,8 @@ async def list_trends(force: Optional[str] = None, user: dict = Depends(require_
         "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
         "peak_year": getattr(t, 'peak_year', 0),
         "diffusion_curve": getattr(t, 'diffusion_curve', 's_curve'),
+        "ai_suggestion": getattr(t, 'ai_suggestion', None),
+        "proposal_summary": build_proposal_summary(proposals_by_trend.get(t.id, []), user_id),
     } for t in trends]
 
 @router.post("/api/v1/trends")
@@ -342,6 +357,17 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
     trend = db.get_trend_by_id(trend_id)
     if not trend:
         raise HTTPException(404, f"Trend {trend_id} not found")
+
+    # Multi-expert proposal summary (June 2026): cheap per-trend load.
+    from pulse.api.proposals import build_proposal_summary
+    user_id, _, _ = _identity_from_user(user)
+    try:
+        from pulse.database import load_trend_proposals
+        _prop_rows = load_trend_proposals(trend_id)
+    except Exception as e:
+        logger.warning(f"get_trend: proposal summary unavailable ({e})")
+        _prop_rows = []
+
     return {
         "id": trend.id, "force": trend.force, "name": trend.name,
         "description": trend.description, "direction": trend.direction,
@@ -357,6 +383,8 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         "probability_posterior": trend.probability_posterior,
         "scorer_count": trend.scorer_count,
         "score_variance": trend.score_variance,
+        "ai_suggestion": getattr(trend, "ai_suggestion", None),
+        "proposal_summary": build_proposal_summary(_prop_rows, user_id),
     }
 
 @router.put("/api/v1/trends/{trend_id}")
@@ -438,6 +466,128 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
     _state["stale_reason"] = f"Trend '{trend_id}' was updated"
 
     return {"status": "updated", "trend_id": trend_id}
+
+def _identity_from_user(user: dict) -> tuple[str, str, str]:
+    """Derive (user_id, user_name, user_role) from a verified JWT payload.
+
+    Multi-expert proposals are keyed by the caller's stable identity:
+      user_id  — JWT `sub`, else `email` (one of these always present for a
+                 Clerk-minted token; falls back to "anonymous" defensively).
+      user_name — best-effort display name: `name`, else the email local-part,
+                  else the user_id.
+      user_role — `role` claim if present, else "viewer".
+    """
+    user = user or {}
+    email = user.get("email") or ""
+    user_id = str(user.get("sub") or email or "anonymous")
+    name = user.get("name") or user.get("full_name") or ""
+    if not name:
+        name = email.split("@", 1)[0] if "@" in email else user_id
+    role = str(user.get("role") or "viewer")
+    return user_id, str(name), role
+
+
+def _proposals_payload(trend_id: str, user_id: str | None) -> dict:
+    """Load + shape the full proposals response for a trend."""
+    from pulse.database import load_trend_proposals
+    rows = load_trend_proposals(trend_id)
+    return build_proposals_response(trend_id, rows, user_id)
+
+
+@router.get("/api/v1/trends/{trend_id}/proposals")
+async def get_trend_proposals(trend_id: str, user: dict = Depends(require_auth)):
+    """Multi-expert score proposals for a trend (authenticated read).
+
+    Returns the caller's own proposal (`my`), the cross-expert aggregate
+    (means/median/mode + per-cell exposure aggregates), and a named
+    "who scored what" breakdown (`scorers`).
+    """
+    db = _state.get("db")
+    if not db:
+        raise HTTPException(404, "No model loaded")
+    if not db.get_trend_by_id(trend_id):
+        raise HTTPException(404, f"Trend {trend_id} not found")
+    user_id, _, _ = _identity_from_user(user)
+    try:
+        from pulse.database import init_db
+        init_db()
+        return _proposals_payload(trend_id, user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"get_trend_proposals failed for {trend_id}: {e}")
+        raise HTTPException(503, "Proposals store unavailable")
+
+
+@router.put("/api/v1/trends/{trend_id}/proposals")
+async def put_trend_proposal(
+    trend_id: str, proposal: ProposalUpdate, user: dict = Depends(require_auth)
+):
+    """Upsert the CALLER's own partial score proposal for a trend.
+
+    ANY authenticated user may write their own row (not admin-only). The body
+    is a partial object: only the fields actually sent are merged into the
+    caller's existing row; unspecified fields are never wiped. Ranges are
+    validated/clamped; an unknown diffusion_curve is rejected with 400. This
+    does NOT change the live trend — endorsement is a separate admin action
+    via PUT /trends/{id}.
+    """
+    db = _state.get("db")
+    if not db:
+        raise HTTPException(404, "No model loaded")
+    if not db.get_trend_by_id(trend_id):
+        raise HTTPException(404, f"Trend {trend_id} not found")
+
+    user_id, user_name, user_role = _identity_from_user(user)
+
+    # Only the fields the client actually sent (pydantic v2): distinguishes
+    # "absent" (leave untouched) from "explicitly null".
+    sent = proposal.model_fields_set
+    fields: dict = {}
+
+    if "probability" in sent and proposal.probability is not None:
+        fields["probability"] = max(1, min(5, int(proposal.probability)))
+    if "gp1_pct_affected" in sent and proposal.gp1_pct_affected is not None:
+        fields["gp1_pct_affected"] = max(0.0, min(1.0, float(proposal.gp1_pct_affected)))
+    if "peak_year" in sent and proposal.peak_year is not None:
+        fields["peak_year"] = int(proposal.peak_year)
+    if "diffusion_curve" in sent and proposal.diffusion_curve is not None:
+        from pulse.config import VALID_DIFFUSION_CURVES
+        if proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
+            raise HTTPException(
+                400, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}"
+            )
+        fields["diffusion_curve"] = proposal.diffusion_curve
+
+    # Exposure maps: clamp every cell to 0..5, drop non-numeric values.
+    def _clean_exposure(m: dict) -> dict:
+        out = {}
+        for k, v in (m or {}).items():
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                continue
+            out[str(k)] = max(0.0, min(5.0, fv))
+        return out
+
+    for mfield in ("category_exposure", "regional_exposure", "vc_exposure"):
+        if mfield in sent:
+            val = getattr(proposal, mfield)
+            fields[mfield] = _clean_exposure(val) if val is not None else None
+
+    try:
+        from pulse.database import init_db, upsert_trend_proposal
+        init_db()
+        upsert_trend_proposal(
+            trend_id, user_id, fields, user_name=user_name, user_role=user_role
+        )
+        return _proposals_payload(trend_id, user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"put_trend_proposal failed for {trend_id}/{user_id}: {e}")
+        raise HTTPException(503, "Failed to persist proposal")
+
 
 @router.delete("/api/v1/trends/{trend_id}")
 async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):

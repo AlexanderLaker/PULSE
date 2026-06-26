@@ -1538,9 +1538,9 @@ const ProfitPoolAnalysis2: FC<{
         </AnimatePresence>
 
         {/* ── The evidence: the shift matrix ─────────────────────── */}
-        <div className="mb-5 pl-5" style={{ borderLeft: `3px solid ${S.cardBorderStrong}` }}>
+        <div className="mb-5 pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
           <h2 className="font-extrabold tracking-tight"
-            style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '1.5rem', lineHeight: 1.15 }}>
+            style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '2.4rem', lineHeight: 1.15 }}>
             Profit Pool Exposure
           </h2>
           {/* Reduced header (owner request, June 2026): the relative-exposure /

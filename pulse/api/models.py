@@ -95,6 +95,24 @@ class TrendUpdate(BaseModel):
     diffusion_curve: Optional[str] = Field(None,
         description="Materialization shape: s_curve, linear, front_loaded, back_loaded, step_function")
 
+class ProposalUpdate(BaseModel):
+    """Partial multi-expert score proposal (PUT /trends/{id}/proposals).
+
+    Every field is optional: the body carries only what the caller is
+    changing. The handler merges the SET fields into the caller's own row
+    via `model_fields_set` so an absent field is never confused with an
+    explicit null. Identity (user_id/name/role) comes from the auth
+    dependency, NOT from the body.
+    """
+    probability: Optional[int] = Field(None, ge=1, le=5)
+    gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0)
+    peak_year: Optional[int] = Field(None, ge=2025, le=2035)
+    diffusion_curve: Optional[str] = None
+    category_exposure: Optional[dict] = None   # {"Hair: Color": 0-5, ...}
+    regional_exposure: Optional[dict] = None   # {"Europe": 0-5, ...}
+    vc_exposure: Optional[dict] = None          # {"Packaging": 0-5, ...}
+
+
 class ShockRequest(BaseModel):
     shocked_force: str
     magnitude: float = Field(0.3)

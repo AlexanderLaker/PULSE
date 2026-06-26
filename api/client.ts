@@ -6,6 +6,7 @@
 
 import type {
   Trend, TrendUpdate,
+  TrendProposalPatch, TrendProposalsResponse,
   SimulationResult, SimulationParams,
   HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
 } from '@/types';
@@ -90,6 +91,28 @@ export const getTrend = (id: string): Promise<Trend> =>
 
 export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
   request(`/trends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+
+// ── Trend score proposals (multi-expert scoring) ─────────────────
+// Any authenticated user may read aggregates and write THEIR OWN proposal.
+// Endorsement is a normal admin updateTrend() with the chosen values, so it
+// flows through the existing validated, audited PUT /trends/{id} path.
+
+/** GET /api/v1/trends/{id}/proposals — the caller's own proposal, the expert
+ *  aggregate, and the named "who scored what" breakdown. */
+export const getTrendProposals = (id: string): Promise<TrendProposalsResponse> =>
+  request(`/trends/${id}/proposals`);
+
+/** PUT /api/v1/trends/{id}/proposals — upsert the caller's own proposal.
+ *  Partial patch: only the provided fields are written. Returns the refreshed
+ *  proposals payload. */
+export const saveMyProposal = (
+  id: string,
+  patch: TrendProposalPatch,
+): Promise<TrendProposalsResponse> =>
+  request(`/trends/${id}/proposals`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  });
 
 // ── Simulation ───────────────────────────────────────────────────
 

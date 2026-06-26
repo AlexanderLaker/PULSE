@@ -924,7 +924,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   // ════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen" style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}>
-      <main className="max-w-[1720px] mx-auto px-8 py-10">
+      <main className="max-w-[1440px] mx-auto px-8 py-10">
 
         {/* ─── Header (insight-rail accent) ─── */}
         <header className="mb-5 flex items-start justify-between gap-8 flex-wrap">

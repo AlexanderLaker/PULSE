@@ -18,7 +18,7 @@
 
 'use client';
 
-import React, { useMemo, useState, useEffect, FC } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
@@ -26,12 +26,16 @@ import {
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
   ArrowUp, ArrowDown, ArrowUpDown,
-  Plus, Trash2, Info, Lock,
+  Plus, Trash2, Info, Lock, Check, PenLine,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
+import { getTrendProposals, saveMyProposal } from '@/api/client';
 import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
-import type { Trend, ForceName, CategoryId, TrendSource, TrendUpdate } from '@/types';
+import type {
+  Trend, ForceName, CategoryId, TrendSource, TrendUpdate,
+  TrendProposalPatch, TrendProposalsResponse,
+} from '@/types';
 
 // ─── Value-chain steps — must match backend VC_KEYS in pulse/config.py ──
 // The Python engine (seed_trends / config) keys vc_exposure by the display-
@@ -474,6 +478,558 @@ function sortValue(t: Trend, key: SortKey): string | number | null | undefined {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Multi-expert scoring — 3-mode layer (June 2026)
+//
+// One editorial table, three modes (the table layout is unchanged — only the
+// behaviour of the cells / trend tab changes):
+//   • list   — the agreed truth that feeds the model (read-only). A trend whose
+//              endorsed truth deviates from the AI baseline shows its dots in
+//              green; the AI suggestion is on hover.
+//   • input  — every signed-in expert scores from a blank slate in the trend
+//              tab; changes auto-save; the AI suggestion is on hover of a grey
+//              dot / blank field.
+//   • review — admin-only: the expert average vs the AI suggestion with the
+//              delta and the named "who scored what"; the admin endorses one
+//              trend at a time, which writes the new truth through the normal
+//              (validated, audited) trend PUT.
+//
+// The engine only ever consumes the trend's own columns; proposals are a
+// parallel, named, advisory store — never auto-applied.
+// ═══════════════════════════════════════════════════════════════════
+
+type ScoringMode = 'list' | 'input' | 'review';
+
+const EXPERT_COLOR   = '#6b4fc4';   // expert aggregate — violet
+const REVIEWED_COLOR = '#1f7a3d';   // reviewed truth that deviates from AI — green
+const DELTA_COLOR    = '#b07d2b';   // delta chip — gold
+
+const pctI = (v: number | null | undefined): string =>
+  v == null ? '—' : `${Math.round(v * 100)}%`;
+
+// AI baseline reads. An un-overridden trend still holds its AI value, so the
+// current value IS the AI suggestion when there is no snapshot and no override.
+const aiProb = (t: Trend): number | undefined =>
+  t.ai_suggestion?.probability ?? (t.user_override ? undefined : (t.probability ?? undefined));
+const aiGp1 = (t: Trend): number | undefined => {
+  const g = (t as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
+  return t.ai_suggestion?.gp1_pct_affected ?? (t.user_override ? undefined : g);
+};
+
+/** A trend is "reviewed & changed" (→ green dots, "Reviewed" chip) when it
+ *  carries an admin override AND its truth differs from the AI baseline.
+ *  Without a snapshot we treat any override as a change. */
+const reviewedDeviates = (t: Trend): boolean => {
+  if (!t.user_override) return false;
+  const ap = aiProb(t);
+  const ag = aiGp1(t);
+  const curG = (t as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
+  if (ap == null && ag == null) return true;
+  const pDev = ap != null && Math.round(t.probability ?? 0) !== Math.round(ap);
+  const gDev = ag != null && curG != null && Math.round(curG * 100) !== Math.round(ag * 100);
+  return pDev || gDev;
+};
+
+/** Colourable, read-only 1–5 dot bar (mirrors DotBar's geometry). */
+const ColorDots: FC<{ value: number; color: string; title?: string; muted?: boolean }> = ({ value, color, title, muted }) => (
+  <div className="flex gap-1.5" title={title} aria-label={`${value} of 5`} style={{ cursor: title ? 'help' : undefined }}>
+    {[1, 2, 3, 4, 5].map((d) => (
+      <span key={d} className="inline-block w-2.5 h-2.5 rounded-full"
+        style={{ backgroundColor: d <= value ? color : S.surfaceHigh, opacity: muted ? 0.5 : 1 }} />
+    ))}
+  </div>
+);
+
+const DeltaChip: FC<{ value: number; unit?: string; digits?: number }> = ({ value, unit = '', digits = 1 }) => {
+  const zero = Math.abs(value) < (digits === 0 ? 0.5 : 0.05);
+  const sign = value > 0 ? '+' : '−';
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
+      backgroundColor: zero ? S.surfaceLow : 'rgba(176,125,43,0.15)',
+      color: zero ? S.mutedText : DELTA_COLOR,
+    }}>
+      {zero ? '=' : `${sign}${Math.abs(value).toFixed(digits)}${unit}`}
+    </span>
+  );
+};
+
+const Dash: FC = () => <span style={{ color: S.mutedText, fontSize: 12 }}>—</span>;
+const Val: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: S.onSurface }}>{children}</span>
+);
+
+// ── Collapsed-row cells (mode-aware, read-only — editing lives in the tab) ──
+const ProbCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+  const ai = aiProb(trend);
+  if (mode === 'list') {
+    const dev = !!trend.user_override && ai != null && Math.round(trend.probability ?? 0) !== Math.round(ai);
+    return (
+      <ColorDots value={Math.round(trend.probability ?? 0)} color={dev ? REVIEWED_COLOR : S.primary}
+        title={ai != null ? `AI suggested ${Math.round(ai)} / 5${trend.user_override ? ` · endorsed ${Math.round(trend.probability ?? 0)} / 5` : ''}` : undefined} />
+    );
+  }
+  if (mode === 'input') {
+    const my = trend.proposal_summary?.my?.probability;
+    return (
+      <ColorDots value={my != null ? Math.round(my) : 0} color={S.primary} muted={my == null}
+        title={ai != null ? `AI suggests ${Math.round(ai)} / 5 — open the trend to score` : 'Open the trend to score'} />
+    );
+  }
+  const agg = trend.proposal_summary?.probability;
+  if (!agg || agg.avg == null) return <Dash />;
+  const d = ai != null ? agg.avg - ai : null;
+  return (
+    <div className="flex items-center gap-2">
+      <ColorDots value={Math.round(agg.avg)} color={EXPERT_COLOR} title={`Expert average ${agg.avg.toFixed(1)} / 5 · ${agg.count} scored`} />
+      <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: EXPERT_COLOR }}>{agg.avg.toFixed(1)}</span>
+      {d != null && <DeltaChip value={d} />}
+    </div>
+  );
+};
+
+const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+  const ai = aiGp1(trend);
+  const cur = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
+  const big: React.CSSProperties = { fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.15rem' };
+  if (mode === 'list') {
+    const dev = !!trend.user_override && ai != null && cur != null && Math.round(cur * 100) !== Math.round(ai * 100);
+    return (
+      <span style={{ ...big, color: dev ? REVIEWED_COLOR : S.onSurface, cursor: ai != null ? 'help' : undefined }}
+        title={ai != null ? `AI suggested ${pctI(ai)}${trend.user_override ? ` · endorsed ${pctI(cur)}` : ''}` : undefined}>
+        {cur != null ? fmtPct(cur) : '—'}
+      </span>
+    );
+  }
+  if (mode === 'input') {
+    const my = trend.proposal_summary?.my?.gp1_pct_affected;
+    return (
+      <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
+        title={ai != null ? `AI suggests ${pctI(ai)} — open the trend to score` : 'Open the trend to score'}>
+        {my != null ? pctI(my) : '—'}
+      </span>
+    );
+  }
+  const agg = trend.proposal_summary?.gp1_pct_affected;
+  if (!agg || agg.avg == null) return <Dash />;
+  const d = ai != null ? (agg.avg - ai) * 100 : null;
+  return (
+    <div className="flex items-center gap-2 justify-end">
+      <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.05rem', color: EXPERT_COLOR }}
+        title={`Expert average ${pctI(agg.avg)} · ${agg.count} scored`}>{pctI(agg.avg)}</span>
+      {d != null && <DeltaChip value={d} unit="pp" digits={0} />}
+    </div>
+  );
+};
+
+const RowEndCell: FC<{ trend: Trend; mode: ScoringMode }> = ({ trend, mode }) => {
+  const [tip, setTip] = useState(false);
+  if (mode === 'list') {
+    const shift = trend.gp1_shift;
+    const probClamped = Math.max(1, Math.min(5, Math.round(trend.probability ?? 0)));
+    const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0;
+    const dirSign = trend.direction === 'Contraction' ? -1 : 1;
+    return (
+      <div className="text-right" style={{ position: 'relative' }}
+        onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
+        <span className="font-bold text-[14px]" style={{
+          color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
+          borderBottom: `1px dotted ${S.onSurfaceVariant}66`, cursor: 'help',
+        }}>
+          {shift != null ? fmtShift(shift) : '—'}
+        </span>
+        {tip && shift != null && (
+          <div role="tooltip" onClick={(e) => e.stopPropagation()} style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 40, minWidth: 240, maxWidth: 320,
+            padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
+            fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, lineHeight: 1.5, textAlign: 'left',
+            boxShadow: '0 10px 24px rgba(0,52,94,0.28)', pointerEvents: 'none',
+          }}>
+            Shift = (prob/6) × GP1% × direction
+            <br />= ({probClamped}/6) × {(gp1 * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(shift)}
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (mode === 'input') {
+    const my = trend.proposal_summary?.my;
+    const scored = !!my && Object.keys(my).length > 0;
+    return (
+      <div className="flex justify-end">
+        <span className="inline-flex items-center gap-1.5" style={{
+          fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+          padding: '4px 11px', borderRadius: 999,
+          backgroundColor: scored ? 'rgba(31,122,61,0.10)' : S.primaryContainer,
+          color: scored ? REVIEWED_COLOR : S.onPrimaryContainer,
+        }}>
+          {scored ? <><Check size={11} strokeWidth={2.6} /> Scored</> : <><PenLine size={11} strokeWidth={2.4} /> Score</>}
+        </span>
+      </div>
+    );
+  }
+  const count = trend.proposal_summary?.count ?? 0;
+  return (
+    <div className="flex justify-end">
+      <span style={{
+        fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+        padding: '4px 11px', borderRadius: 999,
+        backgroundColor: count > 0 ? 'rgba(107,79,196,0.10)' : S.surfaceLow,
+        color: count > 0 ? EXPERT_COLOR : S.onSurfaceVariant,
+      }}>
+        {count > 0 ? `◆ ${count} · Review` : 'No proposals'}
+      </span>
+    </div>
+  );
+};
+
+// ── Mode toggle (Review tab is admin-only) ──
+const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; isAdmin: boolean }> = ({ mode, onChange, isAdmin }) => {
+  const opts: Array<{ id: ScoringMode; label: string; dot: string }> = [
+    { id: 'list', label: 'Trend List', dot: REVIEWED_COLOR },
+    { id: 'input', label: 'Expert Input', dot: S.primary },
+    ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
+  ];
+  return (
+    <div role="tablist" aria-label="Scoring mode" style={{
+      display: 'inline-flex', gap: 4, padding: 5, borderRadius: 999, backgroundColor: S.surface, border: `1px solid ${S.cardBorder}`,
+    }}>
+      {opts.map((o) => {
+        const active = mode === o.id;
+        return (
+          <button key={o.id} role="tab" aria-selected={active} onClick={() => onChange(o.id)}
+            className="inline-flex items-center gap-2 transition-colors"
+            style={{
+              padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              fontFamily: HEADLINE_FONT, fontSize: 13, fontWeight: 700,
+              backgroundColor: active ? S.primary : 'transparent', color: active ? '#fff' : S.onSurfaceVariant,
+            }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: active ? '#ffffff' : o.dot }} />
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Diffusion-curve visualization (kept from the expert-input mockup) ──
+const CURVE_PATHS: Record<string, string> = {
+  s_curve: 'M2,16 C9,15 11,3 26,2',
+  linear: 'M2,16 L26,2',
+  front_loaded: 'M2,16 Q6,3 26,2',
+  back_loaded: 'M2,16 Q22,15 26,2',
+  step_function: 'M2,16 L18,16 L18,2 L26,2',
+};
+const DiffusionGlyph: FC<{ curve: string; color: string }> = ({ curve, color }) => (
+  <svg width="30" height="18" viewBox="0 0 28 18" aria-hidden="true">
+    <path d={CURVE_PATHS[curve] ?? CURVE_PATHS.s_curve} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+  </svg>
+);
+const DiffusionPicker: FC<{ value?: string; ai?: string; distribution?: Record<string, number>; onChange?: (c: string) => void }> = ({ value, ai, distribution, onChange }) => (
+  <div className="flex flex-wrap gap-2">
+    {Object.entries(DIFFUSION_LABELS).map(([key, meta]) => {
+      const selected = value === key;
+      const n = distribution?.[key];
+      return (
+        <button key={key} type="button" onClick={() => onChange?.(key)} title={meta.description}
+          aria-pressed={selected} style={{
+            position: 'relative', minWidth: 78, textAlign: 'center', padding: '8px 10px 6px', borderRadius: 9, cursor: 'pointer',
+            backgroundColor: S.surface, border: `1px solid ${selected ? S.primary : S.cardBorder}`,
+            boxShadow: selected ? `inset 0 0 0 1px ${S.primary}` : 'none',
+          }}>
+          {ai === key && <Sparkles size={11} style={{ position: 'absolute', top: 5, right: 5, color: S.primary }} />}
+          <DiffusionGlyph curve={key} color={selected ? S.primary : S.onSurfaceVariant} />
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, marginTop: 3 }}>{meta.label}</div>
+          {n != null && n > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: EXPERT_COLOR, marginTop: 2 }}>×{n}</div>}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const AiRef: FC<{ label: string }> = ({ label }) => (
+  <span title="AI suggestion (applies if you don't score this field)" style={{
+    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999,
+    backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11, fontWeight: 700, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap', cursor: 'help',
+  }}>
+    <Sparkles size={11} /> {label}
+  </span>
+);
+
+/** Lazily fetch the per-trend proposals payload. Degrades to null (the UI shows
+ *  honest empty states) if the endpoint isn't deployed yet. */
+function useTrendProposals(trendId: string): { data: TrendProposalsResponse | null; loaded: boolean } {
+  const [data, setData] = useState<TrendProposalsResponse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    getTrendProposals(trendId)
+      .then((r) => { if (!cancelled) { setData(r); setLoaded(true); } })
+      .catch(() => { if (!cancelled) { setData(null); setLoaded(true); } });
+    return () => { cancelled = true; };
+  }, [trendId]);
+  return { data, loaded };
+}
+
+// ── Expert Input panel (trend tab) — blank scoring, auto-save, AI on hover ──
+const ExpertInputPanel: FC<{ trend: Trend }> = ({ trend }) => {
+  const { data, loaded } = useTrendProposals(trend.id);
+  const [draft, setDraft] = useState<TrendProposalPatch>({});
+  const [hydrated, setHydrated] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const draftRef = useRef<TrendProposalPatch>({});
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (loaded && !hydrated) {
+      const my = (data?.my ?? {}) as TrendProposalPatch;
+      setDraft(my); draftRef.current = my; setHydrated(true);
+    }
+  }, [loaded, hydrated, data]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  const flush = useCallback(() => {
+    setStatus('saving');
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      saveMyProposal(trend.id, draftRef.current).then(() => setStatus('saved')).catch(() => setStatus('error'));
+    }, 600);
+  }, [trend.id]);
+  const patch = useCallback((p: Partial<TrendProposalPatch>) => {
+    setDraft((prev) => { const next = { ...prev, ...p }; draftRef.current = next; return next; });
+    flush();
+  }, [flush]);
+
+  const ai = trend.ai_suggestion ?? {};
+  const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
+  const dist = data?.aggregate?.diffusion_curve?.distribution;
+  const statusText = status === 'saving' ? 'Saving…'
+    : status === 'saved' ? '✓ All changes saved'
+    : status === 'error' ? '⚠ Save failed — retries on next change'
+    : 'Changes auto-save';
+
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
+        <span className="inline-flex items-center gap-2" style={{ fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.primary }}>
+          <PenLine size={13} strokeWidth={2.4} /> Expert Input · your proposal
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: status === 'error' ? S.error : status === 'saved' ? REVIEWED_COLOR : S.onSurfaceVariant }}>{statusText}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,1fr)', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SectionCard title="Context" icon={FileText}>
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
+              {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
+            </p>
+          </SectionCard>
+
+          <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <span title={ai.probability != null ? `AI suggests ${ai.probability} / 5` : undefined}>
+                <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v })} />
+              </span>
+              <AiRef label={ai.probability != null ? `AI ${ai.probability}/5` : 'AI —'} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this trend can move at full materialization.">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
+                onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
+                title={ai.gp1_pct_affected != null ? `AI suggests ${pctI(ai.gp1_pct_affected)}` : undefined} style={{ flex: 1 }} />
+              <input type="number" min={0} max={100} step={1} value={gp1Int ?? ''} placeholder="—"
+                onChange={(e) => { const n = e.target.value === '' ? undefined : Math.max(0, Math.min(100, parseInt(e.target.value, 10))); patch({ gp1_pct_affected: n == null ? undefined : n / 100 }); }}
+                style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
+              <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
+              <AiRef label={ai.gp1_pct_affected != null ? `AI ${pctI(ai.gp1_pct_affected)}` : 'AI —'} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Materialization timing" icon={Clock}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <FieldLabel>Peak Year</FieldLabel>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="number" min={2026} max={2035} step={1} value={draft.peak_year ?? ''} placeholder="—"
+                    onChange={(e) => patch({ peak_year: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
+                    style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
+                  <AiRef label={ai.peak_year != null ? `AI ${ai.peak_year}` : 'AI —'} />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Diffusion Curve</FieldLabel>
+                <DiffusionPicker value={draft.diffusion_curve} ai={ai.diffusion_curve} distribution={dist} onChange={(c) => patch({ diffusion_curve: c })} />
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SectionCard title="Category Exposure" icon={Layers} footnote="Grey = unscored. If you leave a field blank, the AI baseline applies.">
+            <EditableCategoryGrid exposures={(draft.category_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ category_exposure: e })} />
+          </SectionCard>
+          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+            <EditableRegionGrid exposures={(draft.regional_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ regional_exposure: e })} />
+          </SectionCard>
+          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+            <EditableValueChainGrid exposures={(draft.vc_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ vc_exposure: e })} />
+          </SectionCard>
+        </div>
+      </div>
+
+      <div className="inline-flex items-center gap-1.5" style={{ marginTop: 18, padding: '8px 14px', borderRadius: 10, backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 12.5, lineHeight: 1.5 }}>
+        <Sparkles size={13} style={{ flexShrink: 0, color: S.primary }} />
+        <span>Your scores are a proposal. The AI suggestion stays the model&apos;s value until an admin endorses it.</span>
+      </div>
+    </div>
+  );
+};
+
+// ── Review compare row (expert ø over AI, with delta + who-scored) ──
+const CompareRow: FC<{ label: string; sub?: string; expert: React.ReactNode; ai: React.ReactNode; delta?: React.ReactNode; who?: string }> = ({ label, sub, expert, ai, delta, who }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr auto', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${S.surfaceLow}` }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: S.mutedText }}>{sub}</div>}
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }} title={who}>
+      <div className="flex items-center gap-2" style={{ cursor: who ? 'help' : undefined }}>
+        <span style={{ fontSize: 9, fontWeight: 800, color: EXPERT_COLOR, width: 22 }}>ø</span>{expert}
+      </div>
+      <div className="flex items-center gap-2">
+        <span style={{ fontSize: 9, fontWeight: 800, color: S.primary, width: 22 }}>AI</span>{ai}
+      </div>
+    </div>
+    <div style={{ justifySelf: 'end' }}>{delta}</div>
+  </div>
+);
+
+// ── Review & Endorse panel (admin only) ──
+const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: TrendUpdate) => Promise<void> }> = ({ trend, updateTrend }) => {
+  const { data, loaded } = useTrendProposals(trend.id);
+  const [choice, setChoice] = useState<'experts' | 'ai'>('experts');
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const agg = data?.aggregate;
+  const scorers = data?.scorers ?? [];
+  const ai = trend.ai_suggestion ?? {};
+  const count = scorers.length || (trend.proposal_summary?.count ?? 0);
+
+  const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve'): string | undefined => {
+    const rows = scorers.filter((s) => s[field] != null);
+    if (rows.length === 0) return undefined;
+    return rows.map((s) => `${s.name}${s.role ? ` (${s.role})` : ''}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
+  };
+
+  const mapCells = (m?: Record<string, { avg?: number }>): Record<string, number> | undefined => {
+    if (!m) return undefined;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(m)) if (v.avg != null) out[k] = Math.round(v.avg);
+    return Object.keys(out).length ? out : undefined;
+  };
+  const buildExperts = (): TrendUpdate => {
+    const u: TrendUpdate = {};
+    if (agg?.probability?.avg != null) u.probability = Math.round(agg.probability.avg);
+    if (agg?.gp1_pct_affected?.avg != null) u.gp1_pct_affected = Math.max(0, Math.min(1, agg.gp1_pct_affected.avg));
+    if (agg?.peak_year?.median != null) u.peak_year = Math.round(agg.peak_year.median);
+    if (agg?.diffusion_curve?.mode) u.diffusion_curve = agg.diffusion_curve.mode;
+    const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c;
+    const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r;
+    const vc = mapCells(agg?.vc_exposure); if (vc) u.vc_exposure = vc;
+    return u;
+  };
+  const buildAi = (): TrendUpdate => ({
+    probability: ai.probability, gp1_pct_affected: ai.gp1_pct_affected, peak_year: ai.peak_year,
+    diffusion_curve: ai.diffusion_curve, category_exposure: ai.category_exposure,
+    regional_exposure: ai.regional_exposure, vc_exposure: ai.vc_exposure,
+  });
+  const endorse = async () => {
+    if (!updateTrend) return;
+    setErr(null); setSaving(true);
+    try { await updateTrend(trend.id, choice === 'experts' ? buildExperts() : buildAi()); setDone(true); }
+    catch (e) { setErr((e as Error)?.message ?? 'Endorse failed'); }
+    finally { setSaving(false); }
+  };
+
+  const eProb = agg?.probability?.avg, aProb = ai.probability;
+  const eGp1 = agg?.gp1_pct_affected?.avg, aGp1 = ai.gp1_pct_affected;
+  const ePeak = agg?.peak_year?.median, aPeak = ai.peak_year;
+  const eCurve = agg?.diffusion_curve?.mode, aCurve = ai.diffusion_curve;
+
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 30px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+        <span className="inline-flex items-center gap-2" style={{ fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: EXPERT_COLOR }}>
+          <Users size={13} strokeWidth={2.4} /> Review &amp; Endorse · {count} expert{count === 1 ? '' : 's'} scored
+        </span>
+      </div>
+
+      {loaded && count === 0 ? (
+        <div style={{ padding: '26px 0', textAlign: 'center', color: S.onSurfaceVariant }}>
+          <Sparkles size={20} style={{ color: S.primary }} />
+          <div style={{ marginTop: 8, fontSize: 14 }}>No expert proposals yet for this trend.</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '2px 16px 6px', backgroundColor: S.surface }}>
+            <CompareRow label="Probability" sub="1–5"
+              expert={eProb != null ? <ColorDots value={Math.round(eProb)} color={EXPERT_COLOR} /> : <Dash />}
+              ai={aProb != null ? <ColorDots value={Math.round(aProb)} color={S.primary} /> : <Dash />}
+              delta={eProb != null && aProb != null ? <DeltaChip value={eProb - aProb} /> : undefined}
+              who={whoFor('probability')} />
+            <CompareRow label="Impact — GP1 %"
+              expert={<Val>{eGp1 != null ? pctI(eGp1) : '—'}</Val>} ai={<Val>{aGp1 != null ? pctI(aGp1) : '—'}</Val>}
+              delta={eGp1 != null && aGp1 != null ? <DeltaChip value={(eGp1 - aGp1) * 100} unit="pp" digits={0} /> : undefined}
+              who={whoFor('gp1_pct_affected')} />
+            <CompareRow label="Peak year"
+              expert={<Val>{ePeak != null ? Math.round(ePeak) : '—'}</Val>} ai={<Val>{aPeak != null ? aPeak : '—'}</Val>}
+              delta={ePeak != null && aPeak != null ? <DeltaChip value={ePeak - aPeak} unit="y" digits={0} /> : undefined}
+              who={whoFor('peak_year')} />
+            <CompareRow label="Diffusion curve" sub="mode of expert votes"
+              expert={<Val>{eCurve ? (DIFFUSION_LABELS[eCurve]?.label ?? eCurve) : '—'}</Val>}
+              ai={<Val>{aCurve ? (DIFFUSION_LABELS[aCurve]?.label ?? aCurve) : '—'}</Val>}
+              delta={eCurve ? <DeltaChip value={eCurve === aCurve ? 0 : 1} digits={0} /> : undefined}
+              who={whoFor('diffusion_curve')} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
+            <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
+              {(['experts', 'ai'] as const).map((c) => (
+                <button key={c} type="button" onClick={() => setChoice(c)} aria-pressed={choice === c}
+                  style={{ border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, padding: '8px 16px',
+                    backgroundColor: choice === c ? (c === 'experts' ? EXPERT_COLOR : S.primary) : S.surface, color: choice === c ? '#fff' : S.onSurfaceVariant }}>
+                  {c === 'experts' ? 'Adopt experts ø' : 'Keep AI'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              {err && <span style={{ color: S.error, fontSize: 12 }}>{err}</span>}
+              {done && !err && <span style={{ color: REVIEWED_COLOR, fontSize: 12, fontWeight: 700 }}>✓ Endorsed</span>}
+              <button type="button" onClick={endorse} disabled={saving || !updateTrend}
+                style={{ padding: '9px 20px', borderRadius: 999, border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+                  fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                  backgroundColor: S.onSurface, color: '#fff', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Endorsing…' : done ? 'Endorse again' : 'Endorse trend →'}
+              </button>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5" style={{ marginTop: 14, padding: '8px 14px', borderRadius: 10, backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 12.5, lineHeight: 1.5 }}>
+            <Check size={13} style={{ flexShrink: 0, color: REVIEWED_COLOR }} />
+            <span>Endorsing writes the selected values as the trend&apos;s truth (validated &amp; audited) and flags the run stale. Shifts refresh after the next model run.</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── Main component ────────────────────────────────────────────────
 interface Trends2Props {
   /** Drill-through search seed (v3.6 journey layer): when the Consumer
@@ -513,6 +1069,13 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Scoring mode (June 2026): Trend List (truth) · Expert Input · Review &
+  // Endorse. Review is admin-only; a viewer can never land on it.
+  const [mode, setMode] = useState<ScoringMode>('list');
+  useEffect(() => {
+    if (!isAdmin && mode === 'review') setMode('list');
+  }, [isAdmin, mode]);
 
   // Sort state — null means "backend order" (initial state).
   // Clicking a header sorts by that column; clicking the same column again
@@ -633,6 +1196,18 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
           </div>
         </header>
 
+        {/* Scoring mode toggle + per-mode helper */}
+        <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <ModeToggle mode={mode} onChange={setMode} isAdmin={isAdmin} />
+          <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
+            {mode === 'list'
+              ? 'The agreed truth that feeds the model. Reviewed trends that differ from the AI baseline show green dots; hover any score for the AI suggestion.'
+              : mode === 'input'
+              ? 'Score any trend from a blank slate — open a row and your changes auto-save. Hover a grey dot or blank field to see the AI suggestion.'
+              : 'Compare the expert average against the AI suggestion and endorse one trend at a time. Hover an expert score to see who scored what.'}
+          </p>
+        </div>
+
         {/* Category filter chips */}
         <section className="mb-8">
           <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
@@ -703,6 +1278,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
                   isLast={idx === sorted.length - 1}
                   expanded={expanded}
                   onToggle={() => setExpandedId(expanded ? null : key)}
+                  mode={mode}
                   isAdmin={isAdmin}
                   updateTrend={updateTrend}
                 />
@@ -797,62 +1373,16 @@ interface TrendRowProps {
   isLast: boolean;
   expanded: boolean;
   onToggle: () => void;
+  mode: ScoringMode;
   isAdmin?: boolean;
   updateTrend?: (trendId: string, updates: Partial<Trend>) => Promise<void>;
 }
 
 const TrendRow: FC<TrendRowProps> = ({
-  trend, isLast, expanded, onToggle, isAdmin = false, updateTrend,
+  trend, isLast, expanded, onToggle, mode, isAdmin = false, updateTrend,
 }) => {
   const tile = FORCE_TILE[trend.force] ?? FORCE_TILE.Consumer;
   const { Icon } = tile;
-  const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
-  const shift = trend.gp1_shift;
-
-  // Inline-edit state for GP1% (admin-only). Kept as a string so the user can
-  // clear the field while typing without the parent snapping the value back.
-  const [editingGp1, setEditingGp1] = useState(false);
-  const [gp1Draft, setGp1Draft] = useState<string>(
-    gp1 != null ? String(Math.round(gp1 * 100)) : ''
-  );
-  useEffect(() => {
-    setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
-  }, [gp1]);
-
-  // Shift tooltip hover state
-  const [showShiftTip, setShowShiftTip] = useState(false);
-
-  // Bayesian posterior mean for probability: p / 6 (NOT p / 5).
-  // Matches the backend formula in pulse/ingestion/models.py:
-  //   α = max(p,1),  β = max(6-p,1),  prob_mean = α / (α + β).
-  // For p ∈ [1..5] this simplifies to p / 6.
-  const probClamped = Math.max(1, Math.min(5, Math.round(trend.probability ?? 0)));
-  const probMean    = probClamped / 6;
-  const gp1PctNum   = gp1 ?? 0;
-  const dirSign     = trend.direction === 'Contraction' ? -1 : 1;
-
-  const canEdit = isAdmin && !!updateTrend;
-
-  const commitGp1 = () => {
-    setEditingGp1(false);
-    if (!canEdit) return;
-    const raw = parseInt(gp1Draft, 10);
-    if (!isNaN(raw) && raw >= 1 && raw <= 100) {
-      const next = raw / 100;
-      if (next !== gp1) {
-        updateTrend!(trend.id, { gp1_pct_affected: next } as Partial<Trend>)
-          .catch(() => { /* handled in hook */ });
-      }
-    } else {
-      setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
-    }
-  };
-
-  const handleProbChange = (val: number) => {
-    if (!canEdit) return;
-    updateTrend!(trend.id, { probability: val } as Partial<Trend>)
-      .catch(() => { /* handled in hook */ });
-  };
 
   return (
     <div style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
@@ -890,6 +1420,14 @@ const TrendRow: FC<TrendRowProps> = ({
               style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
             >
               {trend.name}
+              {mode === 'list' && reviewedDeviates(trend) && (
+                <span className="inline-flex items-center gap-1 flex-shrink-0"
+                  title="Reviewed by an admin — differs from the AI baseline"
+                  style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                    color: REVIEWED_COLOR, backgroundColor: 'rgba(31,122,61,0.10)', padding: '2px 7px', borderRadius: 999 }}>
+                  <Check size={10} strokeWidth={2.6} /> Reviewed
+                </span>
+              )}
               <ChevronDown
                 size={14}
                 style={{
@@ -905,155 +1443,17 @@ const TrendRow: FC<TrendRowProps> = ({
         {/* Direction */}
         <div><DirectionPill direction={trend.direction} /></div>
 
-        {/* Probability — inline editable for admin */}
-        <div onClick={(e) => { if (canEdit) e.stopPropagation(); }}>
-          <DotBar
-            value={Math.round(trend.probability ?? 0)}
-            editable={canEdit}
-            onChange={handleProbChange}
-          />
+        {/* Probability — read-only here; scoring/endorsing happens in the trend tab */}
+        <div><ProbCell trend={trend} mode={mode} /></div>
+
+        {/* GP1 % — read-only here; editing happens in the trend tab */}
+        <div className="text-right">
+          <Gp1Cell trend={trend} mode={mode} />
         </div>
 
-        {/* GP1 % — inline editable for admin (click to edit) */}
-        <div
-          className="text-right"
-          onClick={(e) => { if (canEdit) e.stopPropagation(); }}
-        >
-          {canEdit && editingGp1 ? (
-            <input
-              type="number"
-              min={1}
-              max={100}
-              step={1}
-              autoFocus
-              value={gp1Draft}
-              onChange={(e) => setGp1Draft(e.target.value)}
-              onBlur={commitGp1}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); commitGp1(); }
-                if (e.key === 'Escape') {
-                  setGp1Draft(gp1 != null ? String(Math.round(gp1 * 100)) : '');
-                  setEditingGp1(false);
-                }
-              }}
-              style={{
-                width: 64,
-                padding: '3px 6px',
-                borderRadius: 6,
-                border: `1px solid ${S.primary}`,
-                backgroundColor: S.surface,
-                color: S.onSurface,
-                fontFamily: HEADLINE_FONT,
-                fontWeight: 800,
-                fontSize: '1rem',
-                textAlign: 'right',
-                outline: 'none',
-              }}
-            />
-          ) : (
-            <span
-              onClick={(e) => {
-                if (!canEdit) return;
-                e.stopPropagation();
-                setEditingGp1(true);
-              }}
-              title={canEdit ? 'Click to edit (admin)' : undefined}
-              className="font-extrabold"
-              style={{
-                fontFamily: HEADLINE_FONT,
-                color: S.onSurface,
-                fontSize: '1.15rem',
-                cursor: canEdit ? 'text' : 'default',
-                padding: canEdit ? '2px 6px' : 0,
-                borderRadius: 4,
-                borderBottom: canEdit ? `1px dashed ${S.onSurfaceVariant}55` : 'none',
-              }}
-            >
-              {gp1 != null ? fmtPct(gp1) : '—'}
-            </span>
-          )}
-        </div>
-
-        {/* Shift — read-only, with calculation tooltip on hover */}
-        <div
-          className="text-right"
-          style={{ position: 'relative' }}
-          onMouseEnter={() => setShowShiftTip(true)}
-          onMouseLeave={() => setShowShiftTip(false)}
-        >
-          <span
-            className="font-bold text-[14px]"
-            style={{
-              color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
-              borderBottom: `1px dotted ${S.onSurfaceVariant}66`,
-              cursor: 'help',
-            }}
-          >
-            {shift != null ? fmtShift(shift) : '—'}
-          </span>
-
-          {showShiftTip && shift != null && (
-            <div
-              role="tooltip"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 'calc(100% + 6px)',
-                zIndex: 40,
-                minWidth: 280,
-                maxWidth: 340,
-                padding: '10px 12px',
-                borderRadius: 8,
-                backgroundColor: S.onSurface,
-                color: S.surface,
-                fontFamily: HEADLINE_FONT,
-                fontSize: 11.5,
-                lineHeight: 1.45,
-                fontWeight: 500,
-                textAlign: 'left',
-                boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
-                pointerEvents: 'none',
-                whiteSpace: 'normal',
-              }}
-            >
-              <div style={{
-                fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
-                fontSize: 10, opacity: 0.75, marginBottom: 6,
-              }}>
-                Shift Calculation
-              </div>
-              <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11 }}>
-                Shift = Probability × GP1% Affected × Direction
-              </div>
-              <div style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                fontSize: 11, marginTop: 4,
-              }}>
-                = ({probClamped}/6) × {(gp1PctNum * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'}
-              </div>
-              <div style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                fontSize: 11, marginTop: 4, fontWeight: 700,
-              }}>
-                = {fmtShift(shift)} (≈ {(probMean * gp1PctNum * dirSign * 100).toFixed(2)} pp)
-              </div>
-              <div style={{
-                marginTop: 8, paddingTop: 8,
-                borderTop: '1px solid rgba(255,255,255,0.15)',
-                opacity: 0.9,
-              }}>
-                <strong style={{ opacity: 1 }}>Why 4/5 is not 0.80×:</strong>{' '}
-                Probability is normalized via the Bayesian Beta posterior mean
-                (α = p, β = 6 − p), giving <em>p / 6</em> — not p / 5.
-                So a 4/5 rating contributes <strong>4/6 ≈ 0.667×</strong>,
-                and 5/5 contributes 5/6 ≈ 0.833× (the model never asserts full certainty).
-                {' '}Chosen over a linear <em>p / 5</em> mapping so the Monte Carlo stays
-                probabilistic at both tails — a 5/5 is highly likely, not deterministic,
-                and a 1/5 remains non-trivially possible rather than zero.
-              </div>
-            </div>
-          )}
+        {/* Shift (list) / scoring status (input) / review affordance (review) */}
+        <div className="text-right">
+          <RowEndCell trend={trend} mode={mode} />
         </div>
       </div>
 
@@ -1071,7 +1471,13 @@ const TrendRow: FC<TrendRowProps> = ({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
-            <ExpandedPanel trend={trend} isAdmin={isAdmin} updateTrend={updateTrend} />
+            {mode === 'input' ? (
+              <ExpertInputPanel trend={trend} />
+            ) : mode === 'review' ? (
+              <ReviewPanel trend={trend} updateTrend={updateTrend} />
+            ) : (
+              <ExpandedPanel trend={trend} isAdmin={isAdmin} updateTrend={updateTrend} />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

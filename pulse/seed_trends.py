@@ -72,6 +72,24 @@ def reg(eu, na, asia, hg):
     return dict(zip(REG_KEYS, [eu, na, asia, hg]))
 
 
+def _ai_snapshot(t):
+    """Immutable AI baseline snapshot of a trend's 7 scoreable fields.
+
+    Captured at seed time (June 2026 multi-expert proposals layer) so the
+    "AI suggestion" reference shown alongside human proposals always reflects
+    the originally-seeded values, even after admin edits or endorsements.
+    """
+    return {
+        "probability": t.probability,
+        "gp1_pct_affected": t.gp1_pct_affected,
+        "peak_year": t.peak_year,
+        "diffusion_curve": t.diffusion_curve,
+        "category_exposure": dict(t.category_exposure or {}),
+        "regional_exposure": dict(t.regional_exposure or {}),
+        "vc_exposure": dict(t.vc_exposure or {}),
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # FORCE 1: CONSUMER (12 trends incl. S-02, S-06, S-07, S-09)
 # ═══════════════════════════════════════════════════════════════════════
@@ -2749,6 +2767,11 @@ def get_report_trends():
         # Consumer-journey exposure (v3.6 journey layer): AI-suggested
         # seed derived from the curated tile map; keys "<journey>:<stage>".
         t.journey_exposure = dict(JOURNEY_EXPOSURE.get(t.id, {}))
+        # AI baseline snapshot (June 2026 multi-expert proposals layer):
+        # only set it if a trend doesn't already carry one, so a re-seed
+        # never clobbers a deliberately-curated baseline.
+        if getattr(t, "ai_suggestion", None) is None:
+            t.ai_suggestion = _ai_snapshot(t)
         assert_trend_credible(t.id, t.sources)
     return trends
 

@@ -74,6 +74,15 @@ export interface Trend {
   last_updated?: string;
   ai_suggested?: boolean;
   user_override?: boolean;
+  /** Snapshot of the originally AI-suggested scores (captured at seed time).
+   *  Lets the UI show the AI suggestion on hover and flag an endorsed trend
+   *  whose truth now deviates from the AI baseline. Absent on legacy rows. */
+  ai_suggestion?: TrendScoreSnapshot;
+  /** Lightweight per-trend rollup of expert proposals, returned inline with the
+   *  trend list so a collapsed row can show scorer counts and the caller's own
+   *  score without a per-row round-trip. Full detail (named scorers, per-cell
+   *  aggregates) comes from GET /trends/{id}/proposals. */
+  proposal_summary?: ProposalSummary;
   sources?: TrendSource[];
 
   // Delphi metadata
@@ -110,4 +119,81 @@ export interface ForceContribution {
   force: ForceName;
   value: number;
   normalized: number;
+}
+
+// ─── Multi-expert scoring (proposals layer) ─────────────────────────
+// Non-admin experts propose scores for the seven scoreable fields; the
+// AI-suggested value remains the "truth" that feeds the model until an admin
+// endorses. The model only ever consumes the trend's own columns — proposals
+// are a parallel, named, advisory store.
+
+/** A snapshot of the seven scoreable fields. Used for the AI baseline and as
+ *  the shape of a single expert's proposal. */
+export interface TrendScoreSnapshot {
+  probability?: number;        // 1-5
+  gp1_pct_affected?: number;   // 0.0-1.0
+  peak_year?: number;
+  diffusion_curve?: string;
+  category_exposure?: CategoryExposure;
+  regional_exposure?: RegionalExposure;
+  vc_exposure?: VCExposure;
+}
+
+/** The subset of fields a non-admin expert may propose (PUT
+ *  /trends/{id}/proposals). Same shape as the AI snapshot. */
+export type TrendProposalPatch = TrendScoreSnapshot;
+
+/** Aggregate of expert proposals for one field. */
+export interface ProposalAgg {
+  /** Mean — probability, GP1%, per-cell exposures. */
+  avg?: number;
+  /** Median — peak year. */
+  median?: number;
+  /** Mode — diffusion curve (categorical). */
+  mode?: string;
+  /** Vote distribution — diffusion curve. */
+  distribution?: Record<string, number>;
+  /** How many experts scored this field. */
+  count: number;
+}
+
+/** One expert's headline proposal, for the "who scored what" breakdown. */
+export interface ProposalScorer {
+  user_id: string;
+  name: string;
+  role: string;
+  probability?: number;
+  gp1_pct_affected?: number;
+  peak_year?: number;
+  diffusion_curve?: string;
+}
+
+/** Per-cell aggregate map (category / region / value-chain exposure). */
+export type ProposalCellAgg = Record<string, ProposalAgg>;
+
+/** Full proposals payload for a single trend (GET /trends/{id}/proposals). */
+export interface TrendProposalsResponse {
+  trend_id: string;
+  /** The calling user's own current proposal (null if they haven't scored). */
+  my: TrendProposalPatch | null;
+  aggregate: {
+    probability?: ProposalAgg | null;
+    gp1_pct_affected?: ProposalAgg | null;
+    peak_year?: ProposalAgg | null;
+    diffusion_curve?: ProposalAgg | null;
+    category_exposure?: ProposalCellAgg;
+    regional_exposure?: ProposalCellAgg;
+    vc_exposure?: ProposalCellAgg;
+  };
+  scorers: ProposalScorer[];
+}
+
+/** Lightweight rollup returned inline with each trend in the list. */
+export interface ProposalSummary {
+  count: number;
+  probability?: ProposalAgg | null;
+  gp1_pct_affected?: ProposalAgg | null;
+  peak_year?: ProposalAgg | null;
+  diffusion_curve?: ProposalAgg | null;
+  my?: TrendProposalPatch | null;
 }

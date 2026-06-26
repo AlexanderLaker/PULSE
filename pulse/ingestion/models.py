@@ -55,6 +55,14 @@ class Trend:
     diffusion_curve: str = "s_curve"
     # Bayesian posteriors — (alpha, beta) for Beta distribution
     probability_posterior: Optional[tuple] = None
+    # AI baseline snapshot (June 2026 multi-expert proposals layer).
+    # An immutable dict of the originally-seeded scoreable fields
+    # {probability, gp1_pct_affected, peak_year, diffusion_curve,
+    #  category_exposure, regional_exposure, vc_exposure} captured at seed
+    # time and persisted in the trends.ai_suggestion column. Survives admin
+    # edits/endorsements so the "AI suggestion" reference never drifts.
+    # None for legacy trends until scripts/backfill_ai_suggestion.py runs.
+    ai_suggestion: Optional[dict] = None
 
     def __post_init__(self):
         direction_sign = 1 if self.direction == "Expansion" else -1
