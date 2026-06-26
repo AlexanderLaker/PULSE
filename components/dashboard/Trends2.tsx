@@ -541,11 +541,20 @@ const reviewedDeviates = (t: Trend): boolean => {
 };
 
 /** Colourable, read-only 1–5 dot bar (mirrors DotBar's geometry). */
+// Dot fill for a fractional score: full → solid; partial → left-to-right
+// gradient (e.g. ø 3.2 fills the 4th dot 20%); empty → grey.
+const dotFill = (frac: number, color: string): string => {
+  if (frac >= 0.999) return color;
+  if (frac <= 0.001) return S.surfaceHigh;
+  const p = Math.round(frac * 100);
+  return `linear-gradient(90deg, ${color} ${p}%, ${S.surfaceHigh} ${p}%)`;
+};
+
 const ColorDots: FC<{ value: number; color: string; title?: string; muted?: boolean }> = ({ value, color, title, muted }) => (
   <div className="flex gap-1.5" title={title} aria-label={`${value} of 5`} style={{ cursor: title ? 'help' : undefined }}>
     {[1, 2, 3, 4, 5].map((d) => (
       <span key={d} className="inline-block w-2.5 h-2.5 rounded-full"
-        style={{ backgroundColor: d <= value ? color : S.surfaceHigh, opacity: muted ? 0.5 : 1 }} />
+        style={{ background: dotFill(Math.max(0, Math.min(1, value - (d - 1))), color), opacity: muted ? 0.5 : 1 }} />
     ))}
   </div>
 );
@@ -948,10 +957,12 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
 const ReadDots: FC<{ value?: number; color: string }> = ({ value, color }) => (
   <div className="flex gap-1" aria-label={value != null ? `${value} of 5` : 'unscored'}>
     {[0, 1, 2, 3, 4, 5].map((d) => {
-      const filled = value != null && (d === 0 ? value === 0 : d <= value);
+      const bg = d === 0
+        ? (value === 0 ? color : S.surfaceHigh)
+        : dotFill(value == null ? 0 : Math.max(0, Math.min(1, value - (d - 1))), color);
       return (
         <span key={d} className="inline-block rounded-full"
-          style={{ width: 14, height: 14, backgroundColor: filled ? color : S.surfaceHigh, opacity: d === 0 ? 0.4 : 1 }} />
+          style={{ width: 14, height: 14, background: bg, opacity: d === 0 ? 0.4 : 1 }} />
       );
     })}
   </div>
@@ -999,10 +1010,51 @@ const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: 
   </div>
 );
 
+// ── Per-element endorse selector: AI / Expert ø / Manual (+ custom input). ──
+const manInput: React.CSSProperties = {
+  width: 66, padding: '5px 8px', borderRadius: 7, border: `1px solid ${S.primary}`,
+  background: S.surface, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 13,
+};
+const Decide: FC<{
+  cur: 'ai' | 'expert' | 'manual';
+  onPick: (s: 'ai' | 'expert' | 'manual') => void;
+  aiOk: boolean; expertOk: boolean;
+  allowManual?: boolean;
+  manual?: React.ReactNode;
+  result?: React.ReactNode;
+}> = ({ cur, onPick, aiOk, expertOk, allowManual = true, manual, result }) => {
+  const opts: Array<['ai' | 'expert' | 'manual', string]> = allowManual
+    ? [['ai', 'AI'], ['expert', 'Expert ø'], ['manual', 'Manual']]
+    : [['ai', 'AI'], ['expert', 'Expert ø']];
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${S.surfaceLow}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
+      <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
+        {opts.map(([k, lab], i) => {
+          const on = cur === k;
+          const disabled = (k === 'ai' && !aiOk) || (k === 'expert' && !expertOk);
+          const bg = on ? (k === 'ai' ? S.onSurface : k === 'expert' ? REVIEWED_COLOR : S.primary) : S.surface;
+          return (
+            <button key={k} type="button" disabled={disabled} onClick={() => onPick(k)} aria-pressed={on}
+              style={{ border: 'none', borderRight: i < opts.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700,
+                padding: '6px 11px', background: bg, color: on ? '#fff' : (disabled ? S.mutedText : S.onSurfaceVariant), opacity: disabled ? 0.45 : 1 }}>
+              {lab}
+            </button>
+          );
+        })}
+      </div>
+      {cur === 'manual' && manual}
+      {result != null && <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onSurface }}>→ {result}</span>}
+    </div>
+  );
+};
+
 // ── Review & Endorse panel (admin only) ──
 const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: TrendUpdate) => Promise<void> }> = ({ trend, updateTrend }) => {
   const { data, loaded } = useTrendProposals(trend.id);
-  const [choice, setChoice] = useState<'experts' | 'ai'>('experts');
+  const [src, setSrc] = useState<Record<string, 'ai' | 'expert' | 'manual'>>({});
+  const [man, setMan] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -1032,32 +1084,53 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     for (const [k, v] of Object.entries(m)) if (v.avg != null) out[k] = Math.round(v.avg);
     return Object.keys(out).length ? out : undefined;
   };
-  const buildExperts = (): TrendUpdate => {
-    const u: TrendUpdate = {};
-    if (eP != null) u.probability = Math.round(eP);
-    if (eG != null) u.gp1_pct_affected = Math.max(0, Math.min(1, eG));
-    if (ePk != null) u.peak_year = Math.round(ePk);
-    if (eCv) u.diffusion_curve = eCv;
-    const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c;
-    const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r;
-    const vc = mapCells(agg?.vc_exposure); if (vc) u.vc_exposure = vc;
-    return u;
+  // Per-element endorse decisions. Each field defaults to the expert ø when an
+  // expert scored it, else the AI baseline; the admin can override per field
+  // (or enter a manual value for the scalar fields).
+  const hasCatE = !!(agg?.category_exposure && Object.keys(agg.category_exposure).length);
+  const hasRegE = !!(agg?.regional_exposure && Object.keys(agg.regional_exposure).length);
+  const hasVcE = !!(agg?.vc_exposure && Object.keys(agg.vc_exposure).length);
+  const srcOf = (key: string, hasExpert: boolean): 'ai' | 'expert' | 'manual' => src[key] ?? (hasExpert ? 'expert' : 'ai');
+  const setS = (key: string, s: 'ai' | 'expert' | 'manual') => setSrc((p) => ({ ...p, [key]: s }));
+  const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
+  const setAll = (s: 'ai' | 'expert') => setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s, vc: s });
+
+  const resolveProb = (): number | undefined => {
+    const s = srcOf('probability', eP != null);
+    if (s === 'manual') { const n = parseInt(man.probability ?? '', 10); return isNaN(n) ? undefined : Math.max(1, Math.min(5, n)); }
+    if (s === 'ai') return aP != null ? Math.round(aP) : undefined;
+    return eP != null ? Math.round(eP) : undefined;
   };
-  const buildAi = (): TrendUpdate => {
-    const u: TrendUpdate = {};
-    if (aP != null) u.probability = Math.round(aP);
-    if (aG != null) u.gp1_pct_affected = aG;
-    if (aPk != null) u.peak_year = aPk;
-    if (aCv) u.diffusion_curve = aCv;
-    if (aiCat) u.category_exposure = aiCat;
-    if (aiReg) u.regional_exposure = aiReg;
-    if (aiVc) u.vc_exposure = aiVc;
-    return u;
+  const resolveGp1 = (): number | undefined => {
+    const s = srcOf('gp1', eG != null);
+    if (s === 'manual') { const n = parseInt(man.gp1 ?? '', 10); return isNaN(n) ? undefined : Math.max(0, Math.min(100, n)) / 100; }
+    if (s === 'ai') return aG;
+    return eG;
+  };
+  const resolvePeak = (): number | undefined => {
+    const s = srcOf('peak', ePk != null);
+    if (s === 'manual') { const n = parseInt(man.peak ?? '', 10); return isNaN(n) ? undefined : Math.max(2026, Math.min(2035, n)); }
+    if (s === 'ai') return aPk;
+    return ePk != null ? Math.round(ePk) : undefined;
+  };
+  const resolveCurve = (): string | undefined => {
+    const s = srcOf('curve', !!eCv);
+    if (s === 'manual') return man.curve || undefined;
+    if (s === 'ai') return aCv;
+    return eCv;
   };
   const endorse = async () => {
     if (!updateTrend) return;
     setErr(null); setSaving(true);
-    try { await updateTrend(trend.id, choice === 'experts' ? buildExperts() : buildAi()); setDone(true); }
+    const u: TrendUpdate = {};
+    const p = resolveProb(); if (p != null) u.probability = p;
+    const g = resolveGp1(); if (g != null) u.gp1_pct_affected = g;
+    const pk = resolvePeak(); if (pk != null) u.peak_year = pk;
+    const cv = resolveCurve(); if (cv) u.diffusion_curve = cv;
+    if (srcOf('category', hasCatE) === 'ai') { if (aiCat) u.category_exposure = aiCat; } else { const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c; }
+    if (srcOf('region', hasRegE) === 'ai') { if (aiReg) u.regional_exposure = aiReg; } else { const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r; }
+    if (srcOf('vc', hasVcE) === 'ai') { if (aiVc) u.vc_exposure = aiVc; } else { const v = mapCells(agg?.vc_exposure); if (v) u.vc_exposure = v; }
+    try { await updateTrend(trend.id, u); setDone(true); }
     catch (e) { setErr((e as Error)?.message ?? 'Endorse failed'); }
     finally { setSaving(false); }
   };
@@ -1095,12 +1168,18 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                 <CompareStack who={whoFor('probability')}
                   ai={<><ColorDots value={aP != null ? Math.round(aP) : 0} color={S.onSurface} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: S.onSurfaceVariant }}>{aP != null ? Math.round(aP) : '—'}</span></>}
                   expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : '—'}</span>{eP != null && aP != null ? <DeltaChip value={eP - aP} /> : null}</>} />
+                <Decide cur={srcOf('probability', eP != null)} onPick={(s) => setS('probability', s)} aiOk={aP != null} expertOk={eP != null}
+                  manual={<input type="number" min={1} max={5} value={man.probability ?? ''} onChange={(e) => setM('probability', e.target.value)} placeholder="1–5" style={manInput} />}
+                  result={resolveProb() ?? '—'} />
               </SectionCard>
 
               <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this trend can move at full materialization.">
                 <CompareStack who={whoFor('gp1_pct_affected')}
                   ai={<MiniBar v={aG} color={S.onSurface} />}
                   expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && aG != null ? <DeltaChip value={(eG - aG) * 100} unit="pp" digits={0} /> : null}</>} />
+                <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} aiOk={aG != null} expertOk={eG != null}
+                  manual={<span className="inline-flex items-center gap-1"><input type="number" min={0} max={100} value={man.gp1 ?? ''} onChange={(e) => setM('gp1', e.target.value)} placeholder="%" style={manInput} /><span style={{ fontSize: 12, color: S.mutedText }}>%</span></span>}
+                  result={resolveGp1() != null ? pctI(resolveGp1()) : '—'} />
               </SectionCard>
 
               <SectionCard title="Materialization timing" icon={Clock}>
@@ -1110,12 +1189,18 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                     <CompareStack who={whoFor('peak_year')}
                       ai={<Val>{aPk != null ? aPk : '—'}</Val>}
                       expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : '—'}</span>{ePk != null && aPk != null ? <DeltaChip value={ePk - aPk} unit="y" digits={0} /> : null}</>} />
+                    <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} aiOk={aPk != null} expertOk={ePk != null}
+                      manual={<input type="number" min={2026} max={2035} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
+                      result={resolvePeak() ?? '—'} />
                   </div>
                   <div>
                     <FieldLabel>Diffusion Curve</FieldLabel>
                     <CompareStack who={whoFor('diffusion_curve')}
                       ai={<span className="inline-flex items-center gap-2">{aCv ? <DiffusionGlyph curve={aCv} color={S.onSurface} /> : null}<Val>{aCv ? (DIFFUSION_LABELS[aCv]?.label ?? aCv) : '—'}</Val></span>}
                       expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? (DIFFUSION_LABELS[eCv]?.label ?? eCv) : '—'}</span>{eCv ? <DeltaChip value={eCv === aCv ? 0 : 1} digits={0} /> : null}</span>} />
+                    <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} aiOk={!!aCv} expertOk={!!eCv}
+                      manual={<select value={man.curve ?? ''} onChange={(e) => setM('curve', e.target.value)} style={{ ...manInput, width: 'auto' }}><option value="">—</option>{Object.entries(DIFFUSION_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
+                      result={resolveCurve() ? (DIFFUSION_LABELS[resolveCurve() as string]?.label ?? resolveCurve()) : '—'} />
                   </div>
                 </div>
               </SectionCard>
@@ -1136,6 +1221,8 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                     <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]} />
                   ))}
                 </div>
+                <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} aiOk={!!aiCat} expertOk={hasCatE} allowManual={false}
+                  result={srcOf('category', hasCatE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
@@ -1143,6 +1230,8 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                     <ExposureCompareCell key={r.id} label={r.label} aiVal={aiReg == null ? undefined : (aiReg[r.id] ?? 0)} expert={agg?.regional_exposure?.[r.id]} />
                   ))}
                 </div>
+                <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} aiOk={!!aiReg} expertOk={hasRegE} allowManual={false}
+                  result={srcOf('region', hasRegE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
@@ -1150,19 +1239,23 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                     <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]} />
                   ))}
                 </div>
+                <Decide cur={srcOf('vc', hasVcE)} onPick={(s) => setS('vc', s)} aiOk={!!aiVc} expertOk={hasVcE} allowManual={false}
+                  result={srcOf('vc', hasVcE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
               </SectionCard>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
-            <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
-              {(['experts', 'ai'] as const).map((c) => (
-                <button key={c} type="button" onClick={() => setChoice(c)} aria-pressed={choice === c}
-                  style={{ border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, padding: '8px 16px',
-                    backgroundColor: choice === c ? (c === 'experts' ? EXPERT_COLOR : S.primary) : S.surface, color: choice === c ? '#fff' : S.onSurfaceVariant }}>
-                  {c === 'experts' ? 'Adopt experts ø' : 'Keep AI'}
-                </button>
-              ))}
+            <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: S.mutedText }}>Set all to:</span>
+              <button type="button" onClick={() => setAll('expert')}
+                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: REVIEWED_COLOR }}>
+                Experts ø
+              </button>
+              <button type="button" onClick={() => setAll('ai')}
+                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: S.onSurface }}>
+                AI baseline
+              </button>
             </div>
             <div className="flex items-center gap-3">
               {err && <span style={{ color: S.error, fontSize: 12 }}>{err}</span>}
