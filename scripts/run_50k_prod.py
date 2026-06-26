@@ -137,7 +137,6 @@ def main() -> int:
             # D19: integrity events (incl. input drift) + seed stability
             # persist with the run so the read-only dashboard can show them.
             "integrity_events": result.get("integrity_events", []),
-            "seed_stability": result.get("seed_stability"),
             # F2: every persisted run carries its engine fidelity. D13: the
             # engine itself is scipy-only now (it refuses to import without
             # scipy), so reaching this line implies exact numerics; the

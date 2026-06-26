@@ -1,7 +1,11 @@
 """Bayesian Monte Carlo engine with copula-based dependency structure.
 
 Replaces simplistic triangular distributions with:
-- Beta-distributed priors that update with evidence (Bayesian hierarchical)
+- Beta-distributed priors per trend (T7, June 2026 honesty note: the Beta
+  shape is set deterministically from the analyst's 1–5 probability score —
+  these are STRUCTURED-JUDGMENT priors that quantify magnitude uncertainty;
+  there is no Bayesian prior→data→posterior update anywhere in the engine,
+  so do not describe this as "learning from data")
 - Gaussian copula for cross-trend dependency (D20 June 2026: the t-copula
   tail layer was deleted — its df dial was inert, <2% band effect)
 - Continuous path modeling (annual granularity across the config horizon)
@@ -43,6 +47,7 @@ from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
                            JOURNEY_STAGES, CATEGORY_JOURNEY,
                            DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_RESIDUAL_CROSS_RHO,
+                           build_trend_correlation_matrix,
                            FORCE_MATERIALIZATION_OVERRIDES,
                            compute_materialization_schedule,
                            DEFAULT_FORCE_OVERLAP_MATRIX,
@@ -57,7 +62,8 @@ class BayesianMonteCarloEngine:
     Bayesian Monte Carlo with copula dependencies.
 
     Key differences from v1.2:
-    - Beta priors instead of triangular (learnable from data)
+    - Beta priors instead of triangular (shape from the analyst 1–5 score;
+      structured judgment, NOT learned/updated from data — see module docstring)
     - Copula-based correlation instead of flat ρ (captures tail dependence via force_correlation_matrix)
     - Multiplicative compounding across forces
     - Continuous annual paths instead of 2 discrete points
@@ -173,21 +179,13 @@ class BayesianMonteCarloEngine:
         if n == 0:
             return np.eye(0)
 
-        R = np.eye(n)
-        fcm = getattr(self.config, 'force_correlation_matrix', {})
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                if trends[i].force == trends[j].force:
-                    rho = self.config.within_force_rho
-                elif fcm:
-                    # Use force correlation matrix
-                    rho = fcm.get(trends[i].force, {}).get(trends[j].force, DEFAULT_RESIDUAL_CROSS_RHO)
-                else:
-                    rho = DEFAULT_RESIDUAL_CROSS_RHO
-
-                R[i, j] = rho
-                R[j, i] = rho
+        # T16 (June 2026): single source of truth for the raw matrix — shared
+        # with the config validator's spectral gate so they cannot drift.
+        R = build_trend_correlation_matrix(
+            [t.force for t in trends],
+            self.config.within_force_rho,
+            getattr(self.config, 'force_correlation_matrix', {}),
+        )
 
         # Ensure positive definiteness
         eigvals = np.linalg.eigvalsh(R)
@@ -988,129 +986,11 @@ class BayesianMonteCarloEngine:
             for i in range(n_chains)
         ]
 
-        # ── Seed stability (D3 / audit F-13) ────────────────────────────
-        # R̂ on i.i.d. Monte-Carlo draws is ≈1.0 by construction and reads
-        # as theater to a quant. The honest, defensible quantity is how
-        # much the headline moves across independently-seeded chains —
-        # report that spread directly so the UI can show "seed stability"
-        # instead of an MCMC badge.
-        cw = getattr(self.config, "category_weights", None) or {}
-        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
-        w = (w / w.sum()) if w.sum() > 0 else np.full(len(self.config.category_names), 1.0 / len(self.config.category_names))
-        chain_headlines = []
-        max_cat_spread = 0.0
-        per_cat_medians = np.array([
-            [float(np.median(s[:, c_idx, last_idx])) for c_idx in range(s.shape[1])]
-            for s in per_chain_samples
-        ])  # (n_chains, n_cats)
-        chain_headlines = per_cat_medians @ w  # (n_chains,)
-        max_cat_spread = float((per_cat_medians.max(axis=0) - per_cat_medians.min(axis=0)).max())
-        result["seed_stability"] = {
-            "n_chains": int(n_chains),
-            "chain_seeds": [int(s) for s in seeds],
-            "headline_median_spread": float(chain_headlines.max() - chain_headlines.min()),
-            "max_category_median_spread": max_cat_spread,
-        }
+        # T18 (June 2026): the "seed stability" reassurance metric was removed.
+        # At 50k × 3 chains the headline median is stable to ≈0 by construction,
+        # so the number had no failure mode — it could only ever reassure, never
+        # flag a real problem. Run provenance (seed, chains, model version,
+        # numerics backend) and the integrity-events log remain the honest,
+        # falsifiable reproducibility signals.
         return result
 
-    # ── F3: Attenuation sensitivity band ────────────────────────────
-    # The attenuation factor is the single largest lever in the model
-    # (it dampens every force contribution before compounding). Rather
-    # than quote a single headline, we re-run the engine at ±30 % of
-    # the configured attenuation and attach the band to the result
-    # so the dashboard + exports can show the headline as a range.
-    def attenuation_sensitivity_band(
-        self,
-        db: TrendDatabase,
-        base_result: dict,
-        pct: float = 0.30,
-        iterations: Optional[int] = None,
-    ) -> dict:
-        """
-        Re-run the simulation at attenuation × (1 ± pct) and return a
-        band dict keyed by category with ``low`` / ``base`` / ``high``
-        median-2030 shifts plus a portfolio-level headline band.
-
-        Labels are in **attenuation-space**: ``low`` = attenuation × (1 - pct),
-        ``high`` = attenuation × (1 + pct). Because the compounding formula
-        is Π(1 + score × attenuation), a *higher* attenuation amplifies
-        whatever directional signal the trends carry — so ``high`` will
-        typically produce the larger |headline shift|. The UI should label
-        this as "attenuation flex band", not "best/worst case".
-
-        Inner runs are capped (default 2000 iters or config iters,
-        whichever is smaller) to keep the sensitivity step cheap.
-        """
-        if not (0.0 < pct < 1.0):
-            raise ValueError("pct must be in (0, 1)")
-        inner_iters = iterations if iterations is not None else min(self.config.iterations, 2000)
-
-        # v3.2: there is no scalar base attenuation. Flex each calibrated
-        # per-force value uniformly by ±pct, clipped to [0, 1].
-        base_per_force = dict(self.config.per_force_attenuation)
-        base_mean = float(np.mean(list(base_per_force.values())))
-
-        def _scale(d: dict, factor: float) -> dict:
-            return {f: float(np.clip(v * factor, 0.0, 1.0)) for f, v in d.items()}
-
-        per_force_low = _scale(base_per_force, 1.0 - pct)
-        per_force_high = _scale(base_per_force, 1.0 + pct)
-
-        def _run_with_pfa(pfa: dict) -> dict:
-            cfg = self.config.copy_with(
-                per_force_attenuation=pfa,
-                attenuation_source="admin_override",
-            )
-            return BayesianMonteCarloEngine(cfg, seed=self.seed).run(db, iterations=inner_iters)
-
-        low_res = _run_with_pfa(per_force_low)
-        high_res = _run_with_pfa(per_force_high)
-
-        last_year = self.config.path_years[-1]
-
-        def _headline(res: dict) -> float:
-            sm = res.get("shift_matrix", {})
-            meds = []
-            for _, cat_data in sm.items():
-                path = cat_data.get("path", {})
-                y = path.get(last_year, {})
-                if isinstance(y, dict):
-                    meds.append(y.get("median", 0.0))
-            return float(np.mean(meds)) if meds else 0.0
-
-        base_headline = _headline(base_result)
-        low_headline = _headline(low_res)
-        high_headline = _headline(high_res)
-
-        per_cat = {}
-        for cat in self.config.category_names:
-            def _m(res):
-                y = res.get("shift_matrix", {}).get(cat, {}).get("path", {}).get(last_year, {})
-                return float(y.get("median", 0.0)) if isinstance(y, dict) else 0.0
-            per_cat[cat] = {
-                "low": _m(low_res),
-                "base": _m(base_result),
-                "high": _m(high_res),
-            }
-
-        return {
-            "pct": pct,
-            "attenuation_base_mean": base_mean,
-            "per_force_attenuation_base": base_per_force,
-            "per_force_attenuation_low": per_force_low,
-            "per_force_attenuation_high": per_force_high,
-            "headline": {
-                "base": base_headline,
-                "low": low_headline,
-                "high": high_headline,
-                "range": abs(low_headline - high_headline),
-            },
-            "by_category": per_cat,
-            "inner_iterations": inner_iters,
-            "note": (
-                "Band shows headline shift when each calibrated per-force "
-                f"attenuation is uniformly flexed by ±{int(pct*100)}% "
-                "(clipped to [0, 1]). 'low' = pfa × (1-pct), "
-                "'high' = pfa × (1+pct)."
-            ),
-        }

@@ -204,6 +204,37 @@ DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equ
 DEFAULT_WITHIN_FORCE_RHO = 0.3
 DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 
+
+def build_trend_correlation_matrix(trend_forces, within_force_rho, force_correlation_matrix):
+    """Raw N×N trend-level correlation matrix (NO positive-definite repair).
+
+    Single source of truth (T16, June 2026) for the matrix implied by
+    (within_force_rho, force_correlation_matrix) over a trend population given
+    by ``trend_forces`` (a list of force names, one per trend). Same-force pairs
+    take ``within_force_rho``; cross-force pairs take the configured pairwise
+    value or ``DEFAULT_RESIDUAL_CROSS_RHO``.
+
+    Used by BOTH the engine (``_build_correlation_matrix``, which then applies
+    PSD repair) and the config validator's spectral gate
+    (``correlation_lambda_min``) so the two can never drift apart.
+    """
+    import numpy as np
+    n = len(trend_forces)
+    if n == 0:
+        return np.eye(0)
+    R = np.eye(n)
+    fcm = force_correlation_matrix or {}
+    for i in range(n):
+        fi = trend_forces[i]
+        row = fcm.get(fi, {})
+        for j in range(i + 1, n):
+            if fi == trend_forces[j]:
+                rho = within_force_rho
+            else:
+                rho = row.get(trend_forces[j], DEFAULT_RESIDUAL_CROSS_RHO)
+            R[i, j] = R[j, i] = rho
+    return R
+
 # ── Force Overlap Matrix (replaces flat attenuation) ────────────────
 # Cross-force mechanism overlap: O[i][j] = fraction of force i's signal
 # that is already captured by force j. Asymmetric — "Government captures

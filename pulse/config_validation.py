@@ -549,17 +549,10 @@ def correlation_lambda_min(force_correlation_matrix: dict,
     Callers (PUT /api/v1/config) reject settings where this returns < 0.
     """
     import numpy as np
-    n = len(trend_forces)
-    if n == 0:
+    from pulse.config import build_trend_correlation_matrix
+    if len(trend_forces) == 0:
         return 1.0
-    R = np.eye(n)
-    for i in range(n):
-        fi = trend_forces[i]
-        row = force_correlation_matrix.get(fi, {})
-        for j in range(i + 1, n):
-            if fi == trend_forces[j]:
-                r = within_force_rho
-            else:
-                r = row.get(trend_forces[j], 0.05)
-            R[i, j] = R[j, i] = r
+    # T16 (June 2026): build the matrix via the single shared helper so the
+    # spectral gate and the engine cannot drift apart.
+    R = build_trend_correlation_matrix(trend_forces, within_force_rho, force_correlation_matrix)
     return float(np.linalg.eigvalsh(R).min())

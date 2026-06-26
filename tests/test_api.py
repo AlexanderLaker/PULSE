@@ -147,26 +147,18 @@ class TestAPIOptimization:
         response = client.post("/api/v1/optimize/allocation", json={})
         assert response.status_code in [401, 403, 404, 405]
 
-    def test_tornado_endpoint_exists(self, client):
-        """Should have tornado endpoint."""
-        # Try GET first (primary method)
-        response = client.get("/api/v1/sensitivity/tornado")
-        # Fall back to POST if needed
-        if response.status_code == 405:
-            response = client.post("/api/v1/sensitivity/tornado", json={})
-        assert response.status_code in [200, 404, 422]
+    def test_sensitivity_tornado_endpoint_removed(self, client):
+        """T2 (June 2026): no live sensitivity exhibit — /sensitivity/tornado
+        must NOT be served (was previously asserted as possibly-200)."""
+        assert client.get("/api/v1/sensitivity/tornado").status_code in (404, 405)
+        assert client.post("/api/v1/sensitivity/tornado", json={}).status_code in (404, 405)
 
-    def test_breakeven_endpoint_exists(self, client):
-        """Should have breakeven endpoint."""
-        # Try GET first (primary method)
-        response = client.get("/api/v1/sensitivity/breakeven")
-        # Fall back to POST if needed
-        if response.status_code == 405:
-            response = client.post(
-                "/api/v1/sensitivity/breakeven",
-                json={"category": "Hair: Color"}
-            )
-        assert response.status_code in [200, 404, 422]
+    def test_sensitivity_breakeven_endpoint_removed(self, client):
+        """T2 (June 2026): /sensitivity/breakeven must NOT be served."""
+        assert client.get("/api/v1/sensitivity/breakeven").status_code in (404, 405)
+        assert client.post(
+            "/api/v1/sensitivity/breakeven", json={"category": "Hair: Color"}
+        ).status_code in (404, 405)
 
 
 class TestAPIErrorHandling:
@@ -432,9 +424,14 @@ class TestF3ReadAuthentication:
 
 class TestJourneyContentStore:
     """v3.6 journey layer (block 8, restored 2026-06-10): the admin-managed
-    Consumer Journey content store. GET is anonymous at the FastAPI layer by
-    design — the Next.js /api/journey proxy enforces viewer auth — and PUT is
-    admin-only inside the router."""
+    Consumer Journey content store. GET requires a viewer token at the FastAPI
+    layer (defense-in-depth on top of the Next.js /api/journey proxy auth) and
+    PUT is admin-only inside the router."""
+
+    def test_get_rejects_anonymous(self, raw_client):
+        # T5 (June 2026): GET /journey now authenticates at the FastAPI layer —
+        # it no longer relies solely on the Next.js proxy for auth.
+        assert raw_client.get("/api/v1/journey").status_code == 401
 
     def test_get_returns_404_when_store_empty(self, client, monkeypatch, tmp_path):
         monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_empty.db"))

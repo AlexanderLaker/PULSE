@@ -2,14 +2,15 @@
 
 Isolated router for the journey-content store: the admin-managed
 {lhc, hair} tile map persisted via pulse.database.journey_content.
-Auth on GET is enforced by the Next.js proxy (/api/journey); PUT
-requires an admin token. Removable without touching other routers.
+GET requires a viewer token (defense-in-depth, in addition to the
+Next.js /api/journey proxy auth); PUT requires an admin token.
+Removable without touching other routers.
 """
 import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from pulse.api.auth import require_admin
+from pulse.api.auth import require_admin, require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ router = APIRouter()
 
 
 @router.get("/api/v1/journey")
-async def get_journey_content():
+async def get_journey_content(user: dict = Depends(require_auth)):
     """Admin-managed Consumer Journey content ({lhc, hair} tile map).
 
     Returns 404 when no server-managed content exists yet — the frontend

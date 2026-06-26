@@ -10,8 +10,8 @@ supposed to preserve — regardless of the specific input values:
    convergence-tolerance band (Monte Carlo stability).
 4. Two runs with the same seed produce identical output (seed integrity).
 5. ModelConfig.copy_with never mutates the original.
-6. attenuation_sensitivity_band honours monotonicity in |headline|
-   with respect to attenuation magnitude.
+6. |headline| is monotone in attenuation magnitude (per-force attenuation
+   scaled uniformly up/down — see test_attenuation_monotonic_in_headline).
 """
 import math
 

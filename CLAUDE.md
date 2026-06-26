@@ -319,4 +319,4 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 *Document Version: 3.7 — June 2026 (second ruling round D12–D21; MODEL_VERSION 2.8.0)*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
-*Methodology: Bayesian hierarchical priors + Gaussian copula dependencies + structured-judgment overlap correction + input-drift telemetry. Ceteris paribus: the engine holds strategy constant; strategic response belongs to the reader.*
+*Methodology: Beta-shaped structured-judgment priors (set from analyst 1–5 scores — magnitude-uncertainty only, NOT updated from data; T7 June 2026) + Gaussian copula dependencies + structured-judgment overlap correction + input-drift telemetry. Ceteris paribus: the engine holds strategy constant; strategic response belongs to the reader.*

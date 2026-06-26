@@ -51,10 +51,13 @@ export interface ForceAttribution {
   direct_effects?: Record<string, number>;
 }
 
-/** Convergence diagnostics from Monte Carlo simulation. */
+/** Per-category MC diagnostics (detail only).
+ *  T2 (June 2026): the synthetic top-level R̂ / "converged" headline badge was
+ *  removed — R̂ on i.i.d. MC draws is ≈1.0 by construction and could never
+ *  fail, so it is no longer surfaced. Per-category detail remains under
+ *  `categories`. */
 export interface ConvergenceDiagnostics {
-  converged: boolean;
-  r_hat?: number;
+  categories?: Record<string, { ess?: number; converged?: boolean }>;
   ess?: number;
   iterations?: number;
   model_type?: ModelType;
@@ -125,14 +128,6 @@ export interface IntegrityEvent {
   detail?: Record<string, unknown>;
 }
 
-/** Seed-stability summary across independently-seeded chains (D3 / F-13). */
-export interface SeedStability {
-  n_chains: number;
-  chain_seeds?: number[];
-  headline_median_spread: number;
-  max_category_median_spread?: number;
-}
-
 /** Per-run audit metadata attached to every persisted simulation.
  *
  * Populated by the `run_50k_prod.py` script (v3.2+) and rehydrated by
@@ -181,8 +176,6 @@ export interface SimulationResult {
   run_meta?: RunMeta | null;
   /** D19: integrity events (input drift, runtime repairs) persisted with the run. */
   integrity_events?: IntegrityEvent[];
-  /** D3/F-13: cross-chain headline spread — replaces the R̂ badge. */
-  seed_stability?: SeedStability | null;
 }
 
 /** Parameters for running a simulation. */

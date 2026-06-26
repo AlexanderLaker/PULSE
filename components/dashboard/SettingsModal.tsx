@@ -768,8 +768,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   rest on a weighted-Jaccard exposure proxy plus documented
                   judgment adjustments, not on measured outcomes (F-19). */}
               <Field
-                label="Per-force attenuation (read-only)"
-                hint={`Effective multiplier on each force's contribution. Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
+                label="Per-force attenuation factor (0–1, read-only)"
+                hint={`Dampening multiplier (between 0 and 1) applied to each force's combined trend effect to correct for overlap — lower = stronger dampening (e.g. 0.40 keeps ~40% of the raw force contribution, ~60% dampened). Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {Object.entries(draft.per_force_attenuation ?? {}).map(([f, v]) => (

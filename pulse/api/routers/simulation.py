@@ -64,9 +64,8 @@ async def get_simulation(user: dict = Depends(require_auth)):
                         "totals": results_blob.get("totals"),
                         "vc_decomposition": results_blob.get("vc_decomposition"),
                         "journey_decomposition": results_blob.get("journey_decomposition"),
-                        # D19/D3: rehydrate integrity events + seed stability
+                        # D19: rehydrate integrity events (incl. input drift)
                         "integrity_events": results_blob.get("integrity_events") or [],
-                        "seed_stability": results_blob.get("seed_stability"),
                         "convergence": latest.get("convergence_diagnostics", {}),
                         "iterations": latest.get("iterations", 5000),
                         "model_type": latest.get("model_type", "bayesian_copula"),
@@ -122,9 +121,8 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "journey_decomposition": mc.get("journey_decomposition"),
         "decompositions": mc.get("decompositions"),
         "totals": mc.get("totals"),
-        # D19/D3: integrity events (incl. input drift) + seed stability
+        # D19: integrity events (incl. input drift)
         "integrity_events": mc.get("integrity_events") or [],
-        "seed_stability": mc.get("seed_stability"),
         # Run metadata the dashboard's "Showing run #N · date · scenario"
         # ribbon consumes. Safe to expose (no credentials, no €M).
         "run_meta": run_meta or None,
@@ -223,16 +221,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
         if seed_wobble:
             mc_result["seed_wobble"] = seed_wobble
 
-        # F3: attenuation sensitivity band
-        if req.include_attenuation_band:
-            try:
-                band_engine = BayesianMonteCarloEngine(config, seed=primary_seed)
-                mc_result["attenuation_band"] = band_engine.attenuation_sensitivity_band(
-                    db, mc_result, pct=req.attenuation_band_pct
-                )
-            except Exception as e:
-                logger.warning(f"Attenuation band computation failed: {e}")
-                mc_result["attenuation_band"] = {"error": str(e)}
+        # T2 (June 2026): the attenuation sensitivity-band re-run was removed.
 
         _state["mc_result"] = mc_result
 
@@ -274,7 +263,6 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "journey_decomposition": mc_result.get("journey_decomposition"),
                 # D19/D3: persist integrity events + seed stability with the run
                 "integrity_events": mc_result.get("integrity_events", []),
-                "seed_stability": mc_result.get("seed_stability"),
                 "meta": {
                     "engine_fidelity": "scipy",  # guarded above
                     # D13: numerics backend recorded for the audit trail
@@ -328,10 +316,8 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "decompositions": mc_result.get("decompositions"),
             "totals": mc_result.get("totals"),
             "integrity_events": mc_result.get("integrity_events") or [],
-            "seed_stability": mc_result.get("seed_stability"),
             "seed": mc_result.get("seed"),
             "seed_wobble": mc_result.get("seed_wobble"),
-            "attenuation_band": mc_result.get("attenuation_band"),
         })
 
 

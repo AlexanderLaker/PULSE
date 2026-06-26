@@ -32,15 +32,9 @@ class SimulationRequest(BaseModel):
         description="Number of independent MCMC chains for convergence "
                     "diagnostics. Default 3 for rigorous split-R̂ (Vehtari 2021). "
                     "Set to 1 for legacy single-chain mode.")
-    # F3: Attenuation sensitivity band — flex the attenuation factor by
-    # ±`attenuation_band_pct` and attach a headline band so ExCo sees
-    # the single biggest model-assumption lever as a range not a point.
-    include_attenuation_band: bool = Field(False,
-        description="If True, also run the engine at attenuation × (1 ± pct) "
-                    "and attach an 'attenuation_band' dict to the result.")
-    attenuation_band_pct: float = Field(0.30, ge=0.05, le=0.90,
-        description="Fractional flex applied to the attenuation factor for "
-                    "the sensitivity band. Default ±30%.")
+    # T2 (June 2026): the attenuation sensitivity-band request flags were
+    # removed — the deployed service is read-only (F2) and the spec positions
+    # the model as carrying no live sensitivity exhibit.
 
     @field_validator("iterations")
     @classmethod

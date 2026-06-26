@@ -97,7 +97,7 @@ def create_app(args=None) -> FastAPI:
     app = FastAPI(
         title="PRISM Profit Pool Shift Model API",
         version=__version__,
-        description="Profit Pool Simulation Engine — Bayesian MC + t-copula",
+        description="Profit Pool Simulation Engine — Bayesian Monte Carlo with a Gaussian copula",
         lifespan=lifespan
     )
 

@@ -1446,14 +1446,40 @@ const ProfitPoolAnalysis2: FC<{
               className="text-xs font-semibold uppercase tracking-[0.18em]"
               style={{ color: S.onSurfaceVariant }}
             >
-              Henkel Consumer Brands · Profit Pool Outlook
+              Henkel Consumer Brands · Relative Profit-Pool Exposure
             </div>
             <div
               className="text-[11px] font-semibold uppercase tracking-[0.16em] mt-1"
               style={{ color: S.mutedText }}
             >
-              12 categories · 2026–2035 · Bayesian Monte Carlo
+              12 categories · 2026–2035 · relative exposure (assumes no action)
             </div>
+            {/* T10 (June 2026): show whether the trend inputs were edited since
+                the previous accepted run — driven by the D19 input-drift event
+                already attached to the run. Display-only. */}
+            {(() => {
+              const drift = (simulation?.integrity_events ?? []).find((e) => e.type === 'input_drift');
+              if (!drift) return null;
+              const d = (drift.detail ?? {}) as { scores_changed?: number; added?: number; removed?: number; direction_flips?: number };
+              const changed = (d.scores_changed ?? 0) + (d.added ?? 0) + (d.removed ?? 0);
+              const edited = changed > 0;
+              return (
+                <div
+                  className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{
+                    fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+                    backgroundColor: edited ? 'rgba(154,103,0,0.10)' : S.surfaceContainer,
+                    color: edited ? '#9a6700' : S.onSurfaceVariant,
+                    border: `1px solid ${edited ? '#9a6700' : S.cardBorder}`,
+                  }}
+                  title={drift.message}
+                >
+                  {edited
+                    ? `⚠ Trend inputs edited — ${d.scores_changed ?? 0} score change(s), ${d.direction_flips ?? 0} direction flip(s) vs last run`
+                    : '✓ Trend inputs unchanged since last accepted run'}
+                </div>
+              );
+            })()}
           </div>
         </header>
 
@@ -1546,7 +1572,7 @@ const ProfitPoolAnalysis2: FC<{
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}
           >
             <KpiTile
-              label={`Portfolio shift · by ${headline.horizon}`}
+              label={`Portfolio exposure (if no action) · by ${headline.horizon}`}
               value={headline.med}
               p10={headline.p10}
               p90={headline.p90}
@@ -1803,26 +1829,16 @@ const ProfitPoolAnalysis2: FC<{
             <div className="mt-2 px-5 py-5 rounded-2xl" style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}` }}>
               {/* ── This run — provenance + audit metadata + integrity events.
                   Flat layout replaces the old header ribbon's popovers
-                  (RunDetailsPopover / IntegrityChip). D3: seed stability,
-                  not R̂ — the honest reproducibility quantity. D13: numerics
-                  backend on the audit trail. D19: integrity events surfaced
-                  with the run. */}
+                  (RunDetailsPopover / IntegrityChip). T18 (June 2026): the
+                  "seed stability" reassurance metric was removed — it had no
+                  failure mode. D13: numerics backend on the audit trail.
+                  D19: integrity events surfaced with the run. */}
               {simulation?.run_meta?.run_id != null && (() => {
                 const m = simulation.run_meta;
-                const st = simulation.seed_stability;
                 const events = simulation.integrity_events ?? [];
                 const rows: Array<[string, string]> = [];
                 if (m.iterations != null) {
                   rows.push(['Iterations', `${(m.iterations / 1000).toFixed(0)}k${m.chains != null ? ` × ${m.chains} chains` : ''}`]);
-                }
-                if (st?.headline_median_spread != null) {
-                  rows.push([
-                    `Seed stability (${st.n_chains} chains)`,
-                    `headline ±${(st.headline_median_spread * 100 / 2).toFixed(2)}pp`,
-                  ]);
-                  if (st.max_category_median_spread != null) {
-                    rows.push(['Max category spread', `${(st.max_category_median_spread * 100).toFixed(2)}pp`]);
-                  }
                 }
                 if (m.seed != null) rows.push(['Seed', String(m.seed)]);
                 if (m.numerics_backend) rows.push(['Numerics', m.numerics_backend]);
@@ -1923,7 +1939,10 @@ const ProfitPoolAnalysis2: FC<{
                           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula'}</code>,
-          50,000 iterations, Gaussian-copula dependencies, 99 v3.5 trends). Each cell is a{' '}
+          50,000 iterations, Gaussian-copula dependencies, 99 v3.5 trends). The trend
+          probability priors are <strong>structured expert judgement</strong> (Beta shapes set
+          from analyst 1–5 scores); the model expresses uncertainty in those judgements — it
+          does not learn or update from data. Each cell is a{' '}
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by

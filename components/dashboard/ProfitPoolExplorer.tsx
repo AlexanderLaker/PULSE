@@ -541,7 +541,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
         fontFamily={HEADLINE_FONT} fontWeight={700}
         transform={`rotate(-90, ${ML - 48}, ${MT + plotH / 2})`}
       >
-        GP1 / Contribution Margin 1
+        GP1 / Contribution Margin 1 — ⚠️ estimated (not company-reported)
       </text>
       <text
         x={ML + plotW / 2} y={H - 6}

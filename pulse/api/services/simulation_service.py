@@ -49,7 +49,6 @@ def load_latest_run_into_state() -> bool:
             # D19/D3 (June 2026): integrity events + seed stability persist
             # with the run and must survive rehydration.
             "integrity_events": results.get("integrity_events") or [],
-            "seed_stability": results.get("seed_stability"),
             "force_attribution": results.get("force_attribution") or force_attr,
             "convergence": conv or results.get("convergence") or {},
             "iterations": latest.get("iterations") or results.get("iterations") or 1000,

@@ -122,12 +122,17 @@ export interface ProfitPoolSlide {
 // ═══════════════════════════════════════════════════════════════════
 // Shared, verified margin anchors (FY2025 filings unless noted)
 // — single definition so every slide cites the identical fact.
+// T13 (June 2026): every URL points at the COMPANY'S OWN primary source
+//   (its IR results page / annual report / SEC filing) — the third-party
+//   aggregator links (stockanalysis.com, eulerpool.com) were replaced and
+//   each figure re-confirmed against the primary document. GAAP gross
+//   margins are used throughout (not the higher "adjusted" headlines).
 // ═══════════════════════════════════════════════════════════════════
 
 const SRC = {
   henkel: {
-    label: 'Henkel FY2025 — group gross margin 50.9% (€10,421m / €20,495m)',
-    url: 'https://stockanalysis.com/quote/etr/HEN3/financials/',
+    label: 'Henkel FY2025 (2025 Annual Report) — group gross margin 50.9% (€10,421m / €20,495m)',
+    url: 'https://www.henkel.com/press-and-media/press-releases-and-kits/2026-03-11-publication-of-2025-annual-report-2129200',
     grade: 'reported',
   } as SourceRef,
   henkelHcb: {
@@ -136,7 +141,7 @@ const SRC = {
     grade: 'reported',
   } as SourceRef,
   pg: {
-    label: 'P&G FY2025 8-K (SEC) — gross margin 51.2%; Beauty $14,964m, Fabric & Home Care $29,617m net sales',
+    label: 'P&G FY2025 8-K (SEC, year ended Jun-2025) — gross margin 51.2%; Beauty $14,964m, Fabric & Home Care $29,617m net sales',
     url: 'https://www.sec.gov/Archives/edgar/data/0000080424/000008042425000067/fy2425q4amj8-kexhibit991.htm',
     grade: 'reported',
   } as SourceRef,
@@ -157,17 +162,17 @@ const SRC = {
   } as SourceRef,
   colgate: {
     label: 'Colgate-Palmolive FY2025 — gross margin 60.1% ($12,251m / $20,382m)',
-    url: 'https://stockanalysis.com/stocks/cl/financials/',
+    url: 'https://investor.colgatepalmolive.com/news-releases/news-release-details/colgate-palmolive-company-announces-4th-quarter-and-full-year/',
     grade: 'reported',
   } as SourceRef,
   clorox: {
     label: 'Clorox FY2025 (June FYE) — gross margin 45.2% ($3,213m / $7,104m)',
-    url: 'https://stockanalysis.com/stocks/clx/financials/',
+    url: 'https://investors.thecloroxcompany.com/news/news-details/2025/Clorox-Reports-Q4-and-FY25-Results-Provides-FY26-Outlook/',
     grade: 'reported',
   } as SourceRef,
   chd: {
-    label: 'Church & Dwight FY2025 — gross margin 44.7% ($2,775m / $6,203m)',
-    url: 'https://stockanalysis.com/stocks/chd/financials/',
+    label: 'Church & Dwight FY2025 — GAAP gross margin 44.7% ($2,775m / $6,203m)',
+    url: 'https://investor.churchdwight.com/Investors/news/news-details/2026/Church--Dwight-Reports-Q4-2025-and-2025-Results-and-Provides-2026-Outlook/default.aspx',
     grade: 'reported',
   } as SourceRef,
   kao: {
@@ -176,18 +181,18 @@ const SRC = {
     grade: 'reported',
   } as SourceRef,
   beiersdorf: {
-    label: 'Beiersdorf FY2025 — gross margin 57.7% (€5,686m / €9,852m)',
-    url: 'https://stockanalysis.com/quote/etr/BEI/financials/',
+    label: 'Beiersdorf FY2025 (group, incl. tesa) — gross margin 57.7% (€5,686m / €9,852m)',
+    url: 'https://reports.beiersdorf.com/annual-report/2025/consolidated-financial-statements/consolidated-financial-statements/income-statement.html',
     grade: 'reported',
   } as SourceRef,
   olaplex: {
-    label: 'Olaplex FY2025 — gross margin 69.4% ($293.7m / $423.0m)',
-    url: 'https://stockanalysis.com/stocks/olpx/financials/',
+    label: 'Olaplex FY2025 — gross margin 69.4% ($293.6m / $423.0m)',
+    url: 'https://ir.olaplex.com/news/detail/66/olaplex-reports-fourth-quarter-and-fiscal-year-2025-results',
     grade: 'reported',
   } as SourceRef,
   basf: {
     label: 'BASF FY2025 — group gross margin 24.1% (€14,359m / €59,657m)',
-    url: 'https://stockanalysis.com/quote/otc/BASFY/financials/',
+    url: 'https://report.basf.com/2025/en/financial-statements/statement-of-income.html',
     grade: 'reported',
   } as SourceRef,
   croda: {
@@ -197,12 +202,12 @@ const SRC = {
   } as SourceRef,
   givaudan: {
     label: 'Givaudan FY2025 — gross margin 43.5% (CHF 3,252m / 7,472m)',
-    url: 'https://stockanalysis.com/quote/otc/GVDNY/financials/',
+    url: 'https://www.givaudan.com/files/giv-2025-fyr-en.pdf',
     grade: 'reported',
   } as SourceRef,
   symrise: {
-    label: 'Symrise FY2025 — gross margin 37.6% (€1,855m / €4,929m)',
-    url: 'https://stockanalysis.com/quote/otc/SYIEY/financials/',
+    label: 'Symrise FY2025 (consolidated financial statements) — gross margin 37.6% (€1,855m / €4,929m)',
+    url: 'https://symrise.com/corporatereport/2025/home/Symrise_GB25_Konzernabschluss_EN_geschuetzt.pdf',
     grade: 'reported',
   } as SourceRef,
   novonesis: {
@@ -211,43 +216,43 @@ const SRC = {
     grade: 'reported',
   } as SourceRef,
   metro: {
-    label: 'Metro AG FY2024 — gross margin 16.3% (last audited year; taken private May 2025)',
-    url: 'https://eulerpool.com/stock/METRO-Stock-DE000BFB0019/grossmargin',
+    label: 'Metro AG FY2023/24 (Sep FYE; last audited year, taken private May 2025) — gross margin 16.3% (€5,052m / €31,029m)',
+    url: 'https://reports.metroag.de/annual-report/2023-2024/consolidated-financial-statements/income-statement.html',
     grade: 'reported',
   } as SourceRef,
   walmart: {
-    label: 'Walmart FY2026 (Jan-2026 FYE) — gross margin 24.9% ($177.8bn / $713.2bn)',
-    url: 'https://stockanalysis.com/stocks/wmt/financials/',
+    label: 'Walmart FY2026 (Jan-2026 FYE) — gross margin 24.9% on total revenue ($177.8bn / $713.2bn)',
+    url: 'https://stock.walmart.com/_assets/_461d6b46a29d437b51015f942ff9bb4e/walmart/db/938/9972/earnings_release/Earnings+Release+(FY26+Q4).pdf',
     grade: 'reported',
   } as SourceRef,
   carrefour: {
-    label: 'Carrefour FY2024 — gross margin 18.3% (FY2025 not yet published)',
-    url: 'https://stockanalysis.com/quote/otc/CRRFY/financials/',
+    label: 'Carrefour FY2025 — gross margin 19.5% (€16,024m / €82,102m)',
+    url: 'https://www.carrefour.com/sites/default/files/2026-02/VEN_Comptes%20consolide%CC%81s%202025%20incluant%20le%20rapport%20des%20CAC.pdf',
     grade: 'reported',
   } as SourceRef,
   whirlpool: {
     label: 'Whirlpool FY2025 — gross margin 15.4% ($2,386m / $15,524m)',
-    url: 'https://stockanalysis.com/stocks/whr/financials/',
+    url: 'https://investors.whirlpoolcorp.com/news-and-events/news/news-details/2026/Whirlpool-Corporation-Announces-Fourth-Quarter-and-Full-Year-Results-Provides-2026-Guidance/default.aspx',
     grade: 'reported',
   } as SourceRef,
   ecolab: {
     label: 'Ecolab FY2025 — gross margin 44.5% ($7,150m / $16,081m)',
-    url: 'https://stockanalysis.com/stocks/ecl/financials/',
+    url: 'https://www.ecolab.com/news/2026/02/ecolab-announces-record-fourth-quarter-and-strong-2026-outlook-reported-diluted-eps-1-98-adjusted-d',
     grade: 'reported',
   } as SourceRef,
   helenOfTroy: {
     label: 'Helen of Troy FY2026 (Feb FYE) — gross margin 45.7% ($815.7m / $1,786m)',
-    url: 'https://stockanalysis.com/stocks/hele/financials/',
+    url: 'https://investor.helenoftroy.com/press-releases/press-release-details/2026/Helen-of-Troy-Reports-Fourth-Quarter-Fiscal-2026-Results/default.aspx',
     grade: 'reported',
   } as SourceRef,
   edgewell: {
     label: 'Edgewell FY2025 (Sep FYE) — gross margin 41.6% ($924.9m / $2,224m)',
-    url: 'https://stockanalysis.com/stocks/epc/financials/',
+    url: 'https://ir.edgewell.com/news-and-events/press-releases/2025/11-13-2025-110044688?sc_lang=en',
     grade: 'reported',
   } as SourceRef,
   sharkninja: {
-    label: 'SharkNinja FY2025 — gross margin 49.0% ($3,136m / $6,399m)',
-    url: 'https://stockanalysis.com/stocks/sn/financials/',
+    label: 'SharkNinja FY2025 (Dec FYE) — GAAP gross margin 49.0% ($3,136m / $6,399m)',
+    url: 'https://ir.sharkninja.com/news/news-details/2026/SharkNinja-Reports-Fourth-Quarter-and-Full-Year-2025-Results/default.aspx',
     grade: 'reported',
   } as SourceRef,
   allianceLaundry: {
@@ -320,9 +325,9 @@ const MKT = {
     grade: 'reported',
   } as SourceRef,
   salonServices: {
-    label: 'Fortune Business Insights — salon hair care services $203.78bn (2025), 7.6% CAGR',
+    label: 'Salon hair-care services ~$150bn (2025), ~6% CAGR — expert estimate reconciled across 3+ sources (FBI $203.78bn & MRFR $216.76bn are scope-inflated ceilings; GMI $71.5bn a floor; IBISWorld US hair salons ~$60bn × ~40–45% US share ⇒ ~$130–150bn). Treat the FBI ceiling as optimistic.',
     url: 'https://www.fortunebusinessinsights.com/salon-hair-care-services-market-113322',
-    grade: 'reported',
+    grade: 'estimate',
   } as SourceRef,
   beautySub: {
     label: 'Future Market Insights — beauty subscription $1.55bn (2025), 25.9% CAGR to 2035',
@@ -330,14 +335,14 @@ const MKT = {
     grade: 'reported',
   } as SourceRef,
   laundryTotal: {
-    label: 'Grand View Research — laundry detergent $185.28bn (2023), 5.5% CAGR 2024–2030; powder >32% share',
-    url: 'https://www.grandviewresearch.com/press-release/global-laundry-detergent-market',
+    label: 'Laundry CARE $185.28bn (GVR 2023, 5.5% CAGR) — note this is broad laundry care incl. fabric softeners + tablets + industrial/institutional. The consumer detergent-only core reconciles to ~$88bn (2025) across Mordor $103bn / Polaris $84bn / EMR $77bn / MRFR $80bn. Use the $185bn figure only as the wide "laundry care" landscape, not as a pure-detergent pool.',
+    url: 'https://www.grandviewresearch.com/industry-analysis/laundry-detergent-market',
     grade: 'reported',
   } as SourceRef,
   liquid: {
-    label: 'Fortune Business Insights — liquid laundry detergent $28.08bn (2025), 5.9% CAGR (narrower scope; used for trajectory only)',
-    url: 'https://www.fortunebusinessinsights.com/liquid-laundry-detergent-market-108048',
-    grade: 'reported',
+    label: 'Liquid laundry detergent ~$42bn (2025), ~5% CAGR — expert estimate (3 sources span $28–50bn: FBI $28.08bn low / Mordor $45.78bn / MRFR $50.22bn; midpoint ~$42bn). The previously-cited FBI $28bn is the low end of the range.',
+    url: 'https://www.fortunebusinessinsights.com/liquid-laundry-detergent-market-102962',
+    grade: 'estimate',
   } as SourceRef,
   pods: {
     label: 'Grand View Research — laundry detergent pods $11.27bn (2023), 6.5% CAGR 2024–2030',
@@ -429,7 +434,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'hair_value_chain',
     title: 'Hair Care — Industry Value Chain Profit Pool',
-    subtitle: 'GP1 calibrated vs. FY2025 filings | End-consumer pool ~€77bn ($88.2bn, GVR 2025) | € at 1.15',
+    subtitle: 'GP1 estimated (anchored to FY2025 filings, not separately reported) | End-consumer pool ~€77bn ($88.2bn, GVR 2025) | € at 1.15',
     poolSize: '~€77bn',
     poolSizeEurBn: 76.7,
     group: 'Hair',
@@ -548,7 +553,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
   {
     id: 'laundry_value_chain',
     title: 'Laundry Care — Industry Value Chain Profit Pool',
-    subtitle: 'GP1 calibrated vs. FY2025 filings | End-consumer pool ~€161bn ($185.3bn, GVR 2023) | € at 1.15',
+    subtitle: 'GP1 estimated (anchored to FY2025 filings, not separately reported) | End-consumer pool ~€161bn ($185.3bn, GVR 2023) | € at 1.15',
     poolSize: '~€161bn',
     poolSizeEurBn: 161.1,
     group: 'LHC',
