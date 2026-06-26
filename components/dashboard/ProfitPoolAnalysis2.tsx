@@ -1434,48 +1434,6 @@ const ProfitPoolAnalysis2: FC<{
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
       <main className="max-w-[1440px] mx-auto px-8 py-10">
-        {/* ── Editorial Header ───────────────────────────────────
-            Run provenance (run #, seed, integrity events) lives in the
-            "About this model" footer — the header stays lean. */}
-        <header className="mb-8">
-          <div
-            className="pl-5"
-            style={{ borderLeft: `4px solid ${S.primary}` }}
-          >
-            <div
-              className="text-xs font-semibold uppercase tracking-[0.18em]"
-              style={{ color: S.onSurfaceVariant }}
-            >
-              Henkel Consumer Brands · 12 categories · 2026–2035
-            </div>
-            {/* T10 (June 2026): show whether the trend inputs were edited since
-                the previous accepted run — driven by the D19 input-drift event
-                already attached to the run. Display-only. */}
-            {(() => {
-              const drift = (simulation?.integrity_events ?? []).find((e) => e.type === 'input_drift');
-              if (!drift) return null;
-              const d = (drift.detail ?? {}) as { scores_changed?: number; added?: number; removed?: number; direction_flips?: number };
-              const changed = (d.scores_changed ?? 0) + (d.added ?? 0) + (d.removed ?? 0);
-              const edited = changed > 0;
-              return (
-                <div
-                  className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                  style={{
-                    fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
-                    backgroundColor: edited ? 'rgba(154,103,0,0.10)' : S.surfaceContainer,
-                    color: edited ? '#9a6700' : S.onSurfaceVariant,
-                    border: `1px solid ${edited ? '#9a6700' : S.cardBorder}`,
-                  }}
-                  title={drift.message}
-                >
-                  {edited
-                    ? `⚠ Trend inputs edited — ${d.scores_changed ?? 0} score change(s), ${d.direction_flips ?? 0} direction flip(s) vs last run`
-                    : '✓ Inputs unchanged since last run'}
-                </div>
-              );
-            })()}
-          </div>
-        </header>
 
         {/* ── Error / offline banners ──────────────────────────── */}
         <AnimatePresence>
