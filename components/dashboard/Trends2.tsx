@@ -233,7 +233,7 @@ const CategoryExposureGrid: FC<{ exposures: Record<string, number> }> = ({ expos
           <div className="grid grid-cols-4 gap-3">
             {cats.map((cat) => (
               <div key={cat.id} className="flex flex-col items-center gap-1.5">
-                <ExposureDots value={readExposure(exposures, cat.name, cat.id)} tone="emerald" />
+                <ReadDots value={readExposure(exposures, cat.name, cat.id)} color={S.primary} />
                 <div
                   className="text-[10px] font-medium text-center"
                   style={{ color: S.onSurface }}
@@ -275,7 +275,7 @@ const ValueChainExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exp
           >
             {step.label}
           </div>
-          <ExposureDots value={readVCExposure(exposures, step)} tone="purple" />
+          <ReadDots value={readVCExposure(exposures, step)} color={S.primary} />
         </div>
       ))}
     </div>
@@ -448,7 +448,7 @@ const RegionExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposur
         <div className="text-[11px] font-medium" style={{ color: S.onSurface }}>
           {r.label}
         </div>
-        <ExposureDots value={exposures?.[r.id] ?? 0} tone="emerald" />
+        <ReadDots value={exposures?.[r.id] ?? 0} color={S.primary} />
       </div>
     ))}
   </div>
@@ -865,6 +865,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
   }, [flush, onMyChange, trend.id]);
 
   const ai = trend.ai_suggestion ?? {};
+  const sources = trend.sources ?? [];
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate?.diffusion_curve?.distribution;
   const statusText = status === 'saving' ? 'Saving…'
@@ -887,6 +888,12 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
               {trend.description || <em style={{ color: S.mutedText }}>No description documented.</em>}
             </p>
+          </SectionCard>
+
+          <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
+            <blockquote style={{ margin: 0, padding: '12px 16px', borderRadius: 10, borderLeft: `3px solid ${S.primary}`, backgroundColor: S.surfaceLow, fontSize: 14, lineHeight: 1.55, color: S.onSurface, fontWeight: 500 }}>
+              {trend.strategic_implication || <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>No strategic implication documented.</span>}
+            </blockquote>
           </SectionCard>
 
           <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
@@ -928,6 +935,14 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
               </div>
             </div>
           </SectionCard>
+
+          {sources.length > 0 && (
+            <SectionCard title={`Sources · ${sources.length}`} icon={Newspaper}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sources.map((src, i) => <SourceItem key={i} src={src} />)}
+              </div>
+            </SectionCard>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -993,20 +1008,26 @@ const CompareStack: FC<{ ai: React.ReactNode; expert: React.ReactNode; who?: str
 );
 
 // ── One exposure cell: label + AI dot row (ink) over expert ø dot row (green). ──
-const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: number; count: number } }> = ({ label, aiVal, expert }) => (
+const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: number; count: number }; manualVal?: number; onManual?: (v: number) => void }> = ({ label, aiVal, expert, manualVal, onManual }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px', border: `1px solid ${S.cardBorder}`, borderRadius: 9, backgroundColor: S.surface }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
       <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{label}</span>
       {expert?.count ? <span style={{ fontSize: 9.5, fontWeight: 700, color: S.mutedText }} title={`${expert.count} expert(s) scored`}>n{expert.count}</span> : null}
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 14, flexShrink: 0 }}>AI</span>
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 17, flexShrink: 0 }}>AI</span>
       <ReadDots value={aiVal} color={S.onSurface} />
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 14, flexShrink: 0 }}>ø</span>
+      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 17, flexShrink: 0 }}>ø</span>
       <ReadDots value={expert?.avg} color={REVIEWED_COLOR} />
     </div>
+    {onManual && (
+      <div className="flex items-center gap-2" style={{ paddingTop: 5, borderTop: `1px solid ${S.surfaceLow}` }}>
+        <span style={{ fontSize: 8.5, fontWeight: 800, color: S.primary, width: 17, flexShrink: 0 }} title="Manual override — click a dot to set">Man</span>
+        <EditableDots value={manualVal ?? 0} onChange={onManual} tone="emerald" />
+      </div>
+    )}
   </div>
 );
 
@@ -1055,6 +1076,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const { data, loaded } = useTrendProposals(trend.id);
   const [src, setSrc] = useState<Record<string, 'ai' | 'expert' | 'manual'>>({});
   const [man, setMan] = useState<Record<string, string>>({});
+  const [manExpo, setManExpo] = useState<Record<string, Record<string, number>>>({});
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -1094,6 +1116,27 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const setS = (key: string, s: 'ai' | 'expert' | 'manual') => setSrc((p) => ({ ...p, [key]: s }));
   const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
   const setAll = (s: 'ai' | 'expert') => setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s, vc: s });
+  // Manual per-cell exposure overrides. Default each cell to the expert ø
+  // (rounded) where scored, else the AI baseline; editing a cell switches the
+  // group to Manual.
+  const manCell = (kind: string, key: string, aiV: number | undefined, expAvg: number | undefined): number | undefined => {
+    const ex = manExpo[kind]?.[key];
+    if (ex != null) return ex;
+    if (expAvg != null) return Math.round(expAvg);
+    return aiV;
+  };
+  const setManCell = (kind: string, key: string, v: number) => {
+    setManExpo((p) => ({ ...p, [kind]: { ...(p[kind] ?? {}), [key]: v } }));
+    setS(kind, 'manual');
+  };
+  const buildManualMap = (kind: string, cells: Array<{ key: string; aiV?: number; expAvg?: number }>): Record<string, number> | undefined => {
+    const out: Record<string, number> = {};
+    for (const c of cells) { const v = manCell(kind, c.key, c.aiV, c.expAvg); if (v != null) out[c.key] = v; }
+    return Object.keys(out).length ? out : undefined;
+  };
+  const catCells = CATEGORIES.map((c) => ({ key: c.name, aiV: aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), expAvg: agg?.category_exposure?.[c.name]?.avg }));
+  const regCells = REGIONS.map((r) => ({ key: r.id, aiV: aiReg == null ? undefined : (aiReg[r.id] ?? 0), expAvg: agg?.regional_exposure?.[r.id]?.avg }));
+  const vcCells = VC_STEPS.map((step) => ({ key: step.id, aiV: aiVc == null ? undefined : readVCExposure(aiVc, step), expAvg: agg?.vc_exposure?.[step.id]?.avg }));
 
   const resolveProb = (): number | undefined => {
     const s = srcOf('probability', eP != null);
@@ -1127,9 +1170,18 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     const g = resolveGp1(); if (g != null) u.gp1_pct_affected = g;
     const pk = resolvePeak(); if (pk != null) u.peak_year = pk;
     const cv = resolveCurve(); if (cv) u.diffusion_curve = cv;
-    if (srcOf('category', hasCatE) === 'ai') { if (aiCat) u.category_exposure = aiCat; } else { const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c; }
-    if (srcOf('region', hasRegE) === 'ai') { if (aiReg) u.regional_exposure = aiReg; } else { const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r; }
-    if (srcOf('vc', hasVcE) === 'ai') { if (aiVc) u.vc_exposure = aiVc; } else { const v = mapCells(agg?.vc_exposure); if (v) u.vc_exposure = v; }
+    const sc = srcOf('category', hasCatE);
+    if (sc === 'manual') { const m = buildManualMap('category', catCells); if (m) u.category_exposure = m; }
+    else if (sc === 'ai') { if (aiCat) u.category_exposure = aiCat; }
+    else { const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c; }
+    const sr = srcOf('region', hasRegE);
+    if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
+    else if (sr === 'ai') { if (aiReg) u.regional_exposure = aiReg; }
+    else { const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r; }
+    const sv = srcOf('vc', hasVcE);
+    if (sv === 'manual') { const m = buildManualMap('vc', vcCells); if (m) u.vc_exposure = m; }
+    else if (sv === 'ai') { if (aiVc) u.vc_exposure = aiVc; }
+    else { const v = mapCells(agg?.vc_exposure); if (v) u.vc_exposure = v; }
     try { await updateTrend(trend.id, u); setDone(true); }
     catch (e) { setErr((e as Error)?.message ?? 'Endorse failed'); }
     finally { setSaving(false); }
@@ -1212,35 +1264,39 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                 <div style={grpLabel}>HAIR</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
                   {grouped.Hair.map((c) => (
-                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]} />
+                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]}
+                      manualVal={manCell('category', c.name, aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), agg?.category_exposure?.[c.name]?.avg)} onManual={(v) => setManCell('category', c.name, v)} />
                   ))}
                 </div>
                 <div style={{ ...grpLabel, marginTop: 14 }}>LAUNDRY &amp; HOME CARE</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
                   {grouped.LHC.map((c) => (
-                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]} />
+                    <ExposureCompareCell key={c.id} label={shortCat(c.name)} aiVal={aiCat == null ? undefined : readExposure(aiCat, c.name, c.id)} expert={agg?.category_exposure?.[c.name]}
+                      manualVal={manCell('category', c.name, aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), agg?.category_exposure?.[c.name]?.avg)} onManual={(v) => setManCell('category', c.name, v)} />
                   ))}
                 </div>
-                <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} aiOk={!!aiCat} expertOk={hasCatE} allowManual={false}
-                  result={srcOf('category', hasCatE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
+                <Decide cur={srcOf('category', hasCatE)} onPick={(s) => setS('category', s)} aiOk={!!aiCat} expertOk={hasCatE}
+                  result={srcOf('category', hasCatE) === 'ai' ? 'AI baseline' : srcOf('category', hasCatE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
                   {REGIONS.map((r) => (
-                    <ExposureCompareCell key={r.id} label={r.label} aiVal={aiReg == null ? undefined : (aiReg[r.id] ?? 0)} expert={agg?.regional_exposure?.[r.id]} />
+                    <ExposureCompareCell key={r.id} label={r.label} aiVal={aiReg == null ? undefined : (aiReg[r.id] ?? 0)} expert={agg?.regional_exposure?.[r.id]}
+                      manualVal={manCell('region', r.id, aiReg == null ? undefined : (aiReg[r.id] ?? 0), agg?.regional_exposure?.[r.id]?.avg)} onManual={(v) => setManCell('region', r.id, v)} />
                   ))}
                 </div>
-                <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} aiOk={!!aiReg} expertOk={hasRegE} allowManual={false}
-                  result={srcOf('region', hasRegE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
+                <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} aiOk={!!aiReg} expertOk={hasRegE}
+                  result={srcOf('region', hasRegE) === 'ai' ? 'AI baseline' : srcOf('region', hasRegE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
               <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
                   {VC_STEPS.map((step) => (
-                    <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]} />
+                    <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]}
+                      manualVal={manCell('vc', step.id, aiVc == null ? undefined : readVCExposure(aiVc, step), agg?.vc_exposure?.[step.id]?.avg)} onManual={(v) => setManCell('vc', step.id, v)} />
                   ))}
                 </div>
-                <Decide cur={srcOf('vc', hasVcE)} onPick={(s) => setS('vc', s)} aiOk={!!aiVc} expertOk={hasVcE} allowManual={false}
-                  result={srcOf('vc', hasVcE) === 'ai' ? 'AI baseline' : 'Expert ø'} />
+                <Decide cur={srcOf('vc', hasVcE)} onPick={(s) => setS('vc', s)} aiOk={!!aiVc} expertOk={hasVcE}
+                  result={srcOf('vc', hasVcE) === 'ai' ? 'AI baseline' : srcOf('vc', hasVcE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
             </div>
           </div>
@@ -2221,7 +2277,9 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
                     fontSize: 13, fontWeight: 700, color: S.onSurface,
                     backgroundColor: S.surfaceLow,
                     border: `1px solid ${S.cardBorder}`,
+                    display: 'flex', alignItems: 'center', gap: 8,
                   }}>
+                    <DiffusionGlyph curve={diffusion} color={S.primary} />
                     {diffusionMeta.label}
                   </div>
                 )}
@@ -2545,7 +2603,7 @@ const EditableValueChainGrid: FC<{
           <EditableDots
             value={readVCExposure(exposures, step)}
             onChange={(v) => onChange({ ...exposures, [step.id]: v })}
-            tone="purple"
+            tone="emerald"
           />
         </div>
       ))}
