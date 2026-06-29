@@ -200,14 +200,15 @@ const trendStrength = (t?: Trend): number | null => {
   return Math.min(5, score / 5);
 };
 
-/** A stage with many tiles spans two grid columns and lays its tiles out in
- *  two readable sub-columns, so very long stages (e.g. Add Products) don't
- *  stretch the whole rail downward (owner request 2026-06-29). Counts are the
- *  full (unfiltered) tile counts so a stage's width doesn't jump when the type
- *  filter changes. */
+/** A long Laundry stage spans two grid columns and lays its tiles out in two
+ *  readable sub-columns, so very long stages (e.g. Add Products) don't stretch
+ *  the whole rail downward (owner request 2026-06-29). Laundry only — the Hair
+ *  journey stays single-column (owner decision 2026-06-29). Counts are the full
+ *  (unfiltered) tile counts so a stage's width doesn't jump when the type filter
+ *  changes. */
 const WIDE_STAGE_TILE_THRESHOLD = 10;
-const stageSpan = (s: JourneyStageDef): 1 | 2 =>
-  (Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
+const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
+  (journeyKey === 'lhc' && Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
 
 // ════════════════════════════════════════════════════════════════════════
 // Small presentational atoms
@@ -1139,7 +1140,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 // stages + however many are "wide". Each group (headers /
                 // benefiting / declining) sums to the same unit count, so the
                 // three rows stay column-aligned.
-                gridTemplateColumns: `repeat(${stages.reduce((n, s) => n + stageSpan(s), 0)}, minmax(0, 1fr))`,
+                gridTemplateColumns: `repeat(${stages.reduce((n, s) => n + stageSpan(s, tab), 0)}, minmax(0, 1fr))`,
                 width: '100%', gap: 0,
               }}
             >
@@ -1148,7 +1149,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 <div
                   key={stage.id + '_h'}
                   style={{
-                    gridColumn: stageSpan(stage) === 2 ? 'span 2' : undefined,
+                    gridColumn: stageSpan(stage, tab) === 2 ? 'span 2' : undefined,
                     padding: '10px 9px 9px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
@@ -1166,7 +1167,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               {/* Benefiting row */}
               {stages.map((stage, i) => {
                 const tiles = stage.benefiting.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
-                const wide = stageSpan(stage) === 2;
+                const wide = stageSpan(stage, tab) === 2;
                 const tileEls = tiles.map(tile => (
                   <TilePill
                     key={tile.id}
@@ -1201,9 +1202,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                         </button>
                       )}
                     </div>
-                    {wide
-                      ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 6, alignContent: 'start' }}>{tileEls}</div>
-                      : tileEls}
+                    {tileEls}
                   </div>
                 );
               })}
@@ -1211,7 +1210,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               {/* Declining row */}
               {stages.map((stage, i) => {
                 const tiles = stage.negativelyImpacted.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
-                const wide = stageSpan(stage) === 2;
+                const wide = stageSpan(stage, tab) === 2;
                 const tileEls = tiles.map(tile => (
                   <TilePill
                     key={tile.id}
@@ -1246,9 +1245,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                         </button>
                       )}
                     </div>
-                    {wide
-                      ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 6, alignContent: 'start' }}>{tileEls}</div>
-                      : tileEls}
+                    {tileEls}
                   </div>
                 );
               })}
