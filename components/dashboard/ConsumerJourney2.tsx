@@ -333,7 +333,7 @@ const TilePill: FC<{
       <span
         // Full name always visible (no clamp); tight line-height so wrapped
         // lines sit close together instead of stretching the tile.
-        style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.05, fontFamily: HEADLINE_FONT }}
+        style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.1, fontFamily: HEADLINE_FONT }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
