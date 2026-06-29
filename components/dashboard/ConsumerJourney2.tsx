@@ -316,7 +316,7 @@ const TilePill: FC<{
       onClick={onClick}
       className="w-full text-left rounded-lg transition-all duration-150"
       style={{
-        position: 'relative', display: 'block', padding: '3px 8px 3px 11px', marginBottom: 2,
+        position: 'relative', display: 'block', padding: '2px 8px 2px 11px', marginBottom: 2,
         backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -326,12 +326,14 @@ const TilePill: FC<{
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: 0, top: 3, bottom: 3, width: 3, borderRadius: 3,
+          position: 'absolute', left: 0, top: 2, bottom: 2, width: 3, borderRadius: 3,
           backgroundColor: accent, opacity: 0.28 + 0.24 * tile.intensity,
         }}
       />
       <span
-        style={{ fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.15, fontFamily: HEADLINE_FONT }}
+        // Full name always visible (no clamp); tight line-height so wrapped
+        // lines sit close together instead of stretching the tile.
+        style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.05, fontFamily: HEADLINE_FONT }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
