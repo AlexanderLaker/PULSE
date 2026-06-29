@@ -314,9 +314,9 @@ const TilePill: FC<{
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-xl transition-all duration-150"
+      className="w-full text-left rounded-lg transition-all duration-150"
       style={{
-        position: 'relative', display: 'block', padding: '5px 8px 5px 12px', marginBottom: 4,
+        position: 'relative', display: 'block', padding: '3px 8px 3px 11px', marginBottom: 3,
         backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -326,18 +326,18 @@ const TilePill: FC<{
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: 0, top: 4, bottom: 4, width: 3, borderRadius: 3,
+          position: 'absolute', left: 0, top: 3, bottom: 3, width: 3, borderRadius: 3,
           backgroundColor: accent, opacity: 0.28 + 0.24 * tile.intensity,
         }}
       />
       <span
-        style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.3, fontFamily: HEADLINE_FONT }}
+        style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, lineHeight: 1.2, fontFamily: HEADLINE_FONT }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
       </span>
       {isAi && (
-        <div style={{ marginTop: 5 }}>
+        <div style={{ marginTop: 3 }}>
           <span
             className="inline-flex items-center gap-1 rounded-full font-bold"
             style={{ fontSize: 9, padding: '0px 6px', backgroundColor: S.amberContainer, color: S.onAmberContainer, fontFamily: HEADLINE_FONT }}
