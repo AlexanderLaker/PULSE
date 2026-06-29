@@ -1606,7 +1606,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               className="text-xs font-semibold uppercase tracking-[0.18em] mb-2"
               style={{ color: S.onSurfaceVariant }}
             >
-              Trend Intelligence · Editorial View
+              Trends
             </div>
             <h1
               className="font-extrabold tracking-tight"

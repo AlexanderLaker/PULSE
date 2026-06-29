@@ -191,6 +191,16 @@ const intensityTint = (up: boolean, intensity: 1 | 2 | 3): string => {
   return up ? `rgba(31,122,61,${a})` : `rgba(159,64,61,${a})`;
 };
 
+/** Pool-impact grade → tile tint depth. Pronounced spread: High is notably
+ *  dark, Low much lighter. `up` picks the hue (green tailwind / red headwind). */
+const gradeTint = (up: boolean, grade?: 'Low' | 'Med' | 'High'): string => {
+  const a = grade === 'High' ? 0.36 : grade === 'Med' ? 0.17 : 0.06;
+  return up ? `rgba(31,122,61,${a})` : `rgba(159,64,61,${a})`;
+};
+/** Pool-impact grade → left accent-bar opacity (High solid, Low faint). */
+const gradeBarOpacity = (grade?: 'Low' | 'Med' | 'High'): number =>
+  grade === 'High' ? 1 : grade === 'Med' ? 0.6 : 0.3;
+
 /** Trend strength on a 0–5 scale from the model's own inputs (impact ×
  *  probability, ÷5). Independent of the journey tile map. */
 const trendStrength = (t?: Trend): number | null => {
@@ -327,7 +337,7 @@ const TilePill: FC<{
       className="w-full text-left rounded-lg transition-all duration-150"
       style={{
         position: 'relative', display: 'block', padding: '2px 8px 2px 11px', marginBottom: 2,
-        backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
+        backgroundColor: selected ? S.surface : gradeTint(isExp, tile.poolImpact?.grade),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
         cursor: 'pointer', fontFamily: BODY_FONT,
@@ -337,7 +347,7 @@ const TilePill: FC<{
         aria-hidden="true"
         style={{
           position: 'absolute', left: 0, top: 2, bottom: 2, width: 3, borderRadius: 3,
-          backgroundColor: accent, opacity: 0.28 + 0.24 * tile.intensity,
+          backgroundColor: accent, opacity: gradeBarOpacity(tile.poolImpact?.grade),
         }}
       />
       <span
@@ -348,14 +358,6 @@ const TilePill: FC<{
       >
         {displayTileName(tile.name)}
       </span>
-      {tile.poolImpact && (
-        <span
-          style={{ display: 'inline-block', marginTop: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '0.06em', color: accent, fontFamily: HEADLINE_FONT }}
-          title={`Profit-pool impact from the 99 trends: ${tile.poolImpact.grade} (${tile.poolImpact.direction})`}
-        >
-          {isExp ? '▲' : '▼'} {tile.poolImpact.grade.toUpperCase()}
-        </span>
-      )}
       {isAi && (
         <div style={{ marginTop: 3 }}>
           <span
@@ -1049,7 +1051,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
         <header className="mb-5 flex items-start justify-between gap-8 flex-wrap">
           <div className="pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] mb-2" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-              Consumer Journey · Strategist Overlay
+              Consumer Journey
             </div>
             <h1 className="font-extrabold tracking-tight" style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '2.4rem', lineHeight: 1.1 }}>
               Where Profit Pools Shift Along the Journey
@@ -1087,12 +1089,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
         <div className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
           <Info size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 2 }} />
           <p className="text-[12.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, margin: 0 }}>
-            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping trends to consumer moments — authored content does not feed the Shift Matrix.</strong>{' '}
-            Reads are strategist-authored, graded and dated.
-            <span style={{ color: S.mutedText }}>
-              {' '}Content version {JOURNEY_CONTENT_VERSION}
-              {contentSource === 'server' && ' · edited content · server'}.
-            </span>
+            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping trends to consumer moments — authored content does not feed the Shift Matrix.</strong>
           </p>
         </div>
 
@@ -1452,7 +1449,6 @@ const PanelBody: FC<{
             <p style={{ fontSize: 14.5, color: S.onSurfaceVariant, lineHeight: 1.55, margin: '9px 0 0', maxWidth: '52rem' }}>{tile.driverNote}</p>
           )}
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 13 }}>
-            <ProvenanceChip provenance={tile.provenance} />
             <GradeChip grade={tile.provenance.grade} />
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>{ts.label}</span>
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Intensity {tile.intensity}/3</span>
