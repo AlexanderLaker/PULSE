@@ -316,7 +316,7 @@ const TilePill: FC<{
       onClick={onClick}
       className="w-full text-left rounded-lg transition-all duration-150"
       style={{
-        position: 'relative', display: 'block', padding: '3px 8px 3px 11px', marginBottom: 3,
+        position: 'relative', display: 'block', padding: '3px 8px 3px 11px', marginBottom: 2,
         backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -331,7 +331,7 @@ const TilePill: FC<{
         }}
       />
       <span
-        style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, lineHeight: 1.2, fontFamily: HEADLINE_FONT }}
+        style={{ fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.15, fontFamily: HEADLINE_FONT }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
