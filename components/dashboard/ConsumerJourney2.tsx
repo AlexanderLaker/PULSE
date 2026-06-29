@@ -348,6 +348,14 @@ const TilePill: FC<{
       >
         {displayTileName(tile.name)}
       </span>
+      {tile.poolImpact && (
+        <span
+          style={{ display: 'inline-block', marginTop: 2, fontSize: 8.5, fontWeight: 800, letterSpacing: '0.06em', color: accent, fontFamily: HEADLINE_FONT }}
+          title={`Profit-pool impact from the 99 trends: ${tile.poolImpact.grade} (${tile.poolImpact.direction})`}
+        >
+          {isExp ? '▲' : '▼'} {tile.poolImpact.grade.toUpperCase()}
+        </span>
+      )}
       {isAi && (
         <div style={{ marginTop: 3 }}>
           <span
@@ -650,6 +658,16 @@ const WhyChain: FC<{
               {dominant ? <>Dominant force <strong style={{ fontFamily: HEADLINE_FONT }}>{dominant}</strong>. </> : null}
               The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind (benefiting)' : 'a headwind (declining)'}</strong>.
             </p>
+            {tile.poolImpact && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                  Profit-pool impact from the 99 trends
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full" style={{ fontSize: 11, fontWeight: 800, padding: '1px 10px', color: '#fff', backgroundColor: accent, fontFamily: HEADLINE_FONT }}>
+                  {isExp ? '▲' : '▼'} {tile.poolImpact.grade}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
