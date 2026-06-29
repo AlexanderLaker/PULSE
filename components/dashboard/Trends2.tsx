@@ -300,47 +300,22 @@ const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ directi
   );
 };
 
-// ─── Section header help tip — "?" info icon with a hover/tap tooltip ─────
-// Mirrors Gp1InfoTip (the column-header pattern) but is sized for a section
-// title and anchors its tooltip to the card's header row (which is made
-// position:relative by SectionCard), opening downward over the card body so
-// it never spills outside the expanded panel.
-const SectionInfoTip: FC<{ text: React.ReactNode }> = ({ text }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        aria-label="What does this field mean?"
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: 'transparent', border: 'none', padding: 0, marginLeft: 1,
-          color: S.onSurfaceVariant, cursor: 'help',
-        }}
-      >
-        <Info size={12} strokeWidth={2.4} />
-      </button>
-      {open && (
-        <span role="tooltip" style={{
-          position: 'absolute', left: 0, top: 'calc(100% + 6px)', zIndex: 50,
-          width: 264, padding: '10px 12px', borderRadius: 8,
-          backgroundColor: S.onSurface, color: S.surface,
-          fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500,
-          textTransform: 'none', letterSpacing: 0, textAlign: 'left',
-          boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
-          pointerEvents: 'none', whiteSpace: 'normal',
-        }}>
-          {text}
-        </span>
-      )}
-    </>
-  );
-};
+// ─── Section header help tip — "?" info icon with a plain hover tooltip ───
+// Uses the native browser `title` tooltip, matching the existing "AI suggests…"
+// hovers on the dots/sliders/AI chips (which are all plain `title` tooltips) —
+// rather than a custom styled box. Hovering the icon shows the field hint.
+const SectionInfoTip: FC<{ text: string }> = ({ text }) => (
+  <span
+    title={text}
+    aria-label={text}
+    style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      marginLeft: 1, color: S.onSurfaceVariant, cursor: 'help',
+    }}
+  >
+    <Info size={12} strokeWidth={2.4} />
+  </span>
+);
 
 // ─── Section Card — boxed card for each sub-section in the expanded panel ─
 interface SectionCardProps {
@@ -348,8 +323,8 @@ interface SectionCardProps {
   icon: LucideIcon;
   accent?: string;
   footnote?: React.ReactNode;
-  /** Optional "?" help tooltip shown next to the title. */
-  info?: React.ReactNode;
+  /** Optional "?" help tooltip (plain hover text) shown next to the title. */
+  info?: string;
   children: React.ReactNode;
 }
 const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, children }) => (
