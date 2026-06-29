@@ -1193,7 +1193,21 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const srcOf = (key: string, hasExpert: boolean): 'ai' | 'expert' | 'manual' => src[key] ?? (hasExpert ? 'expert' : 'ai');
   const setS = (key: string, s: 'ai' | 'expert' | 'manual') => setSrc((p) => ({ ...p, [key]: s }));
   const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
-  const setAll = (s: 'ai' | 'expert') => setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s, vc: s });
+  const setAll = (s: 'ai' | 'expert' | 'manual') => {
+    // "Set all to Manual" seeds the scalar inputs with the expert ø (else the
+    // AI baseline) so the fields start from a sensible value to edit rather
+    // than blank. Exposure cells already default the same way via manCell.
+    if (s === 'manual') {
+      const numStr = (v: number | undefined) => (v == null ? '' : String(v));
+      setMan({
+        probability: numStr(eP != null ? Math.round(eP) : aP != null ? Math.round(aP) : undefined),
+        gp1: numStr(eG != null ? Math.round(eG * 100) : aG != null ? Math.round(aG * 100) : undefined),
+        peak: numStr(ePk != null ? Math.round(ePk) : aPk != null ? aPk : undefined),
+        curve: eCv || aCv || '',
+      });
+    }
+    setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s, vc: s });
+  };
   // Manual per-cell exposure overrides. Default each cell to the expert ø
   // (rounded) where scored, else the AI baseline; editing a cell switches the
   // group to Manual.
@@ -1433,6 +1447,10 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
               <button type="button" onClick={() => setAll('ai')}
                 style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: S.onSurface }}>
                 AI baseline
+              </button>
+              <button type="button" onClick={() => setAll('manual')}
+                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: S.primary }}>
+                Manual
               </button>
             </div>
             <div className="flex items-center gap-3">
