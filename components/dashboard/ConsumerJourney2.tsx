@@ -37,7 +37,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ExternalLink, ArrowRight, X, Edit3, Check,
   Info, PenLine, Sparkles, CircleCheck, Zap, TriangleAlert, Cloud,
-  Plus, Trash2, Save, ChevronDown, ChevronRight,
+  Plus, Trash2, Save, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import {
@@ -184,6 +184,35 @@ const fmtPct = (fraction: number): string => {
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 };
 
+/** Display name with a trailing parenthetical stripped (declutter, 2026-06-27).
+ *  Display-only — the seed/content name is never mutated, so this is reversible
+ *  and loses nothing (the full string still lives in the content store). */
+const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
+
+/** Categories that own each journey (CLAUDE.md §9 taxonomy). Shown in the
+ *  detail panel's "This moment" step so a reader sees whose pool a stage feeds. */
+const JOURNEY_OWNERS: Record<JourneyKey, string[]> = {
+  lhc: ['FCN', 'FCA', 'FFI', 'LAD', 'HDW', 'ADW', 'HSC', 'IC'],
+  hair: ['Color', 'Care', 'Styling', 'Body'],
+};
+
+/** Intensity → surface tint depth — the declutter replacement for the dots
+ *  (2026-06-27): a stronger tile reads more saturated so the pressure pattern
+ *  stays legible at a squint, with no extra chip. `up` picks the hue. */
+const intensityTint = (up: boolean, intensity: 1 | 2 | 3): string => {
+  const a = 0.03 + 0.05 * intensity; // 0.08 / 0.13 / 0.18
+  return up ? `rgba(31,122,61,${a})` : `rgba(159,64,61,${a})`;
+};
+
+/** Trend strength on a 0–5 scale from the model's own inputs (impact ×
+ *  probability, ÷5). Independent of the journey tile map. */
+const trendStrength = (t?: Trend): number | null => {
+  if (!t) return null;
+  const score = typeof t.score === 'number' ? t.score : (t.impact ?? 0) * (t.probability ?? 0);
+  if (!score) return null;
+  return Math.min(5, score / 5);
+};
+
 // ════════════════════════════════════════════════════════════════════════
 // Small presentational atoms
 // ════════════════════════════════════════════════════════════════════════
@@ -221,23 +250,7 @@ const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => void }> 
   );
 };
 
-/** Intensity dots: filled = intensity, hollow = remainder up to 3. */
-const IntensityDots: FC<{ intensity: 1 | 2 | 3; color: string }> = ({ intensity, color }) => (
-  <span style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }} aria-label={`Intensity ${intensity} of 3`}>
-    {[1, 2, 3].map(n => (
-      <span
-        key={n}
-        style={{
-          width: 5, height: 5, borderRadius: 999,
-          backgroundColor: n <= intensity ? color : 'transparent',
-          border: `1px solid ${color}`, opacity: n <= intensity ? 1 : 0.4,
-        }}
-      />
-    ))}
-  </span>
-);
-
-/** Provenance chip — ✍️ strategist / ✨ AI + date. Never stripped (fix #1). */
+/** Provenance chip — strategist / AI + date. Never stripped (fix #1). */
 const ProvenanceChip: FC<{ provenance: TileProvenance; compact?: boolean }> = ({ provenance, compact }) => {
   const isAi = provenance.author === 'ai';
   const Icon = isAi ? Sparkles : PenLine;
@@ -308,38 +321,34 @@ const TilePill: FC<{
 }> = ({ tile, direction, selected, onClick }) => {
   const isExp = direction === 'benefiting';
   const accent = isExp ? S.expansion : S.error;
-  const accentBg = isExp ? 'rgba(45,125,63,0.06)' : 'rgba(159,64,61,0.06)';
-  const ts = TYPE_STYLES[tile.type];
   const isAi = tile.provenance.author === 'ai';
+  // Declutter (2026-06-27): no dots, no type chip, name parenthetical stripped.
+  // Intensity is carried by surface tint depth + a left accent bar instead.
   return (
     <button
       onClick={onClick}
       className="w-full text-left rounded-xl transition-all duration-150"
       style={{
-        display: 'block', padding: '7px 8px', marginBottom: 5,
-        backgroundColor: selected ? S.surface : accentBg,
+        position: 'relative', display: 'block', padding: '8px 9px 8px 13px', marginBottom: 5,
+        backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
         cursor: 'pointer', fontFamily: BODY_FONT,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-        <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.3, fontFamily: HEADLINE_FONT }}>
-          {tile.name}
-        </span>
-        <IntensityDots intensity={tile.intensity} color={accent} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, flexWrap: 'wrap' }}>
-        <span
-          className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 9, padding: '0px 6px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}
-        >
-          {ts.label}
-        </span>
-        {/* Trend-code chips intentionally omitted from the tile (declutter,
-            2026-06-14). Linked trends remain on the detail panel's Evidence
-            cards; the tile stays scannable and the rail fits on one screen. */}
-      </div>
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 3,
+          backgroundColor: accent, opacity: 0.28 + 0.24 * tile.intensity,
+        }}
+      />
+      <span
+        style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.3, fontFamily: HEADLINE_FONT }}
+        title={tile.name}
+      >
+        {displayTileName(tile.name)}
+      </span>
       {isAi && (
         <div style={{ marginTop: 5 }}>
           <span
@@ -355,14 +364,36 @@ const TilePill: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Evidence card (in the detail panel) — resolves a code to the LIVE trend.
+// Small bar metric — a labelled 0–5 value with a fill bar (right column of a
+// trend-force card). Used for Strength and Stage exposure.
 // ════════════════════════════════════════════════════════════════════════
-const EvidenceCard: FC<{
+const BarMetric: FC<{ label: string; value: number; color: string; title?: string }> = ({ label, value, color, title }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 108 }} title={title}>
+    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText, fontFamily: HEADLINE_FONT }}>
+      {label}
+    </span>
+    <span className="tabular-nums" style={{ fontSize: 11.5, fontWeight: 800, color: S.onSurface, fontFamily: HEADLINE_FONT }}>
+      {value.toFixed(1)}/5
+    </span>
+    <span style={{ display: 'block', height: 5, borderRadius: 3, backgroundColor: S.surfaceHigh, overflow: 'hidden' }}>
+      <span style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(1, value / 5)) * 100}%`, borderRadius: 3, backgroundColor: color }} />
+    </span>
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════════════
+// Trend-force card (in the detail panel) — resolves a code to the LIVE trend
+// and reads it as a directional force: tailwind/headwind, strength, and how
+// hard it hits THIS stage. The connect to the Trends page (B1/B3 preserved).
+// ════════════════════════════════════════════════════════════════════════
+const TrendForceCard: FC<{
   code: string;
+  journeyKey: JourneyKey;
+  stageId: string;
   trendsById: Map<string, Trend>;
   trendsLoaded: boolean;
   onNavigateToTrend?: (query: string) => void;
-}> = ({ code, trendsById, trendsLoaded, onNavigateToTrend }) => {
+}> = ({ code, journeyKey, stageId, trendsById, trendsLoaded, onNavigateToTrend }) => {
   // Retired codes get a muted card with NO live-driver styling (fix B3).
   const retired = RETIRED_CODES[code];
   if (retired) {
@@ -403,88 +434,99 @@ const EvidenceCard: FC<{
 
   const name = live?.name ?? info.name;
   const direction = live?.direction ?? info.direction;
+  const isExp = direction === 'Expansion';
   // fallbackDescription only when trends haven't loaded (fix #3 wording).
   const description = live?.description ?? (trendsLoaded ? '' : info.fallbackDescription);
-  const probability = live?.probability;
-  const confidence = live?.confidence;
+  const strength = trendStrength(live);
+  const stageExp = live?.journey_exposure?.[`${journeyKey}:${stageId}`];
   const sourceCount = live?.sources?.length;
 
   return (
     <div className="rounded-xl p-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
+      {/* identity row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span
           className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 10, padding: '1px 7px', backgroundColor: `${c}1a`, color: c, fontFamily: HEADLINE_FONT }}
+          style={{ fontSize: 10, padding: '1px 7px', backgroundColor: c, color: '#fff', fontFamily: HEADLINE_FONT }}
         >
           {code}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3 }}>{name}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{name}</span>
         <span
           className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: `${c}14`, color: c, fontFamily: HEADLINE_FONT }}
+          style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: `${c}14`, color: c, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
         >
           {info.force}
         </span>
+      </div>
+      {/* force row: direction + strength + stage exposure */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
         <span
           className="inline-flex items-center gap-1 rounded-full font-bold"
           style={{
-            fontSize: 9.5, padding: '1px 7px',
-            backgroundColor: direction === 'Expansion' ? S.expansionContainer : S.errorContainer,
-            color: direction === 'Expansion' ? S.onExpansionContainer : S.onErrorContainer,
-            fontFamily: HEADLINE_FONT,
+            fontSize: 10.5, padding: '2px 9px',
+            backgroundColor: isExp ? S.expansionContainer : S.errorContainer,
+            color: isExp ? S.onExpansionContainer : S.onErrorContainer,
+            fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
           }}
+          title={isExp ? 'Expansion trend — a tailwind for this moment' : 'Contraction trend — a headwind for this moment'}
         >
-          {direction === 'Expansion' ? <TrendingUp size={9} strokeWidth={2.5} /> : <TrendingDown size={9} strokeWidth={2.5} />}
-          {direction}
+          {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
+          {isExp ? 'Tailwind' : 'Headwind'}
         </span>
-        {typeof probability === 'number' && (
-          <span style={{ fontSize: 10, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
-            P {probability.toFixed(1)}/5
-          </span>
+        {typeof strength === 'number' && (
+          <BarMetric
+            label="Strength"
+            value={strength}
+            color={c}
+            title={`Impact ${(live?.impact ?? 0).toFixed(1)} × Probability ${(live?.probability ?? 0).toFixed(1)} — the model's own inputs, independent of the journey map.`}
+          />
         )}
-        {confidence && (
-          <span style={{ fontSize: 10, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, fontWeight: 700 }}>
-            {confidence} confidence
-          </span>
-        )}
-        {typeof sourceCount === 'number' && (
-          <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
-            {sourceCount} source{sourceCount === 1 ? '' : 's'}
-          </span>
+        {typeof stageExp === 'number' && (
+          <BarMetric
+            label="Stage exposure"
+            value={stageExp}
+            color={c}
+            title="This trend's journey-exposure for this stage (0–5). AI-suggested, derived from the tile intensities; pending strategist review — read as how strongly the tile map links this trend here, not as independent evidence."
+          />
         )}
       </div>
       {description && (
-        <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '7px 0 0' }}>
+        <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
           {description}
           {!live && !trendsLoaded && (
             <span style={{ color: S.mutedText, fontStyle: 'italic' }}> (offline fallback)</span>
           )}
         </p>
       )}
-      <button
-        onClick={() => onNavigateToTrend?.(live?.name ?? info.name)}
-        className="inline-flex items-center gap-1.5 mt-2"
-        style={{
-          fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',
-          border: 'none', cursor: 'pointer', padding: 0, fontFamily: HEADLINE_FONT,
-        }}
-        onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-        onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
-      >
-        <ExternalLink size={11} strokeWidth={2.5} />
-        View in Trends
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => onNavigateToTrend?.(live?.name ?? info.name)}
+          className="inline-flex items-center gap-1.5"
+          style={{
+            fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',
+            border: 'none', cursor: 'pointer', padding: 0, fontFamily: HEADLINE_FONT,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+          onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+        >
+          <ExternalLink size={11} strokeWidth={2.5} />
+          View in Trends
+        </button>
+        {typeof sourceCount === 'number' && sourceCount > 0 && (
+          <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
+            {sourceCount} source{sourceCount === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Stage context block (collapsible) — from LHC_CTX / HAIR_CTX (keyed by label).
+// Stage context block (always visible) — from LHC_CTX / HAIR_CTX (by label).
 // ════════════════════════════════════════════════════════════════════════
 const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({ stageLabel, journeyKey }) => {
-  const [open, setOpen] = useState(false);
   const ctxMap = journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX;
   const ctx = ctxMap[stageLabel];
   if (!ctx) return null;
@@ -494,43 +536,22 @@ const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({
     { label: 'Opportunity', value: ctx.opportunity },
   ];
   return (
-    <div className="rounded-2xl" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)', overflow: 'hidden' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3"
-        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-      >
-        <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] pl-2.5" style={{ color: S.onSurfaceVariant, borderLeft: `3px solid ${S.primaryDim}`, fontFamily: HEADLINE_FONT }}>
-          Stage context — {stageLabel}
-        </span>
-        {open ? <ChevronDown size={15} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} /> : <ChevronRight size={15} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />}
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            style={{ overflow: 'hidden' }}
-          >
-            <div className="px-4 pb-4 flex flex-col gap-2.5">
-              {rows.map(r => (
-                <div key={r.label}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, marginBottom: 2 }}>
-                    {r.label}
-                  </div>
-                  <p style={{ fontSize: 12, color: S.onSurface, lineHeight: 1.55, margin: 0 }}>{r.value}</p>
-                </div>
-              ))}
-              <p style={{ fontSize: 10.5, color: S.mutedText, margin: '2px 0 0', fontStyle: 'italic' }}>
-                Authored stage context — same provenance rules as the tile reads.
-              </p>
+    <SectionCard
+      title={`Stage context — ${stageLabel}`}
+      accent={S.primary}
+      subtitle="Authored stage context — same provenance rules as the tile reads"
+    >
+      <div className="flex flex-col gap-2.5">
+        {rows.map(r => (
+          <div key={r.label}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, marginBottom: 2 }}>
+              {r.label}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            <p style={{ fontSize: 12, color: S.onSurface, lineHeight: 1.55, margin: 0 }}>{r.value}</p>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
   );
 };
 
@@ -565,6 +586,160 @@ const AttributionChip: FC<{ value: number | null }> = ({ value }) => {
       {positive ? <TrendingUp size={9} strokeWidth={2.5} /> : <TrendingDown size={9} strokeWidth={2.5} />}
       {fmtPct(value)}
     </span>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// Why-chain (B, 2026-06-27) — the de-blackbox ladder: this moment → driving
+// trends (link to Trends) → net effect → the one computed figure. Makes the
+// reasoning behind the authored classification visible, without ever claiming
+// the classification is simulated. Trends + attribution are real; the read is judgment.
+// ════════════════════════════════════════════════════════════════════════
+const StepDot: FC<{ n: number }> = ({ n }) => (
+  <span style={{
+    position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: 999,
+    backgroundColor: S.primary, color: '#fff', fontFamily: HEADLINE_FONT, fontWeight: 800,
+    fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
+  }}>{n}</span>
+);
+
+const WhyChain: FC<{
+  tile: JourneyTile;
+  stageId: string;
+  stageLabel: string;
+  journeyKey: JourneyKey;
+  direction: Direction;
+  attribution: number | null;
+  trendsById: Map<string, Trend>;
+  trendsLoaded: boolean;
+  onNavigateToTrend?: (query: string) => void;
+}> = ({ tile, stageId, stageLabel, journeyKey, direction, attribution, trendsById, trendsLoaded, onNavigateToTrend }) => {
+  const isExp = direction === 'benefiting';
+  const accent = isExp ? S.expansion : S.error;
+  const owners = JOURNEY_OWNERS[journeyKey];
+
+  // Net effect from the live trends' OWN directions (independent of the tile map).
+  const resolved = tile.trendCodes
+    .filter(code => !RETIRED_CODES[code])
+    .map(code => {
+      const info = TREND_CODE_MAP[code];
+      const id = trendIdForCode(code);
+      const live = id ? trendsById.get(id) : undefined;
+      return { dir: live?.direction ?? info?.direction, force: live?.force ?? info?.force };
+    })
+    .filter(r => r.dir);
+  const up = resolved.filter(r => r.dir === 'Expansion').length;
+  const down = resolved.filter(r => r.dir === 'Contraction').length;
+  const forceCounts: Record<string, number> = {};
+  resolved.forEach(r => { if (r.force) forceCounts[r.force] = (forceCounts[r.force] ?? 0) + 1; });
+  const dominant = Object.entries(forceCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const stepWrap: React.CSSProperties = { position: 'relative', paddingLeft: 38, paddingBottom: 18 };
+  const connector: React.CSSProperties = {
+    position: 'absolute', left: 11.5, top: 24, bottom: 0, width: 1.5,
+    background: `linear-gradient(${S.outline}, rgba(71,125,187,0.2))`,
+  };
+  const stepLabel: React.CSSProperties = {
+    fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+    color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
+  };
+
+  return (
+    <div className="rounded-2xl p-4" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
+      <h3 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.01em', margin: 0, color: S.onBg }}>
+        {isExp ? 'Why this moment is expanding' : 'Why this moment is under pressure'}
+      </h3>
+
+      <div style={{ marginTop: 14 }}>
+        {/* 1 — this moment */}
+        <div style={stepWrap}>
+          <StepDot n={1} /><span style={connector} />
+          <div style={stepLabel}>This moment</div>
+          <div style={{ marginTop: 5 }}>
+            <p style={{ fontSize: 13, color: S.onSurface, lineHeight: 1.5, margin: 0 }}>
+              <strong style={{ fontFamily: HEADLINE_FONT }}>{stageLabel}</strong> — part of the {journeyKey === 'lhc' ? 'Laundry' : 'Hair'} journey.
+            </p>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: S.mutedText, marginRight: 2 }}>Owned by categories:</span>
+              {owners.map(o => (
+                <span key={o} style={{ fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 10, borderRadius: 6, padding: '2px 7px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant }}>{o}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 2 — driving trends */}
+        <div style={stepWrap}>
+          <StepDot n={2} /><span style={connector} />
+          <div style={stepLabel}>Driving trends — links to the Trends page</div>
+          <div style={{ marginTop: 8 }}>
+            {tile.trendCodes.length === 0 ? (
+              <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No trends linked to this tile.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {tile.trendCodes.map(code => (
+                  <TrendForceCard
+                    key={code} code={code} journeyKey={journeyKey} stageId={stageId}
+                    trendsById={trendsById} trendsLoaded={trendsLoaded} onNavigateToTrend={onNavigateToTrend}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3 — net effect */}
+        <div style={stepWrap}>
+          <StepDot n={3} /><span style={connector} />
+          <div style={stepLabel}>Net effect</div>
+          <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceContainer, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.expansion }}>
+                <TrendingUp size={14} strokeWidth={2.5} /> {up} tailwind
+              </span>
+              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.error }}>
+                <TrendingDown size={14} strokeWidth={2.5} /> {down} headwind
+              </span>
+            </div>
+            <p style={{ fontSize: 12.5, color: S.onSurface, lineHeight: 1.5, margin: '9px 0 0' }}>
+              {dominant ? <>Dominant force <strong style={{ fontFamily: HEADLINE_FONT }}>{dominant}</strong>. </> : null}
+              The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind (benefiting)' : 'a headwind (declining)'}</strong>.
+            </p>
+          </div>
+        </div>
+
+        {/* 4 — computed attribution */}
+        <div style={{ ...stepWrap, paddingBottom: 0 }}>
+          <StepDot n={4} />
+          <div style={stepLabel}>Computed attribution — the only simulated figure</div>
+          <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`, padding: '12px 14px' }}>
+            {attribution === null ? (
+              <p style={{ fontSize: 12.5, color: S.mutedText, fontStyle: 'italic', lineHeight: 1.5, margin: 0 }}>
+                The latest persisted run carries no attribution for this stage yet — it arrives with the next production run.
+              </p>
+            ) : (
+              <>
+                <div className="inline-flex items-center gap-1.5 tabular-nums" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em', color: attribution >= 0 ? S.expansion : S.error }}>
+                  {attribution >= 0 ? <TrendingUp size={20} strokeWidth={2.5} /> : <TrendingDown size={20} strokeWidth={2.5} />}
+                  {fmtPct(attribution)}
+                </div>
+                <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '6px 0 0' }}>
+                  Share of this stage in the terminal-year median shift of its categories (journey-exposure weighted). The only computed figure here — it redistributes, it never changes totals.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* honesty line */}
+      <div className="flex items-start gap-2 rounded-xl" style={{ marginTop: 15, padding: '11px 13px', backgroundColor: S.surfaceLow, border: `1px dashed ${S.cardBorder}` }}>
+        <Info size={13} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 1 }} />
+        <p style={{ fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.5, margin: 0 }}>
+          <strong style={{ fontFamily: HEADLINE_FONT }}>Trends</strong> are real model inputs · <strong style={{ fontFamily: HEADLINE_FONT }}>Attribution</strong> is the only computed figure · the <strong style={{ fontFamily: HEADLINE_FONT }}>Strategist Read</strong> is judgment, not simulated.
+        </p>
+      </div>
+    </div>
   );
 };
 
@@ -807,6 +982,43 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   }, []);
   const closePanel = useCallback(() => { setSelected(null); setEditing(false); }, []);
 
+  // ── Flattened, visible tile order for prev/next navigation in the dialog ──
+  //   Stage-major (benefiting then declining within a stage), filtered + sorted
+  //   exactly as the rail renders, so ◀ ▶ steps through neighbours you can see.
+  const flatTiles = useMemo<SelectedTile[]>(() => {
+    const out: SelectedTile[] = [];
+    for (const s of stages) {
+      const ben = s.benefiting.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+      const neg = s.negativelyImpacted.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+      ben.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'benefiting' }));
+      neg.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'negativelyImpacted' }));
+    }
+    return out;
+  }, [stages, typeFilter]);
+  const selectedIndex = useMemo(
+    () => (selected ? flatTiles.findIndex(f => f.tile.id === selected.tile.id) : -1),
+    [flatTiles, selected],
+  );
+  const stepSelection = useCallback((delta: number) => {
+    if (selectedIndex < 0) return;
+    const ni = selectedIndex + delta;
+    if (ni < 0 || ni >= flatTiles.length) return;
+    setSelected(flatTiles[ni]);
+    setEditing(false);
+  }, [selectedIndex, flatTiles]);
+
+  // ── Keyboard: Esc closes, ←/→ step to neighbour tiles (only while open) ──
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePanel();
+      else if (e.key === 'ArrowLeft') stepSelection(-1);
+      else if (e.key === 'ArrowRight') stepSelection(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, closePanel, stepSelection]);
+
   // ── Admin mutations (local state first; persisted on "Save to server") ──
   const mutateTile = useCallback((
     journeyKey: JourneyKey,
@@ -847,7 +1059,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
     setEditing(false);
   }, [mutateTile, tab]);
 
-  // ── Approve an AI-suggested tile (promote ✨ AI → ✍️ strategist) ──
+  // ── Approve an AI-suggested tile (promote AI suggestion to strategist) ──
   //   The reviewer accepts the mapping: the tile loses its "pending review"
   //   treatment and becomes a regular strategist-authored read. Grade is
   //   left as-is (review ≠ new hard evidence); the date is stamped now.
@@ -992,10 +1204,10 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.expansion, fontFamily: HEADLINE_FONT }}>
-                <TrendingUp size={12} strokeWidth={2.5} /> Benefiting {totals.benefiting}
+                <TrendingUp size={12} strokeWidth={2.5} /> Tailwind {totals.benefiting}
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.error, fontFamily: HEADLINE_FONT }}>
-                <TrendingDown size={12} strokeWidth={2.5} /> Declining {totals.declining}
+                <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.declining}
               </span>
               {totals.ai > 0 && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.onAmberContainer, fontFamily: HEADLINE_FONT }}>
@@ -1084,7 +1296,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.expansion, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
-                        <TrendingUp size={10} strokeWidth={2.5} /> Benefiting
+                        <TrendingUp size={10} strokeWidth={2.5} /> Tailwind
                       </span>
                       {isAdmin && (
                         <button
@@ -1124,7 +1336,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.error, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
-                        <TrendingDown size={10} strokeWidth={2.5} /> Declining
+                        <TrendingDown size={10} strokeWidth={2.5} /> Headwind
                       </span>
                       {isAdmin && (
                         <button
@@ -1201,43 +1413,61 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
       </main>
 
       {/* ════════════════════════════════════════════════════════════════
-          Detail panel (drawer) — Strategist Read + evidence + context
+          Detail dialog (full-screen) — Why-chain + Strategist Read + context
       ════════════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {selected && (
           <>
             <motion.div
+              key="cj-scrim"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              onClick={closePanel}
-              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,52,94,0.45)', zIndex: 40 }}
+              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,52,94,0.55)', backdropFilter: 'blur(2px)', zIndex: 40 }}
             />
-            <motion.aside
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+            <motion.div
+              key="cj-dialog"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              onClick={closePanel}
               style={{
-                position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(560px, 100vw)',
-                backgroundColor: S.bg, zIndex: 50, overflowY: 'auto',
-                boxShadow: '-12px 0 60px -20px rgba(0,52,94,0.3)',
+                position: 'fixed', inset: 0, zIndex: 50, overflowY: 'auto',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '28px 20px',
               }}
             >
-              <PanelBody
-                selected={selected}
-                journeyKey={tab}
-                trendsById={trendsById}
-                trendsLoaded={trendsLoaded}
-                attribution={attributionFor(selected.stageId)}
-                isAdmin={isAdmin}
-                editing={editing}
-                onClose={closePanel}
-                onEdit={() => setEditing(true)}
-                onCancelEdit={() => setEditing(false)}
-                onApplyEdits={edits => applyEdits(selected, edits)}
-                onRemove={() => removeTile(selected)}
-                onApprove={() => approveAiTile(selected)}
-                onNavigateToTrend={onNavigateToTrend}
-              />
-            </motion.aside>
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${displayTileName(selected.tile.name)} — detail`}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  width: 'min(1120px, 100%)', margin: 'auto', maxHeight: '92vh',
+                  display: 'flex', flexDirection: 'column',
+                  backgroundColor: S.bg, borderRadius: 20,
+                  boxShadow: '0 2px 4px rgba(0,52,94,0.05), 0 12px 32px -8px rgba(0,52,94,0.16), 0 28px 60px -14px rgba(0,52,94,0.20)',
+                  overflow: 'hidden',
+                }}
+              >
+                <PanelBody
+                  selected={selected}
+                  journeyKey={tab}
+                  trendsById={trendsById}
+                  trendsLoaded={trendsLoaded}
+                  attribution={attributionFor(selected.stageId)}
+                  isAdmin={isAdmin}
+                  editing={editing}
+                  position={selectedIndex >= 0 ? { index: selectedIndex, total: flatTiles.length } : null}
+                  onPrev={() => stepSelection(-1)}
+                  onNext={() => stepSelection(1)}
+                  onClose={closePanel}
+                  onEdit={() => setEditing(true)}
+                  onCancelEdit={() => setEditing(false)}
+                  onApplyEdits={edits => applyEdits(selected, edits)}
+                  onRemove={() => removeTile(selected)}
+                  onApprove={() => approveAiTile(selected)}
+                  onNavigateToTrend={onNavigateToTrend}
+                />
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
@@ -1256,6 +1486,9 @@ const PanelBody: FC<{
   attribution: number | null;
   isAdmin: boolean;
   editing: boolean;
+  position: { index: number; total: number } | null;
+  onPrev: () => void;
+  onNext: () => void;
   onClose: () => void;
   onEdit: () => void;
   onCancelEdit: () => void;
@@ -1265,160 +1498,152 @@ const PanelBody: FC<{
   onNavigateToTrend?: (query: string) => void;
 }> = ({
   selected, journeyKey, trendsById, trendsLoaded, attribution,
-  isAdmin, editing, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onApprove, onNavigateToTrend,
+  isAdmin, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onApprove, onNavigateToTrend,
 }) => {
-  const { tile, stageLabel, direction } = selected;
+  const { tile, stageId, stageLabel, direction } = selected;
   const isExp = direction === 'benefiting';
-  const accent = isExp ? S.expansion : S.error;
   const ts = TYPE_STYLES[tile.type];
+  const isAi = tile.provenance.author === 'ai';
+  const canPrev = !!position && position.index > 0;
+  const canNext = !!position && position.index < position.total - 1;
+
+  const iconBtn: React.CSSProperties = {
+    width: 34, height: 34, borderRadius: 999, border: 'none', backgroundColor: S.surfaceLow,
+    color: S.onSurfaceVariant, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+  };
+  const iconBtnOff: React.CSSProperties = { ...iconBtn, opacity: 0.4, cursor: 'default' };
 
   return (
-    <div className="flex flex-col gap-4 p-5">
-      {/* Header strip */}
-      <div className="flex items-start justify-between gap-3">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-              {journeyKey === 'lhc' ? 'Laundry' : 'Hair'} · {stageLabel}
-            </span>
-            <span
-              className="inline-flex items-center gap-1 rounded-full font-bold"
-              style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: isExp ? S.expansionContainer : S.errorContainer, color: isExp ? S.onExpansionContainer : S.onErrorContainer, fontFamily: HEADLINE_FONT }}
-            >
-              {isExp ? <TrendingUp size={9} strokeWidth={2.5} /> : <TrendingDown size={9} strokeWidth={2.5} />}
-              {isExp ? 'Benefiting' : 'Declining'}
-            </span>
-          </div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: S.onBg, lineHeight: 1.15, fontFamily: HEADLINE_FONT, margin: 0 }}>
-            {tile.name}
-          </h2>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10, padding: '1px 8px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>
-              {ts.label}
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <IntensityDots intensity={tile.intensity} color={accent} />
-              <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }}>
-                intensity {tile.intensity}/3
-              </span>
-            </span>
-            <ProvenanceChip provenance={tile.provenance} />
-            <GradeChip grade={tile.provenance.grade} />
-          </div>
-          {tile.driverNote && (
-            <p style={{ fontSize: 12, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '8px 0 0' }}>
-              {tile.driverNote}
-            </p>
-          )}
-          <div style={{ marginTop: 8 }}>
-            <AttributionChip value={attribution} />
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, width: '100%', fontFamily: BODY_FONT }}>
+      {/* ── Sticky top bar — breadcrumb · neighbour nav · close ── */}
+      <div style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 18px', backgroundColor: 'rgba(248,249,255,0.92)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${S.cardBorder}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12, color: S.onSurfaceVariant, minWidth: 0 }}>
+          <span style={{ whiteSpace: 'nowrap' }}>{journeyKey === 'lhc' ? 'Laundry' : 'Hair'}</span>
+          <ChevronRight size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          <span style={{ color: S.onBg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stageLabel}</span>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-full p-1.5"
-          style={{ backgroundColor: S.surfaceLow, border: 'none', cursor: 'pointer', color: S.onSurfaceVariant, flexShrink: 0 }}
-          aria-label="Close"
-        >
-          <X size={16} strokeWidth={2.5} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span style={{ fontSize: 10.5, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700, marginRight: 2 }}>Esc to close</span>
+          <button onClick={onPrev} disabled={!canPrev} style={canPrev ? iconBtn : iconBtnOff} aria-label="Previous tile" title="Previous tile"><ChevronLeft size={16} strokeWidth={2.5} /></button>
+          <button onClick={onNext} disabled={!canNext} style={canNext ? iconBtn : iconBtnOff} aria-label="Next tile" title="Next tile"><ChevronRight size={16} strokeWidth={2.5} /></button>
+          <button onClick={onClose} style={iconBtn} aria-label="Close" title="Close"><X size={16} strokeWidth={2.5} /></button>
+        </div>
       </div>
 
-      {tile.provenance.author === 'ai' && (
-        <div className="rounded-xl px-3.5 py-2.5" style={{ backgroundColor: S.amberContainer }}>
-          <div className="flex items-start gap-2">
-            <Sparkles size={13} strokeWidth={2.5} style={{ color: S.onAmberContainer, flexShrink: 0, marginTop: 1 }} />
-            <p style={{ fontSize: 11.5, color: S.onAmberContainer, lineHeight: 1.5, margin: 0 }}>
-              AI-suggested mapping ({tile.provenance.date}) — <strong style={{ fontFamily: HEADLINE_FONT }}>pending strategist review</strong>. Treat as a hypothesis until verified.
-            </p>
+      {/* ── Scroll body ── */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {/* Hero */}
+        <div style={{ padding: '22px 26px 18px', borderBottom: `1px solid ${S.cardBorder}` }}>
+          <span
+            className="inline-flex items-center gap-1 rounded-full font-bold"
+            style={{ fontSize: 11, padding: '3px 11px', backgroundColor: isExp ? S.expansionContainer : S.errorContainer, color: isExp ? S.onExpansionContainer : S.onErrorContainer, fontFamily: HEADLINE_FONT }}
+          >
+            {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
+            {isExp ? 'Tailwind' : 'Headwind'}
+          </span>
+          <h2 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.7rem', lineHeight: 1.12, letterSpacing: '-0.02em', margin: '11px 0 0', color: S.onBg }} title={tile.name}>
+            {displayTileName(tile.name)}
+          </h2>
+          {tile.driverNote && (
+            <p style={{ fontSize: 14.5, color: S.onSurfaceVariant, lineHeight: 1.55, margin: '9px 0 0', maxWidth: '52rem' }}>{tile.driverNote}</p>
+          )}
+          <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 13 }}>
+            <ProvenanceChip provenance={tile.provenance} />
+            <GradeChip grade={tile.provenance.grade} />
+            <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>{ts.label}</span>
+            <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Intensity {tile.intensity}/3</span>
           </div>
-          {isAdmin && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={onApprove}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
-                  style={{ backgroundColor: S.expansion, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-                  title="Approve — promote this AI suggestion to a regular strategist-reviewed read"
-                >
-                  <Check size={13} strokeWidth={2.5} /> Approve
-                </button>
-                <button
-                  onClick={onRemove}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
-                  style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-                  title="Discard — remove this AI suggestion from the journey"
-                >
-                  <Trash2 size={13} strokeWidth={2.5} /> Discard
-                </button>
+
+          {isAi && (
+            <div className="rounded-xl" style={{ marginTop: 14, backgroundColor: S.amberContainer, padding: '11px 14px' }}>
+              <div className="flex items-start gap-2">
+                <Sparkles size={13} strokeWidth={2.5} style={{ color: S.onAmberContainer, flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 11.5, color: S.onAmberContainer, lineHeight: 1.5, margin: 0 }}>
+                  AI-suggested mapping ({tile.provenance.date}) — <strong style={{ fontFamily: HEADLINE_FONT }}>pending strategist review</strong>. Treat as a hypothesis until verified.
+                </p>
               </div>
-              <p style={{ fontSize: 10, color: S.onAmberContainer, margin: '6px 0 0', fontStyle: 'italic' }}>
-                Approve clears the review flag and makes it a regular read; Discard removes it. Either way, <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> to persist.
-              </p>
+              {isAdmin && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={onApprove}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
+                      style={{ backgroundColor: S.expansion, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+                      title="Approve — promote this AI suggestion to a regular strategist-reviewed read"
+                    >
+                      <Check size={13} strokeWidth={2.5} /> Approve
+                    </button>
+                    <button
+                      onClick={onRemove}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
+                      style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+                      title="Discard — remove this AI suggestion from the journey"
+                    >
+                      <Trash2 size={13} strokeWidth={2.5} /> Discard
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 10, color: S.onAmberContainer, margin: '6px 0 0', fontStyle: 'italic' }}>
+                    Approve clears the review flag and makes it a regular read; Discard removes it. Either way, <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> to persist.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      {/* Strategist Read */}
-      <SectionCard
-        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={12} strokeWidth={2.5} /> Strategist Read</span>}
-        accent={S.primaryDim}
-        subtitle="Authored analysis — not simulated"
-      >
-        <div style={{ padding: '12px 14px', borderRadius: 10, backgroundColor: S.surfaceLow }}>
-          {tile.analysis
-            ? <MarkdownBlock text={tile.analysis} />
-            : <p style={{ fontSize: 12.5, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No authored analysis for this tile yet.</p>}
-        </div>
-      </SectionCard>
-
-      {/* Evidence cards */}
-      <SectionCard
-        title="Evidence — linked trends"
-        accent={S.primary}
-        subtitle="Live from the trend database (drill through to Trends)"
-      >
-        {tile.trendCodes.length === 0 ? (
-          <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No trend codes linked to this tile.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {tile.trendCodes.map(code => (
-              <EvidenceCard
-                key={code}
-                code={code}
-                trendsById={trendsById}
-                trendsLoaded={trendsLoaded}
-                onNavigateToTrend={onNavigateToTrend}
-              />
-            ))}
+        {/* Two columns: Why-chain (left) · Strategist Read + Stage context (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5" style={{ padding: '20px 26px 30px' }}>
+          <div>
+            <WhyChain
+              tile={tile}
+              stageId={stageId}
+              stageLabel={stageLabel}
+              journeyKey={journeyKey}
+              direction={direction}
+              attribution={attribution}
+              trendsById={trendsById}
+              trendsLoaded={trendsLoaded}
+              onNavigateToTrend={onNavigateToTrend}
+            />
           </div>
-        )}
-      </SectionCard>
 
-      {/* Stage context */}
-      <StageContextBlock stageLabel={stageLabel} journeyKey={journeyKey} />
+          <div className="flex flex-col gap-4">
+            <SectionCard
+              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={12} strokeWidth={2.5} /> Strategist Read</span>}
+              accent={S.primaryDim}
+              subtitle="Authored analysis — not simulated"
+            >
+              <div style={{ padding: '12px 14px', borderRadius: 10, backgroundColor: S.surfaceLow }}>
+                {tile.analysis
+                  ? <MarkdownBlock text={tile.analysis} />
+                  : <p style={{ fontSize: 12.5, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No authored analysis for this tile yet.</p>}
+              </div>
+            </SectionCard>
 
-      {/* Admin editing (fix #6) */}
-      {isAdmin && !editing && (
-        <button
-          onClick={onEdit}
-          className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-full text-sm font-bold uppercase tracking-[0.08em]"
-          style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-        >
-          <Edit3 size={13} strokeWidth={2.5} /> Edit tile
-        </button>
-      )}
-      {isAdmin && editing && (
-        <SectionCard title="Edit tile" accent={S.primary}>
-          <TileEditor
-            initial={tile}
-            onSave={onApplyEdits}
-            onCancel={onCancelEdit}
-            onRemove={onRemove}
-          />
-        </SectionCard>
-      )}
+            <StageContextBlock stageLabel={stageLabel} journeyKey={journeyKey} />
+
+            {isAdmin && !editing && (
+              <button
+                onClick={onEdit}
+                className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-full text-sm font-bold uppercase tracking-[0.08em]"
+                style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
+              >
+                <Edit3 size={13} strokeWidth={2.5} /> Edit tile
+              </button>
+            )}
+            {isAdmin && editing && (
+              <SectionCard title="Edit tile" accent={S.primary}>
+                <TileEditor
+                  initial={tile}
+                  onSave={onApplyEdits}
+                  onCancel={onCancelEdit}
+                  onRemove={onRemove}
+                />
+              </SectionCard>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
