@@ -200,6 +200,15 @@ const trendStrength = (t?: Trend): number | null => {
   return Math.min(5, score / 5);
 };
 
+/** A stage with many tiles spans two grid columns and lays its tiles out in
+ *  two readable sub-columns, so very long stages (e.g. Add Products) don't
+ *  stretch the whole rail downward (owner request 2026-06-29). Counts are the
+ *  full (unfiltered) tile counts so a stage's width doesn't jump when the type
+ *  filter changes. */
+const WIDE_STAGE_TILE_THRESHOLD = 10;
+const stageSpan = (s: JourneyStageDef): 1 | 2 =>
+  (Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
+
 // ════════════════════════════════════════════════════════════════════════
 // Small presentational atoms
 // ════════════════════════════════════════════════════════════════════════
@@ -1125,9 +1134,12 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               style={{
                 // All stages fit on screen, no horizontal scroll (2026-06-14):
                 // minmax(0,1fr) lets the columns shrink to share the available
-                // width equally (Laundry 13 / Hair 8). Tiles are width:100% and
-                // their text wraps, so columns compress cleanly.
-                gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))`,
+                // width equally. Long stages span two units (2026-06-29) and
+                // lay their tiles in two sub-columns, so the total unit count is
+                // stages + however many are "wide". Each group (headers /
+                // benefiting / declining) sums to the same unit count, so the
+                // three rows stay column-aligned.
+                gridTemplateColumns: `repeat(${stages.reduce((n, s) => n + stageSpan(s), 0)}, minmax(0, 1fr))`,
                 width: '100%', gap: 0,
               }}
             >
@@ -1136,6 +1148,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 <div
                   key={stage.id + '_h'}
                   style={{
+                    gridColumn: stageSpan(stage) === 2 ? 'span 2' : undefined,
                     padding: '10px 9px 9px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
@@ -1153,10 +1166,21 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               {/* Benefiting row */}
               {stages.map((stage, i) => {
                 const tiles = stage.benefiting.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+                const wide = stageSpan(stage) === 2;
+                const tileEls = tiles.map(tile => (
+                  <TilePill
+                    key={tile.id}
+                    tile={tile}
+                    direction="benefiting"
+                    selected={selected?.tile.id === tile.id}
+                    onClick={() => openTile(tile, stage.id, stage.label, 'benefiting')}
+                  />
+                ));
                 return (
                   <div
                     key={stage.id + '_b'}
                     style={{
+                      gridColumn: wide ? 'span 2' : undefined,
                       backgroundColor: 'rgba(45,125,63,0.04)', padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       borderBottom: `1px solid ${S.cardBorder}`, minHeight: 56,
@@ -1177,15 +1201,9 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                         </button>
                       )}
                     </div>
-                    {tiles.map(tile => (
-                      <TilePill
-                        key={tile.id}
-                        tile={tile}
-                        direction="benefiting"
-                        selected={selected?.tile.id === tile.id}
-                        onClick={() => openTile(tile, stage.id, stage.label, 'benefiting')}
-                      />
-                    ))}
+                    {wide
+                      ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 6, alignContent: 'start' }}>{tileEls}</div>
+                      : tileEls}
                   </div>
                 );
               })}
@@ -1193,10 +1211,21 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               {/* Declining row */}
               {stages.map((stage, i) => {
                 const tiles = stage.negativelyImpacted.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+                const wide = stageSpan(stage) === 2;
+                const tileEls = tiles.map(tile => (
+                  <TilePill
+                    key={tile.id}
+                    tile={tile}
+                    direction="negativelyImpacted"
+                    selected={selected?.tile.id === tile.id}
+                    onClick={() => openTile(tile, stage.id, stage.label, 'negativelyImpacted')}
+                  />
+                ));
                 return (
                   <div
                     key={stage.id + '_n'}
                     style={{
+                      gridColumn: wide ? 'span 2' : undefined,
                       backgroundColor: 'rgba(159,64,61,0.04)', padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       minHeight: 56,
@@ -1217,15 +1246,9 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                         </button>
                       )}
                     </div>
-                    {tiles.map(tile => (
-                      <TilePill
-                        key={tile.id}
-                        tile={tile}
-                        direction="negativelyImpacted"
-                        selected={selected?.tile.id === tile.id}
-                        onClick={() => openTile(tile, stage.id, stage.label, 'negativelyImpacted')}
-                      />
-                    ))}
+                    {wide
+                      ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 6, alignContent: 'start' }}>{tileEls}</div>
+                      : tileEls}
                   </div>
                 );
               })}
