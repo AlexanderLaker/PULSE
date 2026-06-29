@@ -66,12 +66,10 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
     const dialog = screen.getByRole('dialog');
     const u = within(dialog);
 
-    // the four-step ladder
+    // two-step ladder: driving trends -> net effect
     expect(u.getByText(/Why this moment is (expanding|under pressure)/)).toBeTruthy();
-    expect(u.getByText('This moment')).toBeTruthy();
     expect(u.getByText('Driving trends — links to the Trends page')).toBeTruthy();
     expect(u.getByText('Net effect')).toBeTruthy();
-    expect(u.getByText(/Computed attribution/)).toBeTruthy();
 
     // trend-force card resolved against the LIVE trend
     expect(u.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
@@ -79,8 +77,11 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
     expect(u.getByText('Stage exposure')).toBeTruthy();  // live journey_exposure
     expect(u.getAllByText('View in Trends').length).toBeGreaterThan(0);
 
-    // honesty wall preserved
-    expect(dialog.textContent).toContain('judgment, not simulated');
+    // refinement 2026-06-29: "This moment" + "Computed attribution" steps and
+    // the honesty footer were removed; lock that in.
+    expect(u.queryByText('This moment')).toBeNull();
+    expect(u.queryByText(/Computed attribution/)).toBeNull();
+    expect(dialog.textContent).not.toContain('judgment, not simulated');
   });
 
   it('closes on Escape', async () => {

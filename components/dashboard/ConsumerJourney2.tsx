@@ -36,7 +36,7 @@ import React, {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ExternalLink, ArrowRight, X, Edit3, Check,
-  Info, PenLine, Sparkles, CircleCheck, Zap, TriangleAlert, Cloud,
+  Info, PenLine, Sparkles, CircleCheck, Zap, TriangleAlert,
   Plus, Trash2, Save, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -49,7 +49,6 @@ import {
   TREND_CODE_MAP, RETIRED_CODES, trendIdForCode,
 } from '@/data/trendCodeMap';
 import type { Trend } from '@/types/trends';
-import type { SimulationResult } from '@/types/simulation';
 
 // ════════════════════════════════════════════════════════════════════════
 // Style tokens — intentional local copy of the Maritime light editorial
@@ -179,22 +178,10 @@ const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const fmtPct = (fraction: number): string => {
-  const pct = fraction * 100;
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
-};
-
 /** Display name with a trailing parenthetical stripped (declutter, 2026-06-27).
  *  Display-only — the seed/content name is never mutated, so this is reversible
  *  and loses nothing (the full string still lives in the content store). */
 const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
-
-/** Categories that own each journey (CLAUDE.md §9 taxonomy). Shown in the
- *  detail panel's "This moment" step so a reader sees whose pool a stage feeds. */
-const JOURNEY_OWNERS: Record<JourneyKey, string[]> = {
-  lhc: ['FCN', 'FCA', 'FFI', 'LAD', 'HDW', 'ADW', 'HSC', 'IC'],
-  hair: ['Color', 'Care', 'Styling', 'Body'],
-};
 
 /** Intensity → surface tint depth — the declutter replacement for the dots
  *  (2026-06-27): a stronger tile reads more saturated so the pressure pattern
@@ -329,7 +316,7 @@ const TilePill: FC<{
       onClick={onClick}
       className="w-full text-left rounded-xl transition-all duration-150"
       style={{
-        position: 'relative', display: 'block', padding: '8px 9px 8px 13px', marginBottom: 5,
+        position: 'relative', display: 'block', padding: '5px 8px 5px 12px', marginBottom: 4,
         backgroundColor: selected ? S.surface : intensityTint(isExp, tile.intensity),
         border: `1px solid ${selected ? accent : S.cardBorder}`,
         boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
@@ -339,7 +326,7 @@ const TilePill: FC<{
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 3,
+          position: 'absolute', left: 0, top: 4, bottom: 4, width: 3, borderRadius: 3,
           backgroundColor: accent, opacity: 0.28 + 0.24 * tile.intensity,
         }}
       />
@@ -556,42 +543,8 @@ const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Attribution chip (fix #7) — computed terminal-year stage attribution.
-// ════════════════════════════════════════════════════════════════════════
-const AttributionChip: FC<{ value: number | null }> = ({ value }) => {
-  if (value === null) {
-    return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full font-bold"
-        style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: S.surfaceLow, color: S.mutedText, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
-        title="No journey attribution in the latest persisted run — arrives with the next production run."
-      >
-        <Cloud size={9} strokeWidth={2.5} />
-        attribution pending
-      </span>
-    );
-  }
-  const positive = value >= 0;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full font-bold tabular-nums"
-      style={{
-        fontSize: 9.5, padding: '1px 7px',
-        backgroundColor: positive ? S.expansionContainer : S.errorContainer,
-        color: positive ? S.onExpansionContainer : S.onErrorContainer,
-        fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
-      }}
-      title="Computed stage attribution — per-stage share of the terminal-year median shift (journey-exposure weighted)."
-    >
-      {positive ? <TrendingUp size={9} strokeWidth={2.5} /> : <TrendingDown size={9} strokeWidth={2.5} />}
-      {fmtPct(value)}
-    </span>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Why-chain (B, 2026-06-27) — the de-blackbox ladder: this moment → driving
-// trends (link to Trends) → net effect → the one computed figure. Makes the
+// Why-chain (B, 2026-06-27) — the de-blackbox ladder: driving trends (link to
+// Trends) → net effect. Makes the
 // reasoning behind the authored classification visible, without ever claiming
 // the classification is simulated. Trends + attribution are real; the read is judgment.
 // ════════════════════════════════════════════════════════════════════════
@@ -606,17 +559,14 @@ const StepDot: FC<{ n: number }> = ({ n }) => (
 const WhyChain: FC<{
   tile: JourneyTile;
   stageId: string;
-  stageLabel: string;
   journeyKey: JourneyKey;
   direction: Direction;
-  attribution: number | null;
   trendsById: Map<string, Trend>;
   trendsLoaded: boolean;
   onNavigateToTrend?: (query: string) => void;
-}> = ({ tile, stageId, stageLabel, journeyKey, direction, attribution, trendsById, trendsLoaded, onNavigateToTrend }) => {
+}> = ({ tile, stageId, journeyKey, direction, trendsById, trendsLoaded, onNavigateToTrend }) => {
   const isExp = direction === 'benefiting';
   const accent = isExp ? S.expansion : S.error;
-  const owners = JOURNEY_OWNERS[journeyKey];
 
   // Net effect from the live trends' OWN directions (independent of the tile map).
   const resolved = tile.trendCodes
@@ -651,26 +601,9 @@ const WhyChain: FC<{
       </h3>
 
       <div style={{ marginTop: 14 }}>
-        {/* 1 — this moment */}
+        {/* 1 — driving trends */}
         <div style={stepWrap}>
           <StepDot n={1} /><span style={connector} />
-          <div style={stepLabel}>This moment</div>
-          <div style={{ marginTop: 5 }}>
-            <p style={{ fontSize: 13, color: S.onSurface, lineHeight: 1.5, margin: 0 }}>
-              <strong style={{ fontFamily: HEADLINE_FONT }}>{stageLabel}</strong> — part of the {journeyKey === 'lhc' ? 'Laundry' : 'Hair'} journey.
-            </p>
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: S.mutedText, marginRight: 2 }}>Owned by categories:</span>
-              {owners.map(o => (
-                <span key={o} style={{ fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 10, borderRadius: 6, padding: '2px 7px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant }}>{o}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 2 — driving trends */}
-        <div style={stepWrap}>
-          <StepDot n={2} /><span style={connector} />
           <div style={stepLabel}>Driving trends — links to the Trends page</div>
           <div style={{ marginTop: 8 }}>
             {tile.trendCodes.length === 0 ? (
@@ -688,9 +621,9 @@ const WhyChain: FC<{
           </div>
         </div>
 
-        {/* 3 — net effect */}
-        <div style={stepWrap}>
-          <StepDot n={3} /><span style={connector} />
+        {/* 2 — net effect */}
+        <div style={{ ...stepWrap, paddingBottom: 0 }}>
+          <StepDot n={2} />
           <div style={stepLabel}>Net effect</div>
           <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceContainer, padding: '12px 14px' }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -707,37 +640,6 @@ const WhyChain: FC<{
             </p>
           </div>
         </div>
-
-        {/* 4 — computed attribution */}
-        <div style={{ ...stepWrap, paddingBottom: 0 }}>
-          <StepDot n={4} />
-          <div style={stepLabel}>Computed attribution — the only simulated figure</div>
-          <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`, padding: '12px 14px' }}>
-            {attribution === null ? (
-              <p style={{ fontSize: 12.5, color: S.mutedText, fontStyle: 'italic', lineHeight: 1.5, margin: 0 }}>
-                The latest persisted run carries no attribution for this stage yet — it arrives with the next production run.
-              </p>
-            ) : (
-              <>
-                <div className="inline-flex items-center gap-1.5 tabular-nums" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em', color: attribution >= 0 ? S.expansion : S.error }}>
-                  {attribution >= 0 ? <TrendingUp size={20} strokeWidth={2.5} /> : <TrendingDown size={20} strokeWidth={2.5} />}
-                  {fmtPct(attribution)}
-                </div>
-                <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '6px 0 0' }}>
-                  Share of this stage in the terminal-year median shift of its categories (journey-exposure weighted). The only computed figure here — it redistributes, it never changes totals.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* honesty line */}
-      <div className="flex items-start gap-2 rounded-xl" style={{ marginTop: 15, padding: '11px 13px', backgroundColor: S.surfaceLow, border: `1px dashed ${S.cardBorder}` }}>
-        <Info size={13} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.5, margin: 0 }}>
-          <strong style={{ fontFamily: HEADLINE_FONT }}>Trends</strong> are real model inputs · <strong style={{ fontFamily: HEADLINE_FONT }}>Attribution</strong> is the only computed figure · the <strong style={{ fontFamily: HEADLINE_FONT }}>Strategist Read</strong> is judgment, not simulated.
-        </p>
       </div>
     </div>
   );
@@ -891,7 +793,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   onNavigateToTrend,
   isAdmin = false,
 }) => {
-  const { trends, simulation } = usePrism();
+  const { trends } = usePrism();
 
   // ── Content: seed → replaced by server blob on mount (fix #6) ──
   const [content, setContent] = useState<JourneyContent>(() => ({
@@ -937,31 +839,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
     for (const t of trends) m.set(t.id, t);
     return m;
   }, [trends]);
-
-  // ── Computed stage attribution (fix #7) ──
-  //   Σ over the journey's categories of journey_decomposition[cat][`${tab}:${stageId}`]
-  const stageAttribution = useMemo<Record<string, number> | null>(() => {
-    const decomp = (simulation as SimulationResult | null)?.journey_decomposition;
-    if (!decomp) return null;
-    const prefix = tab === 'lhc' ? 'LHC' : 'Hair';
-    const nsPrefix = `${tab}:`;
-    const sums: Record<string, number> = {};
-    let any = false;
-    for (const [cat, stageMap] of Object.entries(decomp)) {
-      if (!cat.startsWith(prefix)) continue;
-      for (const [stageKey, v] of Object.entries(stageMap)) {
-        if (!stageKey.startsWith(nsPrefix)) continue;
-        const sid = stageKey.slice(nsPrefix.length);
-        sums[sid] = (sums[sid] ?? 0) + (typeof v === 'number' ? v : 0);
-        any = true;
-      }
-    }
-    return any ? sums : null;
-  }, [simulation, tab]);
-  const attributionFor = useCallback(
-    (stageId: string): number | null => (stageAttribution ? (stageAttribution[stageId] ?? 0) : null),
-    [stageAttribution],
-  );
 
   // ── Counters ──
   const totals = useMemo(() => {
@@ -1181,8 +1058,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           <Info size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 2 }} />
           <p className="text-[12.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, margin: 0 }}>
             <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping trends to consumer moments — authored content does not feed the Shift Matrix.</strong>{' '}
-            Reads are strategist-authored, graded and dated; the per-stage attribution chips are the only computed
-            figures here (terminal-year journey decomposition, when a run carries it).
+            Reads are strategist-authored, graded and dated.
             <span style={{ color: S.mutedText }}>
               {' '}Content version {JOURNEY_CONTENT_VERSION}
               {contentSource === 'server' && ' · edited content · server'}.
@@ -1233,13 +1109,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           </div>
         </section>
 
-        {/* ─── Attribution lens caption (fix #7) ─── */}
-        <p className="mb-4 text-[11.5px]" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-          {stageAttribution
-            ? 'Computed stage attribution — per-stage share of the terminal-year median shift (journey-exposure weighted).'
-            : 'Computed stage attribution arrives with the next production run — no numbers are shown until then.'}
-        </p>
-
         {/* ─── Stage rail (horizontal scroll) ─── */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -1265,7 +1134,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 <div
                   key={stage.id + '_h'}
                   style={{
-                    padding: '14px 9px 12px', backgroundColor: S.surfaceLow,
+                    padding: '10px 9px 9px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
                   }}
@@ -1275,9 +1144,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, marginTop: 3, lineHeight: 1.25, fontFamily: HEADLINE_FONT, letterSpacing: '-0.01em' }}>
                     {stage.label}
-                  </div>
-                  <div style={{ marginTop: 7 }}>
-                    <AttributionChip value={attributionFor(stage.id)} />
                   </div>
                 </div>
               ))}
@@ -1289,12 +1155,12 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div
                     key={stage.id + '_b'}
                     style={{
-                      backgroundColor: 'rgba(45,125,63,0.04)', padding: '9px 6px',
+                      backgroundColor: 'rgba(45,125,63,0.04)', padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
-                      borderBottom: `1px solid ${S.cardBorder}`, minHeight: 160,
+                      borderBottom: `1px solid ${S.cardBorder}`, minHeight: 56,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.expansion, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingUp size={10} strokeWidth={2.5} /> Tailwind
                       </span>
@@ -1329,12 +1195,12 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div
                     key={stage.id + '_n'}
                     style={{
-                      backgroundColor: 'rgba(159,64,61,0.04)', padding: '9px 6px',
+                      backgroundColor: 'rgba(159,64,61,0.04)', padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
-                      minHeight: 130,
+                      minHeight: 56,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.error, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingDown size={10} strokeWidth={2.5} /> Headwind
                       </span>
@@ -1452,7 +1318,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   journeyKey={tab}
                   trendsById={trendsById}
                   trendsLoaded={trendsLoaded}
-                  attribution={attributionFor(selected.stageId)}
                   isAdmin={isAdmin}
                   editing={editing}
                   position={selectedIndex >= 0 ? { index: selectedIndex, total: flatTiles.length } : null}
@@ -1483,7 +1348,6 @@ const PanelBody: FC<{
   journeyKey: JourneyKey;
   trendsById: Map<string, Trend>;
   trendsLoaded: boolean;
-  attribution: number | null;
   isAdmin: boolean;
   editing: boolean;
   position: { index: number; total: number } | null;
@@ -1497,7 +1361,7 @@ const PanelBody: FC<{
   onApprove: () => void;
   onNavigateToTrend?: (query: string) => void;
 }> = ({
-  selected, journeyKey, trendsById, trendsLoaded, attribution,
+  selected, journeyKey, trendsById, trendsLoaded,
   isAdmin, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onApprove, onNavigateToTrend,
 }) => {
   const { tile, stageId, stageLabel, direction } = selected;
@@ -1597,10 +1461,8 @@ const PanelBody: FC<{
             <WhyChain
               tile={tile}
               stageId={stageId}
-              stageLabel={stageLabel}
               journeyKey={journeyKey}
               direction={direction}
-              attribution={attribution}
               trendsById={trendsById}
               trendsLoaded={trendsLoaded}
               onNavigateToTrend={onNavigateToTrend}
