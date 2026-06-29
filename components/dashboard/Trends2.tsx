@@ -26,7 +26,7 @@ import {
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
   ArrowUp, ArrowDown, ArrowUpDown,
-  Plus, Trash2, Info, Lock, Check, PenLine,
+  Plus, Trash2, Info, Lock, Check, PenLine, MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
@@ -300,15 +300,59 @@ const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ directi
   );
 };
 
+// ─── Section header help tip — "?" info icon with a hover/tap tooltip ─────
+// Mirrors Gp1InfoTip (the column-header pattern) but is sized for a section
+// title and anchors its tooltip to the card's header row (which is made
+// position:relative by SectionCard), opening downward over the card body so
+// it never spills outside the expanded panel.
+const SectionInfoTip: FC<{ text: React.ReactNode }> = ({ text }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="What does this field mean?"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', border: 'none', padding: 0, marginLeft: 1,
+          color: S.onSurfaceVariant, cursor: 'help',
+        }}
+      >
+        <Info size={12} strokeWidth={2.4} />
+      </button>
+      {open && (
+        <span role="tooltip" style={{
+          position: 'absolute', left: 0, top: 'calc(100% + 6px)', zIndex: 50,
+          width: 264, padding: '10px 12px', borderRadius: 8,
+          backgroundColor: S.onSurface, color: S.surface,
+          fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500,
+          textTransform: 'none', letterSpacing: 0, textAlign: 'left',
+          boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
+          pointerEvents: 'none', whiteSpace: 'normal',
+        }}>
+          {text}
+        </span>
+      )}
+    </>
+  );
+};
+
 // ─── Section Card — boxed card for each sub-section in the expanded panel ─
 interface SectionCardProps {
   title: string;
   icon: LucideIcon;
   accent?: string;
   footnote?: React.ReactNode;
+  /** Optional "?" help tooltip shown next to the title. */
+  info?: React.ReactNode;
   children: React.ReactNode;
 }
-const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, children }) => (
+const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, children }) => (
   <div style={{
     backgroundColor: S.surface,
     border: `1px solid ${S.cardBorder}`,
@@ -316,6 +360,7 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
     padding: '14px 16px 16px',
   }}>
     <div style={{
+      position: 'relative',
       display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
     }}>
       <span style={{
@@ -334,6 +379,7 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
       }}>
         {title}
       </div>
+      {info && <SectionInfoTip text={info} />}
     </div>
     {children}
     {footnote && (
@@ -345,6 +391,16 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
     )}
   </div>
 );
+
+// ─── Per-field help copy (shared by the "?" tooltips on the section cards) ─
+const FIELD_HELP = {
+  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.',
+  gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this trend can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
+  timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
+  category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
+  regional: 'How strongly this trend plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
+  vc: 'Where along the value chain — from raw materials through to the consumer — this trend exerts pressure, on a 0–5 scale.',
+} as const;
 
 // ─── Meta chip (direction/confidence/data-source pill) ─────────────
 const MetaChip: FC<{ label: string }> = ({ label }) => (
@@ -896,7 +952,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </blockquote>
           </SectionCard>
 
-          <SectionCard title="Probability" icon={Zap} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
+          <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <span title={ai.probability != null ? `AI suggests ${ai.probability} / 5` : undefined}>
                 <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v })} />
@@ -905,7 +961,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </div>
           </SectionCard>
 
-          <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this trend can move at full materialization.">
+          <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this trend can move at full materialization.">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
@@ -918,7 +974,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </div>
           </SectionCard>
 
-          <SectionCard title="Materialization timing" icon={Clock}>
+          <SectionCard title="Materialization timing" icon={Clock} info={FIELD_HELP.timing}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <FieldLabel>Peak Year</FieldLabel>
@@ -946,14 +1002,33 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category Exposure" icon={Layers} footnote="Grey = unscored. If you leave a field blank, the AI baseline applies.">
+          <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. If you leave a field blank, the AI baseline applies.">
             <EditableCategoryGrid exposures={(draft.category_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ category_exposure: e })} />
           </SectionCard>
-          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer}>
+          <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
             <EditableRegionGrid exposures={(draft.regional_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ regional_exposure: e })} />
           </SectionCard>
-          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}>
             <EditableValueChainGrid exposures={(draft.vc_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ vc_exposure: e })} />
+          </SectionCard>
+
+          <SectionCard title="Comment" icon={MessageSquare} accent={S.primary} footnote="Optional. Shared with reviewers under Review &amp; Endorse — explain your reasoning, flag a caveat, or note evidence.">
+            <textarea
+              value={draft.comment ?? ''}
+              onChange={(e) => patch({ comment: e.target.value })}
+              placeholder="Add a comment for the reviewers…"
+              rows={4}
+              maxLength={2000}
+              style={{
+                width: '100%', resize: 'vertical', minHeight: 84,
+                padding: '10px 12px', borderRadius: 8,
+                border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow,
+                color: S.onSurface, fontFamily: BODY_FONT, fontSize: 13.5, lineHeight: 1.55,
+              }}
+            />
+            <div style={{ marginTop: 4, textAlign: 'right', fontSize: 10.5, color: S.mutedText }}>
+              {(draft.comment ?? '').length}/2000
+            </div>
           </SectionCard>
         </div>
       </div>
@@ -1084,6 +1159,9 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const agg = data?.aggregate;
   const scorers = data?.scorers ?? [];
   const count = scorers.length || (trend.proposal_summary?.count ?? 0);
+  // Every replier's free-text comment (Expert Rating tab), surfaced for the
+  // admin reviewer. Empty/whitespace comments are skipped.
+  const comments = scorers.filter((s) => (s.comment ?? '').trim().length > 0);
 
   // AI baseline (snapshot, else the current value for an un-overridden trend).
   const aP = aiProb(trend), aG = aiGp1(trend), aPk = aiPeakOf(trend), aCv = aiCurveOf(trend);
@@ -1299,6 +1377,50 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                   result={srcOf('vc', hasVcE) === 'ai' ? 'AI baseline' : srcOf('vc', hasVcE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
             </div>
+          </div>
+
+          {/* Expert comments — every replier's free-text note from the Expert
+              Rating tab. Advisory only; does not feed the endorsement. */}
+          <div style={{ marginTop: 16 }}>
+            <SectionCard
+              title={`Expert Comments · ${comments.length}`}
+              icon={MessageSquare}
+              accent={EXPERT_COLOR}
+              footnote="Free-text notes left by experts on the Expert Rating tab. Advisory context — they are not written into the trend on endorse."
+            >
+              {comments.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: S.mutedText }}>
+                  <em>No comments left yet.</em>
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {comments.map((s) => (
+                    <div key={s.user_id} style={{
+                      padding: '10px 12px', borderRadius: 10,
+                      backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: HEADLINE_FONT, fontSize: 12.5, fontWeight: 800, color: S.onSurface }}>
+                          {s.name}
+                        </span>
+                        {s.role ? (
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
+                            padding: '2px 8px', borderRadius: 999,
+                            backgroundColor: S.surface, color: S.onSurfaceVariant, border: `1px solid ${S.cardBorder}`,
+                          }}>
+                            {s.role}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
+                        {s.comment}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>

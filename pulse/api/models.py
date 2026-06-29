@@ -111,6 +111,7 @@ class ProposalUpdate(BaseModel):
     category_exposure: Optional[dict] = None   # {"Hair: Color": 0-5, ...}
     regional_exposure: Optional[dict] = None   # {"Europe": 0-5, ...}
     vc_exposure: Optional[dict] = None          # {"Packaging": 0-5, ...}
+    comment: Optional[str] = None               # free-text expert note
 
 
 class ShockRequest(BaseModel):

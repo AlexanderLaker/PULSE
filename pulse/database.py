@@ -341,6 +341,12 @@ def init_db() -> None:
             # JSON blob so the "AI suggestion" reference survives admin edits.
             "ALTER TABLE trends ADD COLUMN ai_suggestion TEXT",
             "ALTER TABLE trend_sources ADD COLUMN tier TEXT DEFAULT ''",
+            # Free-text expert comment on a trend score proposal (June 2026).
+            # On a fresh DB the proposals table doesn't exist yet at this point
+            # (it is created with the column below); the failure is swallowed
+            # and the CREATE TABLE adds the column. On an existing DB this adds
+            # the column in place.
+            "ALTER TABLE trend_score_proposals ADD COLUMN comment TEXT",
         ]:
             try:
                 if POSTGRES_URL:
@@ -418,6 +424,7 @@ def init_db() -> None:
                 category_exposure TEXT,
                 regional_exposure TEXT,
                 vc_exposure TEXT,
+                comment TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (trend_id, user_id)
             )
@@ -1084,6 +1091,8 @@ def load_journey_content() -> Optional[dict]:
 
 _PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve")
 _PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
+# Plain-text fields merged verbatim (no JSON encode, no numeric clamp).
+_PROPOSAL_TEXT_FIELDS = ("comment",)
 
 
 def _proposal_row_to_dict(raw) -> dict:
@@ -1101,6 +1110,7 @@ def _proposal_row_to_dict(raw) -> dict:
         "category_exposure": _parse_json_blob(row.get("category_exposure")),
         "regional_exposure": _parse_json_blob(row.get("regional_exposure")),
         "vc_exposure": _parse_json_blob(row.get("vc_exposure")),
+        "comment": row.get("comment"),
         "updated_at": row.get("updated_at"),
     }
 
@@ -1119,7 +1129,8 @@ def load_trend_proposals(trend_id: str) -> List[Dict[str, Any]]:
                 f"""
                 SELECT user_id, user_name, user_role, probability,
                        gp1_pct_affected, peak_year, diffusion_curve,
-                       category_exposure, regional_exposure, vc_exposure, updated_at
+                       category_exposure, regional_exposure, vc_exposure,
+                       comment, updated_at
                 FROM trend_score_proposals
                 WHERE trend_id = {p}
                 ORDER BY updated_at ASC, user_id ASC
@@ -1146,7 +1157,8 @@ def load_all_trend_proposals() -> Dict[str, List[Dict[str, Any]]]:
                 """
                 SELECT trend_id, user_id, user_name, user_role, probability,
                        gp1_pct_affected, peak_year, diffusion_curve,
-                       category_exposure, regional_exposure, vc_exposure, updated_at
+                       category_exposure, regional_exposure, vc_exposure,
+                       comment, updated_at
                 FROM trend_score_proposals
                 ORDER BY updated_at ASC, user_id ASC
                 """
@@ -1186,7 +1198,7 @@ def upsert_trend_proposal(
             f"""
             SELECT user_id, user_name, user_role, probability, gp1_pct_affected,
                    peak_year, diffusion_curve, category_exposure,
-                   regional_exposure, vc_exposure, updated_at
+                   regional_exposure, vc_exposure, comment, updated_at
             FROM trend_score_proposals
             WHERE trend_id = {p} AND user_id = {p}
             """,
@@ -1196,11 +1208,11 @@ def upsert_trend_proposal(
         merged = _proposal_row_to_dict(existing) if existing else {
             "probability": None, "gp1_pct_affected": None, "peak_year": None,
             "diffusion_curve": None, "category_exposure": None,
-            "regional_exposure": None, "vc_exposure": None,
+            "regional_exposure": None, "vc_exposure": None, "comment": None,
         }
 
         # Apply the partial update (only keys present in `fields`).
-        for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS:
+        for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS:
             if k in fields:
                 merged[k] = fields[k]
 
@@ -1215,7 +1227,7 @@ def upsert_trend_proposal(
                 SET user_name = {p}, user_role = {p}, probability = {p},
                     gp1_pct_affected = {p}, peak_year = {p}, diffusion_curve = {p},
                     category_exposure = {p}, regional_exposure = {p},
-                    vc_exposure = {p}, updated_at = {p}
+                    vc_exposure = {p}, comment = {p}, updated_at = {p}
                 WHERE trend_id = {p} AND user_id = {p}
                 """,
                 (
@@ -1225,6 +1237,7 @@ def upsert_trend_proposal(
                     _enc(merged.get("category_exposure")),
                     _enc(merged.get("regional_exposure")),
                     _enc(merged.get("vc_exposure")),
+                    merged.get("comment"),
                     now, trend_id, user_id,
                 ),
             )
@@ -1234,8 +1247,9 @@ def upsert_trend_proposal(
                 INSERT INTO trend_score_proposals (
                     trend_id, user_id, user_name, user_role, probability,
                     gp1_pct_affected, peak_year, diffusion_curve,
-                    category_exposure, regional_exposure, vc_exposure, updated_at
-                ) VALUES ({ph(12)})
+                    category_exposure, regional_exposure, vc_exposure,
+                    comment, updated_at
+                ) VALUES ({ph(13)})
                 """,
                 (
                     trend_id, user_id, user_name or "", user_role or "",
@@ -1244,6 +1258,7 @@ def upsert_trend_proposal(
                     _enc(merged.get("category_exposure")),
                     _enc(merged.get("regional_exposure")),
                     _enc(merged.get("vc_exposure")),
+                    merged.get("comment"),
                     now,
                 ),
             )

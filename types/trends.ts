@@ -140,8 +140,12 @@ export interface TrendScoreSnapshot {
 }
 
 /** The subset of fields a non-admin expert may propose (PUT
- *  /trends/{id}/proposals). Same shape as the AI snapshot. */
-export type TrendProposalPatch = TrendScoreSnapshot;
+ *  /trends/{id}/proposals). The seven scoreable fields plus an optional
+ *  free-text comment (not part of the AI snapshot). */
+export interface TrendProposalPatch extends TrendScoreSnapshot {
+  /** Free-text expert note attached to the proposal. */
+  comment?: string;
+}
 
 /** Aggregate of expert proposals for one field. */
 export interface ProposalAgg {
@@ -166,6 +170,8 @@ export interface ProposalScorer {
   gp1_pct_affected?: number;
   peak_year?: number;
   diffusion_curve?: string;
+  /** Free-text note this expert left with their proposal. */
+  comment?: string;
 }
 
 /** Per-cell aggregate map (category / region / value-chain exposure). */

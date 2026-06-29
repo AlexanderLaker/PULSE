@@ -131,11 +131,13 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         "category_exposure": my_row.get("category_exposure"),
         "regional_exposure": my_row.get("regional_exposure"),
         "vc_exposure": my_row.get("vc_exposure"),
+        "comment": my_row.get("comment"),
     }
 
 
 def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The named "who scored what" breakdown (headline scalar fields only)."""
+    """The named "who scored what" breakdown (headline scalar fields + the
+    expert's free-text comment)."""
     out = []
     for r in rows:
         out.append({
@@ -146,6 +148,7 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "gp1_pct_affected": r.get("gp1_pct_affected"),
             "peak_year": r.get("peak_year"),
             "diffusion_curve": r.get("diffusion_curve"),
+            "comment": r.get("comment"),
         })
     return out
 

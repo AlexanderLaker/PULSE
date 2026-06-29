@@ -575,6 +575,11 @@ async def put_trend_proposal(
             val = getattr(proposal, mfield)
             fields[mfield] = _clean_exposure(val) if val is not None else None
 
+    # Free-text comment: trim whitespace, cap length, store empty as NULL.
+    if "comment" in sent:
+        text = (proposal.comment or "").strip()
+        fields["comment"] = text[:2000] if text else None
+
     try:
         from pulse.database import init_db, upsert_trend_proposal
         init_db()
