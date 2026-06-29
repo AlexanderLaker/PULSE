@@ -556,6 +556,11 @@ const aiExpoOf = (t: Trend, kind: 'category_exposure' | 'regional_exposure' | 'v
   if (t.user_override) return undefined;
   return (t as unknown as Record<string, Record<string, number> | undefined>)[kind];
 };
+/** Per-cell exposure hover label — the same "AI suggests N / 5" plain hover the
+ *  Probability / GP1 % fields use. `undefined` when there is no AI baseline map
+ *  (so the dots keep their default "N / 5" labels). */
+const aiExpoHint = (v: number | undefined): string | undefined =>
+  v == null ? undefined : `AI suggests ${v} / 5`;
 
 /** A trend is "reviewed & changed" (→ green dots, "Reviewed" chip) when it
  *  carries an admin override AND its truth differs from the AI baseline.
@@ -978,13 +983,13 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. If you leave a field blank, the AI baseline applies.">
-            <EditableCategoryGrid exposures={(draft.category_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ category_exposure: e })} />
+            <EditableCategoryGrid exposures={(draft.category_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ category_exposure: e })} ai={aiExpoOf(trend, 'category_exposure')} />
           </SectionCard>
           <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
-            <EditableRegionGrid exposures={(draft.regional_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ regional_exposure: e })} />
+            <EditableRegionGrid exposures={(draft.regional_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ regional_exposure: e })} ai={aiExpoOf(trend, 'regional_exposure')} />
           </SectionCard>
           <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}>
-            <EditableValueChainGrid exposures={(draft.vc_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ vc_exposure: e })} />
+            <EditableValueChainGrid exposures={(draft.vc_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ vc_exposure: e })} ai={aiExpoOf(trend, 'vc_exposure')} />
           </SectionCard>
 
           <SectionCard title="Comment" icon={MessageSquare} accent={S.primary} footnote="Optional. Shared with reviewers under Review &amp; Endorse — explain your reasoning, flag a caveat, or note evidence.">
@@ -1960,11 +1965,15 @@ const EditableDots: FC<{
   value: number;
   onChange: (next: number) => void;
   tone?: 'emerald' | 'purple';
-}> = ({ value, onChange, tone = 'emerald' }) => {
+  /** When set (e.g. "AI suggests 3 / 5"), hovering the dots shows this — the
+   *  same plain hover the Probability / GP1 % fields use — instead of the
+   *  per-dot "N / 5" label. */
+  aiHint?: string;
+}> = ({ value, onChange, tone = 'emerald', aiHint }) => {
   const FILLED = tone === 'emerald' ? S.primary : S.onTertiaryContainer;
   const EMPTY  = S.surfaceHigh;
   return (
-    <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`}>
+    <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`} title={aiHint}>
       {[0, 1, 2, 3, 4, 5].map((d) => (
         <button
           key={d}
@@ -1972,7 +1981,7 @@ const EditableDots: FC<{
           onClick={() => onChange(d)}
           aria-checked={d === value}
           role="radio"
-          title={`${d} / 5`}
+          title={aiHint ?? `${d} / 5`}
           style={{
             width: 14, height: 14, borderRadius: 999,
             border: 'none', padding: 0, cursor: 'pointer',
@@ -2639,7 +2648,8 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
 const EditableCategoryGrid: FC<{
   exposures: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
-}> = ({ exposures, onChange }) => {
+  ai?: Record<string, number>;
+}> = ({ exposures, onChange, ai }) => {
   const grouped = {
     Hair: CATEGORIES.filter((c) => c.group === 'Hair'),
     LHC:  CATEGORIES.filter((c) => c.group === 'LHC'),
@@ -2658,12 +2668,14 @@ const EditableCategoryGrid: FC<{
           <div className="grid grid-cols-4 gap-3">
             {cats.map((cat) => {
               const current = readExposure(exposures, cat.name, cat.id);
+              const aiVal = ai == null ? undefined : readExposure(ai, cat.name, cat.id);
               return (
                 <div key={cat.id} className="flex flex-col items-center gap-1.5">
                   <EditableDots
                     value={current}
                     onChange={(v) => set(cat.name, v)}
                     tone="emerald"
+                    aiHint={aiExpoHint(aiVal)}
                   />
                   <div
                     className="text-[10px] font-medium text-center"
@@ -2684,7 +2696,8 @@ const EditableCategoryGrid: FC<{
 const EditableRegionGrid: FC<{
   exposures: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
-}> = ({ exposures, onChange }) => (
+  ai?: Record<string, number>;
+}> = ({ exposures, onChange, ai }) => (
   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
     {REGIONS.map((r) => (
       <div key={r.id} className="flex flex-col gap-1.5">
@@ -2695,6 +2708,7 @@ const EditableRegionGrid: FC<{
           value={exposures?.[r.id] ?? 0}
           onChange={(v) => onChange({ ...exposures, [r.id]: v })}
           tone="emerald"
+          aiHint={aiExpoHint(ai == null ? undefined : (ai[r.id] ?? 0))}
         />
       </div>
     ))}
@@ -2704,7 +2718,8 @@ const EditableRegionGrid: FC<{
 const EditableValueChainGrid: FC<{
   exposures: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
-}> = ({ exposures, onChange }) => (
+  ai?: Record<string, number>;
+}> = ({ exposures, onChange, ai }) => (
   <div className="space-y-4">
     <div className="grid grid-cols-2 gap-x-6 gap-y-3">
       {VC_STEPS.map((step) => (
@@ -2719,6 +2734,7 @@ const EditableValueChainGrid: FC<{
             value={readVCExposure(exposures, step)}
             onChange={(v) => onChange({ ...exposures, [step.id]: v })}
             tone="emerald"
+            aiHint={aiExpoHint(ai == null ? undefined : readVCExposure(ai, step))}
           />
         </div>
       ))}
