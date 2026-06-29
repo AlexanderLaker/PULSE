@@ -1973,7 +1973,7 @@ const EditableDots: FC<{
   const FILLED = tone === 'emerald' ? S.primary : S.onTertiaryContainer;
   const EMPTY  = S.surfaceHigh;
   return (
-    <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`} title={aiHint}>
+    <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`} title={aiHint} style={{ cursor: aiHint ? 'help' : undefined }}>
       {[0, 1, 2, 3, 4, 5].map((d) => (
         <button
           key={d}
@@ -1984,7 +1984,7 @@ const EditableDots: FC<{
           title={aiHint ?? `${d} / 5`}
           style={{
             width: 14, height: 14, borderRadius: 999,
-            border: 'none', padding: 0, cursor: 'pointer',
+            border: 'none', padding: 0, cursor: aiHint ? 'help' : 'pointer',
             backgroundColor: d === 0
               ? (value === 0 ? FILLED : EMPTY)
               : (d <= value ? FILLED : EMPTY),
