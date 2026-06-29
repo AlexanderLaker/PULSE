@@ -826,7 +826,8 @@ const DiffusionPicker: FC<{ value?: string; ai?: string; distribution?: Record<s
       const selected = value === key;
       const n = distribution?.[key];
       return (
-        <button key={key} type="button" onClick={() => onChange?.(key)} title={meta.description}
+        <button key={key} type="button" onClick={() => onChange?.(key)}
+          title={ai === key ? `AI suggests ${meta.label} — ${meta.description}` : meta.description}
           aria-pressed={selected} style={{
             position: 'relative', minWidth: 78, textAlign: 'center', padding: '8px 10px 6px', borderRadius: 9, cursor: 'pointer',
             backgroundColor: S.surface, border: `1px solid ${selected ? S.primary : S.cardBorder}`,
@@ -900,7 +901,13 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
     flush();
   }, [flush, onMyChange, trend.id]);
 
-  const ai = trend.ai_suggestion ?? {};
+  // AI baseline for the scalar fields — same fallback the exposure grids and the
+  // Review panel use (the trend's own seeded value when there is no explicit
+  // snapshot and no override), so the "AI suggests…" hovers always have a value.
+  const aiP = aiProb(trend);
+  const aiG = aiGp1(trend);
+  const aiPk = aiPeakOf(trend);
+  const aiCv = aiCurveOf(trend);
   const sources = trend.sources ?? [];
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate?.diffusion_curve?.distribution;
@@ -934,10 +941,10 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
 
           <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <span title={ai.probability != null ? `AI suggests ${ai.probability} / 5` : undefined}>
+              <span title={aiP != null ? `AI suggests ${Math.round(aiP)} / 5` : undefined} style={{ cursor: aiP != null ? 'help' : undefined }}>
                 <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v })} />
               </span>
-              <AiRef label={ai.probability != null ? `AI ${ai.probability}/5` : 'AI —'} />
+              <AiRef label={aiP != null ? `AI ${Math.round(aiP)}/5` : 'AI —'} />
             </div>
           </SectionCard>
 
@@ -945,12 +952,13 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
-                title={ai.gp1_pct_affected != null ? `AI suggests ${pctI(ai.gp1_pct_affected)}` : undefined} style={{ flex: 1 }} />
+                title={aiG != null ? `AI suggests ${pctI(aiG)}` : undefined} style={{ flex: 1, cursor: aiG != null ? 'help' : undefined }} />
               <input type="number" min={0} max={100} step={1} value={gp1Int ?? ''} placeholder="—"
                 onChange={(e) => { const n = e.target.value === '' ? undefined : Math.max(0, Math.min(100, parseInt(e.target.value, 10))); patch({ gp1_pct_affected: n == null ? undefined : n / 100 }); }}
+                title={aiG != null ? `AI suggests ${pctI(aiG)}` : undefined}
                 style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
               <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
-              <AiRef label={ai.gp1_pct_affected != null ? `AI ${pctI(ai.gp1_pct_affected)}` : 'AI —'} />
+              <AiRef label={aiG != null ? `AI ${pctI(aiG)}` : 'AI —'} />
             </div>
           </SectionCard>
 
@@ -961,13 +969,14 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input type="number" min={2026} max={2035} step={1} value={draft.peak_year ?? ''} placeholder="—"
                     onChange={(e) => patch({ peak_year: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
+                    title={aiPk != null ? `AI suggests ${aiPk}` : undefined}
                     style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
-                  <AiRef label={ai.peak_year != null ? `AI ${ai.peak_year}` : 'AI —'} />
+                  <AiRef label={aiPk != null ? `AI ${aiPk}` : 'AI —'} />
                 </div>
               </div>
               <div>
                 <FieldLabel>Diffusion Curve</FieldLabel>
-                <DiffusionPicker value={draft.diffusion_curve} ai={ai.diffusion_curve} distribution={dist} onChange={(c) => patch({ diffusion_curve: c })} />
+                <DiffusionPicker value={draft.diffusion_curve} ai={aiCv} distribution={dist} onChange={(c) => patch({ diffusion_curve: c })} />
               </div>
             </div>
           </SectionCard>
