@@ -28,7 +28,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  Info, Loader2, Sparkles, X, ExternalLink,
+  Info, Loader2, Sparkles, X,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import {
@@ -156,29 +156,40 @@ const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, com
   );
 };
 
-// ─── Clickable source line ───────────────────────────────────────
-const SourceLink: FC<{ src: SourceRef }> = ({ src }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-      <a
-        href={src.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          fontSize: 11, fontWeight: 600, color: S.primaryDim, lineHeight: 1.45,
-          textDecoration: 'underline', textDecorationColor: 'rgba(0,93,181,0.35)',
-          textUnderlineOffset: 2, wordBreak: 'break-word',
-        }}
-      >
-        {src.label}
-        <ExternalLink size={10} style={{ display: 'inline', marginLeft: 4, verticalAlign: 'baseline' }} aria-hidden />
-      </a>
-      <span style={{ flexShrink: 0 }}><GradeChip grade={src.grade} compact /></span>
-    </div>
-    {src.detail && (
-      <div style={{ fontSize: 10, color: S.mutedText, lineHeight: 1.45 }}>{src.detail}</div>
-    )}
-  </div>
+// ─── Compact source chip — "Name (value)" hyperlink, coloured by grade ──
+const SRC_VALUE_RE = /~?[€$£]?\s?\d[\d.,]*\s?(?:bn\b|m\b|%)/i;
+function sourceShort(src: SourceRef): string {
+  let name = src.label.split(' — ')[0]
+    .replace(/\s+FY?\d{2,4}.*$/i, '')                          // drop "FY2025 …" onward
+    .replace(/\s*~?[€$£]?\d[\d.,]*\s?(?:bn\b|m\b|%).*$/i, '')  // drop a trailing figure
+    .replace(/\s*\(.*$/, '')                                    // drop a trailing "( …"
+    .trim();
+  if (!name) name = src.label.split(' — ')[0];
+  const m = src.label.match(SRC_VALUE_RE);
+  const value = m ? m[0].replace(/\s+/g, '') : '';
+  return value ? `${name} (${value})` : name;
+}
+
+const dedupeByUrl = (arr: SourceRef[]): SourceRef[] => {
+  const seen = new Map<string, SourceRef>();
+  arr.forEach((s) => { if (!seen.has(s.url)) seen.set(s.url, s); });
+  return Array.from(seen.values());
+};
+
+const SourceChip: FC<{ src: SourceRef }> = ({ src }) => (
+  <a
+    href={src.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    title={src.label}
+    style={{
+      fontSize: 11, fontWeight: 600, color: GRADE_META[src.grade].fg,
+      textDecoration: 'underline', textDecorationColor: 'rgba(0,52,94,0.25)',
+      textUnderlineOffset: 2, whiteSpace: 'nowrap',
+    }}
+  >
+    {sourceShort(src)}
+  </a>
 );
 
 // ─── Hover tooltip (slim — click carries the depth) ──────────────
@@ -404,28 +415,14 @@ const DetailPanel: FC<{
             </div>
           )}
 
-          {/* Sources */}
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 8 }}>
-              Sources — revenue / size
+          {/* Sources — compact "Name (value)" hyperlinks; colour = grade */}
+          <div style={{ marginBottom: 4 }}>
+            <SectionLabel>Sources</SectionLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px', marginTop: 5, lineHeight: 1.5 }}>
+              {dedupeByUrl([...item.sources.revenue, ...item.sources.margin]).map((s) => (
+                <SourceChip key={s.url} src={s} />
+              ))}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-              {item.sources.revenue.map((s, i) => <SourceLink key={`r${i}`} src={s} />)}
-            </div>
-            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 8 }}>
-              Sources — margin calibration
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {item.sources.margin.map((s, i) => <SourceLink key={`m${i}`} src={s} />)}
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${S.surfaceHigh}`, fontSize: 10, color: S.mutedText, lineHeight: 1.55 }}>
-            The Y-axis is a <b>GP1 proxy</b>: GP1 / CM1 is not separately disclosed at tier level by any
-            player, so tier values are structured estimates calibrated against the linked, verified
-            company gross margins (grades shown). Where a company-level figure is itself the anchor it is
-            used exactly as disclosed. Market sizing: Euromonitor (consumer hair · laundry/home care),
-            Kline (professional hair). Nominal terms; € at planning rate 1.15.
           </div>
         </div>
       </motion.aside>
@@ -754,17 +751,6 @@ const ProfitPoolExplorer: FC = () => {
   const summary = useMemo(() => slidePoolSummary(slide), [slide]);
   const slidePoolRating = toPoolRating(summary.weightedPoolCagr);
 
-  // Unique clickable sources across the slide (deduped by URL).
-  const slideSources = useMemo(() => {
-    const seen = new Map<string, SourceRef>();
-    slide.items.forEach(it =>
-      [...it.sources.revenue, ...it.sources.margin].forEach(s => {
-        if (!seen.has(s.url)) seen.set(s.url, s);
-      }),
-    );
-    return Array.from(seen.values());
-  }, [slide]);
-
   const closePanel = useCallback(() => setSelectedId(null), []);
 
   return (
@@ -884,39 +870,6 @@ const ProfitPoolExplorer: FC = () => {
           />
         </div>
 
-        {/* Companion index — every pool (incl. sub-1% slivers) always legible & clickable (U1) */}
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 7 }}>
-            All pools in this view · click to open
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {slide.items.map((it) => {
-              const r = toPoolRating(poolCagr(it));
-              const nm = it.sublabel ? `${it.label} ${it.sublabel}`.trim() : it.label;
-              const isSel = selectedId === it.id;
-              const pct = it.revenueShare * 100;
-              return (
-                <button
-                  key={it.id}
-                  onClick={() => { setHover(null); setSelectedId(it.id); }}
-                  title={`${nm} — ${pct.toFixed(1)}% revenue · ${(it.gp1Margin * 100).toFixed(0)}% GP1 proxy · pool ${r.label} p.a.`}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                    padding: '5px 10px', borderRadius: 999, cursor: 'pointer',
-                    background: isSel ? 'rgba(0,93,181,0.10)' : S.surface,
-                    border: `1px solid ${isSel ? S.primary : S.cardBorder}`,
-                    fontFamily: BODY_FONT, fontSize: 11, color: S.onSurface, lineHeight: 1.2,
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>{nm}</span>
-                  <span style={{ color: S.mutedText, fontVariantNumeric: 'tabular-nums' }}>{pct >= 1 ? pct.toFixed(0) : pct.toFixed(1)}%</span>
-                  <ArrowsHTML rating={r} size={11} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Legend — pool ladder + evidence grades */}
         <div
           style={{
@@ -956,7 +909,7 @@ const ProfitPoolExplorer: FC = () => {
           <span style={{ color: S.mutedText }}>
             {' '}— a verified revenue CAGR combined with a <b>structured margin-drift estimate</b>{' '}
             (the drift is judgment, graded ⚠️ in the drill-down; treat the arrow as directional, not a forecast).
-            Sub-1% pools render as slivers — use the “All pools” index above to open them.
+            Sub-1% pools render as slim slivers — hover or click a bar to inspect them.
             {slide.kind === 'ValueChain' && (
               <> Value-chain tiers <b>overlap</b> (the same end-consumer euro is counted at brand-owner and again at retail), so total chain revenue exceeds the headline consumer pool — areas show where margin sits, not additive pools.</>
             )}
@@ -996,34 +949,16 @@ const ProfitPoolExplorer: FC = () => {
           </div>
         </div>
 
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${S.surfaceHigh}` }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 7 }}>
-            Sources used in this view — every link shows the cited figure (verified 2026-06-11)
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {slideSources.map((s) => (
-              <a
-                key={s.url}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={s.label}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontSize: 10, fontWeight: 600, color: S.primaryDim,
-                  background: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
-                  padding: '4px 9px', borderRadius: 999, textDecoration: 'none',
-                  maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {s.label.split(' — ')[0]}
-                </span>
-                <ExternalLink size={9} style={{ flexShrink: 0 }} aria-hidden />
-              </a>
-            ))}
-          </div>
-        </div>
+      </div>
+
+      {/* About this view — methodology footnote (page bottom) */}
+      <div style={{ marginTop: 18, fontSize: 11, color: S.mutedText, lineHeight: 1.6, maxWidth: 980 }}>
+        <b style={{ color: S.onSurfaceVariant }}>About this view.</b>{' '}
+        The Y-axis is a <b>GP1 proxy</b>: GP1 / CM1 is not separately disclosed at tier level by any
+        player, so tier values are structured estimates calibrated against the linked, verified company
+        gross margins (grades shown). Where a company-level figure is itself the anchor it is used exactly
+        as disclosed. Market sizing: <b>Euromonitor</b> (consumer hair · laundry/home care),
+        <b> Kline</b> (professional hair). Nominal terms; € at planning rate 1.15.
       </div>
 
       {/* Hover tooltip */}
