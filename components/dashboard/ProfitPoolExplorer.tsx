@@ -35,6 +35,7 @@ import {
   PROFIT_POOL_SLIDES,
   POOL_CAGR_THRESHOLDS,
   POOL_HORIZON_LABEL,
+  POOL_HORIZON_YEARS,
   poolCagr,
   gp1Terminal,
   itemRevenueEurBn,
@@ -95,8 +96,9 @@ const arrowGlyphs = (rating: CagrRating): string =>
 const fmtEurBn = (bn: number): string =>
   `€${bn >= 10 ? bn.toFixed(0) : bn.toFixed(1)}bn`;
 
-const fmtPct = (v: number, dp = 1): string =>
-  `${v > 0 ? '+' : ''}${(v * 100).toFixed(dp)}%`;
+/** Share as a clean %: whole number ≥1%, one decimal below 1% (so micro-pools don't read "0%"). */
+const fmtShare = (v: number): string =>
+  `${v * 100 >= 1 ? (v * 100).toFixed(0) : (v * 100).toFixed(1)}%`;
 
 // ─── Arrow stacks (shared glyph treatment) ───────────────────────
 const ArrowsSVG: FC<{ rating: CagrRating; cx: number; cy: number; ariaPrefix: string }> = ({
@@ -149,7 +151,7 @@ const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, com
         whiteSpace: 'nowrap', lineHeight: 1.5,
       }}
     >
-      <span aria-hidden>{m.glyph}</span>{m.label}
+      {m.label}
     </span>
   );
 };
@@ -216,7 +218,6 @@ const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: numb
             {rating.label} p.a.
           </div>
         </div>
-        <ArrowsHTML rating={rating} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
         <MiniMetric label="Revenue" value={`${(item.revenueShare * 100).toFixed(1)}%`} />
@@ -255,10 +256,10 @@ const DetailPanel: FC<{
   const name = item.sublabel ? `${item.label} ${item.sublabel}`.trim() : item.label;
 
   const revEur = itemRevenueEurBn(slide, item);
+  const revEnd = revEur * Math.pow(1 + item.revenueCAGR, POOL_HORIZON_YEARS);
   const gp1Now = itemGp1PoolEurBn(slide, item);
   const gp1End = itemGp1PoolEurBnTerminal(slide, item);
   const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
-  const marginCagr = (1 + pool) / (1 + item.revenueCAGR) - 1;
   const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -341,61 +342,50 @@ const DetailPanel: FC<{
             </button>
           </div>
 
-          {/* Hero — profit pool development */}
-          <div
-            style={{
-              background: S.surfaceLow, borderRadius: 14, padding: '14px 16px',
-              border: `1px solid ${S.cardBorder}`, marginBottom: 14,
-            }}
-          >
-            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 6 }}>
-              Profit pool development · {POOL_HORIZON_LABEL}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ fontSize: 26, fontWeight: 800, fontFamily: HEADLINE_FONT, color: arrowColorFor(poolRating.tone), fontVariantNumeric: 'tabular-nums' }}>
-                {poolRating.label} <span style={{ fontSize: 13, fontWeight: 700 }}>p.a.</span>
-              </div>
-              <ArrowsHTML rating={poolRating} size={24} />
-            </div>
-            <div style={{ fontSize: 12, color: S.onSurfaceVariant, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-              GP1 pool {fmtEurBn(gp1Now)} → <b>{fmtEurBn(gp1End)}</b> by 2030
-            </div>
-            <div style={{ fontSize: 10, color: S.mutedText, marginTop: 6, lineHeight: 1.5 }}>
-              Pool = revenue × GP1 proxy. Composition: ({fmtPct(item.revenueCAGR)} revenue) × ({fmtPct(marginCagr, 2)} margin drift, est.) = {fmtPct(pool)} pool p.a.
-            </div>
+          {/* Top key info — where this pool sits in the view */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" />
+            <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" />
           </div>
 
-          {/* Decomposition — the two factors */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-            <FactorRow
-              title="Revenue CAGR"
-              rating={revRating}
-              valueLabel={`${revRating.label} p.a.`}
+          {/* Profit pool trajectory — one row per metric: today → rate → 2030 */}
+          <div style={{ marginBottom: 16 }}>
+            <SectionLabel>Profit pool trajectory · {POOL_HORIZON_LABEL}</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: TRAJ_GRID, gap: 6, padding: '6px 4px 7px' }}>
+              <span />
+              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>Today</span>
+              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>p.a.</span>
+              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>2030</span>
+            </div>
+            <TrajRow
+              metric="Revenue pool"
+              today={fmtEurBn(revEur)}
+              change={revRating.label}
+              changeTone={revRating.tone}
+              end={fmtEurBn(revEnd)}
               driver={item.revenueDriver}
-              grade={item.sources.revenue[0]?.grade}
+              grade={item.sources.revenue[0]?.grade ?? 'estimate'}
             />
-            <FactorRow
-              title={`GP1-proxy margin development (${(item.gp1Margin * 100).toFixed(1)}% → ${(gp1Terminal(item) * 100).toFixed(1)}%)`}
-              rating={gp1Rating}
-              valueLabel={gp1Rating.label}
+            <TrajRow
+              metric="GP1 margin (proxy)"
+              today={`${(item.gp1Margin * 100).toFixed(1)}%`}
+              change={gp1Rating.label}
+              changeTone={gp1Rating.tone}
+              end={`${(gp1Terminal(item) * 100).toFixed(1)}%`}
               driver={item.marginDriver}
               grade="estimate"
-              gradeNote="Margin drift is structured judgment — ungraded by source. The development arrow inherits this estimate."
             />
-          </div>
-
-          {/* Position metrics */}
-          <div
-            style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-              padding: '12px 0', borderTop: `1px solid ${S.surfaceHigh}`,
-              borderBottom: `1px solid ${S.surfaceHigh}`, marginBottom: 14,
-            }}
-          >
-            <PanelMetric label="Revenue pool" value={fmtEurBn(revEur)} sub={`${(item.revenueShare * 100).toFixed(1)}% of view`} />
-            <PanelMetric label="GP1 margin" value={`${(item.gp1Margin * 100).toFixed(1)}%`} sub={`→ ${(gp1Terminal(item) * 100).toFixed(1)}% by 2030`} />
-            <PanelMetric label="GP1 profit pool" value={fmtEurBn(gp1Now)} sub={`${(gp1PoolShare * 100).toFixed(1)}% of view GP1 pool`} />
-            <PanelMetric label="Pool by 2030" value={fmtEurBn(gp1End)} sub={`${fmtPct(pool)} p.a. compounded`} />
+            <TrajRow
+              metric="GP1 profit pool"
+              today={fmtEurBn(gp1Now)}
+              change={poolRating.label}
+              changeTone={poolRating.tone}
+              end={fmtEurBn(gp1End)}
+              emphasis
+            />
+            <div style={{ fontSize: 10, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
+              Pool = revenue × GP1 margin — the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it.
+            </div>
           </div>
 
           {/* Henkel read */}
@@ -443,43 +433,56 @@ const DetailPanel: FC<{
   );
 };
 
-const FactorRow: FC<{
-  title: string; rating: CagrRating; valueLabel: string; driver: string;
-  grade?: EvidenceGrade; gradeNote?: string;
-}> = ({ title, rating, valueLabel, driver, grade, gradeNote }) => (
-  <div style={{ background: S.surface, border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '10px 12px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: S.onSurfaceVariant }}>
-        {title}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, fontFamily: HEADLINE_FONT, color: arrowColorFor(rating.tone), fontVariantNumeric: 'tabular-nums' }}>
-          {valueLabel}
-        </span>
-        <ArrowsHTML rating={rating} size={13} />
-      </div>
-    </div>
-    <div style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5 }}>{driver}</div>
-    {grade && (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
-        <GradeChip grade={grade} compact />
-        {gradeNote && <span style={{ fontSize: 9.5, color: S.mutedText, lineHeight: 1.4 }}>{gradeNote}</span>}
-      </div>
-    )}
+const SectionLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 2 }}>
+    {children}
   </div>
 );
 
-const PanelMetric: FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
-  <div>
-    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.outline, marginBottom: 2 }}>
-      {label}
+// Top key-info tile — the share of the view this pool holds.
+const KeyInfo: FC<{ label: string; value: string; sub: string }> = ({ label, value, sub }) => (
+  <div style={{ background: S.surfaceLow, borderRadius: 10, padding: '9px 12px', border: `1px solid ${S.cardBorder}` }}>
+    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>{label}</div>
+    <div style={{ fontSize: 18, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
+      {value} <span style={{ fontSize: 10, fontWeight: 600, color: S.mutedText }}>{sub}</span>
     </div>
-    <div style={{ fontSize: 16, fontWeight: 800, color: S.onBg, fontFamily: HEADLINE_FONT, fontVariantNumeric: 'tabular-nums' }}>
-      {value}
-    </div>
-    {sub && <div style={{ fontSize: 10, color: S.mutedText, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>{sub}</div>}
   </div>
 );
+
+const TRAJ_GRID = '1.4fr 1fr 1fr 1fr';
+
+// One trajectory row: metric · today · change (colour = direction) · 2030, with an optional driver + grade beneath.
+const TrajRow: FC<{
+  metric: string; today: string; change: string; changeTone: CagrRating['tone']; end: string;
+  emphasis?: boolean; driver?: string; grade?: EvidenceGrade;
+}> = ({ metric, today, change, changeTone, end, emphasis, driver, grade }) => {
+  const num = (color: string) => ({
+    textAlign: 'right' as const, fontFamily: HEADLINE_FONT, fontWeight: 800,
+    fontSize: emphasis ? 16 : 14, color, fontVariantNumeric: 'tabular-nums' as const,
+  });
+  return (
+    <>
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: TRAJ_GRID, gap: 6, alignItems: 'baseline',
+          padding: emphasis ? '12px' : '9px 4px 0',
+          ...(emphasis ? { background: S.surfaceLow, border: `1px solid ${S.cardBorder}`, borderRadius: 12, marginTop: 8 } : null),
+        }}
+      >
+        <span style={{ fontSize: emphasis ? 13.5 : 12.5, fontWeight: emphasis ? 800 : 700, fontFamily: emphasis ? HEADLINE_FONT : BODY_FONT, color: S.onBg }}>{metric}</span>
+        <span style={num(S.onBg)}>{today}</span>
+        <span style={num(arrowColorFor(changeTone))}>{change}</span>
+        <span style={num(emphasis ? arrowColorFor(changeTone) : S.onBg)}>{end}</span>
+      </div>
+      {driver && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 4px 9px', borderBottom: `1px solid ${S.surfaceHigh}` }}>
+          <span style={{ flex: 1, fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.45 }}>{driver}</span>
+          {grade && <GradeChip grade={grade} compact />}
+        </div>
+      )}
+    </>
+  );
+};
 
 // ─── Pool Chart (SVG) ────────────────────────────────────────────
 interface PoolChartProps {
