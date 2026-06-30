@@ -25,10 +25,10 @@
 
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  Info, ChevronLeft, ChevronRight, Loader2, Sparkles, X, ExternalLink,
+  Info, Loader2, Sparkles, X, ExternalLink,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import {
@@ -64,7 +64,7 @@ const S = {
   onBg:                '#00345e',
   onSurface:           '#00345e',
   onSurfaceVariant:    '#26619d',
-  outline:             '#477dbb',
+  outline:             '#356aa6',
   cardBorder:          'rgba(0, 52, 94, 0.10)',
   cardBorderStrong:    'rgba(0, 52, 94, 0.16)',
   mutedText:           '#64748B',
@@ -259,12 +259,28 @@ const DetailPanel: FC<{
   const gp1End = itemGp1PoolEurBnTerminal(slide, item);
   const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
   const marginCagr = (1 + pool) / (1 + item.revenueCAGR) - 1;
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Focus trap (WCAG 2.4.3): keep Tab focus inside the dialog while it is open.
+  const onTrapKey = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return;
+    const root = panelRef.current;
+    if (!root) return;
+    const focusable = Array.from(
+      root.querySelectorAll<HTMLElement>('a[href], button, [tabindex]:not([tabindex="-1"])'),
+    ).filter((el) => !el.hasAttribute('disabled'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }, []);
 
   return (
     <>
@@ -278,6 +294,8 @@ const DetailPanel: FC<{
       />
       {/* Drawer */}
       <motion.aside
+        ref={panelRef}
+        onKeyDown={onTrapKey}
         role="dialog"
         aria-modal="true"
         aria-label={`${name} — profit pool assessment`}
@@ -343,7 +361,7 @@ const DetailPanel: FC<{
               GP1 pool {fmtEurBn(gp1Now)} → <b>{fmtEurBn(gp1End)}</b> by 2030
             </div>
             <div style={{ fontSize: 10, color: S.mutedText, marginTop: 6, lineHeight: 1.5 }}>
-              Pool = revenue × GP1. Composition: ({fmtPct(item.revenueCAGR)} revenue) × ({fmtPct(marginCagr, 2)} margin drift) = {fmtPct(pool)} pool p.a.
+              Pool = revenue × GP1 proxy. Composition: ({fmtPct(item.revenueCAGR)} revenue) × ({fmtPct(marginCagr, 2)} margin drift, est.) = {fmtPct(pool)} pool p.a.
             </div>
           </div>
 
@@ -354,12 +372,15 @@ const DetailPanel: FC<{
               rating={revRating}
               valueLabel={`${revRating.label} p.a.`}
               driver={item.revenueDriver}
+              grade={item.sources.revenue[0]?.grade}
             />
             <FactorRow
-              title={`GP1 margin development (${(item.gp1Margin * 100).toFixed(1)}% → ${(gp1Terminal(item) * 100).toFixed(1)}%)`}
+              title={`GP1-proxy margin development (${(item.gp1Margin * 100).toFixed(1)}% → ${(gp1Terminal(item) * 100).toFixed(1)}%)`}
               rating={gp1Rating}
               valueLabel={gp1Rating.label}
               driver={item.marginDriver}
+              grade="estimate"
+              gradeNote="Margin drift is structured judgment — ungraded by source. The development arrow inherits this estimate."
             />
           </div>
 
@@ -410,9 +431,11 @@ const DetailPanel: FC<{
           </div>
 
           <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${S.surfaceHigh}`, fontSize: 10, color: S.mutedText, lineHeight: 1.55 }}>
-            GP1 / CM1 is not separately disclosed at tier level by any player; tier margins are
-            structured estimates calibrated against the linked, verified company gross margins
-            (grades shown). Nominal terms; € at planning rate 1.15. Verified 2026-06-11.
+            The Y-axis is a <b>GP1 proxy</b>: GP1 / CM1 is not separately disclosed at tier level by any
+            player, so tier values are structured estimates calibrated against the linked, verified
+            company gross margins (grades shown). Where a company-level figure is itself the anchor it is
+            used exactly as disclosed. Market sizing: Euromonitor (consumer hair · laundry/home care),
+            Kline (professional hair). Nominal terms; € at planning rate 1.15.
           </div>
         </div>
       </motion.aside>
@@ -420,12 +443,13 @@ const DetailPanel: FC<{
   );
 };
 
-const FactorRow: FC<{ title: string; rating: CagrRating; valueLabel: string; driver: string }> = ({
-  title, rating, valueLabel, driver,
-}) => (
+const FactorRow: FC<{
+  title: string; rating: CagrRating; valueLabel: string; driver: string;
+  grade?: EvidenceGrade; gradeNote?: string;
+}> = ({ title, rating, valueLabel, driver, grade, gradeNote }) => (
   <div style={{ background: S.surface, border: `1px solid ${S.cardBorder}`, borderRadius: 12, padding: '10px 12px' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: S.outline }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: S.onSurfaceVariant }}>
         {title}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -436,6 +460,12 @@ const FactorRow: FC<{ title: string; rating: CagrRating; valueLabel: string; dri
       </div>
     </div>
     <div style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5 }}>{driver}</div>
+    {grade && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
+        <GradeChip grade={grade} compact />
+        {gradeNote && <span style={{ fontSize: 9.5, color: S.mutedText, lineHeight: 1.4 }}>{gradeNote}</span>}
+      </div>
+    )}
   </div>
 );
 
@@ -526,7 +556,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
             />
             <text
               x={ML - 10} y={y + 4}
-              fontSize={11} fill={S.outline}
+              fontSize={11} fill={S.onSurfaceVariant}
               textAnchor="end" fontFamily={HEADLINE_FONT} fontWeight={600}
             >
               {(t * 100).toFixed(0)}%
@@ -537,18 +567,18 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
 
       <text
         x={ML - 48} y={MT + plotH / 2}
-        fontSize={11} fill={S.outline} textAnchor="middle"
+        fontSize={11.5} fill={S.onSurfaceVariant} textAnchor="middle"
         fontFamily={HEADLINE_FONT} fontWeight={700}
         transform={`rotate(-90, ${ML - 48}, ${MT + plotH / 2})`}
       >
-        GP1 / Contribution Margin 1 — ⚠️ estimated (not company-reported)
+        GP1 proxy (est.) — Y axis
       </text>
       <text
         x={ML + plotW / 2} y={H - 6}
-        fontSize={11} fill={S.outline} textAnchor="middle"
+        fontSize={11.5} fill={S.onSurfaceVariant} textAnchor="middle"
         fontFamily={HEADLINE_FONT} fontWeight={700}
       >
-        Revenue share (% of view) — order: value chain / format logic · arrows = pool development {POOL_HORIZON_LABEL}
+        Revenue share (% of view) · arrows = pool development {POOL_HORIZON_LABEL}
       </text>
 
       {bars.map((b) => {
@@ -734,14 +764,6 @@ const ProfitPoolExplorer: FC = () => {
 
   const closePanel = useCallback(() => setSelectedId(null), []);
 
-  const slideIdx = PROFIT_POOL_SLIDES.findIndex(s => s.id === slide.id);
-  const go = (delta: number) => {
-    const next = PROFIT_POOL_SLIDES[(slideIdx + delta + PROFIT_POOL_SLIDES.length) % PROFIT_POOL_SLIDES.length];
-    setGroup(next.group);
-    setKind(next.kind);
-    setSelectedId(null);
-  };
-
   return (
     <div
       className="min-h-screen"
@@ -765,15 +787,16 @@ const ProfitPoolExplorer: FC = () => {
           <h1 className="font-extrabold tracking-tight" style={{ fontFamily: HEADLINE_FONT, fontSize: '2.4rem', lineHeight: 1.15, color: S.onBg, margin: 0 }}>
             Industry Profit Pools — HCB Lens
           </h1>
-          <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 760 }}>
-            Bain-classic pool views over verified public data. Arrows show the development of the
-            <b> profit pool</b> (revenue × GP1, {POOL_HORIZON_LABEL}) — click any bar for the
+          <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 780 }}>
+            Bain-classic pool views. Arrows show the development of the
+            <b> profit pool</b> (revenue × GP1 proxy, {POOL_HORIZON_LABEL}) — click any bar for the
             revenue / margin decomposition, € pool sizes and clickable sources.
-            Y-axis = <b>GP1 / Contribution Margin 1</b>.
+            Y-axis = <b>GP1 proxy</b> (estimated). Market sizing: <b>Euromonitor</b> (consumer hair · laundry/home care),
+            <b> Kline</b> (professional hair).
           </p>
         </div>
 
-        {/* Horizon badge + slide nav */}
+        {/* Horizon badge (view selection lives in the Group/Kind toggles below) */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <div
             style={{
@@ -785,30 +808,6 @@ const ProfitPoolExplorer: FC = () => {
           >
             Horizon · {POOL_HORIZON_LABEL}
           </div>
-          <button
-            onClick={() => go(-1)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 36, height: 36, borderRadius: 10, background: S.surface,
-              border: `1px solid ${S.cardBorder}`, cursor: 'pointer', color: S.onBg,
-            }}
-            title="Previous view"
-            aria-label="Previous view"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => go(+1)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 36, height: 36, borderRadius: 10, background: S.surface,
-              border: `1px solid ${S.cardBorder}`, cursor: 'pointer', color: S.onBg,
-            }}
-            title="Next view"
-            aria-label="Next view"
-          >
-            <ChevronRight size={18} />
-          </button>
         </div>
       </div>
 
@@ -882,6 +881,39 @@ const ProfitPoolExplorer: FC = () => {
           />
         </div>
 
+        {/* Companion index — every pool (incl. sub-1% slivers) always legible & clickable (U1) */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 7 }}>
+            All pools in this view · click to open
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {slide.items.map((it) => {
+              const r = toPoolRating(poolCagr(it));
+              const nm = it.sublabel ? `${it.label} ${it.sublabel}`.trim() : it.label;
+              const isSel = selectedId === it.id;
+              const pct = it.revenueShare * 100;
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => { setHover(null); setSelectedId(it.id); }}
+                  title={`${nm} — ${pct.toFixed(1)}% revenue · ${(it.gp1Margin * 100).toFixed(0)}% GP1 proxy · pool ${r.label} p.a.`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '5px 10px', borderRadius: 999, cursor: 'pointer',
+                    background: isSel ? 'rgba(0,93,181,0.10)' : S.surface,
+                    border: `1px solid ${isSel ? S.primary : S.cardBorder}`,
+                    fontFamily: BODY_FONT, fontSize: 11, color: S.onSurface, lineHeight: 1.2,
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>{nm}</span>
+                  <span style={{ color: S.mutedText, fontVariantNumeric: 'tabular-nums' }}>{pct >= 1 ? pct.toFixed(0) : pct.toFixed(1)}%</span>
+                  <ArrowsHTML rating={r} size={11} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Legend — pool ladder + evidence grades */}
         <div
           style={{
@@ -905,6 +937,27 @@ const ProfitPoolExplorer: FC = () => {
           <div style={{ marginLeft: 'auto', fontSize: 10, color: S.mutedText }}>
             Nominal terms · € at 1.15 · click any bar for the full assessment
           </div>
+        </div>
+
+        {/* How-to-read key + honesty caveat on the development arrows */}
+        <div
+          style={{
+            marginTop: 12, padding: '10px 12px', borderRadius: 10,
+            background: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
+            fontSize: 10.5, color: S.onSurfaceVariant, lineHeight: 1.55,
+          }}
+        >
+          <b style={{ color: S.onBg }}>How to read this chart:</b>{' '}
+          bar <b>width</b> = revenue share · bar <b>height</b> = GP1 proxy ·
+          bar <b>area</b> = GP1 profit pool · <b>arrow</b> = pool development p.a.
+          <span style={{ color: S.mutedText }}>
+            {' '}— a verified revenue CAGR combined with a <b>structured margin-drift estimate</b>{' '}
+            (the drift is judgment, graded ⚠️ in the drill-down; treat the arrow as directional, not a forecast).
+            Sub-1% pools render as slivers — use the “All pools” index above to open them.
+            {slide.kind === 'ValueChain' && (
+              <> Value-chain tiers <b>overlap</b> (the same end-consumer euro is counted at brand-owner and again at retail), so total chain revenue exceeds the headline consumer pool — areas show where margin sits, not additive pools.</>
+            )}
+          </span>
         </div>
       </div>
 
