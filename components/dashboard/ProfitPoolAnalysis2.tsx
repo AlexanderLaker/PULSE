@@ -48,7 +48,10 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import * as api from '@/api/client';
-import { CATEGORIES, YEARS, fmtShift, shiftArrow } from '@/lib/format';
+import {
+  CATEGORIES, YEARS, fmtShift, shiftArrow, shiftColor,
+  heatFill, heatText, categoryDisplay, categoryCode, groupDisplay,
+} from '@/lib/format';
 import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
@@ -139,9 +142,9 @@ const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: Lu
 type ImpactFilter = 'total' | 'expansion' | 'contraction';
 
 const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
-  total:       { label: 'Total',          description: 'Net shift — positive and negative trend impacts combined.', Icon: Activity },
-  expansion:   { label: 'Upside Share',   description: 'Portion of each year\'s net shift attributable to positive-impact trends. Year-shape inherits from the net simulation; not equivalent to a positive-only re-run.', Icon: TrendingUp },
-  contraction: { label: 'Downside Share', description: 'Portion of each year\'s net shift attributable to negative-impact trends. Year-shape inherits from the net simulation; not equivalent to a negative-only re-run.', Icon: TrendingDown },
+  total:       { label: 'Net',             description: 'Net shift — positive and negative trend impacts combined.', Icon: Activity },
+  expansion:   { label: 'Positive-trend',  description: 'Positive-trend contribution — the share of each year\'s net shift from upside trends. Year-shape inherits from the net simulation; not a positive-only re-run.', Icon: TrendingUp },
+  contraction: { label: 'Negative-trend',  description: 'Negative-trend contribution — the share of each year\'s net shift from downside trends. Year-shape inherits from the net simulation; not a negative-only re-run.', Icon: TrendingDown },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -171,41 +174,11 @@ function getYearShift(
   return extractMedian(v as PercentileDistribution | number | undefined);
 }
 
-/** Heatmap cell color — signed diverging palette.
- *  Green (#22C55E) = expansion, Red (#EF4444) = contraction.
- *  `scale` is the absolute value at which the gradient saturates.
- *  Main grid cells use a fixed 5% scale; the Total column uses its own
- *  data-driven scale so row totals don't get washed out against per-
- *  dimension cells that are an order of magnitude smaller. */
-function heatFillScaled(v: number | null, scale: number): string {
-  if (v == null || !isFinite(v)) return S.surfaceLow;
-  if (Math.abs(v) < 0.0005) return S.surfaceLow;
-  const s = Math.max(scale, 0.005);
-  const mag = Math.min(Math.abs(v) / s, 1);
-  if (v > 0) {
-    const a = 0.14 + mag * 0.62;
-    return `rgba(31, 122, 61, ${a.toFixed(2)})`; // expansion (maritime #1f7a3d)
-  }
-  const a = 0.14 + mag * 0.62;
-  return `rgba(159, 64, 61, ${a.toFixed(2)})`; // contraction (maritime #9f403d)
-}
-
-function heatTextColorScaled(v: number | null, scale: number): string {
-  if (v == null || !isFinite(v)) return S.onSurfaceVariant;
-  const s = Math.max(scale, 0.005);
-  const mag = Math.min(Math.abs(v) / s, 1);
-  if (mag > 0.45) return '#ffffff';
-  return v > 0 ? '#0f5132' : '#6a2a27';
-}
-
-// Default 5% scale for the main grid cells and the bottom-row column totals
-// (same unit as data cells — per-dimension decomposition shares).
-function heatFill(v: number | null): string {
-  return heatFillScaled(v, 0.05);
-}
-function heatTextColor(v: number | null): string {
-  return heatTextColorScaled(v, 0.05);
-}
+// Heat ramp + text colour now live in lib/format.ts as the single source of
+// truth (U3, June 2026) — imported as `heatFill` / `heatText` above. The Total
+// row/column no longer carry conditional shading (U2): they read as flat,
+// labelled figures so colour saturation never implies a scale the legend
+// doesn't define.
 
 // ─── UI Primitives ───────────────────────────────────────────────
 const PillButton: FC<{
@@ -291,17 +264,18 @@ const KpiTile: FC<{
           className="absolute left-1/2 bottom-full mb-2 z-20 rounded-lg px-3 py-1.5 whitespace-nowrap pointer-events-none"
           style={{
             transform: 'translateX(-50%)',
-            backgroundColor: S.onSurface,
-            color: '#ffffff',
+            backgroundColor: S.surface,
+            color: S.onSurface,
+            border: `1px solid ${S.cardBorderStrong}`,
             fontSize: 11,
             fontWeight: 600,
             fontFamily: BODY_FONT,
             fontVariantNumeric: 'tabular-nums',
-            boxShadow: '0 12px 32px -8px rgba(0, 52, 94, 0.35)',
+            boxShadow: '0 12px 32px -10px rgba(0, 52, 94, 0.22)',
           }}
         >
           P10 {fmtShift(p10, 1)} … P90 {fmtShift(p90, 1)}
-          {bandNote ? <span style={{ opacity: 0.65 }}> · {bandNote}</span> : null}
+          {bandNote ? <span style={{ color: S.onSurfaceVariant }}> · {bandNote}</span> : null}
         </div>
       )}
     </>
@@ -338,7 +312,7 @@ const KpiTile: FC<{
 // ─── Matrix Table Component ──────────────────────────────────────
 interface MatrixProps {
   columns: Array<{ id: string; label: string }>;
-  rows: Array<{ id: string; label: string; group?: string }>;
+  rows: Array<{ id: string; label: string; group?: string; code?: string }>;
   /** Row-major data: rows[rowId][colId] = shift */
   data: Record<string, Record<string, number | null>>;
   subtitle?: string;
@@ -431,23 +405,10 @@ const Matrix: FC<MatrixProps> = ({
 
   const hasAnyData = rows.some((r) => columns.some((c) => (data[r.id]?.[c.id] ?? null) !== null));
 
-  // Total column gets its own conditional-formatting scale — the row totals
-  // (and the grand total) are typically much larger in magnitude than the
-  // per-force / per-VC / per-region cells in the main grid, so sharing the
-  // fixed 5% scale would either saturate them all or wash out the grid.
-  // Scale to the max |rowTotal| (with a defensive floor) so the Total
-  // column is independently legible.
-  const totalScale = useMemo(() => {
-    const vals: number[] = [];
-    if (rowTotals) {
-      Object.values(rowTotals).forEach((v) => {
-        if (v != null && isFinite(v)) vals.push(Math.abs(v));
-      });
-    }
-    if (grandTotal != null && isFinite(grandTotal)) vals.push(Math.abs(grandTotal));
-    const maxAbs = vals.length ? Math.max(...vals) : 0;
-    return Math.max(maxAbs, 0.02); // floor avoids blow-up when totals are near zero
-  }, [rowTotals, grandTotal]);
+  // U2 (June 2026): the Total row/column are no longer heat-shaded, so there is
+  // no separate data-driven colour scale to compute. Totals read as flat,
+  // labelled figures (bold ▲/▼ + sign carries direction) — colour intensity is
+  // reserved for the grid cells, all on the one ±5% scale the legend defines.
 
   if (!hasAnyData && emptyMessage) {
     return (
@@ -592,21 +553,33 @@ const Matrix: FC<MatrixProps> = ({
                       }}
                     >
                       {onRowClick ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8 }}>
                           <span style={{ textDecoration: isRowHover ? 'underline' : 'none', textUnderlineOffset: '3px' }}>
                             {row.label}
                           </span>
+                          {row.code && (
+                            <span
+                              style={{
+                                fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                                fontSize: 10, fontWeight: 600, letterSpacing: '0.02em',
+                                color: S.mutedText, backgroundColor: S.surfaceLow,
+                                padding: '1px 6px', borderRadius: 5, whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {row.code}
+                            </span>
+                          )}
+                          {/* Persistent drill-down affordance (U4) — always visible,
+                              not a hover-only reveal, so the drill-down is discoverable. */}
                           <span
                             aria-hidden
                             style={{
-                              display: 'inline-flex', alignItems: 'center',
-                              fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                              textTransform: 'uppercase', color: S.primary,
-                              opacity: isRowHover ? 1 : 0, transition: 'opacity 0.15s ease',
-                              whiteSpace: 'nowrap',
+                              marginLeft: 'auto', color: S.primary,
+                              fontWeight: 800, fontSize: 16, lineHeight: 1,
+                              opacity: isRowHover ? 1 : 0.4, transition: 'opacity 0.15s ease',
                             }}
                           >
-                            View details →
+                            ›
                           </span>
                         </span>
                       ) : (
@@ -622,7 +595,7 @@ const Matrix: FC<MatrixProps> = ({
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
                             backgroundColor: heatFill(v),
-                            color: heatTextColor(v),
+                            color: heatText(v),
                             fontWeight: v != null && Math.abs(v) > 0.02 ? 700 : 600,
                             fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                             transition: 'background-color 0.25s ease, box-shadow 0.15s ease',
@@ -643,12 +616,11 @@ const Matrix: FC<MatrixProps> = ({
                         <td
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
-                            backgroundColor: heatFillScaled(rt, totalScale),
-                            color: heatTextColorScaled(rt, totalScale),
+                            backgroundColor: S.surfaceContainer,
+                            color: shiftColor(rt),
                             fontWeight: 700,
                             fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                             borderLeft: `2px solid ${S.cardBorderStrong}`,
-                            transition: 'background-color 0.25s ease',
                           }}
                           title={rt != null ? `${row.label} — row total (MC median): ${fmtShift(rt, 1)}` : undefined}
                         >
@@ -680,8 +652,8 @@ const Matrix: FC<MatrixProps> = ({
                       key={col.id}
                       className="px-3 py-1.5 text-center text-[13px] tabular-nums"
                       style={{
-                        backgroundColor: heatFill(ct),
-                        color: heatTextColor(ct),
+                        backgroundColor: S.surfaceContainer,
+                        color: shiftColor(ct),
                         fontWeight: 700,
                         fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                         borderTop: `2px solid ${S.cardBorderStrong}`,
@@ -695,8 +667,8 @@ const Matrix: FC<MatrixProps> = ({
                 <td
                   className="px-3 py-1.5 text-center text-[13px] tabular-nums"
                   style={{
-                    backgroundColor: heatFillScaled(grandTotal ?? null, totalScale),
-                    color: heatTextColorScaled(grandTotal ?? null, totalScale),
+                    backgroundColor: S.surfaceHigh,
+                    color: shiftColor(grandTotal ?? null),
                     fontWeight: 800,
                     fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
                     borderLeft: `2px solid ${S.cardBorderStrong}`,
@@ -720,7 +692,7 @@ const Matrix: FC<MatrixProps> = ({
       >
         <span style={{ fontFamily: BODY_FONT }}>
           Signed % vs 2025 · positive = expansion · negative = contraction
-          {showTotals && ' · totals are category-weighted'}
+          {showTotals && ' · totals are category-weighted averages (labelled, not shaded)'}
         </span>
         <div className="flex items-center gap-3">
           <span>−5%</span>
@@ -755,13 +727,14 @@ const Matrix: FC<MatrixProps> = ({
               left: hover.x,
               top: hover.y - 10,
               transform: 'translate(-50%, -100%)',
-              backgroundColor: S.onSurface,
-              color: '#ffffff',
+              backgroundColor: S.surface,
+              color: S.onSurface,
+              border: `1px solid ${S.cardBorderStrong}`,
               padding: '10px 14px',
               fontFamily: BODY_FONT,
               fontSize: 12,
               minWidth: 176,
-              boxShadow: '0 16px 40px -8px rgba(0, 52, 94, 0.35)',
+              boxShadow: '0 16px 40px -10px rgba(0, 52, 94, 0.22)',
             }}
           >
             <div
@@ -825,6 +798,11 @@ const Matrix: FC<MatrixProps> = ({
                 </>
               )}
             </div>
+            {hasBands && (
+              <div style={{ opacity: 0.55, fontSize: 10, marginTop: 6, lineHeight: 1.4 }}>
+                Band = magnitude uncertainty of the listed trends only.
+              </div>
+            )}
             {!hasBands && cellDetails && (
               <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
                 P10 / P90 not available for this cell
@@ -840,15 +818,18 @@ const Matrix: FC<MatrixProps> = ({
                 Click → {hover.rowLabel} drill-down
               </div>
             )}
-            {/* Pointer arrow */}
+            {/* Pointer arrow — light fill + border on the two downward edges
+                so it reads as one piece with the light tooltip body. */}
             <div
               style={{
                 position: 'absolute',
                 left: '50%',
-                bottom: -5,
+                bottom: -6,
                 width: 10,
                 height: 10,
-                backgroundColor: S.onSurface,
+                backgroundColor: S.surface,
+                borderRight: `1px solid ${S.cardBorderStrong}`,
+                borderBottom: `1px solid ${S.cardBorderStrong}`,
                 transform: 'translateX(-50%) rotate(45deg)',
               }}
             />
@@ -997,9 +978,10 @@ const ProfitPoolAnalysis2: FC<{
 
   const matrixData = useMemo(() => {
     const rows = CATEGORIES.map((c) => ({
-      id: c.name,
-      label: c.name,
-      group: c.group,
+      id: c.name,                       // canonical key — drives every backend lookup
+      label: categoryDisplay(c.name),   // S1: plain-English label, no brand refs
+      code: categoryCode(c.name),       // S1: muted acronym chip for LHC rows
+      group: groupDisplay(c.group),     // "LHC" → "Laundry & Home Care" in the section header
       fallbackId: c.id,
     }));
 
@@ -1433,6 +1415,12 @@ const ProfitPoolAnalysis2: FC<{
       className="min-h-screen"
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
+      {/* U6 (June 2026): visible keyboard focus on the interactive matrix rows
+          and KPI tiles, so the drill-down is reachable without a mouse. */}
+      <style>{`
+        tr[role="button"]:focus-visible { outline: 2px solid ${S.primary}; outline-offset: -2px; border-radius: 4px; }
+        tr[role="button"]:focus:not(:focus-visible) { outline: none; }
+      `}</style>
       <main className="max-w-[1440px] mx-auto px-8 py-10">
 
         {/* ── Error / offline banners ──────────────────────────── */}
@@ -1530,8 +1518,8 @@ const ProfitPoolAnalysis2: FC<{
             />
             {headline.maxCat && (
               <KpiTile
-                label={headline.maxCat.v > 0 ? 'Largest expansion' : 'Least contracting'}
-                name={headline.maxCat.name}
+                label="Most resilient category"
+                name={categoryDisplay(headline.maxCat.name)}
                 value={headline.maxCat.v}
                 p10={headline.maxCat.p10}
                 p90={headline.maxCat.p90}
@@ -1541,8 +1529,8 @@ const ProfitPoolAnalysis2: FC<{
             )}
             {headline.minCat && (
               <KpiTile
-                label={headline.minCat.v < 0 ? 'Most contracting' : 'Smallest expansion'}
-                name={headline.minCat.name}
+                label="Most exposed category"
+                name={categoryDisplay(headline.minCat.name)}
                 value={headline.minCat.v}
                 p10={headline.minCat.p10}
                 p90={headline.minCat.p90}
@@ -1859,8 +1847,8 @@ const ProfitPoolAnalysis2: FC<{
                 <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
-                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Seed stability</div>
-                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>How much the headline moves across independently-seeded simulation chains — the honest reproducibility measure (same seed reproduces bit-identically; the spread shows RNG sensitivity).</div>
+                <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Category codes</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>LHC = Laundry &amp; Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · IC Insect Control.</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Attenuation</div>
@@ -1883,6 +1871,13 @@ const ProfitPoolAnalysis2: FC<{
               </p>
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Methodology</div>
+              {/* U10 (June 2026): a three-line plain read precedes the full
+                  technical prose so the curious reader gets the gist first. */}
+              <ul className="text-[12px] mb-3" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, fontFamily: BODY_FONT, margin: '0 0 12px', paddingLeft: 18 }}>
+                <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs 2025 at that year — a compounded level, not a year-over-year change.</li>
+                <li style={{ marginBottom: 3 }}>Totals are category-weighted averages (not sums), so the portfolio number reads as one interpretable shift.</li>
+                <li>The model holds Henkel and competitor strategy constant — it propagates external trends only.</li>
+              </ul>
               <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
                           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine

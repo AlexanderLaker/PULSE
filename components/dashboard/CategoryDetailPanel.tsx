@@ -30,7 +30,7 @@ import {
   Area, Line, ComposedChart, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct } from '@/lib/format';
+import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct, categoryDisplay, groupDisplay } from '@/lib/format';
 import type { ForceName, ProjectionYear } from '@/types';
 
 // ─── Editorial design tokens — identical to ProfitPoolAnalysis2 ──────
@@ -208,14 +208,20 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
   );
   const yAxisDomain: [number, number] = [-maxAbs * 1.15, maxAbs * 1.15];
 
+  // U9 (June 2026): tint the band + median line by the terminal direction, so a
+  // contracting category reads red and an expanding one green — matching the
+  // matrix cell it was opened from, instead of a neutral blue for both.
+  const termMedian = chartData.length ? chartData[chartData.length - 1]!.median : 0;
+  const fanTint = termMedian < 0 ? S.contraction : termMedian > 0 ? S.expansion : S.primary;
+
   return (
     <div style={{ height: 280 }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 6, bottom: 0 }}>
           <defs>
             <linearGradient id="confidenceBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={S.primary} stopOpacity={0.28} />
-              <stop offset="100%" stopColor={S.primary} stopOpacity={0.04} />
+              <stop offset="0%" stopColor={fanTint} stopOpacity={0.26} />
+              <stop offset="100%" stopColor={fanTint} stopOpacity={0.04} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -248,13 +254,14 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
               return (
                 <div
                   style={{
-                    backgroundColor: S.onSurface,
-                    color: '#fff',
+                    backgroundColor: S.surface,
+                    color: S.onSurface,
+                    border: `1px solid ${S.cardBorderStrong}`,
                     borderRadius: 10,
                     padding: '9px 12px',
                     fontSize: 11,
                     fontFamily: BODY_FONT,
-                    boxShadow: '0 12px 32px -8px rgba(0, 52, 94, 0.32)',
+                    boxShadow: '0 12px 32px -10px rgba(0, 52, 94, 0.22)',
                     minWidth: 148,
                   }}
                 >
@@ -310,7 +317,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
             dataKey="p10"
             stackId="band"
             stroke="none"
-            fill={S.primary}
+            fill={fanTint}
             fillOpacity={0.05}
             isAnimationActive={false}
           />
@@ -326,10 +333,10 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
           <Line
             type="monotone"
             dataKey="median"
-            stroke={S.primary}
+            stroke={fanTint}
             strokeWidth={2.4}
-            dot={{ r: 2.5, fill: S.primary, strokeWidth: 0 }}
-            activeDot={{ r: 4, fill: S.primary, stroke: '#fff', strokeWidth: 2 }}
+            dot={{ r: 2.5, fill: fanTint, strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: fanTint, stroke: '#fff', strokeWidth: 2 }}
             isAnimationActive
           />
         </ComposedChart>
@@ -714,7 +721,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     );
   }, [categoryId, data]);
 
-  // ─── Path Δ hover tooltip state ──────────────────────────────────
+  // ─── Momentum hover tooltip state ────────────────────────────────
   // Mirrors the Matrix cell-tooltip pattern in ProfitPoolAnalysis2: track
   // the cursor anchor (top-center of the KPI tile) and render a fixed-
   // positioned, navy/white tooltip with the same shadow + arrow language
@@ -851,7 +858,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                {category?.group ?? 'Shift Matrix'} · Drill-down
+                {groupDisplay(category?.group) || 'Shift Matrix'} · Drill-down
               </div>
               <h2
                 style={{
@@ -864,7 +871,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   lineHeight: 1.15,
                 }}
               >
-                {category?.name ?? 'Category'}
+                {categoryDisplay(category?.name) || 'Category'}
               </h2>
             </div>
             <button
@@ -968,7 +975,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                Path Δ
+                Momentum
               </div>
               <div
                 style={{
@@ -981,6 +988,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                 }}
               >
                 {fmtShift(velocity, 1)}
+              </div>
+              {/* U5 (June 2026): static one-line meaning so the figure reads
+                  without needing the hover tooltip. */}
+              <div style={{ marginTop: 3, fontSize: 9.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.25 }}>
+                2026 → 2035 change
               </div>
             </div>
 
@@ -1178,7 +1190,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         </div>
       </motion.aside>
 
-      {/* ── Path Δ hover tooltip ─────────────────────────────────
+      {/* ── Momentum hover tooltip ───────────────────────────────
           Visual language is identical to the Matrix cell tooltip in
           ProfitPoolAnalysis2 — fixed position, navy fill, white text,
           uppercase eyebrow, downward arrow. */}
@@ -1189,13 +1201,14 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             left: pathHover.x,
             top: pathHover.y + 10,
             transform: 'translate(-50%, 0)',
-            backgroundColor: S.onSurface,
-            color: '#ffffff',
+            backgroundColor: S.surface,
+            color: S.onSurface,
+            border: `1px solid ${S.cardBorderStrong}`,
             padding: '10px 14px',
             fontFamily: BODY_FONT,
             fontSize: 12,
             maxWidth: 280,
-            boxShadow: '0 16px 40px -8px rgba(0, 52, 94, 0.35)',
+            boxShadow: '0 16px 40px -10px rgba(0, 52, 94, 0.22)',
           }}
         >
           <div
@@ -1209,7 +1222,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               fontFamily: HEADLINE_FONT,
             }}
           >
-            Path Δ · What this means
+            Momentum · What this means
           </div>
           <div style={{ lineHeight: 1.5, opacity: 0.92 }}>
             Velocity of the profit-pool shift across the horizon —
@@ -1221,15 +1234,18 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           <div style={{ marginTop: 6, opacity: 0.65, fontSize: 10.5 }}>
             Positive = accelerating expansion · Negative = accelerating contraction
           </div>
-          {/* Pointer arrow — points up because the bubble sits below the tile */}
+          {/* Pointer arrow — points up because the bubble sits below the tile;
+              light fill + border on the two upward edges to match the body. */}
           <div
             style={{
               position: 'absolute',
               left: '50%',
-              top: -5,
+              top: -6,
               width: 10,
               height: 10,
-              backgroundColor: S.onSurface,
+              backgroundColor: S.surface,
+              borderTop: `1px solid ${S.cardBorderStrong}`,
+              borderLeft: `1px solid ${S.cardBorderStrong}`,
               transform: 'translateX(-50%) rotate(45deg)',
             }}
           />

@@ -74,6 +74,43 @@ export const CATEGORIES: CategoryDefinition[] = [
   { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#b0479e' },
 ];
 
+// ─── Category display labels (plain-English, no brand refs) ─────────
+// Keyed by the canonical `name` (the backend lookup key, e.g. "LHC: FCN").
+// We NEVER change `name` — only how it is shown — so shift-matrix and
+// exposure lookups keyed by display name keep working. The optional `code`
+// is shown as a muted chip next to LHC labels (the acronyms a CEO can't
+// decode at a glance); Hair sub-categories are self-evident and carry none.
+export const CATEGORY_DISPLAY: Record<string, { label: string; code?: string }> = {
+  'Hair: Color':   { label: 'Colour' },
+  'Hair: Care':    { label: 'Care' },
+  'Hair: Styling': { label: 'Styling' },
+  'Hair: Body':    { label: 'Body' },
+  'LHC: FCN':      { label: 'Fabric Clean',         code: 'FCN' },
+  'LHC: FCA':      { label: 'Fabric Care',          code: 'FCA' },
+  'LHC: FFI':      { label: 'Fabric Finishers',     code: 'FFI' },
+  'LHC: LAD':      { label: 'Laundry Additives',    code: 'LAD' },
+  'LHC: HDW':      { label: 'Hand Dishwash',        code: 'HDW' },
+  'LHC: ADW':      { label: 'Auto Dishwash',        code: 'ADW' },
+  'LHC: HSC':      { label: 'Hard-Surface Cleaner', code: 'HSC' },
+  'LHC: IC':       { label: 'Insect Control',       code: 'IC' },
+};
+
+/** Plain-English category label for display. Falls back to the raw name. */
+export function categoryDisplay(name: string | null | undefined): string {
+  if (!name) return '';
+  return CATEGORY_DISPLAY[name]?.label ?? name;
+}
+/** Short code chip (LHC acronyms only); undefined for self-evident Hair rows. */
+export function categoryCode(name: string | null | undefined): string | undefined {
+  if (!name) return undefined;
+  return CATEGORY_DISPLAY[name]?.code;
+}
+/** Expand a group key for headers: "LHC" → "Laundry & Home Care". */
+export function groupDisplay(group: string | null | undefined): string {
+  if (!group) return '';
+  return group === 'LHC' ? 'Laundry & Home Care' : group;
+}
+
 // 10-year strategic horizon (2026–2035), mirroring backend
 // pulse/config.py::DEFAULT_PATH_YEARS. Keep in sync — a short horizon
 // here truncates the S-curve materialization (default peaks at 2030 only
@@ -137,11 +174,29 @@ export function shiftArrow(v: number | null | undefined): string {
  * intensity scaled by |v| up to `scale` (default ±5%).
  *   expansion → rgb(31,122,61) · contraction → rgb(159,64,61)
  */
+// Single source of truth for the matrix heat ramp (F1/U3, June 2026): the
+// Shift-Matrix grid imports these instead of re-deriving its own ramp. Tiny /
+// missing values fall to surfaceLow so a near-zero cell reads as blank, not a
+// faint tint. `scale` is the |value| at which the gradient saturates.
+const HEAT_SURFACE_LOW = '#eff4ff';
+const HEAT_ON_SURFACE_VARIANT = '#26619d';
+
 export function heatFill(v: number | null | undefined, scale = 0.05): string {
-  if (v == null) return 'transparent';
-  const intensity = Math.max(0, Math.min(Math.abs(v) / scale, 1));
-  const a = (0.06 + intensity * 0.5).toFixed(3);
+  if (v == null || !isFinite(v)) return HEAT_SURFACE_LOW;
+  if (Math.abs(v) < FLAT_EPS) return HEAT_SURFACE_LOW;
+  const s = Math.max(scale, 0.005);
+  const mag = Math.min(Math.abs(v) / s, 1);
+  const a = (0.14 + mag * 0.62).toFixed(2);
   return v > 0
     ? `rgba(31, 122, 61, ${a})`
     : `rgba(159, 64, 61, ${a})`;
+}
+
+/** Legible text colour over a `heatFill` cell at the same scale. */
+export function heatText(v: number | null | undefined, scale = 0.05): string {
+  if (v == null || !isFinite(v)) return HEAT_ON_SURFACE_VARIANT;
+  const s = Math.max(scale, 0.005);
+  const mag = Math.min(Math.abs(v) / s, 1);
+  if (mag > 0.45) return '#ffffff';
+  return v > 0 ? '#0f5132' : '#6a2a27';
 }
