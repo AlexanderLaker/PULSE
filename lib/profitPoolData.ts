@@ -91,8 +91,6 @@ export interface SlideItem {
   revenueDriver: string;
   /** One-line driver behind the margin trajectory. */
   marginDriver: string;
-  /** Honest one-liner on Henkel's position in this pool (qualitative only). */
-  henkelAngle?: string;
   note?: string;
   linkedCategoryId?: CategoryId | null;
   sources: {
@@ -457,7 +455,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'ValueChain',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
     construction:
-      'Primary sizing: Euromonitor (consumer hair). Chain revenue per tier, normalized to 100%: retail value ~$88–90bn (Euromonitor 2024 RSP; GVR $88.2bn cross-check) split store/online; brand-owner net sales ≈ 50% of retail value; professional products per Kline (~$17bn salon channel — AMR’s $34.8bn all-channel figure retired; professional overlaps consumer retail, flagged); upstream tiers sized from input-cost shares. NB tiers overlap (the same end-consumer euro is counted at brand-owner and at retail), so total chain revenue exceeds the ~€77bn consumer pool — areas show where margin sits, not additive pools. Tier GP1 = structured estimate calibrated against the linked FY2025 gross margins.',
+      'Chain revenue per tier, normalized to 100%: retail value ~$88–90bn (Euromonitor 2024 RSP; GVR $88.2bn cross-check) split store/online; brand-owner net sales ≈ 50% of retail value; professional products per Kline (~$17bn salon channel — AMR’s $34.8bn all-channel figure retired; professional overlaps consumer retail, flagged); upstream tiers sized from input-cost shares.',
     items: [
       {
         id: 'h_vc_1', label: 'Commodity', sublabel: 'Chemicals',
@@ -497,7 +495,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.24, gp1Margin: 0.53, revenueCAGR: 0.045, gp1DeltaBps: 75,
         revenueDriver: 'Category ~4–5% (Euromonitor ~3% all-category current value + branded premium/treatment-mix lift).',
         marginDriver: 'Premiumization and RGM outpace private-label drag in beauty-adjacent hair.',
-        henkelAngle: 'Schwarzkopf, Syoss, Gliss, Taft — Henkel is a global top-tier retail hair player (clear #2 in European retail colour); group GM 50.8% sits just below the calibrated tier GP1.',
         note: 'P&G Beauty, L’Oréal CPD, Henkel HCB Hair',
         linkedCategoryId: 'hair_care',
         sources: {
@@ -515,7 +512,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.10, gp1Margin: 0.58, revenueCAGR: 0.040, gp1DeltaBps: 50,
         revenueDriver: 'Kline: ~4% growth (salon channel); premium colour & bond services pull through.',
         marginDriver: 'Salon-exclusive positioning protects price; education moat.',
-        henkelAngle: 'Schwarzkopf Professional + Joico — global ~#2 behind L’Oréal (Kline: Henkel ~12% vs Wella ~10% post-Olaplex; #1 in styling, #3 in colour).',
         note: 'L’Oréal Pro, Wella, Schwarzkopf Pro. Sized on Kline’s salon-channel ~$17bn (not AMR’s broader $34.8bn all-channel figure); the salon-products tier overlaps consumer retail.',
         sources: {
           revenue: [MKT.proHair],
@@ -576,7 +572,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'ValueChain',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
     construction:
-      'Primary sizing: Euromonitor (laundry/home care). Chain revenue per tier, normalized to 100%: Laundry Care retail value ~$85bn (Euromonitor 2024 RSP; the prior GVR "$185bn laundry detergent" figure ≈ the entire Home Care universe, retired) split store/online; brand-owner net sales ≈ 50% of retail value; adjacent flows (appliances $66.9bn FBI, services $78.2bn GVR) shown as own tiers. NB tiers overlap (the same euro is counted at brand-owner and at retail), so total chain revenue exceeds the ~€74bn consumer pool — areas show where margin sits, not additive pools. Tier GP1 = structured estimate calibrated against linked FY2025 gross margins.',
+      'Chain revenue per tier, normalized to 100%: Laundry Care retail value ~$85bn (Euromonitor 2024 RSP; the prior GVR "$185bn laundry detergent" figure ≈ the entire Home Care universe, retired) split store/online; brand-owner net sales ≈ 50% of retail value; adjacent flows (appliances $66.9bn FBI, services $78.2bn GVR) shown as own tiers.',
     items: [
       {
         id: 'l_vc_1', label: 'Commodity', sublabel: 'Chemicals',
@@ -616,7 +612,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.20, gp1Margin: 0.46, revenueCAGR: 0.045, gp1DeltaBps: -50,
         revenueDriver: 'Category ~4–5% nominal (Euromonitor) — EM volume + DM price/mix.',
         marginDriver: 'Private label + retailer pressure outweigh RGM in laundry (unlike hair).',
-        henkelAngle: 'Persil, Perwoll, all, Snuggle — laundry is Henkel’s scale backbone; HCB FY2025 adj. EBIT margin 14.5% on €9.7bn sales.',
         note: 'P&G Fabric Care, Henkel LHC, Unilever Home Care',
         linkedCategoryId: 'lhc_fcn',
         sources: {
@@ -704,14 +699,13 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'SubSegment',
     prismProxyCategories: ['hair_care', 'hair_color', 'hair_styling'],
     construction:
-      'Primary sizing: Euromonitor (consumer hair); per-format splits triangulated from specialist reports pending Passport confirmation. Shares = per-segment sizes normalized over their sum ($87.1bn ≈ Euromonitor ~$88–90bn — independent reports reconcile within ~1%): shampoo $38.2bn, colour $26.1bn, styling $10.0bn, conditioner $5.3bn, oil $4.7bn, serums $1.3bn, supplements $0.8bn, masks $0.7bn. Base years 2024–2026 as published. Scope flag: hair colour includes professional colourants — wider than retail-only colour. NB Euromonitor’s ~3% all-category current-value CAGR is below several segment-specialist growth rates shown here.',
+      'Per-format splits triangulated from specialist reports pending Passport confirmation. Shares = per-segment sizes normalized over their sum ($87.1bn ≈ Euromonitor ~$88–90bn — independent reports reconcile within ~1%): shampoo $38.2bn, colour $26.1bn, styling $10.0bn, conditioner $5.3bn, oil $4.7bn, serums $1.3bn, supplements $0.8bn, masks $0.7bn. Base years 2024–2026 as published. Scope flag: hair colour includes professional colourants — wider than retail-only colour. NB Euromonitor’s ~3% all-category current-value CAGR is below several segment-specialist growth rates shown here.',
     items: [
       {
         id: 'h_sub_1', label: 'Shampoo',
         revenueShare: 0.43, gp1Margin: 0.44, revenueCAGR: 0.059, gp1DeltaBps: -50,
         revenueDriver: 'FBI: 5.9% CAGR — EM premiumization carries a mature DM base.',
         marginDriver: 'Private label + price anchoring grind the format’s floor.',
-        henkelAngle: 'Syoss/Gliss/Schauma over-index here — scale strong, margin ceiling structural.',
         linkedCategoryId: 'hair_care',
         sources: {
           revenue: [MKT.shampoo],
@@ -734,7 +728,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.30, gp1Margin: 0.58, revenueCAGR: 0.059, gp1DeltaBps: 100,
         revenueDriver: 'GVR: 5.9% CAGR — root touch-up frequency + fashion shades.',
         marginDriver: 'Chemistry IP + low private-label credibility = strongest pricing in hair.',
-        henkelAngle: 'Schwarzkopf (incl. its Palette sub-brand): clear #2 in European retail colour behind L’Oréal — Henkel’s richest hair pool.',
         note: 'GVR scope includes professional colorants.',
         linkedCategoryId: 'hair_color',
         sources: {
@@ -747,7 +740,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.12, gp1Margin: 0.52, revenueCAGR: 0.044, gp1DeltaBps: 0,
         revenueDriver: 'Mordor: 4.4% CAGR — texture/social-media looks offset spray decline.',
         marginDriver: 'Stable: aerosol cost pass-through balances premium texturizers.',
-        henkelAngle: 'Taft + got2b lead European styling — defend-and-harvest pool.',
         linkedCategoryId: 'hair_styling',
         sources: {
           revenue: [MKT.styling],
@@ -759,7 +751,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.01, gp1Margin: 0.62, revenueCAGR: 0.056, gp1DeltaBps: 150,
         revenueDriver: 'Mordor: ~5.6% CAGR; bond-repair positioning keeps price points high.',
         marginDriver: 'Premium/prestige mix shift — fastest margin build in hair.',
-        henkelAngle: 'Under-indexed vs. bond/treatment specialists — the visible white space.',
         linkedCategoryId: 'hair_care',
         sources: {
           revenue: [MKT.masks],
@@ -793,7 +784,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.01, gp1Margin: 0.68, revenueCAGR: 0.155, gp1DeltaBps: 100,
         revenueDriver: 'GVR: 15.5% CAGR — ingestible beauty rides GLP-1-era hair-loss anxiety.',
         marginDriver: 'Supplement economics: low COGS, brand-driven pricing.',
-        henkelAngle: 'White space — no Henkel play; naturally adjacent to Schwarzkopf scalp claims.',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.supplements],
@@ -820,14 +810,13 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'CoreAdjacent',
     prismProxyCategories: ['hair_color', 'hair_care', 'hair_styling', 'hair_body'],
     construction:
-      'Primary sizing: Euromonitor (consumer hair) + Kline (professional). Pool sizes side by side, normalized: core retail hair care $88.2bn (Euromonitor ~$88–90bn), salon services ~$150bn (triangulated — no tier-1 source sizes salon SERVICES; FBI’s $203.8bn treated as a scope-inflated ceiling), professional products ~$17bn (Kline 2024, salon channel — AMR’s $34.8bn all-channel figure retired), tools $29.4bn (FBI 2025), scalp care $15.8bn (CMI 2026 — cross-cuts retail formats, flagged), beauty subscriptions $1.6bn (FMI 2025), supplements $0.8bn (GVR 2024). Men’s grooming and beauty-tech dropped vs. v1: published scopes too broad to slot honestly.',
+      'Pool sizes side by side, normalized: core retail hair care $88.2bn (Euromonitor ~$88–90bn), salon services ~$150bn (triangulated — no tier-1 source sizes salon SERVICES; FBI’s $203.8bn treated as a scope-inflated ceiling), professional products ~$17bn (Kline 2024, salon channel — AMR’s $34.8bn all-channel figure retired), tools $29.4bn (FBI 2025), scalp care $15.8bn (CMI 2026 — cross-cuts retail formats, flagged), beauty subscriptions $1.6bn (FMI 2025), supplements $0.8bn (GVR 2024). Men’s grooming and beauty-tech dropped vs. v1: published scopes too broad to slot honestly.',
     items: [
       {
         id: 'h_ca_1', label: 'CORE', sublabel: 'Branded Hair (Retail)',
         revenueShare: 0.291, gp1Margin: 0.53, revenueCAGR: 0.045, gp1DeltaBps: 75,
         revenueDriver: 'Euromonitor: ~4–5% on the ~$90bn retail pool (~3% all-category + branded premium lift).',
         marginDriver: 'Premiumization + treatment mix outpace PL drag.',
-        henkelAngle: 'The home pool: Schwarzkopf retail + Syoss/Gliss/Taft. Defend share of a structurally growing pool.',
         linkedCategoryId: 'hair_care',
         sources: {
           revenue: [MKT.hairTotal],
@@ -839,7 +828,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.495, gp1Margin: 0.42, revenueCAGR: 0.060, gp1DeltaBps: 0,
         revenueDriver: '~6% CAGR (triangulated, not FBI’s 7.6% ceiling) — services inflation + premium treatments.',
         marginDriver: 'Labor 50–60% of revenue caps service GP1 structurally.',
-        henkelAngle: 'Not directly addressable — but it is the demand engine for the professional-products pool Henkel does play in.',
         note: 'Largest hair pool by far; labor-intensive economics.',
         linkedCategoryId: null,
         sources: {
@@ -852,7 +840,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.056, gp1Margin: 0.58, revenueCAGR: 0.040, gp1DeltaBps: 50,
         revenueDriver: 'Kline: ~4% growth (salon channel); bond/colour services pull back-bar demand.',
         marginDriver: 'Salon exclusivity + education moat hold price.',
-        henkelAngle: 'Schwarzkopf Professional + Joico: Henkel’s highest-GP1 hair business at global ~#2 scale (Kline: ~12% vs Wella ~10% post-Olaplex, behind L’Oréal).',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.proHair],
@@ -875,7 +862,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.052, gp1Margin: 0.58, revenueCAGR: 0.073, gp1DeltaBps: 100,
         revenueDriver: 'CMI: 7.3% CAGR — dermo positioning, hair-loss anxiety, skinification.',
         marginDriver: 'Dermo/active claims justify prestige pricing.',
-        henkelAngle: 'White space vs. dermo leaders — natural Schwarzkopf extension; cross-cuts existing formats.',
         note: 'CMI scope cross-cuts shampoo/treatment formats — overlay, not strictly additive.',
         linkedCategoryId: 'hair_care',
         sources: {
@@ -899,7 +885,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.0025, gp1Margin: 0.68, revenueCAGR: 0.155, gp1DeltaBps: 50,
         revenueDriver: 'GVR: 15.5% CAGR from a small base.',
         marginDriver: 'Ingestible-beauty economics hold while category professionalizes.',
-        henkelAngle: 'White space — adjacent to scalp-health claims.',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.supplements],
@@ -926,14 +911,13 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'SubSegment',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad'],
     construction:
-      'Primary sizing: Euromonitor Laundry Care ~$85bn (2024 RSP, confirm in Passport). Format MIX (the shares) triangulated from specialist reports: powder >32% (GVR), pods/softener/stain from GVR sister reports, boosters (PMR), specialty proxied by baby cleaning (Precedence); liquid & gels = residual (~40%). Absolute € is rebased onto the Euromonitor total; the bars are the format mix, not separate single-source markets. Eco/concentrates excluded as a bar: cross-cutting, not a MECE format.',
+      'Format MIX (the shares) triangulated from specialist reports: powder >32% (GVR), pods/softener/stain from GVR sister reports, boosters (PMR), specialty proxied by baby cleaning (Precedence); liquid & gels = residual (~40%). Absolute € is rebased onto the Euromonitor Laundry Care total (~$85bn, 2024 RSP; confirm in Passport); the bars are the format mix, not separate single-source markets. Eco/concentrates excluded as a bar: cross-cutting, not a MECE format.',
     items: [
       {
         id: 'l_sub_1', label: 'Liquid', sublabel: '& Gels',
         revenueShare: 0.40, gp1Margin: 0.44, revenueCAGR: 0.059, gp1DeltaBps: -50,
         revenueDriver: 'FBI liquid report: 5.9% CAGR — DM workhorse format, EM trade-up target.',
         marginDriver: 'Heaviest private-label battleground after powder.',
-        henkelAngle: 'Persil liquids/gels carry Henkel’s laundry scale.',
         note: 'Share = residual of the GVR family (derived).',
         linkedCategoryId: 'lhc_fcn',
         sources: {
@@ -946,7 +930,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.31, gp1Margin: 0.38, revenueCAGR: 0.000, gp1DeltaBps: -150,
         revenueDriver: 'DM decline offsets EM affordability growth — net flat (structured estimate; GVR states powder still >32% share).',
         marginDriver: 'Price-fighter tier + EM mix: the steepest margin erosion in laundry.',
-        henkelAngle: 'Over-indexed in EM/value Europe — manage for cash, migrate users to discs.',
         linkedCategoryId: 'lhc_fcn',
         sources: {
           revenue: [asDerived(MKT.laundryTotal, '">32% of total revenue in 2023" stated on-page; growth split DM/EM is a structured estimate.')],
@@ -958,7 +941,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.12, gp1Margin: 0.50, revenueCAGR: 0.051, gp1DeltaBps: 0,
         revenueDriver: 'GVR: 5.1% CAGR (scope incl. surface stain products — flagged).',
         marginDriver: 'Specialist branding (Vanish) holds price; PL nibbles the edges.',
-        henkelAngle: 'Henkel under-indexed vs. Reckitt’s Vanish franchise.',
         linkedCategoryId: 'lhc_lad',
         sources: {
           revenue: [MKT.stain],
@@ -970,7 +952,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.08, gp1Margin: 0.46, revenueCAGR: 0.034, gp1DeltaBps: -50,
         revenueDriver: 'GVR: 3.4% CAGR — sensorial habit, but skip-the-rinse trends cap it.',
         marginDriver: 'Concentrates help; PL share rises slowly.',
-        henkelAngle: 'Vernel/Silan: Henkel’s #3 European softener franchise (behind P&G Lenor and Unilever Comfort; #1–2 in Germany/CEE) — solid, slow pool.',
         linkedCategoryId: 'lhc_ffi',
         sources: {
           revenue: [MKT.softener],
@@ -982,7 +963,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.06, gp1Margin: 0.52, revenueCAGR: 0.065, gp1DeltaBps: 100,
         revenueDriver: 'GVR: 6.5% CAGR — convenience premium keeps converting liquid users.',
         marginDriver: 'Unit-dose premium + weak PL replication = best margin build in laundry.',
-        henkelAngle: 'Persil Discs/4in1 — Henkel’s premiumization spearhead.',
         linkedCategoryId: 'lhc_fca',
         sources: {
           revenue: [MKT.pods],
@@ -994,7 +974,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.03, gp1Margin: 0.48, revenueCAGR: 0.051, gp1DeltaBps: 50,
         revenueDriver: 'Care-for-clothes positioning grows with garment-longevity trend (proxy: baby/specialty 5.1%).',
         marginDriver: 'Niche claims (wool, sport, black) price above base.',
-        henkelAngle: 'Perwoll is Henkel’s clear branded leader here (vs. Reckitt’s Woolite and private label) — its laundry margin champion.',
         note: 'Sized via baby/specialty proxy — flagged.',
         linkedCategoryId: 'lhc_lad',
         sources: {
@@ -1007,7 +986,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.003, gp1Margin: 0.58, revenueCAGR: 0.093, gp1DeltaBps: 50,
         revenueDriver: 'PMR: 9.3% CAGR — pure-indulgence add-on rides the fragrance supercycle.',
         marginDriver: 'Fragrance beads: low COGS, brand-led pricing.',
-        henkelAngle: 'US-led pool (Downy Unstopables); Henkel gap outside the US.',
         note: 'Lower-tier source — treat size as indicative.',
         linkedCategoryId: 'lhc_ffi',
         sources: {
@@ -1035,14 +1013,13 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     kind: 'CoreAdjacent',
     prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_adw', 'lhc_hsc'],
     construction:
-      'Primary sizing: Euromonitor (laundry/home care; Home Care $167bn 2020 RSP for context). Pool sizes side by side, normalized: core Laundry Care ~$85bn (Euromonitor 2024 RSP — the prior GVR $185.3bn was ~the whole Home Care universe, retired), washing machines $66.9bn (FBI 2025), laundry services $78.2bn (GVR 2024), surface cleaners ~$55bn (derived: Mordor household cleaners $170.5bn minus laundry-care overlap — flagged), on-demand laundry $28.5bn (GVR 2023, definition flagged), hand dish $22.7bn (BRI 2026), ADW $19.2bn (Market.us 2024), air freshener $17.2bn (Precedence 2025), smart washers $12.0bn (GVR 2024).',
+      'Pool sizes side by side, normalized: core Laundry Care ~$85bn (Euromonitor 2024 RSP — the prior GVR $185.3bn was ~the whole Home Care universe, retired; Euromonitor Home Care $167bn 2020 RSP for context), washing machines $66.9bn (FBI 2025), laundry services $78.2bn (GVR 2024), surface cleaners ~$55bn (derived: Mordor household cleaners $170.5bn minus laundry-care overlap — flagged), on-demand laundry $28.5bn (GVR 2023, definition flagged), hand dish $22.7bn (BRI 2026), ADW $19.2bn (Market.us 2024), air freshener $17.2bn (Precedence 2025), smart washers $12.0bn (GVR 2024).',
     items: [
       {
         id: 'l_ca_1', label: 'CORE', sublabel: 'Laundry (Branded)',
         revenueShare: 0.221, gp1Margin: 0.46, revenueCAGR: 0.045, gp1DeltaBps: -50,
         revenueDriver: 'Euromonitor: ~4–5% nominal on the ~$85bn Laundry Care pool.',
         marginDriver: 'PL + retailer pressure slightly outweigh RGM.',
-        henkelAngle: 'Persil + Perwoll + Vernel: the cash engine that funds every adjacency bet.',
         linkedCategoryId: 'lhc_fcn',
         sources: {
           revenue: [MKT.laundryTotal],
@@ -1054,7 +1031,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.203, gp1Margin: 0.40, revenueCAGR: 0.073, gp1DeltaBps: 50,
         revenueDriver: 'GVR: 7.3% CAGR (commercial segment 8.0%).',
         marginDriver: 'Automation + route density lift service margins slowly.',
-        henkelAngle: 'Out of scope for HCB — relevant as B2B detergent demand (Ecolab’s domain).',
         note: 'Scope incl. residential (~60%).',
         linkedCategoryId: null,
         sources: {
@@ -1067,7 +1043,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.174, gp1Margin: 0.16, revenueCAGR: 0.086, gp1DeltaBps: -100,
         revenueDriver: 'FBI: 8.6% CAGR — EM penetration + connected replacement cycle.',
         marginDriver: 'Whirlpool 15.4% reported FY2025; Asian price war continues.',
-        henkelAngle: 'Not a pool to enter — but the dosing interface (auto-dose drawers) decides future detergent lock-in.',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.washingMachines],
@@ -1079,7 +1054,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.143, gp1Margin: 0.46, revenueCAGR: 0.046, gp1DeltaBps: -50,
         revenueDriver: 'Mordor household-cleaners family: 4.6% CAGR.',
         marginDriver: 'Reckitt-class specialists hold 60%+; PL erodes the middle.',
-        henkelAngle: 'Bref: strong in WC care — a defensible niche of a broad pool.',
         note: 'Size derived by subtracting laundry overlap from Mordor’s broad scope.',
         linkedCategoryId: 'lhc_hsc',
         sources: {
@@ -1103,7 +1077,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.059, gp1Margin: 0.48, revenueCAGR: 0.032, gp1DeltaBps: -50,
         revenueDriver: 'BRI: 3.2% CAGR — mature DM habit; EM growth in bars→liquid conversion.',
         marginDriver: 'Heavy promo intensity; brand premiums (Fairy/Dawn) defend the top.',
-        henkelAngle: 'Pril: regional strength, global sub-scale.',
         linkedCategoryId: 'lhc_hdw',
         sources: {
           revenue: [MKT.handDish],
@@ -1115,7 +1088,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.050, gp1Margin: 0.50, revenueCAGR: 0.080, gp1DeltaBps: 50,
         revenueDriver: 'Market.us: 8.0% CAGR — dishwasher penetration + premium multi-chamber tabs.',
         marginDriver: 'Tech-format premium holds; PL tabs improve but lag on claims.',
-        henkelAngle: 'Somat: #2 branded in Europe behind Finish (private label collectively rivals the runner-up slot) — the highest-conviction adjacency Henkel already owns.',
         linkedCategoryId: 'lhc_adw',
         sources: {
           revenue: [MKT.adw],
@@ -1127,7 +1099,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.045, gp1Margin: 0.55, revenueCAGR: 0.090, gp1DeltaBps: 50,
         revenueDriver: 'Precedence: 9.0% CAGR — fragrance supercycle, wellness framing.',
         marginDriver: 'Fragrance-led COGS economics; premium formats (diffusers) lift mix.',
-        henkelAngle: 'White space: P&G (Febreze) and Vestacy (ex-Reckitt Air Wick, divested 2025) own it; Vernel’s fragrance equity is Henkel’s entry ticket.',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.airCare],
@@ -1139,7 +1110,6 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.031, gp1Margin: 0.28, revenueCAGR: 0.246, gp1DeltaBps: -100,
         revenueDriver: 'GVR: 24.6% CAGR — connected washers mainstream by 2030.',
         marginDriver: 'Hardware margins thin even with software claims (SharkNinja 49% is small-appliance, not white goods).',
-        henkelAngle: 'Watch the auto-dose ecosystems: whoever owns the refill subscription owns future detergent share.',
         linkedCategoryId: null,
         sources: {
           revenue: [MKT.smartWashers],

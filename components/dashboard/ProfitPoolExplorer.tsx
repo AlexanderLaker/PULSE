@@ -10,7 +10,7 @@
  *   • CLICK DRILL-DOWN. Clicking a bar opens an assessment panel that
  *     decomposes the pool trajectory into its two factors — revenue CAGR
  *     (verified) and GP1 margin development (graded estimate) — plus € pool
- *     sizes today → 2030, the Henkel read, and clickable sources.
+ *     sizes today → 2030, and clickable sources.
  *   • HIERARCHICAL NAVIGATION. Group toggle (Laundry | Hair) with view
  *     sub-pills (Value Chain | Sub-Segments | Core + Adjacent).
  *   • CLICKABLE, GRADED SOURCES. Every figure links to a page where the
@@ -158,39 +158,47 @@ const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, com
 
 // ─── Compact source chip — "Name (value)" hyperlink, coloured by grade ──
 const SRC_VALUE_RE = /~?[€$£]?\s?\d[\d.,]*\s?(?:bn\b|m\b|%)/i;
-function sourceShort(src: SourceRef): string {
+function sourceParts(src: SourceRef): { name: string; value: string } {
   let name = src.label.split(' — ')[0]
     .replace(/\s+FY?\d{2,4}.*$/i, '')                          // drop "FY2025 …" onward
     .replace(/\s*~?[€$£]?\d[\d.,]*\s?(?:bn\b|m\b|%).*$/i, '')  // drop a trailing figure
     .replace(/\s*\(.*$/, '')                                    // drop a trailing "( …"
+    .replace(/\s*&\s*Company$/i, '')                            // "Kline & Company" → "Kline"
     .trim();
   if (!name) name = src.label.split(' — ')[0];
   const m = src.label.match(SRC_VALUE_RE);
-  const value = m ? m[0].replace(/\s+/g, '') : '';
-  return value ? `${name} (${value})` : name;
+  return { name, value: m ? m[0].replace(/\s+/g, '') : '' };
 }
 
-const dedupeByUrl = (arr: SourceRef[]): SourceRef[] => {
-  const seen = new Map<string, SourceRef>();
-  arr.forEach((s) => { if (!seen.has(s.url)) seen.set(s.url, s); });
-  return Array.from(seen.values());
-};
+// Tag each source by what it provides — Revenue/size vs GP1 margin — from which list it came; dedupe by URL.
+function taggedSources(
+  revenue: SourceRef[], margin: SourceRef[],
+): { src: SourceRef; kind: 'Revenue' | 'GP1' }[] {
+  const seen = new Set<string>();
+  const out: { src: SourceRef; kind: 'Revenue' | 'GP1' }[] = [];
+  revenue.forEach((s) => { if (!seen.has(s.url)) { seen.add(s.url); out.push({ src: s, kind: 'Revenue' }); } });
+  margin.forEach((s) => { if (!seen.has(s.url)) { seen.add(s.url); out.push({ src: s, kind: 'GP1' }); } });
+  return out;
+}
 
-const SourceChip: FC<{ src: SourceRef }> = ({ src }) => (
-  <a
-    href={src.url}
-    target="_blank"
-    rel="noopener noreferrer"
-    title={src.label}
-    style={{
-      fontSize: 11, fontWeight: 600, color: GRADE_META[src.grade].fg,
-      textDecoration: 'underline', textDecorationColor: 'rgba(0,52,94,0.25)',
-      textUnderlineOffset: 2, whiteSpace: 'nowrap',
-    }}
-  >
-    {sourceShort(src)}
-  </a>
-);
+const SourceChip: FC<{ src: SourceRef; kind: 'Revenue' | 'GP1' }> = ({ src, kind }) => {
+  const { name, value } = sourceParts(src);
+  return (
+    <a
+      href={src.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={src.label}
+      style={{
+        fontSize: 11, fontWeight: 600, color: GRADE_META[src.grade].fg,
+        textDecoration: 'underline', textDecorationColor: 'rgba(0,52,94,0.25)',
+        textUnderlineOffset: 2, whiteSpace: 'nowrap',
+      }}
+    >
+      {value ? `${name} (${kind}: ${value})` : name}
+    </a>
+  );
+};
 
 // ─── Hover tooltip (slim — click carries the depth) ──────────────
 const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: number }> = ({
@@ -399,28 +407,12 @@ const DetailPanel: FC<{
             </div>
           </div>
 
-          {/* Henkel read */}
-          {item.henkelAngle && (
-            <div
-              style={{
-                background: '#FFFFFF', border: `1px solid ${S.cardBorderStrong}`,
-                borderLeft: `3px solid ${S.primary}`, borderRadius: 10,
-                padding: '10px 12px', marginBottom: 16,
-              }}
-            >
-              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.primary, marginBottom: 4 }}>
-                Henkel read — qualitative
-              </div>
-              <div style={{ fontSize: 12, lineHeight: 1.55, color: S.onSurface }}>{item.henkelAngle}</div>
-            </div>
-          )}
-
           {/* Sources — compact "Name (value)" hyperlinks; colour = grade */}
           <div style={{ marginBottom: 4 }}>
             <SectionLabel>Sources</SectionLabel>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px', marginTop: 5, lineHeight: 1.5 }}>
-              {dedupeByUrl([...item.sources.revenue, ...item.sources.margin]).map((s) => (
-                <SourceChip key={s.url} src={s} />
+              {taggedSources(item.sources.revenue, item.sources.margin).map(({ src, kind }) => (
+                <SourceChip key={src.url} src={src} kind={kind} />
               ))}
             </div>
           </div>
