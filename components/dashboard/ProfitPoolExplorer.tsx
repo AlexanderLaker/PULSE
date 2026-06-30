@@ -1,6 +1,6 @@
 /**
  * Profit Pool Explorer — Bain-classic pool views over verified public data
- * (admin-only; gating enforced at page level).
+ * (Beta; visible to all signed-in users — not admin-gated).
  *
  * v2 (2026-06-11):
  *   • ARROWS = POOL DEVELOPMENT. The indicator above each bar encodes the
@@ -782,7 +782,7 @@ const ProfitPoolExplorer: FC = () => {
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div className="pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
           <div className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: S.onSurfaceVariant, marginBottom: 6 }}>
-            Admin · Profit Pool Explorer
+            Beta · Profit Pool Explorer
           </div>
           <h1 className="font-extrabold tracking-tight" style={{ fontFamily: HEADLINE_FONT, fontSize: '2.4rem', lineHeight: 1.15, color: S.onBg, margin: 0 }}>
             Industry Profit Pools — HCB Lens

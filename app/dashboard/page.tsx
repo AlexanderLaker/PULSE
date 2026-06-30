@@ -15,11 +15,12 @@
  *   - `<SignOutButton>` / `useClerk().signOut()` handles logout —
  *     Clerk invalidates the session on the server and clears cookies.
  *
- * Authorization (admin-only tabs):
+ * Authorization (role-aware UI, not tab gating):
  *   Identity comes from Clerk; *authorization* (admin vs viewer) is
  *   served by our own /api/me endpoint, which reads user_roles in Neon
- *   Postgres. We mirror the pattern used in SettingsModal.tsx. The
- *   Profit Pool Explorer tab is admin-gated.
+ *   Postgres. We mirror the pattern used in SettingsModal.tsx. Role only
+ *   toggles admin-only *controls* inside tabs (e.g. editors); every tab,
+ *   including Profit Pool Explorer, is visible to all signed-in users.
  *
  * Tab navigation (constant across all pages):
  *   Trends | Consumer Journey | Profit Pool Shift Analysis
@@ -430,10 +431,11 @@ export default function DashboardPage() {
       {/* ─── Welcome / MVP modal — shown on every fresh login ──────── */}
       <WelcomeModal open={welcomeOpen} onClose={handleWelcomeClose} />
 
-      {/* ─── Profit Pool Explorer mock-up notice ─────────────────────
-          Beta disclaimer surfaced every time the Explorer tab is opened.
-          The Explorer is a visualization mock-up; data sources have not
-          yet been validated. Users acknowledge with "Got it" to proceed. */}
+      {/* ─── Profit Pool Explorer Beta notice ────────────────────────
+          Informational Beta disclaimer surfaced when the Explorer tab is
+          opened (NOT a gate — the tab is visible to all signed-in users).
+          Market sizing is Euromonitor/Kline-anchored; some figures pending
+          internal Passport confirmation. "Got it" closes. */}
       {explorerNoticeOpen && (
         <div
           role="dialog"
@@ -452,7 +454,7 @@ export default function DashboardPage() {
               className="text-[11px] font-semibold uppercase tracking-[0.16em] mb-2"
               style={{ color: NAV.betaActive }}
             >
-              Beta · Mock-up
+              Beta
             </div>
             <h2
               id="explorer-notice-title"
@@ -465,8 +467,10 @@ export default function DashboardPage() {
               className="text-sm leading-relaxed mb-5"
               style={{ color: NAV.onSurfaceVariant }}
             >
-              This is a visualization mock-up. The data sources are not yet
-              validated.
+              Market sizing is anchored to Euromonitor (consumer hair ·
+              laundry/home care) and Kline (professional hair); a few figures
+              are pending internal Passport confirmation. Margins are GP1
+              proxies calibrated to company filings.
             </p>
             <div className="flex justify-end">
               <button
