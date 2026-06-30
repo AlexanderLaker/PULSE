@@ -186,24 +186,38 @@ const PillButton: FC<{
   onClick: () => void;
   children: React.ReactNode;
   icon?: LucideIcon;
-}> = ({ active, onClick, children, icon: Icon }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-all"
-    style={{
-      backgroundColor: active ? S.primary : S.surfaceLow,
-      color: active ? '#ffffff' : S.onSurfaceVariant,
-      boxShadow: active ? '0 4px 16px -6px rgba(0, 93, 181, 0.45)' : 'none',
-      fontFamily: BODY_FONT,
-      border: 'none',
-      cursor: 'pointer',
-    }}
-  >
-    {Icon && <Icon size={14} strokeWidth={2.3} />}
-    {children}
-  </button>
-);
+  /** 'secondary' = the smaller, outlined chip used for the contextual impact
+      filter, so that row reads as a sub-control of the primary lens row above
+      it rather than a second, equally-weighted set of tabs (U1, June 2026). */
+  variant?: 'primary' | 'secondary';
+}> = ({ active, onClick, children, icon: Icon, variant = 'primary' }) => {
+  const secondary = variant === 'secondary';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={secondary
+        ? 'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all'
+        : 'inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-all'}
+      style={{
+        backgroundColor: active
+          ? (secondary ? S.primaryContainer : S.primary)
+          : (secondary ? S.surface : S.surfaceLow),
+        color: active
+          ? (secondary ? S.onPrimaryContainer : '#ffffff')
+          : (secondary ? S.mutedText : S.onSurfaceVariant),
+        border: secondary && !active ? `1px solid ${S.cardBorder}` : 'none',
+        boxShadow: active && !secondary ? '0 4px 16px -6px rgba(0, 93, 181, 0.45)' : 'none',
+        fontFamily: BODY_FONT,
+        cursor: 'pointer',
+        letterSpacing: secondary ? '0.01em' : undefined,
+      }}
+    >
+      {Icon && <Icon size={secondary ? 13 : 14} strokeWidth={2.3} />}
+      {children}
+    </button>
+  );
+};
 
 const YearPill: FC<{
   active: boolean;
@@ -1393,6 +1407,7 @@ const ProfitPoolAnalysis2: FC<{
                 active={impactFilter === f}
                 onClick={() => setImpactFilter(f)}
                 icon={IMPACT_META[f].Icon}
+                variant="secondary"
               >
                 {IMPACT_META[f].label}
               </PillButton>
