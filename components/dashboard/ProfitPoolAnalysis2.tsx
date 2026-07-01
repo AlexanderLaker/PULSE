@@ -42,7 +42,7 @@ import React, { useMemo, useState, useEffect, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Layers, Globe2, Zap, Loader2, AlertTriangle,
-  Sparkles, Info, Database, ChevronDown,
+  Sparkles, Info, Database, ChevronDown, ChevronLeft, ChevronRight,
   TrendingUp, TrendingDown, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -181,65 +181,139 @@ function getYearShift(
 // doesn't define.
 
 // ─── UI Primitives ───────────────────────────────────────────────
-const PillButton: FC<{
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  icon?: LucideIcon;
-  /** 'secondary' = the smaller, outlined chip used for the contextual impact
-      filter, so that row reads as a sub-control of the primary lens row above
-      it rather than a second, equally-weighted set of tabs (U1, June 2026). */
-  variant?: 'primary' | 'secondary';
-}> = ({ active, onClick, children, icon: Icon, variant = 'primary' }) => {
-  const secondary = variant === 'secondary';
+/** Segmented control — a connected set of options that reads as ONE control
+ *  (the view lens, or the trend-impact toggle). The bordered container + raised
+ *  active segment make it unmistakably distinct from the year stepper and the
+ *  info affordance, so the toolbar's three jobs never blur into one strip of
+ *  look-alike pills (Compact Command Bar restructure, July 2026). */
+const SegControl: FC<{
+  items: Array<{ id: string; label: string; Icon?: LucideIcon }>;
+  activeId: string;
+  onSelect: (id: string) => void;
+  ariaLabel: string;
+  size?: 'md' | 'sm';
+}> = ({ items, activeId, onSelect, ariaLabel, size = 'md' }) => {
+  const sm = size === 'sm';
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={secondary
-        ? 'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all'
-        : 'inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold transition-all'}
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex items-center"
       style={{
-        backgroundColor: active
-          ? (secondary ? S.primaryContainer : S.primary)
-          : (secondary ? S.surface : S.surfaceLow),
-        color: active
-          ? (secondary ? S.onPrimaryContainer : '#ffffff')
-          : (secondary ? S.mutedText : S.onSurfaceVariant),
-        border: secondary && !active ? `1px solid ${S.cardBorder}` : 'none',
-        boxShadow: active && !secondary ? '0 4px 16px -6px rgba(0, 93, 181, 0.45)' : 'none',
-        fontFamily: BODY_FONT,
-        cursor: 'pointer',
-        letterSpacing: secondary ? '0.01em' : undefined,
+        backgroundColor: S.surfaceLow,
+        border: `1px solid ${S.cardBorder}`,
+        borderRadius: 10,
+        padding: 3,
+        gap: 2,
+        maxWidth: '100%',
+        overflowX: 'auto',
       }}
     >
-      {Icon && <Icon size={secondary ? 13 : 14} strokeWidth={2.3} />}
-      {children}
-    </button>
+      {items.map(({ id, label, Icon }) => {
+        const active = id === activeId;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(id)}
+            className={`inline-flex items-center transition-all ${sm
+              ? 'gap-1.5 px-2.5 py-1.5 text-[12px]'
+              : 'gap-2 px-3.5 py-2 text-[13px]'}`}
+            style={{
+              borderRadius: 7,
+              border: 'none',
+              backgroundColor: active ? S.surface : 'transparent',
+              color: active ? S.primary : S.onSurfaceVariant,
+              fontWeight: active ? 700 : 600,
+              boxShadow: active ? '0 1px 2px rgba(0, 52, 94, 0.12)' : 'none',
+              fontFamily: BODY_FONT,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {Icon && <Icon size={sm ? 13 : 14} strokeWidth={2.3} />}
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 };
 
-const YearPill: FC<{
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}> = ({ active, onClick, label }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all"
-    style={{
-      backgroundColor: active ? S.primaryContainer : S.surface,
-      color: active ? S.onPrimaryContainer : S.mutedText,
-      border: active ? 'none' : `1px solid ${S.cardBorder}`,
-      fontFamily: BODY_FONT,
-      cursor: 'pointer',
-      letterSpacing: '0.02em',
-    }}
-  >
-    {label}
-  </button>
-);
+/** Year stepper — replaces the 2026–2035 pill strip on the attribution lenses
+ *  with one compact control, retiring the ten-pill overflow that was the row's
+ *  worst crowding. Steps within YEARS; the arrows disable at the ends
+ *  (Compact Command Bar restructure, July 2026). */
+const YearStepper: FC<{
+  year: number;
+  onChange: (year: number) => void;
+}> = ({ year, onChange }) => {
+  const idx = YEARS.indexOf(year);
+  const atMin = idx <= 0;
+  const atMax = idx < 0 || idx >= YEARS.length - 1;
+  const step = (dir: -1 | 1) => {
+    const next = YEARS[idx + dir];
+    if (next != null) onChange(next);
+  };
+  const arrow = (dir: -1 | 1, disabled: boolean, Icon: LucideIcon, label: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => step(dir)}
+      className="inline-flex items-center justify-center transition-all"
+      style={{
+        width: 32,
+        height: 32,
+        border: 'none',
+        backgroundColor: 'transparent',
+        color: disabled ? S.mutedText : S.onSurfaceVariant,
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <Icon size={16} strokeWidth={2.3} />
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Measurement year"
+      className="inline-flex items-center"
+      style={{
+        backgroundColor: S.surface,
+        border: `1px solid ${S.cardBorder}`,
+        borderRadius: 9,
+        height: 34,
+        overflow: 'hidden',
+      }}
+    >
+      {arrow(-1, atMin, ChevronLeft, 'Earlier year')}
+      <span
+        aria-live="polite"
+        style={{
+          minWidth: 58,
+          textAlign: 'center',
+          fontWeight: 700,
+          fontSize: 13,
+          fontVariantNumeric: 'tabular-nums',
+          color: S.onSurface,
+          borderLeft: `1px solid ${S.cardBorder}`,
+          borderRight: `1px solid ${S.cardBorder}`,
+          height: '100%',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: BODY_FONT,
+        }}
+      >
+        {year}
+      </span>
+      {arrow(1, atMax, ChevronRight, 'Later year')}
+    </div>
+  );
+};
 
 // ─── KPI tile — compact headline stat above the matrix ───────────
 // Lean replacement for the old hero block (June 2026 declutter): one
@@ -864,20 +938,22 @@ const PeakStressTooltip: FC = () => {
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        className="inline-flex items-center gap-1.5 text-[11px] font-semibold"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex items-center justify-center transition-all"
         style={{
-          color: S.onPrimaryContainer,
-          backgroundColor: S.primaryContainer,
-          border: 'none',
-          padding: '4px 10px',
+          width: 28,
+          height: 28,
+          color: open ? S.primary : S.onSurfaceVariant,
+          backgroundColor: open ? S.surfaceLow : S.surface,
+          border: `1px solid ${open ? S.cardBorderStrong : S.cardBorder}`,
           borderRadius: 999,
           cursor: 'help',
           fontFamily: BODY_FONT,
         }}
-        aria-label="Why is peak stress not always in the final year?"
+        aria-label="Why aren't the worst years at the end?"
       >
-        <Info size={12} strokeWidth={2.3} />
-        Why aren&apos;t the worst years at the end?
+        <Info size={15} strokeWidth={2.3} />
       </button>
       {open && (
         <div
@@ -1379,47 +1455,58 @@ const ProfitPoolAnalysis2: FC<{
   const decompositionsMissing = view !== 'time' && simulation != null
     && simulation.decompositions == null;
 
-  // ─── Matrix toolbar (P1 declutter, June 2026) ──────────────────
-  // Every control that manipulates the matrix lives ON the matrix card:
-  // lens pills left; the contextual control right — impact filter on the
-  // Time Path lens, measurement-year pills on the attribution lenses.
-  // The impact-filter / year semantics are captioned in the subtitle
-  // strip directly below, so no floating description rows remain.
+  // ─── Matrix toolbar — Compact Command Bar (P1 restructure, July 2026) ──
+  // Every control that manipulates the matrix lives ON the matrix card, but
+  // the row's three jobs now speak three distinct vocabularies so they never
+  // blur into one strip of look-alike pills:
+  //   • LEFT  — the view lens as a connected segmented control.
+  //   • RIGHT — a labelled contextual control: on Time Path a small segmented
+  //     impact toggle ("Show"); on the attribution lenses a compact year
+  //     stepper ("Year"), retiring the old ten-pill overflow.
+  //   • END   — the peak-stress explainer, demoted to an info icon so a help
+  //     affordance no longer mimics a selected filter.
+  // The impact-filter / year semantics stay captioned in the subtitle strip
+  // directly below, so no floating description rows are needed.
   const matrixToolbar = (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        {(Object.keys(VIEW_META) as ViewMode[]).map((v) => (
-          <PillButton
-            key={v}
-            active={view === v}
-            onClick={() => setView(v)}
-            icon={VIEW_META[v].Icon}
-          >
-            {VIEW_META[v].label}
-          </PillButton>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {view === 'time'
-          ? (Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => (
-              <PillButton
-                key={f}
-                active={impactFilter === f}
-                onClick={() => setImpactFilter(f)}
-                icon={IMPACT_META[f].Icon}
-                variant="secondary"
-              >
-                {IMPACT_META[f].label}
-              </PillButton>
-            ))
-          : YEARS.map((y) => (
-              <YearPill
-                key={y}
-                active={selectedYear === y}
-                onClick={() => setSelectedYear(y)}
-                label={String(y)}
-              />
-            ))}
+      <SegControl
+        ariaLabel="Matrix view lens"
+        items={(Object.keys(VIEW_META) as ViewMode[]).map((v) => ({
+          id: v,
+          label: VIEW_META[v].label,
+          Icon: VIEW_META[v].Icon,
+        }))}
+        activeId={view}
+        onSelect={(id) => setView(id as ViewMode)}
+      />
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <span
+          style={{
+            fontFamily: HEADLINE_FONT,
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: S.mutedText,
+          }}
+        >
+          {view === 'time' ? 'Show' : 'Year'}
+        </span>
+        {view === 'time' ? (
+          <SegControl
+            size="sm"
+            ariaLabel="Trend-impact filter"
+            items={(Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => ({
+              id: f,
+              label: IMPACT_META[f].label,
+              Icon: IMPACT_META[f].Icon,
+            }))}
+            activeId={impactFilter}
+            onSelect={(id) => setImpactFilter(id as ImpactFilter)}
+          />
+        ) : (
+          <YearStepper year={selectedYear} onChange={setSelectedYear} />
+        )}
         <PeakStressTooltip />
       </div>
     </>
