@@ -37,7 +37,7 @@ def create_parser():
     parser.add_argument("--iterations", type=int, default=None,
                         help="Number of Monte Carlo iterations")
     parser.add_argument("--serve", action="store_true",
-                        help="Launch Profit Pool Shift Model dashboard")
+                        help="Launch the local FastAPI backend (dev server on :8000)")
     parser.add_argument("--audit", action="store_true",
                         help="Show audit trail")
     parser.add_argument("--ai", choices=["claude", "azure", "ollama", "none"],
@@ -71,7 +71,7 @@ def main():
         return
 
     if args.serve:
-        _launch_dashboard(args)
+        _launch_api_server(args)
         return
 
     # ── Step 1: Load Trend Database ─────────────────────────────────
@@ -200,22 +200,25 @@ def main():
     print(f"\n  All outputs contain relative % shifts.\n")
 
 
-def _launch_dashboard(args):
-    """Launch the Profit Pool Shift Model dashboard (Phase 2)."""
+def _launch_api_server(args):
+    """Launch the local FastAPI backend for development (uvicorn on :8000).
+
+    The frontend is the Next.js app (`npm run dev`, :3000); this only serves
+    the read-only data plane the dashboard fetches from.
+    """
     try:
         import uvicorn
         from pulse.api.app import create_app
 
         app = create_app(args)
-        print("  Launching Profit Pool Shift Model Dashboard...")
-        print("  Dashboard: http://localhost:3000")
+        print("  Launching PRISM local API (FastAPI)...")
         print("  API:       http://localhost:8000")
+        print("  Frontend:  run `npm run dev` (Next.js on :3000)")
         print("  Press Ctrl+C to stop.\n")
         uvicorn.run(app, host="0.0.0.0", port=8000)
     except ImportError:
-        print("  Dashboard requires Phase 2 dependencies (FastAPI, React).")
-        print("  Install: pip install fastapi uvicorn")
-        print("  Then: cd pulse/dashboard && npm install")
+        print("  The local API requires FastAPI + uvicorn.")
+        print("  Install: pip install -r requirements-dev.txt")
         sys.exit(1)
 
 

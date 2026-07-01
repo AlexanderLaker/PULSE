@@ -13,14 +13,8 @@ _RETIRED_2026-06
 # Next 16: proxy.ts replaced middleware.ts — keep stale stub out of builds
 middleware.ts
 
-# v3.7 deploy hygiene: backup tarball + legacy dashboard builds + decks stay out of uploads
+# v3.7 deploy hygiene: backup tarball + decks stay out of uploads
 _BACKUP*
-pulse/dashboard/dist
-pulse/dashboard/dist-deploy
-pulse/dashboard/dist-new
-pulse/dashboard/dist-v2
-pulse/dashboard/dist-v3
-pulse/dashboard/node_modules
 *.pptx
 *.jpg
 

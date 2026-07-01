@@ -180,7 +180,6 @@ All pages are fully responsive:
 
 To test locally:
 ```bash
-cd pulse/dashboard
 npm install
 npm run dev
 ```

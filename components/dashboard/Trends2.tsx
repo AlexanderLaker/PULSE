@@ -392,9 +392,8 @@ const MetaChip: FC<{ label: string }> = ({ label }) => (
 );
 
 // ─── Source tier rating (editorial credibility scale) ──────────────
-// Mirrors pulse/dashboard/src/components/Trends2.tsx. S = official regulator /
-// statistical authority; E = unverified social. Tooltip explains the meaning
-// on hover.
+// S = official regulator / statistical authority; E = unverified social.
+// Tooltip explains the meaning on hover.
 const TIER_CONFIG: Record<string, { label: string; color: string; description: string }> = {
   'S':  { label: 'S',  color: '#22c55e', description: 'Official regulatory / statistical authority' },
   'A':  { label: 'A',  color: '#3b82f6', description: 'Tier-1 consulting or analyst primary research' },

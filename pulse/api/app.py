@@ -14,12 +14,10 @@ Behavior is intentionally identical to the pre-split monolith; the
 route table is fingerprint-tested in tests/test_api.py.
 """
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from pulse import __version__
 from pulse.config import ModelConfig
@@ -195,11 +193,6 @@ def create_app(args=None) -> FastAPI:
             return response
 
     app.add_middleware(LazyInitMiddleware)
-
-    # Try to serve static files for the legacy dashboard build (no-op when absent)
-    dashboard_dir = Path(__file__).parent.parent / "dashboard" / "dist"
-    if dashboard_dir.exists():
-        app.mount("/", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
     return app
 

@@ -258,7 +258,7 @@ The `attenuation_source` field is a three-way enum:
 "admin_override"              (manual experimentation)
 ```
 
-Validator (`pulse/config_validation.py`), TypeScript union types (`types/config.ts`, `pulse/dashboard/src/types/config.ts`), Bayesian MC fallback (`pulse/simulation/bayesian_mc.py`), test fixtures (`tests/conftest.py`), and the SettingsModal/SettingsPage UI all enforce this enum.
+Validator (`pulse/config_validation.py`), TypeScript union types (`types/config.ts`), Bayesian MC fallback (`pulse/simulation/bayesian_mc.py`), test fixtures (`tests/conftest.py`), and the SettingsModal UI all enforce this enum.
 
 ---
 

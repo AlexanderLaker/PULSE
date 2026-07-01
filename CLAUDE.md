@@ -222,8 +222,6 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 **Types (`types/`):** index, trends, simulation (incl. `TotalsMatrix.portfolio`, `IntegrityEvent`, `SeedStability`, `RunMeta.numerics_backend`), config, api. (`analytics.ts` and `delphi.ts` deleted.)
 
-**Legacy Vite dashboard (`pulse/dashboard/`):** dev-only relic served by `python -m pulse --serve`; excluded from deploys; analytics/Delphi surfaces removed.
-
 ---
 
 ## 5. TECH STACK
