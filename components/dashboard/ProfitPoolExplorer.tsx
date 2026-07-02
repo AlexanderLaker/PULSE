@@ -31,6 +31,7 @@ import {
   Info, Loader2, Sparkles, X,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
+import useOverlay from '@/hooks/useOverlay';
 import {
   PROFIT_POOL_SLIDES,
   POOL_CAGR_THRESHOLDS,
@@ -53,40 +54,21 @@ import {
   type SourceRef,
   type EvidenceGrade,
 } from '@/lib/profitPoolData';
-
-// ─── Editorial design tokens (Maritime light) ────────────────────
-const S = {
-  bg:                  '#f8f9ff',
-  surface:             '#ffffff',
-  surfaceLow:          '#eff4ff',
-  surfaceHigh:         '#dce9ff',
-  primary:             '#005db5',
-  primaryDim:          '#0052a0',
-  onBg:                '#00345e',
-  onSurface:           '#00345e',
-  onSurfaceVariant:    '#26619d',
-  outline:             '#356aa6',
-  cardBorder:          'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong:    'rgba(0, 52, 94, 0.16)',
-  mutedText:           '#64748B',
-  greenStrong:         '#1f7a3d',
-  redStrong:           '#9f403d',
-  neutral:             '#94A3B8',
-  amber:               '#B45309',
-  amberSoft:           '#FEF3C7',
-  greenSoft:           '#D1FAE5',
-  blueSoft:            '#DBEAFE',
-};
-
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 const BAR_FILL = 'rgba(214, 227, 255, 0.85)';
 const BAR_FILL_ACTIVE = 'rgba(178, 205, 255, 0.95)';
 const BAR_STROKE = S.primaryDim;
 
+// R-19.2 (design review 2026-07-01): below ~34 CSS px of rendered bar width
+// (≈26 viewBox units at the ~1250px card width) the in-bar % text and the
+// top arrow glyphs are suppressed — they clip or collide on 1–2%-share
+// slivers. The bar itself, its aria-label and the hover tooltip keep
+// carrying the data.
+const DECOR_MIN_W = 26;
+
 const arrowColorFor = (tone: CagrRating['tone']): string =>
-  tone === 'green' ? S.greenStrong : tone === 'red' ? S.redStrong : S.neutral;
+  tone === 'green' ? S.expansion : tone === 'red' ? S.contraction : S.neutral;
 
 const arrowGlyphs = (rating: CagrRating): string =>
   rating.direction === 'flat' ? '↔' :
@@ -130,7 +112,7 @@ const ArrowsHTML: FC<{ rating: CagrRating; size?: number }> = ({ rating, size = 
 
 // ─── Evidence grade chip — same grammar as the Consumer Journey ──
 const GRADE_META: Record<EvidenceGrade, { glyph: string; label: string; fg: string; bg: string }> = {
-  reported: { glyph: '✅', label: 'Reported', fg: S.greenStrong, bg: S.greenSoft },
+  reported: { glyph: '✅', label: 'Reported', fg: S.expansion, bg: S.greenSoft },
   derived:  { glyph: '⚡', label: 'Derived',  fg: S.primaryDim,  bg: S.blueSoft },
   estimate: { glyph: '⚠️', label: 'Estimate', fg: S.amber,       bg: S.amberSoft },
 };
@@ -146,7 +128,7 @@ const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, com
           : 'structured judgment (basis stated)'}`}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontSize: 9, fontWeight: 700, color: m.fg, background: m.bg,
+        fontSize: 11, fontWeight: 700, color: m.fg, background: m.bg,
         padding: compact ? '1px 6px' : '2px 8px', borderRadius: 999,
         whiteSpace: 'nowrap', lineHeight: 1.5,
       }}
@@ -188,7 +170,10 @@ const SourceChip: FC<{ src: SourceRef; kind: 'Revenue' | 'GP1' }> = ({ src, kind
       href={src.url}
       target="_blank"
       rel="noopener noreferrer"
-      title={src.label}
+      // v3 (2026-07-02): the hover carries the FULL derivation recipe —
+      // triangulated Passport-category sizes must show viewers how they
+      // were derived (Passport internal values are licence-restricted).
+      title={src.detail ? `${src.label}\n\nHow this was derived: ${src.detail}` : src.label}
       style={{
         fontSize: 11, fontWeight: 600, color: GRADE_META[src.grade].fg,
         textDecoration: 'underline', textDecorationColor: 'rgba(0,52,94,0.25)',
@@ -230,7 +215,7 @@ const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: numb
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: S.surfaceLow, borderRadius: 8, padding: '7px 10px', marginBottom: 8 }}>
         <div>
-          <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.outline }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onSurfaceVariant }}>
             Pool development · {POOL_HORIZON_LABEL}
           </div>
           <div style={{ fontSize: 13, fontWeight: 800, fontFamily: HEADLINE_FONT, color: arrowColorFor(rating.tone), fontVariantNumeric: 'tabular-nums' }}>
@@ -243,7 +228,7 @@ const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: numb
         <MiniMetric label="GP1" value={`${(item.gp1Margin * 100).toFixed(1)}%`} />
         <MiniMetric label="Pool share" value={`${(gp1PoolShare * 100).toFixed(1)}%`} />
       </div>
-      <div style={{ fontSize: 10, color: S.primaryDim, fontWeight: 700 }}>
+      <div style={{ fontSize: 11, color: S.primaryDim, fontWeight: 700 }}>
         Click the bar for the full assessment →
       </div>
     </motion.div>
@@ -252,7 +237,7 @@ const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: numb
 
 const MiniMetric: FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: S.outline, marginBottom: 1 }}>
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 1 }}>
       {label}
     </div>
     <div style={{ fontSize: 13, fontWeight: 800, color: S.onBg, fontFamily: HEADLINE_FONT, fontVariantNumeric: 'tabular-nums' }}>
@@ -281,26 +266,11 @@ const DetailPanel: FC<{
   const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
   const panelRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  // Focus trap (WCAG 2.4.3): keep Tab focus inside the dialog while it is open.
-  const onTrapKey = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== 'Tab') return;
-    const root = panelRef.current;
-    if (!root) return;
-    const focusable = Array.from(
-      root.querySelectorAll<HTMLElement>('a[href], button, [tabindex]:not([tabindex="-1"])'),
-    ).filter((el) => !el.hasAttribute('disabled'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  }, []);
+  // R-03 (design review 2026-07-01): shared overlay contract — Escape,
+  // focus trap, initial focus, focus return and body scroll lock all come
+  // from useOverlay. The panel is only mounted while open, so `open` is
+  // simply `true` for its lifetime.
+  useOverlay(true, onClose, panelRef);
 
   return (
     <>
@@ -315,9 +285,9 @@ const DetailPanel: FC<{
       {/* Drawer */}
       <motion.aside
         ref={panelRef}
-        onKeyDown={onTrapKey}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-label={`${name} — profit pool assessment`}
         initial={reduceMotion ? { opacity: 0 } : { x: 440, opacity: 0.6 }}
         animate={reduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
@@ -335,7 +305,7 @@ const DetailPanel: FC<{
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <div>
-              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
                 {slide.kind === 'ValueChain' ? 'Value chain tier' : slide.kind === 'SubSegment' ? 'Sub-segment' : 'Core / adjacent pool'}
                 {' · '}{slide.group === 'Hair' ? 'Hair' : 'Laundry'}
               </div>
@@ -348,7 +318,6 @@ const DetailPanel: FC<{
             </div>
             <button
               onClick={onClose}
-              autoFocus
               aria-label="Close assessment panel"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -372,9 +341,9 @@ const DetailPanel: FC<{
             <SectionLabel>Profit pool trajectory · {POOL_HORIZON_LABEL}</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: TRAJ_GRID, gap: 6, padding: '6px 4px 7px' }}>
               <span />
-              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>Today</span>
-              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>p.a.</span>
-              <span style={{ textAlign: 'right', fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>2030</span>
+              <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>Today</span>
+              <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>p.a.</span>
+              <span style={{ textAlign: 'right', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>2030</span>
             </div>
             <TrajRow
               metric="Revenue pool"
@@ -402,7 +371,7 @@ const DetailPanel: FC<{
               end={fmtEurBn(gp1End)}
               emphasis
             />
-            <div style={{ fontSize: 10, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
+            <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
               Pool = revenue × GP1 margin — the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it.
             </div>
           </div>
@@ -423,7 +392,7 @@ const DetailPanel: FC<{
 };
 
 const SectionLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 2 }}>
+  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 2 }}>
     {children}
   </div>
 );
@@ -431,9 +400,9 @@ const SectionLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
 // Top key-info tile — the share of the view this pool holds.
 const KeyInfo: FC<{ label: string; value: string; sub: string }> = ({ label, value, sub }) => (
   <div style={{ background: S.surfaceLow, borderRadius: 10, padding: '9px 12px', border: `1px solid ${S.cardBorder}` }}>
-    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>{label}</div>
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>{label}</div>
     <div style={{ fontSize: 18, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
-      {value} <span style={{ fontSize: 10, fontWeight: 600, color: S.mutedText }}>{sub}</span>
+      {value} <span style={{ fontSize: 11, fontWeight: 600, color: S.mutedText }}>{sub}</span>
     </div>
   </div>
 );
@@ -515,8 +484,13 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const ordered = slide.items;
   const W = 960;
-  const H = 420;
-  const ML = 56, MR = 20, MT = 32, MB = 104;
+  // R-19.3: H/MB grown together (plotH unchanged → identical bar geometry)
+  // and ML widened so the rotated −35° x-labels render in full: the longest
+  // ("Brand Owner CPG (Retail)", "Conditioners & Treatments") used to clip
+  // at the bottom edge and the first tier's ("Commodity Chemicals") at the
+  // left edge. Verified against the longest labels at ~1200px card width.
+  const H = 448;
+  const ML = 96, MR = 20, MT = 32, MB = 132;
   const plotW = W - ML - MR;
   const plotH = H - MT - MB;
 
@@ -563,7 +537,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
         fontFamily={HEADLINE_FONT} fontWeight={700}
         transform={`rotate(-90, ${ML - 48}, ${MT + plotH / 2})`}
       >
-        GP1 proxy (est.) — Y axis
+        GP1 proxy (est.)
       </text>
       <text
         x={ML + plotW / 2} y={H - 6}
@@ -579,13 +553,20 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
         const cx = b.xPx0 + w / 2;
         const isSelected = selectedId === b.item.id;
         const isFocused = focusedId === b.item.id;
-        // Micro-pools (<14px) keep their honest area but drop decoration —
-        // labels/arrows would collide; hover & click carry their identity.
+        // Micro-pools keep their honest area but drop decoration — labels/
+        // arrows would collide; hover & click carry their identity. Axis
+        // name/% labels need ≥14 units; in-bar % and arrows need
+        // DECOR_MIN_W (R-19.2).
         const labeled = w >= 14;
+        const decorated = w >= DECOR_MIN_W;
         const name = b.item.sublabel ? `${b.item.label} ${b.item.sublabel}` : b.item.label;
         return (
           <g
             key={b.item.id}
+            // R-14 (verified 2026-07-02): outline:'none' is allowed here
+            // because keyboard focus renders its own explicit indicator —
+            // the <rect> below switches to a 2px S.primary stroke (dashed
+            // when focused-but-not-selected) plus the active fill.
             style={{ cursor: 'pointer', outline: 'none' }}
             role="button"
             tabIndex={0}
@@ -608,7 +589,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
               strokeDasharray={isFocused && !isSelected ? '4 2' : undefined}
               rx={2}
             />
-            {b.hPx > 22 && w > 28 && (
+            {b.hPx > 22 && decorated && (
               <text
                 x={cx} y={y + 15}
                 fontSize={11} fontWeight={800}
@@ -640,7 +621,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
               </text>
             )}
             {/* Pool-development arrows — revenue × GP1, not revenue alone */}
-            {labeled && (
+            {decorated && (
               <ArrowsSVG rating={b.poolRating} cx={cx} cy={y} ariaPrefix="Pool development" />
             )}
           </g>
@@ -720,6 +701,79 @@ const KindPills: FC<{ kind: SlideKind; onSelect: (k: SlideKind) => void }> = ({ 
   </div>
 );
 
+// ─── Beta notice (R-19.4) — shown once, acknowledgment persisted ──
+const NOTICE_ACK_KEY = 'prism.explorerNoticeAck.v1';
+
+/** SSR-safe ack read. On the server we report "acked" so the dialog can
+ *  never try to auto-open outside the browser; storage failures (privacy
+ *  mode) read as not-acked, so the notice still shows. */
+function noticeAcked(): boolean {
+  if (typeof window === 'undefined') return true;
+  try { return window.localStorage.getItem(NOTICE_ACK_KEY) === '1'; } catch { return false; }
+}
+
+const ExplorerBetaNotice: FC<{ open: boolean; onAck: () => void; onClose: () => void }> = ({
+  open, onAck, onClose,
+}) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // R-03: shared overlay contract — Escape, focus trap, initial focus,
+  // focus return, body scroll lock.
+  useOverlay(open, onClose, ref);
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1120,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16, background: 'rgba(0,52,94,0.45)',
+      }}
+    >
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="explorer-notice-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 448, width: '100%', background: S.surface, borderRadius: 16,
+          boxShadow: '0 32px 96px -20px rgba(0,52,94,0.35)', padding: 24,
+          fontFamily: BODY_FONT, color: S.onSurface,
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.primaryDim, marginBottom: 8 }}>
+          Beta
+        </div>
+        <h2
+          id="explorer-notice-title"
+          style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 20, color: S.onBg, margin: '0 0 8px', letterSpacing: -0.2 }}
+        >
+          Profit Pool Explorer
+        </h2>
+        <p style={{ fontSize: 13, lineHeight: 1.6, color: S.onSurfaceVariant, margin: '0 0 18px' }}>
+          Market sizing is anchored to Euromonitor (consumer hair ·
+          laundry/home care) and Kline (professional hair); a few figures
+          are pending internal Passport confirmation. Margins are GP1
+          proxies calibrated to company filings.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onAck}
+            style={{
+              padding: '9px 18px', borderRadius: 999, border: 'none',
+              background: S.surfaceLow, color: S.primary,
+              fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main component ──────────────────────────────────────────────
 const ProfitPoolExplorer: FC = () => {
   const { loading } = usePrism();
@@ -727,6 +781,18 @@ const ProfitPoolExplorer: FC = () => {
   const [kind, setKind] = useState<SlideKind>('ValueChain');
   const [hover, setHover] = useState<{ item: SlideItem; x: number; y: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // R-19.4: the Beta notice auto-opens once per browser (the tab is
+  // keep-alive-mounted, so this runs on the first Explorer visit) and
+  // never again once acknowledged. "Got it" persists the ack; Escape or
+  // a backdrop click dismisses without persisting.
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  useEffect(() => { if (!noticeAcked()) setNoticeOpen(true); }, []);
+  const closeNotice = useCallback(() => setNoticeOpen(false), []);
+  const ackNotice = useCallback(() => {
+    try { window.localStorage.setItem(NOTICE_ACK_KEY, '1'); } catch { /* storage unavailable — dismiss only */ }
+    setNoticeOpen(false);
+  }, []);
 
   const slide = useMemo(
     () =>
@@ -811,7 +877,7 @@ const ProfitPoolExplorer: FC = () => {
         {/* Card title + pool summary */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.outline, marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
               {group === 'Hair' ? 'Hair' : 'Laundry'} · {KINDS.find(k => k.id === kind)?.label} · revenue pool {slide.poolSize}
             </div>
             <div style={{ fontFamily: HEADLINE_FONT, fontSize: 22, fontWeight: 800, color: S.onBg, lineHeight: 1.2 }}>
@@ -832,13 +898,13 @@ const ProfitPoolExplorer: FC = () => {
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant }}>
                 GP1 pool · {POOL_HORIZON_LABEL}
               </div>
               <div style={{ fontSize: 14, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums' }}>
                 {fmtEurBn(summary.gp1PoolNowEurBn)} → {fmtEurBn(summary.gp1PoolTerminalEurBn)}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: arrowColorFor(slidePoolRating.tone), fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: arrowColorFor(slidePoolRating.tone), fontVariantNumeric: 'tabular-nums' }}>
                 {slidePoolRating.label} p.a. pool-weighted
               </div>
             </div>
@@ -870,7 +936,7 @@ const ProfitPoolExplorer: FC = () => {
             marginTop: 18,
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant }}>
             Pool development p.a.
           </span>
           <ArrowLegend rating={toPoolRating(0.08)}  label={`≥ ${(POOL_CAGR_THRESHOLDS.two * 100).toFixed(0)}% growth`} />
@@ -882,7 +948,7 @@ const ProfitPoolExplorer: FC = () => {
           <GradeChip grade="reported" compact />
           <GradeChip grade="derived" compact />
           <GradeChip grade="estimate" compact />
-          <div style={{ marginLeft: 'auto', fontSize: 10, color: S.mutedText }}>
+          <div style={{ marginLeft: 'auto', fontSize: 11, color: S.mutedText }}>
             Nominal terms · € at 1.15 · click any bar for the full assessment
           </div>
         </div>
@@ -892,7 +958,7 @@ const ProfitPoolExplorer: FC = () => {
           style={{
             marginTop: 12, padding: '10px 12px', borderRadius: 10,
             background: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
-            fontSize: 10.5, color: S.onSurfaceVariant, lineHeight: 1.55,
+            fontSize: 11, color: S.onSurfaceVariant, lineHeight: 1.55,
           }}
         >
           <b style={{ color: S.onBg }}>How to read this chart:</b>{' '}
@@ -913,7 +979,7 @@ const ProfitPoolExplorer: FC = () => {
       <div style={{ marginTop: 18, padding: 20, background: S.surface, border: `1px solid ${S.cardBorder}`, borderRadius: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <Sparkles size={16} color={S.primary} />
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.primary }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.primary }}>
             Profit Pool Architecture · Key Insights
           </span>
         </div>
@@ -933,7 +999,7 @@ const ProfitPoolExplorer: FC = () => {
         </ul>
 
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${S.surfaceHigh}` }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.outline, marginBottom: 5 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 5 }}>
             How this view is built
           </div>
           <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.55, maxWidth: 980 }}>
@@ -966,6 +1032,9 @@ const ProfitPoolExplorer: FC = () => {
           <DetailPanel slide={slide} item={selectedItem} onClose={closePanel} />
         )}
       </AnimatePresence>
+
+      {/* Beta notice — first-visit acknowledgment (R-19.4) */}
+      <ExplorerBetaNotice open={noticeOpen} onAck={ackNotice} onClose={closeNotice} />
     </div>
   );
 };

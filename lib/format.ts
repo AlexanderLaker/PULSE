@@ -53,11 +53,6 @@ export const FORCE_COLORS: Record<ForceName, string> = Object.fromEntries(
   Object.entries(FORCES).map(([k, v]) => [k, v.color])
 ) as Record<ForceName, string>;
 
-// Retained for back-compat; no longer rendered.
-export const FORCE_ICONS: Record<ForceName, string> = Object.fromEntries(
-  Object.entries(FORCES).map(([k, v]) => [k, v.emoji])
-) as Record<ForceName, string>;
-
 // ─── Category Definitions ───────────────────────────────────────────
 export const CATEGORIES: CategoryDefinition[] = [
   { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Hair', color: '#b0504a' },
@@ -142,6 +137,29 @@ export function fmtPct(v: number | null | undefined, decimals = 1): string {
   return `${(v * 100).toFixed(d)}%`;
 }
 
+// ─── Dates (R-12): one format everywhere — "26 Jun 2026" ────────────
+// The previous bare `toLocaleDateString()` calls rendered in the BROWSER
+// locale (German browser → "26.6.2026") inside an all-English UI.
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "26 Jun 2026" — UI-wide date format. Returns '—' for invalid input. */
+export function fmtDate(d: string | number | Date | null | undefined): string {
+  if (d == null) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return `${dt.getDate()} ${MONTHS_EN[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+
+/** "26 Jun 2026, 08:38" — date + time for run metadata / sessions. */
+export function fmtDateTime(d: string | number | Date | null | undefined): string {
+  if (d == null) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  return `${fmtDate(dt)}, ${hh}:${mm}`;
+}
+
 /** Short category name: "Hair: Color" → "Color" */
 export function shortCat(cat: string | null | undefined): string {
   if (!cat) return '';
@@ -181,22 +199,39 @@ export function shiftArrow(v: number | null | undefined): string {
 const HEAT_SURFACE_LOW = '#eff4ff';
 const HEAT_ON_SURFACE_VARIANT = '#26619d';
 
+// R-01 (design review 2026-07-01): the fill alpha is capped at 0.42 and cell
+// text is ALWAYS the dark ink pair — the previous white-text branch measured
+// 1.9–3.9:1 against every fill it appeared on (WCAG needs 4.5:1 at 13px).
+// Dark ink stays ≥ 5:1 up to the 0.42 cap. Hue never flips: negatives are
+// always red-family, positives always green-family (owner note on R-06).
 export function heatFill(v: number | null | undefined, scale = 0.05): string {
   if (v == null || !isFinite(v)) return HEAT_SURFACE_LOW;
   if (Math.abs(v) < FLAT_EPS) return HEAT_SURFACE_LOW;
   const s = Math.max(scale, 0.005);
   const mag = Math.min(Math.abs(v) / s, 1);
-  const a = (0.14 + mag * 0.62).toFixed(2);
+  const a = (0.14 + mag * 0.28).toFixed(2);
   return v > 0
     ? `rgba(31, 122, 61, ${a})`
     : `rgba(159, 64, 61, ${a})`;
 }
 
-/** Legible text colour over a `heatFill` cell at the same scale. */
-export function heatText(v: number | null | undefined, scale = 0.05): string {
+/** Legible text colour over a `heatFill` cell — always the dark ink pair (R-01). */
+export function heatText(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return HEAT_ON_SURFACE_VARIANT;
-  const s = Math.max(scale, 0.005);
-  const mag = Math.min(Math.abs(v) / s, 1);
-  if (mag > 0.45) return '#ffffff';
+  if (Math.abs(v) < FLAT_EPS) return HEAT_ON_SURFACE_VARIANT;
   return v > 0 ? '#0f5132' : '#6a2a27';
+}
+
+// R-06: per-view heat scale — shading spreads over the values actually in
+// view instead of a fixed ±5%, so within-view structure stays visible.
+// P95 of |values| (min 2%) keeps one outlier from washing out the rest.
+// The legend MUST display the scale in use (labelled in the Matrix legend).
+export function heatScaleFor(values: Array<number | null | undefined>): number {
+  const mags = values
+    .filter((v): v is number => v != null && isFinite(v) && Math.abs(v) >= FLAT_EPS)
+    .map((v) => Math.abs(v))
+    .sort((a, b) => a - b);
+  if (!mags.length) return 0.05;
+  const p95 = mags[Math.min(mags.length - 1, Math.floor(mags.length * 0.95))]!;
+  return Math.max(p95, 0.02);
 }

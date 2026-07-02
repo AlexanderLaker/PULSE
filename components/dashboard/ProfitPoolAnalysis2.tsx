@@ -49,9 +49,11 @@ import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import * as api from '@/api/client';
 import {
-  CATEGORIES, YEARS, fmtShift, shiftArrow, shiftColor,
-  heatFill, heatText, categoryDisplay, categoryCode, groupDisplay,
+  CATEGORIES, YEARS, fmtShift, fmtPct, shiftArrow, shiftColor,
+  heatFill, heatText, heatScaleFor, fmtDate, fmtDateTime,
+  categoryDisplay, categoryCode, groupDisplay,
 } from '@/lib/format';
+import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
@@ -89,38 +91,6 @@ const REGIONS: Array<{ id: string; label: string }> = [
 const FORCE_NAMES: ForceName[] = [
   'Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive',
 ];
-
-// ─── Editorial design tokens — identical to Trends2 ──────────────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  surfaceContainer:   '#e5eeff',
-  surfaceHigh:        '#dce9ff',
-  surfaceHighest:     '#d2e4ff',
-  primary:            '#005db5',
-  primaryDim:         '#0052a0',
-  primaryContainer:   '#d6e3ff',
-  onPrimaryContainer: '#00519e',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-  secondaryContainer: '#d5e3fc',
-  onSecondaryContainer:'#455367',
-  tertiaryContainer:  '#dae2fd',
-  onTertiaryContainer:'#4a5167',
-  error:              '#9f403d',
-  errorContainer:     '#fe8983',
-  onErrorContainer:   '#752121',
-  outline:            '#477dbb',
-  outlineVariant:     '#81b5f6',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
-  mutedText:          '#64748B',
-};
-
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 // ─── View mode ───────────────────────────────────────────────────
 type ViewMode = 'time' | 'force' | 'vc' | 'region';
@@ -334,16 +304,21 @@ const KpiTile: FC<{
   const hasBand = p10 != null && p90 != null;
   const inner = (
     <>
-      <div className="text-[10px] font-bold uppercase tracking-[0.12em]"
+      <div className="text-[11px] font-bold uppercase tracking-[0.12em]"
         style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
         {label}
       </div>
+      {/* R-21: one tile anatomy — label top, then name (left) + value (right)
+          on a shared baseline; the value sits at the right edge on every tile
+          even when there is no category name (portfolio tile). */}
       <div className="flex items-baseline justify-between gap-3 mt-1.5">
-        {name && (
+        {name ? (
           <span className="text-[13px] font-semibold truncate"
             style={{ color: onOpen && hovered ? S.primary : S.onSurface, transition: 'color 0.15s ease' }}>
             {name}
           </span>
+        ) : (
+          <span aria-hidden />
         )}
         <ShiftValue value={value} size={24} fontFamily={HEADLINE_FONT} />
       </div>
@@ -373,13 +348,21 @@ const KpiTile: FC<{
     border: `1px solid ${S.cardBorder}`,
     fontFamily: BODY_FONT,
   };
+  // R-04: the P10–P90 band is decision content — it opens on keyboard focus
+  // and on tap, not just on mouse hover (iPad / keyboard parity; placement
+  // unchanged per the owner's 2026-06-11 declutter ruling).
+  const bandLabel = hasBand
+    ? ` — P10 ${fmtShift(p10, 1)} to P90 ${fmtShift(p90, 1)}${bandNote ? `, ${bandNote}` : ''}`
+    : '';
   return onOpen ? (
     <button
       type="button"
       onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label={`Open ${name ?? label} drill-down — fan chart and contributing trends`}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      aria-label={`Open ${name ?? label} drill-down — fan chart and contributing trends${bandLabel}`}
       className="relative rounded-2xl px-5 py-3.5 text-left"
       style={{ ...surface, cursor: 'pointer' }}
     >
@@ -389,6 +372,11 @@ const KpiTile: FC<{
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      onClick={hasBand ? () => setHovered((h) => !h) : undefined}
+      tabIndex={hasBand ? 0 : undefined}
+      aria-label={hasBand ? `${label}${bandLabel}` : undefined}
       className="relative rounded-2xl px-5 py-3.5"
       style={surface}
     >
@@ -496,7 +484,21 @@ const Matrix: FC<MatrixProps> = ({
   // U2 (June 2026): the Total row/column are no longer heat-shaded, so there is
   // no separate data-driven colour scale to compute. Totals read as flat,
   // labelled figures (bold ▲/▼ + sign carries direction) — colour intensity is
-  // reserved for the grid cells, all on the one ±5% scale the legend defines.
+  // reserved for the grid cells.
+
+  // R-06 (design review 2026-07-01): the heat ramp scales to the values in
+  // THIS view (P95 of |cell|, min 2%) instead of a fixed ±5%, so within-view
+  // structure stays visible; the legend displays the scale in use.
+  const viewScale = useMemo(
+    () => heatScaleFor(rows.flatMap((r) => columns.map((c) => data[r.id]?.[c.id] ?? null))),
+    [rows, columns, data],
+  );
+
+  // R-05: the per-row Total column only exists where row totals exist
+  // (attribution lenses). Time Path passes none — previously this rendered
+  // a full column of "—" that read as broken data.
+  const showTotalCol = showTotals && !!rowTotals
+    && Object.values(rowTotals).some((v) => v != null);
 
   if (!hasAnyData && emptyMessage) {
     return (
@@ -512,7 +514,7 @@ const Matrix: FC<MatrixProps> = ({
     );
   }
 
-  const totalColSpan = columns.length + (showTotals ? 1 : 0) + 1; // +1 for Category column
+  const totalColSpan = columns.length + (showTotalCol ? 1 : 0) + 1; // +1 for Category column
 
   return (
     <div
@@ -580,7 +582,7 @@ const Matrix: FC<MatrixProps> = ({
                   {col.label}
                 </th>
               ))}
-              {showTotals && (
+              {showTotalCol && (
                 <th
                   className="px-3 py-4 text-[11px] font-bold uppercase tracking-[0.12em] text-center"
                   style={{
@@ -602,7 +604,7 @@ const Matrix: FC<MatrixProps> = ({
                   <tr>
                     <td
                       colSpan={totalColSpan}
-                      className="px-6 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+                      className="px-6 py-1 text-[11px] font-bold uppercase tracking-[0.14em]"
                       style={{
                         backgroundColor: gIdx === 0 ? S.surfaceLow : S.surfaceContainer,
                         color: S.onSurfaceVariant,
@@ -648,8 +650,8 @@ const Matrix: FC<MatrixProps> = ({
                           {row.code && (
                             <span
                               style={{
-                                fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
-                                fontSize: 10, fontWeight: 600, letterSpacing: '0.02em',
+                                fontFamily: MONO_FONT,
+                                fontSize: 11, fontWeight: 600, letterSpacing: '0.02em',
                                 color: S.mutedText, backgroundColor: S.surfaceLow,
                                 padding: '1px 6px', borderRadius: 5, whiteSpace: 'nowrap',
                               }}
@@ -682,10 +684,10 @@ const Matrix: FC<MatrixProps> = ({
                           key={col.id}
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
-                            backgroundColor: heatFill(v),
+                            backgroundColor: heatFill(v, viewScale),
                             color: heatText(v),
                             fontWeight: v != null && Math.abs(v) > 0.02 ? 700 : 600,
-                            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                            fontFamily: MONO_FONT,
                             transition: 'background-color 0.25s ease, box-shadow 0.15s ease',
                             // Click affordance — the hovered % value reads as a
                             // button (drill-down opens on click via the row handler).
@@ -700,14 +702,14 @@ const Matrix: FC<MatrixProps> = ({
                         </td>
                       );
                     })}
-                    {showTotals && (
+                    {showTotalCol && (
                         <td
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
                           style={{
                             backgroundColor: S.surfaceContainer,
                             color: shiftColor(rt),
                             fontWeight: 700,
-                            fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                            fontFamily: MONO_FONT,
                             borderLeft: `2px solid ${S.cardBorderStrong}`,
                           }}
                           title={rt != null ? `${row.label} — row total (MC median): ${fmtShift(rt, 1)}` : undefined}
@@ -743,7 +745,7 @@ const Matrix: FC<MatrixProps> = ({
                         backgroundColor: S.surfaceContainer,
                         color: shiftColor(ct),
                         fontWeight: 700,
-                        fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                        fontFamily: MONO_FONT,
                         borderTop: `2px solid ${S.cardBorderStrong}`,
                       }}
                       title={ct != null ? `${col.label} — column total: ${fmtShift(ct, 1)}` : undefined}
@@ -752,20 +754,22 @@ const Matrix: FC<MatrixProps> = ({
                     </td>
                   );
                 })}
-                <td
-                  className="px-3 py-1.5 text-center text-[13px] tabular-nums"
-                  style={{
-                    backgroundColor: S.surfaceHigh,
-                    color: shiftColor(grandTotal ?? null),
-                    fontWeight: 800,
-                    fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
-                    borderLeft: `2px solid ${S.cardBorderStrong}`,
-                    borderTop: `2px solid ${S.cardBorderStrong}`,
-                  }}
-                  title={grandTotal != null ? `Grand total: ${fmtShift(grandTotal, 1)}` : undefined}
-                >
-                  {grandTotal == null ? '—' : `${shiftArrow(grandTotal)} ${fmtShift(grandTotal, 1)}`.trim()}
-                </td>
+                {showTotalCol && (
+                  <td
+                    className="px-3 py-1.5 text-center text-[13px] tabular-nums"
+                    style={{
+                      backgroundColor: S.surfaceHigh,
+                      color: shiftColor(grandTotal ?? null),
+                      fontWeight: 800,
+                      fontFamily: MONO_FONT,
+                      borderLeft: `2px solid ${S.cardBorderStrong}`,
+                      borderTop: `2px solid ${S.cardBorderStrong}`,
+                    }}
+                    title={grandTotal != null ? `Grand total: ${fmtShift(grandTotal, 1)}` : undefined}
+                  >
+                    {grandTotal == null ? '—' : `${shiftArrow(grandTotal)} ${fmtShift(grandTotal, 1)}`.trim()}
+                  </td>
+                )}
               </tr>
             )}
           </tbody>
@@ -782,16 +786,19 @@ const Matrix: FC<MatrixProps> = ({
           Signed % vs 2025 · positive = expansion · negative = contraction
           {showTotals && ' · totals are category-weighted averages (labelled, not shaded)'}
         </span>
+        {/* R-06: the ramp is scaled to this view (P95 of |values|), so the
+            labels state the actual scale in use — never an implied ±5%. */}
         <div className="flex items-center gap-3">
-          <span>−5%</span>
+          <span title="Shading scaled to the values in this view">−{fmtPct(viewScale, 1)}</span>
           <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.76)' }} />
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.36)' }} />
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.42)' }} />
+            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.22)' }} />
             <div style={{ flex: 0.2, background: S.surfaceLow }} />
-            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.36)' }} />
-            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.76)' }} />
+            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.22)' }} />
+            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.42)' }} />
           </div>
-          <span>+5%</span>
+          <span title="Shading scaled to the values in this view">+{fmtPct(viewScale, 1)}</span>
+          <span style={{ fontSize: 11 }}>· shading scaled to this view</span>
         </div>
       </div>
 
@@ -827,7 +834,7 @@ const Matrix: FC<MatrixProps> = ({
           >
             <div
               style={{
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
@@ -850,7 +857,7 @@ const Matrix: FC<MatrixProps> = ({
               <span style={{ opacity: 0.7, fontSize: 11 }}>Median</span>
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                  fontFamily: MONO_FONT,
                   fontWeight: 700,
                   textAlign: 'right',
                 }}
@@ -862,7 +869,7 @@ const Matrix: FC<MatrixProps> = ({
                   <span style={{ opacity: 0.7, fontSize: 11 }}>P10</span>
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontFamily: MONO_FONT,
                       fontWeight: 600,
                       textAlign: 'right',
                     }}
@@ -876,7 +883,7 @@ const Matrix: FC<MatrixProps> = ({
                   <span style={{ opacity: 0.7, fontSize: 11 }}>P90</span>
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontFamily: MONO_FONT,
                       fontWeight: 600,
                       textAlign: 'right',
                     }}
@@ -887,22 +894,22 @@ const Matrix: FC<MatrixProps> = ({
               )}
             </div>
             {hasBands && (
-              <div style={{ opacity: 0.55, fontSize: 10, marginTop: 6, lineHeight: 1.4 }}>
+              <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
                 Band = magnitude uncertainty of the listed trends only.
               </div>
             )}
             {!hasBands && cellDetails && (
-              <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
+              <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6 }}>
                 P10 / P90 not available for this cell
               </div>
             )}
             {!cellDetails && noBandsNote && (
-              <div style={{ opacity: 0.55, fontSize: 10.5, marginTop: 6 }}>
+              <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6 }}>
                 {noBandsNote}
               </div>
             )}
             {onRowClick && (
-              <div style={{ opacity: 0.6, fontSize: 10.5, marginTop: 6, fontWeight: 600 }}>
+              <div style={{ opacity: 0.6, fontSize: 11, marginTop: 6, fontWeight: 600 }}>
                 Click → {hover.rowLabel} drill-down
               </div>
             )}
@@ -1586,11 +1593,12 @@ const ProfitPoolAnalysis2: FC<{
         </AnimatePresence>
 
         {/* ── The evidence: the shift matrix ─────────────────────── */}
+        {/* R-13: page title is an h1 (matches Trends / Journey / Explorer). */}
         <div className="mb-5 pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
-          <h2 className="font-extrabold tracking-tight"
+          <h1 className="font-extrabold tracking-tight"
             style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '2.4rem', lineHeight: 1.15 }}>
             Profit Pool Exposure
-          </h2>
+          </h1>
           {/* Reduced header (owner request, June 2026): the relative-exposure /
               ceteris-paribus framing is carried once here; the full D16 wording
               still lives in "About this model" below. */}
@@ -1851,12 +1859,12 @@ const ProfitPoolAnalysis2: FC<{
                 <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
                   Run #{simulation.run_meta.run_id}
                   {simulation.run_meta.run_date
-                    ? ` · ${new Date(simulation.run_meta.run_date).toLocaleDateString()}`
+                    ? ` · ${fmtDate(simulation.run_meta.run_date)}`
                     : ''}
                 </span>
               ) : simulation?.generated ? (
                 <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
-                  Last run · {new Date(simulation.generated).toLocaleDateString()}
+                  Last run · {fmtDate(simulation.generated)}
                 </span>
               ) : null}
               <ChevronDown size={16} style={{ color: S.onSurfaceVariant,
@@ -1884,7 +1892,7 @@ const ProfitPoolAnalysis2: FC<{
                 if (m.model_version) rows.push(['Model', m.model_version]);
                 return (
                   <div className="mb-5 pb-5" style={{ borderBottom: `1px solid ${S.cardBorder}` }}>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                       style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>This run</div>
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                       <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
@@ -1896,9 +1904,9 @@ const ProfitPoolAnalysis2: FC<{
                       </span>
                       <span style={{ color: S.mutedText, fontSize: 11.5 }}>
                         {m.run_date
-                          ? new Date(m.run_date).toLocaleString()
+                          ? fmtDateTime(m.run_date)
                           : simulation.generated
-                          ? new Date(simulation.generated).toLocaleString()
+                          ? fmtDateTime(simulation.generated)
                           : '—'}
                       </span>
                     </div>
@@ -1915,7 +1923,7 @@ const ProfitPoolAnalysis2: FC<{
                     )}
                     {events.length > 0 && (
                       <div className="mt-3">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-1.5"
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-1.5"
                           style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                           Run integrity · {events.length} {events.length === 1 ? 'event' : 'events'}
                         </div>
@@ -1933,7 +1941,7 @@ const ProfitPoolAnalysis2: FC<{
                   </div>
                 );
               })()}
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-3"
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-3"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Glossary</div>
               <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
@@ -1961,7 +1969,7 @@ const ProfitPoolAnalysis2: FC<{
                 <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Each cell is the compounded level vs 2025 at that year — not a year-over-year change.</div>
               </div>
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>What the model holds constant</div>
               {/* D16 (owner decision, June 2026) — exact owner wording. */}
               <p className="text-[12px] mb-4" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
@@ -1971,7 +1979,7 @@ const ProfitPoolAnalysis2: FC<{
                 today&rsquo;s business if nothing changes&rdquo;, not &ldquo;this pool will shrink&rdquo;.
                 Strategic response belongs to the reader, not the engine.
               </p>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2"
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Methodology</div>
               {/* U10 (June 2026): a three-line plain read precedes the full
                   technical prose so the curious reader gets the gist first. */}

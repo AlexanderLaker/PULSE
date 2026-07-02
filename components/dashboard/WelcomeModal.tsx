@@ -19,7 +19,8 @@
 
 'use client';
 
-import React, { FC, useEffect, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
+import useOverlay from '@/hooks/useOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -30,27 +31,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-
-// ─── Editorial design tokens (mirror SettingsModal / Trends2) ───────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  surfaceContainer:   '#e5eeff',
-  surfaceHigh:        '#dce9ff',
-  primary:            '#005db5',
-  primaryDim:         '#0052a0',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-  outlineVariant:     '#81b5f6',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
-};
-
-const HEADLINE_FONT =
-  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT =
-  "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 interface WelcomeModalProps {
   open: boolean;
@@ -65,15 +46,10 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
     if (open) setStep(1);
   }, [open]);
 
-  // Esc closes the modal at any step.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  // R-03: shared overlay contract — Escape, focus trap, focus return,
+  // body scroll lock (replaces the local Escape-only listener).
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  useOverlay(open, onClose, modalRef);
 
   return (
     <AnimatePresence>
@@ -114,6 +90,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
           >
             {/* Modal card */}
             <motion.div
+              ref={modalRef}
               initial={{ opacity: 0, scale: 0.97, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -121,6 +98,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               role="dialog"
               aria-modal="true"
               aria-label="Welcome to PRISM"
+              tabIndex={-1}
               style={{
                 position: 'relative',
                 width: 'min(620px, 92vw)',
@@ -486,7 +464,7 @@ const ViewCard: FC<ViewCardProps> = ({ number, icon: Icon, title, body, note }) 
           width: 18,
           height: 18,
           borderRadius: 999,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: 800,
           display: 'flex',
           alignItems: 'center',

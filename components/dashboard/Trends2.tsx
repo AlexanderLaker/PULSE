@@ -21,7 +21,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, TrendingUp, TrendingDown, Users, Store, Cpu, Landmark,
+  Search, TrendingUp, Users, Store, Cpu, Landmark,
   Leaf, Swords, Sparkles, ChevronDown,
   FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper,
   Globe, ExternalLink, AlertTriangle,
@@ -32,6 +32,8 @@ import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { getTrendProposals, saveMyProposal } from '@/api/client';
 import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import Chip from '@/components/dashboard/Chip';
 import type {
   Trend, ForceName, CategoryId, TrendSource, TrendUpdate,
   TrendProposalPatch, TrendProposalsResponse,
@@ -93,38 +95,6 @@ const SOURCE_ICON: Record<string, LucideIcon> = {
   Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
 };
 
-// ─── Editorial design tokens (from docs/DESIGN.md) ────────────────────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  surfaceContainer:   '#e5eeff',
-  surfaceHigh:        '#dce9ff',
-  surfaceHighest:     '#d2e4ff',
-  primary:            '#005db5',
-  primaryDim:         '#0052a0',
-  primaryContainer:   '#d6e3ff',
-  onPrimaryContainer: '#00519e',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-  secondaryContainer: '#d5e3fc',
-  onSecondaryContainer:'#455367',
-  tertiaryContainer:  '#dae2fd',
-  onTertiaryContainer:'#4a5167',
-  error:              '#9f403d',
-  errorContainer:     '#fe8983',
-  onErrorContainer:   '#752121',
-  outline:            '#477dbb',
-  outlineVariant:     '#81b5f6',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
-  mutedText:          '#64748B',
-};
-
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-
 // Force → icon + tonal container mapping (editorial palette)
 const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }> = {
   Consumer:      { Icon: Users,    bg: S.primaryContainer,   fg: S.primary },
@@ -149,6 +119,10 @@ const DotBar: FC<DotBarProps> = ({ value, editable = false, onChange }) => (
   >
     {[1, 2, 3, 4, 5].map((d) => {
       const filled = d <= value;
+      // R-14: ≥24px hit area without changing the visual — box is 24×24
+      // (padding 7 / margin −7 keeps the 10px-dot-6px-gap layout unshifted),
+      // background-clip paints only the 10px content-box dot. No outline:none
+      // so the global :focus-visible ring shows on keyboard focus.
       return (
         <span
           key={d}
@@ -159,12 +133,13 @@ const DotBar: FC<DotBarProps> = ({ value, editable = false, onChange }) => (
           onKeyDown={editable && onChange ? (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(d); }
           } : undefined}
-          className="inline-block w-2.5 h-2.5 rounded-full"
+          className="inline-block rounded-full"
           style={{
+            width: 24, height: 24, padding: 7, margin: -7,
+            boxSizing: 'border-box', backgroundClip: 'content-box',
             backgroundColor: filled ? S.primary : S.surfaceHigh,
             cursor: editable ? 'pointer' : 'default',
             transition: 'background-color 140ms',
-            outline: 'none',
           }}
         />
       );
@@ -225,7 +200,7 @@ const CategoryExposureGrid: FC<{ exposures: Record<string, number> }> = ({ expos
       {Object.entries(grouped).map(([group, cats]) => (
         <div key={group}>
           <div
-            className="text-[10px] font-semibold mb-2"
+            className="text-[11px] font-semibold mb-2"
             style={{ color: S.onSurfaceVariant, letterSpacing: '0.08em' }}
           >
             {group.toUpperCase()}
@@ -235,7 +210,7 @@ const CategoryExposureGrid: FC<{ exposures: Record<string, number> }> = ({ expos
               <div key={cat.id} className="flex flex-col items-center gap-1.5">
                 <ReadDots value={readExposure(exposures, cat.name, cat.id)} color={S.primary} />
                 <div
-                  className="text-[10px] font-medium text-center"
+                  className="text-[11px] font-medium text-center"
                   style={{ color: S.onSurface }}
                 >
                   {shortCat(cat.name)}
@@ -282,23 +257,10 @@ const ValueChainExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exp
   </div>
 );
 
-// ─── Direction pill ────────────────────────────────────────────────
-const DirectionPill: FC<{ direction: 'Expansion' | 'Contraction' }> = ({ direction }) => {
-  const isExp = direction === 'Expansion';
-  const Icon = isExp ? TrendingUp : TrendingDown;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase"
-      style={{
-        backgroundColor: isExp ? S.primaryContainer : S.errorContainer,
-        color:           isExp ? S.onPrimaryContainer : S.onErrorContainer,
-      }}
-    >
-      <Icon size={13} strokeWidth={2.5} />
-      {direction}
-    </span>
-  );
-};
+// ─── Direction chips (R-18) ────────────────────────────────────────
+// Expansion/contraction render via the shared <Chip kind=…> component
+// (@/components/dashboard/Chip) — the local slate/red DirectionPill was
+// removed so direction speaks one visual language across the dashboard.
 
 // ─── Section header help tip — "?" info icon with a plain hover tooltip ───
 // Uses the native browser `title` tooltip, matching the existing "AI suggests…"
@@ -448,7 +410,7 @@ const SourceItem: FC<{ src: TrendSource }> = ({ src }) => {
                 minWidth: 22, height: 18, padding: '0 6px',
                 borderRadius: 4,
                 fontFamily: HEADLINE_FONT,
-                fontSize: 10, fontWeight: 800, letterSpacing: '0.04em',
+                fontSize: 11, fontWeight: 800, letterSpacing: '0.04em',
                 backgroundColor: `${tierCfg.color}22`,
                 color: tierCfg.color,
                 border: `1px solid ${tierCfg.color}55`,
@@ -530,6 +492,21 @@ function sortValue(t: Trend, key: SortKey): string | number | null | undefined {
 
 type ScoringMode = 'list' | 'input' | 'review';
 
+// ── R-08 (design review 2026-07): table column templates, per sub-view ──
+// TREND is the single flexible column (~60% of the row in Trend List at
+// 1512px, ≥47% in the 6-column views) with min-width 0 + ellipsis + hover
+// title, so names stop truncating mid-word. PROBABILITY is tightened to the
+// 5-dot cluster (dots need 74px; the tracked 11px "PROBABILITY" header label
+// is the binding ~122px) — Review & Endorse gets extra room for the expert-ø
+// value + delta chip. The Trend List has NO review-status column: it rendered
+// "—" on every row; real review status lives in Expert Rating's YOUR REVIEW.
+// Header and rows read the same template so columns always align.
+const ROW_GRID: Record<ScoringMode, string> = {
+  list:   'minmax(0, 1fr) 130px 128px 170px 100px',
+  input:  'minmax(0, 1fr) 130px 128px 170px 100px 130px',
+  review: 'minmax(0, 1fr) 130px 180px 170px 100px 110px',
+};
+
 const EXPERT_COLOR   = '#6b4fc4';   // expert aggregate — violet
 const REVIEWED_COLOR = '#1f7a3d';   // reviewed truth that deviates from AI — green
 const DELTA_COLOR    = '#b07d2b';   // delta chip — gold
@@ -599,7 +576,7 @@ const DeltaChip: FC<{ value: number; unit?: string; digits?: number }> = ({ valu
   const sign = value > 0 ? '+' : '−';
   return (
     <span style={{
-      fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
+      fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
       backgroundColor: zero ? S.surfaceLow : 'rgba(176,125,43,0.15)',
       color: zero ? S.mutedText : DELTA_COLOR,
     }}>
@@ -732,7 +709,7 @@ const RowEndCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendPropos
 // review → how many experts have scored this trend
 const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalPatch }> = ({ trend, mode, myProposal }) => {
   const pill: React.CSSProperties = {
-    fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+    fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
     textTransform: 'uppercase', padding: '4px 11px', borderRadius: 999,
   };
   if (mode === 'input') {
@@ -748,7 +725,7 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
             ? 'Reviewed — you rated probability, GP1% and at least one category exposure'
             : 'To complete: rate probability, GP1% and at least one category exposure'}
           style={{ ...pill, backgroundColor: done ? 'rgba(31,122,61,0.10)' : S.surfaceLow, color: done ? REVIEWED_COLOR : S.onSurfaceVariant }}>
-          {done ? <><Check size={11} strokeWidth={2.6} /> Reviewed</> : 'In progress'}
+          {done ? <><Check size={11} strokeWidth={2.6} /> Reviewed</> : 'Not reviewed'}
         </span>
       </div>
     );
@@ -835,7 +812,7 @@ const DiffusionPicker: FC<{ value?: string; ai?: string; distribution?: Record<s
           {ai === key && <Sparkles size={11} style={{ position: 'absolute', top: 5, right: 5, color: S.primary }} />}
           <DiffusionGlyph curve={key} color={selected ? S.primary : S.onSurfaceVariant} />
           <div style={{ fontSize: 11, fontWeight: 700, color: S.onSurface, marginTop: 3 }}>{meta.label}</div>
-          {n != null && n > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: EXPERT_COLOR, marginTop: 2 }}>×{n}</div>}
+          {n != null && n > 0 && <div style={{ fontSize: 11, fontWeight: 800, color: EXPERT_COLOR, marginTop: 2 }}>×{n}</div>}
         </button>
       );
     })}
@@ -1014,7 +991,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
                 color: S.onSurface, fontFamily: BODY_FONT, fontSize: 13.5, lineHeight: 1.55,
               }}
             />
-            <div style={{ marginTop: 4, textAlign: 'right', fontSize: 10.5, color: S.mutedText }}>
+            <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: S.mutedText }}>
               {(draft.comment ?? '').length}/2000
             </div>
           </SectionCard>
@@ -1060,11 +1037,11 @@ const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (
 const CompareStack: FC<{ ai: React.ReactNode; expert: React.ReactNode; who?: string }> = ({ ai, expert, who }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div className="flex items-center gap-2.5">
-      <span style={{ fontSize: 9, fontWeight: 800, color: S.onSurface, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>AI</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: S.onSurface, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>AI</span>
       {ai}
     </div>
     <div className="flex items-center gap-2.5" title={who} style={{ cursor: who ? 'help' : undefined }}>
-      <span style={{ fontSize: 9, fontWeight: 800, color: REVIEWED_COLOR, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>ø</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: REVIEWED_COLOR, width: 22, flexShrink: 0, letterSpacing: '0.04em' }}>ø</span>
       {expert}
     </div>
   </div>
@@ -1075,19 +1052,21 @@ const ExposureCompareCell: FC<{ label: string; aiVal?: number; expert?: { avg?: 
   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px', border: `1px solid ${S.cardBorder}`, borderRadius: 9, backgroundColor: S.surface }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
       <span style={{ fontSize: 11.5, fontWeight: 700, color: S.onSurface }}>{label}</span>
-      {expert?.count ? <span style={{ fontSize: 9.5, fontWeight: 700, color: S.mutedText }} title={`${expert.count} expert(s) scored`}>n{expert.count}</span> : null}
+      {expert?.count ? <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText }} title={`${expert.count} expert(s) scored`}>n{expert.count}</span> : null}
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: S.onSurface, width: 38, flexShrink: 0, textAlign: 'right' }}>AI</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: S.onSurface, width: 38, flexShrink: 0, textAlign: 'right' }}>AI</span>
       <ReadDots value={aiVal} color={S.onSurface} />
     </div>
     <div className="flex items-center gap-2">
-      <span style={{ fontSize: 8.5, fontWeight: 800, color: REVIEWED_COLOR, width: 38, flexShrink: 0, textAlign: 'right' }}>ø</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: REVIEWED_COLOR, width: 38, flexShrink: 0, textAlign: 'right' }}>ø</span>
       <ReadDots value={expert?.avg} color={REVIEWED_COLOR} />
     </div>
     {onManual && (
       <div className="flex items-center gap-2" style={{ paddingTop: 5, borderTop: `1px solid ${S.surfaceLow}` }}>
-        <span style={{ fontSize: 8.5, fontWeight: 800, color: S.primary, width: 38, flexShrink: 0, textAlign: 'right' }} title="Manual override — click a dot to set">Manual</span>
+        {/* R-16: 11px floor; tightened tracking so "Manual" still fits the
+            38px label gutter of the dense compare cell. */}
+        <span style={{ fontSize: 11, letterSpacing: '-0.02em', fontWeight: 800, color: S.primary, width: 38, flexShrink: 0, textAlign: 'right' }} title="Manual override — click a dot to set">Manual</span>
         <EditableDots value={manualVal ?? 0} onChange={onManual} tone="emerald" />
       </div>
     )}
@@ -1112,7 +1091,7 @@ const Decide: FC<{
     : [['ai', 'AI'], ['expert', 'Expert ø']];
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${S.surfaceLow}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
+      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
       <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
         {opts.map(([k, lab], i) => {
           const on = cur === k;
@@ -1159,7 +1138,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   // Expert aggregate.
   const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
   const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
-  const grpLabel: React.CSSProperties = { fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
+  const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
@@ -1407,7 +1386,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                         </span>
                         {s.role ? (
                           <span style={{
-                            fontSize: 9.5, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
+                            fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
                             padding: '2px 8px', borderRadius: 999,
                             backgroundColor: S.surface, color: S.onSurfaceVariant, border: `1px solid ${S.cardBorder}`,
                           }}>
@@ -1427,7 +1406,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
             <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: S.mutedText }}>Set all to:</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText }}>Set all to:</span>
               <button type="button" onClick={() => setAll('expert')}
                 style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: REVIEWED_COLOR }}>
                 Experts ø
@@ -1694,7 +1673,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
           <div
             className="grid items-center px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em]"
             style={{
-              gridTemplateColumns: '2.2fr 0.9fr 1fr 0.9fr 0.8fr 0.95fr',
+              gridTemplateColumns: ROW_GRID[mode],
               backgroundColor: S.surfaceLow,
               color: S.onSurfaceVariant,
             }}
@@ -1707,9 +1686,13 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               <Gp1InfoTip />
             </span>
             <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
-            <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
-              {mode === 'input' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Reviewed'}
-            </span>
+            {/* R-08: the Trend List has no review-status column — its real
+                home is Expert Rating's YOUR REVIEW. */}
+            {mode !== 'list' && (
+              <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
+                {mode === 'input' ? 'Your review' : 'Proposals'}
+              </span>
+            )}
           </div>
 
           {/* Rows */}
@@ -1859,7 +1842,7 @@ const TrendRow: FC<TrendRowProps> = ({
         aria-expanded={expanded}
         className="w-full grid items-center px-8 py-2 text-left transition-colors"
         style={{
-          gridTemplateColumns: '2.2fr 0.9fr 1fr 0.9fr 0.8fr 0.95fr',
+          gridTemplateColumns: ROW_GRID[mode],
           backgroundColor: expanded ? S.surfaceLow : S.surface,
           cursor: 'pointer',
           border: 'none',
@@ -1873,15 +1856,19 @@ const TrendRow: FC<TrendRowProps> = ({
           >
             <Icon size={16} strokeWidth={2} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div
-              className="font-bold text-[15px] truncate flex items-center gap-2"
+              className="font-bold text-[15px] flex items-center gap-2 min-w-0"
               style={{ fontFamily: HEADLINE_FONT, color: S.onSurface }}
             >
-              {trend.name}
+              {/* R-08: ellipsis lives on the name span itself (`truncate` on a
+                  flex container never ellipsizes); title reveals the full
+                  name on hover. */}
+              <span className="truncate" title={trend.name}>{trend.name}</span>
               <ChevronDown
                 size={14}
                 style={{
+                  flexShrink: 0,
                   color: S.onSurfaceVariant,
                   transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 180ms ease',
@@ -1891,8 +1878,8 @@ const TrendRow: FC<TrendRowProps> = ({
           </div>
         </div>
 
-        {/* Direction */}
-        <div><DirectionPill direction={trend.direction} /></div>
+        {/* Direction — shared Chip language (R-18) */}
+        <div><Chip kind={trend.direction === 'Expansion' ? 'expansion' : 'contraction'} compact /></div>
 
         {/* Probability — read-only here; scoring/endorsing happens in the trend tab */}
         <div><ProbCell trend={trend} mode={mode} myProposal={myProposal} /></div>
@@ -1907,10 +1894,13 @@ const TrendRow: FC<TrendRowProps> = ({
           <RowEndCell trend={trend} mode={mode} myProposal={myProposal} />
         </div>
 
-        {/* Review status (6th column) */}
-        <div className="text-right">
-          <ReviewStatusCell trend={trend} mode={mode} myProposal={myProposal} />
-        </div>
+        {/* Review status (6th column — Expert Rating / Review & Endorse only;
+            the Trend List dropped its dead REVIEWED column, R-08) */}
+        {mode !== 'list' && (
+          <div className="text-right">
+            <ReviewStatusCell trend={trend} mode={mode} myProposal={myProposal} />
+          </div>
+        )}
       </div>
 
       {/* Expanded detail panel — read-only port of Vite Trends2 ExpandedPanel.
@@ -1961,7 +1951,7 @@ interface ExpandedPanelProps {
 // Small wrapper for a labeled edit control (keeps the form tidy)
 const FieldLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{
-    fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
     textTransform: 'uppercase', color: S.mutedText, marginBottom: 6,
   }}>
     {children}
@@ -1982,6 +1972,10 @@ const EditableDots: FC<{
   const EMPTY  = S.surfaceHigh;
   return (
     <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`} title={aiHint} style={{ cursor: aiHint ? 'help' : undefined }}>
+      {/* R-14: 24px hit target per dot — padding + background-clip keep the
+          painted dot at 14px, the negative margin keeps the 4px-gap layout
+          unshifted. Buttons never had outline:none, so the global
+          :focus-visible ring already shows. */}
       {[0, 1, 2, 3, 4, 5].map((d) => (
         <button
           key={d}
@@ -1991,8 +1985,10 @@ const EditableDots: FC<{
           role="radio"
           title={aiHint ?? `${d} / 5`}
           style={{
-            width: 14, height: 14, borderRadius: 999,
-            border: 'none', padding: 0, cursor: aiHint ? 'help' : 'pointer',
+            width: 24, height: 24, borderRadius: 999,
+            border: 'none', padding: 5, margin: -5,
+            boxSizing: 'border-box', backgroundClip: 'content-box',
+            cursor: aiHint ? 'help' : 'pointer',
             backgroundColor: d === 0
               ? (value === 0 ? FILLED : EMPTY)
               : (d <= value ? FILLED : EMPTY),
@@ -2178,7 +2174,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
           </>
         ) : (
           <>
-            <DirectionPill direction={trend.direction} />
+            <Chip kind={trend.direction === 'Expansion' ? 'expansion' : 'contraction'} />
             {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
           </>
         )}
@@ -2257,7 +2253,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             </blockquote>
             {isEditing && (
               <div style={{
-                marginTop: 8, fontSize: 10, letterSpacing: '0.06em',
+                marginTop: 8, fontSize: 11, letterSpacing: '0.06em',
                 textTransform: 'uppercase', color: S.mutedText, fontWeight: 700,
               }}>
                 PRISM Analysis is generated by the engine and is not editable.
@@ -2566,7 +2562,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 24 }}>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
             style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
-              fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
             title="Trend inputs are maintained by PRISM admins. Ask an administrator for changes.">
             <Lock size={11} strokeWidth={2.4} />
             Read-only · admin-maintained
@@ -2575,7 +2571,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
       )}
 
       {/* Admin toolbar — lower-right pill buttons matching the editorial
-          language of FilterChip / DirectionPill / MetaChip. No icons. */}
+          language of FilterChip / Chip / MetaChip. No icons. */}
       {canEdit && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
@@ -2668,7 +2664,7 @@ const EditableCategoryGrid: FC<{
       {Object.entries(grouped).map(([group, cats]) => (
         <div key={group}>
           <div
-            className="text-[10px] font-semibold mb-2"
+            className="text-[11px] font-semibold mb-2"
             style={{ color: S.onSurfaceVariant, letterSpacing: '0.08em' }}
           >
             {group.toUpperCase()}
@@ -2686,7 +2682,7 @@ const EditableCategoryGrid: FC<{
                     aiHint={aiExpoHint(aiVal)}
                   />
                   <div
-                    className="text-[10px] font-medium text-center"
+                    className="text-[11px] font-medium text-center"
                     style={{ color: S.onSurface }}
                   >
                     {shortCat(cat.name)}

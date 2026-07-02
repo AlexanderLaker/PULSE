@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { S, BODY_FONT, MONO_FONT } from '@/lib/theme';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -50,8 +51,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        backgroundColor: '#FFFFFF',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        backgroundColor: S.surface,
+        fontFamily: BODY_FONT,
         padding: 24,
       };
 
@@ -77,13 +78,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       const headingStyle: React.CSSProperties = {
         fontSize: 24,
         fontWeight: 600,
-        color: '#00345e',
+        color: S.onBg,
         margin: 0,
       };
 
       const descriptionStyle: React.CSSProperties = {
         fontSize: 15,
-        color: '#6E6E73',
+        color: S.mutedText,
         margin: 0,
         lineHeight: 1.6,
       };
@@ -91,7 +92,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       const errorDetailsStyle: React.CSSProperties = {
         width: '100%',
         padding: 12,
-        backgroundColor: '#F5F5F7',
+        backgroundColor: S.surfaceLow,
         borderRadius: 8,
         border: '1px solid rgba(0,0,0,0.08)',
         textAlign: 'left',
@@ -99,15 +100,15 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
       const errorMessageStyle: React.CSSProperties = {
         fontSize: 12,
-        fontFamily: "'JetBrains Mono', monospace",
-        color: '#9f403d',
+        fontFamily: MONO_FONT,
+        color: S.contraction,
         margin: '0 0 8px 0',
         wordBreak: 'break-word',
       };
 
       const detailsStyle: React.CSSProperties = {
         fontSize: 11,
-        color: '#6E6E73',
+        color: S.mutedText,
       };
 
       const summaryStyle: React.CSSProperties = {
@@ -118,7 +119,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       const stackTraceStyle: React.CSSProperties = {
         fontSize: 10,
         overflow: 'auto',
-        color: '#6E6E73',
+        color: S.mutedText,
         margin: 0,
       };
 
@@ -127,8 +128,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         alignItems: 'center',
         gap: 8,
         padding: '12px 24px',
-        backgroundColor: '#005db5',
-        color: '#FFFFFF',
+        backgroundColor: S.primary,
+        color: S.surface,
         border: 'none',
         borderRadius: 10,
         fontSize: 15,
@@ -143,7 +144,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           <div style={contentStyle}>
             {/* Error Icon */}
             <div style={iconContainerStyle}>
-              <AlertTriangle size={32} color="#9f403d" />
+              <AlertTriangle size={32} color={S.contraction} />
             </div>
 
             {/* Heading */}
@@ -181,7 +182,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 e.currentTarget.style.backgroundColor = '#0066CC';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#005db5';
+                e.currentTarget.style.backgroundColor = S.primary;
               }}
             >
               <RotateCcw size={16} />

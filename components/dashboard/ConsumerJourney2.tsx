@@ -31,43 +31,27 @@
 'use client';
 
 import React, {
-  useState, useEffect, useMemo, useCallback, FC,
+  useState, useEffect, useMemo, useCallback, useRef, FC,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ExternalLink, ArrowRight, X, Edit3, Check,
-  Info, PenLine, Sparkles, CircleCheck, Zap, TriangleAlert,
+  Info, PenLine, Sparkles, CircleCheck,
   Plus, Trash2, Save, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
+import useOverlay from '@/hooks/useOverlay';
 import {
   LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX, JOURNEY_CONTENT_VERSION,
   type JourneyKey, type JourneyStageDef, type JourneyTile, type TileType,
-  type TileProvenance, type ProvenanceGrade,
+  type PoolImpactGrade, type ProvenanceGrade,
 } from '@/data/consumerJourney';
 import {
   TREND_CODE_MAP, RETIRED_CODES, trendIdForCode,
 } from '@/data/trendCodeMap';
 import type { Trend } from '@/types/trends';
-
-// ════════════════════════════════════════════════════════════════════════
-// Style tokens — intentional local copy of the Maritime light editorial
-// system. Values match docs/DESIGN.md.
-// ════════════════════════════════════════════════════════════════════════
-const S = {
-  bg: '#f8f9ff', surface: '#ffffff', surfaceLow: '#eff4ff',
-  surfaceContainer: '#e5eeff', surfaceHigh: '#dce9ff', surfaceHighest: '#d2e4ff',
-  primary: '#005db5', primaryDim: '#0052a0', primaryContainer: '#d6e3ff',
-  onPrimaryContainer: '#00519e', onBg: '#00345e', onSurface: '#00345e',
-  onSurfaceVariant: '#26619d',
-  expansionContainer: '#d6ecdb', onExpansionContainer: '#1e5f2e', expansion: '#1f7a3d',
-  error: '#9f403d', errorContainer: '#fee3e1', onErrorContainer: '#752121',
-  amberContainer: '#fdf0d5', onAmberContainer: '#7a5200',
-  outline: '#477dbb', cardBorder: 'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong: 'rgba(0, 52, 94, 0.16)', mutedText: '#64748B',
-};
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import Chip, { type ChipKind } from '@/components/dashboard/Chip';
 
 /** Force colors — per the PRISM spec / CLAUDE.md §9 (data palette, charts
  *  & chips only). Deliberately specified here so the trend-code chips force-
@@ -89,11 +73,14 @@ const TYPE_STYLES: Record<TileType, { label: string; bg: string; fg: string }> =
   service: { label: 'Service', bg: '#e5eeff', fg: '#26619d' },
 };
 
-// ── Provenance grade chip palette ───────────────────────────────────────
-const GRADE_META: Record<ProvenanceGrade, { label: string; icon: typeof CircleCheck; bg: string; fg: string }> = {
-  verified: { label: 'verified', icon: CircleCheck, bg: '#d6ecdb', fg: '#1e5f2e' },
-  estimate: { label: 'estimate', icon: Zap, bg: '#fdf0d5', fg: '#7a5200' },
-  hypothesis: { label: 'hypothesis', icon: TriangleAlert, bg: '#fee3e1', fg: '#752121' },
+// ── Evidence grade → shared Chip variant (R-18: text chips, no icon
+//    stickers). The journey's grade wording (verified / estimate /
+//    hypothesis) is preserved via label overrides; 'hypothesis' has no
+//    dedicated Chip kind and renders neutral — the label carries the meaning.
+const GRADE_CHIP: Record<ProvenanceGrade, { kind: ChipKind; label: string }> = {
+  verified: { kind: 'reported', label: 'Verified' },
+  estimate: { kind: 'estimate', label: 'Estimate' },
+  hypothesis: { kind: 'neutral', label: 'Hypothesis' },
 };
 
 const CURRENT_YYYYMM = (() => {
@@ -201,6 +188,16 @@ const gradeTint = (up: boolean, grade?: 'Low' | 'Med' | 'High'): string => {
 const gradeBarOpacity = (grade?: 'Low' | 'Med' | 'High'): number =>
   grade === 'High' ? 1 : grade === 'Med' ? 0.6 : 0.3;
 
+/** R-09b — display-only impact sort. Pool-impact grade DESC (the grade that
+ *  drives the tile tint: darkest first), then intensity DESC (the previous
+ *  ordering), stable beyond that (source order preserved). Sorts a COPY at
+ *  render time — the content blob and the admin save payload keep their
+ *  original order. */
+const GRADE_RANK: Record<PoolImpactGrade, number> = { High: 3, Med: 2, Low: 1 };
+const impactRank = (t: JourneyTile): number => (t.poolImpact ? GRADE_RANK[t.poolImpact.grade] : 0);
+const sortTilesForDisplay = (tiles: JourneyTile[]): JourneyTile[] =>
+  [...tiles].sort((a, b) => (impactRank(b) - impactRank(a)) || (b.intensity - a.intensity));
+
 /** Trend strength on a 0–5 scale from the model's own inputs (impact ×
  *  probability, ÷5). Independent of the journey tile map. */
 const trendStrength = (t?: Trend): number | null => {
@@ -257,45 +254,29 @@ const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => void }> 
   );
 };
 
-/** Provenance chip — strategist / AI + date. Never stripped (fix #1). */
-const ProvenanceChip: FC<{ provenance: TileProvenance; compact?: boolean }> = ({ provenance, compact }) => {
-  const isAi = provenance.author === 'ai';
-  const Icon = isAi ? Sparkles : PenLine;
+/** R-09a — stage-header rollup: a split bar + counts line so the board
+ *  answers "which stage matters most" at a glance. Weights are the tiles'
+ *  authored intensity grades (1–3); counts respect the active type filter so
+ *  they match the tiles rendered below. Qualitative overlay arithmetic —
+ *  NOT engine output (the title attribute says so).
+ *  (Detail-panel provenance / evidence chips render via the shared <Chip>,
+ *  R-18 — provenance is still never stripped, fix #1.) */
+const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: JourneyTile[] }> = ({ benefiting, negativelyImpacted }) => {
+  const tw = benefiting.reduce((n, t) => n + t.intensity, 0);
+  const hw = negativelyImpacted.reduce((n, t) => n + t.intensity, 0);
+  const total = tw + hw;
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full font-bold"
-      style={{
-        fontSize: compact ? 9.5 : 10.5,
-        padding: compact ? '1px 6px' : '2px 8px',
-        backgroundColor: isAi ? S.amberContainer : S.surfaceLow,
-        color: isAi ? S.onAmberContainer : S.onSurfaceVariant,
-        fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
-      }}
-      title={isAi ? `AI-suggested mapping (${provenance.date}) — pending strategist review` : `Strategist-authored (${provenance.date})`}
-    >
-      <Icon size={compact ? 9 : 10} strokeWidth={2.5} />
-      {isAi ? 'AI' : 'Strategist'} · {provenance.date}
-    </span>
-  );
-};
-
-const GradeChip: FC<{ grade: ProvenanceGrade; compact?: boolean }> = ({ grade, compact }) => {
-  const meta = GRADE_META[grade];
-  const Icon = meta.icon;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full font-bold"
-      style={{
-        fontSize: compact ? 9.5 : 10.5,
-        padding: compact ? '1px 6px' : '2px 8px',
-        backgroundColor: meta.bg, color: meta.fg,
-        fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
-      }}
-      title={`Evidence grade: ${meta.label}`}
-    >
-      <Icon size={compact ? 9 : 10} strokeWidth={2.5} />
-      {meta.label}
-    </span>
+    <div style={{ marginTop: 7 }} title="Tile count weighted by authored grades — qualitative overlay, not simulated">
+      <div style={{ display: 'flex', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: S.surfaceHigh }} aria-hidden="true">
+        {tw > 0 && <span style={{ display: 'block', width: `${(tw / total) * 100}%`, backgroundColor: S.expansion, opacity: 0.55 }} />}
+        {hw > 0 && <span style={{ display: 'block', width: `${(hw / total) * 100}%`, backgroundColor: S.contraction, opacity: 0.55 }} />}
+      </div>
+      <div className="tabular-nums" style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT, lineHeight: 1 }}>
+        {benefiting.length}<span style={{ color: S.expansionInk }}>↗</span>
+        {' · '}
+        {negativelyImpacted.length}<span style={{ color: S.contractionInk }}>↘</span>
+      </div>
+    </div>
   );
 };
 
@@ -701,7 +682,7 @@ const TileEditor: FC<{
   };
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px', borderRadius: 8, backgroundColor: '#fff',
-    border: `1px solid ${S.cardBorder}`, color: S.onSurface, fontSize: 12, fontFamily: BODY_FONT, outline: 'none',
+    border: `1px solid ${S.cardBorder}`, color: S.onSurface, fontSize: 12, fontFamily: BODY_FONT,
   };
 
   return (
@@ -859,6 +840,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   const [typeFilter, setTypeFilter] = useState<Set<TileType>>(new Set(['product', 'tech', 'service']));
   const [selected, setSelected] = useState<SelectedTile | null>(null);
   const [editing, setEditing] = useState(false);
+  const [editMode, setEditMode] = useState(false); // R-15 — editing chrome is opt-in (admin only)
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
@@ -891,14 +873,19 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
   }, []);
   const closePanel = useCallback(() => { setSelected(null); setEditing(false); }, []);
 
+  // R-03 — shared overlay contract on the tile detail dialog: Escape close,
+  // focus trap, focus return to the trigger tile, body scroll lock.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useOverlay(!!selected, closePanel, panelRef);
+
   // ── Flattened, visible tile order for prev/next navigation in the dialog ──
   //   Stage-major (benefiting then declining within a stage), filtered + sorted
   //   exactly as the rail renders, so ◀ ▶ steps through neighbours you can see.
   const flatTiles = useMemo<SelectedTile[]>(() => {
     const out: SelectedTile[] = [];
     for (const s of stages) {
-      const ben = s.benefiting.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
-      const neg = s.negativelyImpacted.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+      const ben = sortTilesForDisplay(s.benefiting.filter(t => typeFilter.has(t.type)));
+      const neg = sortTilesForDisplay(s.negativelyImpacted.filter(t => typeFilter.has(t.type)));
       ben.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'benefiting' }));
       neg.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'negativelyImpacted' }));
     }
@@ -916,17 +903,17 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
     setEditing(false);
   }, [selectedIndex, flatTiles]);
 
-  // ── Keyboard: Esc closes, ←/→ step to neighbour tiles (only while open) ──
+  // ── Keyboard: ←/→ step to neighbour tiles (only while open). Escape,
+  //    focus trap and scroll lock come from the shared useOverlay (R-03). ──
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closePanel();
-      else if (e.key === 'ArrowLeft') stepSelection(-1);
+      if (e.key === 'ArrowLeft') stepSelection(-1);
       else if (e.key === 'ArrowRight') stepSelection(1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, closePanel, stepSelection]);
+  }, [selected, stepSelection]);
 
   // ── Admin mutations (local state first; persisted on "Save to server") ──
   const mutateTile = useCallback((
@@ -1098,6 +1085,24 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <FilterChip label="Laundry" active={tab === 'lhc'} onClick={() => { setTab('lhc'); closePanel(); }} />
             <FilterChip label="Hair" active={tab === 'hair'} onClick={() => { setTab('hair'); closePanel(); }} />
+            {isAdmin && (
+              /* R-15 — editing chrome is opt-in; viewers never see this. */
+              <button
+                onClick={() => { if (editMode) setEditing(false); setEditMode(v => !v); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200"
+                style={{
+                  backgroundColor: editMode ? S.primaryContainer : S.surfaceLow,
+                  color: editMode ? S.onPrimaryContainer : S.onSurfaceVariant,
+                  border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
+                }}
+                aria-pressed={editMode}
+                title={editMode
+                  ? 'Editing is on — click to hide the add / edit / save controls'
+                  : 'Show the editing controls (add tiles, edit tiles, save to server)'}
+              >
+                <Edit3 size={11} strokeWidth={2.5} /> Edit board
+              </button>
+            )}
             {tab === 'lhc' && (
               <span className="text-[11px]" style={{ color: S.mutedText, fontStyle: 'italic', fontFamily: BODY_FONT }}>
                 Laundry only — the Home Care (dish / surface / WC) journey is pending.
@@ -1159,7 +1164,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                 width: '100%', gap: 0,
               }}
             >
-              {/* Stage headers */}
+              {/* Stage headers — with the R-09a tailwind/headwind rollup */}
               {stages.map((stage, i) => (
                 <div
                   key={stage.id + '_h'}
@@ -1176,12 +1181,16 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, marginTop: 3, lineHeight: 1.25, fontFamily: HEADLINE_FONT, letterSpacing: '-0.01em' }}>
                     {stage.label}
                   </div>
+                  <StageRollup
+                    benefiting={stage.benefiting.filter(t => typeFilter.has(t.type))}
+                    negativelyImpacted={stage.negativelyImpacted.filter(t => typeFilter.has(t.type))}
+                  />
                 </div>
               ))}
 
               {/* Benefiting row */}
               {stages.map((stage, i) => {
-                const tiles = stage.benefiting.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+                const tiles = sortTilesForDisplay(stage.benefiting.filter(t => typeFilter.has(t.type)));
                 const wide = stageSpan(stage, tab) === 2;
                 const tileEls = tiles.map(tile => (
                   <TilePill
@@ -1206,7 +1215,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.expansion, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingUp size={10} strokeWidth={2.5} /> Tailwind
                       </span>
-                      {isAdmin && (
+                      {isAdmin && editMode && (
                         <button
                           onClick={() => addTile(stage.id, 'benefiting')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.expansion, padding: 0, display: 'inline-flex' }}
@@ -1224,7 +1233,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
 
               {/* Declining row */}
               {stages.map((stage, i) => {
-                const tiles = stage.negativelyImpacted.filter(t => typeFilter.has(t.type)).sort((a, b) => b.intensity - a.intensity);
+                const tiles = sortTilesForDisplay(stage.negativelyImpacted.filter(t => typeFilter.has(t.type)));
                 const wide = stageSpan(stage, tab) === 2;
                 const tileEls = tiles.map(tile => (
                   <TilePill
@@ -1249,7 +1258,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9, fontWeight: 800, color: S.error, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
                         <TrendingDown size={10} strokeWidth={2.5} /> Headwind
                       </span>
-                      {isAdmin && (
+                      {isAdmin && editMode && (
                         <button
                           onClick={() => addTile(stage.id, 'negativelyImpacted')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.error, padding: 0, display: 'inline-flex' }}
@@ -1277,13 +1286,13 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
           </div>
         </motion.div>
 
-        {/* ─── Admin save bar (fix #6) ─── */}
-        {isAdmin && (
+        {/* ─── Admin save bar (fix #6; shown only in edit mode — R-15) ─── */}
+        {isAdmin && editMode && (
           <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
             <div className="flex items-center gap-2">
               <Edit3 size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />
               <span className="text-[12px]" style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
-                Admin editing on. Tile edits update this view; <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> persists the full Laundry + Hair blob.
+                Editing on — tile edits update this view. <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> — saves the journey content for all users.
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -1338,8 +1347,10 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               }}
             >
               <div
+                ref={panelRef}
                 role="dialog"
                 aria-modal="true"
+                tabIndex={-1}
                 aria-label={`${displayTileName(selected.tile.name)} — detail`}
                 onClick={e => e.stopPropagation()}
                 style={{
@@ -1355,7 +1366,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   journeyKey={tab}
                   trendsById={trendsById}
                   trendsLoaded={trendsLoaded}
-                  isAdmin={isAdmin}
+                  isAdmin={isAdmin && editMode}
                   editing={editing}
                   position={selectedIndex >= 0 ? { index: selectedIndex, total: flatTiles.length } : null}
                   onPrev={() => stepSelection(-1)}
@@ -1449,7 +1460,19 @@ const PanelBody: FC<{
             <p style={{ fontSize: 14.5, color: S.onSurfaceVariant, lineHeight: 1.55, margin: '9px 0 0', maxWidth: '52rem' }}>{tile.driverNote}</p>
           )}
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 13 }}>
-            <GradeChip grade={tile.provenance.grade} />
+            {/* R-18 — evidence + provenance via the shared Chip (text variants, no icon stickers) */}
+            <Chip
+              kind={GRADE_CHIP[tile.provenance.grade].kind}
+              label={GRADE_CHIP[tile.provenance.grade].label}
+              title={`Evidence grade: ${tile.provenance.grade}`}
+            />
+            <Chip
+              kind={isAi ? 'ai' : 'authored'}
+              label={`${isAi ? 'AI suggestion' : 'Strategist-authored'} · ${tile.provenance.date}`}
+              title={isAi
+                ? `AI-suggested mapping (${tile.provenance.date}) — pending strategist review`
+                : `Strategist-authored (${tile.provenance.date})`}
+            />
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>{ts.label}</span>
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Intensity {tile.intensity}/3</span>
           </div>

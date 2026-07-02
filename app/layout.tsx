@@ -1,10 +1,29 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+
+/**
+ * R-17 (design review 2026-07-01): Manrope / Inter / JetBrains Mono are now
+ * actually shipped — self-hosted at build time via next/font (no runtime
+ * Google request), exposed as CSS variables consumed by lib/theme.ts.
+ * `adjustFontFallback` (default) generates size-adjusted fallbacks so the
+ * pre-font paint matches closely and dense layouts don't jump.
+ */
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'PRISM Profit Pool Shift Model',
   description: 'Profit Pool Simulation Engine — Strategic FMCG Analysis',
+};
+
+// R-24: browser/OS chrome colour matches the deep-navy brand.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#00345E',
 };
 
 /**
@@ -38,9 +57,9 @@ export default function RootLayout({
           colorSuccess: '#15803d',
           colorWarning: '#b45309',
           fontFamily:
-            "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+            "var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
           fontFamilyButtons:
-            "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            "var(--font-manrope), 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           fontSize: '14px',
           // NOTE: keep this modest. A fully-rounded global radius (e.g. 9999px)
           // gets applied to Clerk's card/main containers — and when the
@@ -93,23 +112,14 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en">
+      <html lang="en" className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
         <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
-          {/* Schrift-Entscheidung (Handover 2026-06): Die App rendert bewusst
-              den System-Font-Stack. Die früheren Google-Fonts-Links (Inter/
-              Manrope) wurden unter Next 14/React 18 nie tatsächlich geladen —
-              das gewohnte Erscheinungsbild IST die Systemschrift. React 19
-              hätte die Links erstmals aktiviert (breitere Glyphen → Text-
-              überlauf in dichten Layouts wie der Consumer Journey). Daher
-              entfernt; die font-family-Stacks ('Inter', 'Manrope', …) bleiben
-              als Fallback-Ketten unverändert. Siehe PRISM_Handover_Audit. */}
         </head>
         <body
           style={{
             fontFamily:
-              "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+              "var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
             backgroundColor: '#f8f9ff',
             color: '#00345e',
           }}

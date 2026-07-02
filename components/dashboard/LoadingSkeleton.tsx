@@ -8,8 +8,9 @@
  */
 
 import React from 'react';
+import { S } from '@/lib/theme';
 
-const shimmer = 'linear-gradient(90deg, #eff4ff 0%, #dce9ff 50%, #eff4ff 100%)';
+const shimmer = `linear-gradient(90deg, ${S.surfaceLow} 0%, ${S.surfaceHigh} 50%, ${S.surfaceLow} 100%)`;
 
 function SkeletonBase({
   width = '100%', height = 16, borderRadius = 8,
@@ -23,7 +24,7 @@ function SkeletonBase({
 /** Full-page skeleton mirroring the live shell: nav, header, matrix card. */
 export function FullPageSkeleton() {
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9ff' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: S.bg }}>
       <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
       {/* Top nav */}
       <div style={{ height: 64, backgroundColor: 'rgba(255,255,255,0.75)', display: 'flex',
@@ -44,7 +45,7 @@ export function FullPageSkeleton() {
 
       {/* Editorial header + headline tiles + matrix card */}
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '40px 32px' }}>
-        <div style={{ borderLeft: '4px solid #d6e3ff', paddingLeft: 20, marginBottom: 32 }}>
+        <div style={{ borderLeft: `4px solid ${S.primaryContainer}`, paddingLeft: 20, marginBottom: 32 }}>
           <SkeletonBase width={220} height={11} />
           <div style={{ height: 12 }} />
           <SkeletonBase width={420} height={36} borderRadius={10} />
@@ -58,7 +59,7 @@ export function FullPageSkeleton() {
           <SkeletonBase width={200} height={104} borderRadius={16} />
         </div>
 
-        <div style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24,
+        <div style={{ backgroundColor: S.surface, borderRadius: 16, padding: 24,
           boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
           display: 'flex', flexDirection: 'column', gap: 10 }}>
           {Array.from({ length: 10 }).map((_, i) => (

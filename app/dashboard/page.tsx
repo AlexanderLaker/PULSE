@@ -53,6 +53,7 @@ import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
+import { S, HEADLINE_FONT } from '@/lib/theme';
 
 type DashboardTab =
   | 'profit-pool-2'
@@ -79,21 +80,19 @@ const TABS: TabDef[] = [
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
 
-// Editorial top-nav tokens (mirrors Trends2 / docs/DESIGN.md palette)
+// Editorial top-nav tokens — aliases into the shared theme (R-23).
 const NAV = {
-  primary:          '#005db5',
-  onBg:             '#00345e',
-  onSurfaceVariant: '#26619d',
-  surfaceLow:       '#eff4ff',
-  surfaceHigh:      '#dce9ff',
-  outlineVariant:   '#81b5f6',
+  primary:          S.primary,
+  onBg:             S.onBg,
+  onSurfaceVariant: S.onSurfaceVariant,
+  surfaceLow:       S.surfaceLow,
+  surfaceHigh:      S.surfaceHigh,
+  outlineVariant:   S.outlineVariant,
   // Muted gray scale for "(Beta)" tabs — readable but visually
   // de-emphasized vs. the production tabs in maritime blue.
-  betaInactive:     '#94a3b8',
-  betaActive:       '#64748b',
+  betaInactive:     S.neutral,
+  betaActive:       S.mutedText,
 };
-const HEADLINE_FONT =
-  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
 
 export default function DashboardPage() {
   // Clerk: `isLoaded` flips true once the session state has been hydrated.
@@ -120,11 +119,9 @@ export default function DashboardPage() {
   // filters, open drill-down, scroll — survives tab switches.
   const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['profit-pool-2']);
 
-  // ─── Profit Pool Explorer mock-up notice ────────────────────────────
-  // The Explorer is a visualization mock-up — the underlying data sources
-  // have not yet been validated. Surface that fact every time the tab is
-  // opened so beta users don't mistake it for production data.
-  const [explorerNoticeOpen, setExplorerNoticeOpen] = useState(false);
+  // Beta notice for the Explorer now lives INSIDE ProfitPoolExplorer.tsx
+  // (R-19.4: shown once per browser, ack persisted) — the page-level copy
+  // that re-opened on every tab switch was removed with it.
 
   // ─── Welcome / MVP onboarding modal ─────────────────────────────────
   // Shown on every fresh login (v3.6 owner-verified semantics). Keyed by
@@ -157,14 +154,16 @@ export default function DashboardPage() {
     }
   };
 
-  // Central tab opener — marks the tab visited (keep-alive), fires the
-  // beta notice on the two Beta tabs (unchanged behaviour), and closes
-  // the mobile sheet.
+  // Central tab opener — marks the tab visited (keep-alive) and closes
+  // the mobile sheet. R-10: the window scroll position is shared across
+  // the keep-alive panes, so switching tabs used to strand you mid-page
+  // (e.g. landing in the middle of the Journey board) — scroll to top on
+  // every switch; all other per-tab state still survives.
   const openTab = (id: DashboardTab) => {
     setActiveTab(id);
     setVisitedTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    if (id === 'profit-pool-explorer') setExplorerNoticeOpen(true);
     setMobileNavOpen(false);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   // Authorization — same pattern as SettingsModal.tsx. 'unknown' until fetched;
@@ -216,7 +215,7 @@ export default function DashboardPage() {
   // mid-session, for example).
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-surface-primary">
+      <div className="min-h-screen bg-white">
         <FullPageSkeleton />
       </div>
     );
@@ -384,7 +383,7 @@ export default function DashboardPage() {
             {betaTabs.length > 0 && (
               <>
                 <div
-                  className="px-6 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+                  className="px-6 pt-3 pb-1 text-[11px] font-bold uppercase tracking-[0.14em]"
                   style={{ color: NAV.betaInactive, fontFamily: HEADLINE_FONT }}
                 >
                   Beta
@@ -431,63 +430,8 @@ export default function DashboardPage() {
       {/* ─── Welcome / MVP modal — shown on every fresh login ──────── */}
       <WelcomeModal open={welcomeOpen} onClose={handleWelcomeClose} />
 
-      {/* ─── Profit Pool Explorer Beta notice ────────────────────────
-          Informational Beta disclaimer surfaced when the Explorer tab is
-          opened (NOT a gate — the tab is visible to all signed-in users).
-          Market sizing is Euromonitor/Kline-anchored; some figures pending
-          internal Passport confirmation. "Got it" closes. */}
-      {explorerNoticeOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="explorer-notice-title"
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-          style={{ backgroundColor: 'rgba(0, 52, 94, 0.45)' }}
-          onClick={() => setExplorerNoticeOpen(false)}
-        >
-          <div
-            className="max-w-md w-full rounded-2xl bg-white shadow-2xl p-6"
-            style={{ fontFamily: HEADLINE_FONT }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="text-[11px] font-semibold uppercase tracking-[0.16em] mb-2"
-              style={{ color: NAV.betaActive }}
-            >
-              Beta
-            </div>
-            <h2
-              id="explorer-notice-title"
-              className="text-xl font-extrabold tracking-tight mb-2"
-              style={{ color: NAV.onBg }}
-            >
-              Profit Pool Explorer
-            </h2>
-            <p
-              className="text-sm leading-relaxed mb-5"
-              style={{ color: NAV.onSurfaceVariant }}
-            >
-              Market sizing is anchored to Euromonitor (consumer hair ·
-              laundry/home care) and Kline (professional hair); a few figures
-              are pending internal Passport confirmation. Margins are GP1
-              proxies calibrated to company filings.
-            </p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setExplorerNoticeOpen(false)}
-                className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-colors"
-                style={{
-                  backgroundColor: NAV.surfaceLow,
-                  color: NAV.primary,
-                }}
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Explorer Beta notice: rendered inside ProfitPoolExplorer.tsx
+          (R-19.4 — shown once per browser, acknowledgment persisted). */}
     </div>
     </PrismProvider>
   );

@@ -28,7 +28,7 @@
 'use client';
 
 import React, {
-  FC, useCallback, useEffect, useMemo, useState,
+  FC, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,44 +40,9 @@ import type { LucideIcon } from 'lucide-react';
 import {
   useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
-
-// ─── Editorial design tokens (mirrors Trends2 / docs/DESIGN.md) ──────────
-const S = {
-  bg:                  '#f8f9ff',
-  surface:             '#ffffff',
-  surfaceLow:          '#eff4ff',
-  surfaceContainer:    '#e5eeff',
-  surfaceHigh:         '#dce9ff',
-  surfaceHighest:      '#d2e4ff',
-  primary:             '#005db5',
-  primaryDim:          '#0052a0',
-  primaryContainer:    '#d6e3ff',
-  onPrimaryContainer:  '#00519e',
-  onBg:                '#00345e',
-  onSurface:           '#00345e',
-  onSurfaceVariant:    '#26619d',
-  secondaryContainer:  '#d5e3fc',
-  onSecondaryContainer:'#455367',
-  tertiaryContainer:   '#dae2fd',
-  onTertiaryContainer: '#4a5167',
-  error:               '#9f403d',
-  errorContainer:      '#fe8983',
-  onErrorContainer:    '#752121',
-  success:             '#1f7a3d',
-  successContainer:    '#cfead8',
-  warning:             '#8a5a00',
-  warningContainer:    '#ffe1a8',
-  outline:             '#477dbb',
-  outlineVariant:      '#81b5f6',
-  cardBorder:          'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong:    'rgba(0, 52, 94, 0.16)',
-  mutedText:           '#64748B',
-};
-
-const HEADLINE_FONT =
-  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT =
-  "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { fmtDate, fmtDateTime } from '@/lib/format';
+import useOverlay from '@/hooks/useOverlay';
 
 // ─── Section nav definition ─────────────────────────────────────────
 type SectionId =
@@ -165,7 +130,7 @@ const RolePill: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) => {
   const isUnknown = role === 'unknown';
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase"
+      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase"
       style={{
         backgroundColor: isUnknown
           ? S.surfaceHigh
@@ -211,7 +176,10 @@ const INPUT_STYLE: React.CSSProperties = {
   border: `1px solid ${S.cardBorder}`,
   borderRadius: 10,
   padding: '9px 12px',
-  outline: 'none',
+  // R-14: no `outline: 'none'` here — the global input:focus ring and the
+  // :focus-visible outline (globals.css) provide the visible focus
+  // indicator, which the inline override used to suppress (fully so on
+  // <select>, which the input:focus ring doesn't cover).
   transition: 'border-color 0.15s, background-color 0.15s',
 };
 
@@ -220,6 +188,62 @@ const READONLY_STYLE: React.CSSProperties = {
   backgroundColor: S.surfaceContainer,
   color: S.mutedText,
   cursor: 'not-allowed',
+};
+
+// ─── Locale-proof numeric field (R-11, design review 2026-07-01) ────
+// CAUSE of the "0,001 / 0,3 / 0,05 next to 10000" finding: these fields
+// were `<input type="number">`, whose DISPLAYED value is formatted by the
+// browser in the OS/browser locale — a German locale renders the JSON
+// number 0.001 as "0,001" while integers get no separator at all. The
+// stored config values were always plain JSON numbers. Typing a comma in
+// a point-locale browser (or clearing the field) also made
+// `e.target.value` return "" → parseFloat → NaN entered the draft and
+// serialized to `null` in the PUT /api/config payload.
+//
+// Convention now: canonical decimal-POINT display ("0.001", "0.3");
+// editable integers stay plain ("10000") so they parse back; comma AND
+// point are accepted on entry; only finite numbers are committed to the
+// draft, so the PUT body always carries valid JSON numbers.
+const parseDecimal = (raw: string): number =>
+  parseFloat(raw.trim().replace(/\s+/g, '').replace(',', '.'));
+/** Integers: strip grouping separators — "10,000" / "10.000" / "10 000" → 10000. */
+const parseInteger = (raw: string): number =>
+  parseInt(raw.replace(/[.,\s]/g, ''), 10);
+
+interface NumberFieldProps {
+  value: number;
+  onCommit: (v: number) => void;
+  integer?: boolean;
+  readOnly?: boolean;
+  inputStyle: React.CSSProperties;
+}
+const NumberField: FC<NumberFieldProps> = ({
+  value, onCommit, integer, readOnly, inputStyle,
+}) => {
+  const [text, setText] = useState(() => String(value));
+  const parse = integer ? parseInteger : parseDecimal;
+  // Resync when the draft changes elsewhere (load / discard) without
+  // clobbering in-progress typing that already parses to `value`.
+  useEffect(() => {
+    setText((t) => (parse(t) === value ? t : String(value)));
+  }, [value, parse]);
+  return (
+    <input
+      type="text"
+      inputMode={integer ? 'numeric' : 'decimal'}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw);
+        const parsed = parse(raw);
+        if (Number.isFinite(parsed)) onCommit(parsed);
+      }}
+      onBlur={() => setText(String(value))}
+      disabled={readOnly}
+      readOnly={readOnly}
+      style={inputStyle}
+    />
+  );
 };
 
 const PRIMARY_BUTTON: React.CSSProperties = {
@@ -318,9 +342,8 @@ const ProfileSection: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) 
   }
 
   const email = user.primaryEmailAddress?.emailAddress ?? '—';
-  const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric',
-  }) : '—';
+  // R-12: locale-stable "26 Jun 2026" (was browser-locale toLocaleDateString).
+  const createdAt = fmtDate(user.createdAt);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -552,11 +575,8 @@ const SessionsSection: FC = () => {
           )}
           {sorted.map((s) => {
             const isCurrent = currentSession?.id === s.id;
-            const lastActive = s.lastActiveAt
-              ? new Date(s.lastActiveAt).toLocaleString(undefined, {
-                dateStyle: 'medium', timeStyle: 'short',
-              })
-              : 'unknown';
+            // R-12: locale-stable "26 Jun 2026, 08:38".
+            const lastActive = s.lastActiveAt ? fmtDateTime(s.lastActiveAt) : 'unknown';
             // Clerk v6 dropped `latestActivity` from the public SessionResource
             // type, but the data is still hydrated at runtime when the session
             // has been fetched via useSessionList(). We read it through a
@@ -600,7 +620,7 @@ const SessionsSection: FC = () => {
                   }}>
                     <span>{device} · {browser || 'Browser'}</span>
                     {isCurrent && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                      <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
                         style={{ backgroundColor: S.primary, color: '#fff' }}>
                         This device
                       </span>
@@ -798,30 +818,29 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 </div>
               </Field>
               <Field label="Neutral threshold" hint="Shifts below this magnitude are reported as neutral.">
-                <input
-                  type="number" min={0} max={0.05} step={0.0005}
+                <NumberField
                   value={draft.neutral_threshold ?? 0.001}
-                  onChange={(e) => patch({ neutral_threshold: parseFloat(e.target.value) })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
+                  onCommit={(v) => patch({ neutral_threshold: v })}
+                  readOnly={ro}
+                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
-              <Field label="MC iterations" hint="10 000 default. Max 100 000.">
-                <input
-                  type="number" min={1000} max={100000} step={1000}
+              <Field label="MC iterations" hint="10,000 default · max 100,000">
+                <NumberField
+                  integer
                   value={draft.iterations ?? 10000}
-                  onChange={(e) => patch({ iterations: parseInt(e.target.value, 10) })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
+                  onCommit={(v) => patch({ iterations: v })}
+                  readOnly={ro}
+                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Base year">
-                <input
-                  type="number" min={2020} max={2030}
+                <NumberField
+                  integer
                   value={draft.base_year ?? 2025}
-                  onChange={(e) => patch({ base_year: parseInt(e.target.value, 10) })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
+                  onCommit={(v) => patch({ base_year: v })}
+                  readOnly={ro}
+                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
               <Field label="Region">
@@ -849,21 +868,19 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         {draft && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Within-force ρ" hint="Default 0.30">
-              <input
-                type="number" min={0} max={1} step={0.01}
+              <NumberField
                 value={draft.within_force_rho ?? 0.3}
-                onChange={(e) => patch({ within_force_rho: parseFloat(e.target.value) })}
-                disabled={ro} readOnly={ro}
-                style={ro ? READONLY_STYLE : INPUT_STYLE}
+                onCommit={(v) => patch({ within_force_rho: v })}
+                readOnly={ro}
+                inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
               />
             </Field>
             <Field label="Residual cross-ρ" hint="Default 0.05">
-              <input
-                type="number" min={0} max={1} step={0.01}
+              <NumberField
                 value={draft.residual_cross_rho ?? 0.05}
-                onChange={(e) => patch({ residual_cross_rho: parseFloat(e.target.value) })}
-                disabled={ro} readOnly={ro}
-                style={ro ? READONLY_STYLE : INPUT_STYLE}
+                onCommit={(v) => patch({ residual_cross_rho: v })}
+                readOnly={ro}
+                inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
               />
             </Field>
           </div>
@@ -879,14 +896,13 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             {Object.entries(draft.force_weights).map(([force, weight]) => (
               <Field key={force} label={force}>
-                <input
-                  type="number" min={0} max={1} step={0.01}
+                <NumberField
                   value={weight}
-                  onChange={(e) => patch({
-                    force_weights: { ...draft.force_weights, [force]: parseFloat(e.target.value) },
+                  onCommit={(v) => patch({
+                    force_weights: { ...draft.force_weights, [force]: v },
                   })}
-                  disabled={ro} readOnly={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
+                  readOnly={ro}
+                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
             ))}
@@ -1018,7 +1034,7 @@ const UsersSection: FC<{ isAdmin: boolean; currentUserId: string | null }> = ({ 
               padding: '10px 14px',
               backgroundColor: S.surfaceContainer,
               fontFamily: HEADLINE_FONT,
-              fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em',
+              fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
               textTransform: 'uppercase', color: S.onSurfaceVariant,
             }}>
               <span>User</span>
@@ -1030,11 +1046,8 @@ const UsersSection: FC<{ isAdmin: boolean; currentUserId: string | null }> = ({ 
             {users.map((u) => {
               const isSelf = currentUserId === u.id;
               const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ') || '—';
-              const lastSignIn = u.lastSignInAt
-                ? new Date(u.lastSignInAt).toLocaleDateString(undefined, {
-                  month: 'short', day: 'numeric', year: 'numeric',
-                })
-                : '—';
+              // R-12: locale-stable "26 Jun 2026".
+              const lastSignIn = fmtDate(u.lastSignInAt);
               return (
                 <div
                   key={u.id}
@@ -1050,7 +1063,7 @@ const UsersSection: FC<{ isAdmin: boolean; currentUserId: string | null }> = ({ 
                   <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {u.email}
                     {isSelf && (
-                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      <span className="ml-2 text-[11px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer }}>
                         You
                       </span>
@@ -1122,13 +1135,11 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
     return () => { cancelled = true; };
   }, [open]);
 
-  // ESC to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  // R-03 (design review 2026-07-01): shared overlay contract — Escape,
+  // body scroll lock, focus trap, initial focus and focus return all come
+  // from useOverlay (replaces the local Escape-only listener).
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  useOverlay(open, onClose, modalRef);
 
   const isAdmin = role === 'admin';
   const visibleSections = SECTIONS.filter((s) => !s.adminOnly || isAdmin);
@@ -1163,6 +1174,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
           />
           {/* Modal */}
           <motion.div
+            ref={modalRef}
             initial={{ opacity: 0, scale: 0.97, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -1170,6 +1182,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
+            tabIndex={-1}
             style={{
               position: 'fixed',
               inset: '3vh 3vw',
@@ -1202,7 +1215,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
 
               <div style={{
                 padding: '4px 10px 6px',
-                fontFamily: HEADLINE_FONT, fontSize: 10, fontWeight: 800,
+                fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
                 letterSpacing: '0.12em', textTransform: 'uppercase',
                 color: S.onSurfaceVariant,
               }}>
@@ -1241,7 +1254,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                 <>
                   <div style={{
                     padding: '4px 10px 6px',
-                    fontFamily: HEADLINE_FONT, fontSize: 10, fontWeight: 800,
+                    fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
                     letterSpacing: '0.12em', textTransform: 'uppercase',
                     color: S.onSurfaceVariant,
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -1301,7 +1314,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                       }}>
                         {user.primaryEmailAddress?.emailAddress ?? 'Signed in'}
                       </div>
-                      <div style={{ fontSize: 10, color: S.mutedText }}>
+                      <div style={{ fontSize: 11, color: S.mutedText }}>
                         {roleLoaded ? role : 'Loading role…'}
                       </div>
                     </div>

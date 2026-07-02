@@ -20,7 +20,7 @@
  *   • Force decomposition — horizontal bars at the selected year
  *   • Contributing trends — list with force tag and direction
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   X, Activity, Zap, Layers, LineChart, ArrowUpRight,
@@ -31,49 +31,9 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct, categoryDisplay, groupDisplay } from '@/lib/format';
+import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import useOverlay from '@/hooks/useOverlay';
 import type { ForceName, ProjectionYear } from '@/types';
-
-// ─── Editorial design tokens — identical to ProfitPoolAnalysis2 ──────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  surfaceContainer:   '#e5eeff',
-  surfaceHigh:        '#dce9ff',
-  surfaceHighest:     '#d2e4ff',
-  primary:            '#005db5',
-  primaryDim:         '#0052a0',
-  primaryContainer:   '#d6e3ff',
-  onPrimaryContainer: '#00519e',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-  secondaryContainer: '#d5e3fc',
-  onSecondaryContainer:'#455367',
-  tertiaryContainer:  '#dae2fd',
-  onTertiaryContainer:'#4a5167',
-  error:              '#9f403d',
-  errorContainer:     '#fde2e1',
-  onErrorContainer:   '#752121',
-  outline:            '#477dbb',
-  outlineVariant:     '#81b5f6',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
-  cardBorderStrong:   'rgba(0, 52, 94, 0.16)',
-  mutedText:          '#64748B',
-  // Semantic accents — matched to ProfitPoolAnalysis2 cell fills
-  expansion:          'rgb(31, 122, 61)',
-  expansionDim:       'rgba(31, 122, 61, 0.14)',
-  expansionInk:       '#0f5132',
-  contraction:        'rgb(159, 64, 61)',
-  contractionDim:     'rgba(159, 64, 61, 0.14)',
-  contractionInk:     '#6a2a27',
-  amber:              '#b45309',
-  amberDim:           'rgba(180, 83, 9, 0.12)',
-};
-
-const HEADLINE_FONT = "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT     = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const MONO_FONT     = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -232,14 +192,14 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
           />
           <XAxis
             dataKey="year"
-            tick={{ fontSize: 10, fill: S.onSurfaceVariant, fontFamily: BODY_FONT }}
+            tick={{ fontSize: 11, fill: S.onSurfaceVariant, fontFamily: BODY_FONT }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
             interval={0}
           />
           <YAxis
             domain={yAxisDomain}
-            tick={{ fontSize: 10, fill: S.onSurfaceVariant, fontFamily: MONO_FONT }}
+            tick={{ fontSize: 11, fill: S.onSurfaceVariant, fontFamily: MONO_FONT }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
             tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
@@ -267,7 +227,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
                 >
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       letterSpacing: '0.08em',
                       textTransform: 'uppercase',
                       opacity: 0.7,
@@ -573,7 +533,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: 8,
-            fontSize: 10.5,
+            fontSize: 11,
             color: S.onSurfaceVariant,
             fontFamily: BODY_FONT,
           }}
@@ -592,7 +552,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
                 borderRadius: 999,
                 backgroundColor: S.surfaceLow,
                 color: S.onSurfaceVariant,
-                fontSize: 9.5,
+                fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
@@ -610,7 +570,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
               borderRadius: 999,
               backgroundColor: dirBg,
               color: dirInk,
-              fontSize: 9.5,
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
@@ -668,7 +628,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
         </div>
         <div
           style={{
-            fontSize: 10,
+            fontSize: 11,
             color: S.mutedText,
             fontFamily: MONO_FONT,
             letterSpacing: '0.04em',
@@ -681,7 +641,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
         <div
           style={{
             marginTop: 2,
-            fontSize: 10.5,
+            fontSize: 11,
             color: S.onSurfaceVariant,
             fontFamily: MONO_FONT,
             fontWeight: 600,
@@ -727,6 +687,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   // positioned, navy/white tooltip with the same shadow + arrow language
   // so the design is consistent across the dashboard.
   const [pathHover, setPathHover] = useState<{ x: number; y: number } | null>(null);
+
+  // R-03: one overlay contract — Escape closes, focus is trapped inside,
+  // body scroll locks, focus returns to the trigger on close.
+  const panelRef = useRef<HTMLElement | null>(null);
+  useOverlay(true, onClose, panelRef);
 
   const pathData: PathData = useMemo(() => {
     if (!data?.shifts_path?.[categoryId]) return {};
@@ -774,6 +739,26 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const shiftStart = pathData[horizonStart!]?.median ?? 0;
   const velocity = shiftEnd - shiftStart;
 
+  // R-07: momentum is re-expressed verbally — "+1.2%" in green under a red
+  // headline read as good news when it means "still shrinking, more slowly".
+  // The message names the situation; the colour follows the MESSAGE:
+  // deepening = contraction ink, easing = calm navy, accelerating = expansion
+  // ink, slowing = amber. Value renders in percentage POINTS (a delta of a
+  // percentage, not a percentage).
+  const EPS = 0.0005;
+  const momentum = useMemo(() => {
+    const pts = `${velocity >= EPS ? '+' : ''}${(velocity * 100).toFixed(1)} pt`;
+    if (shiftEnd < -EPS && velocity > EPS)
+      return { msg: 'Contraction easing', pts, color: S.onSurface };
+    if (shiftEnd < -EPS && velocity < -EPS)
+      return { msg: 'Contraction deepening', pts, color: S.contractionInk };
+    if (shiftEnd > EPS && velocity > EPS)
+      return { msg: 'Expansion accelerating', pts, color: S.expansionInk };
+    if (shiftEnd > EPS && velocity < -EPS)
+      return { msg: 'Expansion slowing', pts, color: S.amber };
+    return { msg: 'Broadly flat', pts, color: S.onSurface };
+  }, [shiftEnd, velocity]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -802,6 +787,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       {/* Full-page modal — fills the viewport below the global nav.
           The drill-down is a destination, not a side drawer. */}
       <motion.aside
+        ref={panelRef}
         initial={{ opacity: 0, scale: 0.985, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.985, y: 8 }}
@@ -810,6 +796,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={`${category?.name ?? 'Category'} drill-down`}
+        tabIndex={-1}
         style={{
           // The aside IS the scroll container; the header below is
           // position:sticky so it stays pinned while the body scrolls.
@@ -850,7 +837,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
@@ -874,6 +861,16 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                 {categoryDisplay(category?.name) || 'Category'}
               </h2>
             </div>
+            <span
+              aria-hidden
+              style={{
+                fontSize: 11, fontWeight: 600, color: S.mutedText,
+                fontFamily: BODY_FONT, alignSelf: 'center', marginRight: 8,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Esc to close
+            </span>
             <button
               type="button"
               onClick={onClose}
@@ -925,7 +922,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
                   fontWeight: 700,
@@ -949,13 +946,26 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               </div>
             </div>
 
-            {/* Velocity (horizon-end minus horizon-start) */}
+            {/* Momentum (R-07): verbal message + message-driven colour;
+                explainer opens on hover, keyboard focus AND tap (R-04). */}
             <div
               onMouseEnter={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();
                 setPathHover({ x: r.left + r.width / 2, y: r.bottom });
               }}
               onMouseLeave={() => setPathHover(null)}
+              onFocus={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
+              }}
+              onBlur={() => setPathHover(null)}
+              onClick={(e) => {
+                if (pathHover) { setPathHover(null); return; }
+                const r = e.currentTarget.getBoundingClientRect();
+                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
+              }}
+              tabIndex={0}
+              aria-label={`Momentum: ${momentum.msg}, ${momentum.pts} between ${horizonStart} and ${horizonEnd}`}
               style={{
                 position: 'relative',
                 padding: '12px 14px',
@@ -967,7 +977,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
                   fontWeight: 700,
@@ -983,16 +993,15 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontSize: 19,
                   fontWeight: 800,
                   fontFamily: MONO_FONT,
-                  color: velocity > 0 ? S.expansionInk : velocity < 0 ? S.contractionInk : S.onSurface,
+                  color: momentum.color,
                   lineHeight: 1,
                 }}
               >
-                {fmtShift(velocity, 1)}
+                {momentum.pts}
               </div>
-              {/* U5 (June 2026): static one-line meaning so the figure reads
-                  without needing the hover tooltip. */}
-              <div style={{ marginTop: 3, fontSize: 9.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.25 }}>
-                2026 → 2035 change
+              <div style={{ marginTop: 3, fontSize: 11, fontWeight: 600, color: momentum.color, fontFamily: BODY_FONT, lineHeight: 1.25 }}>
+                {momentum.msg}{' '}
+                <span style={{ color: S.mutedText, fontWeight: 400 }}>· {horizonStart} → {horizonEnd}</span>
               </div>
             </div>
 
@@ -1007,7 +1016,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             >
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
                   fontWeight: 700,
@@ -1061,7 +1070,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   borderRadius: 999,
                   backgroundColor: S.primaryContainer,
                   color: S.onPrimaryContainer,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: '0.04em',
                   textTransform: 'none',
@@ -1091,7 +1100,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               trailing={
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: S.onSurfaceVariant,
                     letterSpacing: '0.06em',
@@ -1120,7 +1129,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                       alignItems: 'baseline',
                       justifyContent: 'space-between',
                       marginBottom: 6,
-                      fontSize: 10.5,
+                      fontSize: 11,
                       color: S.onSurfaceVariant,
                       fontFamily: BODY_FONT,
                       letterSpacing: '0.02em',
@@ -1174,7 +1183,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             style={{
               marginTop: 4,
               padding: '0 4px',
-              fontSize: 10.5,
+              fontSize: 11,
               color: S.mutedText,
               lineHeight: 1.55,
               fontFamily: BODY_FONT,
@@ -1213,7 +1222,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         >
           <div
             style={{
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
@@ -1231,8 +1240,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             </span>
             of the MC median path.
           </div>
-          <div style={{ marginTop: 6, opacity: 0.65, fontSize: 10.5 }}>
-            Positive = accelerating expansion · Negative = accelerating contraction
+          <div style={{ marginTop: 6, opacity: 0.65, fontSize: 11 }}>
+            Contraction easing / deepening · Expansion accelerating / slowing — the label names the direction of travel
           </div>
           {/* Pointer arrow — points up because the bubble sits below the tile;
               light fill + border on the two upward edges to match the body. */}
