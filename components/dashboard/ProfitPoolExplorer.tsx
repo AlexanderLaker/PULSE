@@ -266,6 +266,28 @@ const DetailPanel: FC<{
   const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
   const panelRef = useRef<HTMLElement>(null);
 
+  // Per-figure derivation tooltips (owner request 2026-07-03): every number
+  // in the panel explains its own calculation + the source behind it on hover.
+  const revSrc = item.sources.revenue[0];
+  const revSrcNames = item.sources.revenue.map((s) => sourceParts(s).name).join(' · ');
+  const mgnSrcNames = item.sources.margin.map((s) => sourceParts(s).name).join(' · ');
+  const gp1EndPct = gp1Terminal(item);
+  const marginCagr = Math.pow(gp1EndPct / item.gp1Margin, 1 / POOL_HORIZON_YEARS) - 1;
+  const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
+  const tips = {
+    revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
+    gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
+    revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(slide.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
+    revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nDriver: ${item.revenueDriver}\nSource: ${revSrcNames || '—'} (grade: ${item.sources.revenue[0]?.grade ?? 'estimate'}).`,
+    revEnd: `2030 revenue = today × (1 + CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(revEur)} × (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(revEnd)} (nominal).`,
+    gp1Today: `GP1/CM1 proxy ${pct(item.gp1Margin)} — PRISM structured estimate CALIBRATED against reported FY2025 gross margins (GP1 is not separately disclosed at this level, so it is never graded 'reported').\n\nCalibration anchors: ${mgnSrcNames || '—'}.`,
+    gp1Pa: `Margin drift ${gp1Rating.label} over ${POOL_HORIZON_LABEL} — structured judgment (⚠️).\n\nDriver: ${item.marginDriver}`,
+    gp1End: `2030 GP1 = today + drift:\n${pct(item.gp1Margin)} ${item.gp1DeltaBps >= 0 ? '+' : '−'} ${Math.abs(item.gp1DeltaBps)}bps = ${pct(gp1EndPct)}.`,
+    poolToday: `${fmtEurBn(gp1Now)} = revenue ${fmtEurBn(revEur)} × GP1 ${pct(item.gp1Margin)}.\n\nSources: size — ${revSrcNames || '—'}; margin calibration — ${mgnSrcNames || '—'}.`,
+    poolPa: `Pool CAGR = (1 + revenue CAGR) × (1 + margin CAGR) − 1\n= (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))}) × (1 ${marginCagr >= 0 ? '+' : '−'} ${pct(Math.abs(marginCagr), 2)}) − 1 = ${poolRating.label} p.a.\n\nMargin CAGR is the ${item.gp1DeltaBps >= 0 ? '+' : ''}${item.gp1DeltaBps}bps drift spread over ${POOL_HORIZON_YEARS} years.`,
+    poolEnd: `2030 GP1 pool = today × (1 + pool CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(gp1Now)} × (1 ${pool >= 0 ? '+' : '−'} ${pct(Math.abs(pool))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(gp1End)} — equals 2030 revenue × 2030 GP1 (${fmtEurBn(revEnd)} × ${pct(gp1EndPct)}).`,
+  };
+
   // R-03 (design review 2026-07-01): shared overlay contract — Escape,
   // focus trap, initial focus, focus return and body scroll lock all come
   // from useOverlay. The panel is only mounted while open, so `open` is
@@ -332,8 +354,8 @@ const DetailPanel: FC<{
 
           {/* Top key info — where this pool sits in the view */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-            <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" />
-            <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" />
+            <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" tip={tips.revShare} />
+            <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" tip={tips.gp1Share} />
           </div>
 
           {/* Profit pool trajectory — one row per metric: today → rate → 2030 */}
@@ -353,6 +375,9 @@ const DetailPanel: FC<{
               end={fmtEurBn(revEnd)}
               driver={item.revenueDriver}
               grade={item.sources.revenue[0]?.grade ?? 'estimate'}
+              todayTip={tips.revToday}
+              changeTip={tips.revPa}
+              endTip={tips.revEnd}
             />
             <TrajRow
               metric="GP1 margin (proxy)"
@@ -362,6 +387,9 @@ const DetailPanel: FC<{
               end={`${(gp1Terminal(item) * 100).toFixed(1)}%`}
               driver={item.marginDriver}
               grade="estimate"
+              todayTip={tips.gp1Today}
+              changeTip={tips.gp1Pa}
+              endTip={tips.gp1End}
             />
             <TrajRow
               metric="GP1 profit pool"
@@ -370,9 +398,12 @@ const DetailPanel: FC<{
               changeTone={poolRating.tone}
               end={fmtEurBn(gp1End)}
               emphasis
+              todayTip={tips.poolToday}
+              changeTip={tips.poolPa}
+              endTip={tips.poolEnd}
             />
             <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
-              Pool = revenue × GP1 margin — the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it.
+              Pool = revenue × GP1 margin — the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it. Hover any figure for its calculation and source.
             </div>
           </div>
 
@@ -398,8 +429,12 @@ const SectionLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 // Top key-info tile — the share of the view this pool holds.
-const KeyInfo: FC<{ label: string; value: string; sub: string }> = ({ label, value, sub }) => (
-  <div style={{ background: S.surfaceLow, borderRadius: 10, padding: '9px 12px', border: `1px solid ${S.cardBorder}` }}>
+// `tip` (2026-07-03): hover explains how the figure is derived + its source.
+const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string }> = ({ label, value, sub, tip }) => (
+  <div
+    title={tip}
+    style={{ background: S.surfaceLow, borderRadius: 10, padding: '9px 12px', border: `1px solid ${S.cardBorder}`, cursor: tip ? 'help' : undefined }}
+  >
     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: S.onSurfaceVariant }}>{label}</div>
     <div style={{ fontSize: 18, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
       {value} <span style={{ fontSize: 11, fontWeight: 600, color: S.mutedText }}>{sub}</span>
@@ -410,13 +445,22 @@ const KeyInfo: FC<{ label: string; value: string; sub: string }> = ({ label, val
 const TRAJ_GRID = '1.4fr 1fr 1fr 1fr';
 
 // One trajectory row: metric · today · change (colour = direction) · 2030, with an optional driver + grade beneath.
+// Per-cell tips (owner request 2026-07-03): each figure carries its own
+// calculation + source on hover (dotted underline = hover affordance).
 const TrajRow: FC<{
   metric: string; today: string; change: string; changeTone: CagrRating['tone']; end: string;
   emphasis?: boolean; driver?: string; grade?: EvidenceGrade;
-}> = ({ metric, today, change, changeTone, end, emphasis, driver, grade }) => {
-  const num = (color: string) => ({
+  todayTip?: string; changeTip?: string; endTip?: string;
+}> = ({ metric, today, change, changeTone, end, emphasis, driver, grade, todayTip, changeTip, endTip }) => {
+  const num = (color: string, tip?: string) => ({
     textAlign: 'right' as const, fontFamily: HEADLINE_FONT, fontWeight: 800,
     fontSize: emphasis ? 16 : 14, color, fontVariantNumeric: 'tabular-nums' as const,
+    ...(tip ? {
+      cursor: 'help' as const,
+      textDecoration: 'underline dotted' as const,
+      textDecorationColor: 'rgba(0,52,94,0.28)',
+      textUnderlineOffset: 3,
+    } : null),
   });
   return (
     <>
@@ -428,9 +472,9 @@ const TrajRow: FC<{
         }}
       >
         <span style={{ fontSize: emphasis ? 13.5 : 12.5, fontWeight: emphasis ? 800 : 700, fontFamily: emphasis ? HEADLINE_FONT : BODY_FONT, color: S.onBg }}>{metric}</span>
-        <span style={num(S.onBg)}>{today}</span>
-        <span style={num(arrowColorFor(changeTone))}>{change}</span>
-        <span style={num(emphasis ? arrowColorFor(changeTone) : S.onBg)}>{end}</span>
+        <span style={num(S.onBg, todayTip)} title={todayTip}>{today}</span>
+        <span style={num(arrowColorFor(changeTone), changeTip)} title={changeTip}>{change}</span>
+        <span style={num(emphasis ? arrowColorFor(changeTone) : S.onBg, endTip)} title={endTip}>{end}</span>
       </div>
       {driver && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '3px 4px 9px', borderBottom: `1px solid ${S.surfaceHigh}` }}>
