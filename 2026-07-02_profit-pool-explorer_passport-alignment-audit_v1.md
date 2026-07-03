@@ -196,3 +196,12 @@ Owner ruling: Passport data cannot be shared into the tool (licence) — **the �
 - **Derivation is viewer-visible**: every triangulated size carries a "PRISM triangulation" label + full recipe in the source `detail`, rendered in the source-chip hover ("How this was derived: …"); slide `construction` blocks state the method and the ±10–15% error band (insecticides ±25%); grades stay ⚡/⚠️ — never ✅ — until Passport values replace them via the worklist.
 - `SourceRef.denomination` added (RSP | MSP | scanner-POS | salon-mfr | model); 17 retired tier-2 anchors deleted.
 - Verified: typecheck clean, lint 0 errors (single-source guard OK), 36/36 vitest, all slide shares normalize to 1.000±0.002.
+
+### v3.1 (2026-07-03) — value-chain numeric-consistency fix (owner finding)
+
+Owner caught a real defect: the value-chain views applied tier *shares* to the **end-consumer retail total**, so every tier's drill-down € was a fraction of the wrong base (Hair Brand Owner showed €19.6bn where 50% of $94bn RSP ⇒ ~$47bn ≈ **€40.9bn**). The defect predates v3 (the v2 shares were authored impressionistically — e.g. laundry services' share implied a different chain total than the OEM share); the v3 header triangulation made it visible. Fix:
+
+- **Each tier is now sized on its own revenue base** — store retail = retail value less online share (RSP); e-com = online share (RSP); brand owner = RSP→MSP bridge (~50%), supply-side-checked against P&G FY2025 segment net sales; professional = Kline's own base (salon-mfr); services/appliances = their own market sizes (GVR/FBI); upstream = input-cost shares; wholesale = flow-through share.
+- **Chain pool = SUM of tier revenues** (hair $175.5bn ≈ €153bn; laundry $318.4bn ≈ €277bn), stated in the subtitle next to the end-consumer retail total (~€82bn / ~€87bn) — tiers deliberately double-count the cascading consumer euro; each bar reads "this tier's own revenue". Every tier's source hover now opens with "TIER REVENUE ~$Xbn" + the recipe.
+- **Category views**: bar widths stay at RSP (Passport drop-in unchanged); added a basis note that € GP1 pools there read as pool-at-retail-value (brand-owner-level ≈ half).
+- **Programmatic reconciliation across all 6 views**: 52/52 rows within 2.4% of their sourced $ values at the 1.15 planning rate (script-checked); typecheck + lint + 36/36 vitest green.
