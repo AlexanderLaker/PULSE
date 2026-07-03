@@ -89,7 +89,9 @@ class ModelConfigValidator(BaseModel):
     aggregation_method: str
     per_force_attenuation: Dict[str, float]
     attenuation_source: str
-    neutral_threshold: float
+    # neutral_threshold deleted (July 2026): defined and validated since v1
+    # but consumed nowhere in the engine — an inert dial (design philosophy
+    # #8). Old snapshot dicts carrying it are ignored (pydantic extra=ignore).
     base_year: int
     path_years: List[int]
     materialization: Dict[int, float]
@@ -151,17 +153,6 @@ class ModelConfigValidator(BaseModel):
             raise ValueError(
                 f"attenuation_source must be one of ('calibrated_v3.5_april2026', "
                 f"'calibrated_v3.1_april2026' (legacy), 'admin_override'). Got '{v}'"
-            )
-        return v
-
-    @field_validator("neutral_threshold")
-    @classmethod
-    def validate_neutral_threshold(cls, v: float) -> float:
-        """Neutral threshold should be small positive number."""
-        if v < 0 or v > 0.01:
-            raise ValueError(
-                f"neutral_threshold should be between 0 and 0.01 (got {v}). "
-                f"Default is 0.001"
             )
         return v
 

@@ -150,7 +150,6 @@ def mock_model_config() -> ModelConfig:
         aggregation_method="Multiplicative",
         # per_force_attenuation defaults to DEFAULT_PER_FORCE_ATTENUATION
         attenuation_source="calibrated_v3.5_april2026",
-        neutral_threshold=0.001,
         base_year=2025,
         path_years=[2026, 2027, 2028, 2029, 2030],
         iterations=1000,

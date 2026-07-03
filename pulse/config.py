@@ -76,7 +76,10 @@ DEFAULT_PER_FORCE_ATTENUATION = {
     "Competitive":   0.479,
 }
 DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.5_april2026"  # valid sources: "calibrated_v3.5_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
-DEFAULT_NEUTRAL_THRESHOLD = 0.001
+# DEFAULT_NEUTRAL_THRESHOLD deleted (July 2026): defined + validated since v1
+# but consumed nowhere in the engine — an inert dial, removed per design
+# philosophy #8 (like scalar attenuation v3.2 and t_copula_df D20). Old
+# config snapshots carrying it are tolerated by ModelConfig.from_json.
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
@@ -416,7 +419,6 @@ class ModelConfig:
     # dict directly. Source-of-truth is data/Attenuation_Calibration.xlsx.
     per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
     attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.5_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
-    neutral_threshold: float = DEFAULT_NEUTRAL_THRESHOLD
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))
     materialization: dict = field(default_factory=lambda: dict(DEFAULT_MATERIALIZATION))
@@ -439,8 +441,9 @@ class ModelConfig:
         """Reconstruct from a JSON snapshot, tolerating retired fields.
 
         Older config snapshots may carry fields the model no longer has
-        (e.g. ``t_copula_df``, deleted in D20, or the v3.2-retired scalar
-        ``attenuation``). Unknown keys are dropped rather than crashing.
+        (e.g. ``t_copula_df``, deleted in D20, the v3.2-retired scalar
+        ``attenuation``, or ``neutral_threshold``, deleted July 2026 as
+        engine-inert). Unknown keys are dropped rather than crashing.
         """
         from dataclasses import fields as _fields
         data = json.loads(s)

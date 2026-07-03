@@ -40,7 +40,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
-import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { fmtDate, fmtDateTime } from '@/lib/format';
 import useOverlay from '@/hooks/useOverlay';
 
@@ -210,23 +210,29 @@ const parseDecimal = (raw: string): number =>
 const parseInteger = (raw: string): number =>
   parseInt(raw.replace(/[.,\s]/g, ''), 10);
 
+/** Trim float noise for display: 0.08333333333333333 → "0.083333". */
+const fmtShortNumber = (v: number): string => String(parseFloat(v.toFixed(6)));
+
 interface NumberFieldProps {
   value: number;
   onCommit: (v: number) => void;
   integer?: boolean;
   readOnly?: boolean;
   inputStyle: React.CSSProperties;
+  /** Display formatter (default String). Parsing/committing stays exact. */
+  format?: (v: number) => string;
 }
 const NumberField: FC<NumberFieldProps> = ({
-  value, onCommit, integer, readOnly, inputStyle,
+  value, onCommit, integer, readOnly, inputStyle, format,
 }) => {
-  const [text, setText] = useState(() => String(value));
+  const fmt = format ?? String;
+  const [text, setText] = useState(() => fmt(value));
   const parse = integer ? parseInteger : parseDecimal;
   // Resync when the draft changes elsewhere (load / discard) without
   // clobbering in-progress typing that already parses to `value`.
   useEffect(() => {
-    setText((t) => (parse(t) === value ? t : String(value)));
-  }, [value, parse]);
+    setText((t) => (parse(t) === value || fmt(parse(t)) === fmt(value) ? t : fmt(value)));
+  }, [value, parse, fmt]);
   return (
     <input
       type="text"
@@ -238,7 +244,7 @@ const NumberField: FC<NumberFieldProps> = ({
         const parsed = parse(raw);
         if (Number.isFinite(parsed)) onCommit(parsed);
       }}
-      onBlur={() => setText(String(value))}
+      onBlur={() => setText(fmt(value))}
       disabled={readOnly}
       readOnly={readOnly}
       style={inputStyle}
@@ -669,22 +675,253 @@ const SessionsSection: FC = () => {
 // ═══════════════════════════════════════════════════════════════════
 // Section: Config Sheet (admin-editable)
 // ═══════════════════════════════════════════════════════════════════
+// GET /api/config contract — mirrors pulse/api/routers/config.py get_config.
+// Config-sheet review (July 2026): the sheet previously rendered fields the
+// API never returned (region, neutral_threshold, base_year, residual_cross_rho)
+// — those inputs showed hardcoded frontend defaults instead of server state,
+// and PUT silently dropped them (pydantic ignores unknown keys), so they were
+// dead dials. The payload below mirrors the real contract; engine-consumed
+// values that are not admin dials render read-only.
 interface ModelConfigPayload {
-  region?: string;
   per_force_attenuation?: Record<string, number>;
   within_force_overlap?: Record<string, number>;
   attenuation_source?: string;
-  neutral_threshold?: number;
-  iterations?: number;
-  base_year?: number;
+  force_weights?: Record<string, number>;
+  vc_weights?: Record<string, number>;
+  region_weights?: Record<string, number>;
+  category_weights?: Record<string, number>;
+  force_correlation_matrix?: Record<string, Record<string, number>>;
+  force_overlap_matrix?: Record<string, Record<string, number>>;
   path_years?: number[];
+  base_year?: number; // read-only context (engine-consumed, not admin-editable)
+  iterations?: number;
   within_force_rho?: number;
   // t_copula_df removed (D20, June 2026): the engine runs a Gaussian copula.
-  residual_cross_rho?: number;
-  force_weights?: Record<string, number>;
-  materialization_schedule?: Record<string, number>;
-  model_version?: string;
 }
+
+// Keys this sheet may PUT (subset of the backend ConfigUpdate model).
+// The correlation/overlap matrices and attenuation stay read-only in the UI
+// (D8: changed only via a correction release / the admin API and its gates).
+const EDITABLE_KEYS = [
+  'iterations', 'within_force_rho',
+  'force_weights', 'region_weights', 'vc_weights', 'category_weights',
+] as const;
+type EditableKey = typeof EDITABLE_KEYS[number];
+type WeightGroupKey = Exclude<EditableKey, 'iterations' | 'within_force_rho'>;
+
+// Canonical display order — mirrors pulse/config.py taxonomies. Rendering is
+// robust to drift: missing keys are skipped, unknown keys are appended.
+const FORCE_ORDER = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
+const REGION_ORDER = ['Europe', 'North America', 'Asia', 'High Growth'];
+const VC_ORDER = [
+  'Raw Materials', 'Formulation', 'Manufacturing', 'Packaging',
+  'Supply Chain', 'Marketing', 'Commercial', 'Consumer',
+];
+const CATEGORY_ORDER = [
+  'Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
+  'LHC: FCN', 'LHC: FCA', 'LHC: FFI', 'LHC: LAD',
+  'LHC: HDW', 'LHC: ADW', 'LHC: HSC', 'LHC: IC',
+];
+const FORCE_ABBR: Record<string, string> = {
+  Consumer: 'Cons.', Customer: 'Cust.', Technology: 'Tech.',
+  Government: 'Gov.', Environmental: 'Env.', Competitive: 'Comp.',
+};
+
+const orderedKeys = (obj: Record<string, unknown>, order: string[]): string[] => [
+  ...order.filter((k) => k in obj),
+  ...Object.keys(obj).filter((k) => !order.includes(k)),
+];
+
+// ── Non-form sub-block (label + content + hint). Unlike Field this is NOT
+//    a <label> — tables and read-only text are not form controls. ─────
+const SubBlock: FC<{ label: string; hint?: string; children: React.ReactNode }> = ({ label, hint, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <span style={{
+      fontFamily: HEADLINE_FONT,
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+      textTransform: 'uppercase', color: S.onSurfaceVariant,
+    }}>
+      {label}
+    </span>
+    {children}
+    {hint && (
+      <span style={{ fontSize: 11, lineHeight: 1.55, color: S.mutedText }}>{hint}</span>
+    )}
+  </div>
+);
+
+// ── Read-only force tables (attenuation row-pair + 6×6 matrices) ────
+const CELL_TH: React.CSSProperties = {
+  fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 800,
+  letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: S.onSurfaceVariant, backgroundColor: S.surfaceContainer,
+  padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap',
+};
+const CELL_LABEL: React.CSSProperties = {
+  ...CELL_TH,
+  textAlign: 'left', backgroundColor: S.surfaceLow,
+  position: 'sticky', left: 0, zIndex: 1,
+};
+const CELL_NUM: React.CSSProperties = {
+  fontFamily: MONO_FONT, fontSize: 12, color: S.onSurface,
+  padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap',
+  fontVariantNumeric: 'tabular-nums',
+  borderTop: `1px solid ${S.cardBorder}`,
+};
+
+/** Horizontal-scroll wrapper so wide tables are never clipped. */
+const TableScroller: FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div
+    role="region"
+    aria-label={label}
+    tabIndex={0}
+    style={{
+      overflowX: 'auto',
+      border: `1px solid ${S.cardBorder}`,
+      borderRadius: 10,
+      backgroundColor: S.surface,
+    }}
+  >
+    <table style={{ borderCollapse: 'collapse', width: '100%' }}>{children}</table>
+  </div>
+);
+
+/** Read-only 6×6 force matrix, read row → column. */
+const ForceMatrixTable: FC<{
+  matrix: Record<string, Record<string, number>>;
+  digits: number;
+  diagonal: 'dash' | 'value';
+  label: string;
+}> = ({ matrix, digits, diagonal, label }) => {
+  const forces = orderedKeys(matrix, FORCE_ORDER);
+  return (
+    <TableScroller label={label}>
+      <thead>
+        <tr>
+          <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer, textTransform: 'none', letterSpacing: 0 }}>
+            row \ col
+          </th>
+          {forces.map((f) => (
+            <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f] ?? f}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {forces.map((row) => (
+          <tr key={row}>
+            <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{row}</th>
+            {forces.map((col) => {
+              const isDiag = row === col;
+              const v = matrix[row]?.[col];
+              return (
+                <td key={col} style={{ ...CELL_NUM, color: isDiag ? S.mutedText : S.onSurface }}>
+                  {isDiag && diagonal === 'dash' ? '—' : typeof v === 'number' ? v.toFixed(digits) : '—'}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </TableScroller>
+  );
+};
+
+/** Per-force attenuation + within-force overlap as one six-column table
+    (replaces the two cramped half-width box grids that clipped). */
+const AttenuationTable: FC<{
+  attenuation?: Record<string, number>;
+  overlap?: Record<string, number>;
+}> = ({ attenuation, overlap }) => {
+  const forces = orderedKeys({ ...(attenuation ?? {}), ...(overlap ?? {}) }, FORCE_ORDER);
+  if (forces.length === 0) {
+    return <div style={READONLY_STYLE}>not returned by engine</div>;
+  }
+  const renderRow = (name: string, values?: Record<string, number>) => (
+    <tr>
+      <th scope="row" style={{
+        ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}`,
+        textTransform: 'none', letterSpacing: 0, fontSize: 11.5,
+      }}>
+        {name}
+      </th>
+      {forces.map((f) => {
+        const v = values?.[f];
+        return (
+          <td key={f} style={CELL_NUM}>
+            {typeof v === 'number' ? v.toFixed(3) : '—'}
+          </td>
+        );
+      })}
+    </tr>
+  );
+  return (
+    <TableScroller label="Per-force attenuation and within-force overlap">
+      <thead>
+        <tr>
+          <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer }} aria-label="Parameter" />
+          {forces.map((f) => (
+            <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f] ?? f}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {renderRow('Attenuation', attenuation)}
+        {renderRow('Within-force overlap', overlap)}
+      </tbody>
+    </TableScroller>
+  );
+};
+
+// ── Editable weight grid with a live sum badge ──────────────────────
+const WeightGrid: FC<{
+  title: string;
+  weights: Record<string, number>;
+  order: string[];
+  onCommit: (key: string, v: number) => void;
+  readOnly: boolean;
+}> = ({ title, weights, order, onCommit, readOnly }) => {
+  const keys = orderedKeys(weights, order);
+  const sum = keys.reduce((a, k) => a + (Number.isFinite(weights[k]) ? weights[k] : 0), 0);
+  const ok = Math.abs(sum - 1) <= 0.01; // PUT /api/v1/config tolerance
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
+          letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant,
+        }}>
+          {title}
+        </span>
+        <span
+          style={{
+            fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
+            padding: '2px 8px', borderRadius: 999,
+            backgroundColor: ok ? S.successContainer : S.errorContainer,
+            color: ok ? S.success : S.onErrorContainer,
+          }}
+          title={ok
+            ? 'Sums to 1.0 within the ±0.01 backend tolerance.'
+            : 'Must sum to 1.0 (±0.01) — the backend rejects this save.'}
+        >
+          Σ {sum.toFixed(3)}{ok ? '' : ' · must equal 1.0'}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
+        {keys.map((k) => (
+          <Field key={k} label={k}>
+            <NumberField
+              value={weights[k]}
+              onCommit={(v) => onCommit(k, v)}
+              readOnly={readOnly}
+              inputStyle={readOnly ? READONLY_STYLE : INPUT_STYLE}
+              format={fmtShortNumber}
+            />
+          </Field>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
   const [loading, setLoading] = useState(true);
@@ -714,37 +951,51 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Diff-only save: only keys the admin actually changed enter the PUT body.
+  // The previous full-draft PUT audit-logged EVERY field as "changed" on
+  // every save and leaned on pydantic silently dropping unknown keys.
+  const dirtyKeys = useMemo<EditableKey[]>(() => {
+    if (!config || !draft) return [];
+    return EDITABLE_KEYS.filter(
+      (k) => JSON.stringify(config[k]) !== JSON.stringify(draft[k]),
+    );
+  }, [config, draft]);
+  const isDirty = dirtyKeys.length > 0;
+
   const handleSave = useCallback(async () => {
-    if (!draft) return;
+    if (!draft || dirtyKeys.length === 0) return;
     setSaving(true);
     setStatus(null);
     try {
+      const body = Object.fromEntries(dirtyKeys.map((k) => [k, draft[k]]));
       const res = await fetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(draft),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(payload.error ?? `Save failed (${res.status})`);
+        const msg = typeof payload.error === 'string' ? payload.error : `Save failed (${res.status})`;
+        throw new Error(msg);
       }
       setConfig(draft);
-      setStatus({ kind: 'success', message: 'Configuration saved. A new snapshot has been written to the audit log.' });
+      setStatus({
+        kind: 'success',
+        message: `Saved and audit-logged (${dirtyKeys.join(', ')}). The persisted run is now marked stale — dashboard numbers change only after the next production CLI run.`,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save configuration.';
       setStatus({ kind: 'error', message });
     } finally {
       setSaving(false);
     }
-  }, [draft]);
+  }, [draft, dirtyKeys]);
 
   const handleReset = useCallback(() => {
     setDraft(config);
     setStatus({ kind: 'info', message: 'Reverted to last loaded values.' });
   }, [config]);
-
-  const isDirty = useMemo(() => JSON.stringify(config) !== JSON.stringify(draft), [config, draft]);
 
   // Everyone can see the Config sheet — only admins can change it. Non-admins
   // get the same form but with every input disabled and the Save row hidden.
@@ -758,7 +1009,16 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
     setDraft((d) => (d ? { ...d, ...p } : d));
   };
 
+  const patchWeight = (group: WeightGroupKey) => (key: string, v: number) => {
+    if (readOnly) return;
+    setDraft((d) => (d ? { ...d, [group]: { ...(d[group] ?? {}), [key]: v } } : d));
+  };
+
   const ro = readOnly;
+
+  const horizon = draft?.path_years?.length
+    ? `${draft.path_years[0]}–${draft.path_years[draft.path_years.length - 1]} · ${draft.path_years.length} years`
+    : '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -768,64 +1028,21 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
         </StatusBanner>
       )}
 
-      <SectionCard
-        title="Simulation parameters"
-        icon={SlidersHorizontal}
-        description="Changes here affect every subsequent simulation run. Existing runs are immutable and remain auditable."
-      >
-        {loading ? (
-          <div style={{ color: S.mutedText, fontSize: 13 }}>Loading configuration…</div>
-        ) : !draft ? (
-          <div style={{ color: S.mutedText, fontSize: 13 }}>No configuration available.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
-                  silent no-op — the engine consumes six per-force values.
-                  They are displayed read-only here with their source.
-                  D17 (owner decision): the source is labeled "structured-
-                  judgment overlap correction", not "calibrated" — the values
-                  rest on a weighted-Jaccard exposure proxy plus documented
-                  judgment adjustments, not on measured outcomes (F-19). */}
-              <Field
-                label="Per-force attenuation factor (0–1, read-only)"
-                hint={`Dampening multiplier (between 0 and 1) applied to each force's combined trend effect to correct for overlap — lower = stronger dampening (e.g. 0.40 keeps ~40% of the raw force contribution, ~60% dampened). Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                  {Object.entries(draft.per_force_attenuation ?? {}).map(([f, v]) => (
-                    <div key={f} style={{ ...READONLY_STYLE, fontSize: 12.5 }}>
-                      {f}: {Number(v).toFixed(3)}
-                    </div>
-                  ))}
-                  {!draft.per_force_attenuation && (
-                    <div style={{ ...READONLY_STYLE, gridColumn: '1 / -1' }}>not returned by engine</div>
-                  )}
-                </div>
-              </Field>
-              <Field
-                label="Within-force overlap (read-only)"
-                hint="Dampens summed trends inside one force (mechanism redundancy). Source: structured-judgment overlap correction (v3.5, Apr-2026)."
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                  {Object.entries(draft.within_force_overlap ?? {}).map(([f, v]) => (
-                    <div key={f} style={{ ...READONLY_STYLE, fontSize: 12.5 }}>
-                      {f}: {Number(v).toFixed(3)}
-                    </div>
-                  ))}
-                  {!draft.within_force_overlap && (
-                    <div style={{ ...READONLY_STYLE, gridColumn: '1 / -1' }}>not returned by engine</div>
-                  )}
-                </div>
-              </Field>
-              <Field label="Neutral threshold" hint="Shifts below this magnitude are reported as neutral.">
-                <NumberField
-                  value={draft.neutral_threshold ?? 0.001}
-                  onCommit={(v) => patch({ neutral_threshold: v })}
-                  readOnly={ro}
-                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-                />
-              </Field>
-              <Field label="MC iterations" hint="10,000 default · max 100,000">
+      {loading || !draft ? (
+        <SectionCard title="Simulation parameters" icon={SlidersHorizontal}>
+          <div style={{ color: S.mutedText, fontSize: 13 }}>
+            {loading ? 'Loading configuration…' : 'No configuration available.'}
+          </div>
+        </SectionCard>
+      ) : (
+        <>
+          <SectionCard
+            title="Simulation parameters"
+            icon={SlidersHorizontal}
+            description="Admin changes are audit-logged and mark the persisted run stale — dashboard numbers change only after the next production CLI run. Existing runs are immutable."
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+              <Field label="MC iterations" hint="Admin bounds 1,000–100,000 · default 10,000. Production runs execute offline at 50,000 × 3 chains.">
                 <NumberField
                   integer
                   value={draft.iterations ?? 10000}
@@ -834,86 +1051,129 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
               </Field>
-              <Field label="Base year">
-                <NumberField
-                  integer
-                  value={draft.base_year ?? 2025}
-                  onCommit={(v) => patch({ base_year: v })}
-                  readOnly={ro}
-                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-                />
-              </Field>
-              <Field label="Region">
-                <select
-                  value={draft.region ?? 'Europe'}
-                  onChange={(e) => patch({ region: e.target.value })}
-                  disabled={ro}
-                  style={ro ? READONLY_STYLE : INPUT_STYLE}
-                >
-                  {['Europe', 'North America', 'Asia', 'High Growth'].map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </Field>
+              <SubBlock label="Path horizon (read-only)" hint="Relative-shift paths over the 10-year horizon.">
+                <div style={READONLY_STYLE}>{horizon}</div>
+              </SubBlock>
+              <SubBlock label="Base year (read-only)" hint="Materialization anchor. Changed only via a correction release.">
+                <div style={READONLY_STYLE}>{draft.base_year ?? '—'}</div>
+              </SubBlock>
             </div>
-          </div>
-        )}
-      </SectionCard>
+          </SectionCard>
 
-      <SectionCard
-        title="Copula parameters"
-        icon={SlidersHorizontal}
-        description="Controls how trend correlations flow through the Monte Carlo (Gaussian copula — the t-copula tail dial was removed June 2026 after testing inert, <2% band effect). Invalid correlation settings are rejected at save time rather than silently repaired."
-      >
-        {draft && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Within-force ρ" hint="Default 0.30">
-              <NumberField
-                value={draft.within_force_rho ?? 0.3}
-                onCommit={(v) => patch({ within_force_rho: v })}
-                readOnly={ro}
-                inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-              />
-            </Field>
-            <Field label="Residual cross-ρ" hint="Default 0.05">
-              <NumberField
-                value={draft.residual_cross_rho ?? 0.05}
-                onCommit={(v) => patch({ residual_cross_rho: v })}
-                readOnly={ro}
-                inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-              />
-            </Field>
-          </div>
-        )}
-      </SectionCard>
+          <SectionCard
+            title="Copula dependence — Gaussian"
+            icon={SlidersHorizontal}
+            description="How trend correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD trend-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired."
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+                <Field label="Within-force ρ" hint="Correlation between trends of the same force. Bounds 0–0.9 · default 0.30.">
+                  <NumberField
+                    value={draft.within_force_rho ?? 0.3}
+                    onCommit={(v) => patch({ within_force_rho: v })}
+                    readOnly={ro}
+                    inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
+                  />
+                </Field>
+              </div>
+              {draft.force_correlation_matrix && (
+                <SubBlock
+                  label="Force correlation matrix (read-only)"
+                  hint="Cross-force correlations, PSD-valid as entered (v3.6 recalibration, D1). Pairs not covered by a trend's force row fall back to residual ρ = 0.05. Editable via the admin API only — symmetry, unit diagonal and the spectral gate are enforced there."
+                >
+                  <ForceMatrixTable
+                    matrix={draft.force_correlation_matrix}
+                    digits={2}
+                    diagonal="value"
+                    label="Force correlation matrix"
+                  />
+                </SubBlock>
+              )}
+            </div>
+          </SectionCard>
 
-      <SectionCard
-        title="Force weights"
-        icon={SlidersHorizontal}
-        description="Relative influence of each force in the aggregate shift. Weights are normalized automatically so they sum to 1.0."
-      >
-        {draft?.force_weights && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            {Object.entries(draft.force_weights).map(([force, weight]) => (
-              <Field key={force} label={force}>
-                <NumberField
-                  value={weight}
-                  onCommit={(v) => patch({
-                    force_weights: { ...draft.force_weights, [force]: v },
-                  })}
+          <SectionCard
+            title="Attenuation & overlap"
+            icon={SlidersHorizontal}
+            description={`Read-only. The engine dampens each force's combined trend effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
+          >
+            {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
+                silent no-op — the engine consumes six per-force values.
+                D17 (owner decision): the source is labeled "structured-
+                judgment overlap correction", not "calibrated" — the values
+                rest on a weighted-Jaccard exposure proxy plus documented
+                judgment adjustments, not on measured outcomes (F-19). */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <AttenuationTable
+                attenuation={draft.per_force_attenuation}
+                overlap={draft.within_force_overlap}
+              />
+              {draft.force_overlap_matrix && (
+                <SubBlock
+                  label="Between-force overlap matrix (read-only)"
+                  hint="Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is 'covered' by a broad one more than vice versa), bounded 0–0.45. The diagonal is handled by the within-force overlap above."
+                >
+                  <ForceMatrixTable
+                    matrix={draft.force_overlap_matrix}
+                    digits={3}
+                    diagonal="dash"
+                    label="Between-force overlap matrix"
+                  />
+                </SubBlock>
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Aggregation weights"
+            icon={SlidersHorizontal}
+            description="Weights the engine consumes for portfolio aggregation and the force / value-chain / region attribution lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize)."
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {draft.force_weights ? (
+                <WeightGrid
+                  title="Force weights"
+                  weights={draft.force_weights}
+                  order={FORCE_ORDER}
+                  onCommit={patchWeight('force_weights')}
                   readOnly={ro}
-                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
                 />
-              </Field>
-            ))}
-          </div>
-        )}
-        {!draft?.force_weights && (
-          <div style={{ color: S.mutedText, fontSize: 12.5 }}>
-            No force weights returned by the backend — defaults are used (equal weight per force).
-          </div>
-        )}
-      </SectionCard>
+              ) : (
+                <div style={{ color: S.mutedText, fontSize: 12.5 }}>
+                  No force weights returned by the backend — defaults are used (equal weight per force).
+                </div>
+              )}
+              {draft.region_weights && (
+                <WeightGrid
+                  title="Region weights"
+                  weights={draft.region_weights}
+                  order={REGION_ORDER}
+                  onCommit={patchWeight('region_weights')}
+                  readOnly={ro}
+                />
+              )}
+              {draft.vc_weights && (
+                <WeightGrid
+                  title="Value-chain weights"
+                  weights={draft.vc_weights}
+                  order={VC_ORDER}
+                  onCommit={patchWeight('vc_weights')}
+                  readOnly={ro}
+                />
+              )}
+              {draft.category_weights && (
+                <WeightGrid
+                  title="Category weights"
+                  weights={draft.category_weights}
+                  order={CATEGORY_ORDER}
+                  onCommit={patchWeight('category_weights')}
+                  readOnly={ro}
+                />
+              )}
+            </div>
+          </SectionCard>
+        </>
+      )}
 
       {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
 
@@ -927,7 +1187,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
               Discard changes
             </button>
             <button onClick={handleSave} disabled={!isDirty || saving} style={{ ...PRIMARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
-              {saving ? 'Saving…' : 'Save configuration'}
+              {saving ? 'Saving…' : isDirty ? `Save configuration (${dirtyKeys.length})` : 'Save configuration'}
             </button>
           </div>
         )}
@@ -1193,6 +1453,13 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
               overflow: 'hidden',
               display: 'grid',
               gridTemplateColumns: '260px 1fr',
+              // Scroll fix (July 2026): without an explicit row constraint the
+              // single implicit grid row sizes to max-content, so content
+              // taller than the fixed-inset modal grew past its bounds and the
+              // outer overflow:hidden clipped it — <main>'s overflow:auto
+              // never engaged and the sheet could not scroll. minmax(0, 1fr)
+              // pins the row to the modal height so the panes scroll instead.
+              gridTemplateRows: 'minmax(0, 1fr)',
               fontFamily: BODY_FONT,
             }}
           >
@@ -1324,7 +1591,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
             </aside>
 
             {/* Content area */}
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
               <header style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '20px 28px', borderBottom: `1px solid ${S.cardBorder}`,
@@ -1364,7 +1631,7 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
               </header>
 
               <main style={{
-                flex: 1, overflow: 'auto',
+                flex: 1, minHeight: 0, overflow: 'auto',
                 padding: '24px 28px 32px',
                 backgroundColor: S.bg,
               }}>

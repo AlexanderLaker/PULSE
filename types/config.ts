@@ -107,7 +107,7 @@ export interface ModelConfig {
    *  data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet). */
   per_force_attenuation?: Record<ForceName, number>;
   attenuation_source?: 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
-  neutral_threshold?: number;
+  // neutral_threshold deleted (July 2026): engine-inert, removed end-to-end.
   base_year?: number;
   path_years?: ProjectionYear[];
   maturity_schedule?: Record<number, number>;

@@ -42,6 +42,11 @@ async def get_config(user: dict = Depends(require_auth)):
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
         "path_years": config.path_years,
+        # Read-only context for the admin Config sheet (July 2026): base_year
+        # is engine-consumed (materialization schedules) but is a correction-
+        # release parameter, not an admin dial — ConfigUpdate deliberately
+        # does not accept it.
+        "base_year": config.base_year,
         "iterations": config.iterations,
         "within_force_rho": config.within_force_rho,
     }
@@ -219,7 +224,6 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             aggregation_method=getattr(candidate, "aggregation_method", "Multiplicative"),
             per_force_attenuation=dict(candidate.per_force_attenuation),
             attenuation_source=candidate.attenuation_source,
-            neutral_threshold=candidate.neutral_threshold,
             base_year=candidate.base_year,
             path_years=list(candidate.path_years),
             materialization=dict(candidate.materialization),
@@ -286,6 +290,7 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         "category_weights": getattr(config, 'category_weights', {}),
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
+        "base_year": config.base_year,
         "iterations": config.iterations,
         "within_force_rho": config.within_force_rho,
     }}
