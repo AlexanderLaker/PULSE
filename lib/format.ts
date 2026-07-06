@@ -33,6 +33,12 @@ export const EXPANSION_SOFT = 'rgba(31, 122, 61, 0.10)';
 export const CONTRACTION_SOFT = 'rgba(159, 64, 61, 0.10)';
 export const NEUTRAL_SOFT = 'rgba(100, 116, 139, 0.10)';
 
+// L10 (July 2026 review): RGB channel triplets of the semantic pair, for the
+// few call sites that need a custom rgba() alpha (tile tints, ramp legends) —
+// so no component ever re-hardcodes the hex / rgb values.
+export const EXPANSION_RGB = '31, 122, 61';
+export const CONTRACTION_RGB = '159, 64, 61';
+
 /** Below this absolute shift, a value is treated as flat: no sign, no arrow, no colour. */
 export const FLAT_EPS = 0.0005;
 
@@ -126,7 +132,10 @@ export const YEARS: number[] = [
 export function fmtShift(v: number | null | undefined, decimals = 1): string {
   if (v == null || isNaN(v)) return '—';
   const d = Math.max(0, Math.min(decimals, 1));
-  const pct = (v * 100).toFixed(d);
+  let pct = (v * 100).toFixed(d);
+  // L5 (July 2026 review): a tiny negative that rounds to zero must read
+  // "0.0%", never "-0.0%" (toFixed keeps the sign of negative zero).
+  if (parseFloat(pct) === 0) pct = (0).toFixed(d);
   return v >= FLAT_EPS ? `+${pct}%` : `${pct}%`;
 }
 
@@ -134,7 +143,9 @@ export function fmtShift(v: number | null | undefined, decimals = 1): string {
 export function fmtPct(v: number | null | undefined, decimals = 1): string {
   if (v == null || isNaN(v)) return '—';
   const d = Math.max(0, Math.min(decimals, 1));
-  return `${(v * 100).toFixed(d)}%`;
+  let pct = (v * 100).toFixed(d);
+  if (parseFloat(pct) === 0) pct = (0).toFixed(d);  // L5: no "-0.0%"
+  return `${pct}%`;
 }
 
 // ─── Dates (R-12): one format everywhere — "26 Jun 2026" ────────────

@@ -31,7 +31,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { getTrendProposals, saveMyProposal } from '@/api/client';
-import { CATEGORIES, fmtPct, fmtShift, shortCat } from '@/lib/format';
+import { CATEGORIES, EXPANSION, EXPANSION_SOFT, fmtPct, fmtShift, shiftColor, shortCat } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type {
@@ -127,7 +127,11 @@ const DotBar: FC<DotBarProps> = ({ value, editable = false, onChange }) => (
         <span
           key={d}
           role={editable ? 'radio' : undefined}
-          aria-checked={editable ? filled : undefined}
+          // L18 (July 2026 review): exactly ONE radio may be checked — the
+          // old `aria-checked={filled}` marked every dot ≤ value as checked,
+          // which is an invalid multi-checked radio group for AT.
+          aria-checked={editable ? d === value : undefined}
+          aria-label={editable ? `${d} of 5` : undefined}
           tabIndex={editable ? 0 : -1}
           onClick={editable && onChange ? (e) => { e.stopPropagation(); onChange(d); } : undefined}
           onKeyDown={editable && onChange ? (e) => {
@@ -508,7 +512,9 @@ const ROW_GRID: Record<ScoringMode, string> = {
 };
 
 const EXPERT_COLOR   = '#6b4fc4';   // expert aggregate — violet
-const REVIEWED_COLOR = '#1f7a3d';   // reviewed truth that deviates from AI — green
+// L10 (July 2026 review): reviewed-green + its soft tint come from lib/format
+// (EXPANSION / EXPANSION_SOFT) — semantic colours are imported, never re-hardcoded.
+const REVIEWED_COLOR = EXPANSION;   // reviewed truth that deviates from AI — green
 const DELTA_COLOR    = '#b07d2b';   // delta chip — gold
 
 const pctI = (v: number | null | undefined): string =>
@@ -666,10 +672,12 @@ const RowEndCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendPropos
       return <span style={{ color: S.onSurfaceVariant, fontSize: 13, fontWeight: 700 }}>—</span>;
     }
     const myShift = dirSign * (Math.max(1, Math.min(5, p)) / 6) * g;
+    // L9 (July 2026 review): shift numbers colour via shiftColor() — a positive
+    // shift reads expansion green, never maritime blue (sign stays visible via fmtShift).
     return (
       <span className="font-bold text-[14px]"
         title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${pctI(g)} × ${dirSign > 0 ? '+1' : '−1'}`}
-        style={{ color: myShift < 0 ? S.error : S.onPrimaryContainer, cursor: 'help' }}>
+        style={{ color: shiftColor(myShift), cursor: 'help' }}>
         {fmtShift(myShift)}
       </span>
     );
@@ -683,7 +691,8 @@ const RowEndCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendPropos
     <div className="text-right" style={{ position: 'relative' }}
       onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
       <span className="font-bold text-[14px]" style={{
-        color: shift != null && shift < 0 ? S.error : S.onPrimaryContainer,
+        // L9 (July 2026 review): expansion green / contraction red via shiftColor().
+        color: shiftColor(shift),
         borderBottom: `1px dotted ${S.onSurfaceVariant}66`, cursor: 'help',
       }}>
         {shift != null ? fmtShift(shift) : '—'}
@@ -724,7 +733,7 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
           title={done
             ? 'Reviewed — you rated probability, GP1% and at least one category exposure'
             : 'To complete: rate probability, GP1% and at least one category exposure'}
-          style={{ ...pill, backgroundColor: done ? 'rgba(31,122,61,0.10)' : S.surfaceLow, color: done ? REVIEWED_COLOR : S.onSurfaceVariant }}>
+          style={{ ...pill, backgroundColor: done ? EXPANSION_SOFT : S.surfaceLow, color: done ? REVIEWED_COLOR : S.onSurfaceVariant }}>
           {done ? <><Check size={11} strokeWidth={2.6} /> Reviewed</> : 'Not reviewed'}
         </span>
       </div>
@@ -745,7 +754,7 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
     <div className="flex justify-end">
       {reviewed ? (
         <span className="inline-flex items-center gap-1" title="Reviewed by an admin — differs from the AI baseline"
-          style={{ ...pill, color: REVIEWED_COLOR, backgroundColor: 'rgba(31,122,61,0.10)' }}>
+          style={{ ...pill, color: REVIEWED_COLOR, backgroundColor: EXPANSION_SOFT }}>
           <Check size={11} strokeWidth={2.6} /> Reviewed
         </span>
       ) : <span style={{ color: S.onSurfaceVariant, fontSize: 12 }}>—</span>}
@@ -860,12 +869,27 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
       onMyChange?.(trend.id, my);
     }
   }, [loaded, hydrated, data, onMyChange, trend.id]);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  // H6 (July 2026 review): FLUSH — don't drop — a pending autosave on
+  // unmount. Collapsing the row (or switching tabs) within the 0.6s debounce
+  // window used to cancel the timer while the screen already showed the new
+  // value; the edit silently vanished. `pendingSave` is the dirty flag that
+  // prevents a double-save when the debounce already fired.
+  const pendingSave = useRef(false);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (pendingSave.current) {
+      pendingSave.current = false;
+      // Fire-and-forget: the component is gone, but the write must land.
+      void saveMyProposal(trend.id, draftRef.current).catch(() => undefined);
+    }
+  }, [trend.id]);
 
   const flush = useCallback(() => {
     setStatus('saving');
+    pendingSave.current = true;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      pendingSave.current = false;
       saveMyProposal(trend.id, draftRef.current).then(() => setStatus('saved')).catch(() => setStatus('error'));
     }, 600);
   }, [trend.id]);
@@ -1760,7 +1784,10 @@ const SortHeader: FC<{
     <button
       type="button"
       onClick={() => onToggle(sortKey)}
-      aria-sort={isActive ? (currentDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      // L18 (July 2026 review): aria-sort is only valid on a columnheader
+      // (this header row is a CSS grid, not a <table>) — convey the sort
+      // state through the button's accessible name instead.
+      aria-label={`Sort by ${label}${isActive ? ` — currently ${currentDir === 'asc' ? 'ascending' : 'descending'}` : ''}`}
       className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-colors"
       style={{
         justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
@@ -1982,6 +2009,7 @@ const EditableDots: FC<{
           type="button"
           onClick={() => onChange(d)}
           aria-checked={d === value}
+          aria-label={`${d} of 5`}
           role="radio"
           title={aiHint ?? `${d} / 5`}
           style={{
@@ -2002,9 +2030,12 @@ const EditableDots: FC<{
 };
 
 const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateTrend }) => {
-  const gp1Pct      = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10;
+  // L12 (July 2026 review): no invented display defaults — a missing GP1% /
+  // peak year renders '—', never a fabricated 10% / 2030. The edit drafts
+  // fall back separately below (form controls need a number to bind to).
+  const gp1Pct      = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected;
   const probability = trend.probability ?? 0;
-  const peakYear    = (trend as Trend & { peak_year?: number }).peak_year ?? 2030;
+  const peakYear    = (trend as Trend & { peak_year?: number }).peak_year;
   const diffusion   = (trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve';
   const sources     = trend.sources ?? [];
   const confidence  = trend.confidence;
@@ -2029,8 +2060,8 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
   const [draftDesc, setDraftDesc]           = useState(trend.description || '');
   const [draftProb, setDraftProb]           = useState<number>(Math.round(probability));
   const [draftDir, setDraftDir]             = useState<Trend['direction']>(trend.direction);
-  const [draftGp1, setDraftGp1]             = useState<number>(Math.round(gp1Pct * 100));
-  const [draftPeak, setDraftPeak]           = useState<number>(peakYear);
+  const [draftGp1, setDraftGp1]             = useState<number>(Math.round((gp1Pct ?? 0) * 100));
+  const [draftPeak, setDraftPeak]           = useState<number>(peakYear ?? 2030);
   const [draftCurve, setDraftCurve]         = useState<string>(diffusion);
   const [draftConfidence, setDraftConfidence] = useState<string>(confidence ?? '');
   const [draftCatExp, setDraftCatExp]       = useState<Record<string, number>>({ ...catExp });
@@ -2045,7 +2076,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
     setDraftDesc(trend.description || '');
     setDraftProb(Math.round(trend.probability ?? 0));
     setDraftDir(trend.direction);
-    setDraftGp1(Math.round(((trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0.10) * 100));
+    setDraftGp1(Math.round(((trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0) * 100));
     setDraftPeak((trend as Trend & { peak_year?: number }).peak_year ?? 2030);
     setDraftCurve((trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve');
     setDraftConfidence((trend.confidence as string) ?? '');
@@ -2060,8 +2091,8 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
     setDraftDesc(trend.description || '');
     setDraftProb(Math.round(trend.probability ?? 0));
     setDraftDir(trend.direction);
-    setDraftGp1(Math.round(gp1Pct * 100));
-    setDraftPeak(peakYear);
+    setDraftGp1(Math.round((gp1Pct ?? 0) * 100));
+    setDraftPeak(peakYear ?? 2030);
     setDraftCurve(diffusion);
     setDraftConfidence((confidence as string) ?? '');
     setDraftCatExp({ ...catExp });
@@ -2300,9 +2331,11 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
                   flex: 1, height: 6, borderRadius: 4,
                   backgroundColor: S.surfaceHigh, position: 'relative',
                 }}>
+                  {/* L12 (July 2026 review): honest 0–100% bar — the previous
+                      ×2 visual gain had no axis and overstated the value. */}
                   <div style={{
                     position: 'absolute', inset: 0,
-                    width: `${Math.min(100, Math.round(gp1Pct * 100 * 2))}%`,
+                    width: `${Math.min(100, Math.round((gp1Pct ?? 0) * 100))}%`,
                     backgroundColor: S.primary, borderRadius: 4,
                   }} />
                 </div>
@@ -2315,7 +2348,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
                   fontFamily: HEADLINE_FONT,
                   fontWeight: 800, fontSize: 15, color: S.primary,
                 }}>
-                  {Math.round(gp1Pct * 100)}%
+                  {gp1Pct != null ? `${Math.round(gp1Pct * 100)}%` : '—'}
                 </div>
               </div>
             )}
@@ -2375,7 +2408,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
                     backgroundColor: S.surfaceLow,
                     border: `1px solid ${S.cardBorder}`,
                   }}>
-                    {peakYear}
+                    {peakYear ?? '—'}
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>

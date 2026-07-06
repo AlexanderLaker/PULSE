@@ -40,8 +40,8 @@ def create_parser():
                         help="Launch the local FastAPI backend (dev server on :8000)")
     parser.add_argument("--audit", action="store_true",
                         help="Show audit trail")
-    parser.add_argument("--ai", choices=["claude", "azure", "ollama", "none"],
-                        default="none", help="AI provider (claude=Claude API, azure=Azure OpenAI, ollama=local)")
+    # (--ai flag removed 2026-07-06 with the pulse/ai layer — it was dead:
+    #  create_app() never read it.)
     # B6: RNG seed exposure. --seed for reproducibility, --seeds for wobble.
     parser.add_argument("--seed", type=int, default=42,
                         help="RNG seed for reproducibility (default 42)")
@@ -107,10 +107,15 @@ def main():
             _r = _mc.run(db)
             last_result = _r
             sm = _r["shift_matrix"]
-            last_year = max(int(y) for cat in sm.values() for y in cat.keys())
+            # L1 (July 2026 review): category cells are {"path": {...},
+            # "velocity": {...}} — the old code iterated cat.keys() (the
+            # words "path"/"velocity") as years and crashed on int("path").
+            last_year = max(
+                int(y) for cat in sm.values() for y in cat.get("path", {})
+            )
             headline = float(_np.mean([
-                cat[last_year]["median"] for cat in sm.values()
-                if last_year in cat and isinstance(cat[last_year], dict)
+                cat["path"][last_year]["median"] for cat in sm.values()
+                if last_year in cat.get("path", {})
             ]))
             headlines.append(headline)
             print(f"      seed={s}: headline shift {headline:+.4f}")
@@ -172,8 +177,10 @@ def main():
         }
     )
 
-    # Audit
-    audit.log_simulation_run(config.iterations, "bayesian_mc")
+    # Audit — L1 (July 2026 review): this call passed 2 args to a 3-arg
+    # method and TypeError'd at the end of every CLI run.
+    audit.log_simulation_run("cli", config.iterations,
+                             mc_result.get("model_type", "bayesian_copula"))
     audit.save_snapshot(config.to_json(), f"Run {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     # ── Summary ─────────────────────────────────────────────────────
@@ -185,13 +192,14 @@ def main():
     print(f"  Output:     {args.output}")
     print()
 
-    # Top-level summary
+    # Top-level summary — terminal year from config (L15: no hardcoded 2030)
     sm = mc_result["shift_matrix"]
-    print("  Category Shifts (2030 median):")
+    terminal_year = config.path_years[-1]
+    print(f"  Category Shifts ({terminal_year} median):")
     for cat in config.category_names:
         cat_data = sm.get(cat, {})
         path = cat_data.get("path", {})
-        final = path.get(2030, {})
+        final = path.get(terminal_year, {})
         median = final.get("median", 0.0) if isinstance(final, dict) else final
         bar = "█" * int(abs(median) * 200)
         sign = "▲" if median > 0 else "▼" if median < 0 else "─"

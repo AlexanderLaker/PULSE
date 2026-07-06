@@ -64,12 +64,24 @@ class BayesianMonteCarloEngine:
     Key differences from v1.2:
     - Beta priors instead of triangular (shape from the analyst 1–5 score;
       structured judgment, NOT learned/updated from data — see module docstring)
-    - Copula-based correlation instead of flat ρ (captures tail dependence via force_correlation_matrix)
+    - Copula-based cross-trend dependency instead of flat ρ (a Gaussian
+      copula over force_correlation_matrix — L14 honesty note: a Gaussian
+      copula has NO tail dependence; do not claim otherwise)
     - Multiplicative compounding across forces
     - Continuous annual paths instead of 2 discrete points
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
+    # 2.8.1 — July 2026 handover review (owner-approved batch, 2026-07-06):
+    #         C2 deterministic trend load order (ORDER BY id — reproducibility
+    #         was silently order-dependent); M1 missing gp1_pct_affected now
+    #         hard-fails instead of silently becoming 10%; L3 copula uniforms
+    #         clipped at float-safety (1e-12) instead of 0.001 (the old clip
+    #         biased std/mean inward); L4 compounding factors floored at 0
+    #         (−100% shift) with an integrity event counting affected
+    #         iterations; seed_stability re-added to the multichain result
+    #         (owner re-ruling of T18); master seed persisted alongside chain
+    #         seeds. Golden pins regenerated in the same commit.
     # 2.8.0 — v3.7 June 2026 (second ruling round, D12–D21): Gaussian copula
     #         replaces the inert t-copula (D20); scipy-only exact numerics with
     #         numerics_backend in the result contract (D13); analytics suite
@@ -77,7 +89,7 @@ class BayesianMonteCarloEngine:
     #         full config-layer validation (D21).
     # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
     #         removed from result contract (D4).
-    MODEL_VERSION = "2.8.0"
+    MODEL_VERSION = "2.8.1"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -87,6 +99,8 @@ class BayesianMonteCarloEngine:
         # Integrity events: anything the engine had to repair or coerce at runtime
         # is appended here and surfaced in the result dict for the Integrity drawer.
         self._integrity_events: list[dict] = []
+        # L4 floor guard counter — cells where a compounding factor hit ≤ 0.
+        self._floored_factor_cells: int = 0
         # Pre-compute per-force effective attenuation from overlap matrix
         self._effective_attenuation = self._compute_effective_attenuation()
 
@@ -163,7 +177,7 @@ class BayesianMonteCarloEngine:
         # Step 4: Compute percentiles and diagnostics
         result = self._compile_results(shift_samples, db)
 
-        logger.info(f"MC complete. Median total shift at 2030: "
+        logger.info(f"MC complete. Median total shift at {self.config.path_years[-1]}: "
                      f"{np.median(shift_samples[:, :, -1].sum(axis=1)):.4f}")
 
         return result
@@ -226,12 +240,12 @@ class BayesianMonteCarloEngine:
         if n_trends == 0:
             return np.zeros((n_iter, 0))
 
-        # Ensure positive definiteness of R
-        eigvals = np.linalg.eigvalsh(R)
-        if eigvals.min() < 0:
-            R = R + (abs(eigvals.min()) + 0.01) * np.eye(n_trends)
-            d = np.sqrt(np.diag(R))
-            R = R / np.outer(d, d)
+        # L2 (July 2026 review): the redundant SILENT PSD repair that used to
+        # sit here was removed. _build_correlation_matrix() has already
+        # repaired R (with an integrity event) before this method is called;
+        # any residual numerical failure is caught by the audited
+        # eigenvalue-clip fallback around the Cholesky below. One repair path
+        # per failure mode, each one visible in the integrity log.
 
         # Generate correlated uniform samples via Gaussian copula
         try:
@@ -255,7 +269,12 @@ class BayesianMonteCarloEngine:
         Z_correlated = Z @ L.T
 
         U = norm_cdf(Z_correlated)
-        U = np.clip(U, 0.001, 0.999)
+        # L3 (July 2026 review): clip at float-safety only. The old
+        # [0.001, 0.999] clip truncated every marginal beyond the copula's
+        # ±3.09σ, biasing std/mean inward on all 99 trends. beta_ppf is
+        # well-defined on the open interval; 1e-12 only guards the exact
+        # 0.0/1.0 values norm_cdf can emit for |z| ≳ 8σ.
+        U = np.clip(U, 1e-12, 1.0 - 1e-12)
 
         # Transform uniforms to Beta-distributed probability samples
         samples = np.zeros((n_iter, n_trends))
@@ -285,86 +304,6 @@ class BayesianMonteCarloEngine:
             samples[:, j] = prob_01 * gp1 * trend.direction_sign
 
         return samples
-
-    def _compute_category_path(self, trends: list, trend_scores: np.ndarray,
-                                category: str) -> np.ndarray:
-        """
-        Compute shift path for a single category in one MC iteration.
-
-        Uses multiplicative compounding with per-trend materialization schedules.
-        Each trend has its own peak_year and diffusion_curve, producing a unique
-        materialization schedule. Falls back to force-level overrides for legacy trends.
-        Returns: array of shifts for each year in path_years
-        """
-        n_years = len(self.config.path_years)
-        year_shifts = np.zeros(n_years)
-
-        # Pre-compute per-trend materialization schedules
-        trend_mat_schedules = {}
-        for j, trend in enumerate(trends):
-            pk = getattr(trend, 'peak_year', 0) or 0
-            dc = getattr(trend, 'diffusion_curve', '') or ''
-            if pk > 0 and dc:
-                # Per-trend curve from config.compute_materialization_schedule
-                trend_mat_schedules[j] = compute_materialization_schedule(
-                    pk, dc, self.config.path_years, self.config.base_year
-                )
-            else:
-                # Fallback: force-level override or global default
-                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
-                trend_mat_schedules[j] = {
-                    yr: force_mat.get(yr, self.config.materialization.get(yr, 1.0))
-                    for yr in self.config.path_years
-                }
-
-        # Within-force overlap config
-        wf_overlap = getattr(self.config, 'within_force_overlap', {})
-
-        # Compute year-by-year shifts with multiplicative compounding
-        for y_idx, year in enumerate(self.config.path_years):
-            # Build per-force contributions for this year using per-trend materialization
-            force_contributions = {}
-            for force in FORCES:
-                force_weight = self.config.force_weights.get(force, 1.0 / len(FORCES))
-                total_score = 0.0
-                n_active = 0  # Trends with non-zero exposure for this category
-
-                for j, trend in enumerate(trends):
-                    if trend.force != force:
-                        continue
-                    exposure = trend.category_exposure.get(category, 0)
-                    if exposure > 0:
-                        exposure_frac = min(exposure, 5) / 5.0  # Bounded 0.0-1.0
-
-                        # Per-trend materialization fraction for this year
-                        mat_frac = trend_mat_schedules[j].get(year, 1.0)
-
-                        total_score += trend_scores[j] * exposure_frac * mat_frac
-                        n_active += 1
-
-                # Within-force overlap dampening: reduce sum when multiple
-                # trends in the same force capture overlapping mechanisms.
-                # Formula: dampened = raw × (1 - overlap × (n-1)/n)
-                # With 1 trend: no dampening. With many: approaches (1 - overlap).
-                wf = wf_overlap.get(force, 0.0)
-                if n_active > 1 and wf > 0:
-                    dampen = 1.0 - wf * (n_active - 1) / n_active
-                    total_score *= dampen
-
-                force_score = total_score
-                force_contributions[force] = force_score * force_weight
-
-            # Multiplicative compounding with calibrated per-force attenuation.
-            # No scalar fallback: missing force → loud KeyError (validated upstream).
-            product = 1.0
-            for force, contribution in force_contributions.items():
-                eff_att = self._effective_attenuation[force]
-                attenuated = contribution * eff_att
-                product *= (1.0 + attenuated)
-
-            year_shifts[y_idx] = product - 1.0
-
-        return year_shifts
 
     def _compute_all_paths_vectorized(self, trends: list, raw_samples: np.ndarray,
                                          n_iter: int, n_cats: int, n_years: int) -> np.ndarray:
@@ -482,9 +421,34 @@ class BayesianMonteCarloEngine:
             # Multiplicative compounding with overlap-aware per-force attenuation
             # eff_att: (n_forces,) → broadcast to (1, n_forces, 1)
             attenuated = weighted * eff_att[:, np.newaxis]
+            # L4 (July 2026 review): a compounding factor (1 + attenuated) ≤ 0
+            # means one force alone wiped >100% of the pool in that iteration
+            # — and a product of two negative factors would silently flip the
+            # sign of the total. Floor each factor at 0 (a −100% shift is the
+            # semantic lower bound of a relative pool shift) and count the
+            # affected (iteration, force, category) cells for the integrity log.
+            factors = 1.0 + attenuated
+            n_floored = int((factors <= 0.0).sum())
+            if n_floored > 0:
+                self._floored_factor_cells += n_floored
+                factors = np.maximum(factors, 0.0)
             # (n_iter, n_forces, n_cats) → product over axis=1 → (n_iter, n_cats)
-            product = np.prod(1.0 + attenuated, axis=1)
+            product = np.prod(factors, axis=1)
             shift_samples[:, :, y_idx] = product - 1.0
+
+        # Surface the floor guard in the integrity log once per run (not per year).
+        if self._floored_factor_cells > 0:
+            self._integrity_events.append({
+                "type": "compounding_floor",
+                "severity": "warning",
+                "message": (
+                    f"{self._floored_factor_cells} (iteration × force × category × "
+                    f"year) compounding factors were ≤ 0 (a single force wiping "
+                    f">100% of the pool) and were floored at −100%. If this "
+                    f"count is material relative to iterations, review trend "
+                    f"magnitudes/attenuation."
+                ),
+            })
 
         return shift_samples
 
@@ -979,18 +943,50 @@ class BayesianMonteCarloEngine:
         result = dict(chain_results[-1])
         result["convergence"] = convergence
         result["n_chains"] = n_chains
+        # L8 (July 2026 review): persist the MASTER seed (the one an operator
+        # must pass to reproduce the run) alongside the derived chain seeds.
+        # `result["seed"]` from the last chain is a derived value — overwrite
+        # it with the master so the audit trail names the reproducible input.
+        result["seed"] = int(self.seed)
+        result["master_seed"] = int(self.seed)
         result["chain_seeds"] = [int(s) for s in seeds]
+
+        terminal_year = int(self.config.path_years[-1])
+        # Per-chain PORTFOLIO median at the terminal year — the same
+        # category-weighted quantity the dashboard headline reads
+        # (totals.portfolio), so the stability metric and the headline
+        # measure the same number.
+        cw = getattr(self.config, "category_weights", None) or {}
+        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
+        w = (w / w.sum()) if w.sum() > 0 else np.full(
+            len(self.config.category_names), 1.0 / len(self.config.category_names))
+        per_chain_portfolio_medians = [
+            float(np.median(per_chain_samples[i][:, :, last_idx] @ w))
+            for i in range(n_chains)
+        ]
         result["chain_summaries"] = [
             {"seed": int(seeds[i]),
-             "median_2030": float(np.median(per_chain_samples[i][:, :, last_idx].sum(axis=1)))}
+             "terminal_year": terminal_year,
+             "median_terminal": per_chain_portfolio_medians[i]}
             for i in range(n_chains)
         ]
 
-        # T18 (June 2026): the "seed stability" reassurance metric was removed.
-        # At 50k × 3 chains the headline median is stable to ≈0 by construction,
-        # so the number had no failure mode — it could only ever reassure, never
-        # flag a real problem. Run provenance (seed, chains, model version,
-        # numerics backend) and the integrity-events log remain the honest,
-        # falsifiable reproducibility signals.
+        # Seed stability (M2 — owner re-ruling 2026-07-06 of the June T18
+        # removal): the spread of the terminal-year portfolio median across
+        # independently-seeded chains. Honest framing: this measures MC
+        # sampling noise at the configured iteration count ONLY — it cannot
+        # detect model error, and at 50k × 3 chains it is expected to be
+        # ≈0 pp. It replaces the misleading R̂ badge (R̂ on i.i.d. draws is
+        # ≈1.0 by construction, D3).
+        spread_pp = (max(per_chain_portfolio_medians) -
+                     min(per_chain_portfolio_medians)) * 100.0
+        result["seed_stability"] = {
+            "metric": "terminal_year_portfolio_median",
+            "terminal_year": terminal_year,
+            "per_chain_medians": per_chain_portfolio_medians,
+            "spread_pp": float(spread_pp),
+            "n_chains": n_chains,
+            "iterations_per_chain": int(per_chain_samples[0].shape[0]),
+        }
         return result
 

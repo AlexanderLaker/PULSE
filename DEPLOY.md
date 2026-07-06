@@ -193,4 +193,4 @@ Or roll back via the Vercel dashboard: Deployments → click prior healthy deplo
 - `HANDOVER.md` — primary handover entry point (operate, deploy, landmines)
 - `docs/DEPLOYMENT_NOTES.md` — JWT secret synchronization between Next.js and FastAPI
 - `docs/CLERK_MIGRATION.md` — Clerk auth setup
-- `CLAUDE.md` — full project specification (v3.7, MODEL_VERSION 2.8.0)
+- `CLAUDE.md` — full project specification (v3.8, MODEL_VERSION 2.8.1)

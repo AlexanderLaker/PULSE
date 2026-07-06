@@ -101,7 +101,8 @@ def create_app(args=None) -> FastAPI:
 
     # ── CORS Configuration ──────────────────────────────────────
     import os
-    cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+    # (localhost:5173 removed July 2026 — that was the deleted Vite dashboard.)
+    cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
     if os.environ.get('ENV') == 'production':
         cors_origins = os.environ.get('CORS_ORIGINS', 'https://pulse.henkel.com').split(',')
 

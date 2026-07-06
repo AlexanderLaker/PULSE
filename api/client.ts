@@ -7,13 +7,18 @@
 import type {
   Trend, TrendUpdate,
   TrendProposalPatch, TrendProposalsResponse,
-  SimulationResult, SimulationParams,
+  SimulationResult,
   HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
 } from '@/types';
 
 // ── Base Request ─────────────────────────────────────────────────
 
 const BASE = '/api/v1';
+
+/** L25 (July 2026 review): no request may hang forever — a stalled proxy
+ *  used to leave the dashboard in a permanent skeleton. 20s covers Neon
+ *  cold starts with margin. */
+const REQUEST_TIMEOUT_MS = 20_000;
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -26,6 +31,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const res = await fetch(`${BASE}${path}`, {
       headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       ...options,
     });
     if (!res.ok) {
@@ -39,6 +45,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       throw new ApiError(0, 'Backend unavailable or network error');
+    }
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new ApiError(0, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
     }
     throw error;
   }
@@ -166,14 +175,17 @@ export function normalizeSimulation(raw: unknown): SimulationResult {
     // v3.6 journey layer: terminal-year journey-stage attribution.
     // Absent on pre-journey runs — consumers show an empty state.
     journey_decomposition: r.journey_decomposition as SimulationResult['journey_decomposition'],
+    // M2 (2.8.1): cross-seed stability of the terminal-year portfolio
+    // median. Null/absent on pre-2.8.1 runs — the footer says "not recorded".
+    seed_stability: r.seed_stability as SimulationResult['seed_stability'],
   } as SimulationResult;
 }
 
 export const getSimulation = async (): Promise<SimulationResult> =>
   normalizeSimulation(await request<unknown>('/simulation'));
 
-export const runSimulation = async (params: SimulationParams = {}): Promise<SimulationResult> =>
-  normalizeSimulation(await request<unknown>('/simulate', { method: 'POST', body: JSON.stringify(params) }));
+// (runSimulation removed, L25/July 2026 review: it had no callers — F2: the
+//  deployed service never simulates; runs are produced by the offline CLI.)
 
 // ── Forces ───────────────────────────────────────────────────────
 

@@ -5,6 +5,10 @@ from typing import Optional, Any
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Depends
+# M4 (July 2026 review): JSONResponse is used by /diagnostics' DB-failure
+# branch — the missing import made the endpoint crash (NameError → 500) on
+# exactly the outage it exists to explain. Locked by a test now.
+from fastapi.responses import JSONResponse
 
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES

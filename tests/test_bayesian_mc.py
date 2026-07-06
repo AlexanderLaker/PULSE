@@ -105,28 +105,36 @@ class TestBayesianMCStatistics:
 class TestBayesianMCConvergence:
     """Test Monte Carlo convergence properties."""
 
-    def test_more_iterations_narrows_spread(self, mock_model_config, mock_trends_database):
-        """Should verify more iterations reduce percentile spread."""
-        # Run with fewer iterations
+    def test_percentile_spread_is_iteration_consistent(self, mock_model_config, mock_trends_database):
+        """The P10–P90 band estimates a POPULATION quantity — it must be
+        non-degenerate and consistent across iteration counts.
+
+        L29 (July 2026 review): the old assertion here (`spread >= 0`) was
+        vacuous, and the old test name ("more iterations narrows spread")
+        described a statistical misconception — more samples make the band
+        ESTIMATE more precise; they do not narrow the band itself. The real
+        invariants: the band is strictly positive (the model is stochastic),
+        and the 100- and 500-iteration estimates agree to within loose MC
+        noise (a broken `iterations` parameter or a degenerate sampler
+        fails this).
+        """
         config_100 = mock_model_config.copy_with(iterations=100)
-        engine_100 = BayesianMonteCarloEngine(config_100)
-        result_100 = engine_100.run(mock_trends_database)
+        result_100 = BayesianMonteCarloEngine(config_100).run(mock_trends_database)
 
-        # Run with more iterations
         config_500 = mock_model_config.copy_with(iterations=500)
-        engine_500 = BayesianMonteCarloEngine(config_500)
-        result_500 = engine_500.run(mock_trends_database)
+        result_500 = BayesianMonteCarloEngine(config_500).run(mock_trends_database)
 
-        matrix_100 = result_100["shift_matrix"]
-        matrix_500 = result_500["shift_matrix"]
+        cell_100 = result_100["shift_matrix"]["Hair: Color"]["path"][2030]
+        cell_500 = result_500["shift_matrix"]["Hair: Color"]["path"][2030]
+        spread_100 = cell_100["p90"] - cell_100["p10"]
+        spread_500 = cell_500["p90"] - cell_500["p10"]
 
-        # Check spread (p90 - p10) decreases with more iterations
-        spread_100 = abs(matrix_100["Hair: Color"]["path"][2030]["p90"] - matrix_100["Hair: Color"]["path"][2030]["p10"])
-        spread_500 = abs(matrix_500["Hair: Color"]["path"][2030]["p90"] - matrix_500["Hair: Color"]["path"][2030]["p10"])
-
-        # More iterations should produce tighter confidence intervals
-        # (though this is probabilistic, so we use a loose threshold)
-        assert spread_100 >= 0 and spread_500 >= 0
+        assert spread_100 > 0 and spread_500 > 0, "band must be non-degenerate"
+        # Same population quantity, estimated twice — loose 2x agreement band.
+        assert 0.5 < spread_500 / spread_100 < 2.0, (spread_100, spread_500)
+        # And the iterations parameter must actually thread through.
+        assert result_100["iterations"] == 100
+        assert result_500["iterations"] == 500
 
     def test_returns_convergence_diagnostics(self, mock_model_config, mock_trends_database):
         """Should include convergence diagnostics in result."""

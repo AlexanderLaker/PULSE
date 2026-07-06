@@ -15,12 +15,19 @@ Then derives DEFAULT_PER_FORCE_ATTENUATION via:
 Outputs
 -------
 - Console: full before/after table + delta vs v3.1
-- JSON:    /tmp/attenuation_calibration_v3_5.json (machine-readable)
+- JSON:    data/attenuation_calibration_v3_5.json (machine-readable, tracked)
 """
-import sys, json, itertools, math
+import sys
+import json
+import itertools
+import math
+from pathlib import Path
 from collections import defaultdict, Counter
 
-sys.path.insert(0, '/sessions/charming-cool-babbage/mnt/PROFIT_POOL_ENGINE')
+# M16 (July 2026 review): repo-relative — the old hardcoded sandbox path
+# made this provenance script unrunnable anywhere else.
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 
 from pulse.seed_trends import get_report_trends
 from pulse.config import FORCES, CATEGORIES
@@ -262,6 +269,7 @@ out = {
     "v3_1_within_force_final": v3_1_within,
     "v3_1_per_force_effective_attenuation": v3_1_eff,
 }
-with open('/tmp/attenuation_calibration_v3_5.json', 'w') as f:
+OUT_JSON = REPO / 'data' / 'attenuation_calibration_v3_5.json'
+with open(OUT_JSON, 'w') as f:
     json.dump(out, f, indent=2)
-print("\nWrote /tmp/attenuation_calibration_v3_5.json")
+print(f"\nWrote {OUT_JSON}")

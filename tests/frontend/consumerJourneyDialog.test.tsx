@@ -20,14 +20,14 @@ vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(), updateTrend: vi.fn() }
 import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 
 // T-01 → technology_r01 (the first Sorting / benefiting tile links it).
+// (M8, 2026-07-06: the phantom impact/score fields were removed from the
+//  fixture together with the never-rendered Strength bar they fed.)
 const t01 = {
   id: 'technology_r01',
   name: 'AI-Driven Formulation and Speed-to-Market',
   force: 'Technology',
   direction: 'Expansion',
-  impact: 4,
   probability: 4.5,
-  score: 18,
   description: 'AI reads the garment and prescribes the SKU.',
   journey_exposure: { 'lhc:sorting': 5 },
   sources: [{ title: 's', url: 'https://example.com', data: 'd' }],
@@ -73,7 +73,9 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
 
     // trend-force card resolved against the LIVE trend
     expect(u.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
-    expect(u.getByText('Strength')).toBeTruthy();        // impact × probability
+    // M8 (owner decision 2026-07-06): the "Strength" bar is GONE — it was
+    // built on the retired impact input and had never rendered. Lock that in.
+    expect(u.queryByText('Strength')).toBeNull();
     expect(u.getByText('Stage exposure')).toBeTruthy();  // live journey_exposure
     expect(u.getAllByText('View in Trends').length).toBeGreaterThan(0);
 

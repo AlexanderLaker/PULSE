@@ -683,7 +683,9 @@ def save_trends(trends: List[Trend]) -> None:
                     trend.confidence, trend.ai_suggested, trend.user_override,
                     trend.scorer_count, trend.score_variance, trend.debiasing_applied,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
-                    getattr(trend, 'gp1_pct_affected', 0.10),
+                    # M1: persist the actual value (None included) — never
+                    # invent a 10% default at the persistence boundary.
+                    getattr(trend, 'gp1_pct_affected', None),
                     getattr(trend, 'peak_year', 0),
                     getattr(trend, 'diffusion_curve', 's_curve'),
                     # ai_suggestion: immutable AI baseline snapshot (June 2026
@@ -760,7 +762,11 @@ def load_trends() -> List[Trend]:
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM trends")
+        # C2 (July 2026 review): deterministic load order is part of the
+        # reproducibility contract — "same inputs + seed → same result" is
+        # only true if the trend vector always arrives in the same order.
+        # Physical row order changes after edits/VACUUM; never rely on it.
+        cursor.execute("SELECT * FROM trends ORDER BY id")
         trend_rows = cursor.fetchall()
 
         trends = []
@@ -836,7 +842,12 @@ def load_trends() -> List[Trend]:
                 scorer_count=row.get("scorer_count", 1),
                 score_variance=row.get("score_variance", 0.0),
                 debiasing_applied=row.get("debiasing_applied", False),
-                gp1_pct_affected=row.get("gp1_pct_affected", 0.10) or 0.10,
+                # M1 (July 2026 review): pass missing gp1 through as None so the
+                # engine's deliberate data-quality stop fires. The old
+                # `… , 0.10) or 0.10` silently invented a 10% magnitude for
+                # missing/zero values, defeating the hard-fail in
+                # _generate_copula_samples.
+                gp1_pct_affected=row.get("gp1_pct_affected"),
                 peak_year=row.get("peak_year", 0) or 0,
                 diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
                 probability_posterior=prob_posterior,
@@ -919,6 +930,13 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             scorer_count=row.get("scorer_count", 1),
             score_variance=row.get("score_variance", 0.0),
             debiasing_applied=row.get("debiasing_applied", False),
+            # July 2026 review: these three were silently dropped here, so any
+            # caller that round-tripped this object into save_trends() wiped
+            # the trend's magnitude/timing fields. Keep in sync with
+            # load_trends().
+            gp1_pct_affected=row.get("gp1_pct_affected"),
+            peak_year=row.get("peak_year", 0) or 0,
+            diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
             probability_posterior=prob_posterior,
             ai_suggestion=ai_suggestion,
         )

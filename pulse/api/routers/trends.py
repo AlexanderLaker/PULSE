@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pulse import __version__
 from pulse.config import ModelConfig, FORCES, CATEGORIES
 from pulse.ingestion.models import Trend, TrendDatabase
-from pulse.api.auth import require_auth, require_admin
+from pulse.api.auth import require_auth, require_admin, identity_from_user
 from pulse.api.serialization import _sanitize, _summarize_convergence
 from pulse.api.state import _state, _state_lock, _load_trend_database, _backfill_diffusion_fields
 from pulse.api.models import (
@@ -186,7 +186,9 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
     # Log to audit trail
     try:
         from pulse.database import log_audit
-        log_audit("trend_added", "trend", trend_id, new_value=req.name, reason=f"Added from scanner: {req.force}")
+        log_audit("trend_added", "trend", trend_id, new_value=req.name,
+                  reason=f"Added from scanner: {req.force}",
+                  user_id=identity_from_user(user)[0])
     except Exception:
         pass
 
@@ -202,8 +204,10 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
         "trend_count": db.trend_count,
     }
 
-@router.api_route("/api/v1/trends/revert-to-seed", methods=["GET", "POST"])
+@router.post("/api/v1/trends/revert-to-seed")
 async def revert_trends_to_seed(user: dict = Depends(require_admin)):
+    # (Adversarial re-review 2026-07-06: POST-only, matching full-reseed —
+    #  a state-mutating GET is a CSRF-shaped surface even behind admin auth.)
     """Revert ALL trend probability scores back to seed_trends.py original values.
 
     This undoes any manual edits to probability.
@@ -261,6 +265,7 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
             old_value=f"{len(changes)} trends had modified probabilities",
             new_value="All probabilities reset to seed_trends.py",
             reason="User requested revert to seed scores",
+            user_id=identity_from_user(user)[0],
         )
     except Exception:
         pass
@@ -272,13 +277,18 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
         "total_trends": len(db_trends),
     }
 
-@router.api_route("/api/v1/trends/full-reseed", methods=["GET", "POST"])
-async def full_reseed():
+@router.post("/api/v1/trends/full-reseed")
+async def full_reseed(user: dict = Depends(require_admin)):
     """Replace ALL trends in DB with current seed_trends.py values.
+
+    C1 (July 2026 review): admin-only and POST-only. This endpoint replaces
+    the entire production trend base — it previously accepted an
+    unauthenticated GET, i.e. any browser hitting the URL wiped and
+    reseeded prod. Every legitimate caller is an admin running a deliberate
+    reseed after editing seed_trends.py.
 
     Unlike revert-to-seed (which only resets probability), this replaces
     every field: descriptions, gp1_pct_affected, exposures, etc.
-    Used after updating seed_trends.py in the codebase.
 
     Also deletes orphaned trends whose IDs are no longer in seed_trends.py
     (e.g. retired trends like consumer_r12 and customer_r05 in v3.1).
@@ -336,6 +346,7 @@ async def full_reseed():
             old_value=f"{old_count} trends replaced (orphans removed: {orphan_ids})",
             new_value=f"{len(db_trends)} trends from seed_trends.py",
             reason="Full reseed — descriptions, parameters, exposures all refreshed",
+            user_id=identity_from_user(user)[0],
         )
     except Exception:
         pass
@@ -397,8 +408,10 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
         raise HTTPException(404, f"Trend {trend_id} not found")
 
     audit = _state["audit"]
+    actor_id, _, _ = identity_from_user(user)  # M3: attribute edits to the verified JWT identity
     if update.probability is not None:
-        audit.log_score_change(trend_id, "probability", trend.probability, update.probability)
+        audit.log_score_change(trend_id, "probability", trend.probability,
+                               update.probability, user_id=actor_id)
         trend.probability = max(1, min(5, update.probability))
     if update.direction is not None:
         trend.direction = update.direction
@@ -406,7 +419,8 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
         audit.log("score_change", "trend", trend_id,
                    old_value=str(trend.gp1_pct_affected),
                    new_value=str(update.gp1_pct_affected),
-                   reason="gp1_pct_affected update")
+                   reason="gp1_pct_affected update",
+                   user_id=actor_id)
         trend.gp1_pct_affected = max(0.0, min(1.0, update.gp1_pct_affected))
     if update.category_exposure is not None:
         trend.category_exposure = update.category_exposure
@@ -467,24 +481,9 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
 
     return {"status": "updated", "trend_id": trend_id}
 
-def _identity_from_user(user: dict) -> tuple[str, str, str]:
-    """Derive (user_id, user_name, user_role) from a verified JWT payload.
-
-    Multi-expert proposals are keyed by the caller's stable identity:
-      user_id  — JWT `sub`, else `email` (one of these always present for a
-                 Clerk-minted token; falls back to "anonymous" defensively).
-      user_name — best-effort display name: `name`, else the email local-part,
-                  else the user_id.
-      user_role — `role` claim if present, else "viewer".
-    """
-    user = user or {}
-    email = user.get("email") or ""
-    user_id = str(user.get("sub") or email or "anonymous")
-    name = user.get("name") or user.get("full_name") or ""
-    if not name:
-        name = email.split("@", 1)[0] if "@" in email else user_id
-    role = str(user.get("role") or "viewer")
-    return user_id, str(name), role
+# M3 (July 2026 review): identity derivation moved to pulse.api.auth so every
+# router attributes audit entries from the same verified-JWT source.
+_identity_from_user = identity_from_user
 
 
 def _proposals_payload(trend_id: str, user_id: str | None) -> dict:
@@ -625,7 +624,9 @@ async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):
     # Audit log
     try:
         from pulse.database import log_audit
-        log_audit("trend_deleted", "trend", trend_id, old_value=trend.name, reason="User deleted trend")
+        log_audit("trend_deleted", "trend", trend_id, old_value=trend.name,
+                  reason="User deleted trend",
+                  user_id=identity_from_user(user)[0])
     except Exception:
         pass
 
@@ -662,7 +663,9 @@ async def delete_all_trends(user: dict = Depends(require_admin)):
     # Audit log
     try:
         from pulse.database import log_audit
-        log_audit("all_trends_deleted", "trend", "all", reason=f"Cleared {count} trends")
+        log_audit("all_trends_deleted", "trend", "all",
+                  reason=f"Cleared {count} trends",
+                  user_id=identity_from_user(user)[0])
     except Exception:
         pass
 
@@ -725,6 +728,7 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
             "trend",
             ",".join(sorted(missing_ids)),
             reason=f"Added {len(missing_ids)} missing trends from seed_trends.py",
+            user_id=identity_from_user(user)[0],
         )
     except Exception:
         pass

@@ -38,8 +38,6 @@
   "exclude": [
     "node_modules",
     "pulse",
-    "archive",
-    "_NOT_FOR_HANDOVER",
-    "Not in Live Version"
+    "_NOT_FOR_HANDOVER"
   ]
 }

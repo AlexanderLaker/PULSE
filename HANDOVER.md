@@ -1,8 +1,8 @@
 # PRISM — Developer Handover (Henkel DX)
 
 **Audience:** the full-stack developer taking over hosting, operations and further development of PRISM.
-**Status:** v3.7 · MODEL_VERSION 2.8.0 · June 2026
-**Reading order:** this file → `CLAUDE.md` (the developer handbook and single source of truth) → `README.md` (local setup) → `CONCEPT_PRISM_ONLINE_AI.md` (target state for the Henkel-hosted, AI-enabled version).
+**Status:** v3.8 · MODEL_VERSION 2.8.1 · July 2026
+**Reading order:** this file → `CLAUDE.md` (the developer handbook and single source of truth) → `README.md` (local setup) → `docs/governance/` (why the system is the way it is) → `CONCEPT_PRISM_ONLINE_AI.md` (target state for the Henkel-hosted, AI-enabled version).
 
 ---
 
@@ -16,7 +16,7 @@ Three things it deliberately is **not** (these are owner decisions, not gaps):
 2. **Not a € calculator.** The engine outputs relative shifts only; users apply them to their own financials. The GP1-only Beta explorer is the single sanctioned exception (D5).
 3. **Not an autopilot.** Everything is ceteris paribus — no management response modeled (D16). AI-suggested content is never auto-applied; provenance chips track review state (D7).
 
-`CLAUDE.md` explains every such decision (D1–D21). Read its §1 fully before changing model code.
+`CLAUDE.md` explains every such decision (D1–D21, R1–R4). Read its §1 fully before changing model code; the full decision log lives in `docs/governance/`.
 
 ## 2. The operating model — the one mental model you need
 
@@ -46,14 +46,14 @@ Consequence for operations: after every engine-version bump, re-run the CLI so t
 
 | Layer | Tech | Where |
 |---|---|---|
-| Frontend | Next.js 16.2 / React 19 / TS 5.7 / Tailwind / D3 + Recharts | `app/`, `components/dashboard/` (13 production components + 2 arriving with the WIP branch, §7), `hooks/usePrism.ts` (single data provider), `lib/shiftMatrix.ts` (single source for shift-matrix math, lint-enforced) |
+| Frontend | Next.js 16.2 / React 19 / TS 5.7 / Tailwind / Recharts | `app/`, `components/dashboard/` (10 production components), `hooks/usePrism.ts` (single data provider), `lib/shiftMatrix.ts` + `lib/format.ts` (lint-enforced single sources for shift math and shift display) |
 | Auth | Clerk (identity) + short-lived HS256 JWT bridge to the engine | `app/sign-in`, `lib/prismJwt.ts`, `pulse/api/auth.py`, `proxy.ts` (Next 16 middleware replacement) |
 | API | FastAPI, assembled in `pulse/api/app.py` from routers | `pulse/api/routers/{system,trends,simulation,config,competitors,misc,journey}.py`; live route table in `CLAUDE.md` §7 |
-| Engine | Python 3.10+, numpy + **scipy (hard req)** | `pulse/simulation/bayesian_mc.py` (MODEL_VERSION 2.8.0), `paths.py`, `pulse/audit/input_drift.py` |
+| Engine | Python 3.10+, numpy + **scipy (hard req)** | `pulse/simulation/bayesian_mc.py` (MODEL_VERSION 2.8.1), `paths.py`, `pulse/audit/input_drift.py` |
 | Persistence | Neon Postgres (prod) / SQLite (local) — dual-mode | `pulse/database.py`; schema in `CLAUDE.md` §6 |
-| Exports | QA Excel written by the CLI run | `pulse/excel_bridge/writer.py` (PPTX/Power BI modules exist ad-hoc, no live route) |
-| AI layer | **Dormant** — provider abstraction (Claude/Azure/Ollama), scanner, narrator, calibrator | `pulse/ai/`, docs: `docs/AI_QUICKSTART.md`, `docs/SCANNER_API.md` — see concept doc |
-| CI | GitHub Actions: frontend (typecheck/lint/vitest) + engine (pytest with scipy) | `.github/workflows/ci.yml` |
+| Exports | QA Excel written by the CLI run (round-trip-tested, M10) | `pulse/excel_bridge/writer.py` — the only artifact export |
+| AI layer | **Removed** (owner decision R2, 2026-07-06: broken import, no live route, open security findings) | Future AI = fresh build per `CONCEPT_PRISM_ONLINE_AI.md`; the suggest-only governance (D7 chips) carries over unchanged |
+| CI | GitHub Actions: frontend (typecheck/lint/vitest) + engine (pytest, installed from requirements-dev.txt) | `.github/workflows/ci.yml` |
 
 Current production (to be migrated): Vercel project `prism-profit-pool` (org `lakeralexander-8859s-projects`), URL `https://prism-hcb.vercel.app`, GitHub `AlexanderLaker/PULSE`, DB Neon, auth Clerk. All four are personal accounts of the current owner — migration targets are in the concept document.
 
@@ -77,8 +77,8 @@ npm run verify   # typecheck + eslint + single-source check + vitest + pytest
 Local quirks worth knowing on day 1:
 
 - **`JWT_SECRET` must equal `PRISM_JWT_SECRET`** (Next.js side and FastAPI side of the same bridge — mismatch yields 401s on every data call).
-- Without Postgres, the engine falls back to SQLite. `pulse/env_loader.py` defaults to `data/pulse.db`; the convention used everywhere else is `data/prism.db` — set `PRISM_DB_PATH=data/prism.db` explicitly in `.env`.
-- `npm run lint` includes `scripts/check_shiftmatrix_single_source.sh` — it fails the build if shift-matrix aggregation math appears anywhere except `lib/shiftMatrix.ts`. That is intentional (F1).
+- Without Postgres, the engine falls back to SQLite at `data/prism.db` (`PRISM_DB_PATH` overrides). Real shell environment variables win over `.env` (M17) — you can redirect a single run from the command line.
+- `npm run lint` includes `scripts/check_shiftmatrix_single_source.sh` — it fails the build if shift-matrix aggregation math (any declaration style, or a raw category-weights lookup) appears anywhere except `lib/shiftMatrix.ts`. That is intentional (F1/M5).
 
 ## 5. Operations runbook
 
@@ -88,7 +88,15 @@ Local quirks worth knowing on day 1:
 python3 scripts/run_50k_prod.py
 # 99 trends from prod DB → 3 × 50k multichain → input-drift event →
 # persists a NEW simulation_runs row → QA Excel at repo root (~2–6 min)
+# Exit codes (H2): 0 ok · 1 no DB URL · 2 no trends · 3 PERSIST FAILED ·
+# 4 wrong DB mode (Postgres URL set but SQLite active — H1).
+# --iterations/--chains for test runs; --allow-sqlite for a LOCAL test.
 ```
+
+**Do this once after deploying v3.8**: the persisted run predates engine
+2.8.1 — re-run the CLI so the ribbon matches MODEL_VERSION. Expect small
+median changes (L3/L4 honesty corrections, version-stamped) and the first
+populated seed-stability line.
 
 Previous run rows are kept — the input-drift telemetry (D19) diffs each run against the previous run's trend fingerprint and surfaces "N trend score(s) changed" in the dashboard's integrity chip.
 
@@ -111,21 +119,30 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 2. **The deployed service never simulates** (F2). Don't wire `/simulate` back into the UI; recomputation belongs to the offline/job path.
 3. **Correlation defaults must stay PSD-valid as entered** (D1). `PUT /api/v1/config` spectrally rejects invalid matrices; the engine's repair must never fire on defaults — if it does, that's a regression, and golden pins will catch it.
 4. **Gaussian copula only.** The t-copula was deleted because its df dial had no observable output effect (D20); `ModelConfig.from_json` tolerates the retired field in old snapshots — keep that tolerance.
-5. **Golden pins** (`tests/test_golden_pipeline.py`, 2.8.0): regenerating them is a *deliberate model change* — same commit, version bump, owner sign-off. Never regenerate to make CI green.
-6. **Honest display set** (D3/D6/D16/D17): one decimal; P10–P90 always visible; the headline band is the true joint portfolio percentile (`totals.portfolio`); "attribution", never "simulation", on the lenses; the exact ceteris-paribus caption; "structured-judgment overlap correction" — never "calibrated"; seed stability, never R̂, in the run popover. Copy changes here are owner-approval territory.
+5. **Golden pins** (`tests/test_golden_pipeline.py`, 2.8.1): regenerating them is a *deliberate model change* — same commit, version bump, owner sign-off. Never regenerate to make CI green.
+6. **Honest display set** (D3/D6/D16/D17 + M2): one decimal; P10–P90 always reachable (hover tooltip, drill-down fan chart, cell aria-labels); the headline band is the true joint portfolio percentile (`totals.portfolio`); "attribution", never "simulation", on the lenses; the exact ceteris-paribus caption; "structured-judgment overlap correction" — never "calibrated"; seed stability (honestly framed as MC sampling noise), never R̂, in the run footer. Copy changes here are owner-approval territory.
 7. **Deleted means deleted** (D4 optimizer, D10 Delphi, D14 analytics): don't resurrect from git history; the legacy `allocation_recommendation` column stays NULL.
 8. **Relative % only.** No € figures anywhere except the GP1-only Beta explorer (D5).
 9. **AI is suggest-only** (D7): `ai_suggested` / `user_override` drive provenance chips; nothing auto-applies. This governance carries into the online concept unchanged.
 10. **Open-by-decision, not bugs:** no hindcast (F-08), one-sided trend grammar (F-09), no Henkel-position overlay (F-20). Don't "fix" without the owner.
 
-## 7. State at handover (2026-06-23)
+## 7. State at handover (2026-07-06)
 
-- **Repo is clean.** A pre-handover review consolidated the tree so it tracks **only the live product + a slim canonical doc set**. Earlier day-one items are **done**: the legacy Vite dashboard (`pulse/dashboard/`), `public/` Vite artifacts, `assets/`, `pulse/backup.py`, `pulse/integrations/`, the broken `tests/test_scanner_routes.py`, and the dead duplicate `pulse/api/routes/auth.py` are all removed. The still-dormant scanner surface (`pulse/api/routes/scanner.py`) and AI layer (`pulse/ai/`) are deliberately **kept, fenced** for the online/AI concept (§3, `CONCEPT_PRISM_ONLINE_AI.md`) — they are not imported by the live app.
-- **Docs.** Root carries five canonical docs (`README`, `HANDOVER`, `CLAUDE`, `DEPLOY`, `CONCEPT_PRISM_ONLINE_AI`); all provenance/operational deep-dives now live under `docs/` (index: `docs/INDEX.md`). `README`/`DEPLOY` are reconciled to v3.7 / Next 16 / read-only reality; on any conflict this file + `CLAUDE.md` win.
-- **Scripts.** Spent one-time migrations (`migrate_prod_to_v3_1.py`, `migrate_prod_to_v3_5.py`, `import_report_trends.py`) are archived under `scripts/archive/` for provenance; active ops scripts stay in `scripts/`. `data/pulse.db` is a local relic (gitignored — delete locally).
-- **Quality gates** were green at this pass: typecheck clean, vitest 33, lint 0 errors (13 known `set-state-in-effect` advisories), shift-matrix single-source guard OK. Re-run the engine `pytest` + 2.8.0 golden pins on a scipy host as the final pre-deploy check — **no engine code changed in this pass**.
-- **Database:** you will receive a `pg_dump` (trends, simulation_runs, config_snapshots, journey_content, users, audit_log — schema in `CLAUDE.md` §6), not credentials. Journey activation: run `scripts/backfill_journey_exposure.py` once, then a fresh 50k run.
-- **Secrets:** every credential (Clerk, DB, JWT secret, signup code, API keys) is rotated at handover; nothing in the repo or its history contains secrets (verified).
+- **Full review remediated.** An external-style code review (July 1: 2 critical / 6 high / 17 medium / 29 low findings) was remediated end-to-end on 2026-07-06 — security (the unauthenticated full-reseed closed), reproducibility (deterministic trend order), ops integrity (prod runs fail loudly), the save-integrity UI bugs, honest-display and a11y batches, dead code/deps/config removed. Per-finding dispositions with commits: `docs/governance/REMEDIATION_2026-07-06.md`. Engine is **2.8.1** with regenerated golden pins.
+- **Repo tracks only the live product + docs.** The June 23 cleanup items remain done (legacy Vite dashboard, `pulse/backup.py`, `pulse/integrations/` etc. removed). This round additionally deleted the AI layer (`pulse/ai/`) and the legacy `routes/` package (owner decision R2 — broken import, no live route, open security findings) and the 11 legacy-auth tombstone stubs (Clerk owns auth end-to-end). Spent one-time migrations stay archived under `scripts/archive/`.
+- **The handover package** is produced by `bash scripts/package_handover.sh`: a fresh-history export (single-commit git repo) that structurally cannot contain `.env`, local DBs, the quarantine folder, or secret-shaped strings (the build fails if it ever would). The old personal-GitHub history is archived privately by the owner and is NOT part of the handover (H4).
+- **Docs.** Root carries five canonical docs (`README`, `HANDOVER`, `CLAUDE`, `DEPLOY`, `CONCEPT_PRISM_ONLINE_AI`); deep-dives under `docs/` (index: `docs/INDEX.md`); the governance record under `docs/governance/`. All reconciled to the tree on 2026-07-06 (M14); on any conflict this file + `CLAUDE.md` win.
+- **Quality gates green at this pass:** typecheck clean · eslint 0 errors (18 known react-compiler advisories, see backlog) · vitest 44 · pytest 90 (incl. 2.8.1 golden pins, joint-portfolio-band pin, operational tests) · single-source guard OK.
+- **Database:** you will receive a `pg_dump` (schema in `CLAUDE.md` §6), not credentials. Journey activation: run `scripts/backfill_journey_exposure.py` once, then a fresh 50k run.
+- **Secrets:** every credential (Clerk, DB, JWT secret, signup code) is rotated at handover; the package builder verifies nothing secret-shaped ships.
+
+**DX backlog (known and deliberate — not regressions):**
+
+1. Run the first 2.8.1 production run (§5) — until then the dashboard serves the last 2.8.0 run, honestly labeled (seed stability reads "not recorded").
+2. Drop the inert legacy DB columns (`users.password_hash/password_salt`, `trends.scorer_count/score_variance/debiasing_applied`, `simulation_runs.allocation_recommendation`) in a scheduled migration window; run `scripts/migrate_drop_delphi.py` if `delphi_*` tables still exist in prod.
+3. Burn down the 18 react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
+4. Consider splitting the largest dashboard components (Trends2 ≈ 2.8k lines) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
+5. Strategist review of the 46 ✨ AI-suggested journey tiles + 260 exposure scores (owner-gated content backlog; see the Consumer Journey section of `CLAUDE.md`).
 
 ## 8. Who decides what
 
@@ -138,6 +155,6 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 
 ## 9. Suggested first two weeks
 
-Week 1: local env running; read `CLAUDE.md` §§1–2, 6–8; click through every dashboard tab against `https://prism-hcb.vercel.app`; run the pytest + vitest suites; execute one 50k run against a **copy** of the DB and watch the run ribbon/integrity chip update. Week 2: review the §7 cleanup already applied; restore the `pg_dump` into a Henkel-managed Postgres and point a preview deployment at it; then start on the migration plan in `CONCEPT_PRISM_ONLINE_AI.md`.
+Week 1: local env running; read `CLAUDE.md` §§1–2, 6–8 and skim `docs/governance/REMEDIATION_2026-07-06.md`; click through every dashboard tab against `https://prism-hcb.vercel.app`; run `npm run verify`; execute one 50k run against a **copy** of the DB (`--allow-sqlite --iterations 5000` for a dry run) and watch the run ribbon/integrity chip/seed-stability line update. Week 2: work the §7 backlog items 1–2; restore the `pg_dump` into a Henkel-managed Postgres and point a preview deployment at it; then start on the migration plan in `CONCEPT_PRISM_ONLINE_AI.md`.
 
 Questions that look like bugs are usually decisions — check `CLAUDE.md` §1 first, then ask Alex (laker.alexander@gmail.com / Henkel contact to be added at handover).

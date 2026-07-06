@@ -100,20 +100,29 @@ class AuditLogger:
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
 
+    # M3 (July 2026 review): every convenience wrapper forwards user_id so
+    # mutating endpoints attribute changes to the verified JWT identity
+    # instead of the meaningless "system" default.
     def log_score_change(self, trend_id: str, field: str,
-                         old_val, new_val, reason: str = ""):
+                         old_val, new_val, reason: str = "",
+                         user_id: str = "system"):
         self.log("score_change", "trend", trend_id,
-                 str(old_val), str(new_val), reason)
+                 str(old_val), str(new_val), reason, user_id=user_id)
 
-    def log_trend_add(self, trend_id: str, trend_name: str, source: str = ""):
-        self.log("trend_add", "trend", trend_id, "", trend_name, source)
+    def log_trend_add(self, trend_id: str, trend_name: str, source: str = "",
+                      user_id: str = "system"):
+        self.log("trend_add", "trend", trend_id, "", trend_name, source,
+                 user_id=user_id)
 
-    def log_trend_remove(self, trend_id: str, reason: str = ""):
-        self.log("trend_remove", "trend", trend_id, reason=reason)
+    def log_trend_remove(self, trend_id: str, reason: str = "",
+                         user_id: str = "system"):
+        self.log("trend_remove", "trend", trend_id, reason=reason,
+                 user_id=user_id)
 
-    def log_config_change(self, param: str, old_val, new_val, reason: str = ""):
+    def log_config_change(self, param: str, old_val, new_val, reason: str = "",
+                          user_id: str = "system"):
         self.log("config_change", "config", param,
-                 str(old_val), str(new_val), reason)
+                 str(old_val), str(new_val), reason, user_id=user_id)
 
     def log_ai_suggestion(self, suggestion_id: str, action: str, details: str = ""):
         self.log(f"ai_{action}", "ai_suggestion", suggestion_id, new_value=details)

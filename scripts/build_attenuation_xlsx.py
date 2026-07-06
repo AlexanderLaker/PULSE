@@ -18,7 +18,10 @@ Color conventions (xlsx skill):
 import sys, json, itertools, math
 from pathlib import Path
 
-sys.path.insert(0, '/sessions/charming-cool-babbage/mnt/PROFIT_POOL_ENGINE')
+# M16 (July 2026 review): repo-relative — the old hardcoded sandbox path
+# made this provenance script unrunnable anywhere else.
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 from pulse.seed_trends import get_report_trends
 from pulse.config import FORCES, CATEGORIES
 
@@ -26,8 +29,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-CALIB_JSON = Path('/sessions/charming-cool-babbage/mnt/PROFIT_POOL_ENGINE/data/attenuation_calibration_v3_5.json')
-OUT        = Path('/tmp/Attenuation_Calibration_v3_5.xlsx')
+CALIB_JSON = REPO / 'data' / 'attenuation_calibration_v3_5.json'
+OUT        = REPO / 'data' / 'Attenuation_Calibration_v3_5.xlsx'
 
 calib = json.loads(CALIB_JSON.read_text())
 trends = get_report_trends()
