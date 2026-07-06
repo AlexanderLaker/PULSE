@@ -29,18 +29,18 @@ endpoints. The engine has no user store of its own.
 
 | Path | Purpose |
 |------|---------|
-| `app/` | Next.js pages + API routes (BFF: auth bridge, user/role admin) |
+| `app/` | Next.js pages + API routes (BFF: Clerk→engine auth bridge, user/role admin) |
 | `components/dashboard/` | Dashboard views (Trends, Consumer Journey, Profit Pool Shift Analysis, Profit Pool Explorer) |
 | `hooks/usePrism.ts` | Central data hook — single source of truth for engine state |
-| `api/client.ts` | Typed API client for all `/api/v1/*` calls |
-| `lib/` | Server-side helpers: roles, db, Clerk→PRISM JWT bridge, formatting |
+| `api/client.ts` | Typed API client for all `/api/v1/*` calls (20 s timeout on every request) |
+| `lib/` | Server-side helpers (roles, db, Clerk→PRISM JWT bridge) + pure display/math modules (`format.ts`, `shiftMatrix.ts` — lint-guarded single sources) |
 | `types/` | Shared TypeScript types |
 | `api/index.py` | Vercel serverless adapter wrapping the FastAPI app |
 | `pulse/` | Python simulation engine + FastAPI app |
-| `data/` | Static front-end content (consumer journey tiles, trend code map) |
-| `tests/` | pytest suite for the engine |
-| `scripts/` | Production-run + ops helpers (`scripts/archive/` holds spent one-off migrations) |
-| `docs/` | Deep-dive docs: methodology, brand/category mapping, trend audits, testing, design system (`docs/INDEX.md`) |
+| `data/` | Static front-end content (consumer journey tiles, trend code map) + attenuation calibration JSON |
+| `tests/` | pytest suite (engine, API, ops) + `tests/frontend/` vitest suite |
+| `scripts/` | Production run, ops helpers, `package_handover.sh` (`scripts/archive/` holds spent one-off migrations) |
+| `docs/` | Deep-dive docs incl. `docs/governance/` (decision log, findings register, remediation records) — see `docs/INDEX.md` |
 | `*.md` (repo root) | The five canonical docs: README, HANDOVER, CLAUDE, DEPLOY, CONCEPT_PRISM_ONLINE_AI |
 
 ## Prerequisites
@@ -84,21 +84,27 @@ npm run dev                                                 # frontend on :3000
 | `ADMIN_BOOTSTRAP_SECRET` | optional | Next server | Shared secret for `/api/admin/bootstrap` (first admin) |
 | `BACKEND_URL` / `PRISM_BACKEND_URL` | dev only | Next server | Engine URL override (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | optional | engine | SQLite path for local runs without Postgres |
-| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | optional | engine | Transactional e-mail (currently unused after auth cleanup) |
-| `ANTHROPIC_API_KEY` | optional | engine | AI narration/chat features (`pulse/ai/`) |
-| `CORS_ORIGINS`, `PRISM_APP_URL` | optional | engine | CORS / absolute-URL overrides |
+| `CORS_ORIGINS` | optional | engine | CORS override |
+
+Note (M17, July 2026): real shell environment variables **win** over `.env`
+values — you can redirect a single run with `DATABASE_URL=… python3 …`.
+(The former AI-layer and transactional-email variables were removed with
+their features.)
 
 ## Scripts & tests
 
 ```bash
 npm run dev / build / start    # Next.js
-npx tsc -p tsconfig.check.json --noEmit    # typecheck (CI gate)
-pytest                          # engine test suite (simulation, API, properties)
+npm run verify                 # the full local gate: typecheck + eslint +
+                               # single-source guard + vitest + pytest
+                               # (CI runs the same two jobs)
 ```
 
-Engine determinism: simulations use a fixed seed (42) via `np.random.default_rng`
-— identical inputs produce identical results by design (reproducibility for
-audits). Multi-chain convergence checks derive distinct seeds internally.
+Engine determinism: simulations use a fixed master seed (42) via
+`np.random.default_rng`; trends load in a fixed order (`ORDER BY id`, C2) —
+identical inputs produce identical results by design (reproducibility for
+audits). Multi-chain runs derive distinct chain seeds from the master and
+persist both; the cross-seed spread is reported as `seed_stability`.
 
 ## Deployment (Vercel)
 
@@ -112,7 +118,10 @@ Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
 Start with `HANDOVER.md` (takeover guide), then `CLAUDE.md` (full developer
 handbook / spec). Deep-dive docs (methodology, brand/category mapping, trend
 audits, testing, design system) live under `docs/` — see `docs/INDEX.md`.
+The governance record (decision log, findings register, review remediation)
+is committed under `docs/governance/` — code comments cite it by finding ID.
 Target-state concept for Henkel hosting + online AI: `CONCEPT_PRISM_ONLINE_AI.md`.
 
-Strategy decks, management reports and historical audits are NOT part of this
-repository.
+Strategy decks, management reports and personal working files are NOT part
+of this repository. The handover package is built by
+`bash scripts/package_handover.sh` (fresh-history export, secret-checked).

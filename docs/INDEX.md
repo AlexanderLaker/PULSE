@@ -20,15 +20,23 @@ the June 2026 pre-handover cleanup.
 | `TREND_SOURCE_AUDIT_AND_GAP_ANALYSIS.md` | Full source-provenance audit + gap analysis of the 99 trends. |
 | `PROFIT_POOL_EXPLORER_SOURCES_AUDIT_2026-07-02.md` | Passport-taxonomy alignment audit of the Profit Pool Explorer's market-size triangulations (source ladder, denominations). |
 
+## Governance (the credibility trail — start here for "why is it like this?")
+| Doc | What it covers |
+|-----|----------------|
+| `governance/README.md` | How the governance record is organised and cited from code. |
+| `governance/DECISION_LOG.md` | Owner rulings D1–D21 with execution records. |
+| `governance/FINDINGS_REGISTER.md` | Audit findings F-01…F-27 incl. the open-by-decision set. |
+| `governance/CODE_REVIEW_2026-07-01_DECISIONS.md` | The July 2026 code review as presented to the owner. |
+| `governance/REMEDIATION_2026-07-06.md` | Full disposition of that review (owner decisions R1–R4, commits). |
+
 ## Engineering & operations
 | Doc | What it covers |
 |-----|----------------|
 | `DESIGN.md` | "Maritime Editorial" design system — token source of truth (mirrors `tailwind.config.js` + `app/globals.css`). |
 | `TESTING.md` | Canonical testing guide (run commands, fixtures, suite layout). |
 | `DEPLOYMENT_NOTES.md` | JWT-secret synchronization between the Next.js proxy and the FastAPI engine. |
-| `AUTH_PAGES_REFERENCE.md` | Auth page flows (sign-in/up, forgot/reset password). |
-| `CLERK_MIGRATION.md` | History of the Clerk auth integration. |
-| `CONNECTION_STATUS_GUIDE.md` | Health/connection-status behavior in the dashboard. |
+| `CLERK_MIGRATION.md` | History of the Clerk auth integration. (The legacy custom-auth pages it superseded were fully removed 2026-07-06, L26.) |
+| `CONNECTION_STATUS_GUIDE.md` | Health/connection-status behavior in the dashboard. (Since 2026-07-06/M7: reconnecting also reloads data automatically.) |
 
 ## AI layer (roadmap only)
 The dormant `pulse/ai/` package was removed in the July 2026 handover review
