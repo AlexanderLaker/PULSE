@@ -52,6 +52,7 @@ import {
   CATEGORIES, YEARS, fmtShift, fmtPct, shiftArrow, shiftColor,
   heatFill, heatText, heatScaleFor, fmtDate, fmtDateTime,
   categoryDisplay, categoryCode, groupDisplay,
+  EXPANSION_RGB, CONTRACTION_RGB,
 } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import ShiftValue from '@/components/dashboard/ShiftValue';
@@ -624,12 +625,6 @@ const Matrix: FC<MatrixProps> = ({
                     onClick={onRowClick ? () => onRowClick(row.id) : undefined}
                     onMouseEnter={onRowClick ? () => setHoverRow(row.id) : undefined}
                     onMouseLeave={onRowClick ? () => setHoverRow(null) : undefined}
-                    role={onRowClick ? 'button' : undefined}
-                    tabIndex={onRowClick ? 0 : undefined}
-                    aria-label={onRowClick ? `Open ${row.label} detail — fan chart and contributing trends` : undefined}
-                    onKeyDown={onRowClick ? (e) => {
-                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(row.id); }
-                    } : undefined}
                     style={{ cursor: onRowClick ? 'pointer' : 'default' }}
                   >
                     <td
@@ -644,9 +639,28 @@ const Matrix: FC<MatrixProps> = ({
                     >
                       {onRowClick ? (
                         <span style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8 }}>
-                          <span style={{ textDecoration: isRowHover ? 'underline' : 'none', textUnderlineOffset: '3px' }}>
+                          {/* L18 (July 2026 review): the drill-down's keyboard/AT
+                              entry point is a REAL button inside the first cell.
+                              The old `<tr role="button">` overrode the row role
+                              and broke cell semantics for screen readers (cells
+                              were no longer announced as table cells). Mouse
+                              users keep the whole-row click via the tr handler;
+                              focus lands here for everyone else. */}
+                          <button
+                            type="button"
+                            className="ppa2-row-open"
+                            onClick={(e) => { e.stopPropagation(); onRowClick(row.id); }}
+                            onFocus={() => setHoverRow(row.id)}
+                            onBlur={() => setHoverRow(null)}
+                            aria-label={`Open ${row.label} detail — fan chart and contributing trends`}
+                            style={{
+                              all: 'unset', cursor: 'pointer',
+                              textDecoration: isRowHover ? 'underline' : 'none',
+                              textUnderlineOffset: '3px',
+                            }}
+                          >
                             {row.label}
-                          </span>
+                          </button>
                           {row.code && (
                             <span
                               style={{
@@ -679,10 +693,22 @@ const Matrix: FC<MatrixProps> = ({
                     {columns.map((col) => {
                       const v = data[row.id]?.[col.id] ?? null;
                       const isCellHover = hover?.rowId === row.id && hover?.colId === col.id;
+                      // L16 (July 2026 review): the P10–P90 band is a governance
+                      // feature and must not be pointer-only. Screen readers get
+                      // the full band via the cell's aria-label (announced in
+                      // table navigation, no tab-stop pollution across 130+
+                      // cells); sighted keyboard users reach the same band via
+                      // the row drill-down button (fan chart).
+                      const det = cellDetails?.[row.id]?.[col.id] ?? null;
+                      const bandLabel = v == null ? undefined
+                        : det && det.p10 != null && det.p90 != null
+                          ? `${row.label}, ${col.label}: median ${fmtShift(v, 1)}, P10 ${fmtShift(det.p10, 1)}, P90 ${fmtShift(det.p90, 1)}`
+                          : `${row.label}, ${col.label}: ${fmtShift(v, 1)}`;
                       return (
                         <td
                           key={col.id}
                           className="px-3 py-1 text-center text-[13px] tabular-nums"
+                          aria-label={bandLabel}
                           style={{
                             backgroundColor: heatFill(v, viewScale),
                             color: heatText(v),
@@ -790,12 +816,14 @@ const Matrix: FC<MatrixProps> = ({
             labels state the actual scale in use — never an implied ±5%. */}
         <div className="flex items-center gap-3">
           <span title="Shading scaled to the values in this view">−{fmtPct(viewScale, 1)}</span>
+          {/* L10 (July 2026 review): ramp swatches built from lib/format's
+              semantic rgb channels (alphas mirror heatFill's 0.42 cap). */}
           <div className="flex h-2 rounded-full overflow-hidden" style={{ width: 120 }}>
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.42)' }} />
-            <div style={{ flex: 1, background: 'rgba(159, 64, 61, 0.22)' }} />
+            <div style={{ flex: 1, background: `rgba(${CONTRACTION_RGB}, 0.42)` }} />
+            <div style={{ flex: 1, background: `rgba(${CONTRACTION_RGB}, 0.22)` }} />
             <div style={{ flex: 0.2, background: S.surfaceLow }} />
-            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.22)' }} />
-            <div style={{ flex: 1, background: 'rgba(31, 122, 61, 0.42)' }} />
+            <div style={{ flex: 1, background: `rgba(${EXPANSION_RGB}, 0.22)` }} />
+            <div style={{ flex: 1, background: `rgba(${EXPANSION_RGB}, 0.42)` }} />
           </div>
           <span title="Shading scaled to the values in this view">+{fmtPct(viewScale, 1)}</span>
           <span style={{ fontSize: 11 }}>· shading scaled to this view</span>
@@ -1247,16 +1275,12 @@ const ProfitPoolAnalysis2: FC<{
           )
         : undefined;
 
+    // M5 (July 2026 review): this block used to RE-IMPLEMENT the weight
+    // resolution rule inline — a divergent copy the single-source guard
+    // couldn't see. Delegate to lib/shiftMatrix like everywhere else.
     const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
-    const catWeightFor = (catName: string, fallbackId: string): number => {
-      if (!catWeightsRaw) return 1;
-      const byName = catWeightsRaw[catName];
-      if (typeof byName === 'number' && isFinite(byName)) return byName;
-      const byId = catWeightsRaw[fallbackId];
-      if (typeof byId === 'number' && isFinite(byId)) return byId;
-      return 0;
-    };
-    const rowWeights = matrixData.rows.map((r) => catWeightFor(r.id, r.fallbackId));
+    const rowWeights = matrixData.rows.map((r) =>
+      resolveCatWeight(catWeightsRaw, r.id, r.fallbackId));
     const newColTotals: Record<string, number | null> = {};
     Object.keys(matrixData.colTotals ?? {}).forEach((k) => {
       const vals = matrixData.rows.map((r) => newData[r.id]![k] ?? null);
@@ -1407,15 +1431,11 @@ const ProfitPoolAnalysis2: FC<{
     const shifts = simulation?.shifts;
     if (!shifts) return null;
     const horizon = YEARS[YEARS.length - 1]!;
+    // M5 (July 2026 review): weight resolution delegates to lib/shiftMatrix
+    // (this was the third inline re-implementation in this file).
     const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
-    const wFor = (name: string, id: string): number => {
-      if (!catWeightsRaw) return 1;
-      const byName = catWeightsRaw[name];
-      if (typeof byName === 'number' && isFinite(byName)) return byName;
-      const byId = catWeightsRaw[id];
-      if (typeof byId === 'number' && isFinite(byId)) return byId;
-      return 0;
-    };
+    const wFor = (name: string, id: string): number =>
+      resolveCatWeight(catWeightsRaw, name, id);
     const meds: Array<number | null> = [];
     const p10s: Array<number | null> = [];
     const p90s: Array<number | null> = [];
@@ -1524,11 +1544,14 @@ const ProfitPoolAnalysis2: FC<{
       className="min-h-screen"
       style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}
     >
-      {/* U6 (June 2026): visible keyboard focus on the interactive matrix rows
-          and KPI tiles, so the drill-down is reachable without a mouse. */}
+      {/* U6 (June 2026) / L18 (July 2026): visible keyboard focus on the
+          matrix drill-down buttons and KPI tiles, so the drill-down is
+          reachable without a mouse. (The focus target moved from the old
+          `tr[role="button"]` — which broke table semantics — to a real
+          button inside the row's first cell.) */}
       <style>{`
-        tr[role="button"]:focus-visible { outline: 2px solid ${S.primary}; outline-offset: -2px; border-radius: 4px; }
-        tr[role="button"]:focus:not(:focus-visible) { outline: none; }
+        .ppa2-row-open:focus-visible { outline: 2px solid ${S.primary}; outline-offset: 2px; border-radius: 4px; }
+        .ppa2-row-open:focus:not(:focus-visible) { outline: none; }
       `}</style>
       <main className="max-w-[1440px] mx-auto px-8 py-10">
 
@@ -1875,18 +1898,25 @@ const ProfitPoolAnalysis2: FC<{
             <div className="mt-2 px-5 py-5 rounded-2xl" style={{ backgroundColor: S.surface, border: `1px solid ${S.cardBorder}` }}>
               {/* ── This run — provenance + audit metadata + integrity events.
                   Flat layout replaces the old header ribbon's popovers
-                  (RunDetailsPopover / IntegrityChip). T18 (June 2026): the
-                  "seed stability" reassurance metric was removed — it had no
-                  failure mode. D13: numerics backend on the audit trail.
-                  D19: integrity events surfaced with the run. */}
+                  (RunDetailsPopover / IntegrityChip). M2 (owner re-ruling
+                  2026-07-06 of T18): seed stability is BACK — the spread of
+                  the terminal-year portfolio median across independently-
+                  seeded chains; honest framing: it measures MC sampling
+                  noise only (≈0 pp expected at 50k × 3). D13: numerics
+                  backend on the audit trail. D19: integrity events surfaced
+                  with the run. */}
               {simulation?.run_meta?.run_id != null && (() => {
                 const m = simulation.run_meta;
                 const events = simulation.integrity_events ?? [];
+                const ss = simulation.seed_stability;
                 const rows: Array<[string, string]> = [];
                 if (m.iterations != null) {
                   rows.push(['Iterations', `${(m.iterations / 1000).toFixed(0)}k${m.chains != null ? ` × ${m.chains} chains` : ''}`]);
                 }
                 if (m.seed != null) rows.push(['Seed', String(m.seed)]);
+                rows.push(['Seed stability', ss
+                  ? `±${ss.spread_pp.toFixed(2)} pp across ${ss.n_chains} seeds (${ss.terminal_year} portfolio median)`
+                  : 'not recorded (pre-2.8.1 run)']);
                 if (m.numerics_backend) rows.push(['Numerics', m.numerics_backend]);
                 if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
                 if (m.model_version) rows.push(['Model', m.model_version]);

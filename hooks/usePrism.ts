@@ -54,15 +54,29 @@ function usePrismStore(): UsePrismReturn {
   const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
   const mounted = useRef(true);
   const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // M7 (July 2026 review): request ordering. Every loadAll() takes a new
+  // epoch; only the newest epoch may write state, so a slow older load can
+  // never overwrite a newer one.
+  const loadEpochRef = useRef(0);
+  // Mirror of connectionState for use inside stable callbacks (avoids the
+  // stale-closure variant of the reconnect bug). Kept in sync via an effect
+  // — refs must not be written during render (react-hooks/refs).
+  const connectionStateRef = useRef<'connected' | 'reconnecting' | 'offline'>('reconnecting');
+  useEffect(() => { connectionStateRef.current = connectionState; }, [connectionState]);
 
   // -- Health check with reconnect logic ------------------------
   const performHealthCheck = useCallback(async () => {
     try {
       await api.getHealth();
       if (mounted.current) {
+        // M7: transitioning offline → connected must RELOAD data, not just
+        // flip the badge — the dashboard used to read "connected" over
+        // stale/empty data until a manual page refresh.
+        const wasDisconnected = connectionStateRef.current !== 'connected';
         setBackendAvailable(true);
         setConnectionState('connected');
         setError(null);
+        if (wasDisconnected) void loadAllRef.current?.();
       }
     } catch {
       if (mounted.current) {
@@ -95,6 +109,9 @@ function usePrismStore(): UsePrismReturn {
 
   // -- Initial load with graceful degradation -------------------
   const loadAll = useCallback(async () => {
+    // M7: claim a new epoch; stale loads may not write state.
+    const epoch = ++loadEpochRef.current;
+    const fresh = () => mounted.current && epoch === loadEpochRef.current;
     setLoading(true);
     setError(null);
     setConnectionState('reconnecting');
@@ -109,7 +126,7 @@ function usePrismStore(): UsePrismReturn {
         api.getConfig().catch((): null => null),
       ]);
 
-      if (!mounted.current) return;
+      if (!fresh()) return;
 
       setBackendAvailable(true);
       setConnectionState('connected');
@@ -120,20 +137,26 @@ function usePrismStore(): UsePrismReturn {
       // Load stored simulation if available
       if (h?.has_simulation) {
         const sim = await api.getSimulation().catch((): null => null);
-        if (sim && mounted.current) setSimulation(sim);
+        if (sim && fresh()) setSimulation(sim);
       }
       // If no stored simulation, leave it null -- the dashboard explains why.
     } catch (e) {
-      if (mounted.current) {
+      if (fresh()) {
         setBackendAvailable(false);
         setConnectionState('offline');
         setHealth({ status: 'offline', version: 'unknown' });
         setError(`Backend unavailable. ${(e as Error).message}`);
       }
     } finally {
-      if (mounted.current) setLoading(false);
+      if (fresh()) setLoading(false);
     }
   }, []);
+
+  // Stable reference for performHealthCheck's reconnect reload (M7) —
+  // avoids a circular useCallback dependency. Written in an effect (refs
+  // must not be written during render).
+  const loadAllRef = useRef<typeof loadAll | null>(null);
+  useEffect(() => { loadAllRef.current = loadAll; }, [loadAll]);
 
   useEffect(() => {
     mounted.current = true;
@@ -143,15 +166,20 @@ function usePrismStore(): UsePrismReturn {
 
   // -- Update trend score ----------------------------------------
   const updateTrend = useCallback(async (trendId: string, updates: TrendUpdate) => {
+    // M6 (July 2026 review): ALWAYS attempt the write and rethrow on
+    // failure. The old `if (!backendAvailable) return;` guard silently
+    // dropped saves whenever the (up to 60s stale) offline flag was up,
+    // while callers' success paths showed "✓ saved". Callers already have
+    // try/catch + error UI — they just never received the rejection.
     try {
-      if (!backendAvailable) return;
       await api.updateTrend(trendId, updates);
-      const t = await api.getTrends().catch((): Trend[] => []);
-      if (mounted.current) setTrends(t);
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
+      throw e;
     }
-  }, [backendAvailable]);
+    const t = await api.getTrends().catch((): Trend[] => []);
+    if (mounted.current) setTrends(t);
+  }, []);
 
   // -- Explicit reconnect function --------------------------------
   const reconnect = useCallback(async () => {

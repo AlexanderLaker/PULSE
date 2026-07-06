@@ -52,7 +52,10 @@ interface Trend {
   name: string;
   force: ForceName;
   direction: 'Expansion' | 'Contraction';
-  score?: number;
+  /** Engine scoring input carried through from the API trend (spread into
+   *  this payload by PPA2) — used as the ranking tiebreak. (M8, July 2026
+   *  review: replaced the phantom `score` field the backend never sent.) */
+  normalized_score?: number;
   exposure_level?: number;
   /** Scaled contribution to the MC terminal shift (percentage points, signed). */
   contribution?: number;
@@ -709,13 +712,15 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
   const trendList = useMemo<Trend[]>(() => {
     if (!data?.contributing_trends?.[categoryId]) return [];
-    // Rank by |scaled contribution| primarily; fall back to |score| when
-    // the scaled attribution field isn't populated (legacy data).
+    // Rank by |scaled contribution| primarily; fall back to |normalized_score|
+    // when the scaled attribution field isn't populated (legacy data).
+    // (M8, July 2026 review: the old fallback read `score`, a field the
+    // backend never sends — the tiebreak was a permanent no-op.)
     return [...data.contributing_trends[categoryId]].sort((a, b) => {
       const ca = Math.abs(a.contribution ?? 0);
       const cb = Math.abs(b.contribution ?? 0);
       if (Math.abs(ca - cb) > 1e-9) return cb - ca;
-      return Math.abs(b.score ?? 0) - Math.abs(a.score ?? 0);
+      return Math.abs(b.normalized_score ?? 0) - Math.abs(a.normalized_score ?? 0);
     });
   }, [data, categoryId]);
 

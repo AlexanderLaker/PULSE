@@ -128,6 +128,23 @@ export interface IntegrityEvent {
   detail?: Record<string, unknown>;
 }
 
+/**
+ * Cross-seed stability of the terminal-year portfolio median (M2, 2.8.1 —
+ * owner re-ruling 2026-07-06 of the June T18 removal). Measures MC sampling
+ * noise at the configured iteration count ONLY — it cannot detect model
+ * error; at 50k × 3 chains a spread of ≈0 pp is the expected result.
+ * Replaces the misleading R̂ badge (D3).
+ */
+export interface SeedStability {
+  metric: 'terminal_year_portfolio_median' | string;
+  terminal_year: number;
+  per_chain_medians: number[];
+  /** max − min across chains, in percentage points. */
+  spread_pp: number;
+  n_chains: number;
+  iterations_per_chain: number;
+}
+
 /** Per-run audit metadata attached to every persisted simulation.
  *
  * Populated by the `run_50k_prod.py` script (v3.2+) and rehydrated by
@@ -143,6 +160,8 @@ export interface RunMeta {
   scenario?: string | null;
   notes?: string | null;
   seed?: number | null;
+  /** L8 (2.8.1): derived per-chain seeds; `seed` is the reproducible master. */
+  chain_seeds?: number[] | null;
   chains?: number | null;
   git_sha?: string | null;
   model_version?: string | null;
@@ -176,13 +195,12 @@ export interface SimulationResult {
   run_meta?: RunMeta | null;
   /** D19: integrity events (input drift, runtime repairs) persisted with the run. */
   integrity_events?: IntegrityEvent[];
+  /** M2 (2.8.1): cross-seed stability block; null/absent on older runs. */
+  seed_stability?: SeedStability | null;
 }
 
-/** Parameters for running a simulation. */
-export interface SimulationParams {
-  scenario?: ScenarioId;
-  iterations?: number;
-}
+// (SimulationParams removed with runSimulation, L25/July 2026 review —
+//  the deployed service never simulates; runs come from the offline CLI.)
 
 /** Scenario definition. */
 export interface Scenario {

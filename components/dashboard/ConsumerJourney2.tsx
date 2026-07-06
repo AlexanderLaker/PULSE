@@ -51,20 +51,15 @@ import {
 } from '@/data/trendCodeMap';
 import type { Trend } from '@/types/trends';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { FORCE_COLORS, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
 import Chip, { type ChipKind } from '@/components/dashboard/Chip';
 
-/** Force colors — per the PRISM spec / CLAUDE.md §9 (data palette, charts
- *  & chips only). Deliberately specified here so the trend-code chips force-
- *  color consistently regardless of the lib/format.ts series palette. */
-const FORCE_COLOR: Record<string, string> = {
-  Consumer: '#3B82F6',
-  Customer: '#8B5CF6',
-  Technology: '#06B6D4',
-  Government: '#F59E0B',
-  Environmental: '#22C55E',
-  Competitive: '#EF4444',
-};
-const forceColor = (force?: string): string => (force ? FORCE_COLOR[force] ?? S.primary : S.primary);
+/** Force colors — L11 (July 2026 review): the local bright palette rendered a
+ *  SECOND force→colour scheme one tab away from the maritime one used by the
+ *  Trends table and the drill-down. Force chips now read from the single
+ *  palette in lib/format.ts (FORCE_COLORS) — one force, one colour, every tab. */
+const forceColor = (force?: string): string =>
+  (force ? (FORCE_COLORS as Record<string, string>)[force] ?? S.primary : S.primary);
 
 // ── Tile type chip palette ──────────────────────────────────────────────
 const TYPE_STYLES: Record<TileType, { label: string; bg: string; fg: string }> = {
@@ -173,16 +168,18 @@ const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*
 /** Intensity → surface tint depth — the declutter replacement for the dots
  *  (2026-06-27): a stronger tile reads more saturated so the pressure pattern
  *  stays legible at a squint, with no extra chip. `up` picks the hue. */
+// L10 (July 2026 review): both tint helpers build their rgba() from the
+// semantic rgb channels exported by lib/format — never re-hardcoded here.
 const intensityTint = (up: boolean, intensity: 1 | 2 | 3): string => {
   const a = 0.03 + 0.05 * intensity; // 0.08 / 0.13 / 0.18
-  return up ? `rgba(31,122,61,${a})` : `rgba(159,64,61,${a})`;
+  return up ? `rgba(${EXPANSION_RGB},${a})` : `rgba(${CONTRACTION_RGB},${a})`;
 };
 
 /** Pool-impact grade → tile tint depth. Pronounced spread: High is notably
  *  dark, Low much lighter. `up` picks the hue (green tailwind / red headwind). */
 const gradeTint = (up: boolean, grade?: 'Low' | 'Med' | 'High'): string => {
   const a = grade === 'High' ? 0.36 : grade === 'Med' ? 0.17 : 0.06;
-  return up ? `rgba(31,122,61,${a})` : `rgba(159,64,61,${a})`;
+  return up ? `rgba(${EXPANSION_RGB},${a})` : `rgba(${CONTRACTION_RGB},${a})`;
 };
 /** Pool-impact grade → left accent-bar opacity (High solid, Low faint). */
 const gradeBarOpacity = (grade?: 'Low' | 'Med' | 'High'): number =>
@@ -198,14 +195,12 @@ const impactRank = (t: JourneyTile): number => (t.poolImpact ? GRADE_RANK[t.pool
 const sortTilesForDisplay = (tiles: JourneyTile[]): JourneyTile[] =>
   [...tiles].sort((a, b) => (impactRank(b) - impactRank(a)) || (b.intensity - a.intensity));
 
-/** Trend strength on a 0–5 scale from the model's own inputs (impact ×
- *  probability, ÷5). Independent of the journey tile map. */
-const trendStrength = (t?: Trend): number | null => {
-  if (!t) return null;
-  const score = typeof t.score === 'number' ? t.score : (t.impact ?? 0) * (t.probability ?? 0);
-  if (!score) return null;
-  return Math.min(5, score / 5);
-};
+// (M8, owner decision 2026-07-06: the "Strength" bar was removed. It was
+//  built on Impact × Probability, but the model retired the 1–5 impact input
+//  over a year ago (replaced by gp1_pct_affected) — the backend never sends
+//  it, so the bar had never rendered once. Evidence cards keep the live
+//  Stage-exposure bar; the trend's real inputs are one click away via
+//  "View in Trends".)
 
 /** A long Laundry stage spans two grid columns and lays its tiles out in two
  *  readable sub-columns, so very long stages (e.g. Add Products) don't stretch
@@ -373,8 +368,8 @@ const BarMetric: FC<{ label: string; value: number; color: string; title?: strin
 
 // ════════════════════════════════════════════════════════════════════════
 // Trend-force card (in the detail panel) — resolves a code to the LIVE trend
-// and reads it as a directional force: tailwind/headwind, strength, and how
-// hard it hits THIS stage. The connect to the Trends page (B1/B3 preserved).
+// and reads it as a directional force: tailwind/headwind, and how hard it
+// hits THIS stage. The connect to the Trends page (B1/B3 preserved).
 // ════════════════════════════════════════════════════════════════════════
 const TrendForceCard: FC<{
   code: string;
@@ -427,7 +422,6 @@ const TrendForceCard: FC<{
   const isExp = direction === 'Expansion';
   // fallbackDescription only when trends haven't loaded (fix #3 wording).
   const description = live?.description ?? (trendsLoaded ? '' : info.fallbackDescription);
-  const strength = trendStrength(live);
   const stageExp = live?.journey_exposure?.[`${journeyKey}:${stageId}`];
   const sourceCount = live?.sources?.length;
 
@@ -449,7 +443,9 @@ const TrendForceCard: FC<{
           {info.force}
         </span>
       </div>
-      {/* force row: direction + strength + stage exposure */}
+      {/* force row: direction + stage exposure (M8 2026-07-06: the dead
+          "Strength" bar — Impact × Probability on a retired input — was
+          removed; it had never rendered) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
         <span
           className="inline-flex items-center gap-1 rounded-full font-bold"
@@ -464,14 +460,6 @@ const TrendForceCard: FC<{
           {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
           {isExp ? 'Tailwind' : 'Headwind'}
         </span>
-        {typeof strength === 'number' && (
-          <BarMetric
-            label="Strength"
-            value={strength}
-            color={c}
-            title={`Impact ${(live?.impact ?? 0).toFixed(1)} × Probability ${(live?.probability ?? 0).toFixed(1)} — the model's own inputs, independent of the journey map.`}
-          />
-        )}
         {typeof stageExp === 'number' && (
           <BarMetric
             label="Stage exposure"
@@ -1249,7 +1237,8 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                     key={stage.id + '_n'}
                     style={{
                       gridColumn: wide ? 'span 2' : undefined,
-                      backgroundColor: 'rgba(159,64,61,0.04)', padding: '7px 6px',
+                      // L10 (July 2026 review): semantic rgb channels from lib/format.
+                      backgroundColor: `rgba(${CONTRACTION_RGB},0.04)`, padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       minHeight: 56,
                     }}

@@ -19,9 +19,10 @@ const nextConfig = {
     if (process.env.NODE_ENV === 'production' && !process.env.FORCE_DEV_PROXY) {
       return [];
     }
+    // (L23, July 2026 review: the legacy '/api/py/*' alias rewrite was
+    //  removed here and in vercel.json — zero callers in the tree.)
     return [
       { source: '/api/v1/:path*', destination: `${BACKEND_URL}/api/v1/:path*` },
-      { source: '/api/py/:path*', destination: `${BACKEND_URL}/api/v1/:path*` },
     ];
   },
 };

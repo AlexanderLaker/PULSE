@@ -50,13 +50,14 @@ export interface Trend {
   name: string;
   description: string;
   direction: Direction;
-  impact: number;        // 1-5
+  // (M8, July 2026 review: the phantom `impact`, `score` and
+  //  `weighted_score` fields were removed — the backend never sent them;
+  //  the model retired the 1–5 impact input in favour of gp1_pct_affected.)
   probability: number;   // 1-5
   start_year?: number;
-  weighted_score?: number;
   normalized_score?: number;
-  score?: number;        // impact × probability (for display)
-  gp1_shift?: number;    // computed shift
+  /** Backend alias of normalized_score (probability-mean × gp1 × direction). */
+  gp1_shift?: number;
   /** % of GP1 realistically exposed at full materialization (0.0-1.0). */
   gp1_pct_affected?: number;
   /** Year by which 100% of impact has materialized (0 = default). */

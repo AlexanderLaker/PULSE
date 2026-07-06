@@ -1,18 +1,19 @@
-// ESLint flat config — Next.js 16 (next lint wurde in v16 entfernt).
-// Basis: eslint-config-next/core-web-vitals (flat-config-nativ ab v16).
+// ESLint flat config — Next.js 16 (`next lint` was removed in v16).
+// Base: eslint-config-next/core-web-vitals (natively flat-config since v16).
 import coreWebVitals from 'eslint-config-next/core-web-vitals';
 
 export default [
   ...coreWebVitals,
   {
     rules: {
-      // React-Compiler-Diagnostik (advisory): bestehende, funktionierende
-      // Muster — Umbau wäre Verhaltensrisiko. Als Warnungen sichtbar halten,
-      // Abbau gehört auf die IT-Refactoring-Liste (siehe Handover-Audit).
+      // React-Compiler diagnostics (advisory): the flagged patterns are
+      // existing, working code — rewriting them is behavior risk for zero
+      // user value right now. Kept VISIBLE as warnings; burning them down
+      // belongs on the DX refactoring backlog (see HANDOVER.md).
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',
       'react-hooks/purity': 'warn',
-      // Kosmetik: Apostrophe in JSX-Texten sind gewollt.
+      // Cosmetic: literal apostrophes in JSX copy are intentional.
       'react/no-unescaped-entities': 'off',
     },
   },
@@ -20,12 +21,13 @@ export default [
     ignores: [
       '.next/**',
       'node_modules/**',
-      'pulse/**',        // Python-Engine — kein JS-Lint
+      'pulse/**',        // Python engine — not JS-lint territory
       'public/**',
       'data/**',
-      '_ARCHIVE/**',
+      // Vitest specs are typechecked (tsconfig.check.json) but not lint-gated —
+      // test ergonomics (any-casts in mocks etc.) would drown the signal.
       'tests/**',
-      '_NOT_FOR_HANDOVER/**',   // all non-live files consolidated here (gitignored, never shipped)
+      '_NOT_FOR_HANDOVER/**',   // quarantined non-product files (gitignored)
     ],
   },
 ];
