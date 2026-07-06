@@ -138,3 +138,26 @@ async def require_admin(user: dict = Depends(require_auth)) -> dict:
             detail="Admin access required"
         )
     return user
+
+
+def identity_from_user(user: Optional[dict]) -> tuple[str, str, str]:
+    """Derive (user_id, user_name, user_role) from a verified JWT payload.
+
+    M3 (July 2026 review): the single identity source for audit attribution
+    and the multi-expert proposals layer — always derived from the VERIFIED
+    token payload, never from client-supplied headers.
+
+      user_id   — JWT `sub`, else `email` (one of these is always present in
+                  a Clerk-minted token; falls back to "anonymous" defensively).
+      user_name — best-effort display name: `name`/`full_name`, else the
+                  email local-part, else the user_id.
+      user_role — `role` claim if present, else "viewer".
+    """
+    user = user or {}
+    email = user.get("email") or ""
+    user_id = str(user.get("sub") or email or "anonymous")
+    name = user.get("name") or user.get("full_name") or ""
+    if not name:
+        name = email.split("@", 1)[0] if "@" in email else user_id
+    role = str(user.get("role") or "viewer")
+    return user_id, str(name), role

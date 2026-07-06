@@ -270,10 +270,12 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
     config = candidate
 
     if audit and changes:
+        from pulse.api.auth import identity_from_user
         audit.log("config_update", "config", "global",
                    old_value=json.dumps({k: v["old"] for k, v in changes.items()}),
                    new_value=json.dumps({k: v["new"] for k, v in changes.items()}),
-                   reason="Admin config update")
+                   reason="Admin config update",
+                   user_id=identity_from_user(user)[0])  # M3
 
     # Mark simulation as stale — admin must press Simulate to apply
     _state["simulation_stale"] = True

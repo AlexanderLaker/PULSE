@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from pulse.api.auth import require_admin, require_auth
+from pulse.api.auth import require_admin, require_auth, identity_from_user
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,8 @@ async def put_journey_content(content: dict, user: dict = Depends(require_admin)
         try:
             log_audit("journey_content_updated", "journey", "default",
                       new_value=f"{n_tiles} tiles",
-                      reason=f"Journey content updated by {user.get('email', 'unknown')}")
+                      reason=f"Journey content updated by {user.get('email', 'unknown')}",
+                      user_id=identity_from_user(user)[0])  # M3
         except Exception:
             pass
     except HTTPException:

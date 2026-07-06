@@ -119,7 +119,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
         from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
         if req.seeds and len(req.seeds) > 1:
             import numpy as _np
-            medians_2030 = []
+            headline_medians = []
             seed_runs = []
             last_result = None
             for s in req.seeds:
@@ -127,19 +127,24 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 _r = _mc.run(db, iterations=req.iterations)
                 last_result = _r
                 sm = _r["shift_matrix"]
-                last_year = max(int(y) for cat in sm.values() for y in cat.keys())
+                # L1-class fix (July 2026 review): category cells are
+                # {"path": {...}, "velocity": {...}} — iterating cat.keys()
+                # as years crashed on int("path"). Same defect as pulse/main.py.
+                last_year = max(
+                    int(y) for cat in sm.values() for y in cat.get("path", {})
+                )
                 headline = float(_np.mean([
-                    cat[last_year]["median"] for cat in sm.values()
-                    if last_year in cat and isinstance(cat[last_year], dict)
+                    cat["path"][last_year]["median"] for cat in sm.values()
+                    if last_year in cat.get("path", {})
                 ]))
-                medians_2030.append(headline)
+                headline_medians.append(headline)
                 seed_runs.append({"seed": int(s), "headline_median": headline})
             seed_wobble = {
                 "seeds": [int(s) for s in req.seeds],
-                "headline_mean": float(_np.mean(medians_2030)),
-                "headline_std": float(_np.std(medians_2030, ddof=0)),
-                "headline_min": float(_np.min(medians_2030)),
-                "headline_max": float(_np.max(medians_2030)),
+                "headline_mean": float(_np.mean(headline_medians)),
+                "headline_std": float(_np.std(headline_medians, ddof=0)),
+                "headline_min": float(_np.min(headline_medians)),
+                "headline_max": float(_np.max(headline_medians)),
                 "runs": seed_runs,
             }
             # The "canonical" mc_result we persist is the last seed's run
