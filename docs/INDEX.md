@@ -18,6 +18,7 @@ the June 2026 pre-handover cleanup.
 | `TRENDS_VERIFICATION.md` | Trend verification notes. |
 | `TRENDS_SOURCE_AUDIT_2026-05-01.md` | Point-in-time source audit of the trend base. |
 | `TREND_SOURCE_AUDIT_AND_GAP_ANALYSIS.md` | Full source-provenance audit + gap analysis of the 99 trends. |
+| `PROFIT_POOL_EXPLORER_SOURCES_AUDIT_2026-07-02.md` | Passport-taxonomy alignment audit of the Profit Pool Explorer's market-size triangulations (source ladder, denominations). |
 
 ## Engineering & operations
 | Doc | What it covers |
@@ -29,12 +30,9 @@ the June 2026 pre-handover cleanup.
 | `CLERK_MIGRATION.md` | History of the Clerk auth integration. |
 | `CONNECTION_STATUS_GUIDE.md` | Health/connection-status behavior in the dashboard. |
 
-## Dormant AI layer (roadmap)
-These document `pulse/ai/` and the unmounted scanner surface, kept fenced for the
-online/AI concept. Not wired into the live app — read alongside
-`CONCEPT_PRISM_ONLINE_AI.md`.
-
-| Doc | What it covers |
-|-----|----------------|
-| `AI_QUICKSTART.md` | How the (dormant) AI provider/scanner/narrator/calibrator layer is structured. |
-| `SCANNER_API.md` | The trend-scanner API surface and the long-term integration catalogue. |
+## AI layer (roadmap only)
+The dormant `pulse/ai/` package was removed in the July 2026 handover review
+(owner decision, 2026-07-06): it had no live route, could not be imported
+(broken since an earlier refactor), and carried unresolved security findings.
+The target-state design lives in `CONCEPT_PRISM_ONLINE_AI.md` — any future AI
+layer is a fresh build against that concept, not a revival of the old code.
