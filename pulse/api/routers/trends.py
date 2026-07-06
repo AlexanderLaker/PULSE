@@ -204,8 +204,10 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
         "trend_count": db.trend_count,
     }
 
-@router.api_route("/api/v1/trends/revert-to-seed", methods=["GET", "POST"])
+@router.post("/api/v1/trends/revert-to-seed")
 async def revert_trends_to_seed(user: dict = Depends(require_admin)):
+    # (Adversarial re-review 2026-07-06: POST-only, matching full-reseed —
+    #  a state-mutating GET is a CSRF-shaped surface even behind admin auth.)
     """Revert ALL trend probability scores back to seed_trends.py original values.
 
     This undoes any manual edits to probability.

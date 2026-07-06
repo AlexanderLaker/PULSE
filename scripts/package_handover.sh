@@ -6,10 +6,14 @@
 #
 # Why fresh history: the working repo's history (personal GitHub remote)
 # still contains confidential strategy decks from before the June 2026
-# quarantine. `git archive` exports only tracked content at HEAD, so
-# everything gitignored (.env, .clerk/, _NOT_FOR_HANDOVER/, *.db, run
-# outputs) is excluded by construction; the re-init gives DX a clean
-# history whose first commit is the handover snapshot.
+# quarantine. `git archive` exports exactly the TRACKED content at HEAD —
+# untracked files (.env, .clerk/, _NOT_FOR_HANDOVER/, local *.db, run
+# outputs) never ship because they are not tracked. Note the precise
+# guarantee: "tracked at HEAD", NOT "not gitignored" — a tracked file
+# stays in the package even if a later .gitignore rule matches it (e.g.
+# the tracked calibration workbook data/Attenuation_Calibration_v3_5.xlsx
+# ships deliberately despite the *.xlsx ignore rule). The safety gate
+# below is therefore the real guard: forbidden paths + secret-shape scan.
 #
 # Usage:  bash scripts/package_handover.sh
 # Output: PRISM_HANDOVER_DX_YYYY-MM-DD.zip  (gitignored by pattern)

@@ -151,9 +151,12 @@ class ConfigUpdate(BaseModel):
 
 
 class SnapshotCreate(BaseModel):
-    name: str
+    # M12 (July 2026 review, tightened after adversarial re-review): the
+    # free-text fields are length-bounded at the schema so the payload cap in
+    # the router can't be bypassed through `name`/`notes`.
+    name: str = Field(..., min_length=1, max_length=200)
     shifts: dict
     trends: list = []
     trend_count: int = 0
     net_shift: float = 0.0
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=4000)

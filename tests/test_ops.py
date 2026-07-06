@@ -73,6 +73,61 @@ class TestExcelWriterRoundTrip:
         assert any("Metadata" in s or "Meta" in s for s in sheets), sheets
 
 
+class TestReproducibilityContract:
+    def test_load_trends_orders_by_id(self):
+        """C2 upstream pin (adversarial re-review 2026-07-06): the engine-level
+        order-sensitivity test proves order MATTERS; this guards the SQL that
+        pins the order. If someone rewrites the query, this fails until the
+        deterministic-order contract is preserved."""
+        import inspect
+        import pulse.database as pdb
+        src = inspect.getsource(pdb.load_trends)
+        assert "ORDER BY id" in src, (
+            "load_trends() must return trends in a deterministic order — "
+            "reproducibility depends on it (C2)."
+        )
+
+
+class TestSnapshotCap:
+    def test_snapshot_cap_counts_name_and_notes(self):
+        """M12 bypass regression (adversarial re-review 2026-07-06): the cap
+        must count name/notes, not only shifts/trends — multi-MB free-text
+        used to slip past it."""
+        from fastapi.testclient import TestClient
+        from pulse.api.app import app
+        from pulse.api import auth as pauth
+
+        client = TestClient(app, raise_server_exceptions=False)
+        app.dependency_overrides[pauth.require_auth] = lambda: {
+            "sub": "test-user", "email": "t@example.com", "role": "viewer",
+        }
+        try:
+            resp = client.post("/api/v1/snapshots", json={
+                "name": "x" * 199,
+                "shifts": {},
+                "trends": [],
+                "notes": "y" * 3999,
+            })
+            # Within schema bounds and under the byte cap → not a 413/422.
+            assert resp.status_code not in (413, 422), resp.text
+
+            # Over the schema bound → rejected at validation.
+            resp = client.post("/api/v1/snapshots", json={
+                "name": "x" * 10_000, "shifts": {}, "trends": [],
+            })
+            assert resp.status_code == 422
+
+            # Under the schema bounds but a huge shifts payload → 413.
+            resp = client.post("/api/v1/snapshots", json={
+                "name": "ok",
+                "shifts": {"blob": "z" * (600 * 1024)},
+                "trends": [],
+            })
+            assert resp.status_code == 413
+        finally:
+            app.dependency_overrides.pop(pauth.require_auth, None)
+
+
 class TestDiagnosticsFailureBranch:
     def test_diagnostics_survives_db_outage(self, monkeypatch):
         """M4: /diagnostics must EXPLAIN a DB outage, not crash on it."""

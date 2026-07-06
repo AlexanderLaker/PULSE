@@ -91,14 +91,13 @@ export interface Trend {
   score_variance?: number;
   debiasing_applied?: boolean;
 
-  // Bayesian posteriors
-  impact_posterior?: BetaPosterior;
+  // Bayesian posterior (probability only — the impact posterior went with
+  // the retired impact input, M8)
   probability_posterior?: BetaPosterior;
 }
 
 /** Subset of Trend fields that can be updated via PUT /trends/{id}. */
 export interface TrendUpdate {
-  impact?: number;
   probability?: number;
   direction?: Direction;
   description?: string;

@@ -83,7 +83,14 @@ async def create_snapshot(req: SnapshotCreate, user: dict = Depends(require_auth
     from pulse.database import get_db_connection, placeholder, ph, _row_to_dict
     shifts_json = json.dumps(req.shifts)
     trends_json = json.dumps(req.trends)
-    payload_bytes = len(shifts_json.encode()) + len(trends_json.encode())
+    # Adversarial re-review 2026-07-06: cap the TOTAL persisted bytes —
+    # the original cap measured only shifts+trends, so multi-MB `name`/
+    # `notes` strings slipped past it. (Belt: schema max_length; braces:
+    # this total check.)
+    payload_bytes = (
+        len(shifts_json.encode()) + len(trends_json.encode())
+        + len((req.name or "").encode()) + len((req.notes or "").encode())
+    )
     if payload_bytes > MAX_SNAPSHOT_BYTES:
         raise HTTPException(
             413,

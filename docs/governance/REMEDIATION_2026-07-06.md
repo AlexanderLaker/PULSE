@@ -97,6 +97,26 @@ plus the docs/packaging commits that follow this record.
 2. `GET /api/v1/simulation` carried a third, already-drifted inline copy of the run-rehydration logic — consolidated into the F4 service function.
 3. The CLI's end-of-run `log_simulation_run` call had the wrong arity (TypeError after every `python -m pulse` run) — fixed with L1.
 
+## Adversarial re-review (same day, independent pass)
+
+After the remediation, an independent adversarial review attacked the branch
+(engine math, security surface, frontend behavior, claims-vs-code, test
+oracles; all suites re-run). It confirmed the engine math, auth model,
+reproducibility contract and M6/M7/H6 fixes hold, and found **one real
+defect + four minors — all fixed before merge**:
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| A1 | MAJOR | The M12 snapshot cap measured only shifts+trends — multi-MB `name`/`notes` bypassed it (reproduced: a 3 MB row persisted as viewer). | Cap counts ALL persisted free-text; schema `max_length` on name (200) / notes (4000); bypass regression test. |
+| A2 | MINOR | `package_handover.sh` comment claimed "gitignored ⇒ excluded"; the true guarantee is "tracked at HEAD ships" (the tracked calibration workbook ships deliberately despite `*.xlsx` ignore). No leak — the forbidden-path + secret-scan gate is the real guard. | Comment corrected to state the precise invariant. |
+| A3 | MINOR | `revert-to-seed` still accepted GET (admin-gated, but a state-mutating GET is CSRF-shaped). | POST-only, matching C1. |
+| A4 | MINOR | Two weak test oracles: `test_health_includes_version` ended in `or data is not None` (vacuous); nothing guarded the `ORDER BY id` SQL itself. | Health test asserts version == MODEL_VERSION; source-pin test for the C2 ORDER BY. |
+| A5 | NOTE | Inert type leftovers `impact_posterior` / `TrendUpdate.impact` survived M8. | Removed. |
+
+Final state after fixes: pytest **92**, vitest **44**, tsc clean, eslint 0
+errors, single-source guard OK, `git fsck` clean (the L21 loose-object
+noise was macOS sync-duplicate files inside `.git/objects`, deleted).
+
 ## Explicitly NOT done (with reason)
 
 - **No wholesale splitting of the large dashboard components** (Trends2 ≈ 2.8k lines etc.). They are working, tested, audited code days before handover; the pure math already lives in `lib/`, the shared UI in small components. A structural refactor is DX's call to make with time to regression-test — churning it now would trade real review-findings for cosmetic line counts at behavior risk.
