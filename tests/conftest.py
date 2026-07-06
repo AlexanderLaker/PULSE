@@ -39,6 +39,10 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     trends = []
 
     # Consumer force
+    # L29 (July 2026 review): exposures deliberately DIFFER between
+    # "Hair: Color" (3) and "Hair: Care" (2) so no two golden-pinned
+    # categories are numerically identical — identical pins couldn't
+    # distinguish a category-mixup regression from a pass.
     consumer_trend = Trend(
         id="consumer_01",
         force="Consumer",
@@ -51,12 +55,19 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         data_source="test",
     )
     for cat in CATEGORIES:
-        consumer_trend.category_exposure[cat] = 3 if "Hair" in cat else 1
+        if cat == "Hair: Color":
+            consumer_trend.category_exposure[cat] = 3
+        elif "Hair" in cat:
+            consumer_trend.category_exposure[cat] = 2
+        else:
+            consumer_trend.category_exposure[cat] = 1
     for vc in VC_STEPS:
         consumer_trend.vc_exposure[vc] = 2
     trends.append(consumer_trend)
 
-    # Government force
+    # Government force — carries a per-trend materialization schedule
+    # (peak_year + diffusion curve) so the golden pins exercise
+    # compute_materialization_schedule, not only the force-level fallback.
     gov_trend = Trend(
         id="government_01",
         force="Government",
@@ -66,6 +77,8 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         gp1_pct_affected=0.25,
         probability=4,
         start_year=2026,
+        peak_year=2028,
+        diffusion_curve="s_curve",
         data_source="test",
     )
     for cat in CATEGORIES:
@@ -157,143 +170,6 @@ def mock_model_config() -> ModelConfig:
     return config
 
 
-@pytest.fixture
-def deterministic_shift_matrix() -> dict:
-    """Create a sample deterministic shift matrix for testing optimizer."""
-    return {
-        "Hair: Color": {
-            "path": {
-                2026: {"median": -0.001},
-                2027: {"median": -0.003},
-                2028: {"median": -0.005},
-                2029: {"median": -0.008},
-                2030: {"median": -0.010},
-            }
-        },
-        "Hair: Care": {
-            "path": {
-                2026: {"median": 0.002},
-                2027: {"median": 0.005},
-                2028: {"median": 0.008},
-                2029: {"median": 0.010},
-                2030: {"median": 0.012},
-            }
-        },
-        "Hair: Styling": {
-            "path": {
-                2026: {"median": 0.000},
-                2027: {"median": 0.001},
-                2028: {"median": 0.001},
-                2029: {"median": 0.002},
-                2030: {"median": 0.002},
-            }
-        },
-        "Hair: Body": {
-            "path": {
-                2026: {"median": 0.001},
-                2027: {"median": 0.002},
-                2028: {"median": 0.003},
-                2029: {"median": 0.003},
-                2030: {"median": 0.004},
-            }
-        },
-        "LHC: FCN": {
-            "path": {
-                2026: {"median": 0.005},
-                2027: {"median": 0.010},
-                2028: {"median": 0.015},
-                2029: {"median": 0.020},
-                2030: {"median": 0.025},
-            }
-        },
-        "LHC: FCA": {
-            "path": {
-                2026: {"median": -0.001},
-                2027: {"median": -0.002},
-                2028: {"median": -0.004},
-                2029: {"median": -0.005},
-                2030: {"median": -0.006},
-            }
-        },
-        "LHC: FFI": {
-            "path": {
-                2026: {"median": 0.003},
-                2027: {"median": 0.006},
-                2028: {"median": 0.009},
-                2029: {"median": 0.012},
-                2030: {"median": 0.015},
-            }
-        },
-        "LHC: LAD": {
-            "path": {
-                2026: {"median": 0.002},
-                2027: {"median": 0.004},
-                2028: {"median": 0.006},
-                2029: {"median": 0.008},
-                2030: {"median": 0.010},
-            }
-        },
-        "LHC: HDW": {
-            "path": {
-                2026: {"median": 0.001},
-                2027: {"median": 0.002},
-                2028: {"median": 0.003},
-                2029: {"median": 0.004},
-                2030: {"median": 0.005},
-            }
-        },
-        "LHC: ADW": {
-            "path": {
-                2026: {"median": 0.004},
-                2027: {"median": 0.008},
-                2028: {"median": 0.012},
-                2029: {"median": 0.016},
-                2030: {"median": 0.020},
-            }
-        },
-        "LHC: HSC": {
-            "path": {
-                2026: {"median": -0.002},
-                2027: {"median": -0.004},
-                2028: {"median": -0.006},
-                2029: {"median": -0.008},
-                2030: {"median": -0.010},
-            }
-        },
-        "LHC: IC": {
-            "path": {
-                2026: {"median": 0.000},
-                2027: {"median": 0.000},
-                2028: {"median": 0.001},
-                2029: {"median": 0.001},
-                2030: {"median": 0.001},
-            }
-        },
-    }
-
-
-@pytest.fixture
-def shift_matrix_with_percentiles() -> dict:
-    """Create a shift matrix with full percentile distribution."""
-    return {
-        "Hair: Color": {
-            2030: {
-                "p10": -0.020,
-                "p25": -0.015,
-                "median": -0.010,
-                "p75": -0.005,
-                "p90": -0.001,
-                "std": 0.007,
-            }
-        },
-        "Hair: Care": {
-            2030: {
-                "p10": 0.005,
-                "p25": 0.010,
-                "median": 0.015,
-                "p75": 0.020,
-                "p90": 0.025,
-                "std": 0.007,
-            }
-        },
-    }
+# (The former `deterministic_shift_matrix` and `shift_matrix_with_percentiles`
+#  fixtures were removed in the July 2026 handover review — their only
+#  consumer was the deleted allocation-optimizer suite (D4).)

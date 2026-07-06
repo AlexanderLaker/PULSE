@@ -42,71 +42,15 @@ async def get_simulation(user: dict = Depends(require_auth)):
     mc = _state.get("mc_result")
     run_meta: dict = _state.get("run_meta") or {}
     if not mc:
-        # Serverless cold start — try loading latest simulation from database
+        # Serverless cold start — rehydrate from the newest persisted run.
+        # July 2026 review: this used to be a THIRD inline copy of the
+        # bundle-vs-legacy rehydration that had already drifted from the
+        # canonical one; the service function is the single implementation
+        # (F4) and everything must go through it.
         try:
-            from pulse.database import load_simulation_runs
-            runs = load_simulation_runs(limit=1)
-            if runs:
-                latest = runs[0]
-                # `results` may be either the legacy flat shift_matrix
-                # (older runs) or the new bundle shape with
-                # shift_matrix / decompositions / totals / vc_decomposition.
-                # Detect and rehydrate either layout.
-                results_blob = latest.get("results", {}) or {}
-                inner_meta = (
-                    results_blob.get("meta")
-                    if isinstance(results_blob, dict) else None
-                ) or {}
-                if isinstance(results_blob, dict) and "shift_matrix" in results_blob:
-                    mc = {
-                        "shift_matrix": results_blob.get("shift_matrix", {}),
-                        "decompositions": results_blob.get("decompositions"),
-                        "totals": results_blob.get("totals"),
-                        "vc_decomposition": results_blob.get("vc_decomposition"),
-                        "journey_decomposition": results_blob.get("journey_decomposition"),
-                        # D19: rehydrate integrity events (incl. input drift)
-                        "integrity_events": results_blob.get("integrity_events") or [],
-                        "convergence": latest.get("convergence_diagnostics", {}),
-                        "iterations": latest.get("iterations", 5000),
-                        "model_type": latest.get("model_type", "bayesian_copula"),
-                    }
-                else:
-                    # Legacy flat shape (pre-v2.5.1): results IS the shift matrix
-                    mc = {
-                        "shift_matrix": results_blob,
-                        "convergence": latest.get("convergence_diagnostics", {}),
-                        "iterations": latest.get("iterations", 5000),
-                        "model_type": latest.get("model_type", "bayesian_copula"),
-                    }
-                # Build the run_meta block the dashboard displays in the
-                # "Showing run #N" ribbon. Pull from results_bundle.meta
-                # if the writer included it (v3.2+ runs), else synthesize
-                # from the row-level columns.
-                run_date = latest.get("run_date")
-                run_meta = {
-                    "run_id": latest.get("id"),
-                    "run_date": run_date.isoformat() if hasattr(run_date, "isoformat") else str(run_date) if run_date else None,
-                    "iterations": latest.get("iterations"),
-                    "model_type": latest.get("model_type"),
-                    "scenario": inner_meta.get("scenario"),
-                    "notes": inner_meta.get("notes"),
-                    "seed": inner_meta.get("seed"),
-                    "chains": inner_meta.get("chains"),
-                    "git_sha": inner_meta.get("git_sha"),
-                    "model_version": inner_meta.get("model_version"),
-                    "engine_name": inner_meta.get("engine_name"),
-                    "engine_fidelity": inner_meta.get("engine_fidelity"),
-                    "numerics_backend": inner_meta.get("numerics_backend"),  # D13
-                    "converged_categories": inner_meta.get("converged_categories"),
-                    "total_categories": inner_meta.get("total_categories"),
-                    "persisted_at_utc": inner_meta.get("persisted_at_utc"),
-                }
-                _state["mc_result"] = mc
-                _state["run_meta"] = run_meta
-                logger.info(
-                    "Restored simulation from database (run_id=%s, scenario=%s)",
-                    run_meta.get("run_id"), run_meta.get("scenario"),
-                )
+            if load_latest_run_into_state():
+                mc = _state.get("mc_result")
+                run_meta = _state.get("run_meta") or {}
         except Exception as e:
             logger.warning(f"Failed to load simulation from DB: {e}")
 
@@ -123,6 +67,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
         "totals": mc.get("totals"),
         # D19: integrity events (incl. input drift)
         "integrity_events": mc.get("integrity_events") or [],
+        # M2 (owner re-ruling 2026-07-06): cross-seed stability of the
+        # terminal-year portfolio median. None for pre-2.8.1 runs.
+        "seed_stability": mc.get("seed_stability"),
         # Run metadata the dashboard's "Showing run #N · date · scenario"
         # ribbon consumes. Safe to expose (no credentials, no €M).
         "run_meta": run_meta or None,
@@ -263,11 +210,14 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "journey_decomposition": mc_result.get("journey_decomposition"),
                 # D19/D3: persist integrity events + seed stability with the run
                 "integrity_events": mc_result.get("integrity_events", []),
+                "seed_stability": mc_result.get("seed_stability"),
                 "meta": {
                     "engine_fidelity": "scipy",  # guarded above
                     # D13: numerics backend recorded for the audit trail
                     "numerics_backend": mc_result.get("numerics_backend"),
                     "seed": mc_result.get("seed"),
+                    "chain_seeds": mc_result.get("chain_seeds"),  # L8
+                    "chains": mc_result.get("n_chains"),
                     "model_version": mc_result.get("model_version"),
                     "engine_name": mc_result.get("engine_name"),
                     "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -316,6 +266,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "decompositions": mc_result.get("decompositions"),
             "totals": mc_result.get("totals"),
             "integrity_events": mc_result.get("integrity_events") or [],
+            "seed_stability": mc_result.get("seed_stability"),
             "seed": mc_result.get("seed"),
             "seed_wobble": mc_result.get("seed_wobble"),
         })

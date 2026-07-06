@@ -47,8 +47,10 @@ def load_latest_run_into_state() -> bool:
             "vc_decomposition": results.get("vc_decomposition"),
             "journey_decomposition": results.get("journey_decomposition"),
             # D19/D3 (June 2026): integrity events + seed stability persist
-            # with the run and must survive rehydration.
+            # with the run and must survive rehydration. seed_stability is
+            # None for pre-2.8.1 runs — the UI shows "not recorded" then.
             "integrity_events": results.get("integrity_events") or [],
+            "seed_stability": results.get("seed_stability"),
             "force_attribution": results.get("force_attribution") or force_attr,
             "convergence": conv or results.get("convergence") or {},
             "iterations": latest.get("iterations") or results.get("iterations") or 1000,
@@ -76,6 +78,7 @@ def load_latest_run_into_state() -> bool:
         "scenario": inner_meta.get("scenario"),
         "notes": inner_meta.get("notes"),
         "seed": inner_meta.get("seed"),
+        "chain_seeds": inner_meta.get("chain_seeds"),  # L8: derived chain seeds
         "chains": inner_meta.get("chains"),
         "git_sha": inner_meta.get("git_sha"),
         "model_version": inner_meta.get("model_version"),
