@@ -66,9 +66,12 @@ architecture** the same day. Scope, unchanged from the audit ruling:
 
 1. **Honest labelling** — authored tile analyses render as *"Strategist Read —
    authored, not simulated"* (never "PRISM Analysis"); per-tile provenance
-   chips ✍️ strategist-authored / ✨ AI-suggested (46 tiles, pending review)
-   with evidence grades ✅/⚡/⚠️; scope banner: the qualitative overlay does
-   not feed the Shift Matrix.
+   chips ✍️ strategist-authored / ✨ AI-suggested with evidence grades
+   ✅/⚡/⚠️; scope banner: the qualitative overlay does not feed the Shift
+   Matrix. (The once-46 ✨ tiles were folded into the 2026-06-29 seed
+   reformulation and the remainder **bulk-accepted by owner ruling O2,
+   2026-07-07** — the ✨/pending machinery stays live for FUTURE AI
+   suggestions.)
 2. **Content out of code** — 300 tiles + stage contexts live in
    `data/consumerJourney.ts` (`JOURNEY_CONTENT_VERSION`); admin edits persist
    via `GET|PUT /api/v1/journey` (Next proxy `/api/journey`) into the
@@ -91,10 +94,12 @@ architecture** the same day. Scope, unchanged from the audit ruling:
 Activation requires `scripts/backfill_journey_exposure.py` (non-destructive)
 against prod, then a fresh `scripts/run_50k_prod.py` — until then the journey
 attribution chips show their honest empty states.
-Open backlog (owner-gated): strategist review of the 46 ✨ tiles + 260
-exposure scores; internal validation of Henkel claims in stage contexts; Home
-Care journey (tab honestly reads "Laundry" until then); optional per-year
-journey decomposition.
+Content acceptance: the AI-derived tiles and the 260 exposure scores were
+**bulk-accepted by the owner as working values (O2, 2026-07-07)** — no open
+item-level review; UI copy references the acceptance, not a pending review.
+Remaining backlog: internal validation of Henkel claims in stage contexts;
+Home Care journey (tab honestly reads "Laundry" until then); optional
+per-year journey decomposition.
 
 ### Earlier release notes (condensed, still accurate)
 
@@ -247,7 +252,7 @@ Serverless (`api/requirements.txt`): fastapi, pydantic, numpy, psycopg2-binary �
 
 ## 6. DATABASE SCHEMA (production truth)
 
-Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_journey_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint; `allocation_recommendation` column legacy-NULL), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `users`, `session_snapshots` (capped per M12), `scanned_trends` (legacy, nothing writes it since R2). `delphi_rounds` is **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first); `trends.scorer_count/score_variance/debiasing_applied` and `users.password_hash/password_salt` remain as harmless legacy columns nothing reads or writes (dropping them is a DX-scheduled migration — HANDOVER.md §7).
+Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_journey_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint; `allocation_recommendation` column legacy-NULL), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `users`, `session_snapshots` (capped per M12), `scanned_trends` (legacy, nothing writes it since R2). `delphi_rounds` **and** the delphi-era `trends` columns (`scorer_count/score_variance/debiasing_applied`) are **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first; extended per owner ruling O1, 2026-07-07 — run it once per database). `users.password_hash/password_salt` remains as a harmless non-delphi legacy pair nothing reads or writes (dropping it is a DX-scheduled migration — HANDOVER.md §7).
 
 ---
 

@@ -139,10 +139,10 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 **DX backlog (known and deliberate — not regressions):**
 
 1. Run the first 2.8.1 production run (§5) — until then the dashboard serves the last 2.8.0 run, honestly labeled (seed stability reads "not recorded").
-2. Drop the inert legacy DB columns (`users.password_hash/password_salt`, `trends.scorer_count/score_variance/debiasing_applied`, `simulation_runs.allocation_recommendation`) in a scheduled migration window; run `scripts/migrate_drop_delphi.py` if `delphi_*` tables still exist in prod.
+2. Run `scripts/migrate_drop_delphi.py` once against prod (O1, 2026-07-07: it archives-then-drops the `delphi_*` tables AND the delphi-era `trends` columns — the code no longer reads or writes them; already executed against the local DB). The remaining non-delphi legacy columns (`users.password_hash/password_salt`, `simulation_runs.allocation_recommendation`) stay for a DX-scheduled migration window.
 3. Burn down the 18 react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
 4. Consider splitting the largest dashboard components (Trends2 ≈ 2.8k lines) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
-5. Strategist review of the 46 ✨ AI-suggested journey tiles + 260 exposure scores (owner-gated content backlog; see the Consumer Journey section of `CLAUDE.md`).
+5. ~~Strategist review of the AI-suggested journey tiles + exposure scores~~ — **closed by owner ruling O2 (2026-07-07)**: bulk-accepted as working values; the provenance machinery stays live for future AI suggestions. Remaining content backlog: Henkel-claims validation in stage contexts, Home Care journey.
 
 ## 8. Who decides what
 

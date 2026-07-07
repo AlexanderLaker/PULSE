@@ -28,10 +28,10 @@ class Trend:
     last_updated: datetime = field(default_factory=datetime.now)
     ai_suggested: bool = False
     user_override: bool = False
-    # Delphi metadata
-    scorer_count: int = 1
-    score_variance: float = 0.0
-    debiasing_applied: bool = False
+    # (The delphi-era fields scorer_count / score_variance / debiasing_applied
+    #  were removed 2026-07-07, owner ruling O1 — the Delphi capability itself
+    #  was deleted in June 2026 (D10); scripts/migrate_drop_delphi.py drops
+    #  the matching legacy columns from existing databases.)
     # % of GP1 affected — what fraction of the category profit pool is
     # realistically exposed to this trend at full materialization.
     # AI-preset, expert-adjustable. Range 0.0 to 1.0 (e.g. 0.15 = 15%).

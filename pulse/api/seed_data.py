@@ -40,8 +40,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Mintel Global Trends 2024, YouTube Beauty Influencers",
             source_type="market_research",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.2,
         ),
         Trend(
             id="consumer_02",
@@ -61,8 +59,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="McKinsey Beauty & Personal Care 2024, Eurostat household expenditure",
             source_type="market_research",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="consumer_03",
@@ -82,8 +78,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Eurostat Demographics 2024, Nielsen Consumer Panels",
             source_type="demographic_data",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.1,
         ),
         Trend(
             id="consumer_04",
@@ -102,8 +96,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Salon industry surveys, beauty retail transaction data",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.3,
         ),
         Trend(
             id="consumer_05",
@@ -123,8 +115,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="GfK Sustainability Barometer 2024, EU Green Claims Survey",
             source_type="market_research",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.2,
         ),
         Trend(
             id="consumer_06",
@@ -143,8 +133,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Kantar Euromonitor Men's Grooming, GQ Consumer Surveys",
             source_type="market_research",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="consumer_07",
@@ -163,8 +151,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Trend forecasting reports, TikTok/Instagram beauty trends",
             source_type="social_media",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
         Trend(
             id="consumer_08",
@@ -183,8 +169,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Mintel K-Beauty Global Reports, salon booking data",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
     ]
 
@@ -208,8 +192,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="IRI household panel, Euromonitor private label analysis",
             source_type="market_research",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.15,
         ),
         Trend(
             id="customer_02",
@@ -229,8 +211,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="eMarketer E-commerce EU 2024, Euromonitor online retail",
             source_type="market_research",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.1,
         ),
         Trend(
             id="customer_03",
@@ -250,8 +230,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Eurostat retail channel data, Nielsen distribution panels",
             source_type="market_research",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.1,
         ),
         Trend(
             id="customer_04",
@@ -271,8 +249,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="eMarketer Retail Media 2024, trade press",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.2,
         ),
         Trend(
             id="customer_05",
@@ -291,8 +267,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Salon industry reports, beauty supply distribution surveys",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
         Trend(
             id="customer_06",
@@ -311,8 +285,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Retail trends reports, experiential retail case studies",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
     ]
 
@@ -335,8 +307,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Gartner Beauty Tech Report 2024, brand press releases",
             source_type="technology_reports",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="technology_02",
@@ -356,8 +326,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Nature journal biotech articles, brand innovation pipeline disclosures",
             source_type="scientific_research",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="technology_03",
@@ -376,8 +344,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="PackagingTechnology reports, Henkel investor materials",
             source_type="technology_reports",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.2,
         ),
         Trend(
             id="technology_04",
@@ -397,8 +363,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Henkel sustainability reports, industry trends",
             source_type="market_research",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.1,
         ),
         Trend(
             id="technology_05",
@@ -418,8 +382,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="EU Packaging Directive reports, brand sustainability commitments",
             source_type="regulatory",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.1,
         ),
         Trend(
             id="technology_06",
@@ -438,8 +400,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Subscription beauty platforms, brand announcements",
             source_type="market_research",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.2,
         ),
         Trend(
             id="technology_07",
@@ -458,8 +418,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Blockchain beauty initiatives, sustainability reporting",
             source_type="technology_reports",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
     ]
 
@@ -482,8 +440,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="ECHA Cosmetics Regulation, EU Official Journal",
             source_type="regulatory",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.1,
         ),
         Trend(
             id="government_02",
@@ -503,8 +459,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="ECHA PFAS restrictions, EPA GenX decisions",
             source_type="regulatory",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.1,
         ),
         Trend(
             id="government_03",
@@ -523,8 +477,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="EU Green Claims Directive (2023/2673), EFTA Surveillance Authority guidance",
             source_type="regulatory",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.1,
         ),
         Trend(
             id="government_04",
@@ -544,8 +496,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="EU directive 2024/1940, national EPR schemes",
             source_type="regulatory",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.1,
         ),
         Trend(
             id="government_05",
@@ -564,8 +514,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="EU cosmetics labeling proposals, industry working groups",
             source_type="regulatory",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.25,
         ),
         Trend(
             id="government_06",
@@ -584,8 +532,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="SCCS opinions, EU cosmetics regulatory database",
             source_type="regulatory",
             confidence="Medium",
-            scorer_count=3,
-            score_variance=0.15,
         ),
     ]
 
@@ -609,8 +555,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="World Resources Institute water stress maps, manufacturing sustainability reports",
             source_type="environmental",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="environmental_02",
@@ -630,8 +574,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="commodity price indices (CBOT, ICE), agricultural sustainability reports",
             source_type="environmental",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.2,
         ),
         Trend(
             id="environmental_03",
@@ -651,8 +593,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Ellen MacArthur Foundation, brand sustainability disclosures",
             source_type="environmental",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="environmental_04",
@@ -672,8 +612,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Henkel sustainability reports, CDP supply chain data",
             source_type="environmental",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.1,
         ),
         Trend(
             id="environmental_05",
@@ -693,8 +631,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="IUCN biodiversity reports, ESG reporting frameworks",
             source_type="environmental",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.2,
         ),
     ]
 
@@ -718,8 +654,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="Competitive patent analysis, brand launch tracking",
             source_type="competitive",
             confidence="High",
-            scorer_count=4,
-            score_variance=0.15,
         ),
         Trend(
             id="competitive_02",
@@ -738,8 +672,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="indie brand market share data, investor presentations",
             source_type="competitive",
             confidence="High",
-            scorer_count=3,
-            score_variance=0.15,
         ),
         Trend(
             id="competitive_03",
@@ -758,8 +690,6 @@ def create_seed_database() -> TrendDatabase:
             data_source="competitive pricing databases, analyst reports",
             source_type="competitive",
             confidence="Medium",
-            scorer_count=2,
-            score_variance=0.2,
         ),
     ]
 

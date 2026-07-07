@@ -86,10 +86,8 @@ export interface Trend {
   proposal_summary?: ProposalSummary;
   sources?: TrendSource[];
 
-  // Delphi metadata
-  scorer_count?: number;
-  score_variance?: number;
-  debiasing_applied?: boolean;
+  // (Delphi-era metadata fields removed 2026-07-07, owner ruling O1 —
+  //  the capability itself was deleted June 2026, D10.)
 
   // Bayesian posterior (probability only — the impact posterior went with
   // the retired impact input, M8)

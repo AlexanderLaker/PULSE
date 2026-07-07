@@ -318,9 +318,6 @@ def init_db() -> None:
                 confidence TEXT DEFAULT 'Medium',
                 ai_suggested BOOLEAN DEFAULT FALSE,
                 user_override BOOLEAN DEFAULT FALSE,
-                scorer_count INTEGER DEFAULT 1,
-                score_variance REAL DEFAULT 0.0,
-                debiasing_applied BOOLEAN DEFAULT FALSE,
                 probability_posterior TEXT,
                 gp1_pct_affected REAL DEFAULT 0.10,
                 peak_year INTEGER DEFAULT 0,
@@ -670,10 +667,9 @@ def save_trends(trends: List[Trend]) -> None:
                     id, force, sub_category, name, description, direction,
                     probability, start_year, normalized_score,
                     strategic_implication, data_source, source_type, confidence,
-                    ai_suggested, user_override, scorer_count, score_variance,
-                    debiasing_applied, probability_posterior,
+                    ai_suggested, user_override, probability_posterior,
                     gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion
-                ) VALUES ({ph(23)})
+                ) VALUES ({ph(20)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -681,7 +677,6 @@ def save_trends(trends: List[Trend]) -> None:
                     trend.probability, trend.start_year, trend.normalized_score,
                     trend.strategic_implication, trend.data_source, trend.source_type,
                     trend.confidence, trend.ai_suggested, trend.user_override,
-                    trend.scorer_count, trend.score_variance, trend.debiasing_applied,
                     json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
                     # M1: persist the actual value (None included) — never
                     # invent a 10% default at the persistence boundary.
@@ -839,9 +834,6 @@ def load_trends() -> List[Trend]:
                 last_updated=row["updated_at"] if isinstance(row.get("updated_at"), datetime) else (datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow()),
                 ai_suggested=row.get("ai_suggested", False),
                 user_override=row.get("user_override", False),
-                scorer_count=row.get("scorer_count", 1),
-                score_variance=row.get("score_variance", 0.0),
-                debiasing_applied=row.get("debiasing_applied", False),
                 # M1 (July 2026 review): pass missing gp1 through as None so the
                 # engine's deliberate data-quality stop fires. The old
                 # `… , 0.10) or 0.10` silently invented a 10% magnitude for
@@ -927,9 +919,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             last_updated=row["updated_at"] if isinstance(row.get("updated_at"), datetime) else (datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow()),
             ai_suggested=row.get("ai_suggested", False),
             user_override=row.get("user_override", False),
-            scorer_count=row.get("scorer_count", 1),
-            score_variance=row.get("score_variance", 0.0),
-            debiasing_applied=row.get("debiasing_applied", False),
             # July 2026 review: these three were silently dropped here, so any
             # caller that round-tripped this object into save_trends() wiped
             # the trend's magnitude/timing fields. Keep in sync with

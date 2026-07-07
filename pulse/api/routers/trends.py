@@ -105,8 +105,6 @@ async def list_trends(force: Optional[str] = None, user: dict = Depends(require_
         "sources": _build_sources(t),
         "confidence": t.confidence, "ai_suggested": t.ai_suggested,
         "user_override": t.user_override,
-        "scorer_count": t.scorer_count,
-        "score_variance": t.score_variance,
         "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
         "peak_year": getattr(t, 'peak_year', 0),
         "diffusion_curve": getattr(t, 'diffusion_curve', 's_curve'),
@@ -210,8 +208,8 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
     #  a state-mutating GET is a CSRF-shaped surface even behind admin auth.)
     """Revert ALL trend probability scores back to seed_trends.py original values.
 
-    This undoes any manual edits to probability.
-    Also resets debiasing_applied to False and score_variance to 0.
+    This undoes any manual edits to probability. (O1, 2026-07-07: the
+    delphi-era reset of debiasing/variance fields is gone with the fields.)
     """
     from pulse.seed_trends import get_report_trends
     from pulse.database import load_trends, save_trends, log_audit
@@ -226,18 +224,14 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
         seed = seed_map.get(t.id)
         if not seed:
             continue
-        if t.probability != seed.probability or t.debiasing_applied:
+        if t.probability != seed.probability:
             changes.append({
                 "id": t.id,
                 "name": t.name,
                 "old_probability": t.probability,
                 "new_probability": seed.probability,
-                "debiasing_was": t.debiasing_applied,
             })
             t.probability = seed.probability
-            t.debiasing_applied = False
-            t.score_variance = 0.0
-            t.scorer_count = 1
             # Recalculate normalized_score
             t.__post_init__()
 
@@ -392,8 +386,6 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         "journey_exposure": getattr(trend, "journey_exposure", None) or {},
         "confidence": trend.confidence, "ai_suggested": trend.ai_suggested,
         "probability_posterior": trend.probability_posterior,
-        "scorer_count": trend.scorer_count,
-        "score_variance": trend.score_variance,
         "ai_suggestion": getattr(trend, "ai_suggestion", None),
         "proposal_summary": build_proposal_summary(_prop_rows, user_id),
     }

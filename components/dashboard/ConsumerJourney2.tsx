@@ -465,7 +465,7 @@ const TrendForceCard: FC<{
             label="Stage exposure"
             value={stageExp}
             color={c}
-            title="This trend's journey-exposure for this stage (0–5). AI-suggested, derived from the tile intensities; pending strategist review — read as how strongly the tile map links this trend here, not as independent evidence."
+            title="This trend's journey-exposure for this stage (0–5). AI-derived from the tile intensities and accepted as working values by the model owner (O2, Jul 2026) — read as how strongly the tile map links this trend here, not as independent evidence."
           />
         )}
       </div>
