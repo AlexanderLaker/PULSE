@@ -30,21 +30,10 @@ REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 # "<journey>:<stage_id>" (e.g. "lhc:add_products", "hair:diagnose").
 # The LHC journey is usage-stage (laundry; Home Care journey pending),
 # the Hair journey is hybrid (includes pre-purchase decision stages).
-LHC_JOURNEY_STAGES = [
-    "sorting", "pre_treating", "loading", "add_products", "select_wash",
-    "washing_cycle", "unloading", "drying", "ironing", "folding_storing",
-    "taking_out", "wearing", "between_washes",
-]
-HAIR_JOURNEY_STAGES = [
-    "inspire", "diagnose", "prepare", "remedy", "transform",
-    "lock_finish", "maintain_optimize", "refresh_between",
-]
-JOURNEY_STAGES = {"lhc": LHC_JOURNEY_STAGES, "hair": HAIR_JOURNEY_STAGES}
-# Category → journey routing: the four Hair categories read the hair
-# journey, the eight LHC categories the laundry journey.
-CATEGORY_JOURNEY = {
-    c: ("hair" if c.startswith("Hair") else "lhc") for c in CATEGORIES
-}
+# (The consumer-journey stage taxonomy — LHC_JOURNEY_STAGES / HAIR_JOURNEY_STAGES /
+# JOURNEY_STAGES / CATEGORY_JOURNEY — was removed 2026-07-07, owner ruling O3,
+# together with the quantitative journey_exposure layer. The qualitative journey
+# UI keeps its own stage definitions in data/consumerJourney.ts.)
 
 # ── Default model parameters ────────────────────────────────────────
 # v3.5 recalibration (April 2026, 99-trend base). Each value equals what the

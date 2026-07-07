@@ -226,18 +226,9 @@ class TestStructuralIdentities:
                 med = sm[cat]["path"][int(ykey)]["median"]
                 assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
 
-    def test_journey_decomposition_reconciles_to_terminal_median(
-        self, mock_model_config, mock_trends_database,
-    ):
-        """L29: the documented journey invariant ("per-category stage sums
-        reconcile with the terminal-year median exactly") was asserted in
-        prose but never in a test."""
-        r = _run(mock_model_config, mock_trends_database)
-        sm = r["shift_matrix"]
-        last_year = max(sm["Hair: Color"]["path"].keys())
-        for cat, stages in r["journey_decomposition"].items():
-            med = sm[cat]["path"][last_year]["median"]
-            assert sum(stages.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), cat
+    # (The journey-decomposition reconciliation test was removed with the
+    #  quantitative journey layer, owner ruling O3 2026-07-07 — the negative
+    #  contract lock lives in test_bayesian_mc.TestJourneyLayerRemoved.)
 
     def test_all_lenses_present(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)

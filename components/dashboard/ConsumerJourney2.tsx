@@ -16,10 +16,10 @@
  *   • Trend-code chips resolve through data/trendCodeMap.ts to the LIVE trend
  *     in usePrism().trends, with working "View in Trends →" drill-through
  *     (fix #3, B1/B3). Retired codes render muted, with no live-driver styling.
- *   • Per-stage QUANTITATIVE attribution (fix #7) reads the computed
- *     journey_decomposition off the latest persisted run (same pattern as
- *     vc_decomposition); when a run lacks it, the chip is honest about the
- *     empty state rather than faking numbers.
+ *   • (O3, owner ruling 2026-07-07: the quantitative journey layer —
+ *     journey_exposure scores + engine journey_decomposition — was deleted.
+ *     This overlay is deliberately QUALITATIVE: tiles, Strategist Reads and
+ *     live-trend evidence only; nothing here feeds or reads the Shift Matrix.)
  *   • The "Laundry" tab is labelled honestly — it is laundry-only; a caption
  *     notes the Home Care journey is pending (fix #9 / A2).
  *
@@ -349,36 +349,16 @@ const TilePill: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Small bar metric — a labelled 0–5 value with a fill bar (right column of a
-// trend-force card). Used for Strength and Stage exposure.
-// ════════════════════════════════════════════════════════════════════════
-const BarMetric: FC<{ label: string; value: number; color: string; title?: string }> = ({ label, value, color, title }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 108 }} title={title}>
-    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText, fontFamily: HEADLINE_FONT }}>
-      {label}
-    </span>
-    <span className="tabular-nums" style={{ fontSize: 11.5, fontWeight: 800, color: S.onSurface, fontFamily: HEADLINE_FONT }}>
-      {value.toFixed(1)}/5
-    </span>
-    <span style={{ display: 'block', height: 5, borderRadius: 3, backgroundColor: S.surfaceHigh, overflow: 'hidden' }}>
-      <span style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(1, value / 5)) * 100}%`, borderRadius: 3, backgroundColor: color }} />
-    </span>
-  </div>
-);
-
-// ════════════════════════════════════════════════════════════════════════
 // Trend-force card (in the detail panel) — resolves a code to the LIVE trend
 // and reads it as a directional force: tailwind/headwind, and how hard it
 // hits THIS stage. The connect to the Trends page (B1/B3 preserved).
 // ════════════════════════════════════════════════════════════════════════
 const TrendForceCard: FC<{
   code: string;
-  journeyKey: JourneyKey;
-  stageId: string;
   trendsById: Map<string, Trend>;
   trendsLoaded: boolean;
   onNavigateToTrend?: (query: string) => void;
-}> = ({ code, journeyKey, stageId, trendsById, trendsLoaded, onNavigateToTrend }) => {
+}> = ({ code, trendsById, trendsLoaded, onNavigateToTrend }) => {
   // Retired codes get a muted card with NO live-driver styling (fix B3).
   const retired = RETIRED_CODES[code];
   if (retired) {
@@ -422,7 +402,8 @@ const TrendForceCard: FC<{
   const isExp = direction === 'Expansion';
   // fallbackDescription only when trends haven't loaded (fix #3 wording).
   const description = live?.description ?? (trendsLoaded ? '' : info.fallbackDescription);
-  const stageExp = live?.journey_exposure?.[`${journeyKey}:${stageId}`];
+  // (O3 2026-07-07: the per-stage exposure score — and its bar — went with
+  //  the deleted quantitative journey layer.)
   const sourceCount = live?.sources?.length;
 
   return (
@@ -460,14 +441,6 @@ const TrendForceCard: FC<{
           {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
           {isExp ? 'Tailwind' : 'Headwind'}
         </span>
-        {typeof stageExp === 'number' && (
-          <BarMetric
-            label="Stage exposure"
-            value={stageExp}
-            color={c}
-            title="This trend's journey-exposure for this stage (0–5). AI-derived from the tile intensities and accepted as working values by the model owner (O2, Jul 2026) — read as how strongly the tile map links this trend here, not as independent evidence."
-          />
-        )}
       </div>
       {description && (
         <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
@@ -603,7 +576,7 @@ const WhyChain: FC<{
               <div className="flex flex-col gap-2">
                 {tile.trendCodes.map(code => (
                   <TrendForceCard
-                    key={code} code={code} journeyKey={journeyKey} stageId={stageId}
+                    key={code} code={code}
                     trendsById={trendsById} trendsLoaded={trendsLoaded} onNavigateToTrend={onNavigateToTrend}
                   />
                 ))}

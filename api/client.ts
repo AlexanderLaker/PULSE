@@ -172,9 +172,6 @@ export function normalizeSimulation(raw: unknown): SimulationResult {
     // Already JSON-serializable (backend stringified int year keys).
     decompositions: r.decompositions as SimulationResult['decompositions'],
     totals: r.totals as SimulationResult['totals'],
-    // v3.6 journey layer: terminal-year journey-stage attribution.
-    // Absent on pre-journey runs — consumers show an empty state.
-    journey_decomposition: r.journey_decomposition as SimulationResult['journey_decomposition'],
     // M2 (2.8.1): cross-seed stability of the terminal-year portfolio
     // median. Null/absent on pre-2.8.1 runs — the footer says "not recorded".
     seed_stability: r.seed_stability as SimulationResult['seed_stability'],

@@ -9,8 +9,7 @@ from pulse.config import FORCES, CATEGORIES
 
 class SimulationRequest(BaseModel):
     # The response/results bundle is dict-shaped (not pydantic-modeled); since
-    # the v3.6 journey layer it additionally carries `journey_decomposition`
-    # (terminal-year journey-stage attribution per category) alongside
+    # (the journey_decomposition key was removed 2026-07-07, O3) alongside
     # shift_matrix / decompositions / totals / vc_decomposition.
     iterations: int = Field(5000, ge=1, le=100000)  # 1 to 100k iterations
     # D21 sweep: `include_sensitivity` removed — the SensitivityEngine it
@@ -64,7 +63,6 @@ class TrendCreate(BaseModel):
     category_exposure: Optional[dict] = None   # {"Hair: Color": 3, ...}
     vc_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
-    journey_exposure: Optional[dict] = None    # {"<journey>:<stage_id>": 0-5}
     strategic_implication: str = ""
     data_source: str = ""
     confidence: str = "Medium"
@@ -85,7 +83,6 @@ class TrendUpdate(BaseModel):
     category_exposure: Optional[dict] = None
     vc_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
-    journey_exposure: Optional[dict] = None    # {"<journey>:<stage_id>": 0-5}
     name: Optional[str] = None
     description: Optional[str] = None
     strategic_implication: Optional[str] = None

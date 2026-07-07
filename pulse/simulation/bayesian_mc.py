@@ -44,7 +44,6 @@ norm_cdf = _norm_dist.cdf
 NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 
 from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
-                           JOURNEY_STAGES, CATEGORY_JOURNEY,
                            DEFAULT_WITHIN_FORCE_RHO,
                            DEFAULT_RESIDUAL_CROSS_RHO,
                            build_trend_correlation_matrix,
@@ -148,7 +147,6 @@ class BayesianMonteCarloEngine:
                 "shift_matrix": {category: {year: {percentile: value}}},
                 "force_attribution": {category: {"direct_effects": {force: contribution}}},
                 "vc_decomposition": {category: {vc_step: contribution}},
-                "journey_decomposition": {category: {"<journey>:<stage_id>": contribution}},
                 "convergence": {category: {"r_hat": float, "ess": int}},
                 "raw_samples": np.ndarray,  # (iterations, categories, years)
                 "model_version": str, "engine_name": str,
@@ -597,41 +595,14 @@ class BayesianMonteCarloEngine:
                     for step, share in step_shares.items()
                 }
 
-        # ── Consumer-journey decomposition (terminal-year, v3.6) ────────
-        # Redistributes each category's terminal-year MC-median across the
-        # stages of ITS journey (Hair categories → hair journey, 8 stages;
-        # LHC categories → laundry journey, 13 stages) using exposure-
-        # weighted shares — the same construction as vc_decomposition.
-        # Stage keys stay namespaced ("lhc:add_products"). Because shares
-        # are normalized to 1.0 before scaling, per-category stage sums
-        # reconcile with the terminal-year median by construction — the
-        # journey lens redistributes, it never changes totals.
-        journey_decomposition = {}
-        journey_trends = db.trends
-        journey_last_year = self.config.path_years[-1]
-        for cat in self.config.category_names:
-            journey = CATEGORY_JOURNEY.get(cat, "lhc")
-            stage_keys = [f"{journey}:{s}" for s in JOURNEY_STAGES[journey]]
-            stage_scores = {k: 0.0 for k in stage_keys}
-            for trend in journey_trends:
-                cat_exp = trend.category_exposure.get(cat, 0)
-                if cat_exp <= 0:
-                    continue
-                j_exp = getattr(trend, 'journey_exposure', {}) or {}
-                for k in stage_keys:
-                    v = float(j_exp.get(k, 0) or 0)
-                    if v > 0:
-                        stage_scores[k] += abs(trend.normalized_score) * (cat_exp / 5.0) * (v / 5.0)
-            stage_total = sum(stage_scores.values())
-            if stage_total > 0:
-                stage_shares = {k: v / stage_total for k, v in stage_scores.items()}
-            else:
-                stage_shares = {k: 1.0 / len(stage_keys) for k in stage_keys}
-            cat_median_shift = shift_matrix[cat]["path"][journey_last_year]["median"]
-            journey_decomposition[cat] = {
-                k: float(share * cat_median_shift)
-                for k, share in stage_shares.items()
-            }
+        # (O3, owner ruling 2026-07-07: the consumer-journey decomposition —
+        #  the quantitative journey lens introduced as v3.6 block 8 — was
+        #  removed together with the never-activated `journey_exposure`
+        #  score layer it depended on. The qualitative journey overlay
+        #  (tiles, Strategist Reads, trend evidence cards) is unaffected.
+        #  Removal is contract-symmetric with the June addition, which was
+        #  ruled additive with no MODEL_VERSION bump: shift numbers and
+        #  golden pins are untouched.)
 
         # ═══════════════════════════════════════════════════════════════
         # PER-YEAR DECOMPOSITIONS (Force / VC / Region)
@@ -798,7 +769,6 @@ class BayesianMonteCarloEngine:
             "convergence": convergence,
             "force_attribution": force_attribution,
             "vc_decomposition": vc_decomposition,
-            "journey_decomposition": journey_decomposition,
             "decompositions": decompositions,
             "totals": totals,
             "raw_samples": samples,

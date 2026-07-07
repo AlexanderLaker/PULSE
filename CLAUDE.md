@@ -80,26 +80,24 @@ architecture** the same day. Scope, unchanged from the audit ruling:
    (C/T/G/K/E/X-rNN, 99 live codes; `RETIRED_CODES` C-12/K-05/T-09 must never
    render as live drivers); evidence cards drill through to the live trend DB
    (`Trends2` `initialSearch`).
-4. **Quantitative layer** — `journey_exposure` (99 trends × 260 stage scores,
-   `trend_journey_exposure`; seed `pulse/seed_journey_exposure.py`, derived
-   from tile intensities {1→2, 2→3, 3→5}; stage keys `"<journey>:<stage_id>"`
-   per `JOURNEY_STAGES` in `pulse/config.py`: LHC 13 / Hair 8) and
-   **`journey_decomposition`** in the engine — terminal-year MC-median per
-   category redistributed across its journey's stages (same construction as
-   `vc_decomposition`; per-category stage sums reconcile with the
-   terminal-year median exactly; redistributes, never changes totals). No
-   MODEL_VERSION bump: an additive attribution lens; 2.8.0 golden pins
-   unaffected.
+4. **Quantitative layer — REMOVED (O3, owner ruling 2026-07-07).** The
+   `journey_exposure` score table (99 trends × 260 stage scores), its seed
+   and backfill scripts, the engine's `journey_decomposition`, the stage
+   taxonomy in `pulse/config.py`, and the per-stage exposure/attribution UI
+   were deleted before ever being activated in production — the owner ruled
+   the scores unnecessary. The journey overlay is deliberately QUALITATIVE
+   (tiles, Strategist Reads, live-trend evidence); nothing in it feeds or
+   reads the Shift Matrix. Removal is contract-symmetric with the June
+   addition (ruled additive, no MODEL_VERSION bump): shift numbers and
+   golden pins are untouched. `scripts/migrate_drop_legacy.py` drops the
+   `trend_journey_exposure` table from existing databases.
 
-Activation requires `scripts/backfill_journey_exposure.py` (non-destructive)
-against prod, then a fresh `scripts/run_50k_prod.py` — until then the journey
-attribution chips show their honest empty states.
-Content acceptance: the AI-derived tiles and the 260 exposure scores were
-**bulk-accepted by the owner as working values (O2, 2026-07-07)** — no open
-item-level review; UI copy references the acceptance, not a pending review.
-Remaining backlog: internal validation of Henkel claims in stage contexts;
-Home Care journey (tab honestly reads "Laundry" until then); optional
-per-year journey decomposition.
+Content acceptance: the AI-derived tiles were **bulk-accepted by the owner
+as working values (O2, 2026-07-07)** — no open item-level review; the
+✨/pending machinery stays live for future AI suggestions. (The 260 exposure
+scores accepted under O2 were then deleted outright under O3 the same day —
+see block 4.) Remaining backlog: internal validation of Henkel claims in
+stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 
 ### Earlier release notes (condensed, still accurate)
 
@@ -134,7 +132,7 @@ per-year journey decomposition.
 | Continuous path modeling | **Production** | 5 MECE diffusion curves, 2026–2035, velocity per iteration |
 | Joint portfolio band + seed stability | **Production** | `totals.portfolio` (D3) + `seed_stability` (M2, re-added 2026-07-06 — populated from the first 2.8.1 run) |
 | Input-drift telemetry | **Production** | `pulse/audit/input_drift.py` (D19; L6/L7 coverage + severity, 2.8.1) |
-| Consumer-journey decomposition + content store | **Production** | `journey_decomposition` (engine) + `journey_content` admin store; v3.6 block 8, restored 2026-06-10 |
+| Consumer-journey content store (qualitative) | **Production** | `journey_content` admin store + tile overlay. The quantitative decomposition/exposure layer was **removed (O3, 2026-07-07)** before activation |
 | Multi-expert proposals layer | **Production** | `pulse/api/proposals.py` + `trend_score_proposals` table; per-expert drafts, aggregate + endorse flow (June 2026) |
 | AI layer (scanner, narrator, calibrator, chat) | **Removed (R2, 2026-07-06)** | Broken import, no live route, open security findings; future AI = fresh build per `CONCEPT_PRISM_ONLINE_AI.md` |
 | Excel export (Shift Matrix QA workbook) | **Production** | Written by `run_50k_prod.py`; D16/D17 wording included; round-trip-tested (M10) |
@@ -187,7 +185,7 @@ LOCAL DEV: python -m pulse --serve (FastAPI :8000, SQLite data/prism.db)
 
 ### The Shift Matrix contract (per persisted run)
 
-`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year), `journey_decomposition` (terminal-year journey-stage attribution per category, v3.6 block 8), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability` (2.8.1+; null on older runs), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
+`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability` (2.8.1+; null on older runs), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
 
 Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
@@ -210,13 +208,13 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 **config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21)
 
-**database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — 99-trend seed; **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips)
+**database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — 99-trend seed; **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips). Legacy-schema cleanup: `scripts/migrate_drop_delphi.py` (O1) + `scripts/migrate_drop_legacy.py` (O3/O4), both `--postgres`-gated
 
 **env_loader.py** — loads the repo-root `.env` as an import side effect; shell variables win (`override=False`, M17)
 
 **excel_bridge/** — `writer.py` only (QA workbook with D16 READING NOTE + D17 provenance wording + D13 numerics backend). The former `export_center.py` / `powerbi_export.py` / `api/export_pptx.py` ad-hoc modules are deleted.
 
-**api/** — `app.py` (assembly only), `state.py`, `serialization.py`, `models.py`, `proposals.py` (multi-expert score proposals: per-expert drafts + aggregate, consumed by the trends router), `services/simulation_service.py` (THE single rehydration implementation incl. integrity events, seed stability + journey decomposition — `GET /simulation` delegates here, F4), `auth.py` (JWT dependencies + `identity_from_user` for audit attribution, M3), `routers/{system,trends,simulation,config,competitors,misc,journey}.py` (journey mounted since the 2026-06-10 restore: GET/PUT `/api/v1/journey` content store). The legacy unmounted `routes/` package and the `ai/` package are deleted (R2).
+**api/** — `app.py` (assembly only), `state.py`, `serialization.py`, `models.py`, `proposals.py` (multi-expert score proposals: per-expert drafts + aggregate, consumed by the trends router), `services/simulation_service.py` (THE single rehydration implementation incl. integrity events + seed stability — `GET /simulation` delegates here, F4), `auth.py` (JWT dependencies + `identity_from_user` for audit attribution, M3), `routers/{system,trends,simulation,config,competitors,misc,journey}.py` (journey mounted since the 2026-06-10 restore: GET/PUT `/api/v1/journey` content store). The legacy unmounted `routes/` package and the `ai/` package are deleted (R2).
 
 ---
 
@@ -252,7 +250,7 @@ Serverless (`api/requirements.txt`): fastapi, pydantic, numpy, psycopg2-binary �
 
 ## 6. DATABASE SCHEMA (production truth)
 
-Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_journey_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint; `allocation_recommendation` column legacy-NULL), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `users`, `session_snapshots` (capped per M12), `scanned_trends` (legacy, nothing writes it since R2). `delphi_rounds` **and** the delphi-era `trends` columns (`scorer_count/score_variance/debiasing_applied`) are **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first; extended per owner ruling O1, 2026-07-07 — run it once per database). `users.password_hash/password_salt` remains as a harmless non-delphi legacy pair nothing reads or writes (dropping it is a DX-scheduled migration — HANDOVER.md §7).
+Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `session_snapshots` (capped per M12). Removed 2026-07-07 (O3/O4, via `scripts/migrate_drop_legacy.py` — run once per database): `trend_journey_exposure`, `users` (engine-side legacy; identity is Clerk, roles live in the Next-managed `user_roles` table), `scanned_trends`, and the `simulation_runs.allocation_recommendation` column. `delphi_rounds` **and** the delphi-era `trends` columns (`scorer_count/score_variance/debiasing_applied`) are **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first; extended per owner ruling O1, 2026-07-07 — run it once per database). `users.password_hash/password_salt` remains as a harmless non-delphi legacy pair nothing reads or writes (dropping it is a DX-scheduled migration — HANDOVER.md §7).
 
 ---
 

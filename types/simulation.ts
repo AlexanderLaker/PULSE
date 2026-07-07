@@ -109,16 +109,8 @@ export interface TotalsMatrix {
   portfolio?:    Record<string, PercentileDistribution & { mean?: number; std?: number }>;
 }
 
-/**
- * Consumer-journey decomposition (v3.6 journey layer): per category, the
- * terminal-year MC-median shift redistributed across the stages of that
- * category's journey (Hair categories → 8 hair stages, LHC categories →
- * 13 laundry stages). Stage keys are namespaced "<journey>:<stage_id>"
- * matching data/consumerJourney.ts ids. Same construction as the VC
- * decomposition — stage sums reconcile with the category's terminal-year
- * median; the lens redistributes, it never changes totals.
- */
-export type JourneyDecomposition = Record<string, Record<string, number>>;
+// (JourneyDecomposition removed 2026-07-07, owner ruling O3 — the
+//  quantitative journey layer was deleted.)
 
 /** Integrity event emitted by the engine or the run orchestrator (D19). */
 export interface IntegrityEvent {
@@ -183,10 +175,6 @@ export interface SimulationResult {
   decompositions?: DecompositionMatrix;
   /** Per-year row/column/grand totals — matching the decompositions. */
   totals?: TotalsMatrix;
-  /** Terminal-year journey-stage attribution (v3.6 journey layer) — drives
-   *  the Consumer Journey attribution chips.
-   *  Absent on pre-journey runs: the UI shows an honest empty state. */
-  journey_decomposition?: JourneyDecomposition;
   convergence?: ConvergenceDiagnostics;
   scenario?: ScenarioId;
   generated?: string;

@@ -109,7 +109,7 @@ curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count' 
 # /api/v1/simulation requires auth (viewer cookie or Bearer JWT) — verify via the dashboard
 ```
 
-**Other ops scripts** (`scripts/`): `backfill_journey_exposure.py` (non-destructive seed of the 99 × 260 journey-exposure scores — must run once against prod before journey attribution chips populate, then a fresh 50k run), `migrate_drop_delphi.py` (archives-then-drops legacy `delphi_*` tables), `promote_admin.py` (role promotion).
+**Other ops scripts** (`scripts/`): `migrate_drop_delphi.py` (O1 — archives-then-drops the `delphi_*` tables + delphi-era trend columns) and `migrate_drop_legacy.py` (O3/O4 — archives-then-drops `trend_journey_exposure`, the legacy `users` and `scanned_trends` tables and the `allocation_recommendation` column). Both REFUSE a Postgres target without an explicit `--postgres` flag; run each once against prod, only AFTER deploying this code. `promote_admin.py` (role promotion).
 
 ## 6. Landmines — decisions you must not accidentally undo
 
@@ -133,16 +133,16 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 - **The handover package** is produced by `bash scripts/package_handover.sh`: a fresh-history export (single-commit git repo) that structurally cannot contain `.env`, local DBs, the quarantine folder, or secret-shaped strings (the build fails if it ever would). The old personal-GitHub history is archived privately by the owner and is NOT part of the handover (H4).
 - **Docs.** Root carries five canonical docs (`README`, `HANDOVER`, `CLAUDE`, `DEPLOY`, `CONCEPT_PRISM_ONLINE_AI`); deep-dives under `docs/` (index: `docs/INDEX.md`); the governance record under `docs/governance/`. All reconciled to the tree on 2026-07-06 (M14); on any conflict this file + `CLAUDE.md` win.
 - **Quality gates green at this pass:** typecheck clean · eslint 0 errors (18 known react-compiler advisories, see backlog) · vitest 44 · pytest 90 (incl. 2.8.1 golden pins, joint-portfolio-band pin, operational tests) · single-source guard OK.
-- **Database:** you will receive a `pg_dump` (schema in `CLAUDE.md` §6), not credentials. Journey activation: run `scripts/backfill_journey_exposure.py` once, then a fresh 50k run.
+- **Database:** you will receive a `pg_dump` (schema in `CLAUDE.md` §6), not credentials.
 - **Secrets:** every credential (Clerk, DB, JWT secret, signup code) is rotated at handover; the package builder verifies nothing secret-shaped ships.
 
 **DX backlog (known and deliberate — not regressions):**
 
 1. Run the first 2.8.1 production run (§5) — until then the dashboard serves the last 2.8.0 run, honestly labeled (seed stability reads "not recorded").
-2. Run `scripts/migrate_drop_delphi.py` once against prod (O1, 2026-07-07: it archives-then-drops the `delphi_*` tables AND the delphi-era `trends` columns — the code no longer reads or writes them; already executed against the local DB). The remaining non-delphi legacy columns (`users.password_hash/password_salt`, `simulation_runs.allocation_recommendation`) stay for a DX-scheduled migration window.
+2. Run the two legacy-cleanup migrations once against prod, AFTER the first deploy of this code: `python3 scripts/migrate_drop_delphi.py --postgres` (O1) and `python3 scripts/migrate_drop_legacy.py --postgres` (O3/O4). Both are archive-first, idempotent, and already executed against the local DB. Nothing legacy remains after them.
 3. Burn down the 18 react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
 4. Consider splitting the largest dashboard components (Trends2 ≈ 2.8k lines) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
-5. ~~Strategist review of the AI-suggested journey tiles + exposure scores~~ — **closed by owner ruling O2 (2026-07-07)**: bulk-accepted as working values; the provenance machinery stays live for future AI suggestions. Remaining content backlog: Henkel-claims validation in stage contexts, Home Care journey.
+5. ~~Strategist review of the AI-suggested journey tiles + exposure scores~~ — **closed by owner rulings O2/O3 (2026-07-07)**: tiles bulk-accepted; the quantitative exposure layer deleted outright. Remaining content backlog: Henkel-claims validation in stage contexts, Home Care journey.
 
 ## 8. Who decides what
 

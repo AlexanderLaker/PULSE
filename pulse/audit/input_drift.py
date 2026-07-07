@@ -32,8 +32,9 @@ def trend_fingerprint(trends) -> dict:
     2026 review): the original fingerprint covered only probability, gp1,
     direction and force — an edit to an exposure map, peak year or
     diffusion curve (each of which moves the numbers just as hard) read as
-    "no change". Now included: category/vc/region/journey exposures,
-    peak_year and diffusion_curve.
+    "no change". Now included: category/vc/region exposures,
+    peak_year and diffusion_curve. (The journey-exposure key "je" existed
+    only between 2.8.1 and the same-week O3 removal of the journey layer.)
 
     Diffing stays backward-compatible: fields absent from a pre-2.8.1
     fingerprint are skipped in the comparison (see compute_input_drift_event)
@@ -50,7 +51,6 @@ def trend_fingerprint(trends) -> dict:
             "ce": _exposure_map(getattr(t, "category_exposure", None)),
             "ve": _exposure_map(getattr(t, "vc_exposure", None)),
             "re": _exposure_map(getattr(t, "regional_exposure", None)),
-            "je": _exposure_map(getattr(t, "journey_exposure", None)),
             "pk": int(getattr(t, "peak_year", 0) or 0),
             "dc": str(getattr(t, "diffusion_curve", "") or ""),
         }
@@ -89,7 +89,7 @@ def compute_input_drift_event(
 
     prob_changes, gp1_changes, direction_flips = [], [], []
     structure_changes = []  # L6: exposures / peak year / diffusion curve
-    _STRUCTURE_KEYS = ("ce", "ve", "re", "je", "pk", "dc")
+    _STRUCTURE_KEYS = ("ce", "ve", "re", "pk", "dc")
     for tid in sorted(curr_ids & prev_ids):
         a, b = previous_fp[tid], current_fp[tid]
         if a.get("p") != b.get("p"):

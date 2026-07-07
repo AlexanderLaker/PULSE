@@ -4,11 +4,10 @@ When POSTGRES_URL is set (Vercel Postgres / Neon), uses psycopg2.
 Otherwise falls back to SQLite for local development.
 
 Implements all tables from the CLAUDE.md specification:
-- trends, trend_category_exposure, trend_vc_exposure, trend_journey_exposure
+- trends, trend_category_exposure, trend_vc_exposure
 - journey_content (admin-managed Consumer Journey tile map, versioned blob)
 - config_snapshots, simulation_runs
 - triggers, ai_suggestions, audit_log
-- users (auth)
 
 NOTE: causal_edges, competitors, and backtest_results tables were removed in v2.4
 as the underlying modules (causal DAG, game theory, backtesting) were not implemented.
@@ -385,17 +384,10 @@ def init_db() -> None:
             )
         """)
 
-        # ── Consumer-journey exposure (v3.6 journey layer) ──────────────
-        # journey_stage is namespaced "<journey>:<stage_id>"
-        # (see pulse/config.py JOURNEY_STAGES / data/consumerJourney.ts).
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS trend_journey_exposure (
-                trend_id TEXT REFERENCES trends(id) ON DELETE CASCADE,
-                journey_stage TEXT NOT NULL,
-                exposure_score INTEGER,
-                PRIMARY KEY (trend_id, journey_stage)
-            )
-        """)
+        # (trend_journey_exposure removed 2026-07-07, owner ruling O3 —
+        #  the quantitative journey layer was deleted; the qualitative
+        #  journey_content tile store below is unaffected. Existing
+        #  databases: scripts/migrate_drop_legacy.py drops the table.)
 
         # ── Multi-expert trend score proposals (June 2026) ──────────────
         # One row per (trend, user): any authenticated user proposes scores
@@ -507,7 +499,6 @@ def init_db() -> None:
                 config_snapshot_id INTEGER,
                 results TEXT,
                 force_attribution TEXT,
-                allocation_recommendation TEXT,
                 convergence_diagnostics TEXT
             )
         """)
@@ -579,19 +570,10 @@ def init_db() -> None:
             )
         """)
 
-        # ── Users (auth) ────────────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                password_salt TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'analyst',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP
-            )
-        """)
+        # (users table removed 2026-07-07, owner ruling O4 — the engine has
+        #  no user store; Clerk owns identity, roles live in the Next-managed
+        #  user_roles table. scripts/migrate_drop_legacy.py archives+drops
+        #  the legacy table from existing databases.)
 
         # ── Session snapshots (permanent history) ────────────────────
         cursor.execute("""
@@ -610,35 +592,14 @@ def init_db() -> None:
             )
         """)
 
-        # ── Scanned trends (emerging trends persistence) ──────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS scanned_trends (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT,
-                force TEXT,
-                direction TEXT DEFAULT 'Expansion',
-                suggested_gp1_pct_affected REAL DEFAULT 0.10,
-                suggested_probability INTEGER DEFAULT 3,
-                relevance_score INTEGER DEFAULT 65,
-                category_mapping TEXT,
-                sources TEXT,
-                discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                reasoning TEXT,
-                status TEXT DEFAULT 'new',
-                scan_session TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        # (scanned_trends table removed 2026-07-07, owner ruling O4 — the
+        #  scanner was deleted with the AI layer (R2); nothing wrote it since.)
 
         # ── Indexes ──────────────────────────────────────────────────
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trends_force ON trends(force)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_status ON scanned_trends(status)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_scanned_trends_force ON scanned_trends(force)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_trend_score_proposals_trend ON trend_score_proposals(trend_id)")
 
         conn.commit()
@@ -658,7 +619,6 @@ def save_trends(trends: List[Trend]) -> None:
             cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (trend.id,))
-            cursor.execute(f"DELETE FROM trend_journey_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend.id,))
 
             cursor.execute(
@@ -708,12 +668,6 @@ def save_trends(trends: List[Trend]) -> None:
                 cursor.execute(
                     f"INSERT INTO trend_regional_exposure (trend_id, region, exposure_score) VALUES ({ph(3)})",
                     (trend.id, region, score),
-                )
-
-            for journey_stage, score in (getattr(trend, 'journey_exposure', None) or {}).items():
-                cursor.execute(
-                    f"INSERT INTO trend_journey_exposure (trend_id, journey_stage, exposure_score) VALUES ({ph(3)})",
-                    (trend.id, journey_stage, score),
                 )
 
             # Save source URLs if available
@@ -786,11 +740,6 @@ def load_trends() -> List[Trend]:
             )
             regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-            cursor.execute(
-                f"SELECT journey_stage, exposure_score FROM trend_journey_exposure WHERE trend_id = {p}",
-                (row["id"],),
-            )
-            journey_exposures = {_row_to_dict(r)["journey_stage"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
             prob_posterior = (
                 tuple(json.loads(row["probability_posterior"]))
@@ -827,7 +776,6 @@ def load_trends() -> List[Trend]:
                 category_exposure=cat_exposures,
                 vc_exposure=vc_exposures,
                 regional_exposure=regional_exposures,
-                journey_exposure=journey_exposures,
                 data_source=row.get("data_source"),
                 source_type=row.get("source_type"),
                 confidence=row.get("confidence", "Medium"),
@@ -884,11 +832,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
         )
         regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
-        cursor.execute(
-            f"SELECT journey_stage, exposure_score FROM trend_journey_exposure WHERE trend_id = {p}",
-            (trend_id,),
-        )
-        journey_exposures = {_row_to_dict(r)["journey_stage"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
 
         prob_posterior = (
             tuple(json.loads(row["probability_posterior"]))
@@ -912,7 +855,6 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             category_exposure=cat_exposures,
             vc_exposure=vc_exposures,
             regional_exposure=regional_exposures,
-            journey_exposure=journey_exposures,
             data_source=row.get("data_source"),
             source_type=row.get("source_type"),
             confidence=row.get("confidence", "Medium"),
@@ -940,7 +882,6 @@ def save_simulation_run(
     model_type: str,
     results: dict,
     force_attribution: Optional[dict] = None,
-    allocation_recommendation: Optional[dict] = None,
     convergence_diagnostics: Optional[dict] = None,
     config_snapshot_id: Optional[int] = None,
     # A6 backward-compat alias — old callers can still pass causal_decomposition
@@ -963,14 +904,13 @@ def save_simulation_run(
                 f"""
                 INSERT INTO simulation_runs (
                     iterations, model_type, results,
-                    force_attribution, allocation_recommendation,
+                    force_attribution,
                     convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(7)}) RETURNING id
+                ) VALUES ({ph(6)}) RETURNING id
                 """,
                 (
                     iterations, model_type, _safe_dumps(results),
                     _safe_dumps(force_attribution) if force_attribution else None,
-                    _safe_dumps(allocation_recommendation) if allocation_recommendation else None,
                     _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
                 ),
@@ -981,14 +921,13 @@ def save_simulation_run(
                 f"""
                 INSERT INTO simulation_runs (
                     iterations, model_type, results,
-                    force_attribution, allocation_recommendation,
+                    force_attribution,
                     convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(7)})
+                ) VALUES ({ph(6)})
                 """,
                 (
                     iterations, model_type, _safe_dumps(results),
                     _safe_dumps(force_attribution) if force_attribution else None,
-                    _safe_dumps(allocation_recommendation) if allocation_recommendation else None,
                     _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
                     config_snapshot_id,
                 ),
@@ -1011,7 +950,7 @@ def load_simulation_runs(
         cursor.execute(
             f"""
             SELECT id, run_date, iterations, model_type,
-                   results, force_attribution, allocation_recommendation,
+                   results, force_attribution,
                    convergence_diagnostics
             FROM simulation_runs
             ORDER BY run_date DESC
@@ -1045,7 +984,6 @@ def load_simulation_runs(
                 "model_type": row["model_type"],
                 "results": _safe_json(row["results"]) or {},
                 "force_attribution": _safe_json(row.get("force_attribution")),
-                "allocation_recommendation": _safe_json(row.get("allocation_recommendation")),
                 "convergence_diagnostics": _safe_json(row.get("convergence_diagnostics")),
             }
             runs.append(run)

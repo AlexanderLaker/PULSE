@@ -21,7 +21,9 @@ import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
 
 // T-01 → technology_r01 (the first Sorting / benefiting tile links it).
 // (M8, 2026-07-06: the phantom impact/score fields were removed from the
-//  fixture together with the never-rendered Strength bar they fed.)
+//  fixture together with the never-rendered Strength bar they fed.
+//  O3, 2026-07-07: journey_exposure / journey_decomposition removed with
+//  the quantitative journey layer — the overlay is qualitative-only.)
 const t01 = {
   id: 'technology_r01',
   name: 'AI-Driven Formulation and Speed-to-Market',
@@ -29,19 +31,12 @@ const t01 = {
   direction: 'Expansion',
   probability: 4.5,
   description: 'AI reads the garment and prescribes the SKU.',
-  journey_exposure: { 'lhc:sorting': 5 },
   sources: [{ title: 's', url: 'https://example.com', data: 'd' }],
 };
 
 STORE.store = {
   trends: [t01],
-  // populated journey_decomposition → step 4 shows a computed %
-  simulation: {
-    journey_decomposition: {
-      'LHC: FCN': { 'lhc:sorting': 0.012 },
-      'LHC: ADW': { 'lhc:sorting': -0.004 },
-    },
-  },
+  simulation: {},
   loading: false,
   error: null,
 };
@@ -73,10 +68,11 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
 
     // trend-force card resolved against the LIVE trend
     expect(u.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
-    // M8 (owner decision 2026-07-06): the "Strength" bar is GONE — it was
-    // built on the retired impact input and had never rendered. Lock that in.
+    // M8 (2026-07-06): the "Strength" bar is GONE (retired impact input).
+    // O3 (2026-07-07): "Stage exposure" is GONE too — the quantitative
+    // journey layer was deleted. Lock both in.
     expect(u.queryByText('Strength')).toBeNull();
-    expect(u.getByText('Stage exposure')).toBeTruthy();  // live journey_exposure
+    expect(u.queryByText('Stage exposure')).toBeNull();
     expect(u.getAllByText('View in Trends').length).toBeGreaterThan(0);
 
     // refinement 2026-06-29: "This moment" + "Computed attribution" steps and

@@ -97,7 +97,6 @@ async def list_trends(force: Optional[str] = None, user: dict = Depends(require_
         "category_exposure": t.category_exposure,
         "vc_exposure": t.vc_exposure,
         "regional_exposure": t.regional_exposure,
-        "journey_exposure": getattr(t, "journey_exposure", None) or {},
         "description": t.description,
         "strategic_implication": t.strategic_implication,
         "data_source": t.data_source,
@@ -150,7 +149,6 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
     cat_exp = req.category_exposure or {c: 3 for c in CATEGORIES}
     vc_exp = req.vc_exposure or {}
     reg_exp = req.regional_exposure or {}
-    journey_exp = req.journey_exposure or {}
 
     new_trend = Trend(
         id=trend_id,
@@ -164,7 +162,6 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
         category_exposure=cat_exp,
         vc_exposure=vc_exp,
         regional_exposure=reg_exp,
-        journey_exposure=journey_exp,
         data_source=req.data_source,
         source_type="scanner",
         confidence=req.confidence,
@@ -313,7 +310,6 @@ async def full_reseed(user: dict = Depends(require_admin)):
                     cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (oid,))
                     cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (oid,))
                     cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (oid,))
-                    cursor.execute(f"DELETE FROM trend_journey_exposure WHERE trend_id = {p}", (oid,))
                     cursor.execute(f"DELETE FROM trends WHERE id = {p}", (oid,))
                 conn.commit()
         except Exception as e:
@@ -383,7 +379,6 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         "category_exposure": trend.category_exposure,
         "vc_exposure": trend.vc_exposure,
         "regional_exposure": trend.regional_exposure,
-        "journey_exposure": getattr(trend, "journey_exposure", None) or {},
         "confidence": trend.confidence, "ai_suggested": trend.ai_suggested,
         "probability_posterior": trend.probability_posterior,
         "ai_suggestion": getattr(trend, "ai_suggestion", None),
@@ -420,17 +415,6 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
         trend.vc_exposure = update.vc_exposure
     if update.regional_exposure is not None:
         trend.regional_exposure = update.regional_exposure
-    if update.journey_exposure is not None:
-        # Validate namespaced stage keys ("<journey>:<stage_id>") against
-        # the journey taxonomy before accepting admin edits.
-        from pulse.config import JOURNEY_STAGES
-        for k, v in update.journey_exposure.items():
-            journey, _, stage = str(k).partition(":")
-            if journey not in JOURNEY_STAGES or stage not in JOURNEY_STAGES[journey]:
-                raise HTTPException(422, f"Invalid journey stage key: {k}")
-            if not isinstance(v, (int, float)) or not (0 <= v <= 5):
-                raise HTTPException(422, f"Invalid journey exposure for {k}: {v} (0-5)")
-        trend.journey_exposure = update.journey_exposure
     if update.name is not None:
         trend.name = update.name
     if update.description is not None:
@@ -458,7 +442,6 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
     if any(v is not None for v in (update.probability, update.direction,
                                    update.gp1_pct_affected, update.category_exposure,
                                    update.vc_exposure, update.regional_exposure,
-                                   update.journey_exposure,
                                    update.peak_year, update.diffusion_curve)):
         trend.user_override = True
     trend.__post_init__()
@@ -608,7 +591,6 @@ async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):
             cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend_id,))
             cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend_id,))
             cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend_id,))
-            cursor.execute(f"DELETE FROM trend_journey_exposure WHERE trend_id = {p}", (trend_id,))
             conn.commit()
     except Exception as e:
         logger.warning(f"Failed to delete trend from DB: {e}")
@@ -647,7 +629,6 @@ async def delete_all_trends(user: dict = Depends(require_admin)):
             cursor.execute("DELETE FROM trends")
             cursor.execute("DELETE FROM trend_category_exposure")
             cursor.execute("DELETE FROM trend_vc_exposure")
-            cursor.execute("DELETE FROM trend_journey_exposure")
             conn.commit()
     except Exception as e:
         logger.warning(f"Failed to clear trends from DB: {e}")

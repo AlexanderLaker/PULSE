@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── 5) Persist ───────────────────────────────────────────────────
     # Save the full results bundle (shift_matrix + decompositions + totals +
-    # journey/vc decompositions + integrity + seed stability) in the shape
+    # vc decomposition + integrity + seed stability) in the shape
     # the FastAPI /api/v1/simulation endpoint rehydrates.
     log.info("[5/5] Persisting to %s…", "Neon PROD" if USE_POSTGRES else "SQLite (test)")
     persist_failed = False
@@ -178,7 +178,6 @@ def main(argv: list[str] | None = None) -> int:
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
-            "journey_decomposition": result.get("journey_decomposition"),
             # D19: integrity events (incl. input drift) + seed stability
             # persist with the run so the read-only dashboard can show them.
             "integrity_events": result.get("integrity_events", []),
@@ -207,7 +206,6 @@ def main(argv: list[str] | None = None) -> int:
             model_type="bayesian_copula_multichain",
             results=results_bundle,
             force_attribution=result.get("force_attribution"),
-            allocation_recommendation=None,
             convergence_diagnostics=result.get("convergence"),
         )
         log.info("      Saved simulation_run id=%s", run_id)

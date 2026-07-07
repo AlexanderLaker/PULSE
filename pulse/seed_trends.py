@@ -54,8 +54,7 @@ This module lives inside the pulse package so it's importable on Vercel serverle
 """
 
 from pulse.ingestion.models import Trend
-from pulse.config import CATEGORIES, VC_STEPS, REGIONS, JOURNEY_STAGES
-from pulse.seed_journey_exposure import JOURNEY_EXPOSURE
+from pulse.config import CATEGORIES, VC_STEPS, REGIONS
 
 # ── Helper to build category/vc/region dicts from ordered lists ──────
 CAT_KEYS = list(CATEGORIES)  # 12 categories in order
@@ -2764,9 +2763,6 @@ def get_report_trends():
     trends = list(TRENDS)
     for t in trends:
         t.sources = SOURCE_URLS.get(t.id, [])
-        # Consumer-journey exposure (v3.6 journey layer): AI-suggested
-        # seed derived from the curated tile map; keys "<journey>:<stage>".
-        t.journey_exposure = dict(JOURNEY_EXPOSURE.get(t.id, {}))
         # AI baseline snapshot (June 2026 multi-expert proposals layer):
         # only set it if a trend doesn't already carry one, so a re-seed
         # never clobbers a deliberately-curated baseline.
@@ -2799,11 +2795,6 @@ def main():
         for k, v in t.regional_exposure.items():
             assert k in REGIONS, f"Invalid region: {k} for {t.id}"
             assert 0 <= v <= 5, f"Invalid regional exposure: {v} for {k} in {t.id}"
-        for k, v in JOURNEY_EXPOSURE.get(t.id, {}).items():
-            journey, _, stage = k.partition(":")
-            assert journey in JOURNEY_STAGES and stage in JOURNEY_STAGES[journey], \
-                f"Invalid journey stage key: {k} for {t.id}"
-            assert 0 <= v <= 5, f"Invalid journey exposure: {v} for {k} in {t.id}"
 
     # Attach source URLs before saving
     trends = get_report_trends()

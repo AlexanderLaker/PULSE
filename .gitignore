@@ -57,3 +57,6 @@ _NOT_FOR_HANDOVER/
 # DX handover deliverable (build artifact, not source)
 PRISM_HANDOVER_DX_*.zip
 PRISM_HANDOVER_READINESS_*.md
+
+# One-off migration archives (may contain legacy auth rows) — local/OneDrive only
+data/archive/
