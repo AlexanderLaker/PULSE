@@ -261,7 +261,7 @@ const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: JourneyTi
   const hw = negativelyImpacted.reduce((n, t) => n + t.intensity, 0);
   const total = tw + hw;
   return (
-    <div style={{ marginTop: 7 }} title="Tile count weighted by authored grades — qualitative overlay, not simulated">
+    <div title="Tile count weighted by authored grades — qualitative overlay, not simulated">
       <div style={{ display: 'flex', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: S.surfaceHigh }} aria-hidden="true">
         {tw > 0 && <span style={{ display: 'block', width: `${(tw / total) * 100}%`, backgroundColor: S.expansion, opacity: 0.55 }} />}
         {hw > 0 && <span style={{ display: 'block', width: `${(hw / total) * 100}%`, backgroundColor: S.contraction, opacity: 0.55 }} />}
@@ -1134,6 +1134,11 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                     padding: '10px 9px 9px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
+                    // Flex column so the rollup bar can be pinned to the bottom of
+                    // the cell (grid stretches all header cells to equal height),
+                    // keeping every stage's bar horizontally aligned regardless of
+                    // whether the title wraps to one line or two.
+                    display: 'flex', flexDirection: 'column',
                   }}
                 >
                   <div style={{ fontSize: 10, fontWeight: 800, color: S.onSurfaceVariant, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT }}>
@@ -1142,10 +1147,14 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
                   <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, marginTop: 3, lineHeight: 1.25, fontFamily: HEADLINE_FONT, letterSpacing: '-0.01em' }}>
                     {stage.label}
                   </div>
-                  <StageRollup
-                    benefiting={stage.benefiting.filter(t => typeFilter.has(t.type))}
-                    negativelyImpacted={stage.negativelyImpacted.filter(t => typeFilter.has(t.type))}
-                  />
+                  {/* marginTop:auto pushes the rollup to the bottom edge; paddingTop
+                      guarantees a gap from the title even in the tallest (2-line) cell. */}
+                  <div style={{ marginTop: 'auto', paddingTop: 7 }}>
+                    <StageRollup
+                      benefiting={stage.benefiting.filter(t => typeFilter.has(t.type))}
+                      negativelyImpacted={stage.negativelyImpacted.filter(t => typeFilter.has(t.type))}
+                    />
+                  </div>
                 </div>
               ))}
 
