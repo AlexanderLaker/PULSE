@@ -27,6 +27,11 @@
  *   [+ Profit Pool Explorer — Beta, pinned right]
  *   Below md: a menu button opens the same tab list as a sheet.
  *
+ * Entry view (July 2026): users land on the HomeGate — "Profit Pool
+ * Model", four visual doors in tab order. It is a hidden tab (not in the
+ * top nav); the PRISM wordmark returns to it from anywhere. Keys 1–4 on
+ * the gate jump straight into a room.
+ *
  * Data (single store): one <PrismProvider> wraps all tabs, so the data
  * layer loads once and is shared. Tabs are mounted on first visit and
  * then KEPT MOUNTED (hidden via display:none), so in-view state — lens,
@@ -49,6 +54,7 @@ const ProfitPoolExplorer = dynamic(
   { loading: () => <FullPageSkeleton />, ssr: false },
 );
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
+import HomeGate from '@/components/dashboard/HomeGate';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
@@ -56,6 +62,7 @@ import { PrismProvider } from '@/hooks/usePrism';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
 type DashboardTab =
+  | 'home'
   | 'profit-pool-2'
   | 'trends-2'
   | 'consumer-journey-2'
@@ -72,6 +79,8 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  // Entry view — the gate. Not in the top nav; the PRISM wordmark opens it.
+  { id: 'home',                  label: 'Home', hidden: true },
   // Production views — left side of the top nav, in maritime blue.
   { id: 'trends-2',              label: 'Trends' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
@@ -103,7 +112,7 @@ export default function DashboardPage() {
   const { session } = useSession();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('profit-pool-2');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -117,7 +126,7 @@ export default function DashboardPage() {
   // A tab is mounted the first time it is visited and stays mounted
   // afterwards (hidden with display:none). In-view state — lens, year,
   // filters, open drill-down, scroll — survives tab switches.
-  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['profit-pool-2']);
+  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['home']);
 
   // Beta notice for the Explorer now lives INSIDE ProfitPoolExplorer.tsx
   // (R-19.4: shown once per browser, ack persisted) — the page-level copy
@@ -311,12 +320,14 @@ export default function DashboardPage() {
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            <div
-              className="text-2xl font-extrabold tracking-tighter uppercase"
+            <button
+              onClick={() => openTab('home')}
+              aria-label="PRISM home"
+              className="text-2xl font-extrabold tracking-tighter uppercase transition-opacity hover:opacity-70"
               style={{ fontFamily: HEADLINE_FONT, color: NAV.onBg }}
             >
               PRISM
-            </div>
+            </button>
 
             <div className="hidden md:flex items-center gap-6">
               {mainTabs.map((tab) => renderTabButton(tab))}
@@ -400,6 +411,9 @@ export default function DashboardPage() {
           Every visited tab stays mounted; only the active one is
           displayed. Switching back is instant and stateful. */}
       <div className="relative">
+        {tabPane('home', (
+          <HomeGate active={activeTab === 'home'} onNavigate={openTab} />
+        ))}
         {tabPane('profit-pool-2', (
           <ProfitPoolAnalysis2
             isAdmin={isAdmin}
