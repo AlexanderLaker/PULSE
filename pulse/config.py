@@ -20,6 +20,54 @@ VC_STEPS = [
     "Supply Chain", "Marketing", "Commercial", "Consumer"
 ]
 
+
+def vc_epicentre_of(vc_exposure: Optional[dict]) -> Optional[int]:
+    """1-based value-chain epicentre stage of a vc_exposure profile, or None.
+
+    2.9.0 (July 2026 VC-epicentre redesign): experts score the value chain
+    as a SINGLE epicentre stage (the Trends editor's slider); the stored
+    8-step 0–5 profile is a serialization format, not eight independent
+    judgments. This function is the engine-side twin of ``epicentreOf`` in
+    components/dashboard/Trends2.tsx and MUST stay behaviourally identical —
+    both are pinned against the same fixture table
+    (tests/test_vc_epicentre.py ↔ tests/frontend/vcEpicentre.test.ts):
+
+      • read each VC_STEPS entry case-/snake_case-tolerantly (old payloads
+        stored keys like "supply_chain"),
+      • None when the profile is missing / empty / all-zero (unscored),
+      • otherwise the max-scoring stage; ties resolve toward the
+        exposure-weighted centroid (deterministic; first stage wins an
+        exact-distance tie, matching the TS `<` comparison).
+
+    Legacy arbitrary profiles (pre-slider expert grids) collapse through the
+    same rule, so no data migration is needed and engine and UI can never
+    disagree about a trend's stage.
+    """
+    if not vc_exposure:
+        return None
+    # Case-/snake_case-insensitive lookup (mirror of the TS readVCExposure).
+    norm_map = {str(k).lower().replace(" ", "_"): float(v or 0.0)
+                for k, v in vc_exposure.items()}
+    vs = [norm_map.get(s.lower().replace(" ", "_"), 0.0) for s in VC_STEPS]
+    total = sum(vs)
+    if total <= 0:
+        return None
+    mx = max(vs)
+    centroid = sum(v * (i + 1) for i, v in enumerate(vs)) / total
+    best: Optional[int] = None
+    for i, v in enumerate(vs):
+        if v != mx:
+            continue
+        if best is None or abs(i + 1 - centroid) < abs(best - centroid):
+            best = i + 1
+    return best
+
+
+def vc_epicentre_step_of(vc_exposure: Optional[dict]) -> Optional[str]:
+    """Canonical VC_STEPS name of a profile's epicentre stage, or None."""
+    stage = vc_epicentre_of(vc_exposure)
+    return VC_STEPS[stage - 1] if stage is not None else None
+
 # ── Regional taxonomy ──────────────────────────────────────────────
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
@@ -183,8 +231,13 @@ def compute_materialization_schedule(
     return schedule
 
 # ── Default weights ─────────────────────────────────────────────────
+# DEFAULT_VC_WEIGHTS deleted (2.9.0, July 2026): with the VC lens computed
+# as a categorical epicentre partition, a per-step weight has no defensible
+# meaning (it would silently re-weight expert stage votes). At its equal
+# default it cancelled in the share normalization — an inert dial, removed
+# per design philosophy #8 (like neutral_threshold and t_copula_df).
+# ModelConfig.from_json tolerates it in old snapshots.
 DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}  # Equal: ~16.7%
-DEFAULT_VC_WEIGHTS = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}  # Equal: 12.5%
 DEFAULT_REGION_WEIGHTS = {r: 1.0 / len(REGIONS) for r in REGIONS}  # Equal: 25%
 DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equal: ~8.3%
 
@@ -412,7 +465,8 @@ class ModelConfig:
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))
     materialization: dict = field(default_factory=lambda: dict(DEFAULT_MATERIALIZATION))
     force_weights: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_WEIGHTS))
-    vc_weights: dict = field(default_factory=lambda: dict(DEFAULT_VC_WEIGHTS))
+    # vc_weights deleted (2.9.0): the VC lens is an epicentre partition —
+    # see DEFAULT_VC_WEIGHTS tombstone above. from_json drops the old key.
     region_weights: dict = field(default_factory=lambda: dict(DEFAULT_REGION_WEIGHTS))
     category_names: list = field(default_factory=lambda: list(CATEGORIES))
     category_weights: dict = field(default_factory=lambda: dict(DEFAULT_CATEGORY_WEIGHTS))
@@ -431,8 +485,9 @@ class ModelConfig:
 
         Older config snapshots may carry fields the model no longer has
         (e.g. ``t_copula_df``, deleted in D20, the v3.2-retired scalar
-        ``attenuation``, or ``neutral_threshold``, deleted July 2026 as
-        engine-inert). Unknown keys are dropped rather than crashing.
+        ``attenuation``, ``neutral_threshold``, deleted July 2026 as
+        engine-inert, or ``vc_weights``, deleted in 2.9.0 with the VC
+        epicentre partition). Unknown keys are dropped rather than crashing.
         """
         from dataclasses import fields as _fields
         data = json.loads(s)

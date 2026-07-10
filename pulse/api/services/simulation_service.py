@@ -84,6 +84,9 @@ def load_latest_run_into_state() -> bool:
         "engine_name": inner_meta.get("engine_name"),
         "engine_fidelity": inner_meta.get("engine_fidelity"),
         "numerics_backend": inner_meta.get("numerics_backend"),  # D13 audit trail
+        # 2.9.0: "epicentre" for partition-based runs; None on pre-2.9 runs
+        # (the About-footer then reads "profile-weighted (pre-2.9 run)").
+        "vc_attribution_basis": inner_meta.get("vc_attribution_basis"),
         "converged_categories": inner_meta.get("converged_categories"),
         "total_categories": inner_meta.get("total_categories"),
         "persisted_at_utc": inner_meta.get("persisted_at_utc"),

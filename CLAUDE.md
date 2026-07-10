@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.8
+## Project Specification & Architecture — v3.9
 
 ---
 
@@ -16,6 +16,17 @@ PRISM operates on a **probabilistic profit pool shifting architecture**: directi
 - **Production simulation runs are CLI-only**: `python3 scripts/run_50k_prod.py` (scipy engine, 50k × 3 chains) computes offline and persists to Neon.
 - **The deployed service never simulates.** It is a read-only renderer of the latest persisted run; `POST /api/v1/simulate` refuses (409) on any runtime without scipy. Every data endpoint authenticates (httpOnly viewer cookie or Bearer JWT); `/health` and `/diagnostics` stay anonymous by design.
 - **Exact numerics only (D13)**: scipy is a hard engine requirement; the engine module refuses to import without it. There is no approximation fallback anywhere. Every result and persisted run carries `numerics_backend` (exact scipy/numpy versions) for the audit trail.
+
+### What Changed in v3.9 (vs. v3.8) — VC Epicentre Attribution, July 2026
+
+Executed against owner ruling **O5** (2026-07-10; full text `docs/governance/DECISION_LOG.md` Part G). MODEL_VERSION bumped to **2.9.0**. Context: the July 2026 Trends-editor redesign made the value chain a **single epicentre stage per trend** (slider; the stored 8-step 0–5 profile is a canonical 5/3/1 serialization, categorical votes in Review & Endorse) — but the engine still consumed the expanded profile, so the VC lens smeared each trend across steps through a UI kernel constant × `vc_weights`: pseudo-measured attribution (the D3/D17/F-19 failure mode).
+
+1. **VC lens = categorical epicentre partition.** Each trend's relevance (|normalized_score| × cat_exposure/5) is assigned wholly to its epicentre stage — structurally parallel to the force lens; shares sum to 1, so the Σ-over-steps == MC-median identity holds unchanged. `pulse.config.vc_epicentre_of/vc_epicentre_step_of` is the engine-side twin of the frontend's `epicentreOf`, parity-pinned to the same fixture table (`tests/test_vc_epicentre.py` ↔ `tests/frontend/vcEpicentre.test.ts`); legacy profiles collapse identically on both sides — **no data migration**. Propagation up/down the chain is deliberately not modelled (D16 ceteris paribus).
+2. **`vc_weights` deleted end-to-end** (defaults, ModelConfig, validator, ConfigUpdate, GET/PUT /config, SettingsModal grid, TS types — inert at equal defaults, meaningless over categorical votes; `from_json` tolerates old snapshots; the never-written `config_snapshots.vc_weights` column stays inert on the DX backlog).
+3. **Honesty events:** unscored trends → `vc_epicentre_coverage` warning (pre-2.9 they silently vanished from the lens while still driving the shift); a category with zero epicentre-scored contributors → `vc_attribution_fallback` warning for its uniform 1/8 spread (degenerate guard; never fires on the 99-trend base).
+4. **Drift telemetry:** the fingerprint's `"ve"` component is now the derived stage — an epicentre flip is drift, a representation rewrite (legacy grid → canonical slider profile, same stage) is not; pre-2.9 dict-format fingerprints are collapsed before diffing (no false drift wall on the first 2.9.0 run).
+5. **Labels:** lens reads "Value chain **epicentre** attribution" (assign-wholly + no-propagation caption); About-footer shows the run's basis from persisted `meta.vc_attribution_basis` ("epicentre partition" vs "profile-weighted (pre-2.9 run)"); Excel metadata carries a VC ATTRIBUTION note; Trends-editor copy no longer claims the engine consumes the 8-step expansion.
+6. **Contract mechanics:** shift-matrix numbers untouched (`vc_exposure` never fed the shift math) — golden shift/portfolio pins deliberately NOT regenerated and pass unchanged on 2.9.0; only `decompositions.vc`/`vc_decomposition` values move (terminal-year block now reuses the same shares — single source). New structural locks: VC reconciliation, categorical-partition leak test, coverage event. **Run the 50k CLI after deploying** so the persisted run matches 2.9.0 (until then the footer honestly labels the old run "profile-weighted").
 
 ### What Changed in v3.8 (vs. v3.7) — Handover Review, July 2026
 
@@ -128,7 +139,7 @@ stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1) |
+| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1); 2.9.0 VC-epicentre partition (O5) |
 | Continuous path modeling | **Production** | 5 MECE diffusion curves, 2026–2035, velocity per iteration |
 | Joint portfolio band + seed stability | **Production** | `totals.portfolio` (D3) + `seed_stability` (M2, re-added 2026-07-06 — populated from the first 2.8.1 run) |
 | Input-drift telemetry | **Production** | `pulse/audit/input_drift.py` (D19; L6/L7 coverage + severity, 2.8.1) |
@@ -185,7 +196,7 @@ LOCAL DEV: python -m pulse --serve (FastAPI :8000, SQLite data/prism.db)
 
 ### The Shift Matrix contract (per persisted run)
 
-`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability` (2.8.1+; null on older runs), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
+`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year — the vc lens is an **epicentre partition** since 2.9.0), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability` (2.8.1+; null on older runs), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `vc_attribution_basis` (2.9.0+; "epicentre"), `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
 
 Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
@@ -193,20 +204,21 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 ## 3. PYTHON ENGINE (`pulse/`)
 
-**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.8.1**)
+**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.9.0**)
 - Beta-distributed priors per trend (α, β from `probability_posterior`)
 - **Gaussian copula** over a trend-level correlation matrix built from `within_force_rho` + `force_correlation_matrix` (PSD-valid as entered, D1; repair events surface as integrity events and must NOT fire on defaults)
 - Hard scipy requirement; `NUMERICS_BACKEND` constant recorded in every result (D13)
 - Per-trend materialization schedules (peak_year × diffusion_curve), multiplicative compounding with per-force attenuation + within-force overlap dampening (zero-trend guard, D21)
 - Quantile convention: `np.percentile` linear interpolation, engine-wide (D21)
 - `totals.portfolio` joint band (D3); `run_multichain` adds `seed_stability` (M2, owner re-ruling 2026-07-06) + `master_seed`/`chain_seeds` (L8)
+- **VC lens = categorical epicentre partition (2.9.0, O5):** one share computation (reused by `decompositions.vc` and the terminal-year `vc_decomposition`); each trend assigned wholly to `vc_epicentre_step_of(vc_exposure)`; no vc_weights; `vc_epicentre_coverage`/`vc_attribution_fallback` integrity events; result carries `vc_attribution_basis`
 - 10,000 iterations default; 50,000 × 3 chains in production runs
 
 **simulation/paths.py** — diffusion curves, velocity/acceleration, trigger primitives (PRODUCTION)
 
 **audit/input_drift.py** — D19 fingerprint + drift-event computation (PRODUCTION); **audit/logger.py** — transactional audit log
 
-**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21)
+**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), **`vc_epicentre_of`/`vc_epicentre_step_of`** (2.9.0 — engine-side twin of the frontend's `epicentreOf`, parity-pinned), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid; `DEFAULT_VC_WEIGHTS` deleted 2.9.0), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21)
 
 **database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — 99-trend seed; **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips). Legacy-schema cleanup: `scripts/migrate_drop_delphi.py` (O1) + `scripts/migrate_drop_legacy.py` (O3/O4), both `--postgres`-gated
 
@@ -226,12 +238,12 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
 
 | Component | Purpose |
 |-----------|---------|
-| `ProfitPoolAnalysis2.tsx` | Shift Matrix, four lenses; lean KPI strip above the matrix (portfolio shift + least/most contracting category; P10–P90 on hover only — owner declutter 2026-06-11, replaces the hero block); short D16 caption under the section intro; run provenance, seed stability + integrity events (D19) rendered flat inside the About-this-model footer (header ribbon/popovers removed) |
+| `ProfitPoolAnalysis2.tsx` | Shift Matrix, four lenses (VC lens reads "Value chain **epicentre** attribution" since 2.9.0 — assign-wholly caption, no modelled propagation); lean KPI strip above the matrix (portfolio shift + least/most contracting category; P10–P90 on hover only — owner declutter 2026-06-11, replaces the hero block); short D16 caption under the section intro; run provenance (incl. the 2.9.0 VC-basis row: "epicentre partition" vs "profile-weighted (pre-2.9 run)"), seed stability + integrity events (D19) rendered flat inside the About-this-model footer (header ribbon/popovers removed) |
 | `Trends2.tsx` | Trend explorer + admin editor; D7 provenance chips |
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
 | `ProfitPoolExplorer.tsx` | Beta, GP1-only pool views (D5). v2 (2026-06-11): arrows = pool development (revenue × GP1 drift, FY2025→2030, derived in `lib/profitPoolData.ts`); Laundry/Hair toggle + view pills; click drill-down decomposes pool CAGR into revenue CAGR + GP1 drift with € pools; all sources clickable URLs verified vs. FY2025 filings, graded ✅ reported / ⚡ derived / ⚠️ estimate. **v3 (2026-07-02): category views rebuilt on the Euromonitor Passport taxonomy** (Hair: 8 Passport categories incl. Salon Professional; Home Care: all 8 categories — Toilet Care & Home Insecticides finally have pool rows); sizes are public triangulations at RSP (Passport internal not shareable — licence), derivation recipes viewer-visible in the source-chip hovers; source ladder EMI → Kline (pro hair, salon-mfr level) → Circana/NIQ (scanner-POS) → filings (MSP) → tier-2; `SourceRef.denomination` guards mixed-basis sums. Audit: `docs/PROFIT_POOL_EXPLORER_SOURCES_AUDIT_2026-07-02.md` (+ the validation worklist xlsx, retained offline by the owner) for eventual Passport confirmation |
-| `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions. **v2 (2026-07-03): sheet aligned to the real GET/PUT contract** — dead dials deleted (Region select, neutral threshold, base year, residual cross-ρ: never returned by GET, silently dropped by PUT), base year now served read-only by GET; between-force overlap + force correlation matrices rendered read-only (6×6, D17/D1 wording); editable force/region/VC/category weight grids with live Σ badges (backend rejects ≠1.0 ±0.01, no renormalization); diff-only PUT so the audit log records only actual changes; modal scroll fixed (grid row `minmax(0,1fr)`). `neutral_threshold` deleted end-to-end same day (engine-inert since v1; ModelConfig field, validator, defaults, router call, test fixture, TS type — `from_json` tolerates it in old snapshots) |
+| `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions. **v2 (2026-07-03): sheet aligned to the real GET/PUT contract** — dead dials deleted (Region select, neutral threshold, base year, residual cross-ρ: never returned by GET, silently dropped by PUT), base year now served read-only by GET; between-force overlap + force correlation matrices rendered read-only (6×6, D17/D1 wording); editable force/region/category weight grids with live Σ badges (backend rejects ≠1.0 ±0.01, no renormalization — the VC weight grid was deleted with the 2.9.0 epicentre partition, O5); diff-only PUT so the audit log records only actual changes; modal scroll fixed (grid row `minmax(0,1fr)`). `neutral_threshold` deleted end-to-end same day (engine-inert since v1; ModelConfig field, validator, defaults, router call, test fixture, TS type — `from_json` tolerates it in old snapshots) |
 | `WelcomeModal.tsx`, `ErrorBoundary.tsx`, `LoadingSkeleton.tsx` | Shell |
 
 **State:** `hooks/usePrism.ts` — single provider; renders the latest persisted run; no in-app simulate. **API client:** `api/client.ts` (typed; `normalizeSimulation` unit-tested). **Math:** `lib/shiftMatrix.ts` is the single source of truth for category-weighted aggregation (F1; enforced by `scripts/check_shiftmatrix_single_source.sh` in `npm run lint`).
@@ -304,13 +316,13 @@ Maritime light editorial system (June 2026 unification): light surfaces, deep-na
 
 ## 10. TESTING
 
-`tests/`: `conftest.py` (fixture differentiated per L29 — golden-pinned categories are pairwise distinct and one trend carries a per-trend materialization schedule), `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + **2.8.1 golden pins** incl. the joint portfolio band + journey reconciliation + no-repair-on-defaults + version sync; pins regenerate ONLY with deliberate model changes, same commit), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_ops.py` (M10: prod-entrypoint import, H1 wrong-DB-mode exit, CLI parser, Excel writer round-trip, M4 diagnostics-outage). Frontend: `tests/frontend/` via vitest (`normalizeSimulation`, shift-matrix math, format/display-honesty pins, auth-seam, journey dialog, tab smoke).
+`tests/`: `conftest.py` (fixture differentiated per L29 — golden-pinned categories are pairwise distinct, one trend carries a per-trend materialization schedule, and the five DB trends carry canonical VC profiles with distinct epicentres + one deliberate collision, 2.9.0), `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + golden pins (2.8.1 values, passing unchanged on 2.9.0 — the VC rework never touched shift math) incl. the joint portfolio band + no-repair-on-defaults + version sync + **2.9.0 VC structural locks**: reconciliation, categorical-partition leak test, coverage event, basis tag; pins regenerate ONLY with deliberate model changes, same commit), `test_vc_epicentre.py` (**parity fixture table with `tests/frontend/vcEpicentre.test.ts`** — Python `vc_epicentre_of` and TS `epicentreOf` must never drift; plus drift-"ve" semantics), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_ops.py` (M10: prod-entrypoint import, H1 wrong-DB-mode exit, CLI parser, Excel writer round-trip, M4 diagnostics-outage). Frontend: `tests/frontend/` via vitest (`normalizeSimulation`, shift-matrix math, format/display-honesty pins, auth-seam, journey dialog, tab smoke, vcEpicentre parity).
 
 ---
 
 ## 11. AUDIT TRAIL & GOVERNANCE
 
-- **Governance record (in-repo since v3.8, H5/R4):** `docs/governance/` — `DECISION_LOG.md` (D1–D21 + Sobol rider, full text + execution records), `FINDINGS_REGISTER.md` (open-by-decision: F-08 (D9), F-09 (D15), F-20 (D18); resolved-by-deletion: F-02..05/F-10/F-12/F-17/F-18/F-22; resolved: F-01 (D1), F-13/F-16 (D3), F-15 (D19), F-19 (D17), F-21 (D16 positioning), F-23/F-25 (D21), F-26 (files re-verified), F-27 (D8)), `CODE_REVIEW_2026-07-01_DECISIONS.md` and `REMEDIATION_2026-07-06.md` (R1–R4 + full disposition table).
+- **Governance record (in-repo since v3.8, H5/R4):** `docs/governance/` — `DECISION_LOG.md` (D1–D21 + Sobol rider + O1–O5, full text + execution records; Part G = the 2026-07-10 VC-epicentre ruling), `FINDINGS_REGISTER.md` (open-by-decision: F-08 (D9), F-09 (D15), F-20 (D18); resolved-by-deletion: F-02..05/F-10/F-12/F-17/F-18/F-22; resolved: F-01 (D1), F-13/F-16 (D3), F-15 (D19), F-19 (D17), F-21 (D16 positioning), F-23/F-25 (D21), F-26 (files re-verified), F-27 (D8)), `CODE_REVIEW_2026-07-01_DECISIONS.md` and `REMEDIATION_2026-07-06.md` (R1–R4 + full disposition table).
 - **Verification artifacts** (incl. `v8_d20_tcopula_df_out.txt`, D20 evidence) are retained offline by the owner; available on request.
 - Every persisted run carries: master seed + chain seeds, chains, model version, engine fidelity, numerics backend, trend fingerprint, integrity events (incl. input drift), seed stability (2.8.1+).
 
@@ -323,7 +335,7 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 | Risk | Mitigation |
 |------|------------|
-| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.8.1 until the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate); seed-stability line reads "not recorded" until then |
+| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.9.0 until the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate); until then the footer reads "profile-weighted (pre-2.9 run)" for the VC basis (and "not recorded" for seed stability if the run also predates 2.8.1) |
 | No predictive validation (accepted, D9) | Position as structured judgment; revisit at first board citation |
 | One-sided trend grammar understates uncertainty (accepted, D15) | Disclosed; bands labeled as listed-trend magnitude uncertainty |
 | Neon connection limits / cold starts | Pooled connections, lazy init retry, SQLite locally |
@@ -332,7 +344,7 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 ---
 
-*Document Version: 3.8 — July 2026 (handover review R1–R4; MODEL_VERSION 2.8.1)*
+*Document Version: 3.9 — July 2026 (VC epicentre attribution O5; MODEL_VERSION 2.9.0)*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Beta-shaped structured-judgment priors (set from analyst 1–5 scores — magnitude-uncertainty only, NOT updated from data; T7 June 2026) + Gaussian copula dependencies + structured-judgment overlap correction + input-drift telemetry. Ceteris paribus: the engine holds strategy constant; strategic response belongs to the reader.*

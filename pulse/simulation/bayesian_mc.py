@@ -50,7 +50,8 @@ from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
                            FORCE_MATERIALIZATION_OVERRIDES,
                            compute_materialization_schedule,
                            DEFAULT_FORCE_OVERLAP_MATRIX,
-                           DEFAULT_WITHIN_FORCE_OVERLAP)
+                           DEFAULT_WITHIN_FORCE_OVERLAP,
+                           vc_epicentre_step_of)
 from pulse.ingestion.models import TrendDatabase, Trend
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,22 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
+    # 2.9.0 — July 2026 VC-epicentre attribution (owner-directed, 2026-07-10):
+    #         the value-chain lens is now a categorical EPICENTRE PARTITION,
+    #         structurally parallel to the force lens. Experts score the VC as
+    #         one epicentre stage per trend (July 2026 Trends-editor redesign);
+    #         the old share math smeared each trend across steps through the
+    #         editor's 5/3/1 serialization kernel × vc_weights — a UI constant
+    #         laundered into pseudo-measured attribution. Now each trend's
+    #         contribution (|normalized_score| × cat_exposure/5) is assigned
+    #         wholly to vc_epicentre_step_of(vc_exposure); vc_weights is
+    #         deleted end-to-end (inert at equal defaults, meaningless over
+    #         categorical votes); unscored trends and uniform-fallback
+    #         categories emit integrity events instead of failing silently;
+    #         results carry vc_attribution_basis="epicentre". Shift-matrix
+    #         numbers are UNTOUCHED (VC never fed the shift math) — golden
+    #         shift/portfolio pins unchanged; decompositions.vc /
+    #         vc_decomposition values move.
     # 2.8.1 — July 2026 handover review (owner-approved batch, 2026-07-06):
     #         C2 deterministic trend load order (ORDER BY id — reproducibility
     #         was silently order-dependent); M1 missing gp1_pct_affected now
@@ -88,7 +105,7 @@ class BayesianMonteCarloEngine:
     #         full config-layer validation (D21).
     # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
     #         removed from result contract (D4).
-    MODEL_VERSION = "2.8.1"
+    MODEL_VERSION = "2.9.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -147,6 +164,7 @@ class BayesianMonteCarloEngine:
                 "shift_matrix": {category: {year: {percentile: value}}},
                 "force_attribution": {category: {"direct_effects": {force: contribution}}},
                 "vc_decomposition": {category: {vc_step: contribution}},
+                "vc_attribution_basis": "epicentre",  # 2.9.0 partition basis tag
                 "convergence": {category: {"r_hat": float, "ess": int}},
                 "raw_samples": np.ndarray,  # (iterations, categories, years)
                 "model_version": str, "engine_name": str,
@@ -546,54 +564,95 @@ class BayesianMonteCarloEngine:
                 "direct_effects": {f: float(v * scale) for f, v in raw_force_sums.items()},
             }
 
+        # ── Value-chain EPICENTRE shares (2.9.0) ────────────────────────
+        # Computed ONCE and consumed by BOTH the terminal-year back-compat
+        # block below and the per-year decompositions.vc (single source).
+        #
+        # July 2026 VC redesign: experts score the value chain as ONE
+        # epicentre stage per trend (the stored 8-step 0–5 profile is a
+        # serialization format — the Trends editor writes a canonical 5/3/1
+        # falloff around the picked stage). The former share math
+        # (exposure-profile × vc_weights smear) therefore laundered a UI
+        # kernel constant into pseudo-measured cross-step attribution. The
+        # lens is now a hard categorical partition, exactly parallel to the
+        # force lens: each trend's relevance — |normalized_score| ×
+        # (category exposure / 5) — is assigned WHOLLY to its epicentre
+        # stage (pulse.config.vc_epicentre_step_of, the engine-side twin of
+        # the frontend's epicentreOf). Propagation up/downstream the chain
+        # is deliberately NOT modelled: under D16 ceteris paribus that is a
+        # market/management-response story, not a trend property.
+        trends = db.trends
+        trend_epicentre = {
+            t.id: vc_epicentre_step_of(getattr(t, 'vc_exposure', None) or {})
+            for t in trends
+        }
+        unscored_vc = sorted(tid for tid, s in trend_epicentre.items() if s is None)
+
+        vc_shares: dict = {}
+        vc_fallback_cats: list = []
+        for cat in self.config.category_names:
+            vsum = {s: 0.0 for s in VC_STEPS}
+            for trend in trends:
+                cat_exp = trend.category_exposure.get(cat, 0)
+                step = trend_epicentre.get(trend.id)
+                if cat_exp > 0 and step is not None:
+                    vsum[step] += abs(trend.normalized_score) * (min(cat_exp, 5) / 5.0)
+            vtot = sum(vsum.values())
+            if vtot > 0:
+                vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
+            else:
+                # Degenerate guard ONLY: no contributing trend carries a VC
+                # epicentre. Uniform shares keep the lens exhaustive (the
+                # Σ-over-steps == MC-median identity that PPA2 anchors row
+                # totals on), and the integrity event below makes the
+                # fabricated flatness visible instead of silent. Never fires
+                # on the seeded 99-trend base — every stored profile
+                # resolves to an epicentre.
+                vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
+                vc_fallback_cats.append(cat)
+
+        if unscored_vc:
+            self._integrity_events.append({
+                "type": "vc_epicentre_coverage",
+                "severity": "warning",
+                "message": (
+                    f"{len(unscored_vc)} trend(s) carry no value-chain "
+                    f"epicentre (empty/unscored VC profile) — the VC "
+                    f"attribution lens is computed on the scored subset "
+                    f"while these trends still drive the shift numbers. "
+                    f"Score them in the Trends editor: "
+                    + ", ".join(unscored_vc[:10])
+                    + ("…" if len(unscored_vc) > 10 else "")
+                ),
+                "detail": {"count": len(unscored_vc),
+                           "unscored_trend_ids": unscored_vc[:50]},
+            })
+        if vc_fallback_cats:
+            self._integrity_events.append({
+                "type": "vc_attribution_fallback",
+                "severity": "warning",
+                "message": (
+                    f"{len(vc_fallback_cats)} categor"
+                    f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no "
+                    f"epicentre-scored contributing trend — the VC lens shows "
+                    f"a uniform 1/8 spread there (structural fallback, not "
+                    f"expert judgment): " + ", ".join(vc_fallback_cats)
+                ),
+                "detail": {"categories": list(vc_fallback_cats)},
+            })
+
         # ── Value Chain Decomposition (terminal-year, back-compat) ─────
-        # VC weights allocate the total category shift across VC steps.
-        # For each category, compute how much of the shift lands on each
-        # VC step based on trend VC exposures × vc_weights (normalized).
+        # The same epicentre shares applied to the terminal-year median;
+        # kept because the persisted-run contract and GET /simulation carry
+        # this key alongside decompositions.vc (which holds every year).
         vc_decomposition = {}
-        vc_weights = getattr(self.config, 'vc_weights', {})
-
-        # Build case-insensitive lookup helper (shared with per-year path below)
-        def _vc_lookup(vc_exp: dict, step: str) -> float:
-            v = vc_exp.get(step, None)
-            if v is not None:
-                return float(v)
-            norm = step.lower().replace(' ', '_')
-            for k, val in vc_exp.items():
-                if k.lower().replace(' ', '_') == norm:
-                    return float(val)
-            return 0.0
-
-        if vc_weights:
-            trends = db.trends
-            for c_idx, cat in enumerate(self.config.category_names):
-                # Compute raw relevance score per VC step for this category
-                step_scores = {}
-                for step, w in vc_weights.items():
-                    raw = 0.0
-                    for trend in trends:
-                        cat_exp = trend.category_exposure.get(cat, 0)
-                        if cat_exp > 0:
-                            vc_exp = getattr(trend, 'vc_exposure', {}) or {}
-                            v = _vc_lookup(vc_exp, step)
-                            raw += abs(trend.normalized_score) * (cat_exp / 5.0) * (v / 5.0) * w
-                    step_scores[step] = raw
-
-                # Normalize to proportions summing to 1.0
-                total_raw = sum(step_scores.values())
-                if total_raw > 0:
-                    step_shares = {s: v / total_raw for s, v in step_scores.items()}
-                else:
-                    n_steps = len(vc_weights)
-                    step_shares = {s: 1.0 / n_steps for s in vc_weights}
-
-                # Apply shares to the median terminal-year shift for this category
-                last_year = self.config.path_years[-1]
-                median_shift = shift_matrix[cat]["path"][last_year]["median"]
-                vc_decomposition[cat] = {
-                    step: float(share * median_shift)
-                    for step, share in step_shares.items()
-                }
+        last_year = self.config.path_years[-1]
+        for cat in self.config.category_names:
+            median_shift = shift_matrix[cat]["path"][last_year]["median"]
+            vc_decomposition[cat] = {
+                step: float(share * median_shift)
+                for step, share in vc_shares[cat].items()
+            }
 
         # (O3, owner ruling 2026-07-07: the consumer-journey decomposition —
         #  the quantitative journey lens introduced as v3.6 block 8 — was
@@ -620,11 +679,12 @@ class BayesianMonteCarloEngine:
         years = list(self.config.path_years)
         region_weights = getattr(self.config, 'region_weights', None) or {r: 1.0 / len(REGIONS) for r in REGIONS}
 
-        # Build the three per-category share structures ONCE (shares are
+        # Build the force/region share structures ONCE (shares are
         # exposure-weighted and do not depend on year — the year-dependent
-        # magnitude enters via mc_median[c][y]).
+        # magnitude enters via mc_median[c][y]). The VC shares were computed
+        # above as the epicentre partition (2.9.0) and are reused here —
+        # one share computation per lens, engine-wide.
         force_shares: dict = {}
-        vc_shares: dict = {}
         region_shares: dict = {}
 
         for cat in cats:
@@ -641,21 +701,7 @@ class BayesianMonteCarloEngine:
             else:
                 force_shares[cat] = {f: 1.0 / len(FORCES) for f in FORCES}
 
-            # VC shares (exposure × vc_weight × |score|)
-            vsum = {s: 0.0 for s in VC_STEPS}
-            for step in VC_STEPS:
-                w = vc_weights.get(step, 1.0 / len(VC_STEPS)) if vc_weights else 1.0 / len(VC_STEPS)
-                for trend in trends:
-                    cat_exp = trend.category_exposure.get(cat, 0)
-                    if cat_exp > 0:
-                        vc_exp = getattr(trend, 'vc_exposure', {}) or {}
-                        v = _vc_lookup(vc_exp, step)
-                        vsum[step] += abs(trend.normalized_score) * (cat_exp / 5.0) * (v / 5.0) * w
-            vtot = sum(vsum.values())
-            if vtot > 0:
-                vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
-            else:
-                vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
+            # (VC shares: epicentre partition, computed once above — 2.9.0.)
 
             # Region shares (exposure × region_weight × |score|)
             rsum = {r: 0.0 for r in REGIONS}
@@ -777,6 +823,10 @@ class BayesianMonteCarloEngine:
             "model_version": self.MODEL_VERSION,
             "engine_name": self.ENGINE_NAME,
             "numerics_backend": NUMERICS_BACKEND,
+            # 2.9.0: how the VC lens was computed. "epicentre" = categorical
+            # partition by vc_epicentre_step_of; pre-2.9 runs carry no tag
+            # (the dashboard labels those "profile-weighted, pre-2.9").
+            "vc_attribution_basis": "epicentre",
             "seed": self.seed,
             "integrity_events": list(self._integrity_events),
         }

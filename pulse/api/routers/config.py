@@ -36,7 +36,8 @@ async def get_config(user: dict = Depends(require_auth)):
         "within_force_overlap": dict(getattr(config, "within_force_overlap", {})),
         "attenuation_source": config.attenuation_source,
         "force_weights": config.force_weights,
-        "vc_weights": config.vc_weights,
+        # vc_weights removed (2.9.0): the VC lens is an epicentre partition —
+        # no per-step weight exists anymore.
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
@@ -83,12 +84,8 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         changes["force_weights"] = {"old": config.force_weights, "new": req.force_weights}
         overrides["force_weights"] = req.force_weights
 
-    if req.vc_weights is not None:
-        total = sum(req.vc_weights.values())
-        if abs(total - 1.0) > 0.01:
-            raise HTTPException(400, f"VC weights must sum to 1.0, got {total}")
-        changes["vc_weights"] = {"old": config.vc_weights, "new": req.vc_weights}
-        overrides["vc_weights"] = req.vc_weights
+    # (vc_weights handling removed, 2.9.0 — the field no longer exists on
+    #  ConfigUpdate or ModelConfig; the VC lens is an epicentre partition.)
 
     if req.region_weights is not None:
         total = sum(req.region_weights.values())
@@ -228,7 +225,6 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             path_years=list(candidate.path_years),
             materialization=dict(candidate.materialization),
             force_weights=dict(candidate.force_weights),
-            vc_weights=dict(candidate.vc_weights),
             region_weights=dict(candidate.region_weights),
             category_names=list(candidate.category_names),
             category_weights=dict(candidate.category_weights),
@@ -287,7 +283,6 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         "within_force_overlap": dict(getattr(config, "within_force_overlap", {})),
         "attenuation_source": config.attenuation_source,
         "force_weights": config.force_weights,
-        "vc_weights": config.vc_weights,
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),

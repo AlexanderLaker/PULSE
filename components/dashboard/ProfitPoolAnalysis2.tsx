@@ -99,7 +99,7 @@ type ViewMode = 'time' | 'force' | 'vc' | 'region';
 const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
   time:   { label: 'Time Path',   description: 'MC median shifts 2026→2035, cumulative vs 2025', Icon: Calendar },
   force:  { label: 'Force attribution',       description: 'Distributes each category shift across forces by exposure — attribution, not an independent simulation', Icon: Zap },
-  vc:     { label: 'Value chain attribution', description: 'Distributes each category shift across value-chain steps by exposure — attribution, not an independent simulation', Icon: Layers },
+  vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each trend\'s contribution wholly to the single stage where its impact centres (its epicentre) — propagation up/down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },
   region: { label: 'Region attribution',      description: 'Distributes each category shift across regions by exposure — attribution, not an independent simulation', Icon: Globe2 },
 };
 
@@ -1922,6 +1922,12 @@ const ProfitPoolAnalysis2: FC<{
                   ? `±${ss.spread_pp.toFixed(2)} pp across ${ss.n_chains} seeds (${ss.terminal_year} portfolio median)`
                   : 'not recorded (pre-2.8.1 run)']);
                 if (m.numerics_backend) rows.push(['Numerics', m.numerics_backend]);
+                // 2.9.0: VC-lens basis. Epicentre partition on 2.9+ runs;
+                // older persisted runs used profile×weight shares and are
+                // labeled honestly until the next CLI run replaces them.
+                rows.push(['VC attribution', m.vc_attribution_basis === 'epicentre'
+                  ? 'epicentre partition'
+                  : 'profile-weighted (pre-2.9 run)']);
                 if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
                 if (m.model_version) rows.push(['Model', m.model_version]);
                 return (
@@ -2033,10 +2039,14 @@ const ProfitPoolAnalysis2: FC<{
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by
-          the engine; within each lens, the per-category shares use both the trend 0–5
-          ratings (category, force/VC/region exposure) and the Config-sheet dimension
-          weights, so both the strength of the trend's link and its business importance
-          are reflected. Every row total equals the MC median shift for that (category, year)
+          the engine. The Force and Region shares use the trend 0–5 ratings (category,
+          force/region exposure) and the Config-sheet dimension weights; the{' '}
+          <strong>Value Chain lens is a categorical epicentre partition</strong> (2.9.0) —
+          each trend's contribution is assigned wholly to the single stage where experts
+          located its impact epicentre, with no per-step weights and no modelled
+          propagation up or down the chain (holding responses constant, propagation would
+          be a management/market story, not a trend property). Every row total equals the
+          MC median shift for that (category, year)
           and is therefore identical across all four lenses. <strong>Column and grand totals
           are category-weighted averages</strong> of the per-category values, using the
           admin-editable category business-importance weights from the Config sheet —

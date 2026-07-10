@@ -495,7 +495,7 @@ const FIELD_HELP = {
   timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
   category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
   regional: 'How strongly this trend plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
-  vc: 'The stage of the value chain — from raw materials through to the consumer — where this trend’s impact centres (its epicentre). One stage per trend; the pick expands into the engine’s eight per-step exposure scores.',
+  vc: 'The stage of the value chain — from raw materials through to the consumer — where this trend’s impact centres (its epicentre). One stage per trend; the engine’s VC attribution assigns the trend’s whole contribution to exactly this stage (2.9.0 epicentre partition — the pick is stored as a canonical eight-step profile for compatibility).',
 } as const;
 
 // ─── Meta chip (direction/confidence/data-source pill) ─────────────
@@ -1171,7 +1171,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
                 {vcStageLabel(myVcStage)}
               </span>
             }
-            footnote="One choice — the stage where this trend’s impact centres. Your pick expands into the eight per-step scores the engine consumes; leave it unscored and the AI baseline applies."
+            footnote="One choice — the stage where this trend’s impact centres. The engine assigns this trend’s whole contribution to this stage in the value-chain attribution (2.9.0 epicentre partition); leave it unscored and the AI baseline applies."
           >
             <EpicentreSlider value={myVcStage} ai={aiVcStage} onChange={(st) => patch({ vc_exposure: canonicalVcProfile(st) })} />
           </SectionCard>

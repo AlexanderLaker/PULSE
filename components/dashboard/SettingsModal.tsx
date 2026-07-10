@@ -687,7 +687,8 @@ interface ModelConfigPayload {
   within_force_overlap?: Record<string, number>;
   attenuation_source?: string;
   force_weights?: Record<string, number>;
-  vc_weights?: Record<string, number>;
+  // vc_weights deleted (2.9.0, July 2026): the VC lens is an epicentre
+  // partition — GET /config no longer returns a per-step weight group.
   region_weights?: Record<string, number>;
   category_weights?: Record<string, number>;
   force_correlation_matrix?: Record<string, Record<string, number>>;
@@ -704,7 +705,7 @@ interface ModelConfigPayload {
 // (D8: changed only via a correction release / the admin API and its gates).
 const EDITABLE_KEYS = [
   'iterations', 'within_force_rho',
-  'force_weights', 'region_weights', 'vc_weights', 'category_weights',
+  'force_weights', 'region_weights', 'category_weights',
 ] as const;
 type EditableKey = typeof EDITABLE_KEYS[number];
 type WeightGroupKey = Exclude<EditableKey, 'iterations' | 'within_force_rho'>;
@@ -713,10 +714,8 @@ type WeightGroupKey = Exclude<EditableKey, 'iterations' | 'within_force_rho'>;
 // robust to drift: missing keys are skipped, unknown keys are appended.
 const FORCE_ORDER = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
 const REGION_ORDER = ['Europe', 'North America', 'Asia', 'High Growth'];
-const VC_ORDER = [
-  'Raw Materials', 'Formulation', 'Manufacturing', 'Packaging',
-  'Supply Chain', 'Marketing', 'Commercial', 'Consumer',
-];
+// (VC_ORDER deleted with the value-chain weight grid, 2.9.0 — the VC lens
+//  is an epicentre partition; there are no per-step weights to edit.)
 const CATEGORY_ORDER = [
   'Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
   'LHC: FCN', 'LHC: FCA', 'LHC: FFI', 'LHC: LAD',
@@ -1127,7 +1126,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Aggregation weights"
             icon={SlidersHorizontal}
-            description="Weights the engine consumes for portfolio aggregation and the force / value-chain / region attribution lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize)."
+            description="Weights the engine consumes for portfolio aggregation and the force / region attribution lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize). The value-chain lens carries no weights: it is a categorical epicentre partition (each trend assigned wholly to its epicentre stage, 2.9.0)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {draft.force_weights ? (
@@ -1149,15 +1148,6 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   weights={draft.region_weights}
                   order={REGION_ORDER}
                   onCommit={patchWeight('region_weights')}
-                  readOnly={ro}
-                />
-              )}
-              {draft.vc_weights && (
-                <WeightGrid
-                  title="Value-chain weights"
-                  weights={draft.vc_weights}
-                  order={VC_ORDER}
-                  onCommit={patchWeight('vc_weights')}
                   readOnly={ro}
                 />
               )}

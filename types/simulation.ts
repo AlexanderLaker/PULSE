@@ -162,6 +162,11 @@ export interface RunMeta {
   engine_fidelity?: string | null;
   /** D13: exact library versions, e.g. 'scipy 1.15.3 · numpy 2.2.6'. */
   numerics_backend?: string | null;
+  /** 2.9.0: how the run's VC lens was computed. 'epicentre' = categorical
+   *  partition (each trend assigned wholly to its value-chain epicentre
+   *  stage). Null/absent on pre-2.9 runs, which used profile×weight shares
+   *  — the About-footer labels those "profile-weighted (pre-2.9 run)". */
+  vc_attribution_basis?: string | null;
   converged_categories?: number | null;
   total_categories?: number | null;
   persisted_at_utc?: string | null;

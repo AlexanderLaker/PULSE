@@ -8,6 +8,22 @@ from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS
 from pulse.ingestion.models import Trend, TrendDatabase
 
 
+def _canonical_vc(stage: int) -> dict:
+    """Canonical 5/3/1 epicentre profile for a 1-based stage.
+
+    Mirror of ``canonicalVcProfile`` in components/dashboard/Trends2.tsx —
+    the serialization the epicentre slider writes. Used so the fixture
+    trends carry realistic 2.9.0-era VC profiles with DISTINCT epicentres
+    (the engine's VC lens is a categorical partition; identical epicentres
+    couldn't catch a stage-mixup regression).
+    """
+    falloff = [5, 3, 1]
+    return {
+        s: (falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0)
+        for i, s in enumerate(VC_STEPS)
+    }
+
+
 @pytest.fixture
 def mock_trend() -> Trend:
     """Create a single mock trend for basic testing."""
@@ -25,7 +41,11 @@ def mock_trend() -> Trend:
         source_type="test",
         confidence="High",
     )
-    # Populate category and VC exposures
+    # Populate category and VC exposures. The VC profile is deliberately a
+    # LEGACY-shaped flat grid (pre-slider expert scoring): 2.9.0 collapses
+    # it through vc_epicentre_of — flat profiles tie at every stage and
+    # resolve toward the exposure-weighted centroid (stage 4, "Packaging"),
+    # exercising the legacy-collapse path.
     for cat in CATEGORIES:
         trend.category_exposure[cat] = 2 if "Hair" in cat else 1
     for vc in VC_STEPS:
@@ -61,8 +81,12 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
             consumer_trend.category_exposure[cat] = 2
         else:
             consumer_trend.category_exposure[cat] = 1
-    for vc in VC_STEPS:
-        consumer_trend.vc_exposure[vc] = 2
+    # 2.9.0 VC-epicentre fixture profiles: canonical slider serializations
+    # with DISTINCT stages (plus one deliberate collision, Technology +
+    # Competitive both at Commercial, so the partition's grouping is
+    # exercised). vc_exposure feeds ONLY the VC attribution lens — never
+    # the shift math — so these assignments leave the golden pins intact.
+    consumer_trend.vc_exposure = _canonical_vc(6)   # epicentre: Marketing
     trends.append(consumer_trend)
 
     # Government force — carries a per-trend materialization schedule
@@ -83,8 +107,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     )
     for cat in CATEGORIES:
         gov_trend.category_exposure[cat] = 2 if "Body" in cat or "Styling" in cat else 3
-    for vc in VC_STEPS:
-        gov_trend.vc_exposure[vc] = 3
+    gov_trend.vc_exposure = _canonical_vc(2)        # epicentre: Formulation
     trends.append(gov_trend)
 
     # Technology force
@@ -101,8 +124,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     )
     for cat in CATEGORIES:
         tech_trend.category_exposure[cat] = 2
-    for vc in VC_STEPS:
-        tech_trend.vc_exposure[vc] = 2
+    tech_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial
     trends.append(tech_trend)
 
     # Environmental force
@@ -119,8 +141,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     )
     for cat in CATEGORIES:
         env_trend.category_exposure[cat] = 2
-    for vc in VC_STEPS:
-        env_trend.vc_exposure[vc] = 3
+    env_trend.vc_exposure = _canonical_vc(3)        # epicentre: Manufacturing
     trends.append(env_trend)
 
     # Competitive force
@@ -137,8 +158,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     )
     for cat in CATEGORIES:
         comp_trend.category_exposure[cat] = 3
-    for vc in VC_STEPS:
-        comp_trend.vc_exposure[vc] = 1
+    comp_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial (collides with tech)
     trends.append(comp_trend)
 
     db = TrendDatabase(

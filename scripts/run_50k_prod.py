@@ -195,6 +195,10 @@ def main(argv: list[str] | None = None) -> int:
                 "chains": args.chains,
                 "model_version": result.get("model_version"),
                 "engine_name": result.get("engine_name"),
+                # 2.9.0: VC lens basis — "epicentre" (categorical partition).
+                # Pre-2.9 runs carry no tag; the dashboard labels those
+                # "profile-weighted (pre-2.9 run)".
+                "vc_attribution_basis": result.get("vc_attribution_basis"),
                 "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
                 # D19: fingerprint of THIS run's inputs — next run diffs itself
                 # against it.

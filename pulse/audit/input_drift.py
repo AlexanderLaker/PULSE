@@ -25,6 +25,26 @@ def _exposure_map(m) -> dict:
     return {str(k): round(float(v), 4) for k, v in sorted(m.items())}
 
 
+def _ve_norm(v):
+    """Normalize a fingerprint's "ve" component to the epicentre stage.
+
+    2.9.0: the fingerprint stores the DERIVED epicentre stage (int 1–8, or
+    None when unscored) instead of the raw 8-step profile — the engine's VC
+    attribution consumes only the stage, so only a stage move is semantic
+    drift. A representation rewrite (legacy arbitrary profile → canonical
+    5/3/1 slider profile with the same epicentre) must NOT read as drift.
+
+    Pre-2.9 fingerprints carry the old dict format; collapse those through
+    the same pulse.config.vc_epicentre_of rule so the first post-upgrade
+    diff compares stages with stages rather than reporting a wall of false
+    structural drift.
+    """
+    if isinstance(v, dict):
+        from pulse.config import vc_epicentre_of  # top-level module, no scipy
+        return vc_epicentre_of(v)
+    return v
+
+
 def trend_fingerprint(trends) -> dict:
     """Compact, JSON-stable fingerprint of the scoring state of a trend set.
 
@@ -36,10 +56,18 @@ def trend_fingerprint(trends) -> dict:
     peak_year and diffusion_curve. (The journey-exposure key "je" existed
     only between 2.8.1 and the same-week O3 removal of the journey layer.)
 
+    2.9.0 (VC epicentre): "ve" stores the DERIVED epicentre stage (int 1–8
+    or None), not the raw 8-step profile — the profile is a serialization
+    format and only the stage feeds the VC attribution. An epicentre flip
+    is drift; a representation rewrite with the same stage is not.
+
     Diffing stays backward-compatible: fields absent from a pre-2.8.1
-    fingerprint are skipped in the comparison (see compute_input_drift_event)
-    rather than reported as spurious drift on the first run after upgrade.
+    fingerprint are skipped in the comparison, and pre-2.9 dict-format "ve"
+    values are collapsed to their stage before comparing (see
+    compute_input_drift_event) rather than reported as spurious drift on
+    the first run after upgrade.
     """
+    from pulse.config import vc_epicentre_of  # top-level module, no scipy
     fp = {}
     for t in trends:
         fp[str(t.id)] = {
@@ -49,7 +77,8 @@ def trend_fingerprint(trends) -> dict:
             "f": str(t.force),
             # L6 additions (2.8.1)
             "ce": _exposure_map(getattr(t, "category_exposure", None)),
-            "ve": _exposure_map(getattr(t, "vc_exposure", None)),
+            # 2.9.0: derived epicentre stage (see docstring).
+            "ve": vc_epicentre_of(getattr(t, "vc_exposure", None) or {}),
             "re": _exposure_map(getattr(t, "regional_exposure", None)),
             "pk": int(getattr(t, "peak_year", 0) or 0),
             "dc": str(getattr(t, "diffusion_curve", "") or ""),
@@ -100,9 +129,16 @@ def compute_input_drift_event(
             direction_flips.append(tid)
         # L6: compare structure fields only when the previous fingerprint
         # carries them (pre-2.8.1 fingerprints don't — skipping avoids a
-        # wall of false drift on the first post-upgrade run).
+        # wall of false drift on the first post-upgrade run). "ve" values
+        # are normalized to the epicentre stage first (2.9.0) so a pre-2.9
+        # dict-format fingerprint diffs cleanly against the new int format.
         for key in _STRUCTURE_KEYS:
-            if key in a and a.get(key) != b.get(key):
+            if key not in a:
+                continue
+            av, bv = a.get(key), b.get(key)
+            if key == "ve":
+                av, bv = _ve_norm(av), _ve_norm(bv)
+            if av != bv:
                 structure_changes.append(tid)
                 break
 

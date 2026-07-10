@@ -123,7 +123,9 @@ class ConfigUpdate(BaseModel):
                     "(legacy) | 'admin_override'. ('assumed' was retired with "
                     "the v3.5 structured-judgment overlap correction.)")
     force_weights: Optional[dict] = None
-    vc_weights: Optional[dict] = None
+    # vc_weights removed (2.9.0, July 2026): the VC attribution lens is a
+    # categorical epicentre partition — there is no per-step weight dial.
+    # Clients still sending the key get it silently ignored (pydantic).
     region_weights: Optional[dict] = None
     category_weights: Optional[dict] = None
     force_correlation_matrix: Optional[dict] = Field(None,

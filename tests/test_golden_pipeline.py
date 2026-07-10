@@ -102,8 +102,11 @@ class TestDeterminism:
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 
-    Engine: bayesian_copula MODEL_VERSION 2.8.1. Regenerate pins ONLY for
-    deliberate model changes, in the same commit as the change.
+    Engine: bayesian_copula MODEL_VERSION 2.9.0 (2.9.0 changed the VC
+    attribution basis only — shift/portfolio pin values are the 2.8.1
+    numbers, deliberately NOT regenerated because the shift math did not
+    move). Regenerate pins ONLY for deliberate model changes, in the same
+    commit as the change.
 
     Regenerated 2026-07-06 (2.8.1, owner-approved July review batch): the
     copula-uniform clip moved to float-safety (L3), compounding factors are
@@ -116,6 +119,12 @@ class TestGoldenPins:
     June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
     """
 
+    # 2.9.0 note: the VC-epicentre attribution rework (partition replaces
+    # profile×vc_weights shares) does NOT move these pins — vc_exposure
+    # never fed the shift math, only the VC lens. Shift/portfolio pins
+    # below are therefore UNCHANGED from the 2.8.1 regeneration; only
+    # decompositions.vc / vc_decomposition values moved (structural tests
+    # below, not pinned values).
     PINS = {
         # cat:          (median,            p10,                p90)
         "Hair: Color": (-0.005123402183, -0.007827267324, -0.002184655835),
@@ -129,10 +138,11 @@ class TestGoldenPins:
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.8.1"
+        assert r["model_version"] == "2.9.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")  # D13
+        assert r["vc_attribution_basis"] == "epicentre"    # 2.9.0 partition tag
 
     def test_version_single_source(self):
         """M15 (July 2026 review): one authoritative version everywhere —
@@ -221,6 +231,81 @@ class TestStructuralIdentities:
         """
         r = _run(mock_model_config, mock_trends_database)
         sm, dec = r["shift_matrix"], r["decompositions"]["force"]
+        for ykey, by_cat in dec.items():
+            for cat, row in by_cat.items():
+                med = sm[cat]["path"][int(ykey)]["median"]
+                assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
+
+    def test_vc_decomposition_reconciles_to_median(
+        self, mock_model_config, mock_trends_database,
+    ):
+        """2.9.0: the epicentre partition stays exhaustive — Σ over VC steps
+        of decomp[vc][year][cat] == MC median for every (cat, year), the
+        same identity the force lens carries. Shares sum to 1 per category
+        by construction of the partition."""
+        r = _run(mock_model_config, mock_trends_database)
+        sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
+        for ykey, by_cat in dec.items():
+            for cat, row in by_cat.items():
+                med = sm[cat]["path"][int(ykey)]["median"]
+                assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
+
+    def test_vc_attribution_is_categorical_partition(
+        self, mock_model_config, mock_trends_database,
+    ):
+        """2.9.0: the VC lens is a hard partition by epicentre stage.
+
+        The fixture's five trends carry epicentres {Marketing(6),
+        Formulation(2), Commercial(7)×2, Manufacturing(3)} and every trend
+        exposes every category — so for EVERY category, exactly the stages
+        {Formulation, Manufacturing, Marketing, Commercial} carry non-zero
+        attribution and the other four stages carry exactly 0.0 (no kernel
+        smear, no uniform residue). Also locks the terminal-year
+        vc_decomposition to the per-year block's terminal slice (single
+        source of shares)."""
+        from pulse.config import vc_epicentre_step_of
+        r = _run(mock_model_config, mock_trends_database)
+        expected_steps = {
+            vc_epicentre_step_of(t.vc_exposure)
+            for t in mock_trends_database.trends
+        }
+        assert expected_steps == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
+
+        dec = r["decompositions"]["vc"]
+        last_year = max(int(y) for y in dec.keys())
+        for ykey, by_cat in dec.items():
+            for cat, row in by_cat.items():
+                med = r["shift_matrix"][cat]["path"][int(ykey)]["median"]
+                for step, val in row.items():
+                    if step in expected_steps:
+                        # Non-zero whenever the category actually shifted.
+                        if abs(med) > 1e-15:
+                            assert abs(val) > 0.0, (cat, ykey, step)
+                    else:
+                        assert val == 0.0, (
+                            f"{cat}/{ykey}/{step}: non-epicentre stage carries "
+                            f"attribution {val} — the partition leaked."
+                        )
+        # Terminal-year back-compat block == terminal slice of the per-year block.
+        for cat, row in r["vc_decomposition"].items():
+            assert row == pytest.approx(dec[last_year][cat]), cat
+
+    def test_vc_coverage_integrity_event_on_unscored_trend(
+        self, mock_model_config, mock_trends_database,
+    ):
+        """A trend without a VC epicentre must surface as an integrity event
+        (the lens silently ignoring contributors was the pre-2.9 behavior),
+        while the partition identity still holds on the scored subset."""
+        import copy
+        db = copy.deepcopy(mock_trends_database)
+        db.trends[0].vc_exposure = {}   # unscore one contributor
+        r = _run(mock_model_config, db)
+        events = [e for e in r["integrity_events"] if e["type"] == "vc_epicentre_coverage"]
+        assert len(events) == 1
+        assert events[0]["severity"] == "warning"
+        assert db.trends[0].id in events[0]["message"]
+        # Identity survives: shares renormalize over the scored subset.
+        sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
         for ykey, by_cat in dec.items():
             for cat, row in by_cat.items():
                 med = sm[cat]["path"][int(ykey)]["median"]

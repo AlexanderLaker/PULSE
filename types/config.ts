@@ -3,7 +3,7 @@
  * Maps to ModelConfig and application settings.
  */
 
-import type { ForceName, ValueChainStep, AIProvider, ProjectionYear } from './index';
+import type { ForceName, AIProvider, ProjectionYear } from './index';
 
 /** Force metadata for display. */
 export interface ForceDefinition {
@@ -112,7 +112,8 @@ export interface ModelConfig {
   path_years?: ProjectionYear[];
   maturity_schedule?: Record<number, number>;
   force_weights?: Record<ForceName, number>;
-  vc_weights?: Record<ValueChainStep, number>;
+  // vc_weights deleted (2.9.0, July 2026): the VC attribution lens is a
+  // categorical epicentre partition — no per-step weight dial exists.
   /** Regional business-importance weights — admin-editable on the config page.
    *  Used by the frontend to aggregate decomposition cells across regions
    *  for Region-lens row totals and for computing "overall region impact"

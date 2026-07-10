@@ -18,7 +18,7 @@ no validation at all (audit F-23).
 from typing import Optional, List, Dict
 from pydantic import BaseModel, field_validator, model_validator
 
-from pulse.config import FORCES, CATEGORIES, VC_STEPS, REGIONS
+from pulse.config import FORCES, CATEGORIES, REGIONS
 
 
 class MaterializationSchedule(BaseModel):
@@ -96,7 +96,9 @@ class ModelConfigValidator(BaseModel):
     path_years: List[int]
     materialization: Dict[int, float]
     force_weights: Dict[str, float]
-    vc_weights: Dict[str, float]
+    # vc_weights deleted (2.9.0, July 2026): the VC lens is a categorical
+    # epicentre partition — a per-step weight has no defensible meaning over
+    # stage votes. Old snapshots carrying it are ignored (extra=ignore).
     region_weights: Dict[str, float]
     category_names: List[str]
     category_weights: Dict[str, float]
@@ -233,49 +235,7 @@ class ModelConfigValidator(BaseModel):
 
         return v
 
-    @field_validator("vc_weights")
-    @classmethod
-    def validate_vc_weights(cls, v: Dict[str, float]) -> Dict[str, float]:
-        """VC weights must sum to 1.0 and include all value chain steps."""
-        if not v:
-            raise ValueError("vc_weights cannot be empty")
-
-        # Check all VC steps present
-        provided_steps = set(v.keys())
-        required_steps = set(VC_STEPS)
-        missing = required_steps - provided_steps
-        if missing:
-            raise ValueError(
-                f"vc_weights missing these value chain steps: {missing}. "
-                f"Required: {required_steps}"
-            )
-
-        # Check for extra steps
-        extra = provided_steps - required_steps
-        if extra:
-            raise ValueError(
-                f"vc_weights contains unexpected steps: {extra}. "
-                f"Only these allowed: {required_steps}"
-            )
-
-        # Validate sum
-        total = sum(v.values())
-        tolerance = 0.01
-        if abs(total - 1.0) > tolerance:
-            raise ValueError(
-                f"vc_weights must sum to 1.0 (got {total:.4f}, tolerance ±{tolerance}). "
-                f"Normalize: {{{', '.join(f'{k}: {val/total:.4f}' for k, val in v.items())}}}"
-            )
-
-        # All weights non-negative
-        for step, weight in v.items():
-            if weight < 0:
-                raise ValueError(
-                    f"vc_weights['{step}'] is negative ({weight}). "
-                    f"All weights must be >= 0"
-                )
-
-        return v
+    # (validate_vc_weights deleted with the vc_weights field, 2.9.0.)
 
     @field_validator("category_names")
     @classmethod

@@ -227,6 +227,11 @@ class ShiftMatrixWriter:
             ("", "moves, innovation, or competitive reaction by Henkel or competitors."),
             ("", "Totals read as exposure if nobody acts, not as forecast outcomes."),
             ("", ""),
+            # 2.9.0: VC-lens basis travels with every export of the run.
+            ("VC ATTRIBUTION", "Epicentre partition: each trend's contribution is assigned"),
+            ("", "wholly to the value-chain stage where experts located its impact"),
+            ("", "epicentre. Propagation up/down the chain is not modelled."),
+            ("", ""),
             ("SECURITY NOTE", "This file contains ONLY percentage shifts."),
             ("", "No company financial data (NES, GP1, GP2) is present."),
             ("", "Apply shifts to your financials in your own Excel."),

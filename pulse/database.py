@@ -454,7 +454,11 @@ def init_db() -> None:
         # payload (a single serialised blob of the full config + an
         # operator-supplied label). The structured columns alongside
         # them are retained for queries that need to filter snapshots
-        # without parsing the JSON blob.
+        # without parsing the JSON blob. `attenuation` (scalar, v3.2) and
+        # `vc_weights` (2.9.0 epicentre partition) are inert legacy
+        # columns — nothing reads or writes them (save_snapshot writes
+        # config_json + label only); dropping them is a DX-scheduled
+        # migration alongside users.password_* (HANDOVER.md §7).
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS config_snapshots (
                 id {serial},
