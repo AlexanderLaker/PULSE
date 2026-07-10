@@ -228,7 +228,7 @@ const CategoryExposureGrid: FC<{ exposures: Record<string, number> }> = ({ expos
   );
 };
 
-// ─── Value-chain Exposure Grid (read-only, 1:1 with TrendExplorer) ─
+// ─── Value-chain exposure reader ───────────────────────────────────
 // 8 steps matched against the backend's display-name keys, with
 // snake_case/legacy fallbacks so old trend payloads still render.
 const readVCExposure = (
@@ -243,20 +243,183 @@ const readVCExposure = (
   return 0;
 };
 
-const ValueChainExposureGrid: FC<{ exposures: Record<string, number> }> = ({ exposures }) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-      {VC_STEPS.map((step) => (
-        <div key={step.id} className="flex flex-col gap-1.5">
-          <div
-            className="text-[11px] font-medium"
-            style={{ color: S.onSurface }}
-          >
-            {step.label}
-          </div>
-          <ReadDots value={readVCExposure(exposures, step)} color={S.primary} />
+// ─── Value-chain epicentre (July 2026 redesign) ────────────────────
+// The VC dimension is entered and read as ONE stage — the epicentre
+// (centre of gravity) of the trend's impact along the chain. The engine
+// contract is unchanged: it still consumes the 8-step vc_exposure map.
+//   read  → epicentre = the max-scoring step of the stored profile
+//           (ties resolve toward the exposure-weighted centroid);
+//   write → a chosen stage expands into the canonical profile
+//           5 (epicentre) / 3 (±1 step) / 1 (±2 steps) / 0 elsewhere.
+// Review & Endorse treats the stage as CATEGORICAL: expert picks are
+// counted as votes, never averaged — a Supply Chain vote and two
+// Commercial votes must not blend into "Marketing".
+
+const VC_SHORT_LABELS = ['Raw', 'Form', 'Mfg', 'Pack', 'Supply', 'Mktg', 'Comm', 'Cons'];
+
+/** 1-based epicentre stage of a vc_exposure profile, or null when unscored.
+ *  Exported for the vcEpicentre invariant tests. */
+export const epicentreOf = (exposures: Record<string, number> | undefined): number | null => {
+  const vs = VC_STEPS.map((s) => readVCExposure(exposures, s));
+  const total = vs.reduce((a, b) => a + b, 0);
+  if (total <= 0) return null;
+  const max = Math.max(...vs);
+  const centroid = vs.reduce((a, v, i) => a + v * (i + 1), 0) / total;
+  let best: number | null = null;
+  for (let i = 0; i < vs.length; i++) {
+    if (vs[i] !== max) continue;
+    if (best == null || Math.abs(i + 1 - centroid) < Math.abs(best - centroid)) best = i + 1;
+  }
+  return best;
+};
+
+/** Canonical 8-step profile for an epicentre stage (engine input).
+ *  Exported for the vcEpicentre invariant tests. */
+export const canonicalVcProfile = (stage: number): Record<string, number> => {
+  const falloff = [5, 3, 1];
+  const out: Record<string, number> = {};
+  VC_STEPS.forEach((s, i) => {
+    const d = Math.abs(i + 1 - stage);
+    out[s.id] = d < falloff.length ? falloff[d] : 0;
+  });
+  return out;
+};
+
+const vcZone = (stage: number): string =>
+  stage <= 4 ? 'upstream' : stage === 5 ? 'mid-chain' : 'downstream';
+const vcStageLabel = (stage: number | null): string =>
+  stage == null ? 'unscored' : `${VC_STEPS[stage - 1].label} · ${vcZone(stage)}`;
+/** Stop/pin position along the rail (stage centre of 8 equal cells). */
+const vcPos = (stage: number): string => `${(((stage - 0.5) / 8) * 100).toFixed(2)}%`;
+
+/** Read-only epicentre rail. `row` = compact inline (trend list row);
+ *  `card` = full-width with stage labels (expanded panel). */
+const EpicentreRail: FC<{
+  stage: number | null;
+  ai?: number | null;
+  size?: 'row' | 'card';
+  pinColor?: string;
+}> = ({ stage, ai, size = 'card', pinColor }) => {
+  const color = pinColor ?? S.primary;
+  const row = size === 'row';
+  const railTop = row ? 6 : 17;
+  const title = stage == null
+    ? 'Value chain: unscored'
+    : `Value chain epicentre: ${vcStageLabel(stage)}${ai != null && ai !== stage ? ` · AI: ${VC_STEPS[ai - 1].label}` : ''}`;
+  return (
+    <div title={title} aria-label={title} style={{ cursor: 'help' }}>
+      <div style={{ position: 'relative', height: row ? 16 : 40 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: railTop, height: row ? 4 : 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
+        {VC_STEPS.map((s, i) => (
+          <span key={s.id} style={{
+            position: 'absolute', top: railTop - 1, left: vcPos(i + 1),
+            width: row ? 6 : 8, height: row ? 6 : 8, borderRadius: 999,
+            backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
+          }} />
+        ))}
+        {!row && ai != null && ai !== stage && (
+          <span style={{
+            position: 'absolute', top: railTop - 2, left: vcPos(ai),
+            width: 10, height: 10, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
+            transform: 'translateX(-50%) rotate(45deg)',
+          }} />
+        )}
+        {stage != null && (
+          <span style={{
+            position: 'absolute', top: row ? 2 : 11, left: vcPos(stage),
+            width: row ? 12 : 18, height: row ? 12 : 18, borderRadius: 999,
+            backgroundColor: color, border: `${row ? 2 : 3}px solid #ffffff`,
+            outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
+          }} />
+        )}
+        {stage == null && row && (
+          <span style={{ position: 'absolute', top: 1, left: 0, fontSize: 11, color: S.mutedText }}>—</span>
+        )}
+      </div>
+      {!row && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
+          {VC_SHORT_LABELS.map((l, i) => (
+            <span key={l} style={{
+              fontSize: 11, textAlign: 'center', lineHeight: 1.25,
+              color: i + 1 === stage ? color : S.mutedText,
+              fontWeight: i + 1 === stage ? 800 : 400,
+            }}>
+              {l}
+            </span>
+          ))}
         </div>
+      )}
+    </div>
+  );
+};
+
+/** Editable epicentre slider (Expert Rating + admin edit): drag the pin or
+ *  click a stage. One value only — snaps to one of the 8 stages. */
+const EpicentreSlider: FC<{
+  value: number | null;
+  ai?: number | null;
+  onChange: (stage: number) => void;
+}> = ({ value, ai, onChange }) => (
+  <div>
+    <div style={{ position: 'relative', height: 44 }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 19, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
+      {VC_STEPS.map((s, i) => (
+        <span key={s.id} style={{
+          position: 'absolute', top: 17, left: vcPos(i + 1), width: 10, height: 10,
+          borderRadius: 999, backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
+        }} />
       ))}
+      {ai != null && ai !== value && (
+        <span title={`AI suggestion: ${VC_STEPS[ai - 1].label}`} style={{
+          position: 'absolute', top: 17, left: vcPos(ai), width: 10, height: 10,
+          backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
+          transform: 'translateX(-50%) rotate(45deg)', cursor: 'help',
+        }} />
+      )}
+      {value != null && (
+        <span style={{
+          position: 'absolute', top: 12, left: vcPos(value), width: 20, height: 20,
+          borderRadius: 999, backgroundColor: S.primary, border: '3px solid #ffffff',
+          outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+        }} />
+      )}
+      <input
+        type="range" min={1} max={8} step={1}
+        value={value ?? ai ?? 5}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        aria-label="Value chain epicentre"
+        aria-valuetext={value != null ? vcStageLabel(value) : 'unscored'}
+        style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
+      />
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
+      {VC_STEPS.map((s, i) => (
+        <button
+          key={s.id} type="button" onClick={() => onChange(i + 1)}
+          aria-pressed={i + 1 === value}
+          title={ai === i + 1 ? `${s.label} — AI suggestion` : s.label}
+          style={{
+            border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
+            fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
+            color: i + 1 === value ? S.primary : S.mutedText,
+            fontWeight: i + 1 === value ? 800 : 400,
+          }}
+        >
+          {VC_SHORT_LABELS[i]}
+        </button>
+      ))}
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Upstream</span>
+      <span title="AI suggestion (applies if you don't score this field)" style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999,
+        backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11, fontWeight: 700,
+        fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap', cursor: 'help',
+      }}>
+        <Sparkles size={11} /> {ai != null ? `AI: ${VC_STEPS[ai - 1].label}` : 'AI —'}
+      </span>
+      <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Downstream</span>
     </div>
   </div>
 );
@@ -291,9 +454,11 @@ interface SectionCardProps {
   footnote?: React.ReactNode;
   /** Optional "?" help tooltip (plain hover text) shown next to the title. */
   info?: string;
+  /** Optional right-aligned header slot (live value / status chip). */
+  right?: React.ReactNode;
   children: React.ReactNode;
 }
-const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, children }) => (
+const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, right, children }) => (
   <div style={{
     backgroundColor: S.surface,
     border: `1px solid ${S.cardBorder}`,
@@ -321,6 +486,7 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
         {title}
       </div>
       {info && <SectionInfoTip text={info} />}
+      {right != null && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{right}</span>}
     </div>
     {children}
     {footnote && (
@@ -340,7 +506,7 @@ const FIELD_HELP = {
   timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
   category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
   regional: 'How strongly this trend plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
-  vc: 'Where along the value chain — from raw materials through to the consumer — this trend exerts pressure, on a 0–5 scale.',
+  vc: 'The stage of the value chain — from raw materials through to the consumer — where this trend’s impact centres (its epicentre). One stage per trend; the pick expands into the engine’s eight per-step exposure scores.',
 } as const;
 
 // ─── Meta chip (direction/confidence/data-source pill) ─────────────
@@ -505,8 +671,11 @@ type ScoringMode = 'list' | 'input' | 'review';
 // value + delta chip. The Trend List has NO review-status column: it rendered
 // "—" on every row; real review status lives in Expert Rating's YOUR REVIEW.
 // Header and rows read the same template so columns always align.
+// July 2026: the Trend List gained a VALUE CHAIN column (compact epicentre
+// rail, 132px) between PROBABILITY and GP1 — list mode only, so the busier
+// 6-column input/review templates stay unchanged.
 const ROW_GRID: Record<ScoringMode, string> = {
-  list:   'minmax(0, 1fr) 130px 128px 170px 100px',
+  list:   'minmax(0, 1fr) 130px 128px 132px 170px 100px',
   input:  'minmax(0, 1fr) 130px 128px 170px 100px 130px',
   review: 'minmax(0, 1fr) 130px 180px 170px 100px 110px',
 };
@@ -908,6 +1077,8 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
   const aiG = aiGp1(trend);
   const aiPk = aiPeakOf(trend);
   const aiCv = aiCurveOf(trend);
+  const aiVcStage = epicentreOf(aiExpoOf(trend, 'vc_exposure'));
+  const myVcStage = epicentreOf(draft.vc_exposure as Record<string, number> | undefined);
   const sources = trend.sources ?? [];
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate?.diffusion_curve?.distribution;
@@ -997,8 +1168,16 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
           <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
             <EditableRegionGrid exposures={(draft.regional_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ regional_exposure: e })} ai={aiExpoOf(trend, 'regional_exposure')} />
           </SectionCard>
-          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}>
-            <EditableValueChainGrid exposures={(draft.vc_exposure ?? {}) as Record<string, number>} onChange={(e) => patch({ vc_exposure: e })} ai={aiExpoOf(trend, 'vc_exposure')} />
+          <SectionCard
+            title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+            right={
+              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: myVcStage != null ? S.primary : S.mutedText }}>
+                {vcStageLabel(myVcStage)}
+              </span>
+            }
+            footnote="One choice — the stage where this trend’s impact centres. Your pick expands into the eight per-step scores the engine consumes; leave it unscored and the AI baseline applies."
+          >
+            <EpicentreSlider value={myVcStage} ai={aiVcStage} onChange={(st) => patch({ vc_exposure: canonicalVcProfile(st) })} />
           </SectionCard>
 
           <SectionCard title="Comment" icon={MessageSquare} accent={S.primary} footnote="Optional. Shared with reviewers under Review &amp; Endorse — explain your reasoning, flag a caveat, or note evidence.">
@@ -1137,18 +1316,153 @@ const Decide: FC<{
   );
 };
 
+// ── Value-chain epicentre vote panel (Review & Endorse) ──
+// Stages are CATEGORICAL: each expert's pick is a stacked dot on its stage —
+// counted, never averaged (a Supply Chain vote and two Commercial votes must
+// not blend into "Marketing"). The admin endorses the majority, the AI stage,
+// or clicks any stage on the rail; ties leave no majority and stay visible.
+const EpicentreVotePanel: FC<{
+  ai: number | null;
+  votes: Array<{ name: string; role?: string; stage: number }>;
+  majority: { stage: number; n: number } | null;
+  endorsed: number | null;
+  onEndorse: (stage: number) => void;
+}> = ({ ai, votes, majority, endorsed, onEndorse }) => {
+  const byStage = new Map<number, Array<{ name: string; role?: string }>>();
+  for (const v of votes) {
+    const l = byStage.get(v.stage) ?? [];
+    l.push(v);
+    byStage.set(v.stage, l);
+  }
+  const srcText = endorsed == null ? null
+    : majority != null && endorsed === majority.stage ? `Expert majority (${majority.n} of ${votes.length})`
+    : ai != null && endorsed === ai ? 'AI baseline'
+    : 'Manual pick';
+  const pillStyle = (on: boolean, disabled = false): React.CSSProperties => ({
+    border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, padding: '6px 12px',
+    background: on ? S.onSurface : S.surface,
+    color: on ? '#fff' : disabled ? S.mutedText : S.onSurfaceVariant,
+    opacity: disabled ? 0.45 : 1,
+  });
+  return (
+    <div>
+      <div style={{ position: 'relative', height: 78 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 54, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
+        {VC_STEPS.map((s, i) => (
+          <button
+            key={s.id} type="button" onClick={() => onEndorse(i + 1)}
+            title={`Endorse ${s.label}`} aria-label={`Endorse ${s.label}`}
+            style={{
+              position: 'absolute', top: 52, left: vcPos(i + 1), width: 10, height: 10,
+              borderRadius: 999, backgroundColor: S.surfaceHighest, border: 'none',
+              padding: 0, cursor: 'pointer', transform: 'translateX(-50%)',
+            }}
+          />
+        ))}
+        {[...byStage.entries()].map(([stage, list]) => {
+          const who = list.map((v) => `${v.name}${v.role ? ` (${v.role})` : ''}`).join('\n');
+          return (
+            <React.Fragment key={stage}>
+              <span title={who} style={{ position: 'absolute', top: 48, left: vcPos(stage), width: 2, height: 5, backgroundColor: EXPERT_COLOR, opacity: 0.35, transform: 'translateX(-50%)', cursor: 'help' }} />
+              {list.slice(0, 3).map((v, j) => (
+                <span
+                  key={`${stage}-${j}`}
+                  title={j === 2 && list.length > 3 ? who : `${v.name}${v.role ? ` (${v.role})` : ''} → ${VC_STEPS[stage - 1].label}`}
+                  style={{
+                    position: 'absolute', top: 36 - 13 * j, left: vcPos(stage), width: 10, height: 10,
+                    borderRadius: 999, backgroundColor: EXPERT_COLOR, opacity: 0.65,
+                    transform: 'translateX(-50%)', cursor: 'help',
+                  }}
+                />
+              ))}
+              {list.length > 3 && (
+                <span title={who} style={{ position: 'absolute', top: 8, left: vcPos(stage), transform: 'translateX(-50%)', fontSize: 11, fontWeight: 800, color: EXPERT_COLOR, cursor: 'help' }}>
+                  ×{list.length}
+                </span>
+              )}
+            </React.Fragment>
+          );
+        })}
+        {ai != null && (
+          <span title={`AI baseline · ${VC_STEPS[ai - 1].label}`} style={{ position: 'absolute', top: 64, left: vcPos(ai), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
+        )}
+        {endorsed != null && (
+          <span title={`Endorsed · ${VC_STEPS[endorsed - 1].label}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: '3px solid #ffffff', outline: '1px solid rgba(31,122,61,0.45)', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
+        {VC_STEPS.map((s, i) => (
+          <button
+            key={s.id} type="button" onClick={() => onEndorse(i + 1)}
+            aria-pressed={i + 1 === endorsed}
+            title={`Endorse ${s.label}`}
+            style={{
+              border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
+              fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
+              color: i + 1 === endorsed ? REVIEWED_COLOR : S.mutedText,
+              fontWeight: i + 1 === endorsed ? 800 : 400,
+            }}
+          >
+            {VC_SHORT_LABELS[i]}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, flexWrap: 'wrap', fontSize: 11, color: S.mutedText }}>
+        <span className="inline-flex items-center gap-1.5"><span style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: EXPERT_COLOR, opacity: 0.65 }} /> One dot = one expert vote</span>
+        <span className="inline-flex items-center gap-1.5"><span style={{ width: 8, height: 8, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'rotate(45deg)' }} /> AI baseline</span>
+        <span className="inline-flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: '2px solid #fff', outline: '1px solid rgba(31,122,61,0.45)' }} /> Endorsed stage</span>
+      </div>
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${S.surfaceLow}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
+        <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
+          <button
+            type="button" disabled={ai == null}
+            onClick={() => { if (ai != null) onEndorse(ai); }}
+            aria-pressed={ai != null && endorsed === ai}
+            style={{ ...pillStyle(ai != null && endorsed === ai, ai == null), borderRight: `1px solid ${S.cardBorder}` }}
+          >
+            {ai != null ? `AI · ${VC_STEPS[ai - 1].label}` : 'AI —'}
+          </button>
+          <button
+            type="button" disabled={majority == null}
+            onClick={() => { if (majority) onEndorse(majority.stage); }}
+            aria-pressed={majority != null && endorsed === majority.stage}
+            style={pillStyle(majority != null && endorsed === majority.stage, majority == null)}
+          >
+            {majority != null
+              ? `Majority · ${VC_STEPS[majority.stage - 1].label} (${majority.n}/${votes.length})`
+              : votes.length > 0 ? 'No majority — tie' : 'No expert votes yet'}
+          </button>
+        </div>
+        <span style={{ fontSize: 11.5, color: S.mutedText }}>or click a stage on the rail</span>
+        {endorsed != null && srcText && (
+          <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onSurface }}>
+            → <span style={{ color: REVIEWED_COLOR }}>{VC_STEPS[endorsed - 1].label}</span> · {srcText}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Review & Endorse panel (admin only) ──
 const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: TrendUpdate) => Promise<void> }> = ({ trend, updateTrend }) => {
   const { data, loaded } = useTrendProposals(trend.id);
   const [src, setSrc] = useState<Record<string, 'ai' | 'expert' | 'manual'>>({});
   const [man, setMan] = useState<Record<string, string>>({});
   const [manExpo, setManExpo] = useState<Record<string, Record<string, number>>>({});
+  // VC epicentre endorsement — categorical (one stage), defaulting to the
+  // expert majority, else the AI stage. Never an average (see EpicentreVotePanel).
+  const [endorsedVc, setEndorsedVc] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const agg = data?.aggregate;
-  const scorers = data?.scorers ?? [];
+  // Memoized so the vc-vote useMemo below doesn't recompute on every render
+  // while proposals are still loading (data == null → fresh [] each time).
+  const scorers = useMemo(() => data?.scorers ?? [], [data]);
   const count = scorers.length || (trend.proposal_summary?.count ?? 0);
   // Every replier's free-text comment (Expert Rating tab), surfaced for the
   // admin reviewer. Empty/whitespace comments are skipped.
@@ -1159,6 +1473,28 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const aiCat = aiExpoOf(trend, 'category_exposure');
   const aiReg = aiExpoOf(trend, 'regional_exposure');
   const aiVc = aiExpoOf(trend, 'vc_exposure');
+  const aiVcStage = epicentreOf(aiVc);
+  // VC epicentre votes — one per expert, derived from each proposal's stored
+  // profile (max-scoring stage). Requires scorers[].vc_exposure from the API;
+  // older payloads degrade to an empty vote list (honest empty state).
+  const vcVotes = useMemo(
+    () => scorers
+      .map((s) => ({ name: s.name, role: s.role, stage: epicentreOf(s.vc_exposure as Record<string, number> | undefined) }))
+      .filter((v): v is { name: string; role: string; stage: number } => v.stage != null),
+    [scorers],
+  );
+  const vcMajority = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const v of vcVotes) counts.set(v.stage, (counts.get(v.stage) ?? 0) + 1);
+    let best: { stage: number; n: number } | null = null;
+    let tied = false;
+    for (const [stage, n] of counts) {
+      if (best == null || n > best.n) { best = { stage, n }; tied = false; }
+      else if (n === best.n) tied = true;
+    }
+    return tied ? null : best;
+  }, [vcVotes]);
+  const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? aiVcStage;
   // Expert aggregate.
   const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
   const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
@@ -1180,7 +1516,6 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   // (or enter a manual value for the scalar fields).
   const hasCatE = !!(agg?.category_exposure && Object.keys(agg.category_exposure).length);
   const hasRegE = !!(agg?.regional_exposure && Object.keys(agg.regional_exposure).length);
-  const hasVcE = !!(agg?.vc_exposure && Object.keys(agg.vc_exposure).length);
   const srcOf = (key: string, hasExpert: boolean): 'ai' | 'expert' | 'manual' => src[key] ?? (hasExpert ? 'expert' : 'ai');
   const setS = (key: string, s: 'ai' | 'expert' | 'manual') => setSrc((p) => ({ ...p, [key]: s }));
   const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
@@ -1197,7 +1532,11 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
         curve: eCv || aCv || '',
       });
     }
-    setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s, vc: s });
+    setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s });
+    // VC epicentre follows the bulk intent where a value exists; "manual"
+    // means clicking a stage on the rail, so it changes nothing here.
+    if (s === 'ai') setEndorsedVc(aiVcStage);
+    else if (s === 'expert' && vcMajority != null) setEndorsedVc(vcMajority.stage);
   };
   // Manual per-cell exposure overrides. Default each cell to the expert ø
   // (rounded) where scored, else the AI baseline; editing a cell switches the
@@ -1219,7 +1558,6 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   };
   const catCells = CATEGORIES.map((c) => ({ key: c.name, aiV: aiCat == null ? undefined : readExposure(aiCat, c.name, c.id), expAvg: agg?.category_exposure?.[c.name]?.avg }));
   const regCells = REGIONS.map((r) => ({ key: r.id, aiV: aiReg == null ? undefined : (aiReg[r.id] ?? 0), expAvg: agg?.regional_exposure?.[r.id]?.avg }));
-  const vcCells = VC_STEPS.map((step) => ({ key: step.id, aiV: aiVc == null ? undefined : readVCExposure(aiVc, step), expAvg: agg?.vc_exposure?.[step.id]?.avg }));
 
   const resolveProb = (): number | undefined => {
     const s = srcOf('probability', eP != null);
@@ -1261,10 +1599,14 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
     else if (sr === 'ai') { if (aiReg) u.regional_exposure = aiReg; }
     else { const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r; }
-    const sv = srcOf('vc', hasVcE);
-    if (sv === 'manual') { const m = buildManualMap('vc', vcCells); if (m) u.vc_exposure = m; }
-    else if (sv === 'ai') { if (aiVc) u.vc_exposure = aiVc; }
-    else { const v = mapCells(agg?.vc_exposure); if (v) u.vc_exposure = v; }
+    // VC epicentre — categorical: the endorsed stage writes the canonical
+    // profile. Endorsing the AI's own stage keeps the AI profile
+    // byte-identical, so unchanged meaning never registers as input drift.
+    if (endorsedVcStage != null) {
+      u.vc_exposure = aiVcStage != null && endorsedVcStage === aiVcStage && aiVc
+        ? aiVc
+        : canonicalVcProfile(endorsedVcStage);
+    }
     try { await updateTrend(trend.id, u); setDone(true); }
     catch (e) { setErr((e as Error)?.message ?? 'Endorse failed'); }
     finally { setSaving(false); }
@@ -1371,15 +1713,16 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                 <Decide cur={srcOf('region', hasRegE)} onPick={(s) => setS('region', s)} aiOk={!!aiReg} expertOk={hasRegE}
                   result={srcOf('region', hasRegE) === 'ai' ? 'AI baseline' : srcOf('region', hasRegE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
               </SectionCard>
-              <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(174px, 1fr))', gap: 10 }}>
-                  {VC_STEPS.map((step) => (
-                    <ExposureCompareCell key={step.id} label={step.label} aiVal={aiVc == null ? undefined : readVCExposure(aiVc, step)} expert={agg?.vc_exposure?.[step.id]}
-                      manualVal={manCell('vc', step.id, aiVc == null ? undefined : readVCExposure(aiVc, step), agg?.vc_exposure?.[step.id]?.avg)} onManual={(v) => setManCell('vc', step.id, v)} />
-                  ))}
-                </div>
-                <Decide cur={srcOf('vc', hasVcE)} onPick={(s) => setS('vc', s)} aiOk={!!aiVc} expertOk={hasVcE}
-                  result={srcOf('vc', hasVcE) === 'ai' ? 'AI baseline' : srcOf('vc', hasVcE) === 'manual' ? 'Manual (custom)' : 'Expert ø'} />
+              <SectionCard
+                title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+                right={
+                  <span title="Stages are categorical — votes are counted, never averaged" style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, backgroundColor: S.amberContainer, color: S.onAmberContainer, whiteSpace: 'nowrap', cursor: 'help' }}>
+                    {aiVcStage != null ? `AI ${VC_SHORT_LABELS[aiVcStage - 1]}` : 'AI —'}
+                    {vcMajority != null ? ` · Majority ${VC_SHORT_LABELS[vcMajority.stage - 1]} ×${vcMajority.n}` : vcVotes.length > 0 ? ' · no majority' : ' · no votes'}
+                  </span>
+                }
+              >
+                <EpicentreVotePanel ai={aiVcStage} votes={vcVotes} majority={vcMajority} endorsed={endorsedVcStage} onEndorse={setEndorsedVc} />
               </SectionCard>
             </div>
           </div>
@@ -1705,6 +2048,8 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
             <SortHeader label="Trend"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+            {/* Value-chain epicentre — Trend List only; not sortable (categorical stage) */}
+            {mode === 'list' && <span title={FIELD_HELP.vc} style={{ cursor: 'help' }}>Value Chain</span>}
             <span className="inline-flex items-center justify-end w-full">
               <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
               <Gp1InfoTip />
@@ -1911,6 +2256,17 @@ const TrendRow: FC<TrendRowProps> = ({
         {/* Probability — read-only here; scoring/endorsing happens in the trend tab */}
         <div><ProbCell trend={trend} mode={mode} myProposal={myProposal} /></div>
 
+        {/* Value-chain epicentre — Trend List only (compact rail, hover for the stage) */}
+        {mode === 'list' && (
+          <div style={{ paddingRight: 16 }}>
+            <EpicentreRail
+              stage={epicentreOf(trend.vc_exposure as Record<string, number> | undefined)}
+              ai={epicentreOf(aiExpoOf(trend, 'vc_exposure'))}
+              size="row"
+            />
+          </div>
+        )}
+
         {/* GP1 % — read-only here; editing happens in the trend tab */}
         <div className="text-right">
           <Gp1Cell trend={trend} mode={mode} myProposal={myProposal} />
@@ -2049,6 +2405,10 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
   const vcExp  = (trend.vc_exposure ?? {}) as Record<string, number>;
   const regExp = ((trend as Trend & { regional_exposure?: Record<string, number> })
     .regional_exposure ?? {}) as Record<string, number>;
+  // VC epicentre — read from the stored profile; the AI reference uses the
+  // same baseline fallback the exposure grids use.
+  const vcStage = epicentreOf(vcExp);
+  const aiVcStage = epicentreOf(aiExpoOf(trend, 'vc_exposure'));
 
   // ─── Admin edit state ────────────────────────────────────────────
   const canEdit = isAdmin && !!updateTrend;
@@ -2579,11 +2939,18 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
               <RegionExposureGrid exposures={regExp} />
             )}
           </SectionCard>
-          <SectionCard title="Value Chain Exposure" icon={Cpu} accent={S.onTertiaryContainer}>
+          <SectionCard
+            title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
+            right={
+              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: (isEditing ? epicentreOf(draftVcExp) : vcStage) != null ? S.primary : S.mutedText }}>
+                {vcStageLabel(isEditing ? epicentreOf(draftVcExp) : vcStage)}
+              </span>
+            }
+          >
             {isEditing ? (
-              <EditableValueChainGrid exposures={draftVcExp} onChange={setDraftVcExp} />
+              <EpicentreSlider value={epicentreOf(draftVcExp)} ai={aiVcStage} onChange={(st) => setDraftVcExp(canonicalVcProfile(st))} />
             ) : (
-              <ValueChainExposureGrid exposures={vcExp} />
+              <EpicentreRail stage={vcStage} ai={aiVcStage} size="card" />
             )}
           </SectionCard>
         </div>
@@ -2752,32 +3119,9 @@ const EditableRegionGrid: FC<{
   </div>
 );
 
-const EditableValueChainGrid: FC<{
-  exposures: Record<string, number>;
-  onChange: (next: Record<string, number>) => void;
-  ai?: Record<string, number>;
-}> = ({ exposures, onChange, ai }) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-      {VC_STEPS.map((step) => (
-        <div key={step.id} className="flex flex-col gap-1.5">
-          <div
-            className="text-[11px] font-medium"
-            style={{ color: S.onSurface }}
-          >
-            {step.label}
-          </div>
-          <EditableDots
-            value={readVCExposure(exposures, step)}
-            onChange={(v) => onChange({ ...exposures, [step.id]: v })}
-            tone="emerald"
-            aiHint={aiExpoHint(ai == null ? undefined : readVCExposure(ai, step))}
-          />
-        </div>
-      ))}
-    </div>
-  </div>
-);
+// (EditableValueChainGrid was retired July 2026 — the VC dimension is entered
+// via EpicentreSlider; the engine-facing 8-step profile is derived from the
+// chosen stage by canonicalVcProfile.)
 
 // ─── Empty / loading row ───────────────────────────────────────────
 const EmptyRow: FC<{ text: string; icon: React.ReactNode }> = ({ text, icon }) => (

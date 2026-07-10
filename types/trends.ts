@@ -163,6 +163,9 @@ export interface ProposalScorer {
   gp1_pct_affected?: number;
   peak_year?: number;
   diffusion_curve?: string;
+  /** This expert's VC profile — carried so Review & Endorse can count value-chain
+   *  epicentre VOTES per stage (categorical; never averaged). July 2026. */
+  vc_exposure?: VCExposure;
   /** Free-text note this expert left with their proposal. */
   comment?: string;
 }

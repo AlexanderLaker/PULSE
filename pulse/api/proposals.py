@@ -136,8 +136,14 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 
 def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The named "who scored what" breakdown (headline scalar fields + the
-    expert's free-text comment)."""
+    """The named "who scored what" breakdown (headline scalar fields, the
+    expert's free-text comment, and the expert's vc_exposure profile).
+
+    vc_exposure is carried per scorer (July 2026) because the value-chain
+    dimension is endorsed as a CATEGORICAL epicentre stage: the review UI
+    counts one vote per expert (derived from their profile's peak stage)
+    and must never present a per-cell average as a position.
+    """
     out = []
     for r in rows:
         out.append({
@@ -148,6 +154,7 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "gp1_pct_affected": r.get("gp1_pct_affected"),
             "peak_year": r.get("peak_year"),
             "diffusion_curve": r.get("diffusion_curve"),
+            "vc_exposure": r.get("vc_exposure"),
             "comment": r.get("comment"),
         })
     return out
