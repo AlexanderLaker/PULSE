@@ -1624,7 +1624,7 @@ const ProfitPoolAnalysis2: FC<{
           </div>
           <h1 className="font-extrabold tracking-tight"
             style={{ fontFamily: HEADLINE_FONT, color: S.onBg, fontSize: '2.4rem', lineHeight: 1.15 }}>
-            How profit pools shift
+            Where Profit Pools Shift
           </h1>
           {/* Reduced header (owner request, June 2026): the relative-exposure /
               ceteris-paribus framing is carried once here; the full D16 wording
