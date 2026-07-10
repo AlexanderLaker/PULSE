@@ -292,63 +292,52 @@ const vcStageLabel = (stage: number | null): string =>
 /** Stop/pin position along the rail (stage centre of 8 equal cells). */
 const vcPos = (stage: number): string => `${(((stage - 0.5) / 8) * 100).toFixed(2)}%`;
 
-/** Read-only epicentre rail. `row` = compact inline (trend list row);
- *  `card` = full-width with stage labels (expanded panel). */
-const EpicentreRail: FC<{
-  stage: number | null;
-  ai?: number | null;
-  size?: 'row' | 'card';
-  pinColor?: string;
-}> = ({ stage, ai, size = 'card', pinColor }) => {
-  const color = pinColor ?? S.primary;
-  const row = size === 'row';
-  const railTop = row ? 6 : 17;
+/** Read-only epicentre rail with stage labels. Renders in the expanded
+ *  detail panel ONLY — the collapsed trend rows deliberately carry no
+ *  value-chain cell (owner ruling 2026-07-10: the epicentre lives below
+ *  the fold, not beside direction/probability). */
+const EpicentreRail: FC<{ stage: number | null; ai?: number | null }> = ({ stage, ai }) => {
   const title = stage == null
     ? 'Value chain: unscored'
     : `Value chain epicentre: ${vcStageLabel(stage)}${ai != null && ai !== stage ? ` · AI: ${VC_STEPS[ai - 1].label}` : ''}`;
   return (
     <div title={title} aria-label={title} style={{ cursor: 'help' }}>
-      <div style={{ position: 'relative', height: row ? 16 : 40 }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, top: railTop, height: row ? 4 : 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
+      <div style={{ position: 'relative', height: 40 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 17, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
         {VC_STEPS.map((s, i) => (
           <span key={s.id} style={{
-            position: 'absolute', top: railTop - 1, left: vcPos(i + 1),
-            width: row ? 6 : 8, height: row ? 6 : 8, borderRadius: 999,
+            position: 'absolute', top: 16, left: vcPos(i + 1),
+            width: 8, height: 8, borderRadius: 999,
             backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
           }} />
         ))}
-        {!row && ai != null && ai !== stage && (
+        {ai != null && ai !== stage && (
           <span style={{
-            position: 'absolute', top: railTop - 2, left: vcPos(ai),
+            position: 'absolute', top: 15, left: vcPos(ai),
             width: 10, height: 10, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
             transform: 'translateX(-50%) rotate(45deg)',
           }} />
         )}
         {stage != null && (
           <span style={{
-            position: 'absolute', top: row ? 2 : 11, left: vcPos(stage),
-            width: row ? 12 : 18, height: row ? 12 : 18, borderRadius: 999,
-            backgroundColor: color, border: `${row ? 2 : 3}px solid #ffffff`,
+            position: 'absolute', top: 11, left: vcPos(stage),
+            width: 18, height: 18, borderRadius: 999,
+            backgroundColor: S.primary, border: '3px solid #ffffff',
             outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
           }} />
         )}
-        {stage == null && row && (
-          <span style={{ position: 'absolute', top: 1, left: 0, fontSize: 11, color: S.mutedText }}>—</span>
-        )}
       </div>
-      {!row && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
-          {VC_SHORT_LABELS.map((l, i) => (
-            <span key={l} style={{
-              fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-              color: i + 1 === stage ? color : S.mutedText,
-              fontWeight: i + 1 === stage ? 800 : 400,
-            }}>
-              {l}
-            </span>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
+        {VC_SHORT_LABELS.map((l, i) => (
+          <span key={l} style={{
+            fontSize: 11, textAlign: 'center', lineHeight: 1.25,
+            color: i + 1 === stage ? S.primary : S.mutedText,
+            fontWeight: i + 1 === stage ? 800 : 400,
+          }}>
+            {l}
+          </span>
+        ))}
+      </div>
     </div>
   );
 };
@@ -671,11 +660,8 @@ type ScoringMode = 'list' | 'input' | 'review';
 // value + delta chip. The Trend List has NO review-status column: it rendered
 // "—" on every row; real review status lives in Expert Rating's YOUR REVIEW.
 // Header and rows read the same template so columns always align.
-// July 2026: the Trend List gained a VALUE CHAIN column (compact epicentre
-// rail, 132px) between PROBABILITY and GP1 — list mode only, so the busier
-// 6-column input/review templates stay unchanged.
 const ROW_GRID: Record<ScoringMode, string> = {
-  list:   'minmax(0, 1fr) 130px 128px 132px 170px 100px',
+  list:   'minmax(0, 1fr) 130px 128px 170px 100px',
   input:  'minmax(0, 1fr) 130px 128px 170px 100px 130px',
   review: 'minmax(0, 1fr) 130px 180px 170px 100px 110px',
 };
@@ -2055,8 +2041,6 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
             <SortHeader label="Trend"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
-            {/* Value-chain epicentre — Trend List only; not sortable (categorical stage) */}
-            {mode === 'list' && <span title={FIELD_HELP.vc} style={{ cursor: 'help' }}>Value Chain</span>}
             <span className="inline-flex items-center justify-end w-full">
               <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
               <Gp1InfoTip />
@@ -2262,17 +2246,6 @@ const TrendRow: FC<TrendRowProps> = ({
 
         {/* Probability — read-only here; scoring/endorsing happens in the trend tab */}
         <div><ProbCell trend={trend} mode={mode} myProposal={myProposal} /></div>
-
-        {/* Value-chain epicentre — Trend List only (compact rail, hover for the stage) */}
-        {mode === 'list' && (
-          <div style={{ paddingRight: 16 }}>
-            <EpicentreRail
-              stage={epicentreOf(trend.vc_exposure as Record<string, number> | undefined)}
-              ai={epicentreOf(aiExpoOf(trend, 'vc_exposure'))}
-              size="row"
-            />
-          </div>
-        )}
 
         {/* GP1 % — read-only here; editing happens in the trend tab */}
         <div className="text-right">
@@ -2957,7 +2930,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             {isEditing ? (
               <EpicentreSlider value={epicentreOf(draftVcExp)} ai={aiVcStage} onChange={(st) => setDraftVcExp(canonicalVcProfile(st))} />
             ) : (
-              <EpicentreRail stage={vcStage} ai={aiVcStage} size="card" />
+              <EpicentreRail stage={vcStage} ai={aiVcStage} />
             )}
           </SectionCard>
         </div>
