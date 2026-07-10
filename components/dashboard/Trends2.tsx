@@ -660,8 +660,11 @@ type ScoringMode = 'list' | 'input' | 'review';
 // value + delta chip. The Trend List has NO review-status column: it rendered
 // "—" on every row; real review status lives in Expert Rating's YOUR REVIEW.
 // Header and rows read the same template so columns always align.
+// Owner request 2026-07-10 (supersedes the R-08 drop, now that endorsements
+// are live): the Trend List carries a REVIEWED tick column after SHIFT —
+// blank until an admin endorses, so it never renders a dead "—" per row.
 const ROW_GRID: Record<ScoringMode, string> = {
-  list:   'minmax(0, 1fr) 130px 128px 170px 100px',
+  list:   'minmax(0, 1fr) 130px 128px 170px 100px 110px',
   input:  'minmax(0, 1fr) 130px 128px 170px 100px 130px',
   review: 'minmax(0, 1fr) 130px 180px 170px 100px 110px',
 };
@@ -904,15 +907,22 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
       </div>
     );
   }
-  const reviewed = reviewedDeviates(trend);
+  // List mode: the tick means "an admin reviewed & endorsed this trend"
+  // (user_override), whether or not the endorsement moved off the AI
+  // baseline — the tooltip carries that nuance. Un-reviewed rows stay
+  // blank (no dead "—" per row, the original R-08 objection).
+  const endorsed = !!trend.user_override;
   return (
     <div className="flex justify-end">
-      {reviewed ? (
-        <span className="inline-flex items-center gap-1" title="Reviewed by an admin — differs from the AI baseline"
+      {endorsed ? (
+        <span className="inline-flex items-center gap-1"
+          title={reviewedDeviates(trend)
+            ? 'Reviewed & endorsed by an admin — differs from the AI baseline'
+            : 'Reviewed & endorsed by an admin — matches the AI baseline'}
           style={{ ...pill, color: REVIEWED_COLOR, backgroundColor: EXPANSION_SOFT }}>
           <Check size={11} strokeWidth={2.6} /> Reviewed
         </span>
-      ) : <span style={{ color: S.onSurfaceVariant, fontSize: 12 }}>—</span>}
+      ) : null}
     </div>
   );
 };
@@ -2046,13 +2056,11 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               <Gp1InfoTip />
             </span>
             <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
-            {/* R-08: the Trend List has no review-status column — its real
-                home is Expert Rating's YOUR REVIEW. */}
-            {mode !== 'list' && (
-              <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
-                {mode === 'input' ? 'Your review' : 'Proposals'}
-              </span>
-            )}
+            {/* Status column: list → endorsed "Reviewed" tick (owner request
+                2026-07-10); input → your review; review → proposal count. */}
+            <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
+              {mode === 'input' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Reviewed'}
+            </span>
           </div>
 
           {/* Rows */}
@@ -2257,13 +2265,11 @@ const TrendRow: FC<TrendRowProps> = ({
           <RowEndCell trend={trend} mode={mode} myProposal={myProposal} />
         </div>
 
-        {/* Review status (6th column — Expert Rating / Review & Endorse only;
-            the Trend List dropped its dead REVIEWED column, R-08) */}
-        {mode !== 'list' && (
-          <div className="text-right">
-            <ReviewStatusCell trend={trend} mode={mode} myProposal={myProposal} />
-          </div>
-        )}
+        {/* Status (6th column): endorsed "Reviewed" tick (list) / your
+            review (input) / proposal count (review) */}
+        <div className="text-right">
+          <ReviewStatusCell trend={trend} mode={mode} myProposal={myProposal} />
+        </div>
       </div>
 
       {/* Expanded detail panel — read-only port of Vite Trends2 ExpandedPanel.
