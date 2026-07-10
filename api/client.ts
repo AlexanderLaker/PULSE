@@ -53,6 +53,44 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
+/**
+ * Like `request()`, but targets a Next.js admin-proxy route under `/api`
+ * (NOT the `/api/v1` engine rewrite). Admin mutations must go through a
+ * proxy that mints a role=admin Bearer token — the browser's direct
+ * `pulse-token` cookie is viewer-only by design, so hitting `/api/v1`
+ * straight would always 403 "Admin access required" (see
+ * app/api/trends/[id]/route.ts). Sends credentials so Clerk can identify
+ * the caller, and surfaces either `{ detail }` or `{ error }` bodies.
+ */
+const ADMIN_BASE = '/api';
+
+async function adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  try {
+    const res = await fetch(`${ADMIN_BASE}${path}`, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      ...options,
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
+      throw new ApiError(res.status, err.detail ?? err.error ?? `API ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new ApiError(0, 'Backend unavailable or network error');
+    }
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new ApiError(0, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw error;
+  }
+}
+
 // ── Health & Config ──────────────────────────────────────────────
 
 export const getHealth = (): Promise<HealthStatus> =>
@@ -98,13 +136,18 @@ export const getTrends = (force?: string): Promise<Trend[]> =>
 export const getTrend = (id: string): Promise<Trend> =>
   request(`/trends/${id}`);
 
+// Admin-only. Routes through the Next.js proxy /api/trends/{id} (which mints
+// a role=admin Bearer token), NOT the viewer-cookie /api/v1 path — otherwise
+// the backend's require_admin answers 403 even for real admins.
 export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
-  request(`/trends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  adminRequest(`/trends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // ── Trend score proposals (multi-expert scoring) ─────────────────
-// Any authenticated user may read aggregates and write THEIR OWN proposal.
-// Endorsement is a normal admin updateTrend() with the chosen values, so it
-// flows through the existing validated, audited PUT /trends/{id} path.
+// Any authenticated user may read aggregates and write THEIR OWN proposal
+// (backend require_auth — the viewer cookie suffices, so these stay on the
+// direct /api/v1 path). Endorsement is a normal admin updateTrend() with the
+// chosen values, so it flows through the validated, audited PUT /trends/{id}
+// path — now via the /api/trends/{id} admin proxy.
 
 /** GET /api/v1/trends/{id}/proposals — the caller's own proposal, the expert
  *  aggregate, and the named "who scored what" breakdown. */

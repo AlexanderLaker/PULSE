@@ -3,6 +3,10 @@
  *   /api/me      — 401 anonymous, 200 with role from Postgres
  *   /api/config  — GET requires auth; PUT requires admin (403 viewer,
  *                  401 anonymous, 200 admin forwards Bearer JWT)
+ *   /api/trends/[id] — PUT requires admin (403 viewer, 401 anonymous,
+ *                  200 admin forwards a role=admin Bearer JWT). This is the
+ *                  proxy that makes Review & Endorse work: a direct /api/v1
+ *                  call carries only the viewer cookie and would 403.
  * Clerk and Neon are mocked at module boundary; the backend fetch is
  * stubbed so PUT/GET forwarding (incl. Authorization header) is pinned.
  */
@@ -33,6 +37,7 @@ vi.mock('next/headers', () => ({
 
 import { GET as meGET } from '@/app/api/me/route';
 import { GET as cfgGET, PUT as cfgPUT } from '@/app/api/config/route';
+import { PUT as trendPUT } from '@/app/api/trends/[id]/route';
 
 const signedOut = () => clerk.auth.mockResolvedValue({ userId: null });
 const signedIn = (role: 'admin' | 'viewer') => {
@@ -102,6 +107,36 @@ describe('/api/config', () => {
     }));
     expect(res.status).toBe(200);
     const call = vi.mocked(fetch).mock.calls[0];
+    const hdrs = (call[1] as RequestInit).headers as Record<string, string>;
+    expect(hdrs.Authorization).toMatch(/^Bearer /);
+    expect((call[1] as RequestInit).method).toBe('PUT');
+  });
+});
+
+describe('/api/trends/[id] (endorse / admin trend edit)', () => {
+  const params = { params: Promise.resolve({ id: 'trend_42' }) };
+  const putReq = () => new Request('http://x/api/trends/trend_42', {
+    method: 'PUT', body: JSON.stringify({ probability: 4 }),
+  });
+
+  it('PUT: 401 anonymous', async () => {
+    signedOut();
+    const res = await trendPUT(putReq(), params);
+    expect(res.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('PUT: 403 for viewer — the admin gate is the proxy, not the client', async () => {
+    signedIn('viewer');
+    const res = await trendPUT(putReq(), params);
+    expect(res.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('PUT: 200 for admin — forwards to /api/v1/trends/{id} with a Bearer JWT', async () => {
+    signedIn('admin');
+    const res = await trendPUT(putReq(), params);
+    expect(res.status).toBe(200);
+    const call = vi.mocked(fetch).mock.calls[0];
+    expect(String(call[0])).toBe('http://backend.test/api/v1/trends/trend_42');
     const hdrs = (call[1] as RequestInit).headers as Record<string, string>;
     expect(hdrs.Authorization).toMatch(/^Bearer /);
     expect((call[1] as RequestInit).method).toBe('PUT');
