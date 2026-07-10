@@ -762,8 +762,6 @@ const TileEditor: FC<{
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════
 const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
-  onNavigateProfitPoolShiftModel,
-  onNavigateTrends,
   onNavigateToTrend,
   isAdmin = false,
 }) => {
@@ -1008,28 +1006,6 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               Trends mapped to consumer moments, tile by tile. Each tile is an authored
               strategist read with visible provenance; click any tile for its evidence and analysis.
             </p>
-          </div>
-
-          {/* Header actions — keep the cross-tab navigation hooks alive */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {onNavigateTrends && (
-              <button
-                onClick={onNavigateTrends}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold"
-                style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-              >
-                Trends <ArrowRight size={12} strokeWidth={2.5} />
-              </button>
-            )}
-            {onNavigateProfitPoolShiftModel && (
-              <button
-                onClick={onNavigateProfitPoolShiftModel}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold"
-                style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-              >
-                Shift Matrix <ArrowRight size={12} strokeWidth={2.5} />
-              </button>
-            )}
           </div>
         </header>
 
