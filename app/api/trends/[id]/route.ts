@@ -46,6 +46,36 @@ async function resolveBackendUrl(path: string): Promise<string> {
   return `${proto}://${host}${path}`;
 }
 
+/** Turn a backend error body into a single human-readable string.
+ *  FastAPI validation errors arrive as { detail: [ { loc, msg }, ... ] };
+ *  passed through as-is they render client-side as "[object Object]". */
+function formatBackendError(body: string, status: number): string {
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown; error?: unknown };
+    const d = parsed?.detail ?? parsed?.error;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) {
+      const parts = d
+        .map((item) => {
+          if (item && typeof item === 'object') {
+            const rec = item as Record<string, unknown>;
+            const locArr = Array.isArray(rec.loc) ? (rec.loc as unknown[]) : [];
+            const loc = locArr.filter((l) => l !== 'body').join('.');
+            const msg = typeof rec.msg === 'string' ? rec.msg : JSON.stringify(item);
+            return loc ? `${loc}: ${msg}` : msg;
+          }
+          return String(item);
+        })
+        .filter(Boolean);
+      if (parts.length) return parts.join('; ');
+    }
+    if (d && typeof d === 'object') return JSON.stringify(d);
+  } catch {
+    /* not JSON — fall through to the raw body */
+  }
+  return body || `Backend error ${status}`;
+}
+
 interface Params {
   params: Promise<{ id: string }>;
 }
@@ -89,17 +119,11 @@ export async function PUT(req: Request, { params }: Params) {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      // Relay the backend's own error detail so the client surfaces a
-      // useful message (e.g. validation errors from TrendUpdate).
+      // Relay the backend's own error detail as a flat string so the client
+      // surfaces a useful message (e.g. validation errors from TrendUpdate)
+      // instead of "[object Object]".
       const text = await res.text().catch(() => res.statusText);
-      let detail = text;
-      try {
-        const parsed = JSON.parse(text);
-        detail = parsed?.detail ?? parsed?.error ?? text;
-      } catch {
-        /* not JSON — use the raw text */
-      }
-      return NextResponse.json({ error: detail }, { status: res.status });
+      return NextResponse.json({ error: formatBackendError(text, res.status) }, { status: res.status });
     }
     const data = await res.json().catch(() => ({ ok: true }));
     return NextResponse.json(data);

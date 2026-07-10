@@ -73,8 +73,12 @@ async function adminRequest<T>(path: string, options: RequestInit = {}): Promise
       ...options,
     });
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
-      throw new ApiError(res.status, err.detail ?? err.error ?? `API ${res.status}`);
+      const err = (await res.json().catch(() => ({}))) as { detail?: unknown; error?: unknown };
+      const raw = err.detail ?? err.error ?? `API ${res.status}`;
+      // Guard against non-string bodies (e.g. a FastAPI 422 detail array):
+      // stringify them so the UI never shows "[object Object]".
+      const msg = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      throw new ApiError(res.status, msg);
     }
     return res.json() as Promise<T>;
   } catch (error) {

@@ -1573,9 +1573,16 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   };
   const resolvePeak = (): number | undefined => {
     const s = srcOf('peak', ePk != null);
-    if (s === 'manual') { const n = parseInt(man.peak ?? '', 10); return isNaN(n) ? undefined : Math.max(2026, Math.min(2035, n)); }
-    if (s === 'ai') return aPk;
-    return ePk != null ? Math.round(ePk) : undefined;
+    let n: number | undefined;
+    if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(2026, Math.min(2035, m)); }
+    else if (s === 'ai') n = aPk != null ? Math.round(aPk) : undefined;
+    else n = ePk != null ? Math.round(ePk) : undefined;
+    // The backend requires an integer year in [2025, 2035]. The stored
+    // "0 = default 2030" sentinel and any out-of-range value must NOT be
+    // sent — they 422 the whole endorse. Omit peak_year in that case so the
+    // trend keeps its current timing.
+    if (n == null || !Number.isFinite(n) || n < 2025 || n > 2035) return undefined;
+    return n;
   };
   const resolveCurve = (): string | undefined => {
     const s = srcOf('curve', !!eCv);

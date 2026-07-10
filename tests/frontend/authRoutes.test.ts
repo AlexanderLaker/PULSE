@@ -141,4 +141,22 @@ describe('/api/trends/[id] (endorse / admin trend edit)', () => {
     expect(hdrs.Authorization).toMatch(/^Bearer /);
     expect((call[1] as RequestInit).method).toBe('PUT');
   });
+  it('PUT: a FastAPI 422 detail array is flattened to a readable string (not "[object Object]")', async () => {
+    signedIn('admin');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ detail: [{
+        type: 'greater_than_equal',
+        loc: ['body', 'peak_year'],
+        msg: 'Input should be greater than or equal to 2025',
+      }] }),
+      { status: 422, headers: { 'Content-Type': 'application/json' } },
+    )));
+    const res = await trendPUT(putReq(), params);
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(typeof body.error).toBe('string');
+    expect(body.error).toContain('peak_year');
+    expect(body.error).toContain('greater than or equal to 2025');
+    expect(body.error).not.toContain('[object Object]');
+  });
 });
