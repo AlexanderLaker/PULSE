@@ -23,7 +23,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  X, Activity, Zap, Layers, LineChart, ArrowUpRight,
+  X, Activity, Zap, Layers, LineChart, ArrowUpRight, Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -69,6 +69,11 @@ interface CategoryDetailPanelData {
   shifts_path?: { [categoryId: string]: PathData };
   force_decomposition?: { [categoryId: string]: Record<ForceName, number> };
   contributing_trends?: { [categoryId: string]: Trend[] };
+  /** F1 (2.10.0): per-category regional shift at the selected year — the 3D
+   *  drill-down (region → {median, p10, p90}). */
+  regional_shift?: { [categoryId: string]: Record<string, PathDataPoint> };
+  /** Region GP1-share weights used in the roll-up (region → weight 0..1). */
+  region_weights?: Record<string, number>;
   categories?: Array<{ id: string; name: string; group?: string }>;
 }
 
@@ -425,6 +430,57 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
   );
 };
 
+// ─── RegionalDecomposition — F1 (2.10.0) 3D drill-down ───────────────────
+// The category's shift resolved by region at the selected year. Unlike the
+// force/vc/region ATTRIBUTION lenses (which partition the category median),
+// these are the ACTUAL per-region relative shifts the engine computed; the
+// category number is their GP1-share-weighted roll-up (weights shown).
+interface RegionalRow { region: string; median: number; p10?: number; p90?: number; weight?: number; }
+const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows }) => {
+  if (!rows || rows.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: S.mutedText, fontFamily: BODY_FONT }}>
+        No regional detail for this run (pre-2.10 run — re-run the engine).
+      </div>
+    );
+  }
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.median)), 1e-9);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {rows.map((r) => {
+        const pct = Math.abs(r.median) / maxAbs;
+        const isPositive = r.median > 0;
+        const barColor = isPositive ? S.expansion : S.contraction;
+        const valueInk = isPositive ? S.expansionInk : S.contractionInk;
+        return (
+          <div key={r.region} style={{ display: 'grid', gridTemplateColumns: '132px 1fr 62px', alignItems: 'center', columnGap: 10 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontSize: 12, fontWeight: 600, color: S.onSurface, fontFamily: BODY_FONT }}>
+              <span>{r.region}</span>
+              {r.weight != null && (
+                <span style={{ fontSize: 10, color: S.mutedText, fontFamily: MONO_FONT }}>
+                  {(r.weight * 100).toFixed(0)}%
+                </span>
+              )}
+            </div>
+            <div style={{ height: 8, backgroundColor: S.surfaceLow, borderRadius: 4, overflow: 'hidden' }}>
+              <motion.div initial={{ width: 0 }} animate={{ width: `${pct * 100}%` }}
+                transition={{ delay: 0.15, duration: 0.55, ease: 'easeOut' }}
+                style={{ height: '100%', backgroundColor: barColor, borderRadius: 4, opacity: 0.88 }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: MONO_FONT, color: valueInk, textAlign: 'right' }}>
+              {fmtShift(r.median, 1)}
+            </span>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 10.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.5, marginTop: 2 }}>
+        % = region&rsquo;s GP1 share used in the roll-up. The category shift above is the
+        share-weighted average of these regional shifts.
+      </div>
+    </div>
+  );
+};
+
 // ─── TrendCard — Bain-grade attribution row ──────────────────────────────
 //
 // Each card answers one question a Bain partner would ask in a matrix read-out:
@@ -708,6 +764,23 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     };
     if (!data?.force_decomposition?.[categoryId]) return empty;
     return data.force_decomposition[categoryId] as Record<ForceName, number>;
+  }, [data, categoryId]);
+
+  // F1 (2.10.0): the 3D regional breakdown for this category at the selected
+  // year — a list of {region, median, p10, p90, weight} sorted by |median|.
+  const regionalShift = useMemo(() => {
+    const byRegion = data?.regional_shift?.[categoryId];
+    if (!byRegion) return [];
+    const weights = data?.region_weights ?? {};
+    return Object.entries(byRegion)
+      .map(([region, cell]) => ({
+        region,
+        median: cell?.median ?? 0,
+        p10: cell?.p10,
+        p90: cell?.p90,
+        weight: weights[region],
+      }))
+      .sort((a, b) => Math.abs(b.median) - Math.abs(a.median));
   }, [data, categoryId]);
 
   const trendList = useMemo<Trend[]>(() => {
@@ -1092,6 +1165,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           {/* Force decomposition */}
           <Section title="Force Decomposition" icon={Zap}>
             <ForceDecomposition decomposition={forceDecomposition} />
+          </Section>
+
+          {/* F1 (2.10.0): regional shift drill-down — the actual per-region
+              shifts (not attribution) at the selected year, with the GP1
+              weights that roll them up to the category number. */}
+          <Section title="Regional Shift" icon={Globe}>
+            <RegionalDecomposition rows={regionalShift} />
           </Section>
           </div>
 

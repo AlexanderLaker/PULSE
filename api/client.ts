@@ -178,16 +178,16 @@ export const saveMyProposal = (
  * Backend response shape (FastAPI):
  *   {
  *     shift_matrix: { [cat]: { path: { [year]: {p10,p25,median,p75,p90,mean,std} }, velocity: {...} } },
- *     convergence: {...},
- *     force_attribution?: {...},
+ *     regional_shift_matrix: { [cat]: { [region]: { path: {...} } } },  // F1 (2.10.0)
+ *     region_weights_used: { [region]: number },
+ *     mc_standard_error: { [cat]: {median_se_pp,...} },                 // F7 (2.10.0)
  *     iterations, model_type, ...
  *   }
  *
  * Frontend type `SimulationResult` expects:
  *   {
  *     shifts: { [cat]: { [year]: PercentileDistribution } },    // flat, no `.path`
- *     convergence: {...},
- *     force_attribution: {...}
+ *     regional_shift_matrix, region_weights_used, mc_standard_error
  *   }
  *
  * This normalizer accepts either shape (idempotent).
@@ -213,8 +213,12 @@ export function normalizeSimulation(raw: unknown): SimulationResult {
   return {
     ...(r as Partial<SimulationResult>),
     shifts: (shifts ?? {}) as SimulationResult['shifts'],
-    convergence: r.convergence as SimulationResult['convergence'],
-    force_attribution: r.force_attribution as SimulationResult['force_attribution'],
+    // F1 (2.10.0): the 3D regional shift + the region GP1-share weights used.
+    regional_shift_matrix: r.regional_shift_matrix as SimulationResult['regional_shift_matrix'],
+    region_weights_used: r.region_weights_used as SimulationResult['region_weights_used'],
+    // F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS convergence;
+    // F9: force_attribution deleted — neither is carried through any more).
+    mc_standard_error: r.mc_standard_error as SimulationResult['mc_standard_error'],
     // v3.1: pass through the per-year decompositions and totals blocks.
     // Already JSON-serializable (backend stringified int year keys).
     decompositions: r.decompositions as SimulationResult['decompositions'],

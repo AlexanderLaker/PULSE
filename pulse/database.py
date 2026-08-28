@@ -641,7 +641,10 @@ def save_trends(trends: List[Trend]) -> None:
                     trend.probability, trend.start_year, trend.normalized_score,
                     trend.strategic_implication, trend.data_source, trend.source_type,
                     trend.confidence, trend.ai_suggested, trend.user_override,
-                    json.dumps(trend.probability_posterior) if trend.probability_posterior else None,
+                    # F11 rename: probability_prior (was probability_posterior).
+                    # The DB column name stays `probability_posterior` (no
+                    # migration) but the Python field is now probability_prior.
+                    json.dumps(trend.probability_prior) if trend.probability_prior else None,
                     # M1: persist the actual value (None included) — never
                     # invent a 10% default at the persistence boundary.
                     getattr(trend, 'gp1_pct_affected', None),
@@ -794,7 +797,7 @@ def load_trends() -> List[Trend]:
                 gp1_pct_affected=row.get("gp1_pct_affected"),
                 peak_year=row.get("peak_year", 0) or 0,
                 diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
-                probability_posterior=prob_posterior,
+                probability_prior=prob_posterior,
                 ai_suggestion=ai_suggestion,
             )
             # Attach sources as transient attribute (not in dataclass)

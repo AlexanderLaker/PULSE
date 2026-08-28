@@ -490,7 +490,7 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
 
 // ─── Per-field help copy (shared by the "?" tooltips on the section cards) ─
 const FIELD_HELP = {
-  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.',
+  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. This 1–5 score sets a Beta prior whose MEAN is score/6 — deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five-in-six, not certainty). The band width comes from the fixed Beta concentration (α+β=6), sampled by the Monte Carlo.',
   gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this trend can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
   timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
   category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',

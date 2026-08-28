@@ -1062,7 +1062,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Copula dependence — Gaussian"
             icon={SlidersHorizontal}
-            description="How trend correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD trend-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired."
+            description="How trend correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD trend-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired. F8 (2.10.0): these correlations are LATENT-SCALE — they parameterise the co-movement of the underlying Gaussian drivers, not the delivered Beta scores; the realised score-to-score correlation is a touch lower (≈0.28 for a latent 0.30). The [0,1] restriction means negative dependence is not expressible (a documented limitation)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
@@ -1126,7 +1126,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Aggregation weights"
             icon={SlidersHorizontal}
-            description="Weights the engine consumes for portfolio aggregation and the force / region attribution lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize). The value-chain lens carries no weights: it is a categorical epicentre partition (each trend assigned wholly to its epicentre stage, 2.9.0)."
+            description="Weights the engine consumes for portfolio aggregation and the lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize). Since 2.10.0 (F1) region weights are LOAD-BEARING: the shift math is 3D (category × region × year) and these weights roll the regional shifts up to the category/portfolio level, so they move the published numbers. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {draft.force_weights ? (
@@ -1143,22 +1143,38 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 </div>
               )}
               {draft.region_weights && (
-                <WeightGrid
-                  title="Region weights"
-                  weights={draft.region_weights}
-                  order={REGION_ORDER}
-                  onCommit={patchWeight('region_weights')}
-                  readOnly={ro}
-                />
+                <>
+                  <WeightGrid
+                    title="Region weights — each region's share of GP1 (rolls the 3D regional shifts up to category)"
+                    weights={draft.region_weights}
+                    order={REGION_ORDER}
+                    onCommit={patchWeight('region_weights')}
+                    readOnly={ro}
+                  />
+                  <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
+                    <strong>Assumption:</strong> defaults are the Henkel Group FY2025 consolidated regional
+                    sales split (Europe&nbsp;38% · North&nbsp;America&nbsp;26% · Asia-Pacific&nbsp;17% ·
+                    High&nbsp;Growth&nbsp;~19%), used as a proxy for the HCB GP1 mix — Consumer Brands is
+                    not disclosed by region. HCB is likely somewhat more Europe-weighted; refine these with
+                    an internal HCB regional GP1 split. Source: Henkel FY2025 results. The same split is
+                    applied to every category (public data has no per-category regional mix).
+                  </div>
+                </>
               )}
               {draft.category_weights && (
-                <WeightGrid
-                  title="Category weights"
-                  weights={draft.category_weights}
-                  order={CATEGORY_ORDER}
-                  onCommit={patchWeight('category_weights')}
-                  readOnly={ro}
-                />
+                <>
+                  <WeightGrid
+                    title="Category weights — each category's share of GP1 (rolls category shifts up to the portfolio)"
+                    weights={draft.category_weights}
+                    order={CATEGORY_ORDER}
+                    onCommit={patchWeight('category_weights')}
+                    readOnly={ro}
+                  />
+                  <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
+                    <strong>Assumption:</strong> defaults are equal (each category = 1/12). Set them to the
+                    real HCB category GP1 mix so the portfolio headline weights each pool by its actual size.
+                  </div>
+                </>
               )}
             </div>
           </SectionCard>

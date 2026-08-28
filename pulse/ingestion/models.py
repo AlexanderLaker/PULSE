@@ -52,8 +52,13 @@ class Trend:
     #   "back_loaded"   — slow start, accelerates toward the end
     #   "step_function" — minimal impact then sudden jump at peak_year
     diffusion_curve: str = "s_curve"
-    # Bayesian posteriors — (alpha, beta) for Beta distribution
-    probability_posterior: Optional[tuple] = None
+    # (alpha, beta) for the Beta prior. F11 (2.10.0): renamed from the
+    # misleading ``probability_posterior`` — there is NO Bayesian update from
+    # data anywhere in the engine (T7), so "posterior" implied a learning step
+    # that never happens. This is a structured-judgment PRIOR set from the 1–5
+    # score. A read-only ``probability_posterior`` property is kept as a
+    # deprecated alias for one release so no external reader breaks.
+    probability_prior: Optional[tuple] = None
     # AI baseline snapshot (June 2026 multi-expert proposals layer).
     # An immutable dict of the originally-seeded scoreable fields
     # {probability, gp1_pct_affected, peak_year, diffusion_curve,
@@ -65,17 +70,17 @@ class Trend:
 
     def __post_init__(self):
         direction_sign = 1 if self.direction == "Expansion" else -1
-        # Bayesian priors centered on expert score — always recompute from
-        # current probability values so sensitivity analysis works
-        # (tornado analysis changes these fields and re-calls __post_init__).
-        self.probability_posterior = (max(self.probability, 1), max(6 - self.probability, 1))
+        # Structured-judgment Beta PRIOR centered on the expert/AI 1–5 score —
+        # always recompute from the current probability so re-scoring updates it
+        # (F11: renamed prior; NOT updated from data — see field comment).
+        self.probability_prior = (max(self.probability, 1), max(6 - self.probability, 1))
         # normalized_score aligned with MC engine formula:
         #   MC samples: prob_01 × gp1_pct_affected × direction
         #   Deterministic: E[prob_01] × gp1_pct_affected × direction
-        # where E[prob_01] = alpha / (alpha + beta) from the Beta posterior.
+        # where E[prob_01] = alpha / (alpha + beta) from the Beta prior.
         # Economic magnitude is captured by gp1_pct_affected (high-materialization
         # trends get higher gp1_pct assignments).
-        a_p, b_p = self.probability_posterior
+        a_p, b_p = self.probability_prior
         prob_mean = a_p / (a_p + b_p)  # Expected probability of materialization
         gp1 = self.gp1_pct_affected if self.gp1_pct_affected is not None else 0.0
         self.normalized_score = prob_mean * gp1 * direction_sign
@@ -83,6 +88,20 @@ class Trend:
     @property
     def direction_sign(self) -> int:
         return 1 if self.direction == "Expansion" else -1
+
+    @property
+    def probability_posterior(self):
+        """Deprecated alias for ``probability_prior`` (F11, 2.10.0).
+
+        Kept read-only for one release so any external reader still resolves;
+        the engine and API now use ``probability_prior``. There is no Bayesian
+        posterior in PRISM — the name was a misnomer (T7)."""
+        return self.probability_prior
+
+    @probability_posterior.setter
+    def probability_posterior(self, value):
+        # Tolerate old code/paths that still assign the former field name.
+        self.probability_prior = value
 
 
 

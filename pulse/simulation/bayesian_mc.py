@@ -72,6 +72,31 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
+    # 2.10.0 — July 2026 mathematical review remediation (owner-directed,
+    #         2026-07-13; review PRISM_Model_Review_2026-07-11). Numbers move —
+    #         golden pins regenerated in the same commit, 50k re-run required.
+    #         F1: the shift math is now REGIONAL — a 3D (category × region ×
+    #         year) tensor. Each trend's contribution to a (category, region)
+    #         cell is weighted by BOTH category_exposure/5 AND
+    #         regional_exposure/5, so a regionally-concentrated trend now hits
+    #         only its regions' slice of the pool (previously every trend was
+    #         treated as global). Category/portfolio numbers are the region-
+    #         GP1-weighted roll-up (config.region_weights); a globally-present
+    #         trend reproduces the old 2D number exactly, so only regional
+    #         concentration moves the numbers. New `regional_shift_matrix` in
+    #         the result; the Region lens is now shift-based, not attribution-
+    #         only. F2: within-force overlap dampening uses the magnitude-
+    #         weighted effective number n_eff = (Σm)²/Σm² (participation ratio)
+    #         instead of a raw count — restores monotonicity (adding a tiny
+    #         trend no longer worsens the outlook). F4: per-iteration peak-year
+    #         jitter (±1yr triangular) gives velocity/timing bands real content.
+    #         F7: the 3 chains are POOLED for the published percentiles (√3
+    #         noise cut); the vacuous i.i.d. R̂/ESS block is replaced by a
+    #         per-quantile Monte-Carlo standard error (mc_standard_error).
+    #         F9: force_attribution.direct_effects deleted (dormant, unstable
+    #         near cancellation). F10: totals.grand deleted (raw sum of medians,
+    #         unused, 12× the headline). F11: start_year now gates materialization
+    #         onset; probability_posterior renamed probability_prior.
     # 2.9.0 — July 2026 VC-epicentre attribution (owner-directed, 2026-07-10):
     #         the value-chain lens is now a categorical EPICENTRE PARTITION,
     #         structurally parallel to the force lens. Experts score the VC as
@@ -105,7 +130,7 @@ class BayesianMonteCarloEngine:
     #         full config-layer validation (D21).
     # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
     #         removed from result contract (D4).
-    MODEL_VERSION = "2.9.0"
+    MODEL_VERSION = "2.10.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -154,19 +179,24 @@ class BayesianMonteCarloEngine:
         """
         Run Bayesian Monte Carlo simulation.
 
-        Args:
-            db: TrendDatabase with all trends
-            iterations: number of MC iterations (default from config)
+        2.10.0 (F1): the shift math is REGIONAL. Internally the engine solves
+        a 3D tensor over composite (category × region) cells, then rolls the
+        regional shifts up to the category level with the region GP1-share
+        weights (config.region_weights). The category-level `shift_matrix`
+        keeps its shape; a NEW `regional_shift_matrix` carries the full 3D
+        detail. A globally-present trend reproduces the pre-2.10 category
+        number exactly — only regionally-concentrated trends move it.
 
         Returns:
             dict with structure:
             {
-                "shift_matrix": {category: {year: {percentile: value}}},
-                "force_attribution": {category: {"direct_effects": {force: contribution}}},
+                "shift_matrix": {category: {"path"/"velocity": ...}},      # region roll-up
+                "regional_shift_matrix": {category: {region: {"path": ...}}},  # F1 3D
+                "region_weights_used": {region: weight},
                 "vc_decomposition": {category: {vc_step: contribution}},
-                "vc_attribution_basis": "epicentre",  # 2.9.0 partition basis tag
-                "convergence": {category: {"r_hat": float, "ess": int}},
-                "raw_samples": np.ndarray,  # (iterations, categories, years)
+                "vc_attribution_basis": "epicentre",
+                "mc_standard_error": {category: {median_se_pp, p10_se_pp, ...}},  # F7
+                "raw_samples": np.ndarray,  # (iterations, categories, years) — region roll-up
                 "model_version": str, "engine_name": str,
                 "seed": int, "integrity_events": list[dict],
             }
@@ -177,26 +207,98 @@ class BayesianMonteCarloEngine:
         trends = db.trends
 
         logger.info(f"Running Bayesian MC: {n_iter} iterations, "
-                     f"{len(trends)} trends, {n_cats} categories, {n_years} years")
+                     f"{len(trends)} trends, {n_cats} categories, "
+                     f"{len(REGIONS)} regions, {n_years} years")
 
-        # Step 1: Build correlation matrix (within-force and residual cross-force)
-        corr_matrix = self._build_correlation_matrix(trends)
+        # Steps 1–3 → regional (3D) samples + the region-weighted category roll-up.
+        category_samples, regional_samples = self._simulate_samples(db, n_iter)
 
-        # Step 2: Generate correlated samples using copula
-        raw_samples = self._generate_copula_samples(trends, corr_matrix, n_iter)
+        # Step 4: category-level percentiles + diagnostics (interior unchanged).
+        result = self._compile_results(category_samples, db)
 
-        # Step 3: Compute shift paths for each category — VECTORIZED across iterations
-        shift_samples = self._compute_all_paths_vectorized(
-            trends, raw_samples, n_iter, n_cats, n_years
-        )
+        # F1: attach the 3D regional matrix and the weights actually applied.
+        result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
+        rw = self._region_weight_vector()
+        result["region_weights_used"] = {r: float(rw[i]) for i, r in enumerate(REGIONS)}
 
-        # Step 4: Compute percentiles and diagnostics
-        result = self._compile_results(shift_samples, db)
-
-        logger.info(f"MC complete. Median total shift at {self.config.path_years[-1]}: "
-                     f"{np.median(shift_samples[:, :, -1].sum(axis=1)):.4f}")
+        logger.info(f"MC complete. Median portfolio shift at {self.config.path_years[-1]}: "
+                     f"{np.median(category_samples[:, :, -1].mean(axis=1)):.4f}")
 
         return result
+
+    def _region_weight_vector(self) -> np.ndarray:
+        """Normalized region GP1-share weights aligned to REGIONS (F1 roll-up).
+
+        These are each region's share of the pool (config.region_weights,
+        default = the documented Henkel Group 2025 split proxy). They roll the
+        per-region relative shifts up to the category/portfolio level:
+        ``category_shift = Σ_r region_weight_r · regional_shift_r``. Falls back
+        to equal weights if unset.
+        """
+        rw_cfg = getattr(self.config, "region_weights", None) or {}
+        w = np.array([float(rw_cfg.get(r, 0.0)) for r in REGIONS])
+        if w.sum() <= 0:
+            return np.full(len(REGIONS), 1.0 / len(REGIONS))
+        return w / w.sum()
+
+    def _simulate_samples(self, db: TrendDatabase, n_iter: int):
+        """Steps 1–3: copula draw → 3D (category×region) shift cells → roll-up.
+
+        Returns ``(category_samples, regional_samples)``:
+          - regional_samples: (n_iter, n_cats, n_regions, n_years) — the 3D shift
+          - category_samples: (n_iter, n_cats, n_years) — region-GP1-weighted
+            roll-up of the regional shifts (what the existing category views read)
+        """
+        n_cats = len(self.config.category_names)
+        n_regions = len(REGIONS)
+        n_years = len(self.config.path_years)
+        trends = db.trends
+
+        corr_matrix = self._build_correlation_matrix(trends)
+        raw_samples = self._generate_copula_samples(trends, corr_matrix, n_iter)
+        # 3D shift over the n_cats × n_regions composite cells (F1).
+        cell_samples = self._compute_all_paths_vectorized(
+            trends, raw_samples, n_iter, n_cats, n_regions, n_years
+        )
+        # Cell index is c * n_regions + r, so the reshape splits cleanly.
+        regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
+        rw = self._region_weight_vector()
+        category_samples = np.tensordot(regional_samples, rw, axes=([2], [0]))
+        return category_samples, regional_samples
+
+    def _build_regional_matrix(self, regional_samples: np.ndarray) -> dict:
+        """Per-(category, region) percentile paths from the 3D samples (F1).
+
+        Same per-cell shape as `shift_matrix` entries (path percentiles +
+        velocity), so the frontend region drill-down can reuse the cell
+        renderer. regional_samples: (n_iter, n_cats, n_regions, n_years).
+        """
+        percentiles = [10, 25, 50, 75, 90]
+        cats = self.config.category_names
+        years = self.config.path_years
+        out: dict = {}
+        for c_idx, cat in enumerate(cats):
+            out[cat] = {}
+            for r_idx, region in enumerate(REGIONS):
+                series = regional_samples[:, c_idx, r_idx, :]  # (n_iter, n_years)
+                path = {}
+                for y_idx, year in enumerate(years):
+                    ys = series[:, y_idx]
+                    cell = {f"p{p}": float(np.percentile(ys, p)) for p in percentiles}
+                    cell["median"] = cell["p50"]
+                    cell["mean"] = float(np.mean(ys))
+                    cell["std"] = float(np.std(ys))
+                    path[int(year)] = cell
+                velocity = {}
+                for i in range(1, len(years)):
+                    deltas = series[:, i] - series[:, i - 1]
+                    velocity[int(years[i])] = {
+                        "median": float(np.percentile(deltas, 50)),
+                        "p10": float(np.percentile(deltas, 10)),
+                        "p90": float(np.percentile(deltas, 90)),
+                    }
+                out[cat][region] = {"path": path, "velocity": velocity}
+        return out
 
     def _build_correlation_matrix(self, trends: list) -> np.ndarray:
         """
@@ -297,7 +399,7 @@ class BayesianMonteCarloEngine:
         for j, trend in enumerate(trends):
             # Probability of materialization: Beta(α, β) → [0, 1]
             # The sole stochastic driver — "how likely does this trend fully play out?"
-            a_p, b_p = trend.probability_posterior
+            a_p, b_p = trend.probability_prior
             prob_01 = beta_ppf(U[:, j], a_p, b_p)
 
             # gp1_pct_affected: economic magnitude — "what fraction of the
@@ -322,164 +424,209 @@ class BayesianMonteCarloEngine:
         return samples
 
     def _compute_all_paths_vectorized(self, trends: list, raw_samples: np.ndarray,
-                                         n_iter: int, n_cats: int, n_years: int) -> np.ndarray:
+                                       n_iter: int, n_cats: int, n_regions: int,
+                                       n_years: int) -> np.ndarray:
         """
-        Vectorized computation of all category × year shifts across all iterations.
-        Replaces the O(n_iter × n_cats) Python loop with numpy broadcasting.
-        ~50-100x faster than the per-iteration loop.
+        Vectorized shift computation over the n_cats × n_regions composite cells
+        (F1, 2.10.0). Each composite cell (category c, region r) has index
+        ``c * n_regions + r`` and combined exposure ``(cat_exp/5) × (region_exp/5)``
+        — so a trend hits a cell to the extent it is exposed to that category
+        AND present in that region. The existing force-compounding machinery
+        runs unchanged on the cells; the caller reshapes/rolls up.
+
+        Also carries F2 (magnitude-weighted n_eff dampening), F4 (per-iteration
+        peak-year jitter) and F11 (start_year materialization onset).
+
+        Returns: (n_iter, n_cells, n_years) with n_cells = n_cats × n_regions.
         """
         categories = self.config.category_names
         n_trends = len(trends)
+        n_cells = n_cats * n_regions
 
         if n_trends == 0:
-            return np.zeros((n_iter, n_cats, n_years))
+            return np.zeros((n_iter, n_cells, n_years))
 
-        # Pre-compute static arrays (independent of iteration)
-        # trend_force_idx[j] = index of trend j's force in FORCES
         force_list = list(FORCES)
         n_forces = len(force_list)
         force_idx_map = {f: i for i, f in enumerate(force_list)}
         trend_force_idx = np.array([force_idx_map.get(t.force, 0) for t in trends])
-
-        # force_weights: (n_forces,)
         fw = np.array([self.config.force_weights.get(f, 1.0 / n_forces) for f in force_list])
 
-        # exposure_matrix: (n_trends, n_cats) — exposure / 5.0, bounded
-        exposure_matrix = np.zeros((n_trends, n_cats))
+        # --- F1: per-trend regional weight (region_exposure/5), global fallback ---
+        region_weight = np.zeros((n_trends, n_regions))
+        regionless: list = []
+        for j, trend in enumerate(trends):
+            reg_map = getattr(trend, 'regional_exposure', None) or {}
+            vals = np.array([min(float(reg_map.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
+            if vals.sum() <= 0:
+                # A trend with no regional exposure is treated as globally
+                # present (equal across regions) so it is not silently dropped;
+                # the integrity event below makes that assumption visible.
+                vals = np.ones(n_regions)
+                regionless.append(trend.id)
+            region_weight[j, :] = vals
+
+        # --- F1: composite cell exposure (n_trends, n_cells) ---
+        # cell (c, r) at column c*n_regions + r; exposure = (cat/5)·(region/5).
+        exposure_matrix = np.zeros((n_trends, n_cells))
         for j, trend in enumerate(trends):
             for c_idx, cat in enumerate(categories):
                 exp = trend.category_exposure.get(cat, 0)
-                exposure_matrix[j, c_idx] = min(exp, 5) / 5.0 if exp > 0 else 0.0
+                ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
+                if ce <= 0:
+                    continue
+                base = c_idx * n_regions
+                for r_idx in range(n_regions):
+                    exposure_matrix[j, base + r_idx] = ce * region_weight[j, r_idx]
 
-        # materialization_matrix: (n_trends, n_years)
-        mat_matrix = np.ones((n_trends, n_years))
+        if regionless:
+            self._integrity_events.append({
+                "type": "regional_exposure_coverage",
+                "severity": "warning",
+                "message": (
+                    f"{len(regionless)} trend(s) carry no regional exposure and "
+                    f"were treated as globally present (equal across regions) in "
+                    f"the 3D shift math — score their regions in the Trends "
+                    f"editor: " + ", ".join(regionless[:10])
+                    + ("…" if len(regionless) > 10 else "")
+                ),
+                "detail": {"count": len(regionless), "trend_ids": regionless[:50]},
+            })
+
+        # --- F4/F11: per-trend materialization schedules with peak-year jitter ---
+        # sched_table[j, k, y] = materialization of trend j at year y when its
+        # peak_year is shifted by offsets[k]; start_year gates the onset (F11).
+        jitter = int(getattr(self.config, "peak_year_jitter", 0) or 0)
+        offsets = list(range(-jitter, jitter + 1)) if jitter > 0 else [0]
+        n_off = len(offsets)
+        if n_off == 1:
+            off_probs = np.array([1.0])
+        else:
+            # Symmetric triangular weights: ∝ (jitter + 1 − |offset|).
+            raw_w = np.array([jitter + 1 - abs(o) for o in offsets], dtype=float)
+            off_probs = raw_w / raw_w.sum()
+
+        path_years = self.config.path_years
+        sched_table = np.ones((n_trends, n_off, n_years))
         for j, trend in enumerate(trends):
-            pk = getattr(trend, 'peak_year', 0) or 0
+            base_pk = getattr(trend, 'peak_year', 0) or 0
             dc = getattr(trend, 'diffusion_curve', '') or ''
-            if pk > 0 and dc:
-                sched = compute_materialization_schedule(
-                    pk, dc, self.config.path_years, self.config.base_year
-                )
-            else:
-                force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
-                sched = {
-                    yr: force_mat.get(yr, self.config.materialization.get(yr, 1.0))
-                    for yr in self.config.path_years
-                }
-            for y_idx, yr in enumerate(self.config.path_years):
-                mat_matrix[j, y_idx] = sched.get(yr, 1.0)
+            sy = getattr(trend, 'start_year', None)
+            onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
+            for k, off in enumerate(offsets):
+                if base_pk > 0 and dc:
+                    sched = compute_materialization_schedule(
+                        base_pk + off, dc, path_years, self.config.base_year,
+                        start_year=sy,
+                    )
+                else:
+                    # Legacy fallback (force/default global schedule), still
+                    # gated by start_year so F11 holds for these trends too.
+                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
+                    sched = {
+                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0))
+                             if yr > onset else 0.0)
+                        for yr in path_years
+                    }
+                for y_idx, yr in enumerate(path_years):
+                    sched_table[j, k, y_idx] = sched.get(yr, 1.0)
 
-        # --- Calibrated per-force attenuation (no scalar default) ---
-        # Per-force effective attenuation: (n_forces,)
+        # Draw a peak-year offset per (iteration, trend) — reproducible under seed.
+        if n_off > 1:
+            offset_idx = self.rng.choice(n_off, size=(n_iter, n_trends), p=off_probs)
+        else:
+            offset_idx = np.zeros((n_iter, n_trends), dtype=np.intp)
+        trend_arange = np.arange(n_trends)
+
+        # --- Per-force effective attenuation (n_forces,) ---
         eff_att = np.array([self._effective_attenuation[f] for f in force_list])
 
-        # Within-force overlap: pre-compute per (force, category) dampening factors.
-        # n_active[f][c] = number of trends in force f with non-zero exposure to category c
-        # dampen[f][c] = 1 - overlap × (n_active - 1) / n_active
+        # --- F2: magnitude-weighted within-force dampening (per force, per cell) ---
+        # Replaces the count-based 1 − ov·(n−1)/n. The effective number is the
+        # participation ratio n_eff = (Σ m)² / Σ m² over the force's trends'
+        # DETERMINISTIC mean |contribution| m = |normalized_score|·cell_exposure
+        # (deterministic → preserves the vectorized shape + reproducibility).
+        # n_eff = count for equal contributions, → 1 as one trend dominates, and
+        # is essentially unchanged by a negligible trend — so adding a tiny trend
+        # no longer re-scales an entire force (audit F2 monotonicity fix).
         wf_overlap = getattr(self.config, 'within_force_overlap', {})
-        wf_dampen = np.ones((n_forces, n_cats))
+        abs_score = np.array([abs(float(getattr(t, 'normalized_score', 0.0))) for t in trends])
+        contrib = abs_score[:, np.newaxis] * exposure_matrix  # (n_trends, n_cells)
+        wf_dampen = np.ones((n_forces, n_cells))
         for f_idx, force in enumerate(force_list):
             mask = trend_force_idx == f_idx
             if not mask.any():
                 continue
-            wf = wf_overlap.get(force, 0.0)
-            if wf <= 0:
+            ov = wf_overlap.get(force, 0.0)
+            if ov <= 0:
                 continue
-            # Count active trends per category for this force
-            # exposure_matrix[mask, :] > 0 → (n_force_trends, n_cats) boolean
-            n_active_per_cat = (exposure_matrix[mask, :] > 0).sum(axis=0)  # (n_cats,)
-            # dampening: 1 - overlap × (n-1)/n, clipped to avoid negative.
-            # F-25/D21: divide on a guarded denominator — np.where evaluates
-            # both branches, so a category with zero active trends used to
-            # emit a spurious divide-by-zero RuntimeWarning here.
-            n_safe = np.maximum(n_active_per_cat, 1)
-            dampen = np.where(
-                n_active_per_cat > 1,
-                1.0 - wf * (n_active_per_cat - 1) / n_safe,
-                1.0
-            )
+            M = contrib[mask, :]                 # (n_force_trends, n_cells)
+            s1 = M.sum(axis=0)                    # Σ m
+            s2 = (M * M).sum(axis=0)             # Σ m²
+            n_eff = np.where(s2 > 0.0, (s1 * s1) / np.where(s2 > 0.0, s2, 1.0), 0.0)
+            # Guard the denominator: np.where evaluates BOTH branches, so divide
+            # on a floored n_eff to avoid a spurious 0-division warning for cells
+            # with no active trend (n_eff = 0 → dampen = 1.0, the True-branch
+            # value is discarded). Same pattern as the F-25 count-based guard.
+            n_eff_safe = np.maximum(n_eff, 1.0)
+            dampen = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
             wf_dampen[f_idx, :] = np.clip(dampen, 0.1, 1.0)
 
-        # --- VECTORIZED CORE ---
-        # raw_samples: (n_iter, n_trends) — sampled trend scores
-        # For each year: compute force contributions with within-force dampening,
-        # then multiplicative compounding with overlap-aware per-force attenuation.
-
-        shift_samples = np.zeros((n_iter, n_cats, n_years))
-
+        # --- VECTORIZED CORE (over composite cells) ---
+        shift_samples = np.zeros((n_iter, n_cells, n_years))
         for y_idx in range(n_years):
-            # mat_y: (n_trends,) — materialization fraction for this year
-            mat_y = mat_matrix[:, y_idx]
-            # effective per-trend contribution: raw_samples * mat_y
-            # shape: (n_iter, n_trends)
-            effective = raw_samples * mat_y[np.newaxis, :]
+            # F4: per-(iteration, trend) materialization for this year via the
+            # drawn peak-year offset. Shape (n_iter, n_trends).
+            mat_y = sched_table[trend_arange[np.newaxis, :], offset_idx, y_idx]
+            effective = raw_samples * mat_y  # (n_iter, n_trends)
 
-            # For each force, sum contributions across its trends per category
-            # then apply within-force overlap dampening
-            # force_contribution: (n_iter, n_forces, n_cats)
-            force_contrib = np.zeros((n_iter, n_forces, n_cats))
+            force_contrib = np.zeros((n_iter, n_forces, n_cells))
             for f_idx in range(n_forces):
-                # mask trends belonging to this force
                 mask = trend_force_idx == f_idx
                 if not mask.any():
                     continue
-                # effective[:, mask]: (n_iter, n_force_trends)
-                # exposure_matrix[mask, :]: (n_force_trends, n_cats)
-                # result: (n_iter, n_cats) — sum of trend_score * exposure for this force
+                # (n_iter, n_force_trends) @ (n_force_trends, n_cells) → (n_iter, n_cells)
                 raw_sum = effective[:, mask] @ exposure_matrix[mask, :]
-                # Within-force overlap dampening per category
                 force_contrib[:, f_idx, :] = raw_sum * wf_dampen[f_idx, :][np.newaxis, :]
 
-            # Apply force weights
-            # Weighted: (n_iter, n_forces, n_cats) * (n_forces, 1)
             weighted = force_contrib * fw[:, np.newaxis]
-
-            # Multiplicative compounding with overlap-aware per-force attenuation
-            # eff_att: (n_forces,) → broadcast to (1, n_forces, 1)
             attenuated = weighted * eff_att[:, np.newaxis]
-            # L4 (July 2026 review): a compounding factor (1 + attenuated) ≤ 0
-            # means one force alone wiped >100% of the pool in that iteration
-            # — and a product of two negative factors would silently flip the
-            # sign of the total. Floor each factor at 0 (a −100% shift is the
-            # semantic lower bound of a relative pool shift) and count the
-            # affected (iteration, force, category) cells for the integrity log.
+            # L4: floor each compounding factor at 0 (−100% is the lower bound of
+            # a relative pool shift); count the affected cells for the audit log.
             factors = 1.0 + attenuated
             n_floored = int((factors <= 0.0).sum())
             if n_floored > 0:
                 self._floored_factor_cells += n_floored
                 factors = np.maximum(factors, 0.0)
-            # (n_iter, n_forces, n_cats) → product over axis=1 → (n_iter, n_cats)
-            product = np.prod(factors, axis=1)
+            product = np.prod(factors, axis=1)  # (n_iter, n_cells)
             shift_samples[:, :, y_idx] = product - 1.0
 
-        # Surface the floor guard in the integrity log once per run (not per year).
         if self._floored_factor_cells > 0:
             self._integrity_events.append({
                 "type": "compounding_floor",
                 "severity": "warning",
                 "message": (
-                    f"{self._floored_factor_cells} (iteration × force × category × "
-                    f"year) compounding factors were ≤ 0 (a single force wiping "
-                    f">100% of the pool) and were floored at −100%. If this "
-                    f"count is material relative to iterations, review trend "
-                    f"magnitudes/attenuation."
+                    f"{self._floored_factor_cells} (iteration × force × "
+                    f"category×region × year) compounding factors were ≤ 0 (a "
+                    f"single force wiping >100% of a cell's pool) and were "
+                    f"floored at −100%. If this count is material relative to "
+                    f"iterations, review trend magnitudes/attenuation."
                 ),
             })
 
         return shift_samples
 
     def _compile_results(self, samples: np.ndarray, db: TrendDatabase) -> dict:
-        """Compute percentiles, convergence diagnostics, force attribution."""
+        """Compute percentiles, per-quantile Monte-Carlo standard error, and
+        the Force / Value-chain / Region attribution lenses.
+
+        ``samples`` is the region-GP1-weighted category roll-up
+        (n_iter, n_cats, n_years) — see run()/_simulate_samples (F1).
+        """
         n_iter, n_cats, n_years = samples.shape
         percentiles = [10, 25, 50, 75, 90]
 
         shift_matrix = {}
-        convergence = {}
-        # NOTE: what used to be called "causal_decomposition" was never actually
-        # causal — it is a static force attribution scaled to match the MC median.
-        # Since the Causal DAG module and scenario engine have been removed,
-        # we are honest about what this is: a force-level attribution.
-        force_attribution = {}
 
         for c_idx, cat in enumerate(self.config.category_names):
             cat_data = samples[:, c_idx, :]
@@ -521,48 +668,17 @@ class BayesianMonteCarloEngine:
                 "velocity": velocity,
             }
 
-            # Convergence diagnostic: single-chain split-R̂ approximation.
-            # A5: This is the ONE-CHAIN fallback — calling run_multichain()
-            # yields proper multi-chain split-R̂ + integrated-autocorrelation
-            # ESS across independent seeds. We still report this here so
-            # the single-chain path has a convergence block, but we flag
-            # it explicitly so nothing downstream presents it as rigorous.
-            cat_chain = cat_data[:, -1]
-            r_hat = self._split_rhat([cat_chain])
-            convergence[cat] = {
-                "r_hat": float(r_hat) if np.isfinite(r_hat) else 1.0,
-                "ess": self._effective_sample_size(cat_chain),
-                "converged": bool(np.isfinite(r_hat) and r_hat < 1.05),
-                "n_chains": 1,
-                "method": "single_chain_split_rhat_approximate",
-            }
+            # (F9, 2.10.0: the force_attribution.direct_effects block was deleted
+            #  here — a dormant, numerically-unstable signed attribution scaled to
+            #  the MC median that no consumer read and that blew up ±1,000× near
+            #  cancellation. The shipped Force lens is decompositions.force below,
+            #  computed on |score| shares. F7: the vacuous single-chain split-R̂/
+            #  ESS block was also deleted — R̂≈1 on i.i.d. draws by construction;
+            #  the honest diagnostic is the per-quantile MC standard error,
+            #  computed once after this loop.)
 
-            # Direct effects: per-force contribution to total category shift.
-            # Compute using same logic as the simulation: normalized_score × exposure × force_weight
-            # Then scale proportionally so contributions sum to the MC median at the terminal year.
-            # This is the TERMINAL-YEAR attribution — for per-year attribution see
-            # `decompositions.force` in the returned dict below.
-            raw_force_sums = {}
-            for force in FORCES:
-                raw_force_sums[force] = 0.0
-
-            trends = db.trends
-            for trend in trends:
-                exposure = trend.category_exposure.get(cat, 0)
-                if exposure > 0:
-                    exposure_frac = min(exposure, 5) / 5.0
-                    force_weight = self.config.force_weights.get(trend.force, 1.0 / len(FORCES))
-                    raw_force_sums[trend.force] += trend.normalized_score * exposure_frac * force_weight
-
-            # Scale to match MC median at terminal year so contributions add up
-            raw_total = sum(raw_force_sums.values())
-            last_year = self.config.path_years[-1]
-            mc_median = path[last_year]["median"]
-            scale = mc_median / raw_total if abs(raw_total) > 1e-10 else 1.0
-
-            force_attribution[cat] = {
-                "direct_effects": {f: float(v * scale) for f, v in raw_force_sums.items()},
-            }
+        # F7: per-category Monte-Carlo standard error of the published quantiles.
+        mc_standard_error = self._mc_standard_error(samples)
 
         # ── Value-chain EPICENTRE shares (2.9.0) ────────────────────────
         # Computed ONCE and consumed by BOTH the terminal-year back-compat
@@ -751,7 +867,6 @@ class BayesianMonteCarloEngine:
         by_force_totals: dict = {int(y): {f: 0.0 for f in FORCES} for y in years}
         by_vc_totals: dict = {int(y): {s: 0.0 for s in VC_STEPS} for y in years}
         by_region_totals: dict = {int(y): {r: 0.0 for r in REGIONS} for y in years}
-        grand_totals: dict = {int(y): 0.0 for y in years}
         for year in years:
             yi = int(year)
             for cat in cats:
@@ -761,7 +876,6 @@ class BayesianMonteCarloEngine:
                     by_vc_totals[yi][s] += vc_decomp[yi][cat][s]
                 for r in REGIONS:
                     by_region_totals[yi][r] += region_decomp[yi][cat][r]
-                grand_totals[yi] += category_path_totals[cat][yi]
 
         decompositions = {
             "force":  force_decomp,   # year → cat → force  → shift
@@ -803,7 +917,10 @@ class BayesianMonteCarloEngine:
             "by_force":       by_force_totals,       # column totals (Force lens)
             "by_vc":          by_vc_totals,          # column totals (VC lens)
             "by_region":      by_region_totals,      # column totals (Region lens)
-            "grand":          grand_totals,          # cross-category grand total
+            # (F10, 2.10.0: totals.grand deleted — it was a raw SUM of the 12
+            #  category medians, ≈12× the headline, unused, and "sum of medians
+            #  ≠ median of sum". The portfolio band below is the real portfolio
+            #  quantity, computed per-iteration.)
             # Joint portfolio percentiles (category-weighted mean per
             # iteration). The headline band reads THIS, not an average of
             # per-category bands.
@@ -812,8 +929,9 @@ class BayesianMonteCarloEngine:
 
         return {
             "shift_matrix": shift_matrix,
-            "convergence": convergence,
-            "force_attribution": force_attribution,
+            # F7: per-quantile Monte-Carlo standard error replaces the vacuous
+            # i.i.d. split-R̂/ESS "convergence" block (R̂≈1 by construction).
+            "mc_standard_error": mc_standard_error,
             "vc_decomposition": vc_decomposition,
             "decompositions": decompositions,
             "totals": totals,
@@ -831,100 +949,54 @@ class BayesianMonteCarloEngine:
             "integrity_events": list(self._integrity_events),
         }
 
-    def _autocorr(self, x: np.ndarray, lag: int = 1) -> float:
-        """Simple lag-1 autocorrelation for ESS estimate."""
-        n = len(x)
-        if n < lag + 2:
-            return 0.0
-        mean = np.mean(x)
-        c0 = np.sum((x - mean) ** 2) / n
-        c1 = np.sum((x[lag:] - mean) * (x[:-lag] - mean)) / n
-        return c1 / max(c0, 1e-10)
+    def _mc_standard_error(self, samples: np.ndarray, n_boot: int = 200) -> dict:
+        """F7: per-quantile Monte-Carlo standard error at the terminal year.
 
-    # ── A5: Multi-chain convergence diagnostics ─────────────────────
-    # The old split-in-half R̂ (one chain cut into two halves) can look
-    # converged even when the chain is stuck — the two halves share the
-    # same RNG and can be consistently wrong in the same way. Proper
-    # multi-chain split-R̂ (Vehtari et al. 2021) runs ≥2 independent
-    # chains from different seeds and compares between- vs. within-chain
-    # variance. Plus ESS is computed from integrated autocorrelation
-    # time (sum of positive autocorrelations) rather than just lag-1.
-
-    @staticmethod
-    def _split_rhat(chains: list) -> float:
+        Honest replacement for the i.i.d.-vacuous split-R̂/ESS: this is the
+        sampling noise of THIS run's published percentiles at the configured
+        iteration count (bootstrap; ≈0.001 pp at 50k, two orders below the
+        0.1 pp display precision — and √3 smaller once the 3 chains are pooled).
+        It measures MC noise only, never model error. Reproducible sub-RNG so
+        the reported SE is itself deterministic.
         """
-        Compute split-R̂ across ≥1 independent chains (Vehtari et al. 2021).
-
-        Each chain is split in half (Vehtari's "split-chain" convention);
-        those 2*m half-chains are then compared via the standard B/W/σ̂²
-        formula. Needs ≥2 independent chains for the result to be
-        informative — with a single chain we fall back to the old
-        split-in-half behaviour but the caller should flag the result.
-
-        chains: list of 1D np.ndarrays, one per chain, each of length n.
-        returns: float R̂ (1.0 = perfect mixing, >1.05 = not converged).
-        """
-        if not chains:
-            return float("nan")
-        # Truncate to equal length
-        n_min = min(len(c) for c in chains)
-        if n_min < 4:
-            return float("nan")
-        # Split each chain in half → 2m half-chains of length n_min//2
-        half = n_min // 2
-        split = []
-        for c in chains:
-            arr = np.asarray(c)[:n_min]
-            split.append(arr[:half])
-            split.append(arr[half:2 * half])
-        split = np.array(split)  # shape (2m, half)
-        m, n = split.shape
-        chain_means = split.mean(axis=1)
-        chain_vars = split.var(axis=1, ddof=1)
-        # Between-chain variance B
-        B = n * chain_means.var(ddof=1) if m > 1 else 0.0
-        # Within-chain variance W
-        W = chain_vars.mean()
-        if W <= 0:
-            return 1.0
-        # Variance estimate
-        var_hat = ((n - 1) / n) * W + B / n
-        return float(np.sqrt(var_hat / W))
-
-    @staticmethod
-    def _effective_sample_size(chain: np.ndarray, max_lag: int = 200) -> int:
-        """
-        ESS via integrated autocorrelation time (Geyer's initial positive
-        sequence). Sums autocorrelations up to the first non-positive one,
-        which is the standard way to avoid summing noise in the tail.
-        """
-        x = np.asarray(chain, dtype=float)
-        n = len(x)
-        if n < 4:
-            return n
-        x = x - x.mean()
-        var = np.dot(x, x) / n
-        if var <= 0:
-            return n
-        max_lag = min(max_lag, n - 1)
-        tau = 1.0
-        for lag in range(1, max_lag + 1):
-            rho = np.dot(x[:-lag], x[lag:]) / (n * var)
-            if rho <= 0:
-                break
-            tau += 2.0 * rho
-        return int(max(1, n / max(tau, 1.0)))
+        n_iter, n_cats, n_years = samples.shape
+        last = n_years - 1
+        terminal_year = int(self.config.path_years[-1])
+        rng = np.random.default_rng(20260713)
+        out: dict = {}
+        for c_idx, cat in enumerate(self.config.category_names):
+            col = samples[:, c_idx, last]
+            meds = np.empty(n_boot); p10s = np.empty(n_boot); p90s = np.empty(n_boot)
+            for b in range(n_boot):
+                r = col[rng.integers(0, n_iter, n_iter)]
+                meds[b] = np.percentile(r, 50)
+                p10s[b] = np.percentile(r, 10)
+                p90s[b] = np.percentile(r, 90)
+            out[cat] = {
+                "median_se_pp": float(np.std(meds) * 100.0),
+                "p10_se_pp": float(np.std(p10s) * 100.0),
+                "p90_se_pp": float(np.std(p90s) * 100.0),
+                "terminal_year": terminal_year,
+                "n": int(n_iter),
+                "method": "bootstrap_terminal_year",
+            }
+        return out
 
     def run_multichain(self, db: TrendDatabase,
                         n_chains: int = 3,
                         iterations: Optional[int] = None,
                         seeds: Optional[list] = None) -> dict:
         """
-        A5: Run ``n_chains`` independent simulations from different seeds
-        and compute proper multi-chain split-R̂ + integrated-autocorrelation
-        ESS across them. Returns the last chain's full result enriched with
-        a ``convergence`` dict whose R̂/ESS are computed across chains and
-        a ``chain_summaries`` list for audit.
+        Run ``n_chains`` independent simulations from different seeds and
+        POOL them for the published percentiles (F7, 2.10.0).
+
+        F7: the old code ran 3 chains but published only the last chain's
+        percentiles and threw the other 2/3 of the samples away, keeping a
+        vacuous split-R̂/ESS block (R̂≈1 on i.i.d. draws by construction). Now
+        the chains are concatenated and the published shift_matrix / totals /
+        regional matrix / decompositions / MC standard error are all computed
+        on the POOLED sample (√3 noise reduction for free). Seed stability
+        keeps its per-chain terminal-year portfolio medians unchanged.
         """
         if n_chains < 1:
             raise ValueError("n_chains must be >= 1")
@@ -934,70 +1006,67 @@ class BayesianMonteCarloEngine:
         if len(seeds) != n_chains:
             raise ValueError("len(seeds) must equal n_chains")
 
-        chain_results = []
-        per_chain_samples = []  # list of (n_iter, n_cats, n_years) arrays
-        for i, s in enumerate(seeds):
+        # This method compiles the pooled result on SELF, which appends VC
+        # integrity events to self._integrity_events. Reset the parent's
+        # accumulators so a reused engine instance (e.g. .run() then
+        # .run_multichain()) cannot double-count events.
+        self._integrity_events = []
+        self._floored_factor_cells = 0
+
+        per_chain_cat = []   # list of (n_iter, n_cats, n_years)
+        per_chain_reg = []   # list of (n_iter, n_cats, n_regions, n_years)
+        chain_engines = []
+        for s in seeds:
             engine = BayesianMonteCarloEngine(self.config, seed=s)
-            r = engine.run(db, iterations=iterations)
-            chain_results.append(r)
-            per_chain_samples.append(r["raw_samples"])
+            cat_s, reg_s = engine._simulate_samples(db, iterations or self.config.iterations)
+            per_chain_cat.append(cat_s)
+            per_chain_reg.append(reg_s)
+            chain_engines.append(engine)
 
-        # Stack and compute proper multi-chain convergence on the
-        # final-year category samples (the quantity users actually read).
-        last_idx = per_chain_samples[0].shape[2] - 1
-        convergence = {}
-        for c_idx, cat in enumerate(self.config.category_names):
-            cat_chains = [s[:, c_idx, last_idx] for s in per_chain_samples]
-            r_hat = self._split_rhat(cat_chains)
-            ess_total = sum(self._effective_sample_size(c) for c in cat_chains)
-            convergence[cat] = {
-                "r_hat": float(r_hat),
-                "ess": int(ess_total),
-                "converged": bool(np.isfinite(r_hat) and r_hat < 1.05),
-                "n_chains": n_chains,
-                "method": "multi_chain_split_rhat",
-            }
-
-        # Use the last chain's full result as the canonical output but
-        # replace its convergence block with the cross-chain one.
-        result = dict(chain_results[-1])
-        result["convergence"] = convergence
-        result["n_chains"] = n_chains
-        # L8 (July 2026 review): persist the MASTER seed (the one an operator
-        # must pass to reproduce the run) alongside the derived chain seeds.
-        # `result["seed"]` from the last chain is a derived value — overwrite
-        # it with the master so the audit trail names the reproducible input.
-        result["seed"] = int(self.seed)
-        result["master_seed"] = int(self.seed)
-        result["chain_seeds"] = [int(s) for s in seeds]
-
+        last_idx = per_chain_cat[0].shape[2] - 1
         terminal_year = int(self.config.path_years[-1])
-        # Per-chain PORTFOLIO median at the terminal year — the same
-        # category-weighted quantity the dashboard headline reads
-        # (totals.portfolio), so the stability metric and the headline
-        # measure the same number.
+
+        # Per-chain PORTFOLIO median at the terminal year (seed stability) —
+        # the SAME category-weighted quantity the headline reads, computed per
+        # chain BEFORE pooling so the spread reflects independent seeds.
         cw = getattr(self.config, "category_weights", None) or {}
         w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
         w = (w / w.sum()) if w.sum() > 0 else np.full(
             len(self.config.category_names), 1.0 / len(self.config.category_names))
         per_chain_portfolio_medians = [
-            float(np.median(per_chain_samples[i][:, :, last_idx] @ w))
-            for i in range(n_chains)
+            float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(n_chains)
         ]
+
+        # F7: POOL the chains, then compile the published views once on the
+        # full sample (this is what cuts the MC noise by √n_chains).
+        pooled_cat = np.concatenate(per_chain_cat, axis=0)
+        pooled_reg = np.concatenate(per_chain_reg, axis=0)
+        result = self._compile_results(pooled_cat, db)   # self.integrity = [vc coverage]
+        result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
+        rw = self._region_weight_vector()
+        result["region_weights_used"] = {r: float(rw[i]) for i, r in enumerate(REGIONS)}
+
+        # Integrity events: the vc-coverage events come from self._compile_results
+        # above; the data-driven correlation/cholesky/regional/floor events are
+        # identical every chain — take chain 0's as representative and prepend.
+        result["integrity_events"] = (
+            list(chain_engines[0]._integrity_events) + list(result.get("integrity_events", []))
+        )
+
+        result["n_chains"] = n_chains
+        # L8: the MASTER seed reproduces the run; chain seeds are derived.
+        result["seed"] = int(self.seed)
+        result["master_seed"] = int(self.seed)
+        result["chain_seeds"] = [int(s) for s in seeds]
         result["chain_summaries"] = [
-            {"seed": int(seeds[i]),
-             "terminal_year": terminal_year,
+            {"seed": int(seeds[i]), "terminal_year": terminal_year,
              "median_terminal": per_chain_portfolio_medians[i]}
             for i in range(n_chains)
         ]
 
-        # Seed stability (M2 — owner re-ruling 2026-07-06 of the June T18
-        # removal): the spread of the terminal-year portfolio median across
-        # independently-seeded chains. Honest framing: this measures MC
-        # sampling noise at the configured iteration count ONLY — it cannot
-        # detect model error, and at 50k × 3 chains it is expected to be
-        # ≈0 pp. It replaces the misleading R̂ badge (R̂ on i.i.d. draws is
-        # ≈1.0 by construction, D3).
+        # Seed stability (M2): spread of the terminal-year portfolio median
+        # across independently-seeded chains. MC sampling noise only — cannot
+        # detect model error; ≈0 pp expected at 50k × 3.
         spread_pp = (max(per_chain_portfolio_medians) -
                      min(per_chain_portfolio_medians)) * 100.0
         result["seed_stability"] = {
@@ -1006,7 +1075,8 @@ class BayesianMonteCarloEngine:
             "per_chain_medians": per_chain_portfolio_medians,
             "spread_pp": float(spread_pp),
             "n_chains": n_chains,
-            "iterations_per_chain": int(per_chain_samples[0].shape[0]),
+            "iterations_per_chain": int(per_chain_cat[0].shape[0]),
+            "pooled_iterations": int(pooled_cat.shape[0]),
         }
         return result
 

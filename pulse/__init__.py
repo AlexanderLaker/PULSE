@@ -7,4 +7,4 @@ asserts all three agree. (It is duplicated as a literal here, rather than
 imported from the engine, because importing the engine pulls in scipy and the
 read-only serverless runtime deliberately has no scipy — D13/F2.)
 """
-__version__ = "2.9.0"
+__version__ = "2.10.0"

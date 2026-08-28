@@ -42,15 +42,23 @@ def load_latest_run_into_state() -> bool:
     if isinstance(results, dict) and "shift_matrix" in results:
         mc = {
             "shift_matrix": results.get("shift_matrix", {}),
+            # F1 (2.10.0): the 3D category × region shift + the weights used.
+            "regional_shift_matrix": results.get("regional_shift_matrix"),
+            "region_weights_used": results.get("region_weights_used")
+                or inner_meta.get("region_weights_used"),
             "decompositions": results.get("decompositions"),
             "totals": results.get("totals"),
             "vc_decomposition": results.get("vc_decomposition"),
+            # F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS).
+            "mc_standard_error": results.get("mc_standard_error"),
             # D19/D3 (June 2026): integrity events + seed stability persist
             # with the run and must survive rehydration. seed_stability is
             # None for pre-2.8.1 runs — the UI shows "not recorded" then.
             "integrity_events": results.get("integrity_events") or [],
             "seed_stability": results.get("seed_stability"),
-            "force_attribution": results.get("force_attribution") or force_attr,
+            # F9 (2.10.0): force_attribution.direct_effects deleted. Pre-2.10
+            # runs may still carry the column — we neither propagate nor render
+            # it; nothing reads it.
             "convergence": conv or results.get("convergence") or {},
             "iterations": latest.get("iterations") or results.get("iterations") or 1000,
             "model_type": latest.get("model_type") or results.get("model_type") or "bayesian_copula",
@@ -87,6 +95,8 @@ def load_latest_run_into_state() -> bool:
         # 2.9.0: "epicentre" for partition-based runs; None on pre-2.9 runs
         # (the About-footer then reads "profile-weighted (pre-2.9 run)").
         "vc_attribution_basis": inner_meta.get("vc_attribution_basis"),
+        # 2.10.0 (F1): the region GP1-share weights applied in the roll-up.
+        "region_weights_used": inner_meta.get("region_weights_used"),
         "converged_categories": inner_meta.get("converged_categories"),
         "total_categories": inner_meta.get("total_categories"),
         "persisted_at_utc": inner_meta.get("persisted_at_utc"),

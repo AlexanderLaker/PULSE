@@ -102,43 +102,37 @@ class TestDeterminism:
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 
-    Engine: bayesian_copula MODEL_VERSION 2.9.0 (2.9.0 changed the VC
-    attribution basis only — shift/portfolio pin values are the 2.8.1
-    numbers, deliberately NOT regenerated because the shift math did not
-    move). Regenerate pins ONLY for deliberate model changes, in the same
-    commit as the change.
+    Engine: bayesian_copula MODEL_VERSION 2.10.0.
 
-    Regenerated 2026-07-06 (2.8.1, owner-approved July review batch): the
-    copula-uniform clip moved to float-safety (L3), compounding factors are
-    floored at 0 with an integrity event (L4), and the conftest fixture was
-    differentiated (Hair: Color ≠ Hair: Care exposure) + given a per-trend
-    materialization schedule so no two pins are identical and the schedule
-    path is pinned (L29).
+    REGENERATED 2026-07-13 (2.10.0, owner-directed mathematical-review batch —
+    numbers MOVE by design): the shift math is now regional (F1, 3D category ×
+    region × year rolled up by the region GP1-share weights), the within-force
+    dampening uses the magnitude-weighted n_eff (F2), and start_year gates the
+    materialization onset (F11). The fixture now carries per-trend regional
+    exposure and pins with peak-year jitter OFF (F4 has its own test). The
+    magnitudes shrank vs the 2.8.1 pins because the fixture trends are Europe-
+    weighted, so the regional roll-up correctly dilutes their category impact.
+    Regenerate pins ONLY for deliberate model changes, in the same commit.
 
-    Prior regenerations: June 2026 v3.7/D20 (t-copula deleted → Gaussian),
+    Prior regenerations: 2026-07-06 v3.8/2.8.1 (L3 clip, L4 floor, fixture
+    differentiation); June 2026 v3.7/D20 (t-copula deleted → Gaussian);
     June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
     """
 
-    # 2.9.0 note: the VC-epicentre attribution rework (partition replaces
-    # profile×vc_weights shares) does NOT move these pins — vc_exposure
-    # never fed the shift math, only the VC lens. Shift/portfolio pins
-    # below are therefore UNCHANGED from the 2.8.1 regeneration; only
-    # decompositions.vc / vc_decomposition values moved (structural tests
-    # below, not pinned values).
     PINS = {
         # cat:          (median,            p10,                p90)
-        "Hair: Color": (-0.005123402183, -0.007827267324, -0.002184655835),
-        "Hair: Care":  (-0.006658914451, -0.009184228794, -0.003627384381),
-        "LHC: FCN":    (-0.008226331487, -0.010567677496, -0.005100180189),
+        "Hair: Color": (-0.003365458544, -0.005207021042, -0.001350259625),
+        "Hair: Care":  (-0.004405135395, -0.006105482349, -0.002398520912),
+        "LHC: FCN":    (-0.005469456519, -0.007019692994, -0.003314337205),
     }
 
     # L29: the joint portfolio band (totals.portfolio) is what the dashboard
     # headline shows (D3) — pin it too, not only per-category cells.
-    PORTFOLIO_PIN = (-0.007155337354, -0.009448349364, -0.004241665228)
+    PORTFOLIO_PIN = (-0.004730794486, -0.006328294549, -0.002752637701)
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.9.0"
+        assert r["model_version"] == "2.10.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")  # D13

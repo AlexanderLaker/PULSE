@@ -164,6 +164,7 @@ def compute_materialization_schedule(
     diffusion_curve: str,
     path_years: list[int] | None = None,
     base_year: int = DEFAULT_BASE_YEAR,
+    start_year: int | None = None,
 ) -> dict[int, float]:
     """
     Compute a year→fraction materialization schedule for a single trend.
@@ -172,23 +173,40 @@ def compute_materialization_schedule(
         peak_year: year when 100% impact materializes (0 = use last path year)
         diffusion_curve: one of VALID_DIFFUSION_CURVES
         path_years: list of years to compute fractions for
-        base_year: start year (fraction = 0.0)
+        base_year: global model base year (fraction = 0.0 at/before onset)
+        start_year: the trend's onset year — when its impact BEGINS to
+            materialize (F11, 2.10.0). Onset = max(base_year, start_year).
+            Before onset the fraction is 0.0; the diffusion curve then ramps
+            from onset to peak_year. None → onset = base_year (legacy behavior:
+            everything ramps from the global base year).
 
     Returns:
         dict mapping each path year to a fraction in [0.0, 1.0]
     """
     import math
     years = path_years or DEFAULT_PATH_YEARS
-    py = peak_year if peak_year and peak_year > base_year else years[-1]
+    # F11: the impact does not accrue before the trend's start_year. Onset is
+    # the later of the global base year and the trend's own start_year.
+    onset = base_year if start_year is None else max(int(base_year), int(start_year))
+    # Peak must be strictly after onset; otherwise ramp to the horizon (or, if
+    # the onset is itself past the horizon, a degenerate onset+1 → all-zero).
+    if peak_year and peak_year > onset:
+        py = peak_year
+    else:
+        py = years[-1] if years[-1] > onset else onset + 1
 
     schedule = {}
     for year in years:
         if year >= py:
             schedule[year] = 1.0
             continue
-        # t = normalized progress from base_year to peak_year: 0.0 → 1.0
-        span = max(py - base_year, 1)
-        t = max(0.0, min(1.0, (year - base_year) / span))
+        if year <= onset:
+            # F11: no materialization before the trend comes into effect.
+            schedule[year] = 0.0
+            continue
+        # t = normalized progress from onset (start_year) to peak_year: 0.0 → 1.0
+        span = max(py - onset, 1)
+        t = max(0.0, min(1.0, (year - onset) / span))
 
         if diffusion_curve == "linear":
             frac = t
@@ -238,8 +256,54 @@ def compute_materialization_schedule(
 # per design philosophy #8 (like neutral_threshold and t_copula_df).
 # ModelConfig.from_json tolerates it in old snapshots.
 DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}  # Equal: ~16.7%
-DEFAULT_REGION_WEIGHTS = {r: 1.0 / len(REGIONS) for r in REGIONS}  # Equal: 25%
+
+# ── Region weights = each region's share of GP1 (2.10.0, F1 3D roll-up) ──
+# Before 2.10.0 region_weights only fed the Region ATTRIBUTION lens (a share
+# partition, so equal weights were harmless). In 2.10.0 the shift math is
+# regional (category × region × year) and these weights roll the regional
+# shifts back up to the category/portfolio level — so they now MOVE the
+# published numbers and must reflect each region's real share of the pool.
+#
+# PROVENANCE (documented proxy, admin-editable in the Config sheet):
+#   Henkel Group consolidated 2025 regional sales split — Europe 38%,
+#   North America 26%, Asia-Pacific 17%, remainder (IMEA + Latin America,
+#   mapped to PRISM's "High Growth") ~19%. Consumer Brands is NOT disclosed
+#   by region publicly, so the Group split is used as a proxy for the HCB
+#   GP1 regional mix (HCB is likely somewhat MORE Europe-weighted — refine
+#   in the Config sheet when an internal HCB regional GP1 split is available).
+#   Source: Henkel FY2025 results (henkel.com investor relations, Mar 2026).
+#   Sales are used as a proxy for GP1 shares (relative-only model — no € here).
+# Per-category regional weights are NOT public; the same global split is
+# applied to every category until an internal per-category mix is supplied
+# (a 12×4 refinement noted in the model card).
+DEFAULT_REGION_WEIGHTS = {
+    "Europe":        0.38,
+    "North America": 0.26,
+    "Asia":          0.17,
+    "High Growth":   0.19,
+}
+DEFAULT_REGION_WEIGHTS_SOURCE = (
+    "Henkel Group FY2025 consolidated regional sales split "
+    "(Europe 38% / North America 26% / Asia-Pacific 17% / High Growth ~19%), "
+    "used as a proxy for the HCB GP1 regional mix — Consumer Brands is not "
+    "disclosed by region. Admin-editable; refine with internal HCB data."
+)
 DEFAULT_CATEGORY_WEIGHTS = {c: 1.0 / len(CATEGORIES) for c in CATEGORIES}  # Equal: ~8.3%
+DEFAULT_CATEGORY_WEIGHTS_SOURCE = (
+    "Equal category weights (each category = 1/12 of the portfolio). "
+    "These are business-importance / GP1-share weights for rolling category "
+    "shifts up to the portfolio headline — set them to the real HCB category "
+    "GP1 mix in the Config sheet to weight the portfolio by actual pool size."
+)
+
+# ── Peak-year timing jitter (2.10.0, F4) ────────────────────────────
+# Timing uncertainty: each iteration perturbs every trend's peak_year by a
+# small integer offset (triangular, symmetric) so the velocity/timing bands
+# carry real "it arrives a year earlier/later" content instead of measuring
+# only the spread of a fixed schedule shape (audit F4 — the 2026↔2030 paths
+# were correlated 0.993, i.e. one draw drove the whole path). 0 disables.
+# Default ±1 year: offsets {-1, 0, +1} with triangular weights {0.25, 0.5, 0.25}.
+DEFAULT_PEAK_YEAR_JITTER = 1
 
 # ── Copula parameters ──────────────────────────────────────────────
 # D20 (June 2026): DEFAULT_T_COPULA_DF deleted with the t-copula tail layer.
@@ -471,6 +535,8 @@ class ModelConfig:
     category_names: list = field(default_factory=lambda: list(CATEGORIES))
     category_weights: dict = field(default_factory=lambda: dict(DEFAULT_CATEGORY_WEIGHTS))
     iterations: int = DEFAULT_ITERATIONS
+    # F4 (2.10.0): per-iteration peak-year jitter magnitude in years (0 = off).
+    peak_year_jitter: int = DEFAULT_PEAK_YEAR_JITTER
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     force_correlation_matrix: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_CORRELATIONS))
     force_overlap_matrix: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_OVERLAP_MATRIX))

@@ -1318,8 +1318,26 @@ const ProfitPoolAnalysis2: FC<{
     const shifts_path: { [cat: string]: Record<string, { median?: number; p10?: number; p90?: number }> } = {};
     const force_decomposition: { [cat: string]: Record<ForceName, number> } = {};
     const contributing_trends: { [cat: string]: Trend[] } = {};
+    // F1 (2.10.0): per-category regional shift at the selected year — the 3D
+    // drill-down. region → {median, p10, p90}.
+    const regional_shift: { [cat: string]: Record<string, { median?: number; p10?: number; p90?: number }> } = {};
 
     cats.forEach((c) => {
+      // Regional breakdown at selectedYear from the 3D regional_shift_matrix.
+      const rsmCat = simulation?.regional_shift_matrix?.[c.id];
+      if (rsmCat) {
+        const byRegion: Record<string, { median?: number; p10?: number; p90?: number }> = {};
+        Object.entries(rsmCat).forEach(([region, cell]) => {
+          const p = (cell as { path?: Record<string | number, unknown> })?.path;
+          const v = p?.[selectedYear] ?? p?.[String(selectedYear)];
+          if (v && typeof v === 'object') {
+            const pd = v as PercentileDistribution;
+            byRegion[region] = { median: pd.median, p10: pd.p10, p90: pd.p90 };
+          }
+        });
+        if (Object.keys(byRegion).length) regional_shift[c.id] = byRegion;
+      }
+
       // Fan-chart path: pass median + p10/p90 for every projection year.
       const raw = simulation?.shifts?.[c.id] as ShiftPath | undefined;
       if (raw) {
@@ -1417,6 +1435,8 @@ const ProfitPoolAnalysis2: FC<{
       shifts_path,
       force_decomposition,
       contributing_trends,
+      regional_shift,
+      region_weights: simulation?.region_weights_used,
       categories: cats,
     };
   }, [simulation, trends, selectedYear]);
@@ -1928,6 +1948,11 @@ const ProfitPoolAnalysis2: FC<{
                 rows.push(['VC attribution', m.vc_attribution_basis === 'epicentre'
                   ? 'epicentre partition'
                   : 'profile-weighted (pre-2.9 run)']);
+                // F1 (2.10.0): the region GP1-share weights used in the roll-up.
+                if (m.region_weights_used) {
+                  rows.push(['Region weights', Object.entries(m.region_weights_used)
+                    .map(([r, w]) => `${r} ${(Number(w) * 100).toFixed(0)}%`).join(' · ')]);
+                }
                 if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
                 if (m.model_version) rows.push(['Model', m.model_version]);
                 return (
@@ -2009,6 +2034,72 @@ const ProfitPoolAnalysis2: FC<{
                 <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Each cell is the compounded level vs 2025 at that year — not a year-over-year change.</div>
               </div>
               </div>
+              {/* F1 (2.10.0): the structural scale chain — put the level's
+                  provenance on the record so a reader who compares a cell
+                  against intuition about a single trend understands the ~13×
+                  gap (audit F1). */}
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
+                style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Reading the level</div>
+              <p className="text-[12px] mb-2" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
+                Each trend&rsquo;s elicited &ldquo;share of GP1 it could touch&rdquo; is deliberately
+                scaled down before it reaches a category: a trend belongs to 1 of 6 forces
+                (&divide;6 averaging) and each force is attenuated (~0.4&ndash;0.5) so overlapping
+                trends aren&rsquo;t double-counted. Net <strong>structural pass-through &asymp; 7%</strong>.
+                So a near-certain trend that could touch 20% of a category&rsquo;s GP1 moves that
+                category <strong>&asymp;1.4%</strong> at full materialization &mdash; not 20%. Read cells as a
+                conservative, comparable index and apply them with the formula
+                (GP1<sub>projected</sub> = GP1<sub>actual</sub> &times; (1 + shift)); don&rsquo;t read one cell
+                as the raw elicited magnitude. The impact is applied per <strong>category &times; region</strong>:
+                a trend only moves the categories and regions it is scored on, and the category
+                number is the region-GP1-weighted roll-up (weights above).
+              </p>
+              <div className="rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1.5" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>
+                  Structural pass-through per force <span style={{ fontWeight: 400, color: S.mutedText }}>(force weight 1/6 &times; attenuation; before probability, materialization, exposure &amp; overlap)</span>
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1">
+                  {[['Consumer','8.3%'],['Competitive','8.0%'],['Technology','7.2%'],['Environmental','7.0%'],['Government','6.9%'],['Customer','6.7%']].map(([f,v]) => (
+                    <span key={f} className="inline-flex items-baseline gap-1.5">
+                      <span style={{ fontSize: 11.5, color: S.onSurfaceVariant }}>{f}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: S.onSurface, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{v}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
+                  Shown at default attenuation (admin-editable in the Config sheet). Timing: P10&ndash;P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo (fixed Beta concentration); per-iteration peak-year jitter (&plusmn;1yr) gives velocity bands their timing spread. Confidence is AI-scored display metadata &mdash; it does not drive the bands.
+                </div>
+              </div>
+              {/* F5 (2.10.0): publish what a 1–5 probability score means as a
+                  Beta prior — the scale deliberately shrinks against
+                  overconfidence (a "5" ≈ five-in-six, not certainty). */}
+              <div className="rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: S.surfaceLow }}>
+                <div className="text-[11px] font-bold mb-1.5" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>
+                  What a probability score means <span style={{ fontWeight: 400, color: S.mutedText }}>(1&ndash;5 &rarr; Beta prior; the sole stochastic driver)</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="text-[11.5px]" style={{ borderCollapse: 'collapse', fontFamily: MONO_FONT, minWidth: 300 }}>
+                    <thead>
+                      <tr style={{ color: S.mutedText }}>
+                        {['Score', 'Beta(α,β)', 'Mean', 'P10', 'P90'].map((h) => (
+                          <th key={h} style={{ textAlign: 'right', padding: '2px 10px 4px', fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody style={{ color: S.onSurface }}>
+                      {[['1','(1,5)','0.167','0.021','0.369'],['2','(2,4)','0.333','0.112','0.584'],['3','(3,3)','0.500','0.247','0.753'],['4','(4,2)','0.667','0.416','0.888'],['5','(5,1)','0.833','0.631','0.979']].map((row) => (
+                        <tr key={row[0]}>
+                          {row.map((v, i) => (
+                            <td key={i} style={{ textAlign: 'right', padding: '2px 10px' }}>{v}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
+                  The scale never reaches 0 or 1 &mdash; a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The band width comes from the fixed Beta concentration (&alpha;+&beta;=6).
+                </div>
+              </div>
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>What the model holds constant</div>
               {/* D16 (owner decision, June 2026) — exact owner wording. */}
@@ -2039,8 +2130,14 @@ const ProfitPoolAnalysis2: FC<{
           <strong>cumulative shift level vs 2025</strong> at that measurement year — i.e. the
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by
-          the engine. The Force and Region shares use the trend 0–5 ratings (category,
-          force/region exposure) and the Config-sheet dimension weights; the{' '}
+          the engine. <strong>Since 2.10.0 (F1) region also enters the shift math itself</strong>:
+          the engine solves a 3D category × region × year tensor (each trend weighted by
+          category exposure × regional exposure) and rolls the regional shifts up to the
+          category level by each region&rsquo;s GP1 share (the Region-weights above) — so a
+          regionally-concentrated trend only moves its regions&rsquo; slice of the pool. The
+          Region lens is therefore now shift-based, not attribution-only; the full 3D detail
+          is available in the region drill-down. The Force and Region shares use the trend
+          0–5 ratings (category, force/region exposure) and the Config-sheet dimension weights; the{' '}
           <strong>Value Chain lens is a categorical epicentre partition</strong> (2.9.0) —
           each trend's contribution is assigned wholly to the single stage where experts
           located its impact epicentre, with no per-step weights and no modelled

@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.9
+## Project Specification & Architecture — v3.10
 
 ---
 
@@ -16,6 +16,22 @@ PRISM operates on a **probabilistic profit pool shifting architecture**: directi
 - **Production simulation runs are CLI-only**: `python3 scripts/run_50k_prod.py` (scipy engine, 50k × 3 chains) computes offline and persists to Neon.
 - **The deployed service never simulates.** It is a read-only renderer of the latest persisted run; `POST /api/v1/simulate` refuses (409) on any runtime without scipy. Every data endpoint authenticates (httpOnly viewer cookie or Bearer JWT); `/health` and `/diagnostics` stay anonymous by design.
 - **Exact numerics only (D13)**: scipy is a hard engine requirement; the engine module refuses to import without it. There is no approximation fallback anywhere. Every result and persisted run carries `numerics_backend` (exact scipy/numpy versions) for the audit trail.
+
+### What Changed in v3.10 (vs. v3.9) — Mathematical Review Remediation, July 2026
+
+Executed against the owner-approved remediation of the 11-finding independent mathematical review (`PRISM_Model_Review_2026-07-11.docx`; decisions 2026-07-13). MODEL_VERSION bumped to **2.10.0**. **Numbers move** — golden pins regenerated in the same commit; **run the 50k CLI after deploying** so the persisted run matches 2.10.0.
+
+1. **F1 — the shift math is now REGIONAL (3D).** The engine solves a category × region × year tensor: each trend's contribution to a `(category, region)` cell is weighted by **both** `category_exposure/5` **and** `regional_exposure/5` (implemented as 48 composite cells = 12 categories × 4 regions, so the existing force-compounding machinery runs unchanged). Category/portfolio numbers are the **region-GP1-share-weighted roll-up** (`config.region_weights`). A globally-present trend (region exposure full everywhere) reproduces the pre-2.10 category number exactly — **only regional concentration moves the numbers** (regionally-concentrated headwinds/tailwinds are correctly diluted to their regions' slice of the pool). New `regional_shift_matrix` in the result contract; the Region lens is now **shift-based**, not attribution-only, with a category×region drill-down in `CategoryDetailPanel`. `region_weights` are now **load-bearing** and default to the **Henkel Group FY2025 regional sales split** (Europe 0.38 / North America 0.26 / Asia 0.17 / High Growth 0.19) as a documented, admin-editable proxy for the HCB GP1 mix (`DEFAULT_REGION_WEIGHTS` + `DEFAULT_REGION_WEIGHTS_SOURCE`). A region-less trend is treated as globally present with a `regional_exposure_coverage` integrity event. F1(i) documentation: the structural scale chain (force weight 1/6 × attenuation ≈ 7% pass-through) is on the record in the About-footer, the Config sheet, the model card and the QA Excel.
+2. **F2 — monotonic within-force dampening.** The count-based overlap dampening (`1 − ov·(n−1)/n`) is replaced by a magnitude-weighted **effective number** `n_eff = (Σm)²/Σm²` (participation ratio) over the deterministic mean contributions per (force, cell). Adding a negligible trend no longer worsens the outlook (the demonstrated dominance violation is fixed).
+3. **F4 — peak-year jitter.** Each iteration draws a per-trend peak-year offset (±1yr symmetric triangular, `config.peak_year_jitter`, default 1) so velocity/timing bands carry real "arrives a year earlier/later" content. Reproducible under seed.
+4. **F7 — chains pooled + MC standard error.** `run_multichain` now **pools** the 3 chains for the published percentiles (√3 noise cut); the vacuous i.i.d. split-R̂/ESS block is **deleted** and replaced by a per-quantile **`mc_standard_error`** (bootstrap, in pp). Seed stability keeps its per-chain terminal-year portfolio medians.
+5. **F9 — `force_attribution.direct_effects` deleted end-to-end** (engine block, persist call, API service/router carry-through, `api/client.ts`, `types/simulation.ts`). Dormant, numerically unstable near cancellation (±1,000× blow-ups), consumed by nothing. Old runs rehydrate tolerantly.
+6. **F10 — `totals.grand` deleted** (raw sum of 12 category medians, ≈12× the headline, unused; "sum of medians ≠ median of sum"). The portfolio band is the real portfolio quantity.
+7. **F11 — `start_year` wired + trigger sign + rename.** `start_year` now gates the materialization onset (0 before it; the diffusion curve ramps from `max(base_year, start_year)` to `peak_year`). The early-warning trigger comparison is **signed** (a positive overshoot no longer fires a contraction trigger). `probability_posterior` renamed **`probability_prior`** (there is no Bayesian update from data, T7) with a deprecated read-only alias; DB column name unchanged (no migration).
+8. **F6 — CLI pre-flight spectral gate.** `run_50k_prod.py` computes `correlation_lambda_min` on the **loaded** trend mix and refuses to run (exit 5) if non-PSD, unless `--allow-nonpsd`. Population-dependent validity can no longer slide past the PUT /config gate.
+9. **F3/F5/F8 — honesty documentation (no numbers move).** F3: P10–P90 comes from the Monte Carlo (fixed Beta concentration α+β=6); Confidence is AI-scored **display-only** metadata, not a band input (owner clarification — the mapping to band width was **not** adopted). F5: the score→Beta-prior table (1→0.17 … 5→0.83) is published in the Trends editor tooltip and the model card. F8: correlations documented as **latent-scale**; the [0,1] restriction (no negative dependence) recorded as a known limit.
+
+**Contract additions (2.10.0):** `regional_shift_matrix`, `region_weights_used`, `mc_standard_error`. **Removed:** `force_attribution`/`direct_effects`, `totals.grand`, the R̂/ESS `convergence` block. New config: `peak_year_jitter`, sourced `DEFAULT_REGION_WEIGHTS`.
 
 ### What Changed in v3.9 (vs. v3.8) — VC Epicentre Attribution, July 2026
 
@@ -139,7 +155,7 @@ stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1); 2.9.0 VC-epicentre partition (O5) |
+| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1); 2.9.0 VC-epicentre partition (O5); **2.10.0 3D regional shift (F1), n_eff dampening (F2), peak-year jitter (F4), chain pooling + MC-SE (F7), start_year onset (F11)** |
 | Continuous path modeling | **Production** | 5 MECE diffusion curves, 2026–2035, velocity per iteration |
 | Joint portfolio band + seed stability | **Production** | `totals.portfolio` (D3) + `seed_stability` (M2, re-added 2026-07-06 — populated from the first 2.8.1 run) |
 | Input-drift telemetry | **Production** | `pulse/audit/input_drift.py` (D19; L6/L7 coverage + severity, 2.8.1) |
@@ -196,29 +212,32 @@ LOCAL DEV: python -m pulse --serve (FastAPI :8000, SQLite data/prism.db)
 
 ### The Shift Matrix contract (per persisted run)
 
-`results` bundle: `shift_matrix` (per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), `decompositions` (force/vc/region attribution per year — the vc lens is an **epicentre partition** since 2.9.0), `totals` (row/column/grand + **`portfolio`** joint percentiles), `integrity_events`, `seed_stability` (2.8.1+; null on older runs), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `vc_attribution_basis` (2.9.0+; "epicentre"), `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff).
+`results` bundle: `shift_matrix` (category roll-up: per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), **`regional_shift_matrix`** (2.10.0/F1: the 3D category × region shift — per (category, region) a `path`+`velocity`), **`region_weights_used`** (the region GP1-share weights applied in the roll-up), `decompositions` (force/vc/region attribution per year — the vc lens is an **epicentre partition** since 2.9.0; region is also a real shift dimension since 2.10.0), `totals` (row/column + **`portfolio`** joint percentiles — **`grand` deleted, F10**), **`mc_standard_error`** (2.10.0/F7: per-quantile MC standard error, replaces the deleted R̂/ESS `convergence` block), `integrity_events`, `seed_stability` (2.8.1+; null on older runs; carries `pooled_iterations` since 2.10.0), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `vc_attribution_basis` (2.9.0+; "epicentre"), `region_weights_used` (2.10.0+), `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff). **`force_attribution` deleted end-to-end (F9).**
 
-Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)`.
+Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)` — the shift is the region-GP1-weighted roll-up; apply per (category, region) with `regional_shift_matrix` when regional € pools are available.
 
 ---
 
 ## 3. PYTHON ENGINE (`pulse/`)
 
-**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.9.0**)
-- Beta-distributed priors per trend (α, β from `probability_posterior`)
-- **Gaussian copula** over a trend-level correlation matrix built from `within_force_rho` + `force_correlation_matrix` (PSD-valid as entered, D1; repair events surface as integrity events and must NOT fire on defaults)
+**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.10.0**)
+- Beta-distributed priors per trend (α, β from `probability_prior` — renamed from `probability_posterior`, F11; there is no data update, T7)
+- **Gaussian copula** over a trend-level correlation matrix built from `within_force_rho` + `force_correlation_matrix` (PSD-valid as entered, D1; latent-scale, F8; repair events surface as integrity events and must NOT fire on defaults)
 - Hard scipy requirement; `NUMERICS_BACKEND` constant recorded in every result (D13)
-- Per-trend materialization schedules (peak_year × diffusion_curve), multiplicative compounding with per-force attenuation + within-force overlap dampening (zero-trend guard, D21)
+- **3D shift (F1, 2.10.0):** `_compute_all_paths_vectorized` solves 48 composite cells (12 categories × 4 regions); each trend weighted by `category_exposure/5 × regional_exposure/5`. `_simulate_samples` reshapes to (iter, cat, region, year) and rolls up to category via `_region_weight_vector()` (region GP1 shares). `run()` attaches `regional_shift_matrix` + `region_weights_used`; region-less trends → global + `regional_exposure_coverage` event
+- **Within-force dampening = magnitude-weighted `n_eff` participation ratio (F2)** (was count-based) — restores monotonicity; zero-cell guarded
+- Per-trend materialization schedules (**start_year onset gate, F11**; peak_year × diffusion_curve; **per-iteration peak-year jitter ±1yr, F4**), multiplicative compounding with per-force attenuation, factor floor at −100%
 - Quantile convention: `np.percentile` linear interpolation, engine-wide (D21)
-- `totals.portfolio` joint band (D3); `run_multichain` adds `seed_stability` (M2, owner re-ruling 2026-07-06) + `master_seed`/`chain_seeds` (L8)
+- `totals.portfolio` joint band (D3); **`run_multichain` POOLS the 3 chains for published percentiles (F7)** + `seed_stability` (per-chain medians; `pooled_iterations`) + `master_seed`/`chain_seeds` (L8); **`mc_standard_error`** replaces the deleted R̂/ESS `convergence` block
+- **`force_attribution.direct_effects` deleted (F9); `totals.grand` deleted (F10)**
 - **VC lens = categorical epicentre partition (2.9.0, O5):** one share computation (reused by `decompositions.vc` and the terminal-year `vc_decomposition`); each trend assigned wholly to `vc_epicentre_step_of(vc_exposure)`; no vc_weights; `vc_epicentre_coverage`/`vc_attribution_fallback` integrity events; result carries `vc_attribution_basis`
-- 10,000 iterations default; 50,000 × 3 chains in production runs
+- 10,000 iterations default; 50,000 × 3 chains (pooled → 150k) in production runs
 
 **simulation/paths.py** — diffusion curves, velocity/acceleration, trigger primitives (PRODUCTION)
 
 **audit/input_drift.py** — D19 fingerprint + drift-event computation (PRODUCTION); **audit/logger.py** — transactional audit log
 
-**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), **`vc_epicentre_of`/`vc_epicentre_step_of`** (2.9.0 — engine-side twin of the frontend's `epicentreOf`, parity-pinned), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid; `DEFAULT_VC_WEIGHTS` deleted 2.9.0), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21)
+**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), **`vc_epicentre_of`/`vc_epicentre_step_of`** (2.9.0 — engine-side twin of the frontend's `epicentreOf`, parity-pinned), `compute_materialization_schedule` (**start_year onset param, F11**), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid; **`DEFAULT_REGION_WEIGHTS` = Henkel Group FY2025 split proxy + `DEFAULT_REGION_WEIGHTS_SOURCE`, load-bearing since F1; `peak_year_jitter` F4**; `DEFAULT_VC_WEIGHTS` deleted 2.9.0), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21; the CLI pre-flight gate in `run_50k_prod.py` runs it on the loaded trend mix, F6)
 
 **database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — 99-trend seed; **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips). Legacy-schema cleanup: `scripts/migrate_drop_delphi.py` (O1) + `scripts/migrate_drop_legacy.py` (O3/O4), both `--postgres`-gated
 
@@ -335,7 +354,7 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 | Risk | Mitigation |
 |------|------------|
-| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.9.0 until the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate); until then the footer reads "profile-weighted (pre-2.9 run)" for the VC basis (and "not recorded" for seed stability if the run also predates 2.8.1) |
+| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.10.0 until the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate). Until then the dashboard renders the pre-2.10 run: **no `regional_shift_matrix` (region drill-down shows "pre-2.10 run — re-run the engine"), category numbers are still the old non-regional values, `mc_standard_error` absent**. The 2.10.0 numbers move (regional roll-up dilutes regionally-concentrated trends) — expect the portfolio magnitude to change on the first 2.10.0 run |
 | No predictive validation (accepted, D9) | Position as structured judgment; revisit at first board citation |
 | One-sided trend grammar understates uncertainty (accepted, D15) | Disclosed; bands labeled as listed-trend magnitude uncertainty |
 | Neon connection limits / cold starts | Pooled connections, lazy init retry, SQLite locally |
@@ -344,7 +363,7 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 ---
 
-*Document Version: 3.9 — July 2026 (VC epicentre attribution O5; MODEL_VERSION 2.9.0)*
+*Document Version: 3.10 — July 2026 (Mathematical review remediation F1–F11; MODEL_VERSION 2.10.0)*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Beta-shaped structured-judgment priors (set from analyst 1–5 scores — magnitude-uncertainty only, NOT updated from data; T7 June 2026) + Gaussian copula dependencies + structured-judgment overlap correction + input-drift telemetry. Ceteris paribus: the engine holds strategy constant; strategic response belongs to the reader.*

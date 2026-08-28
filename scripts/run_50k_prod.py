@@ -25,6 +25,10 @@ Exit codes (H2, July 2026 review — cron/operators must see failures):
        show the previous run; nothing was written
     4  wrong database mode (Postgres URL set but SQLite fallback active —
        usually a missing psycopg2; H1) and --allow-sqlite not passed
+    5  correlation matrix not positive semi-definite on the LOADED trend mix
+       (F6 pre-flight spectral gate) and --allow-nonpsd not passed — the
+       engine would silently repair it at runtime, making configured ≠
+       effective correlations. Lower the cross-force correlations or override.
 """
 
 from __future__ import annotations
@@ -69,6 +73,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-sqlite", action="store_true",
                         help="permit running against the local SQLite fallback "
                              "(testing only — NEVER for a production run)")
+    parser.add_argument("--allow-nonpsd", action="store_true",
+                        help="override the F6 pre-flight spectral gate and run "
+                             "even if the correlation matrix is not PSD on the "
+                             "loaded trend mix (the engine will repair it at "
+                             "runtime — configured ≠ effective correlations)")
     args = parser.parse_args(argv)
 
     db_url = os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL")
@@ -127,6 +136,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     log.info("      Horizon: %s – %s", config.path_years[0], config.path_years[-1])
 
+    # ── 2b) F6 pre-flight spectral gate ──────────────────────────────
+    # Correlation PSD validity is population-dependent: the defaults are valid
+    # on the 99-trend base but adding trends to one force can flip the minimum
+    # eigenvalue negative. The PUT /config spectral gate does NOT re-run on
+    # trend add/delete, so a run could ship with a matrix the engine silently
+    # repairs at runtime (rescaling ALL correlations → configured ≠ effective).
+    # For a production run, refuse rather than repair.
+    from pulse.config_validation import correlation_lambda_min
+    lam_min = correlation_lambda_min(
+        config.force_correlation_matrix, config.within_force_rho,
+        [t.force for t in trend_db.trends],
+    )
+    log.info("[2b/5] Correlation pre-flight: min eigenvalue on the loaded "
+             "%d-trend mix = %+.4f", len(trend_db.trends), lam_min)
+    if lam_min < 0 and not args.allow_nonpsd:
+        log.error("Correlation matrix is NOT positive semi-definite on the "
+                  "loaded trend mix (min eigenvalue %+.4f). The engine would "
+                  "repair it at runtime, making configured ≠ effective "
+                  "correlations (audit F-01/F6).", lam_min)
+        log.error("Lower the cross-force correlations in Config, or pass "
+                  "--allow-nonpsd to run with runtime repair anyway.")
+        return 5
+    if lam_min < 0:
+        log.warning("Running with a non-PSD correlation matrix (--allow-nonpsd) "
+                    "— the engine will repair it and emit an integrity event.")
+
     # ── 3) Run multichain MC ─────────────────────────────────────────
     log.info("[3/5] Running Bayesian Monte Carlo (2–6 minutes at 3 × 50k)…")
     t0 = datetime.now()
@@ -136,9 +171,15 @@ def main(argv: list[str] | None = None) -> int:
     elapsed = (datetime.now() - t0).total_seconds()
     log.info("      Done in %.1fs", elapsed)
 
-    converged = sum(1 for v in result["convergence"].values() if v.get("converged"))
-    total_cats = len(result["convergence"])
-    log.info("      Convergence: %d/%d categories R̂ < 1.05", converged, total_cats)
+    # F7 (2.10.0): the vacuous R̂/ESS convergence log is replaced by the
+    # honest Monte-Carlo standard error of the published quantiles.
+    mc_se = result.get("mc_standard_error") or {}
+    if mc_se:
+        worst = max((v.get("median_se_pp", 0.0) for v in mc_se.values()), default=0.0)
+        log.info("      MC standard error (terminal-year median): worst-category "
+                 "%.4f pp across %d categories (pooled %s iterations)",
+                 worst, len(mc_se),
+                 (result.get("seed_stability") or {}).get("pooled_iterations", "?"))
     stability = result.get("seed_stability") or {}
     if stability:
         log.info("      Seed stability: terminal-year portfolio median spread "
@@ -175,9 +216,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         results_bundle = {
             "shift_matrix": result.get("shift_matrix"),
+            # F1 (2.10.0): the 3D category × region shift matrix + the region
+            # GP1-share weights actually applied in the category/portfolio roll-up.
+            "regional_shift_matrix": result.get("regional_shift_matrix"),
+            "region_weights_used": result.get("region_weights_used"),
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
+            # F7 (2.10.0): per-quantile Monte-Carlo standard error (replaces the
+            # vacuous i.i.d. split-R̂/ESS block).
+            "mc_standard_error": result.get("mc_standard_error"),
             # D19: integrity events (incl. input drift) + seed stability
             # persist with the run so the read-only dashboard can show them.
             "integrity_events": result.get("integrity_events", []),
@@ -199,6 +247,8 @@ def main(argv: list[str] | None = None) -> int:
                 # Pre-2.9 runs carry no tag; the dashboard labels those
                 # "profile-weighted (pre-2.9 run)".
                 "vc_attribution_basis": result.get("vc_attribution_basis"),
+                # 2.10.0 (F1): region GP1-share weights applied in the roll-up.
+                "region_weights_used": result.get("region_weights_used"),
                 "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
                 # D19: fingerprint of THIS run's inputs — next run diffs itself
                 # against it.
@@ -209,8 +259,10 @@ def main(argv: list[str] | None = None) -> int:
             iterations=config.iterations,
             model_type="bayesian_copula_multichain",
             results=results_bundle,
-            force_attribution=result.get("force_attribution"),
-            convergence_diagnostics=result.get("convergence"),
+            # F9 (2.10.0): force_attribution deleted; F7: MC standard error
+            # travels in the results bundle, not the convergence column.
+            force_attribution=None,
+            convergence_diagnostics=None,
         )
         log.info("      Saved simulation_run id=%s", run_id)
     except Exception as e:

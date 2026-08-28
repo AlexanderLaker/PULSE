@@ -77,8 +77,16 @@ def main():
     # ── Step 1: Load Trend Database ─────────────────────────────────
     print("[1/5] Loading trend database...")
     try:
-        from pulse.seed_trends import load_trend_database
-        db = load_trend_database()
+        # Load from the DB; if empty (fresh local SQLite), seed the 99-trend base.
+        from pulse.database import load_trends, init_db, save_trends
+        from pulse.config import CATEGORIES, FORCES
+        from pulse.ingestion.models import TrendDatabase
+        trends = load_trends()
+        if not trends:
+            from pulse.seed_trends import TRENDS
+            init_db(); save_trends(TRENDS)
+            trends = load_trends()
+        db = TrendDatabase(trends=trends, categories=CATEGORIES, forces=FORCES)
         print(f"      {len(db.trends)} trends, {len(db.categories)} categories, {len(db.forces)} forces")
     except Exception as e:
         print(f"ERROR loading trend database: {e}")
@@ -137,13 +145,18 @@ def main():
         mc_engine = BayesianMonteCarloEngine(config, seed=args.seed)
         mc_result = mc_engine.run_multichain(db, n_chains=3, iterations=config.iterations)
         mc_result["seed"] = args.seed
-        print(f"      Multichain convergence method: {mc_result['convergence'].get(list(mc_result['convergence'].keys())[0], {}).get('method', 'unknown')}")
 
-    # Convergence report
-    converged = sum(1 for v in mc_result["convergence"].values() if v["converged"])
-    total = len(mc_result["convergence"])
-    n_chains = mc_result.get("n_chains", 1)
-    print(f"      Convergence: {converged}/{total} categories (R̂ < 1.05, n_chains={n_chains})")
+    # F7 (2.10.0): the vacuous R̂/ESS convergence block was removed — report the
+    # honest MC standard error + seed stability instead.
+    mc_se = mc_result.get("mc_standard_error") or {}
+    if mc_se:
+        worst = max((v.get("median_se_pp", 0.0) for v in mc_se.values()), default=0.0)
+        print(f"      MC standard error (terminal-year median): worst-category {worst:.4f} pp "
+              f"across {len(mc_se)} categories")
+    ss = mc_result.get("seed_stability") or {}
+    if ss:
+        print(f"      Seed stability: {ss.get('spread_pp', 0.0):.4f} pp across "
+              f"{ss.get('n_chains', '?')} chains (pooled {ss.get('pooled_iterations', '?')} iters)")
 
     allocation = None  # optimizer removed (D4, June 2026)
 

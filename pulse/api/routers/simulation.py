@@ -58,7 +58,13 @@ async def get_simulation(user: dict = Depends(require_auth)):
         raise HTTPException(404, "No simulation results. Run a simulation first.")
     return _sanitize({
         "shift_matrix": mc["shift_matrix"],
+        # F1 (2.10.0): the 3D category × region shift + the region GP1-share
+        # weights actually applied in the roll-up.
+        "regional_shift_matrix": mc.get("regional_shift_matrix"),
+        "region_weights_used": mc.get("region_weights_used"),
         "convergence": _summarize_convergence(mc.get("convergence", {})),
+        # F7 (2.10.0): per-quantile Monte-Carlo standard error (replaces R̂/ESS).
+        "mc_standard_error": mc.get("mc_standard_error"),
         "iterations": mc.get("iterations", 5000),
         "model_type": mc.get("model_type", "bayesian_copula"),
         "vc_decomposition": mc.get("vc_decomposition"),
@@ -208,9 +214,14 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             from datetime import datetime, timezone
             results_bundle = {
                 "shift_matrix": mc_result.get("shift_matrix"),
+                # F1: 3D regional shift + weights used in the roll-up.
+                "regional_shift_matrix": mc_result.get("regional_shift_matrix"),
+                "region_weights_used": mc_result.get("region_weights_used"),
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
+                # F7: per-quantile MC standard error (replaces R̂/ESS).
+                "mc_standard_error": mc_result.get("mc_standard_error"),
                 # D19/D3: persist integrity events + seed stability with the run
                 "integrity_events": mc_result.get("integrity_events", []),
                 "seed_stability": mc_result.get("seed_stability"),
@@ -223,6 +234,9 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                     "chains": mc_result.get("n_chains"),
                     "model_version": mc_result.get("model_version"),
                     "engine_name": mc_result.get("engine_name"),
+                    # 2.9.0 VC basis + 2.10.0 region weights on the audit trail.
+                    "vc_attribution_basis": mc_result.get("vc_attribution_basis"),
+                    "region_weights_used": mc_result.get("region_weights_used"),
                     "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
                     # D19: fingerprint of THIS run's inputs for the next diff
                     "trend_fingerprint": current_fp,
@@ -232,8 +246,11 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 iterations=req.iterations,
                 model_type="bayesian_copula",
                 results=_sanitize(results_bundle),
-                force_attribution=_sanitize(mc_result.get("force_attribution")),
-                    convergence_diagnostics=_sanitize(mc_result.get("convergence")),
+                # F9: force_attribution deleted — persist None (the column stays
+                # for tolerant rehydration of old runs). F7: the MC standard
+                # error travels in the results bundle, not the convergence column.
+                force_attribution=None,
+                convergence_diagnostics=None,
             )
             # Refresh the in-memory run_meta so GET /simulation immediately
             # describes THIS run (previously it kept showing the prior run's
@@ -259,7 +276,9 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
 
         return _sanitize({
             "shift_matrix": mc_result["shift_matrix"],
-            "convergence": _summarize_convergence(mc_result.get("convergence", {})),
+            "regional_shift_matrix": mc_result.get("regional_shift_matrix"),
+            "region_weights_used": mc_result.get("region_weights_used"),
+            "mc_standard_error": mc_result.get("mc_standard_error"),
             "iterations": mc_result["iterations"],
             "model_type": mc_result["model_type"],
             "competitive": _state.get("competitive"),

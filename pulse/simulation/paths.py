@@ -37,12 +37,21 @@ class TriggerCondition:
 
         if self.condition_type == "shift_exceeds":
             median_val = year_data.get("median", year_data) if isinstance(year_data, dict) else year_data
-            if abs(median_val) >= abs(self.threshold):
+            # F11 (2.10.0): the comparison is now SIGNED. The old
+            # `abs(median) >= abs(threshold)` was sign-blind, so a positive
+            # overshoot could fire a contraction (negative-threshold) trigger
+            # and vice-versa. A trigger fires only when the shift breaches its
+            # threshold IN THE THRESHOLD'S OWN DIRECTION: a contraction trigger
+            # (threshold < 0) fires when median ≤ threshold; an expansion
+            # trigger (threshold > 0) fires when median ≥ threshold.
+            fired = (median_val <= self.threshold) if self.threshold < 0 \
+                else (median_val >= self.threshold)
+            if fired:
                 return TriggerAlert(
                     trigger=self,
                     actual_value=median_val,
                     message=f"TRIGGER: {self.category} shift ({median_val:.1%}) "
-                            f"exceeds threshold ({self.threshold:.1%}) by {self.target_year}. "
+                            f"breached threshold ({self.threshold:.1%}) by {self.target_year}. "
                             f"Action: {self.action_text}"
                 )
         return None

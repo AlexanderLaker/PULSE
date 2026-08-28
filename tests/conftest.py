@@ -4,8 +4,19 @@ import pytest
 import numpy as np
 from datetime import datetime
 
-from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS
+from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS, REGIONS
 from pulse.ingestion.models import Trend, TrendDatabase
+
+
+def _reg(europe: int, na: int, asia: int, high_growth: int) -> dict:
+    """Regional exposure profile (0–5 per region), REGIONS order (2.10.0, F1).
+
+    The engine's shift math is now 3D (category × region × year): a trend hits
+    a (category, region) cell weighted by region_exposure/5. The fixture trends
+    carry DISTINCT regional profiles so the golden pins exercise the region
+    roll-up (and no ``regional_exposure_coverage`` integrity event fires).
+    """
+    return dict(zip(REGIONS, (europe, na, asia, high_growth)))
 
 
 def _canonical_vc(stage: int) -> dict:
@@ -50,6 +61,7 @@ def mock_trend() -> Trend:
         trend.category_exposure[cat] = 2 if "Hair" in cat else 1
     for vc in VC_STEPS:
         trend.vc_exposure[vc] = 2
+    trend.regional_exposure = _reg(5, 3, 2, 2)
     return trend
 
 
@@ -87,6 +99,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     # exercised). vc_exposure feeds ONLY the VC attribution lens — never
     # the shift math — so these assignments leave the golden pins intact.
     consumer_trend.vc_exposure = _canonical_vc(6)   # epicentre: Marketing
+    consumer_trend.regional_exposure = _reg(5, 3, 2, 2)   # Europe-heavy
     trends.append(consumer_trend)
 
     # Government force — carries a per-trend materialization schedule
@@ -108,6 +121,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     for cat in CATEGORIES:
         gov_trend.category_exposure[cat] = 2 if "Body" in cat or "Styling" in cat else 3
     gov_trend.vc_exposure = _canonical_vc(2)        # epicentre: Formulation
+    gov_trend.regional_exposure = _reg(5, 4, 1, 2)  # EU regulatory, low Asia
     trends.append(gov_trend)
 
     # Technology force
@@ -125,6 +139,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     for cat in CATEGORIES:
         tech_trend.category_exposure[cat] = 2
     tech_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial
+    tech_trend.regional_exposure = _reg(3, 5, 4, 2)  # NA/Asia tech-led
     trends.append(tech_trend)
 
     # Environmental force
@@ -142,6 +157,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     for cat in CATEGORIES:
         env_trend.category_exposure[cat] = 2
     env_trend.vc_exposure = _canonical_vc(3)        # epicentre: Manufacturing
+    env_trend.regional_exposure = _reg(4, 3, 3, 4)  # broad, High-Growth tilt
     trends.append(env_trend)
 
     # Competitive force
@@ -159,6 +175,7 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     for cat in CATEGORIES:
         comp_trend.category_exposure[cat] = 3
     comp_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial (collides with tech)
+    comp_trend.regional_exposure = _reg(5, 2, 2, 1)  # Europe PL pressure
     trends.append(comp_trend)
 
     db = TrendDatabase(
@@ -186,6 +203,11 @@ def mock_model_config() -> ModelConfig:
         base_year=2025,
         path_years=[2026, 2027, 2028, 2029, 2030],
         iterations=1000,
+        # F4 (2.10.0): pin the golden fixture with jitter OFF so the pins are
+        # the pure deterministic-schedule compounding result (stable across
+        # numpy RNG versions). Peak-year jitter has its own dedicated test;
+        # production runs use the ModelConfig default (peak_year_jitter=1).
+        peak_year_jitter=0,
     )
     return config
 

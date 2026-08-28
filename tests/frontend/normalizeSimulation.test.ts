@@ -27,8 +27,10 @@ describe('normalizeSimulation', () => {
   it('is idempotent: normalize(normalize(x)) === normalize(x) structurally', () => {
     const once = normalizeSimulation({
       shift_matrix: { 'Hair: Color': { path: { 2030: cell } } },
+      regional_shift_matrix: { 'Hair: Color': { Europe: { path: { 2030: cell } } } },
+      region_weights_used: { Europe: 0.38, 'North America': 0.26, Asia: 0.17, 'High Growth': 0.19 },
       decompositions: { force: {} },
-      totals: { grand: {} },
+      totals: { portfolio: {} },
     });
     const twice = normalizeSimulation(once);
     expect(twice).toEqual(once);

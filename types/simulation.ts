@@ -46,22 +46,28 @@ export interface TriggerStatus {
   fired_date?: string;
 }
 
-/** Force attribution: how forces drive category shifts. */
-export interface ForceAttribution {
-  direct_effects?: Record<string, number>;
+// (F9, 2.10.0: ForceAttribution / force_attribution deleted — the dormant,
+//  numerically-unstable direct_effects block that no consumer read. The
+//  shipped Force lens is decompositions.force.)
+
+/** F7 (2.10.0): per-quantile Monte-Carlo standard error at the terminal year,
+ *  per category (in percentage points). Replaces the vacuous i.i.d. split-R̂/
+ *  ESS "convergence" block. Measures sampling noise only — ≈0.001 pp at 50k. */
+export interface McStandardError {
+  median_se_pp: number;
+  p10_se_pp: number;
+  p90_se_pp: number;
+  terminal_year: number;
+  n: number;
+  method: string;
 }
 
-/** Per-category MC diagnostics (detail only).
- *  T2 (June 2026): the synthetic top-level R̂ / "converged" headline badge was
- *  removed — R̂ on i.i.d. MC draws is ≈1.0 by construction and could never
- *  fail, so it is no longer surfaced. Per-category detail remains under
- *  `categories`. */
-export interface ConvergenceDiagnostics {
-  categories?: Record<string, { ess?: number; converged?: boolean }>;
-  ess?: number;
-  iterations?: number;
-  model_type?: ModelType;
-}
+/** F1 (2.10.0): the 3D regional shift — per category, per region, a percentile
+ *  path (+ velocity), the same cell shape as ShiftMatrix entries. */
+export type RegionalShiftMatrix = Record<string, Record<string, {
+  path: ShiftPath;
+  velocity?: Record<string, { median: number; p10?: number; p90?: number }>;
+}>>;
 
 /**
  * Per-year Decomposition Matrix — backend-computed (bayesian_mc v2.5+).
@@ -98,8 +104,9 @@ export interface TotalsMatrix {
   by_force:      Record<string, Record<string, number>>;         // year → force → total
   by_vc:         Record<string, Record<string, number>>;         // year → vc_step → total
   by_region:     Record<string, Record<string, number>>;         // year → region → total
-  /** Grand total per year (sum of category row totals; same as sum of any lens's column totals). */
-  grand:         Record<string, number>;                         // year → total
+  // (F10, 2.10.0: `grand` deleted — a raw SUM of the 12 category medians,
+  //  ≈12× the headline, unused, and "sum of medians ≠ median of sum". Use
+  //  `portfolio` below, the real per-iteration portfolio quantity.)
   /**
    * Joint portfolio percentiles (D3 / audit F-16, June 2026): true joint
    * band of the category-weighted portfolio shift, computed per iteration
@@ -167,6 +174,8 @@ export interface RunMeta {
    *  stage). Null/absent on pre-2.9 runs, which used profile×weight shares
    *  — the About-footer labels those "profile-weighted (pre-2.9 run)". */
   vc_attribution_basis?: string | null;
+  /** 2.10.0 (F1): the region GP1-share weights applied in the roll-up. */
+  region_weights_used?: Record<string, number> | null;
   converged_categories?: number | null;
   total_categories?: number | null;
   persisted_at_utc?: string | null;
@@ -175,12 +184,16 @@ export interface RunMeta {
 /** Full simulation result from POST /simulate. */
 export interface SimulationResult {
   shifts: ShiftMatrix;
-  force_attribution?: CategoryRecord<ForceAttribution>;
+  /** F1 (2.10.0): the 3D category × region shift + the region GP1-share weights
+   *  actually applied in the category/portfolio roll-up. */
+  regional_shift_matrix?: RegionalShiftMatrix;
+  region_weights_used?: Record<string, number>;
   /** Per-year Force/VC/Region decompositions — source of truth for the Shift-Matrix lenses. */
   decompositions?: DecompositionMatrix;
-  /** Per-year row/column/grand totals — matching the decompositions. */
+  /** Per-year row/column totals + the joint portfolio band. */
   totals?: TotalsMatrix;
-  convergence?: ConvergenceDiagnostics;
+  /** F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS convergence). */
+  mc_standard_error?: Record<string, McStandardError>;
   scenario?: ScenarioId;
   generated?: string;
   model_version?: string;

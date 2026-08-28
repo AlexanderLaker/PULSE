@@ -1,9 +1,10 @@
 """Shift Matrix Excel writer — exports PRISM results to Excel.
 
-Writes continuous path shift matrices with percentile distributions,
-force attribution and velocity data. All values are percentages — no
-financial data. (The allocation sheet was removed with the optimizer,
-D4 June 2026.)
+Writes continuous-path shift matrices with percentile distributions, the 3D
+regional shift matrix (F1, 2.10.0) and velocity data. All values are
+percentages — no financial data. (The allocation sheet was removed with the
+optimizer, D4 June 2026; force_attribution.direct_effects was deleted, F9
+2.10.0.)
 """
 
 import logging
@@ -52,13 +53,16 @@ class ShiftMatrixWriter:
         """
         wb = openpyxl.Workbook()
 
-        # Sheet 1: Shift Matrix
+        # Sheet 1: Shift Matrix (category roll-up)
         self._write_shift_matrix(wb, mc_result)
 
-        # Sheet 2: Velocity & Triggers
+        # Sheet 2: Regional Shift (F1, 2.10.0 — the 3D category × region matrix)
+        self._write_regional(wb, mc_result)
+
+        # Sheet 3: Velocity & Triggers
         self._write_velocity(wb, mc_result)
 
-        # Sheet 3: Metadata
+        # Sheet 4: Metadata
         self._write_metadata(wb, mc_result, metadata)
 
         # Remove default sheet if extra sheets were created
@@ -135,6 +139,55 @@ class ShiftMatrixWriter:
         for c in range(1, col):
             ws.column_dimensions[get_column_letter(c)].width = 12
         ws.column_dimensions["A"].width = 18
+
+    def _write_regional(self, wb, mc_result):
+        """F1 (2.10.0): the 3D shift resolved by (category, region), median per
+        year. Rows are category × region; a globally-present trend reproduces
+        the category number, so a region's row shows where the shift concentrates.
+        """
+        from pulse.config import REGIONS
+        ws = wb.create_sheet("Regional Shift")
+        rsm = mc_result.get("regional_shift_matrix", {})
+        weights = mc_result.get("region_weights_used", {})
+
+        ws.cell(row=1, column=1, value="Category").font = HEADER_FONT
+        ws.cell(row=1, column=1).fill = HEADER_FILL
+        ws.cell(row=1, column=2, value="Region (GP1 wt)").font = HEADER_FONT
+        ws.cell(row=1, column=2).fill = HEADER_FILL
+        for j, year in enumerate(self.config.path_years, 3):
+            c = ws.cell(row=1, column=j, value=str(year))
+            c.font = HEADER_FONT; c.fill = HEADER_FILL
+            c.alignment = Alignment(horizontal="center")
+
+        row = 2
+        for cat in self.config.category_names:
+            by_region = rsm.get(cat, {})
+            for region in REGIONS:
+                wt = weights.get(region)
+                label = f"{region}" + (f" ({wt*100:.0f}%)" if isinstance(wt, (int, float)) else "")
+                ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", size=9)
+                ws.cell(row=row, column=2, value=label).font = Font(name="Inter", size=9)
+                path = (by_region.get(region, {}) or {}).get("path", {})
+                for j, year in enumerate(self.config.path_years, 3):
+                    yd = path.get(year, {}) or path.get(str(year), {})
+                    val = yd.get("median", 0.0) if isinstance(yd, dict) else 0.0
+                    cell = ws.cell(row=row, column=j, value=round(val, 6))
+                    cell.number_format = "0.00%"
+                    cell.font = DATA_FONT
+                    cell.alignment = Alignment(horizontal="center")
+                    cell.border = BORDER
+                    if val > 0.005:
+                        cell.fill = EXPANSION_FILL
+                    elif val < -0.005:
+                        cell.fill = CONTRACTION_FILL
+                    else:
+                        cell.fill = NEUTRAL_FILL
+                row += 1
+
+        ws.column_dimensions["A"].width = 18
+        ws.column_dimensions["B"].width = 20
+        for c in range(3, 3 + len(self.config.path_years)):
+            ws.column_dimensions[get_column_letter(c)].width = 11
 
     def _write_velocity(self, wb, mc_result):
         """Write velocity and trigger analysis."""
@@ -231,6 +284,30 @@ class ShiftMatrixWriter:
             ("VC ATTRIBUTION", "Epicentre partition: each trend's contribution is assigned"),
             ("", "wholly to the value-chain stage where experts located its impact"),
             ("", "epicentre. Propagation up/down the chain is not modelled."),
+            ("", ""),
+            # F1 (2.10.0): the structural scale chain + the regional roll-up.
+            ("SCALE (F1)", "Structural pass-through per force = force weight (1/6) x attenuation"),
+            ("", "(~0.40-0.50) ~= 7%. A near-certain trend touching 20% of a category's"),
+            ("", "GP1 moves it ~1.4% at full materialization, not 20% — read cells as a"),
+            ("", "conservative, comparable index and apply with GP1_proj = GP1 x (1+shift)."),
+            ("REGIONAL (F1)", "The shift math is 3D (category x region x year): a trend hits a"),
+            ("", "(category, region) cell weighted by category exposure x regional exposure."),
+            ("", "Category numbers are the region-GP1-weighted roll-up (see Region weights);"),
+            ("", "a regionally-concentrated trend only moves its regions' slice of the pool."),
+            ("REGION WEIGHTS", ", ".join(
+                f"{r} {w*100:.0f}%" for r, w in (mc_result.get("region_weights_used") or {}).items()
+            ) or "equal (fallback)"),
+            ("", "Proxy: Henkel Group FY2025 regional sales split (HCB not disclosed by region)."),
+            ("", ""),
+            # F4/F5 (2.10.0): timing uncertainty + the probability-score meaning.
+            ("TIMING (F4)", "P10-P90 bands are magnitude uncertainty (fixed Beta concentration"),
+            ("", "a+b=6). Per-iteration peak-year jitter (+/-1yr triangular) gives the"),
+            ("", "velocity bands their timing content. start_year gates the onset (F11)."),
+            ("SCORE->PRIOR (F5)", "1->0.17  2->0.33  3->0.50  4->0.67  5->0.83 (Beta mean = score/6;"),
+            ("", "deliberate shrinkage vs overconfidence — a '5' is five-in-six, not certainty)."),
+            # F8 (2.10.0): copula scale.
+            ("COPULA (F8)", "Configured correlations are LATENT-scale (co-movement of the underlying"),
+            ("", "drivers); realized score-score correlation is slightly lower (~0.28 at 0.30)."),
             ("", ""),
             ("SECURITY NOTE", "This file contains ONLY percentage shifts."),
             ("", "No company financial data (NES, GP1, GP2) is present."),
