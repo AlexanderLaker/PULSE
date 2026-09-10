@@ -181,7 +181,6 @@ Engine is **2.11.0**, and one version number is enforced everywhere: `pulse.__ve
 **DX backlog (known and deliberate — not regressions):**
 
 1. Replace the trend base and run the first 2.11.0 production run (§5, in that order) — until then the dashboard serves the last pre-2.11 run, honestly labeled. Load the actual cell weights (`--cell-weights FILE`) when finance provides the category × region gross-profit shares.
-1a. Decide F-29 (`docs/governance/FINDINGS_REGISTER.md`): on Postgres every admin edit cascade-deletes that trend's expert proposals because `save_trends` deletes and re-inserts the row; the replacement script works around it, the product code does not yet.
 2. Run the two legacy-cleanup migrations once against prod, AFTER the first deploy of this code: `python3 scripts/migrate_drop_delphi.py --postgres` (O1) and `python3 scripts/migrate_drop_legacy.py --postgres` (O3/O4). Both are archive-first, idempotent, and already executed against the local DB.
 3. Burn down the react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
 4. Consider splitting the largest dashboard components (`Trends2.tsx` is the biggest) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).

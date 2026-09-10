@@ -618,9 +618,41 @@ def init_db() -> None:
 
 # ── TRENDS ──────────────────────────────────────────────────────────────
 
+# Columns of `trends` that save_trends writes, in statement order. The id is
+# the conflict target of the upsert below; every other column is overwritten
+# from the incoming object, so a save is a complete replacement of the row's
+# content without the row ever ceasing to exist (F-29).
+_TREND_WRITE_COLUMNS = (
+    "id", "force", "sub_category", "name", "description", "direction",
+    "probability", "start_year", "normalized_score",
+    "strategic_implication", "data_source", "source_type", "confidence",
+    "ai_suggested", "user_override", "probability_posterior",
+    "gp1_pct_affected", "peak_year", "diffusion_curve", "ai_suggestion",
+    "uncertainty",
+)
+
+
 def save_trends(trends: List[Trend]) -> None:
-    """Save trends to database, replacing any existing trends with same IDs."""
+    """Save trends to database, replacing the content of any trend with the same ID.
+
+    F-29 (September 2026): the trend row is UPSERTED, never deleted and
+    re-inserted. `trend_score_proposals` references `trends(id)` with ON
+    DELETE CASCADE, so the old delete-then-insert silently destroyed every
+    expert proposal on a trend each time an admin edited it (PUT
+    /api/v1/trends/{id}, Review & Endorse, sync, reseed, revert). Postgres
+    enforces the cascade, SQLite does not by default, so it never showed
+    locally. Proposals must only disappear when a trend is genuinely deleted
+    (DELETE /api/v1/trends/{id}, or the retired ids in
+    scripts/replace_trend_base.py), which still cascades as intended.
+
+    The four derived child tables (category, VC and regional exposure, and
+    sources) are rewritten from the incoming object on every save, so they
+    keep their delete-then-insert. `created_at` survives an edit;
+    `updated_at` is refreshed.
+    """
     p = placeholder()
+    cols = ", ".join(_TREND_WRITE_COLUMNS)
+    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in _TREND_WRITE_COLUMNS if c != "id")
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
@@ -629,18 +661,13 @@ def save_trends(trends: List[Trend]) -> None:
             cursor.execute(f"DELETE FROM trend_category_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_vc_exposure WHERE trend_id = {p}", (trend.id,))
             cursor.execute(f"DELETE FROM trend_regional_exposure WHERE trend_id = {p}", (trend.id,))
-            cursor.execute(f"DELETE FROM trends WHERE id = {p}", (trend.id,))
 
             cursor.execute(
                 f"""
-                INSERT INTO trends (
-                    id, force, sub_category, name, description, direction,
-                    probability, start_year, normalized_score,
-                    strategic_implication, data_source, source_type, confidence,
-                    ai_suggested, user_override, probability_posterior,
-                    gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion,
-                    uncertainty
-                ) VALUES ({ph(21)})
+                INSERT INTO trends ({cols}) VALUES ({ph(21)})
+                ON CONFLICT (id) DO UPDATE SET
+                    {updates},
+                    updated_at = CURRENT_TIMESTAMP
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -658,9 +685,10 @@ def save_trends(trends: List[Trend]) -> None:
                     getattr(trend, 'peak_year', 0),
                     getattr(trend, 'diffusion_curve', 's_curve'),
                     # ai_suggestion: immutable AI baseline snapshot (June 2026
-                    # proposals layer). Carried through delete-then-insert so an
-                    # admin edit or endorsement never erases the baseline. None
-                    # for legacy trends until scripts/backfill_ai_suggestion.py runs.
+                    # proposals layer). Written on every save from the incoming
+                    # object, so an admin edit or endorsement never erases the
+                    # baseline. None for legacy trends until
+                    # scripts/backfill_ai_suggestion.py runs.
                     (_safe_dumps(getattr(trend, 'ai_suggestion', None))
                      if getattr(trend, 'ai_suggestion', None) else None),
                     # 2.11.0 (O7): uncertainty score, NULL when not scored.

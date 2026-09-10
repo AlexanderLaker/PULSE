@@ -208,14 +208,17 @@ class TestReplacementScript:
         assert len(trends) == 51 and "technology_r06" not in trends and "customer_r13" in trends
         assert trends["consumer_r01"].name != "old consumer_r01"  # replaced by the reviewed driver
         assert trends["consumer_r01"].uncertainty is not None
-        # the cascade wiped the kept ids' proposals; the script re-inserted them
-        assert "2 re-inserted after the cascade" in out
+        # Since F-29 the write no longer deletes the trend rows, so the kept
+        # ids' proposals survive the replacement and the script's restore step
+        # finds nothing to re-insert. It stays as the safety net for a base
+        # written by pre-2.11.0 code, where the cascade did fire.
+        assert "2 snapshot, 0 re-inserted after the cascade" in out
         props = old_base.load_all_trend_proposals()
-        assert set(props) == {"consumer_r01", "government_r02"}
+        assert set(props) == {"consumer_r01", "government_r02"}  # the retired id's proposal is gone
         assert props["consumer_r01"][0]["uncertainty"] == 4 and props["consumer_r01"][0]["comment"] == "keep me"
         report = json.loads(sorted(Path("data/archive").glob("trend_base_replacement_*.json"))[0].read_text())
         assert report["problems"] == [] and report["trend_count"] == 51
-        assert report["proposals_restored"] == 2 and report["proposals_archived_only"] == 1
+        assert report["proposals_restored"] == 0 and report["proposals_archived_only"] == 1
 
     def test_second_run_is_refused_unless_forced(self, old_base, capsys):
         mod = _load_script("replace_trend_base")

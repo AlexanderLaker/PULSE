@@ -30,11 +30,13 @@ What it does, in order:
      force-moved ids) with their exposure, source and proposal rows.
   5. Writes the 51 drivers with pulse.database.save_trends (delete-then-
      insert per id, exactly what the admin full-reseed endpoint does).
-  6. Restores the expert proposals of the KEPT ids. save_trends deletes and
-     re-inserts each trend row, and trend_score_proposals references
-     trends(id) ON DELETE CASCADE, so on Postgres the kept drivers' proposals
-     would otherwise vanish with the replacement (SQLite does not enforce
-     the cascade). They are re-inserted from the pre-replacement snapshot.
+  6. Restores the expert proposals of the KEPT ids from the pre-replacement
+     snapshot, if any are missing. Since F-29 was fixed (2026-09-10)
+     save_trends upserts the trend row instead of deleting and re-inserting
+     it, so the ON DELETE CASCADE on trend_score_proposals no longer fires on
+     a write and normally nothing needs restoring. The step stays as the
+     safety net for a database last written by pre-2.11.0 code, where the
+     cascade did fire; proposals on RETIRED ids are archived, never restored.
   7. Verifies: 51 trends, every driver with 12 category / 4 region / 8
      value-chain rows and at least one source, proposals restored; writes
      the verification next to the archive and an audit-log entry.
@@ -226,7 +228,7 @@ def main(dry_run: bool, allow_postgres: bool, force: bool = False, archive_dir: 
             cols = [c for c in PROPOSAL_COLUMNS if c in props_kept[0]]
             for row in props_kept:
                 if (row["trend_id"], row["user_id"]) in present:
-                    continue  # SQLite: the cascade is not enforced, the row survived
+                    continue  # still there: since F-29 a save no longer cascades
                 cur.execute(
                     f"INSERT INTO trend_score_proposals ({', '.join(cols)}) VALUES ({ph(len(cols))})",
                     tuple(row.get(c) for c in cols),
