@@ -195,8 +195,30 @@ python3 scripts/replace_trend_base.py --postgres    # Neon — after deploying 2
 # expert proposals. Deletes the retired ids, writes the 51 reviewed drivers,
 # restores the kept ids' expert proposals, verifies, writes an audit entry.
 # Exit codes: 0 ok · 2 seed module not 51 · 3 archive failed (nothing changed) ·
-#             4 Postgres without --postgres · 5 verification problems (archive = rollback)
+#             4 Postgres without --postgres · 5 verification problems (archive = rollback) ·
+#             7 the database is already on the 51 base (--force overrides)
 ```
+
+**Two operational notes from the 2026-09-10 go-live.**
+
+*Redeploy after the base replacement.* The FastAPI lambda loads the trend list
+into memory at cold start (`pulse/api/state.py`), and `/api/v1/trends` and the
+`trend_count` in `/health` serve that cache; `latest_run_id` and the rendered
+run come from the database on every request. A serverless instance that was
+warm before the replacement therefore keeps reporting the OLD trend count until
+it recycles. After replacing the base, redeploy the current production
+deployment from the Vercel dashboard (or push again) so every instance reloads.
+
+*Give the replacement a real terminal.* On Neon the write phase is roughly
+1,700 statements (per driver: five deletes, one insert, twelve category, eight
+value-chain and four regional exposure rows, plus sources) at transatlantic
+round-trip latency, about four seconds per driver, so the whole script needs
+three to four minutes. Run it where nothing kills it at a timeout: the write is
+one transaction, so an interrupted run rolls the write back and leaves the base
+at the kept ids only (the archive and the delete are already committed at that
+point). Recovery is to run the write phase again in slices with the same
+`save_trends` path; the one-off resume script of 2026-09-10 is in the owner's
+working-files folder.
 
 Quality signals in the run: **seed stability** — the headline spread across
 independently-seeded chains, shown in the dashboard's About-this-model footer
