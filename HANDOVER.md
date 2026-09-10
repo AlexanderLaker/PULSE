@@ -18,15 +18,16 @@ Three things it deliberately is **not** (these are owner decisions, not gaps):
 2. **Not a € calculator.** The engine outputs relative shifts only; users apply them to their own financials. The GP1-only Beta explorer is the single sanctioned exception (D5).
 3. **Not an autopilot.** Everything is ceteris paribus — no management response modeled (D16). AI-suggested content is never auto-applied; provenance chips track review state (D7).
 
-`CLAUDE.md` explains every such decision (D1–D21, R1–R4, O1–O5). Read its §1 fully before changing model code; the full decision log lives in `docs/governance/`.
+`CLAUDE.md` explains every such decision (D1–D21, R1–R4, O1–O11). Read its §1 fully before changing model code; the full decision log lives in `docs/governance/`.
 
 ## 2. The operating model — the one mental model you need
 
 ```
 ┌── OFFLINE (operator machine / future: scheduled job) ─────────────┐
 │  python3 scripts/run_50k_prod.py                                  │
-│  → loads 99 trends from Postgres (Neon), ORDER BY id              │
+│  → loads the 51 drivers from Postgres (Neon), ORDER BY id (O10)   │
 │  → pre-flight spectral gate on the LOADED mix (F6; exit 5)        │
+│  → optional --cell-weights FILE (gross-profit shares, O6)         │
 │  → BayesianMonteCarloEngine.run_multichain(3 × 50k, scipy)        │
 │    chains are POOLED for the published percentiles (F7)           │
 │  → input-drift diff vs previous run                               │
@@ -59,7 +60,7 @@ Consequence for operations: after every engine-version bump, re-run the CLI so t
 | AI layer | **Removed** (owner decision R2, 2026-07-06: broken import, no live route, open security findings) | Future AI = fresh build per `CONCEPT_PRISM_ONLINE_AI.md`; the suggest-only governance (D7 chips) carries over unchanged |
 | CI | GitHub Actions: frontend (typecheck/lint/vitest) + engine (pytest, installed from requirements-dev.txt) | `.github/workflows/ci.yml` |
 
-Current production (to be migrated): Vercel project `prism-profit-pool` (org `lakeralexander-8859s-projects`), URL `https://prism-hcb.vercel.app`, GitHub `AlexanderLaker/PULSE`, DB Neon, auth Clerk. All four are personal accounts of the current owner — migration targets are in the concept document.
+Current production (to be migrated): Vercel project `prism-profit-pool` (org `lakeralexander-8859s-projects`), URL `https://prism-hcb.vercel.app`, GitHub `AlexanderLaker/PRISM` (renamed from `PULSE` on 2026-08-28 — GitHub redirects the old URL), DB Neon, auth Clerk. All four are personal accounts of the current owner — migration targets are in the concept document.
 
 ## 4. Day 1 — local environment
 
@@ -90,24 +91,42 @@ Local quirks worth knowing on day 1:
 **Canonical production run** (currently from the operator's machine; `.env` must contain the prod database URL):
 
 ```bash
-python3 scripts/run_50k_prod.py
-# 99 trends from prod DB → pre-flight spectral gate → 3 × 50k multichain
+python3 scripts/run_50k_prod.py [--cell-weights FILE]
+# 51 drivers from prod DB → pre-flight spectral gate → 3 × 50k multichain
 # (pooled) → input-drift event → persists a NEW simulation_runs row →
 # QA Excel at repo root (~2–6 min)
 # Exit codes (H2): 0 ok · 1 no DB URL · 2 no trends · 3 PERSIST FAILED ·
 # 4 wrong DB mode (Postgres URL set but SQLite active — H1) ·
-# 5 correlation matrix not PSD on the loaded trend mix (F6).
+# 5 correlation matrix not PSD on the loaded trend mix (F6) ·
+# 6 cell-weights file rejected (O6).
 # --iterations/--chains for test runs; --allow-sqlite for a LOCAL test;
 # --allow-nonpsd to override the spectral gate deliberately.
+# --cell-weights FILE: the actual HCB gross-profit shares per category x
+#   region (JSON: {"source": "...", "basis": "gp1_share" | "gp1_absolute",
+#   "cells": {category: {region: value}}}); absolute figures are normalised
+#   to shares before the engine is built and are never persisted. Keep the
+#   file OUTSIDE the repository. Without it the equal 1/48 placeholder applies.
 ```
 
-**Do this once after deploying this version**: the persisted run predates engine
-2.10.0 — re-run the CLI so the ribbon matches MODEL_VERSION. Until then the
-dashboard renders the pre-2.10 run and labels it honestly: the region
-drill-down shows "pre-2.10 run — re-run the engine", category numbers are the
-old non-regional values, and `mc_standard_error` is absent. **Expect the
-numbers to move** on the first 2.10.0 run — the regional roll-up dilutes
-regionally-concentrated trends, which is the point of the change.
+**Do this once after deploying 2.11.0, in this order:**
+
+1. `python3 scripts/replace_trend_base.py --dry-run` (local SQLite), then
+   `python3 scripts/replace_trend_base.py`, then the same against Neon with
+   `--postgres`. Archive-first (trends, exposures, sources and expert
+   proposals to `data/archive/`), deletes the retired ids, writes the 51
+   reviewed drivers, restores the kept ids' proposals, verifies, writes an
+   audit-log entry. The archive is the rollback. Until this runs the CLI
+   warns loudly that the base has 99 trends instead of 51.
+2. `python3 scripts/run_50k_prod.py` (add `--cell-weights FILE` once the P&L
+   shares exist). The first 2.11.0 run reports the mass replacement as a
+   critical input-drift event by design (D19). **Expect the numbers to move
+   for three stamped reasons** — the 51-driver base, the v3.11 calibration
+   and the equal 1/48 cell weights; the acceptance-run delta table in the
+   release summary separates them.
+
+Until both steps are done the dashboard renders the older run and labels it
+honestly (no cell-weight block in the About footer; footer totals fall back
+to the config's derived category weights).
 
 Previous run rows are kept — the input-drift telemetry (D19) diffs each run against the previous run's trend fingerprint and surfaces "N trend score(s) changed" in the dashboard's integrity chip.
 
@@ -116,11 +135,11 @@ Previous run rows are kept — the input-drift telemetry (D19) diffs each run ag
 **Smoke test after deploy:**
 
 ```bash
-curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count'   # "ok", 99
+curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count'   # "ok", 51 (99 until the base is replaced)
 # /api/v1/simulation requires auth (viewer cookie or Bearer JWT) — verify via the dashboard
 ```
 
-**Other ops scripts** (`scripts/`): `migrate_drop_delphi.py` (O1 — archives-then-drops the `delphi_*` tables + delphi-era trend columns) and `migrate_drop_legacy.py` (O3/O4 — archives-then-drops `trend_journey_exposure`, the legacy `users` and `scanned_trends` tables and the `allocation_recommendation` column). Both REFUSE a Postgres target without an explicit `--postgres` flag; run each once against prod, only AFTER deploying this code. `promote_admin.py` (role promotion).
+**Other ops scripts** (`scripts/`): `replace_trend_base.py` (O10 — archive-first move of a database onto the 51-driver base, see above), `generate_seed_from_core_set.py` (regenerates `pulse/seed_trends.py` + `data/trendCodeMap.ts` from `data/trend_base_2026-09/`; `--check` in CI), `compute_attenuation_v3_11.py` + `build_attenuation_xlsx.py v3_11` (O11 calibration record and workbook), `migrate_drop_delphi.py` (O1 — archives-then-drops the `delphi_*` tables + delphi-era trend columns) and `migrate_drop_legacy.py` (O3/O4 — archives-then-drops `trend_journey_exposure`, the legacy `users` and `scanned_trends` tables and the `allocation_recommendation` column). The migration and replacement scripts REFUSE a Postgres target without an explicit `--postgres` flag; run each once against prod, only AFTER deploying this code. `promote_admin.py` (role promotion).
 
 ## 6. Landmines — decisions you must not accidentally undo
 
@@ -147,20 +166,22 @@ Three review rounds have been executed and closed since the June 2026 baseline:
 - **v3.8 (2026-07-06) — full code review remediated.** An external-style review (July 1: 2 critical / 6 high / 17 medium / 29 low findings) was remediated end-to-end: security (the unauthenticated full-reseed closed), reproducibility (deterministic trend order), ops integrity (prod runs fail loudly), the save-integrity UI bugs, honest-display and a11y batches, dead code/deps/config removed. Per-finding dispositions with commits: `docs/governance/REMEDIATION_2026-07-06.md`.
 - **v3.9 (owner ruling O5, 2026-07-10) — VC epicentre attribution.** The value-chain lens became a categorical epicentre partition; `vc_weights` deleted end-to-end. Shift-matrix numbers were untouched, so the golden pins were deliberately *not* regenerated and passed unchanged.
 - **v3.10 (decisions 2026-07-13) — mathematical review remediation.** Executed against an 11-finding independent mathematical review. The shift math became regional (3D), within-force dampening became monotonic, per-trend peak-year jitter was added, the chains are now pooled with a reported MC standard error, and three dead result fields were removed. **Numbers move**; golden pins were regenerated in the same commit.
+- **v3.11 (owner rulings O6–O11, 2026-09-03 / 2026-09-10) — September 2026 trend-base review.** The 99-trend base became 51 reviewed drivers (generated seed, archive-first replacement script), the roll-up now uses a 12 × 4 matrix of gross-profit shares per category × region (equal 1/48 until the P&L shares are loaded via the CLI), every driver carries one uncertainty score that sets its band width and timing jitter, and the overlap correction was recalibrated on the new population (v3.11; a pre-existing provenance drift, F-28, was corrected in the process). **Numbers move**; golden pins regenerated in the same commit; the 2.10.0 numbers stay reproducible under test.
 
-Engine is **2.10.0**, and one version number is enforced everywhere: `pulse.__version__` == `MODEL_VERSION` == `package.json` == 2.10.0, test-locked (M15).
+Engine is **2.11.0**, and one version number is enforced everywhere: `pulse.__version__` == `MODEL_VERSION` == `package.json` == 2.11.0, test-locked (M15).
 
 - **Repo tracks only the live product + docs.** Strategy decks, management reports, internal audits, mockups and working files live outside the tree in the git-ignored `_NOT_FOR_HANDOVER/` quarantine (inventory: `_NOT_FOR_HANDOVER/MANIFEST.md`). Spent one-time migrations stay archived under `scripts/archive/`.
 - **The handover package** is produced by `bash scripts/package_handover.sh`: a fresh-history export (single-commit git repo) that structurally cannot contain `.env`, local DBs, the quarantine folder, or secret-shaped strings (the build fails if it ever would). The old personal-GitHub history is archived privately by the owner and is NOT part of the handover (H4).
 - **Docs.** Root carries `00_INTEGRATION_GUIDE.md` (the folder map for the incoming team) plus the five canonical docs (`README`, `HANDOVER`, `CLAUDE`, `DEPLOY`, `CONCEPT_PRISM_ONLINE_AI`); deep-dives under `docs/` (index: `docs/INDEX.md`); the governance record under `docs/governance/`. All reconciled to the tree on 2026-08-25; on any conflict this file + `CLAUDE.md` win.
-- **Quality gates green at this pass:** typecheck clean · eslint clean (react-compiler advisories kept visible as warnings on purpose) · **vitest 59** · **pytest 121** (incl. golden pins, joint-portfolio-band pin, VC parity, operational tests) · single-source guard OK.
+- **Quality gates green at this pass (2026-09-10):** typecheck clean · eslint clean (react-compiler advisories kept visible as warnings on purpose) · **vitest 71** · **pytest 189** (incl. golden pins, the 2.10.0 reproduction locks, uncertainty, trend base, calibration, operational tests) · single-source guard OK · generator `--check` OK.
 - **Dependencies audited and patched (2026-08-28).** `package-lock.json` had drifted out of sync with `package.json` (root version, and `@types/node` pinned a major behind), which made `npm ci` — and therefore the CI frontend job — fail; it is resynced. The August 2026 advisories against `next`, `postcss`, `sharp` and `nanoid` were then closed with an in-range `npm audit fix`: **`npm audit` reports 0 vulnerabilities** as of this handover. Full `npm run verify` passed after both changes. Re-audit on your first checkout — new advisories land continuously.
 - **Database:** you will receive a `pg_dump` (schema in `CLAUDE.md` §6), not credentials.
 - **Secrets:** every credential (Clerk, DB, JWT secret, signup code) is rotated at handover; the package builder verifies nothing secret-shaped ships.
 
 **DX backlog (known and deliberate — not regressions):**
 
-1. Run the first 2.10.0 production run (§5) — until then the dashboard serves the last pre-2.10 run, honestly labeled.
+1. Replace the trend base and run the first 2.11.0 production run (§5, in that order) — until then the dashboard serves the last pre-2.11 run, honestly labeled. Load the actual cell weights (`--cell-weights FILE`) when finance provides the category × region gross-profit shares.
+1a. Decide F-29 (`docs/governance/FINDINGS_REGISTER.md`): on Postgres every admin edit cascade-deletes that trend's expert proposals because `save_trends` deletes and re-inserts the row; the replacement script works around it, the product code does not yet.
 2. Run the two legacy-cleanup migrations once against prod, AFTER the first deploy of this code: `python3 scripts/migrate_drop_delphi.py --postgres` (O1) and `python3 scripts/migrate_drop_legacy.py --postgres` (O3/O4). Both are archive-first, idempotent, and already executed against the local DB.
 3. Burn down the react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
 4. Consider splitting the largest dashboard components (`Trends2.tsx` is the biggest) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).

@@ -1,187 +1,59 @@
 # PRISM Testing Guide
 
-## Quick Start
+Reconciled to the tree on 2026-09-10 (release 2.11.0). CI runs the same gates (`.github/workflows/ci.yml`): frontend typecheck, lint, vitest; scipy engine pytest.
 
-Run all tests:
-```bash
-cd /sessions/lucid-festive-cannon/mnt/PROFIT_POOL_ENGINE
-PYTHONPATH=/sessions/lucid-festive-cannon/mnt/PROFIT_POOL_ENGINE python -m pytest tests/ -v
-```
-
-## Test Suite Overview
-
-| File | Tests | Purpose |
-|------|-------|---------|
-| **conftest.py** | - | Shared fixtures (mock data, configurations) |
-| **test_firewall.py** | 59 | Financial data security validation |
-| **test_deterministic.py** | 39 | V12 Dashboard parity verification |
-| **test_bayesian_mc.py** | 27 | Bayesian Monte Carlo engine |
-| **test_causal_dag.py** | 40 | Causal force propagation |
-| **test_optimizer.py** | 31 | Resource allocation optimization |
-| **test_sensitivity.py** | 26 | Sensitivity analysis (tornado, breakeven) |
-| **test_game_theory.py** | 32 | Competitive response modeling |
-| **test_api.py** | 35 | FastAPI backend endpoints |
-| **TOTAL** | **289** | **199 unique tests** |
-
-## Results Summary
-
-- **Total Tests:** 199
-- **Passing:** 172 (86.4%)
-- **Failing:** 27 (13.6%)
-- **Runtime:** ~3.1 seconds
-- **Memory Usage:** ~213 MB
-
-## Test Priorities
-
-### 🔴 Critical (Must Pass)
-- `test_firewall.py` — Financial data security
-- `test_deterministic.py` — V12 parity
-
-### 🟡 Important (Should Pass)
-- `test_causal_dag.py` — Shock propagation
-- `test_sensitivity.py` — Sensitivity ranking
-
-### 🟢 Implementation (In Progress)
-- `test_bayesian_mc.py` — Bayesian Monte Carlo
-- `test_api.py` — API endpoints
-- `test_optimizer.py` — Allocation optimization
-- `test_game_theory.py` — Competitive modeling
-
-## Run by Category
+## Quick start
 
 ```bash
-# Security (highest priority)
-pytest tests/test_firewall.py -v
-
-# Deterministic baseline
-pytest tests/test_deterministic.py -v
-
-# Probabilistic analysis
-pytest tests/test_bayesian_mc.py tests/test_causal_dag.py -v
-
-# Decision support
-pytest tests/test_optimizer.py tests/test_sensitivity.py -v
-
-# Strategic context
-pytest tests/test_game_theory.py -v
-
-# API integration
-pytest tests/test_api.py -v
-
-# All at once
-pytest tests/ -v
+npm run verify          # typecheck + lint (incl. the shift-matrix single-source guard) + vitest + pytest
+python3 -m pytest tests -q          # engine, API, ops, base, calibration (scipy required, D13)
+npx vitest run                      # frontend
+python3 scripts/generate_seed_from_core_set.py --check   # committed seed + code map == generator output
 ```
 
-## Documentation
+## Python suite (`tests/`, 189 tests)
 
-This guide is the canonical testing reference for the suite.
-(The earlier TEST_SUITE_SUMMARY.md / TESTS_README.md write-ups were consolidated here in the June 2026 handover cleanup.)
+| File | Tests | Locks |
+|------|:---:|-------|
+| `conftest.py` | – | Fixture DB (five differentiated trends with canonical VC profiles, L29) and `mock_model_config` (defaults, 1,000 iterations, 2026–2030, jitter OFF) |
+| `test_bayesian_mc.py` | 30 | Engine behaviour: priors, copula, materialisation, dampening, velocity, peak-year jitter (F4), multichain pooling |
+| `test_golden_pipeline.py` | 17 | Determinism; **golden pins** (seed 42, 500 iterations, regenerated only with deliberate model changes in the same commit — last 2026-09-10 for 2.11.0); joint portfolio band pin; no repair fires on defaults (D1); one version everywhere (M15); VC structural locks (2.9.0) |
+| `test_cell_weights.py` | 17 | **O6**: the 2.11.0 engine with the separable Group-split matrix and the 2.10.0 calibration reproduces the 2.10.0 fixture run to 1e-12 (category cells, portfolio band, velocity bands with jitter on, region lens); roll-up algebra; contract keys; validator and config construction |
+| `test_uncertainty.py` | 19 | **O7**: prior table and floors, unscored = 2.10.0, `peak_year_jitter = 0` as the off switch, per-trend jitter widths drawn by the engine's own sampler, the onset clamp (an early draw never becomes the latest arrival), multichain event dedupe, reproducibility, drift key `"u"`, SQLite and proposals round trip |
+| `test_trend_base_2026_09.py` | 13 | **O10**: seed integrity (51 drivers, ranges, sources, scores, no provenance label, snapshot), generator `--check`, code map partition and pointers, journey citations, the replacement script (dry run without schema writes, live run with the Postgres-style cascade, second-run refusal unless `--force`, Postgres refusal) |
+| `test_calibration_v3_11.py` | 11 | **O11 / F-28**: defaults == calibration record, record == script output, eff_att identity, copula PSD margin on the 51 mix, validator source tags |
+| `test_vc_epicentre.py` | 13 | Parity fixture table with `tests/frontend/vcEpicentre.test.ts` (Python `vc_epicentre_of` == TS `epicentreOf`); drift semantics |
+| `test_input_drift.py` | 5 | D19 fingerprint and drift events |
+| `test_properties.py` | 7 | Hypothesis property tests |
+| `test_api.py` | 50 | Endpoint behaviour incl. the F2 409 guard, F3 read authentication, D13 backend tag, the 2.11.0 config contract (cell weights only, derived marginals, grid validation), the uncertainty field (range, round trip, explicit-null clearing) and the reseed/sync base-replacement guard |
+| `test_ops.py` | 7 | M10: prod entrypoint import, `EXPECTED_TREND_COUNT` (51), H1 wrong-DB-mode exit, CLI parser, Excel writer round trip, diagnostics outage |
 
-## Fixtures Available
+## Frontend suite (`tests/frontend/`, vitest, 71 tests)
 
-All tests use these fixtures (no Excel/database required):
+| File | Locks |
+|------|-------|
+| `normalizeSimulation.test.ts` | Shape adapter incl. the 2.11.0 cell-weight block |
+| `shiftMatrix.test.ts` | Category-weighted aggregation (single source, F1) |
+| `cellWeights.test.ts` | 12 × 4 matrix marginals, sum badge, equal placeholder, row shares (O6) |
+| `trendCodeMap.test.ts` | 51 live codes derived from ids, 65 retired codes with live pointers, `liveCodeFor`, journey citations (O10) |
+| `vcEpicentre.test.ts` | Parity with the Python epicentre rule |
+| `format.test.ts` | Display-honesty pins (one decimal, sign always visible) |
+| `authRoutes.test.ts`, `prismCookie.test.ts` | Auth seam |
+| `consumerJourneyDialog.test.tsx`, `homeGate.test.tsx`, `tabSmoke.test.tsx`, `usePrism.test.tsx` | Component smoke tests |
 
-```python
-mock_trend              # Single trend object
-mock_trends_database    # 5-trend database across 6 forces
-mock_model_config       # Default model configuration
-mock_causal_dag         # Causal DAG with default edges
-deterministic_shift_matrix  # Pre-computed shifts for testing
-shift_matrix_with_percentiles  # Full percentile distribution
-```
+## Rules
 
-## Common Commands
+- **Golden pins** move only with a deliberate model change and are regenerated in the same commit, with the reason in the test docstring and the decision log.
+- **Reproduction locks** stay: `test_cell_weights.py` must keep reproducing the 2.10.0 numbers, so a change that breaks it is a model change, not a refactor.
+- **Generated files** (`pulse/seed_trends.py`, `data/trendCodeMap.ts`, `data/attenuation_calibration_v3_11.json`) are never hand-edited; the tests compare them to their generators.
+- The scipy engine is a hard requirement; there is no approximate test path.
+
+## Useful invocations
 
 ```bash
-# Run specific test class
-pytest tests/test_firewall.py::TestFirewallColumnHeaders -v
-
-# Run specific test
-pytest tests/test_firewall.py::TestFirewallColumnHeaders::test_blocks_nes_column -v
-
-# Run with coverage
-pytest tests/ --cov=pulse --cov-report=html
-
-# Show slowest tests
-pytest tests/ --durations=10
-
-# Run with minimal output
-pytest tests/ -q
-
-# Stop on first failure
-pytest tests/ -x
-
-# Enter debugger on failure
-pytest tests/ --pdb
+python3 -m pytest tests/test_golden_pipeline.py -q                 # pins only
+python3 -m pytest tests -q -x                                      # stop at the first failure
+python3 -m pytest tests -q --durations=10                          # slowest tests
+npx vitest run tests/frontend/trendCodeMap.test.ts                 # one frontend file
+PRISM_DB_PATH=/tmp/x.db python3 scripts/replace_trend_base.py --dry-run   # replacement report on any SQLite copy
 ```
-
-## Test File Structure
-
-Each test file contains:
-- **Test Classes** grouped by functionality
-- **Test Methods** prefixed with `test_`
-- **Docstrings** explaining what's tested
-- **Fixtures** injected as parameters
-- **Assertions** with clear messages
-
-Example:
-```python
-def test_blocks_nes_column(self, firewall):
-    """Should reject NES column (financial data)."""
-    headers = ["Trend Name", "NES", "Description"]
-    safe = firewall.scan_column_headers(headers)
-    assert "NES" not in safe
-    assert len(firewall.violations_log) > 0
-```
-
-## Dependencies
-
-Required:
-- pytest
-- pandas
-- numpy
-- scipy
-- fastapi
-- httpx (for API tests)
-
-Install:
-```bash
-pip install pytest pandas numpy scipy fastapi httpx
-```
-
-## CI/CD Integration
-
-Tests are designed to run in CI/CD pipelines:
-- No file system access required
-- No external API calls
-- Deterministic results (seeded randomness)
-- Fast execution (~3 seconds)
-- Comprehensive error messages
-
-## Known Issues
-
-### Passing Perfectly (✅)
-- Firewall security tests (56/59)
-- Deterministic engine (39/39)
-- Causal DAG (39/40)
-- Sensitivity analysis (25/26)
-
-### Needs Alignment (⚠️)
-- API endpoints (24/35) — Endpoints not yet built
-- Bayesian MC (13/27) — Result structure differs
-- Optimizer (26/31) — Frontier format differs
-- Game Theory (27/32) — Model attributes
-
-## Next Steps
-
-1. **For Security:** All firewall tests pass ✅
-2. **For Determinism:** All deterministic tests pass ✅
-3. **For APIs:** Build missing endpoints
-4. **For Probabilistic:** Align result structures
-5. **For Integration:** Run full suite in CI/CD
-
----
-
-**Last Updated:** March 26, 2026
-**PRISM Version:** 2.0
-**Status:** 172/199 passing (86.4%)

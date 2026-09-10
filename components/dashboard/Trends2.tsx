@@ -490,7 +490,8 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
 
 // ─── Per-field help copy (shared by the "?" tooltips on the section cards) ─
 const FIELD_HELP = {
-  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. This 1–5 score sets a Beta prior whose MEAN is score/6 — deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five-in-six, not certainty). The band width comes from the fixed Beta concentration (α+β=6), sampled by the Monte Carlo.',
+  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. This 1–5 score sets a Beta prior whose MEAN is score/6 — deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five-in-six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (2.11.0; 6 for an unscored trend), sampled by the Monte Carlo.',
+  uncertainty: 'How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction — one score per trend (2.11.0, owner ruling O7). It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (24/16/10/6/4/3 — the mean stays probability/6) and the peak-year jitter (0/1/1/2/3/4 years). Unscored = the 2.10.0 behaviour (concentration 6, global ±1 year).',
   gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this trend can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
   timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
   category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
@@ -690,6 +691,62 @@ const aiPeakOf = (t: Trend): number | undefined =>
   t.ai_suggestion?.peak_year ?? (t.user_override ? undefined : (t as Trend & { peak_year?: number }).peak_year);
 const aiCurveOf = (t: Trend): string | undefined =>
   t.ai_suggestion?.diffusion_curve ?? (t.user_override ? undefined : (t as Trend & { diffusion_curve?: string }).diffusion_curve);
+const aiUncOf = (t: Trend): number | undefined => {
+  const snap = t.ai_suggestion?.uncertainty;
+  if (snap != null) return snap;
+  if (t.user_override) return undefined;
+  return t.uncertainty ?? undefined;
+};
+const UNC_LABELS = ['Fixed', 'Tight', 'Evidenced', 'Half–double', 'Near zero–2×', 'Sign open'];
+const uncLabel = (v: number | null | undefined): string =>
+  v == null ? 'unscored' : `${v} · ${UNC_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
+
+/** 2.11.0 (O7): 0–5 uncertainty picker — six labelled buttons (0 is a real
+ *  score, unlike probability), an optional "clear" back to unscored, and the
+ *  AI/baseline reference on hover. */
+const UncertaintyPicker: FC<{
+  value: number | null | undefined;
+  ai?: number;
+  onChange: (v: number | undefined) => void;
+  allowClear?: boolean;
+}> = ({ value, ai, onChange, allowClear = true }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div role="radiogroup" aria-label="Uncertainty score" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
+      title={ai != null ? `AI suggests ${ai} / 5 (${UNC_LABELS[ai]})` : undefined}>
+      {[0, 1, 2, 3, 4, 5].map((v) => {
+        const on = value != null && Math.round(value) === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(v)}
+            title={`${v} — ${UNC_LABELS[v]}${ai === v ? ' (AI suggestion)' : ''}`}
+            style={{
+              minWidth: 44, padding: '6px 8px', borderRadius: 8,
+              border: `1px solid ${ai === v && !on ? S.primary : 'transparent'}`,
+              backgroundColor: on ? S.primary : S.surfaceLow,
+              color: on ? '#fff' : S.onSurface,
+              fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            {v}
+          </button>
+        );
+      })}
+      {allowClear && value != null && (
+        <button type="button" onClick={() => onChange(undefined)}
+          style={{ padding: '6px 8px', borderRadius: 8, border: 'none', backgroundColor: 'transparent', color: S.mutedText, fontSize: 11, cursor: 'pointer' }}
+          title="Back to unscored (2.10.0 behaviour: concentration 6, global jitter)">
+          clear
+        </button>
+      )}
+    </div>
+    <span style={{ fontSize: 11, color: S.mutedText }}>{uncLabel(value)}</span>
+  </div>
+);
+
 const aiExpoOf = (t: Trend, kind: 'category_exposure' | 'regional_exposure' | 'vc_exposure'): Record<string, number> | undefined => {
   const snap = t.ai_suggestion?.[kind] as Record<string, number> | undefined;
   if (snap) return snap;
@@ -1073,6 +1130,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
   const aiG = aiGp1(trend);
   const aiPk = aiPeakOf(trend);
   const aiCv = aiCurveOf(trend);
+  const aiU = aiUncOf(trend);
   const aiVcStage = epicentreOf(aiExpoOf(trend, 'vc_exposure'));
   const myVcStage = epicentreOf(draft.vc_exposure as Record<string, number> | undefined);
   const sources = trend.sources ?? [];
@@ -1145,6 +1203,13 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
                 <FieldLabel>Diffusion Curve</FieldLabel>
                 <DiffusionPicker value={draft.diffusion_curve} ai={aiCv} distribution={dist} onChange={(c) => patch({ diffusion_curve: c })} />
               </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this trend; the mean stays where probability puts it.">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+              <UncertaintyPicker value={draft.uncertainty} ai={aiU} allowClear={false} onChange={(v) => patch({ uncertainty: v })} />
+              <AiRef label={aiU != null ? `AI ${aiU}/5` : 'AI —'} />
             </div>
           </SectionCard>
 
@@ -1466,6 +1531,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
 
   // AI baseline (snapshot, else the current value for an un-overridden trend).
   const aP = aiProb(trend), aG = aiGp1(trend), aPk = aiPeakOf(trend), aCv = aiCurveOf(trend);
+  const aU = aiUncOf(trend);
   const aiCat = aiExpoOf(trend, 'category_exposure');
   const aiReg = aiExpoOf(trend, 'regional_exposure');
   const aiVc = aiExpoOf(trend, 'vc_exposure');
@@ -1493,10 +1559,11 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
   const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? aiVcStage;
   // Expert aggregate.
   const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
+  const eU = agg?.uncertainty?.median;
   const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
   const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
-  const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve'): string | undefined => {
+  const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve' | 'uncertainty'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
     if (rows.length === 0) return undefined;
     return rows.map((s) => `${s.name}${s.role ? ` (${s.role})` : ''}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
@@ -1526,9 +1593,10 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
         gp1: numStr(eG != null ? Math.round(eG * 100) : aG != null ? Math.round(aG * 100) : undefined),
         peak: numStr(ePk != null ? Math.round(ePk) : aPk != null ? aPk : undefined),
         curve: eCv || aCv || '',
+        uncertainty: numStr(eU != null ? Math.round(eU) : aU != null ? Math.round(aU) : undefined),
       });
     }
-    setSrc({ probability: s, gp1: s, peak: s, curve: s, category: s, region: s });
+    setSrc({ probability: s, gp1: s, peak: s, curve: s, uncertainty: s, category: s, region: s });
     // VC epicentre follows the bulk intent where a value exists; "manual"
     // means clicking a stage on the rail, so it changes nothing here.
     if (s === 'ai') setEndorsedVc(aiVcStage);
@@ -1586,6 +1654,17 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     if (s === 'ai') return aCv;
     return eCv;
   };
+  // O7: uncertainty 0–5 (integer). Omitted from the endorse when nothing
+  // resolves, so an unscored trend stays unscored.
+  const resolveUnc = (): number | undefined => {
+    const s = srcOf('uncertainty', eU != null);
+    let n: number | undefined;
+    if (s === 'manual') { const m = parseInt(man.uncertainty ?? '', 10); n = isNaN(m) ? undefined : m; }
+    else if (s === 'ai') n = aU != null ? Math.round(aU) : undefined;
+    else n = eU != null ? Math.round(eU) : undefined;
+    if (n == null || !Number.isFinite(n)) return undefined;
+    return Math.max(0, Math.min(5, n));
+  };
   const endorse = async () => {
     if (!updateTrend) return;
     setErr(null); setSaving(true);
@@ -1594,6 +1673,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
     const g = resolveGp1(); if (g != null) u.gp1_pct_affected = g;
     const pk = resolvePeak(); if (pk != null) u.peak_year = pk;
     const cv = resolveCurve(); if (cv) u.diffusion_curve = cv;
+    const un = resolveUnc(); if (un != null) u.uncertainty = un;
     const sc = srcOf('category', hasCatE);
     if (sc === 'manual') { const m = buildManualMap('category', catCells); if (m) u.category_exposure = m; }
     else if (sc === 'ai') { if (aiCat) u.category_exposure = aiCat; }
@@ -1683,6 +1763,15 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                       result={resolveCurve() ? (DIFFUSION_LABELS[resolveCurve() as string]?.label ?? resolveCurve()) : '—'} />
                   </div>
                 </div>
+              </SectionCard>
+
+              <SectionCard title="Uncertainty" icon={Zap} footnote="0 = fixed · 3 = half or double · 5 = sign open (2.11.0, O7). Experts' scores are summarised by their median.">
+                <CompareStack who={whoFor('uncertainty')}
+                  ai={<Val>{aU != null ? uncLabel(aU) : '—'}</Val>}
+                  expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : '—'}</span>{eU != null && aU != null ? <DeltaChip value={Math.round(eU) - aU} digits={0} /> : null}</>} />
+                <Decide cur={srcOf('uncertainty', eU != null)} onPick={(s) => setS('uncertainty', s)} aiOk={aU != null} expertOk={eU != null}
+                  manual={<input type="number" min={0} max={5} value={man.uncertainty ?? ''} onChange={(e) => setM('uncertainty', e.target.value)} placeholder="0–5" style={manInput} />}
+                  result={resolveUnc() != null ? uncLabel(resolveUnc()) : '—'} />
               </SectionCard>
             </div>
 
@@ -2409,6 +2498,8 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
   const [draftGp1, setDraftGp1]             = useState<number>(Math.round((gp1Pct ?? 0) * 100));
   const [draftPeak, setDraftPeak]           = useState<number>(peakYear ?? 2030);
   const [draftCurve, setDraftCurve]         = useState<string>(diffusion);
+  // 2.11.0 (O7): uncertainty score 0–5; undefined = unscored (left untouched on save).
+  const [draftUnc, setDraftUnc]             = useState<number | undefined>(trend.uncertainty ?? undefined);
   const [draftConfidence, setDraftConfidence] = useState<string>(confidence ?? '');
   const [draftCatExp, setDraftCatExp]       = useState<Record<string, number>>({ ...catExp });
   const [draftVcExp, setDraftVcExp]         = useState<Record<string, number>>({ ...vcExp });
@@ -2425,6 +2516,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
     setDraftGp1(Math.round(((trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0) * 100));
     setDraftPeak((trend as Trend & { peak_year?: number }).peak_year ?? 2030);
     setDraftCurve((trend as Trend & { diffusion_curve?: string }).diffusion_curve ?? 's_curve');
+    setDraftUnc(trend.uncertainty ?? undefined);
     setDraftConfidence((trend.confidence as string) ?? '');
     setDraftCatExp({ ...((trend.category_exposure ?? {}) as Record<string, number>) });
     setDraftVcExp({ ...((trend.vc_exposure ?? {}) as Record<string, number>) });
@@ -2440,6 +2532,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
     setDraftGp1(Math.round((gp1Pct ?? 0) * 100));
     setDraftPeak(peakYear ?? 2030);
     setDraftCurve(diffusion);
+    setDraftUnc(trend.uncertainty ?? undefined);
     setDraftConfidence((confidence as string) ?? '');
     setDraftCatExp({ ...catExp });
     setDraftVcExp({ ...vcExp });
@@ -2460,6 +2553,8 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
       gp1_pct_affected: Math.max(0, Math.min(1, draftGp1 / 100)),
       peak_year: Math.max(2025, Math.min(2035, Math.round(draftPeak))),
       diffusion_curve: draftCurve,
+      // O7: only sent when scored (the API treats an absent field as "unchanged").
+      ...(draftUnc != null ? { uncertainty: Math.max(0, Math.min(5, Math.round(draftUnc))) } : {}),
       category_exposure: draftCatExp,
       vc_exposure: draftVcExp,
       regional_exposure: draftRegExp,
@@ -2555,23 +2650,28 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             {confidence && <MetaChip label={`Confidence · ${confidence}`} />}
           </>
         )}
-        {/* D7 (June 2026): score provenance. Baseline values are AI-preset;
-            an admin edit via this editor marks the trend expert-reviewed. */}
-        <span
-          title={trend.user_override
-            ? 'Scores were AI-preset and have been reviewed/adjusted by an expert via the Trend editor.'
-            : 'Scores are AI-preset from the evidence base — not yet expert-reviewed.'}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '4px 12px', borderRadius: 999,
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-            backgroundColor: S.tertiaryContainer,
-            color: S.onTertiaryContainer,
-            textTransform: 'uppercase',
-          }}>
-          <Sparkles size={12} />
-          {trend.user_override ? 'AI suggestion · expert-reviewed' : 'AI suggestion'}
-        </span>
+        {/* D7 (June 2026): score provenance. An AI-preset trend carries the
+            chip until an admin edit marks it expert-reviewed. 2.11.0 (owner
+            decision 2026-09-10): the reviewed September 2026 base is seeded
+            with neither flag and carries NO label — the chip renders only
+            for a trend that is AI-suggested or has been edited by an admin. */}
+        {(trend.ai_suggested || trend.user_override) && (
+          <span
+            title={trend.user_override
+              ? 'Scores have been reviewed/adjusted by an expert via the Trend editor.'
+              : 'Scores are AI-preset from the evidence base — not yet expert-reviewed.'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 12px', borderRadius: 999,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+              backgroundColor: S.tertiaryContainer,
+              color: S.onTertiaryContainer,
+              textTransform: 'uppercase',
+            }}>
+            <Sparkles size={12} />
+            {trend.user_override ? (trend.ai_suggested ? 'AI suggestion · expert-reviewed' : 'Expert-reviewed') : 'AI suggestion'}
+          </span>
+        )}
         {!isEditing && dataSource && <MetaChip label={dataSource} />}
       </div>
 
@@ -2795,6 +2895,34 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
                 </div>
               </div>
             </div>
+          </SectionCard>
+
+          {/* 2.11.0 (O7): one uncertainty score per trend — sets the Beta
+              concentration (band width) and the per-trend peak-year jitter. */}
+          <SectionCard
+            title="Uncertainty"
+            icon={Zap}
+            info={FIELD_HELP.uncertainty}
+            footnote="0 = fixed by law or contract · 3 = size could be half or double · 5 = the sign could differ. Band width and timing jitter follow this score; the mean stays where probability puts it."
+          >
+            {isEditing ? (
+              <UncertaintyPicker value={draftUnc} ai={aiUncOf(trend)} allowClear={false} onChange={(v) => setDraftUnc(v)} />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{
+                  padding: '8px 10px', borderRadius: 8, minWidth: 160,
+                  fontSize: 13, fontWeight: 700, color: S.onSurface,
+                  backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
+                }}>
+                  {uncLabel(trend.uncertainty)}
+                </div>
+                <span style={{ fontSize: 11, color: S.mutedText }}>
+                  {trend.uncertainty == null
+                    ? 'Unscored: the engine uses the 2.10.0 defaults (concentration 6, global ±1-year jitter).'
+                    : `Beta concentration ${[24, 16, 10, 6, 4, 3][Math.max(0, Math.min(5, trend.uncertainty))]} · peak-year jitter ±${[0, 1, 1, 2, 3, 4][Math.max(0, Math.min(5, trend.uncertainty))]} y`}
+                </span>
+              </div>
+            )}
           </SectionCard>
 
           {/* Sources — edit mode reveals per-row title / url / data / tier controls */}

@@ -7,7 +7,7 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Depends
 
 from pulse import __version__
-from pulse.config import ModelConfig, FORCES, CATEGORIES
+from pulse.config import ModelConfig, FORCES, CATEGORIES, REGIONS, DEFAULT_CELL_WEIGHTS_SOURCE
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.api.auth import require_auth, require_admin
 from pulse.api.serialization import _sanitize, _summarize_convergence
@@ -38,8 +38,17 @@ async def get_config(user: dict = Depends(require_auth)):
         "force_weights": config.force_weights,
         # vc_weights removed (2.9.0): the VC lens is an epicentre partition —
         # no per-step weight exists anymore.
+        # 2.11.0 (O6): cell_weights is the roll-up input (12 × 4 gross-profit
+        # shares); region_weights / category_weights are its derived marginals
+        # and are served READ-ONLY (PUT rejects them).
+        "cell_weights": getattr(config, 'cell_weights', {}),
+        "cell_weights_source": getattr(config, 'cell_weights_source', ''),
+        # The label the Config sheet's "reset to equal" writes, so the UI
+        # never invents its own wording for the placeholder.
+        "cell_weights_source_default": DEFAULT_CELL_WEIGHTS_SOURCE,
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
+        "derived_weights": ["region_weights", "category_weights"],
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
         "path_years": config.path_years,
@@ -87,21 +96,52 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
     # (vc_weights handling removed, 2.9.0 — the field no longer exists on
     #  ConfigUpdate or ModelConfig; the VC lens is an epicentre partition.)
 
-    if req.region_weights is not None:
-        total = sum(req.region_weights.values())
-        if abs(total - 1.0) > 0.01:
-            raise HTTPException(400, f"Region weights must sum to 1.0, got {total}")
-        old_rw = getattr(config, 'region_weights', {})
-        changes["region_weights"] = {"old": old_rw, "new": req.region_weights}
-        overrides["region_weights"] = req.region_weights
+    # 2.11.0 (O6): the two separable vectors are derived marginals now —
+    # reject them explicitly (they used to move numbers; silent drop would
+    # be dishonest to a client that still relies on them).
+    if req.region_weights is not None or req.category_weights is not None:
+        raise HTTPException(400,
+            "region_weights and category_weights are derived from cell_weights since "
+            "MODEL_VERSION 2.11.0 and can no longer be set directly. Send cell_weights "
+            "({category: {region: gross-profit share}}, 12 x 4, sum 1.0) instead.")
 
-    if req.category_weights is not None:
-        total = sum(req.category_weights.values())
+    if req.cell_weights is not None:
+        cw = req.cell_weights
+        if not isinstance(cw, dict):
+            raise HTTPException(400, "cell_weights must be a {category: {region: share}} object")
+        total = 0.0
+        for cat, row in cw.items():
+            if cat not in config.category_names:
+                raise HTTPException(400, f"cell_weights: unknown category '{cat}'")
+            if not isinstance(row, dict):
+                raise HTTPException(400, f"cell_weights['{cat}'] must map every region to a share")
+            for region, val in row.items():
+                if region not in REGIONS:
+                    raise HTTPException(400, f"cell_weights['{cat}']: unknown region '{region}'")
+                if isinstance(val, bool) or not isinstance(val, (int, float)) or val != val:
+                    raise HTTPException(400, f"cell_weights['{cat}']['{region}'] must be numeric")
+                if val < 0:
+                    raise HTTPException(400, f"cell_weights['{cat}']['{region}'] must be non-negative, got {val}")
+                total += float(val)
+        missing = [c for c in config.category_names if c not in cw] + [
+            f"{c}/{r}" for c in cw for r in REGIONS if r not in cw[c]]
+        if missing:
+            raise HTTPException(400, f"cell_weights incomplete — missing: {missing[:8]}")
         if abs(total - 1.0) > 0.01:
-            raise HTTPException(400, f"Category weights must sum to 1.0, got {total}")
-        old_cw = getattr(config, 'category_weights', {})
-        changes["category_weights"] = {"old": old_cw, "new": req.category_weights}
-        overrides["category_weights"] = req.category_weights
+            raise HTTPException(400, f"cell_weights must sum to 1.0 over all 48 cells, got {total:.4f}")
+        new_cw = {c: {r: float(cw[c][r]) for r in REGIONS} for c in config.category_names}
+        old_cw = getattr(config, 'cell_weights', {})
+        if new_cw != old_cw:
+            changes["cell_weights"] = {"old": old_cw, "new": new_cw}
+            overrides["cell_weights"] = new_cw
+
+    if req.cell_weights_source is not None:
+        if not req.cell_weights_source.strip():
+            raise HTTPException(400, "cell_weights_source must name the provenance of the shares (non-empty)")
+        old_src = getattr(config, 'cell_weights_source', '')
+        if req.cell_weights_source != old_src:
+            changes["cell_weights_source"] = {"old": old_src, "new": req.cell_weights_source}
+            overrides["cell_weights_source"] = req.cell_weights_source
 
     if req.force_correlation_matrix is not None:
         # Validate: must be symmetric, diagonal 1.0, off-diagonal in [0, 1]
@@ -225,6 +265,8 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             path_years=list(candidate.path_years),
             materialization=dict(candidate.materialization),
             force_weights=dict(candidate.force_weights),
+            cell_weights={c: dict(r) for c, r in candidate.cell_weights.items()},
+            cell_weights_source=candidate.cell_weights_source,
             region_weights=dict(candidate.region_weights),
             category_names=list(candidate.category_names),
             category_weights=dict(candidate.category_weights),
@@ -283,8 +325,14 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         "within_force_overlap": dict(getattr(config, "within_force_overlap", {})),
         "attenuation_source": config.attenuation_source,
         "force_weights": config.force_weights,
+        "cell_weights": getattr(config, 'cell_weights', {}),
+        "cell_weights_source": getattr(config, 'cell_weights_source', ''),
+        # The label the Config sheet's "reset to equal" writes, so the UI
+        # never invents its own wording for the placeholder.
+        "cell_weights_source_default": DEFAULT_CELL_WEIGHTS_SOURCE,
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
+        "derived_weights": ["region_weights", "category_weights"],
         "force_correlation_matrix": getattr(config, 'force_correlation_matrix', {}),
         "force_overlap_matrix": getattr(config, 'force_overlap_matrix', {}),
         "base_year": config.base_year,

@@ -127,6 +127,142 @@ class TestAPIConfiguration:
                     assert data[field] is not None
 
 
+class TestConfigCellWeights2_11:
+    """2.11.0 (owner ruling O6): GET /config serves the 12 × 4 cell matrix
+    with its derived marginals; PUT /config accepts cell_weights (+ source)
+    only and rejects the retired region/category dials and invalid grids."""
+
+    def _get(self, client):
+        r = client.get("/api/v1/config")
+        assert r.status_code == 200
+        return r.json()
+
+    def test_get_serves_matrix_and_derived_marginals(self, client):
+        from pulse.config import CATEGORIES, REGIONS
+        data = self._get(client)
+        assert set(data["cell_weights"]) == set(CATEGORIES)
+        for c in CATEGORIES:
+            assert set(data["cell_weights"][c]) == set(REGIONS)
+        assert abs(sum(sum(r.values()) for r in data["cell_weights"].values()) - 1) < 1e-9
+        assert data["derived_weights"] == ["region_weights", "category_weights"]
+        assert abs(sum(data["region_weights"].values()) - 1) < 1e-9
+        assert abs(sum(data["category_weights"].values()) - 1) < 1e-9
+        assert data["cell_weights_source"]
+        assert data["attenuation_source"] == "calibrated_v3.11_september2026"
+
+    def test_put_rejects_retired_dials(self, client):
+        r = client.put("/api/v1/config", json={"region_weights": {"Europe": 1.0}})
+        assert r.status_code == 400
+        r = client.put("/api/v1/config", json={"category_weights": {"Hair: Color": 1.0}})
+        assert r.status_code == 400
+
+    def test_put_rejects_incomplete_or_unbalanced_grid(self, client):
+        from pulse.config import CATEGORIES, REGIONS
+        data = self._get(client)
+        W = {c: dict(data["cell_weights"][c]) for c in CATEGORIES}
+        W[CATEGORIES[0]][REGIONS[0]] += 0.5  # sums to 1.5
+        assert client.put("/api/v1/config", json={"cell_weights": W}).status_code == 400
+        W2 = {c: dict(data["cell_weights"][c]) for c in CATEGORIES[1:]}  # a row missing
+        assert client.put("/api/v1/config", json={"cell_weights": W2}).status_code == 400
+        W3 = {c: dict(data["cell_weights"][c]) for c in CATEGORIES}
+        W3[CATEGORIES[0]]["Atlantis"] = 0.0  # unknown region
+        assert client.put("/api/v1/config", json={"cell_weights": W3}).status_code == 400
+
+    def test_put_accepts_a_valid_grid_and_derives_marginals(self, client):
+        from pulse.config import CATEGORIES, REGIONS
+        data = self._get(client)
+        W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
+        # everything in Europe, equally over the categories
+        for c in CATEGORIES:
+            W[c]["Europe"] = 1.0 / len(CATEGORIES)
+        r = client.put("/api/v1/config", json={"cell_weights": W, "cell_weights_source": "pytest grid"})
+        assert r.status_code == 200, r.text
+        after = self._get(client)
+        assert after["cell_weights"][CATEGORIES[0]]["Europe"] == pytest.approx(1 / 12)
+        assert after["region_weights"]["Europe"] == pytest.approx(1.0)
+        assert after["region_weights"]["Asia"] == pytest.approx(0.0)
+        assert after["category_weights"][CATEGORIES[-1]] == pytest.approx(1 / 12)
+        assert after["cell_weights_source"] == "pytest grid"
+        # restore the default grid so later tests see the placeholder
+        r = client.put("/api/v1/config", json={"cell_weights": data["cell_weights"],
+                                               "cell_weights_source": data["cell_weights_source"]})
+        assert r.status_code == 200, r.text
+
+
+class TestTrendUncertainty2_11:
+    """2.11.0 (owner ruling O7): the uncertainty score travels through the
+    trend list and the update endpoint with its 0–5 validation."""
+
+    def test_trend_list_carries_uncertainty_key(self, client):
+        r = client.get("/api/v1/trends")
+        assert r.status_code == 200
+        rows = r.json()
+        assert rows and all("uncertainty" in t for t in rows)
+
+    def test_update_validates_range(self, client):
+        rows = client.get("/api/v1/trends").json()
+        tid = rows[0]["id"]
+        assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": 9}).status_code == 422
+        assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": -1}).status_code == 422
+
+    def test_update_round_trip_recomputes_prior_and_explicit_null_clears(self, client):
+        from pulse.config import beta_prior_for
+        rows = client.get("/api/v1/trends").json()
+        t0 = rows[0]
+        tid, p = t0["id"], int(t0["probability"])
+        before = {"uncertainty": t0["uncertainty"], "user_override": t0["user_override"]}
+        try:
+            r = client.put(f"/api/v1/trends/{tid}", json={"uncertainty": 5})
+            assert r.status_code == 200, r.text
+            row = next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)
+            assert row["uncertainty"] == 5 and row["user_override"] is True
+            a, b = beta_prior_for(p, 5)
+            assert row["probability_posterior"]["alpha"] == pytest.approx(a)
+            assert row["probability_posterior"]["beta"] == pytest.approx(b)
+            # absent field: unchanged
+            assert client.put(f"/api/v1/trends/{tid}", json={"description": row["description"]}).status_code == 200
+            assert next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)["uncertainty"] == 5
+            # explicit null: cleared, back to the 2.10.0 prior (p, 6 − p)
+            assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": None}).status_code == 200
+            row = next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)
+            assert row["uncertainty"] is None
+            assert (row["probability_posterior"]["alpha"], row["probability_posterior"]["beta"]) == beta_prior_for(p, None)
+        finally:
+            # restore the fixture DB row (uncertainty + user_override) for the other tests
+            client.put(f"/api/v1/trends/{tid}", json={"uncertainty": before["uncertainty"]})
+            from pulse.database import get_db_connection, placeholder
+            with get_db_connection() as conn:
+                conn.cursor().execute(
+                    f"UPDATE trends SET user_override = {placeholder()} WHERE id = {placeholder()}",
+                    (bool(before["user_override"]), tid))
+                conn.commit()
+
+
+class TestBaseReplacementGuard2_11:
+    """2.11.0 (O10): the admin reseed/sync endpoints refuse to act as a base
+    replacement when the seed and the database differ materially."""
+
+    def test_full_reseed_refuses_material_difference(self, client, monkeypatch):
+        from pulse.api.routers import trends as trends_router
+        from pulse.ingestion.models import Trend
+        from pulse.config import CATEGORIES, REGIONS, VC_STEPS
+        fake_seed = [Trend(id=f"consumer_r{90 + i}", force="Consumer", name=f"new {i}", direction="Contraction",
+                           probability=3, gp1_pct_affected=0.1, start_year=2025, peak_year=2030,
+                           diffusion_curve="linear", category_exposure={c: 1 for c in CATEGORIES},
+                           regional_exposure={r: 1 for r in REGIONS}, vc_exposure={v: 1 for v in VC_STEPS})
+                     for i in range(12)]
+        for t in fake_seed:
+            t.sources = [{"title": "x", "url": "https://example.org", "tier": "A"}]
+        import pulse.seed_trends as seed_mod
+        monkeypatch.setattr(seed_mod, "get_report_trends", lambda: fake_seed)
+        before = client.get("/api/v1/trends").json()
+        r = client.post("/api/v1/trends/full-reseed")
+        assert r.status_code == 409 and "replace_trend_base" in r.text
+        r = client.post("/api/v1/trends/sync")
+        assert r.status_code == 409 and "replace_trend_base" in r.text
+        assert len(client.get("/api/v1/trends").json()) == len(before)
+
+
 class TestAPISimulation:
     """Test simulation endpoints."""
 

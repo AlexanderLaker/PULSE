@@ -77,14 +77,15 @@ def main():
     # ── Step 1: Load Trend Database ─────────────────────────────────
     print("[1/5] Loading trend database...")
     try:
-        # Load from the DB; if empty (fresh local SQLite), seed the 99-trend base.
+        # Load from the DB; if empty (fresh local SQLite), seed the base
+        # (51 drivers since 2.11.0) with sources and AI-baseline snapshots.
         from pulse.database import load_trends, init_db, save_trends
         from pulse.config import CATEGORIES, FORCES
         from pulse.ingestion.models import TrendDatabase
         trends = load_trends()
         if not trends:
-            from pulse.seed_trends import TRENDS
-            init_db(); save_trends(TRENDS)
+            from pulse.seed_trends import get_report_trends
+            init_db(); save_trends(get_report_trends())
             trends = load_trends()
         db = TrendDatabase(trends=trends, categories=CATEGORIES, forces=FORCES)
         print(f"      {len(db.trends)} trends, {len(db.categories)} categories, {len(db.forces)} forces")

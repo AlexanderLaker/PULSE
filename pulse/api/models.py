@@ -70,6 +70,11 @@ class TrendCreate(BaseModel):
     gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0, description="Fraction of category GP1 exposed (0.0-1.0)")
     peak_year: Optional[int] = Field(None, ge=2025, le=2035)
     diffusion_curve: Optional[str] = None
+    # 2.11.0 (O7): one uncertainty score per trend, 0 (fixed by law) … 5 (sign
+    # could differ across scenarios). Optional: an unscored trend runs at the
+    # 2.10.0 prior (concentration 6) and the global peak-year jitter.
+    uncertainty: Optional[int] = Field(None, ge=0, le=5,
+        description="Uncertainty score 0-5: dispersion around size and timing of the effect; sets the Beta-prior spread and the peak-year jitter per trend")
     sources: Optional[list] = Field(None,
         description="List of {title, url, source_type, tier} dicts. "
                     "At least one source rated B- or better is required "
@@ -91,6 +96,8 @@ class TrendUpdate(BaseModel):
         description="Year when 100% of trend impact materializes (0 = default 2030)")
     diffusion_curve: Optional[str] = Field(None,
         description="Materialization shape: s_curve, linear, front_loaded, back_loaded, step_function")
+    uncertainty: Optional[int] = Field(None, ge=0, le=5,
+        description="Uncertainty score 0-5 (2.11.0, O7); sets the Beta-prior spread and the per-trend peak-year jitter")
 
 class ProposalUpdate(BaseModel):
     """Partial multi-expert score proposal (PUT /trends/{id}/proposals).
@@ -105,6 +112,7 @@ class ProposalUpdate(BaseModel):
     gp1_pct_affected: Optional[float] = Field(None, ge=0.0, le=1.0)
     peak_year: Optional[int] = Field(None, ge=2025, le=2035)
     diffusion_curve: Optional[str] = None
+    uncertainty: Optional[int] = Field(None, ge=0, le=5)  # 2.11.0 (O7)
     category_exposure: Optional[dict] = None   # {"Hair: Color": 0-5, ...}
     regional_exposure: Optional[dict] = None   # {"Europe": 0-5, ...}
     vc_exposure: Optional[dict] = None          # {"Packaging": 0-5, ...}
@@ -126,8 +134,21 @@ class ConfigUpdate(BaseModel):
     # vc_weights removed (2.9.0, July 2026): the VC attribution lens is a
     # categorical epicentre partition — there is no per-step weight dial.
     # Clients still sending the key get it silently ignored (pydantic).
+    #
+    # 2.11.0 (O6): region_weights / category_weights are no longer inputs —
+    # they are derived marginals of cell_weights. A client that still sends
+    # them gets a 400 from the router pointing at cell_weights (explicit
+    # rejection rather than silent drop, because these used to move numbers).
     region_weights: Optional[dict] = None
     category_weights: Optional[dict] = None
+    cell_weights: Optional[dict] = Field(None,
+        description="12 x 4 matrix of HCB gross-profit SHARES per (category, region) "
+                    "cell: {category: {region: share}}, non-negative, sum 1.0 (±0.01). "
+                    "Rolls the composite cells up to category and portfolio numbers "
+                    "(2.11.0, owner ruling O6). Equal 1/48 placeholder until the actual "
+                    "P&L shares are loaded.")
+    cell_weights_source: Optional[str] = Field(None, max_length=400,
+        description="Provenance label stored with the cell weights (shown in the run footer).")
     force_correlation_matrix: Optional[dict] = Field(None,
         description="6×6 force correlation matrix for copula. "
                     "Each force maps to a dict with all 6 forces. "

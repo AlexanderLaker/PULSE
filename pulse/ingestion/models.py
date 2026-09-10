@@ -67,13 +67,27 @@ class Trend:
     # edits/endorsements so the "AI suggestion" reference never drifts.
     # None for legacy trends until scripts/backfill_ai_suggestion.py runs.
     ai_suggestion: Optional[dict] = None
+    # Uncertainty score (2.11.0, owner ruling O7): ONE score per trend on a
+    # 0–5 scale — the dispersion around the modelled size and timing of the
+    # effect, given its direction (scale documented in pulse/config.py next
+    # to UNCERTAINTY_KAPPA). It sets the Beta-prior concentration (the mean
+    # stays p/6) and the per-trend peak-year jitter width. None = not scored:
+    # the trend then behaves exactly as in 2.10.0 (κ = 6, global jitter).
+    uncertainty: Optional[int] = None
 
     def __post_init__(self):
+        from pulse.config import beta_prior_for  # top-level module, no scipy
         direction_sign = 1 if self.direction == "Expansion" else -1
+        if self.uncertainty is not None:
+            self.uncertainty = max(0, min(5, int(self.uncertainty)))
         # Structured-judgment Beta PRIOR centered on the expert/AI 1–5 score —
-        # always recompute from the current probability so re-scoring updates it
-        # (F11: renamed prior; NOT updated from data — see field comment).
-        self.probability_prior = (max(self.probability, 1), max(6 - self.probability, 1))
+        # always recompute from the current probability (and, since 2.11.0,
+        # the uncertainty score) so re-scoring updates it (F11: renamed prior;
+        # NOT updated from data — see field comment). Without an uncertainty
+        # score this is (p, 6 − p), the 2.10.0 prior, exactly.
+        # The raw score goes in: the unscored branch of beta_prior_for is the
+        # 2.10.0 formula verbatim, (max(p, 1), max(6 − p, 1)).
+        self.probability_prior = beta_prior_for(self.probability, self.uncertainty)
         # normalized_score aligned with MC engine formula:
         #   MC samples: prob_01 × gp1_pct_affected × direction
         #   Deterministic: E[prob_01] × gp1_pct_affected × direction

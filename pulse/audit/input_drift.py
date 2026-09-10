@@ -82,6 +82,9 @@ def trend_fingerprint(trends) -> dict:
             "re": _exposure_map(getattr(t, "regional_exposure", None)),
             "pk": int(getattr(t, "peak_year", 0) or 0),
             "dc": str(getattr(t, "diffusion_curve", "") or ""),
+            # 2.11.0 (O7): the uncertainty score moves the prior spread and the
+            # jitter width, so a re-score is drift; None = not scored.
+            "u": (int(getattr(t, "uncertainty")) if getattr(t, "uncertainty", None) is not None else None),
         }
     return fp
 
@@ -117,8 +120,8 @@ def compute_input_drift_event(
     removed = sorted(prev_ids - curr_ids)
 
     prob_changes, gp1_changes, direction_flips = [], [], []
-    structure_changes = []  # L6: exposures / peak year / diffusion curve
-    _STRUCTURE_KEYS = ("ce", "ve", "re", "pk", "dc")
+    structure_changes = []  # L6: exposures / peak year / diffusion curve; 2.11.0: uncertainty
+    _STRUCTURE_KEYS = ("ce", "ve", "re", "pk", "dc", "u")
     for tid in sorted(curr_ids & prev_ids):
         a, b = previous_fp[tid], current_fp[tid]
         if a.get("p") != b.get("p"):

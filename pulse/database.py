@@ -322,6 +322,7 @@ def init_db() -> None:
                 peak_year INTEGER DEFAULT 0,
                 diffusion_curve TEXT DEFAULT 's_curve',
                 ai_suggestion TEXT,
+                uncertainty INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -336,6 +337,10 @@ def init_db() -> None:
             # snapshot of the originally-seeded scoreable fields, stored as a
             # JSON blob so the "AI suggestion" reference survives admin edits.
             "ALTER TABLE trends ADD COLUMN ai_suggestion TEXT",
+            # 2.11.0 (owner ruling O7): one uncertainty score per trend (0-5,
+            # NULL = not scored → 2.10.0 behaviour). Nullable, no backfill.
+            "ALTER TABLE trends ADD COLUMN uncertainty INTEGER",
+            "ALTER TABLE trend_score_proposals ADD COLUMN uncertainty INTEGER",
             "ALTER TABLE trend_sources ADD COLUMN tier TEXT DEFAULT ''",
             # Free-text expert comment on a trend score proposal (June 2026).
             # On a fresh DB the proposals table doesn't exist yet at this point
@@ -410,6 +415,7 @@ def init_db() -> None:
                 gp1_pct_affected REAL,
                 peak_year INTEGER,
                 diffusion_curve TEXT,
+                uncertainty INTEGER,
                 category_exposure TEXT,
                 regional_exposure TEXT,
                 vc_exposure TEXT,
@@ -632,8 +638,9 @@ def save_trends(trends: List[Trend]) -> None:
                     probability, start_year, normalized_score,
                     strategic_implication, data_source, source_type, confidence,
                     ai_suggested, user_override, probability_posterior,
-                    gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion
-                ) VALUES ({ph(20)})
+                    gp1_pct_affected, peak_year, diffusion_curve, ai_suggestion,
+                    uncertainty
+                ) VALUES ({ph(21)})
                 """,
                 (
                     trend.id, trend.force, trend.sub_category, trend.name,
@@ -656,6 +663,8 @@ def save_trends(trends: List[Trend]) -> None:
                     # for legacy trends until scripts/backfill_ai_suggestion.py runs.
                     (_safe_dumps(getattr(trend, 'ai_suggestion', None))
                      if getattr(trend, 'ai_suggestion', None) else None),
+                    # 2.11.0 (O7): uncertainty score, NULL when not scored.
+                    getattr(trend, 'uncertainty', None),
                 ),
             )
 
@@ -695,6 +704,16 @@ def _row_to_dict(row) -> dict:
         return row
     # sqlite3.Row
     return dict(row)
+
+
+def _int_or_none(val):
+    """Nullable integer column reader (uncertainty, 2.11.0)."""
+    if val is None or val == "":
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_json_blob(val):
@@ -799,6 +818,7 @@ def load_trends() -> List[Trend]:
                 diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
                 probability_prior=prob_posterior,
                 ai_suggestion=ai_suggestion,
+                uncertainty=_int_or_none(row.get("uncertainty")),
             )
             # Attach sources as transient attribute (not in dataclass)
             trend.sources = sources
@@ -875,8 +895,9 @@ def get_trend_by_id(trend_id: str) -> Optional[Trend]:
             gp1_pct_affected=row.get("gp1_pct_affected"),
             peak_year=row.get("peak_year", 0) or 0,
             diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
-            probability_posterior=prob_posterior,
+            probability_prior=prob_posterior,  # F11 rename (the dataclass field)
             ai_suggestion=ai_suggestion,
+            uncertainty=_int_or_none(row.get("uncertainty")),
         )
 
 
@@ -1041,7 +1062,7 @@ def load_journey_content() -> Optional[dict]:
 # read back as dicts. A proposal is PARTIAL: any subset of the 7 scoreable
 # fields may be set; NULL/absent fields mean "this user did not score that".
 
-_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve")
+_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty")
 _PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
 # Plain-text fields merged verbatim (no JSON encode, no numeric clamp).
 _PROPOSAL_TEXT_FIELDS = ("comment",)
@@ -1059,6 +1080,7 @@ def _proposal_row_to_dict(raw) -> dict:
         "gp1_pct_affected": row.get("gp1_pct_affected"),
         "peak_year": row.get("peak_year"),
         "diffusion_curve": row.get("diffusion_curve"),
+        "uncertainty": _int_or_none(row.get("uncertainty")),
         "category_exposure": _parse_json_blob(row.get("category_exposure")),
         "regional_exposure": _parse_json_blob(row.get("regional_exposure")),
         "vc_exposure": _parse_json_blob(row.get("vc_exposure")),
@@ -1080,7 +1102,7 @@ def load_trend_proposals(trend_id: str) -> List[Dict[str, Any]]:
             cursor.execute(
                 f"""
                 SELECT user_id, user_name, user_role, probability,
-                       gp1_pct_affected, peak_year, diffusion_curve,
+                       gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
                        category_exposure, regional_exposure, vc_exposure,
                        comment, updated_at
                 FROM trend_score_proposals
@@ -1108,7 +1130,7 @@ def load_all_trend_proposals() -> Dict[str, List[Dict[str, Any]]]:
             cursor.execute(
                 """
                 SELECT trend_id, user_id, user_name, user_role, probability,
-                       gp1_pct_affected, peak_year, diffusion_curve,
+                       gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
                        category_exposure, regional_exposure, vc_exposure,
                        comment, updated_at
                 FROM trend_score_proposals
@@ -1149,7 +1171,7 @@ def upsert_trend_proposal(
         cursor.execute(
             f"""
             SELECT user_id, user_name, user_role, probability, gp1_pct_affected,
-                   peak_year, diffusion_curve, category_exposure,
+                   peak_year, diffusion_curve, uncertainty, category_exposure,
                    regional_exposure, vc_exposure, comment, updated_at
             FROM trend_score_proposals
             WHERE trend_id = {p} AND user_id = {p}
@@ -1159,7 +1181,7 @@ def upsert_trend_proposal(
         existing = cursor.fetchone()
         merged = _proposal_row_to_dict(existing) if existing else {
             "probability": None, "gp1_pct_affected": None, "peak_year": None,
-            "diffusion_curve": None, "category_exposure": None,
+            "diffusion_curve": None, "uncertainty": None, "category_exposure": None,
             "regional_exposure": None, "vc_exposure": None, "comment": None,
         }
 
@@ -1178,6 +1200,7 @@ def upsert_trend_proposal(
                 UPDATE trend_score_proposals
                 SET user_name = {p}, user_role = {p}, probability = {p},
                     gp1_pct_affected = {p}, peak_year = {p}, diffusion_curve = {p},
+                    uncertainty = {p},
                     category_exposure = {p}, regional_exposure = {p},
                     vc_exposure = {p}, comment = {p}, updated_at = {p}
                 WHERE trend_id = {p} AND user_id = {p}
@@ -1186,6 +1209,7 @@ def upsert_trend_proposal(
                     user_name or "", user_role or "",
                     merged.get("probability"), merged.get("gp1_pct_affected"),
                     merged.get("peak_year"), merged.get("diffusion_curve"),
+                    merged.get("uncertainty"),
                     _enc(merged.get("category_exposure")),
                     _enc(merged.get("regional_exposure")),
                     _enc(merged.get("vc_exposure")),
@@ -1198,15 +1222,16 @@ def upsert_trend_proposal(
                 f"""
                 INSERT INTO trend_score_proposals (
                     trend_id, user_id, user_name, user_role, probability,
-                    gp1_pct_affected, peak_year, diffusion_curve,
+                    gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
                     category_exposure, regional_exposure, vc_exposure,
                     comment, updated_at
-                ) VALUES ({ph(13)})
+                ) VALUES ({ph(14)})
                 """,
                 (
                     trend_id, user_id, user_name or "", user_role or "",
                     merged.get("probability"), merged.get("gp1_pct_affected"),
                     merged.get("peak_year"), merged.get("diffusion_curve"),
+                    merged.get("uncertainty"),
                     _enc(merged.get("category_exposure")),
                     _enc(merged.get("regional_exposure")),
                     _enc(merged.get("vc_exposure")),

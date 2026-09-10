@@ -106,7 +106,7 @@ export interface ModelConfig {
    *  anywhere. Six values (one per force) sourced from
    *  data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet). */
   per_force_attenuation?: Record<ForceName, number>;
-  attenuation_source?: 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
+  attenuation_source?: 'calibrated_v3.11_september2026' | 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
   // neutral_threshold deleted (July 2026): engine-inert, removed end-to-end.
   base_year?: number;
   path_years?: ProjectionYear[];
@@ -114,17 +114,27 @@ export interface ModelConfig {
   force_weights?: Record<ForceName, number>;
   // vc_weights deleted (2.9.0, July 2026): the VC attribution lens is a
   // categorical epicentre partition — no per-step weight dial exists.
-  /** Regional business-importance weights — admin-editable on the config page.
-   *  Used by the frontend to aggregate decomposition cells across regions
-   *  for Region-lens row totals and for computing "overall region impact"
-   *  views. Keyed by region display name ("Europe", "North America", etc.). */
+  /** 2.11.0 (owner ruling O6): the 12 × 4 matrix of HCB gross-profit SHARES
+   *  per category × region cell (sums to 1). The engine rolls the 48 composite
+   *  cells up with it: category shift = share-weighted mean of the row,
+   *  portfolio = Σ share × cell. Editable on the Config sheet (admin) and via
+   *  `--cell-weights FILE` on the production CLI; the default is the equal
+   *  1/48 placeholder until the actual P&L shares are loaded. Keyed
+   *  cell_weights[category][region]. */
+  cell_weights?: Record<string, Record<string, number>>;
+  /** Provenance label of the cell weights (shown in the About footer). */
+  cell_weights_source?: string;
+  /** The backend's placeholder label (what "reset to equal" writes). */
+  cell_weights_source_default?: string;
+  /** Names of the weight vectors GET /config derives from cell_weights
+   *  (read-only; PUT rejects them). */
+  derived_weights?: string[];
+  /** DERIVED (2.11.0): column sums of cell_weights — the region shares.
+   *  Read-only; kept on the contract for the region lens and the drill-down. */
   region_weights?: Record<string, number>;
-  /** Category business-importance weights — admin-editable on the config page.
-   *  Drives the Shift-Matrix column totals and grand total on the Profit
-   *  Pool Analysis 2 page: we take category-weighted averages across the
-   *  12 categories instead of raw sums, so totals reflect each category's
-   *  importance to the portfolio. Keyed by category display name
-   *  ("Hair: Color", "LHC: FCN", ...). */
+  /** DERIVED (2.11.0): row sums of cell_weights — the category shares that
+   *  drive the Shift-Matrix column totals and grand total (lib/shiftMatrix.ts
+   *  takes category-weighted averages, never raw sums). Read-only. */
   category_weights?: Record<string, number>;
   category_names?: string[];
   ai_provider?: AIProvider;

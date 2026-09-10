@@ -62,6 +62,9 @@ async def get_simulation(user: dict = Depends(require_auth)):
         # weights actually applied in the roll-up.
         "regional_shift_matrix": mc.get("regional_shift_matrix"),
         "region_weights_used": mc.get("region_weights_used"),
+        "cell_weights_used": mc.get("cell_weights_used"),
+        "category_weights_used": mc.get("category_weights_used"),
+        "cell_weights_source": mc.get("cell_weights_source"),
         "convergence": _summarize_convergence(mc.get("convergence", {})),
         # F7 (2.10.0): per-quantile Monte-Carlo standard error (replaces R̂/ESS).
         "mc_standard_error": mc.get("mc_standard_error"),
@@ -217,6 +220,9 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 # F1: 3D regional shift + weights used in the roll-up.
                 "regional_shift_matrix": mc_result.get("regional_shift_matrix"),
                 "region_weights_used": mc_result.get("region_weights_used"),
+                "cell_weights_used": mc_result.get("cell_weights_used"),
+                "category_weights_used": mc_result.get("category_weights_used"),
+                "cell_weights_source": mc_result.get("cell_weights_source"),
                 "decompositions": mc_result.get("decompositions"),
                 "totals": mc_result.get("totals"),
                 "vc_decomposition": mc_result.get("vc_decomposition"),
@@ -237,6 +243,12 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                     # 2.9.0 VC basis + 2.10.0 region weights on the audit trail.
                     "vc_attribution_basis": mc_result.get("vc_attribution_basis"),
                     "region_weights_used": mc_result.get("region_weights_used"),
+                    "cell_weights_used": mc_result.get("cell_weights_used"),
+                    "category_weights_used": mc_result.get("category_weights_used"),
+                    "cell_weights_source": mc_result.get("cell_weights_source"),
+                    # 2.11.0 (O10/O11): base size + calibration tag of the run.
+                    "trend_count": len(getattr(db, "trends", []) or []),
+                    "attenuation_source": getattr(config, "attenuation_source", None),
                     "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
                     # D19: fingerprint of THIS run's inputs for the next diff
                     "trend_fingerprint": current_fp,
@@ -267,6 +279,13 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
                 "engine_name": mc_result.get("engine_name"),
                 "engine_fidelity": _meta.get("engine_fidelity"),
                 "numerics_backend": _meta.get("numerics_backend"),
+                "vc_attribution_basis": _meta.get("vc_attribution_basis"),
+                "region_weights_used": _meta.get("region_weights_used"),
+                "cell_weights_used": _meta.get("cell_weights_used"),
+                "category_weights_used": _meta.get("category_weights_used"),
+                "cell_weights_source": _meta.get("cell_weights_source"),
+                "trend_count": _meta.get("trend_count"),
+                "attenuation_source": _meta.get("attenuation_source"),
                 "persisted_at_utc": _meta.get("persisted_at_utc"),
             }
             logger.info(f"Simulation persisted ({req.iterations} iterations, run_id={run_id})")
@@ -278,6 +297,9 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
             "shift_matrix": mc_result["shift_matrix"],
             "regional_shift_matrix": mc_result.get("regional_shift_matrix"),
             "region_weights_used": mc_result.get("region_weights_used"),
+            "cell_weights_used": mc_result.get("cell_weights_used"),
+            "category_weights_used": mc_result.get("category_weights_used"),
+            "cell_weights_source": mc_result.get("cell_weights_source"),
             "mc_standard_error": mc_result.get("mc_standard_error"),
             "iterations": mc_result["iterations"],
             "model_type": mc_result["model_type"],

@@ -15,7 +15,7 @@ PRISM is a profit-pool simulation platform for consumer-brands category strategy
 ```
 OFFLINE  (operator machine today, a scheduled job tomorrow)
   python3 scripts/run_50k_prod.py
-    → loads 99 trends from Postgres
+    → loads the 51 drivers from Postgres (2.11.0)
     → Bayesian MC, 3 chains × 50k, scipy
     → persists ONE results row to the database
     → writes a QA Excel

@@ -174,8 +174,18 @@ export interface RunMeta {
    *  stage). Null/absent on pre-2.9 runs, which used profile×weight shares
    *  — the About-footer labels those "profile-weighted (pre-2.9 run)". */
   vc_attribution_basis?: string | null;
-  /** 2.10.0 (F1): the region GP1-share weights applied in the roll-up. */
+  /** 2.10.0 (F1): the region GP1-share weights applied in the roll-up
+   *  (since 2.11.0 the column sums of cell_weights_used). */
   region_weights_used?: Record<string, number> | null;
+  /** 2.11.0 (O6): the 12 × 4 gross-profit-share matrix the run rolled up
+   *  with, its row sums, and the provenance label. Absent on pre-2.11 runs. */
+  cell_weights_used?: Record<string, Record<string, number>> | null;
+  category_weights_used?: Record<string, number> | null;
+  cell_weights_source?: string | null;
+  /** 2.11.0 (O10/O11): number of drivers the run loaded and the calibration
+   *  tag of its config (e.g. 'calibrated_v3.11_september2026'). */
+  trend_count?: number | null;
+  attenuation_source?: string | null;
   converged_categories?: number | null;
   total_categories?: number | null;
   persisted_at_utc?: string | null;
@@ -188,6 +198,11 @@ export interface SimulationResult {
    *  actually applied in the category/portfolio roll-up. */
   regional_shift_matrix?: RegionalShiftMatrix;
   region_weights_used?: Record<string, number>;
+  /** 2.11.0 (O6): the cell gross-profit-share matrix the run used, its row
+   *  sums (the category weights the footer totals must use) and the label. */
+  cell_weights_used?: Record<string, Record<string, number>>;
+  category_weights_used?: Record<string, number>;
+  cell_weights_source?: string;
   /** Per-year Force/VC/Region decompositions — source of truth for the Shift-Matrix lenses. */
   decompositions?: DecompositionMatrix;
   /** Per-year row/column totals + the joint portfolio band. */

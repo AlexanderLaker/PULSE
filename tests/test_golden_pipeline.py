@@ -102,37 +102,49 @@ class TestDeterminism:
 class TestGoldenPins:
     """Exact expected output for seed=42 / 500 iterations on the fixture DB.
 
-    Engine: bayesian_copula MODEL_VERSION 2.10.0.
+    Engine: bayesian_copula MODEL_VERSION 2.11.0.
 
-    REGENERATED 2026-07-13 (2.10.0, owner-directed mathematical-review batch —
-    numbers MOVE by design): the shift math is now regional (F1, 3D category ×
-    region × year rolled up by the region GP1-share weights), the within-force
-    dampening uses the magnitude-weighted n_eff (F2), and start_year gates the
-    materialization onset (F11). The fixture now carries per-trend regional
-    exposure and pins with peak-year jitter OFF (F4 has its own test). The
-    magnitudes shrank vs the 2.8.1 pins because the fixture trends are Europe-
-    weighted, so the regional roll-up correctly dilutes their category impact.
+    REGENERATED 2026-09-10 (2.11.0, owner rulings O6–O11 — numbers MOVE by
+    design): the 48 composite cells are now rolled up with the cell
+    gross-profit-share matrix (config.cell_weights), whose default is the
+    EQUAL 1/48 placeholder (owner decision: equal regions and categories until
+    the actual P&L shares are loaded). The 2.10.0 pins used the Henkel Group
+    FY2025 regional split (0.38/0.26/0.17/0.19); because the fixture trends
+    are Europe-weighted, equal region shares dilute them further and the
+    magnitudes shrink. The second mover is the v3.11 calibration (O11): the
+    per-force attenuation and the within-force overlap defaults are now the
+    51-driver values of data/attenuation_calibration_v3_11.json (e.g. the
+    Government within-force overlap 0.426 → 0.126 dampens the fixture's
+    regulatory pair less, so the pins moved again on 2026-09-10 when the
+    calibration landed). tests/test_cell_weights.py locks the other
+    direction: the 2.11.0 engine with the separable Group-split matrix AND
+    the 2.10.0 calibration reproduces the 2.10.0 pins to 1e-12, so the
+    difference is weights plus calibration, not a defect. Jitter stays OFF
+    in the fixture (F4 has its own test); no fixture trend carries an
+    uncertainty score, so the O7 path is inert here and is exercised in
+    tests/test_uncertainty.py.
+
+    Prior regenerations: 2026-07-13 v3.10/2.10.0 (regional 3D roll-up, n_eff
+    dampening, start_year onset); 2026-07-06 v3.8/2.8.1 (L3 clip, L4 floor,
+    fixture differentiation); June 2026 v3.7/D20 (t-copula deleted →
+    Gaussian); June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
     Regenerate pins ONLY for deliberate model changes, in the same commit.
-
-    Prior regenerations: 2026-07-06 v3.8/2.8.1 (L3 clip, L4 floor, fixture
-    differentiation); June 2026 v3.7/D20 (t-copula deleted → Gaussian);
-    June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
     """
 
     PINS = {
         # cat:          (median,            p10,                p90)
-        "Hair: Color": (-0.003365458544, -0.005207021042, -0.001350259625),
-        "Hair: Care":  (-0.004405135395, -0.006105482349, -0.002398520912),
-        "LHC: FCN":    (-0.005469456519, -0.007019692994, -0.003314337205),
+        "Hair: Color": (-0.003119105635, -0.004789608404, -0.001275106969),
+        "Hair: Care":  (-0.004026102323, -0.005571151116, -0.002186639590),
+        "LHC: FCN":    (-0.004954576037, -0.006348585044, -0.003017910387),
     }
 
     # L29: the joint portfolio band (totals.portfolio) is what the dashboard
     # headline shows (D3) — pin it too, not only per-category cells.
-    PORTFOLIO_PIN = (-0.004730794486, -0.006328294549, -0.002752637701)
+    PORTFOLIO_PIN = (-0.004289467411, -0.005718831386, -0.002458386817)
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.10.0"
+        assert r["model_version"] == "2.11.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")  # D13

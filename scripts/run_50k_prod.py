@@ -4,6 +4,13 @@
 Usage (from the operator machine, repo root):
     python3 scripts/run_50k_prod.py                 # canonical: 3 × 50k vs Neon
     python3 scripts/run_50k_prod.py --iterations 5000 --allow-sqlite   # local dry run
+    python3 scripts/run_50k_prod.py --cell-weights data/cell_weights.local.json
+        # 2.11.0 (O6): roll the 48 category × region cells up with the actual
+        # HCB gross-profit share per cell instead of the equal 1/48 placeholder.
+        # FILE is JSON: {"source": "<provenance label>", "basis": "gp1_share" |
+        # "gp1_absolute", "cells": {category: {region: value}}}. Absolute
+        # figures are normalised to shares BEFORE the engine is constructed and
+        # are never persisted (design philosophy #5); keep the file outside git.
 
 Requirements:
     - .env contains POSTGRES_URL or DATABASE_URL pointing at Neon prod
@@ -29,6 +36,7 @@ Exit codes (H2, July 2026 review — cron/operators must see failures):
        (F6 pre-flight spectral gate) and --allow-nonpsd not passed — the
        engine would silently repair it at runtime, making configured ≠
        effective correlations. Lower the cross-force correlations or override.
+    6  --cell-weights file missing, unreadable or failing validation (2.11.0)
 """
 
 from __future__ import annotations
@@ -59,9 +67,65 @@ logging.basicConfig(
 )
 log = logging.getLogger("run_50k_prod")
 
-#: Trend-base size the operator expects (v3.5 base). A different count is not
-#: fatal (the drift event reports adds/removes) but is warned loudly.
-EXPECTED_TREND_COUNT = 99
+#: Trend-base size the operator expects (the 51-driver base of the September
+#: 2026 review, release 2.11.0; 99 before). A different count is not fatal
+#: (the drift event reports adds/removes) but is warned loudly: a 2.11.0 run
+#: on a database that still holds the 99-trend base has not had
+#: scripts/replace_trend_base.py applied.
+EXPECTED_TREND_COUNT = 51
+
+
+def load_cell_weights_file(path: "Path") -> tuple:
+    """Read a 2.11.0 cell-weights file and return (shares, source_label).
+
+    Format: {"source": str, "basis": "gp1_share" | "gp1_absolute",
+             "cells": {category: {region: value}}}. Values must be
+    non-negative and complete (12 categories × 4 regions). "gp1_absolute"
+    figures (any currency unit) are normalised to shares here so the engine
+    and the persisted run only ever see shares — the total is not retained.
+    Raises ValueError with a readable message on any defect.
+    """
+    import json as _json
+    from pulse.config import CATEGORIES as _CATS, REGIONS as _REGS
+    raw = _json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or "cells" not in raw:
+        raise ValueError("cell-weights file must be a JSON object with a 'cells' key")
+    basis = str(raw.get("basis", "gp1_share")).strip().lower()
+    if basis not in ("gp1_share", "gp1_absolute"):
+        raise ValueError(f"basis must be 'gp1_share' or 'gp1_absolute', got {basis!r}")
+    cells = raw["cells"]
+    if not isinstance(cells, dict):
+        raise ValueError("'cells' must map every category to {region: value}")
+    missing = [c for c in _CATS if c not in cells]
+    unknown = [c for c in cells if c not in _CATS]
+    if missing or unknown:
+        raise ValueError(f"cells: missing categories {missing}; unknown categories {unknown}")
+    total = 0.0
+    shares = {}
+    for cat in _CATS:
+        row = cells[cat]
+        if not isinstance(row, dict):
+            raise ValueError(f"cells['{cat}'] must map every region to a value")
+        rmiss = [r for r in _REGS if r not in row]
+        runk = [r for r in row if r not in _REGS]
+        if rmiss or runk:
+            raise ValueError(f"cells['{cat}']: missing regions {rmiss}; unknown regions {runk}")
+        shares[cat] = {}
+        for region in _REGS:
+            v = row[region]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0:
+                raise ValueError(f"cells['{cat}']['{region}'] must be a non-negative number, got {v!r}")
+            shares[cat][region] = float(v)
+            total += float(v)
+    if total <= 0:
+        raise ValueError("cells must contain at least one positive value")
+    if basis == "gp1_share" and abs(total - 1.0) > 0.01:
+        raise ValueError(f"basis 'gp1_share' requires the 48 cells to sum to 1.0 (±0.01), got {total:.4f}")
+    shares = {c: {r: v / total for r, v in row.items()} for c, row in shares.items()}
+    source = str(raw.get("source") or f"cell-weights file {Path(path).name}")
+    if basis == "gp1_absolute":
+        source = f"{source} (absolute gross profit normalised to shares at run time; amounts not persisted)"
+    return shares, source
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -78,6 +142,10 @@ def main(argv: list[str] | None = None) -> int:
                              "even if the correlation matrix is not PSD on the "
                              "loaded trend mix (the engine will repair it at "
                              "runtime — configured ≠ effective correlations)")
+    parser.add_argument("--cell-weights", type=str, default=None, metavar="FILE",
+                        help="JSON file with the HCB gross-profit share (or absolute "
+                             "gross profit, normalised here) per category x region "
+                             "cell (2.11.0, O6). Default: equal 1/48 placeholder.")
     args = parser.parse_args(argv)
 
     db_url = os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL")
@@ -130,11 +198,27 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── 2) Configure ─────────────────────────────────────────────────
     config = ModelConfig().copy_with(iterations=args.iterations)
+    if args.cell_weights:
+        try:
+            shares, source = load_cell_weights_file(Path(args.cell_weights))
+            config = config.copy_with(cell_weights=shares, cell_weights_source=source)
+            from pulse.config_validation import validate_model_config
+            validate_model_config(config.__dict__)
+        except Exception as exc:  # readable failure, exit 6
+            log.error("--cell-weights rejected: %s", exc)
+            return 6
     log.info(
         "[2/5] Config: %d iterations × %d chains = %d samples per category",
         config.iterations, args.chains, config.iterations * args.chains,
     )
     log.info("      Horizon: %s – %s", config.path_years[0], config.path_years[-1])
+    # 2.11.0 (O6): the cell gross-profit shares that roll the 48 cells up.
+    log.info("      Cell weights: %s", config.cell_weights_source)
+    from pulse.config import REGIONS as _REGIONS
+    log.info("      Region shares (column sums): %s",
+             ", ".join(f"{r} {config.region_weights[r]*100:.1f}%" for r in _REGIONS))
+    log.info("      Category shares (row sums): %s",
+             ", ".join(f"{c} {config.category_weights[c]*100:.1f}%" for c in CATEGORIES))
 
     # ── 2b) F6 pre-flight spectral gate ──────────────────────────────
     # Correlation PSD validity is population-dependent: the defaults are valid
@@ -220,6 +304,9 @@ def main(argv: list[str] | None = None) -> int:
             # GP1-share weights actually applied in the category/portfolio roll-up.
             "regional_shift_matrix": result.get("regional_shift_matrix"),
             "region_weights_used": result.get("region_weights_used"),
+            "cell_weights_used": result.get("cell_weights_used"),
+            "category_weights_used": result.get("category_weights_used"),
+            "cell_weights_source": result.get("cell_weights_source"),
             "decompositions": result.get("decompositions"),
             "totals": result.get("totals"),
             "vc_decomposition": result.get("vc_decomposition"),
@@ -249,6 +336,13 @@ def main(argv: list[str] | None = None) -> int:
                 "vc_attribution_basis": result.get("vc_attribution_basis"),
                 # 2.10.0 (F1): region GP1-share weights applied in the roll-up.
                 "region_weights_used": result.get("region_weights_used"),
+                "cell_weights_used": result.get("cell_weights_used"),
+                "category_weights_used": result.get("category_weights_used"),
+                "cell_weights_source": result.get("cell_weights_source"),
+                # 2.11.0 (O10/O11): the base and the calibration the run used,
+                # so the About footer can say so without guessing from dates.
+                "trend_count": len(trend_db.trends),
+                "attenuation_source": config.attenuation_source,
                 "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
                 # D19: fingerprint of THIS run's inputs — next run diffs itself
                 # against it.

@@ -26,6 +26,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+#: 2.11.0 (O10): full-reseed / sync refuse when the seed and the database
+#: differ by more ids than this — a base replacement goes through
+#: scripts/replace_trend_base.py (archive-first, proposals restored, verified).
+BASE_REPLACEMENT_THRESHOLD = 10
+
 
 @router.get("/api/v1/trends")
 async def list_trends(force: Optional[str] = None, user: dict = Depends(require_auth)):
@@ -107,6 +112,8 @@ async def list_trends(force: Optional[str] = None, user: dict = Depends(require_
         "probability_posterior": {"alpha": t.probability_posterior[0], "beta": t.probability_posterior[1]} if t.probability_posterior else None,
         "peak_year": getattr(t, 'peak_year', 0),
         "diffusion_curve": getattr(t, 'diffusion_curve', 's_curve'),
+        # 2.11.0 (O7): uncertainty score 0-5, None when not scored.
+        "uncertainty": getattr(t, 'uncertainty', None),
         "ai_suggestion": getattr(t, 'ai_suggestion', None),
         "proposal_summary": build_proposal_summary(proposals_by_trend.get(t.id, []), user_id),
     } for t in trends]
@@ -169,6 +176,7 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
         gp1_pct_affected=req.gp1_pct_affected or 0.10,
         peak_year=req.peak_year or 0,
         diffusion_curve=req.diffusion_curve or "s_curve",
+        uncertainty=req.uncertainty,
     )
 
     # Persist to database
@@ -299,6 +307,18 @@ async def full_reseed(user: dict = Depends(require_admin)):
     db_ids = {t.id for t in old_trends}
     orphan_ids = sorted(db_ids - seed_ids)
 
+    # 2.11.0 (O10): a base REPLACEMENT is not a reseed. When the id sets differ
+    # materially (the 99 → 51 move, or any future review), the archive-first
+    # script is the only sanctioned path: it archives trends, exposures,
+    # sources and expert proposals, restores the kept ids' proposals across
+    # the Postgres cascade (F-29) and verifies. This endpoint does none of that.
+    added_ids = sorted(seed_ids - db_ids)
+    if old_count and len(orphan_ids) + len(added_ids) > BASE_REPLACEMENT_THRESHOLD:
+        raise HTTPException(409,
+            f"full-reseed refused: the seed and the database differ by {len(orphan_ids)} retired "
+            f"and {len(added_ids)} new ids — that is a trend-base replacement. Run "
+            f"scripts/replace_trend_base.py (archive-first) instead.")
+
     # Delete orphans from all related tables before upserting the new seed
     if orphan_ids:
         p = placeholder()
@@ -381,6 +401,9 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         "regional_exposure": trend.regional_exposure,
         "confidence": trend.confidence, "ai_suggested": trend.ai_suggested,
         "probability_posterior": trend.probability_posterior,
+        "peak_year": getattr(trend, 'peak_year', 0),
+        "diffusion_curve": getattr(trend, 'diffusion_curve', 's_curve'),
+        "uncertainty": getattr(trend, 'uncertainty', None),
         "ai_suggestion": getattr(trend, "ai_suggestion", None),
         "proposal_summary": build_proposal_summary(_prop_rows, user_id),
     }
@@ -437,12 +460,27 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
         if update.diffusion_curve not in VALID_DIFFUSION_CURVES:
             raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
         trend.diffusion_curve = update.diffusion_curve
+    # 2.11.0 (O7): re-scoring the uncertainty changes the Beta-prior spread
+    # and the per-trend jitter, so it is a score change (audited) and
+    # __post_init__ below recomputes the prior. An EXPLICIT null clears the
+    # score (back to the 2.10.0 behaviour: κ 6, global jitter); an absent
+    # field leaves it unchanged, like every other field of this endpoint.
+    uncertainty_sent = "uncertainty" in update.model_fields_set
+    if uncertainty_sent:
+        new_unc = None if update.uncertainty is None else max(0, min(5, int(update.uncertainty)))
+        if new_unc != getattr(trend, 'uncertainty', None):
+            audit.log("score_change", "trend", trend_id,
+                       old_value=str(getattr(trend, 'uncertainty', None)),
+                       new_value=str(new_unc),
+                       reason="uncertainty update" if new_unc is not None else "uncertainty cleared",
+                       user_id=actor_id)
+        trend.uncertainty = new_unc
     # D7 (June 2026): any score-bearing admin edit marks the trend as
     # expert-reviewed — drives the "AI suggestion · expert-reviewed" chip.
-    if any(v is not None for v in (update.probability, update.direction,
-                                   update.gp1_pct_affected, update.category_exposure,
-                                   update.vc_exposure, update.regional_exposure,
-                                   update.peak_year, update.diffusion_curve)):
+    if uncertainty_sent or any(v is not None for v in (update.probability, update.direction,
+                                                       update.gp1_pct_affected, update.category_exposure,
+                                                       update.vc_exposure, update.regional_exposure,
+                                                       update.peak_year, update.diffusion_curve)):
         trend.user_override = True
     trend.__post_init__()
 
@@ -525,6 +563,8 @@ async def put_trend_proposal(
         fields["gp1_pct_affected"] = max(0.0, min(1.0, float(proposal.gp1_pct_affected)))
     if "peak_year" in sent and proposal.peak_year is not None:
         fields["peak_year"] = int(proposal.peak_year)
+    if "uncertainty" in sent and proposal.uncertainty is not None:
+        fields["uncertainty"] = max(0, min(5, int(proposal.uncertainty)))
     if "diffusion_curve" in sent and proposal.diffusion_curve is not None:
         from pulse.config import VALID_DIFFUSION_CURVES
         if proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
@@ -665,6 +705,15 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
     db_ids = {t.id for t in db_trends}
     seed_ids = {t.id for t in seed_trends}
     missing_ids = seed_ids - db_ids
+
+    # 2.11.0 (O10): syncing the 51-driver seed INTO a 99-trend database would
+    # produce a hybrid base; a material difference is a replacement, see
+    # full_reseed above.
+    if db_trends and len(missing_ids) + len(db_ids - seed_ids) > BASE_REPLACEMENT_THRESHOLD:
+        raise HTTPException(409,
+            f"sync refused: {len(missing_ids)} seed ids are missing and {len(db_ids - seed_ids)} "
+            f"database ids are not in the seed — that is a trend-base replacement. Run "
+            f"scripts/replace_trend_base.py (archive-first) instead.")
 
     if not missing_ids:
         return {

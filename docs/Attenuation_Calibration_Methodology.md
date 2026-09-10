@@ -310,3 +310,107 @@ python3 scripts/run_50k_prod.py
 *Pairs evaluated: 4,851 unordered pairs (within + across forces)*
 *Baseline J₀ shift: 0.4846 → 0.4525 (−0.0321)*
 *Trend-weighted mean eff_att shift: 0.4462 → 0.4523 (+0.0061)*
+
+---
+
+# PRISM v3.11 — Recalibration on the 51-Driver Base (release 2.11.0)
+
+Owner ruling O11 (10 September 2026). The September 2026 senior-partner review replaced the 99-trend base with 51 drivers (O10). Every population-dependent quantity of the overlap correction is re-derived on that population with the method of sections 2 and 7 unchanged: weighted Jaccard on the 12-category exposure vectors, excess over the random-pair baseline, asymmetric force-size factor, per-cell mechanism adjustments, clamps [0.10, 0.45] within and [0.00, 0.45] across, and the identity eff_att = 0.5 x (1 - mean cross-force row overlap). The mechanism adjustments were re-judged cell by cell for the new population (owner decision 2026-09-10); every non-zero cell carries its reason in `data/attenuation_calibration_v3_11.json` and on the Mechanism Adjustments sheet of the workbook.
+
+## 12. What the population change did to the inputs
+
+- 51 drivers: Consumer 20, Government 10, Customer 7, Technology 6, Competitive 4, Environmental 4 (99 before: 32/14/10/18/14/11).
+- Unique pairs: 1,275 (4,851 before).
+- Random-pair baseline J0: 0.4265 (0.4525 before). The reviewed exposure vectors are more differentiated, so the structural floor is lower and the excess transform bites earlier.
+- Trend-weighted mean effective attenuation: 0.4520 (0.4523 before). The headline pass-through is unchanged within rounding; the redistribution between forces is what moves.
+
+## 13. Within-force overlap (raw J, excess, mechanism, final)
+
+| Force | n | raw J | excess | mech | v3.11 final | v3.5 record | in config at 2.10.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Consumer | 20 | 0.3576 | 0.0000 | +0.00 | **0.100** | 0.100 | 0.100 |
+| Customer | 7 | 0.5255 | 0.1726 | +0.05 | **0.223** | 0.242 | 0.157 |
+| Technology | 6 | 0.6116 | 0.3227 | +0.05 | **0.373** | 0.206 | 0.232 |
+| Government | 10 | 0.4700 | 0.0759 | +0.05 | **0.126** | 0.312 | 0.426 |
+| Environmental | 4 | 0.6207 | 0.3386 | +0.05 | **0.389** | 0.314 | 0.269 |
+| Competitive | 4 | 0.2876 | 0.0000 | +0.00 | **0.100** | 0.100 | 0.100 |
+
+Reasons for the mechanism adjustments (re-judged for the 51 drivers):
+
+- Consumer (+0.00): 20 drivers, one mechanism each after the review (duplicated regional lines, GLP-1 shedding, longevity claims consolidated); residual premium-hair (C-03/C-04/C-07/C-02), value (C-01/C-06/C-11/C-35) and demographic (C-05/C-25/C-18/C-34) clusters act on different P&L lines or regions; empirical excess 0, floor 0.10 applies, no adjustment.
+- Customer (+0.05): K-01 discounters, K-12 drugstores, K-03 buyer power and K-13 retail media all compress the same European trade margin on the same LHC volume; kept separate because the channels differ, but the P&L line is one.
+- Technology (+0.05): T-11 AI agents, T-13 generative search and T-08 platform replenishment are one digital-intermediation cluster (three of six drivers); the high raw overlap also reflects category-broad vectors, so the adjustment stays at the v3.5 level.
+- Government (+0.05): six of ten drivers come out of one legislative programme (microplastics, PPWR/EPR, EmpCo, EUDR/CSDDD, Detergents Regulation, UWWTD) and G-04, G-16 and G-17 stack compliance cost on the same detergent SKUs; the review removed the triple count of the packaging stack, the cluster remains.
+- Environmental (+0.05): four COGS-side cost drivers on the same European manufactured volume; E-07 energy, E-12 oil feedstock and E-03 carbon move with the same 2026 energy shock.
+- Competitive (+0.00): four drivers with distinct actors and mechanisms (scale leaders, challengers, share windows, salon channel); empirical excess 0, floor 0.10 applies, no adjustment.
+
+The Government value is the largest move (0.426 in the 2.10.0 configuration, 0.312 in the v3.5 record, 0.126 now): the review differentiated the regulatory exposures (cosmetics rules against hair, detergent rules against LHC, packaging against all, US instruments against North America) and merged the packaging and DPP lines that used to triple-count one cost stack, so the drivers of that force no longer overlap in exposure space the way the April base did. Technology (0.373) and Environmental (0.389) rise because their few remaining drivers are category-broad and share the digital-intermediation and the 2026 energy-shock mechanisms respectively.
+
+## 14. Cross-force overlap matrix (final; rows = how much of the row force is covered by the column force)
+
+| | Consumer | Customer | Technology | Government | Environmental | Competitive |
+|---|---:|---:|---:|---:|---:|---:|
+| **Consumer** | - | 0.051 | 0.000 | 0.030 | 0.000 | 0.050 |
+| **Customer** | 0.052 | - | 0.239 | 0.208 | 0.220 | 0.104 |
+| **Technology** | 0.000 | 0.266 | - | 0.223 | 0.333 | 0.030 |
+| **Government** | 0.030 | 0.155 | 0.154 | - | 0.199 | 0.000 |
+| **Environmental** | 0.000 | 0.363 | 0.450 | 0.402 | - | 0.000 |
+| **Competitive** | 0.050 | 0.123 | 0.030 | 0.000 | 0.000 | - |
+
+Mechanism adjustments per cell (symmetric; the empirical layers are in the JSON):
+
+- Consumer and Customer (+0.05): new: C-01 private label and K-01 discounters / K-12 drugstores are two faces of one shift (Aldi and Lidl growth is own-label growth); C-06 trading down feeds the same channels.
+- Consumer and Government (+0.03): new: G-15 SNAP retrenchment and G-08 tariff pass-through hit the same low-income shopper as C-06; C-34 immigration reversal is a policy-driven demographic.
+- Consumer and Competitive (+0.05): C-11 dupes and C-16 China domestic brands are the demand side of X-16 challenger fragmentation; C-35 mass unit decline is the demand side of X-15 scale-leader escalation.
+- Customer and Technology (+0.08): raised from +0.05: retail media now sits in Customer (K-13) and is the same digital-shelf visibility tax that T-11 AI agents and T-13 generative search impose; K-02 marketplaces and T-08 platform replenishment are one channel mechanism.
+- Customer and Government (+0.03): lowered from +0.05: the PVA retailer-reformulation link went with G-14; what remains is G-15 SNAP retrenchment acting on the discounter shopper of K-01 and retailer compliance under G-04/G-16 labels.
+- Customer and Environmental (+0.03): new: E-01/E-12 cost pass-through is negotiated against K-03 buyer power; price recovery is the shared mechanism.
+- Customer and Competitive (+0.08): new: K-07 pro brands crossing into retail and X-18 salon channel restructuring are one shift seen from the retail and the salon side; K-04 social commerce and X-16 social-commerce-native challengers share the channel.
+- Technology and Government (+0.05): G-02 microplastics, G-03 ingredient restrictions and G-16 film criteria trigger the reformulation R&D of T-02 bio-based substitution and T-03 formats.
+- Technology and Environmental (+0.05): E-01 palm/lauric cost drives T-02 bio-based substitution; T-03 compaction reduces the packaging-resin and freight exposure of E-12.
+- Technology and Competitive (+0.03): new: AI productivity (T-01) accrues to the scale leaders of X-15 (the L'Oréal tech platform lines merged into X-15).
+- Government and Environmental (+0.05): E-03 carbon pricing (ETS2, CBAM) is a regulatory instrument; E-01 palm cost sits with G-06 EUDR; the regulation-plus-ESG cost axis of v3.5 remains.
+- Deliberately 0: Consumer and Environmental (C-06 and E-12 share the 2026 energy shock on different P&L lines, demand against COGS; the co-movement belongs to the copula, not to the overlap), Consumer and Technology, Government and Competitive, Environmental and Competitive.
+
+## 15. Effective attenuation per force
+
+| Force | row mean cross overlap | v3.11 eff_att | v3.5 eff_att | delta |
+|---|---:|---:|---:|---:|
+| Consumer | 0.0262 | **0.487** | 0.495 | -0.008 |
+| Customer | 0.1646 | **0.418** | 0.401 | +0.017 |
+| Technology | 0.1704 | **0.415** | 0.434 | -0.019 |
+| Government | 0.1076 | **0.446** | 0.415 | +0.031 |
+| Environmental | 0.2430 | **0.379** | 0.418 | -0.039 |
+| Competitive | 0.0406 | **0.480** | 0.479 | +0.001 |
+
+Environmental attenuates most (0.379): its four cost drivers are covered by Technology (substitution), Government (carbon and EPR instruments) and Customer (pass-through) at once. Government attenuates least of the coupled forces (0.446) because the review moved the retail-media and carbon-cost mechanisms out of its neighbourhood.
+
+## 16. Copula validity on the new population
+
+`DEFAULT_FORCE_CORRELATIONS` (v3.6, scaled 0.73 for positive semi-definiteness on the 99-trend population, minimum eigenvalue +0.14) was re-checked on the 51 drivers: the implied 51 x 51 matrix has minimum eigenvalue **+0.4135**, a wider margin because the force mix is less Consumer-heavy. The matrix is kept unchanged; the golden lock "no repair fires on defaults" passes on the 2.11.0 fixture and the CLI pre-flight gate (F6) re-checks the loaded mix on every production run.
+
+## 17. Where it lands in code, and the F-28 correction
+
+`pulse/config.py` carries all three layers from one generated record: `DEFAULT_PER_FORCE_ATTENUATION`, `DEFAULT_WITHIN_FORCE_OVERLAP` and `DEFAULT_FORCE_OVERLAP_MATRIX`, with `DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.11_september2026"`. `tests/test_calibration_v3_11.py` locks the defaults to the JSON, the JSON to the script, the identity between the matrix and the attenuation, and the copula margin.
+
+Before 2.11.0 the three layers had two provenances (finding F-28): `DEFAULT_PER_FORCE_ATTENUATION` held the v3.5 record's values, but `DEFAULT_WITHIN_FORCE_OVERLAP` (0.100/0.157/0.232/0.426/0.269/0.100) and the cross-force matrix were the v3.1 numbers with hand edits, labelled v3.5. The engine consumes the attenuation and the within-force overlap, so the 2.10.0 production runs used v3.5 attenuation with v3.1 within-force dampening. The 2.10.0 regression lock in `tests/test_cell_weights.py` pins exactly that combination so the 2.11.0 engine still reproduces the 2.10.0 numbers when asked to.
+
+## 18. v3.11 deliverables
+
+| File | Purpose |
+|---|---|
+| `scripts/compute_attenuation_v3_11.py` | Reproducible computation on the current seed; per-cell mechanism adjustments with reasons; copula check |
+| `data/attenuation_calibration_v3_11.json` | The record: every layer, every reason, the previous version's values for comparison |
+| `data/Attenuation_Calibration_v3_11.xlsx` | Companion workbook (`python3 scripts/build_attenuation_xlsx.py v3_11`); not tracked in git, regenerate from the JSON |
+| `pulse/config.py` | Live defaults (all three layers) |
+| `tests/test_calibration_v3_11.py` | Lock |
+
+```bash
+python3 scripts/compute_attenuation_v3_11.py        # recompute on the current seed
+python3 scripts/build_attenuation_xlsx.py v3_11     # regenerate the workbook
+python3 scripts/run_50k_prod.py                     # production run after deploying
+```
+
+*v3.11 calibration date: 10 September 2026*
+*Input: 51 drivers x 12 categories = 612 exposure scores; 1,275 unordered pairs*
+*Baseline J0 shift: 0.4525 to 0.4265; trend-weighted mean eff_att 0.4523 to 0.452*

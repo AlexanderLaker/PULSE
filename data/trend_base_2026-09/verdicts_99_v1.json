@@ -1,0 +1,989 @@
+{
+ "C-01": {
+  "verdict": "KEEP",
+  "target": "C-01",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Largest single Contraction driver and still the best-evidenced one: European private label at about half of units and 42% of value, growing again in 2026. Kept as the anchor of the private-label mechanism; the premium own-label tier point from X-10 and X-13 is folded in.",
+  "corrections": "45% German laundry PL and 30% hair PL claims were wrong (laundry about 20% value, cleaners about 30%, hair low); brand geography fixed (Lacura/Cien compete with Schauma, Persil, Perwoll, Pril); GP1 0.25 to 0.22.",
+  "base_name": "Private Label Structural Penetration in Europe"
+ },
+ "C-02": {
+  "verdict": "KEEP",
+  "target": "C-02",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Real, North America-led demand reshaping; the hair-shedding side effect is now documented in dermatology cohorts. Kept with a smaller weight because HCB's categories see only a slice of the effect.",
+  "corrections": "Adoption figures updated (11-12% of US adults); JP Morgan USD 116bn replaced by USD 200bn incretin market; unsupported laundry-frequency and 12-18-month-lag sentences deleted; probability 5 to 4, GP1 0.10 to 0.06; dead source replaced.",
+  "base_name": "GLP-1 Drugs Reshape Consumer Spending Patterns"
+ },
+ "C-03": {
+  "verdict": "KEEP",
+  "target": "C-03",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Confirmed by Henkel's own price/volume pattern and by L'Oréal and Kérastase growth. Kept as the hair premiumisation anchor; T-14 becomes its ingredient reason-to-believe.",
+  "corrections": "'L'Oréal Professional Products +15% in 2025' wrong (+7.5% LFL; +15% was premium haircare only); '2-3x mass' overstated (about 1.5x in value); Olaplex added; GP1 0.20 to 0.18 because the mass unit decline is now its own line (C-35).",
+  "base_name": "Premiumization Acceleration in Hair Care"
+ },
+ "C-04": {
+  "verdict": "KEEP",
+  "target": "C-04",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Clinical-efficacy premiumisation is the umbrella for the science-led hair stories and is visible in Circana and NIQ prestige data. Kept.",
+  "corrections": "Green Claims Directive reference replaced by EmpCo (Directive 2024/825, 27 Sep 2026); unverified '3,000 formulations' claim removed; GP1 0.08 to 0.10.",
+  "base_name": "Conscious Consumption and Cleanical Beauty"
+ },
+ "C-05": {
+  "verdict": "KEEP",
+  "target": "C-05",
+  "new_tier": "Megatrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Ageing is one of two true Megatrends in the set; only the evidenced HCB mechanisms (grey-coverage colour, gentle and scalp care) are kept. Absorbs the LHC ageing slice of C-30 through category exposure instead of a clone trend.",
+  "corrections": "Packaging-ergonomics story removed (not a pool driver); probability 5 to 4; GP1 0.12 to 0.08; dead Eurostat link replaced.",
+  "base_name": "Silver Economy — Aging Population Shifts Category Demand"
+ },
+ "C-06": {
+  "verdict": "KEEP",
+  "target": "C-06",
+  "new_tier": "Macrotrend",
+  "fc": "STALE, PARTLY CONTRADICTED",
+  "rationale": "The base described 2025 disinflation and ECB cuts; the 2026 reality is energy-shock inflation, an ECB hike and entrenched value-seeking. Kept and rewritten; the goods-to-services wallet shift, shrinkflation laws and the French promo cap are folded in as description content.",
+  "corrections": "ECB-cuts and 'stabilising' sentences deleted; H1 2026 price/volume pattern inserted; probability 4 to 5; peak 2029 to 2028; North America exposure raised to 4.",
+  "base_name": "Cost-of-Living Squeeze and Persistent Trading Down"
+ },
+ "C-07": {
+  "verdict": "KEEP",
+  "target": "C-07",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Scalp care as a regimen step is confirmed in US prestige data and by Dove and L'Oréal launches. Kept; T-04 (microbiome) was the same GP1 counted twice and is folded in.",
+  "corrections": "'USD 88.2bn to 150.5bn' was the global hair-care total, not scalp care (deleted); stale 'Henkel has no scalp line' corrected; GP1 0.08 to 0.06.",
+  "base_name": "Scalp Care Emerges as Standalone Category"
+ },
+ "C-08": {
+  "verdict": "MERGE INTO",
+  "target": "C-10",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, weak evidence",
+  "rationale": "Men's grooming is a real personal-care mesotrend but HCB's exposure is thin (Men Perfect, Taft/got2b) and the sizing was report-mill grade. Its thinning and grey-blending slice is carried in C-10.",
+  "corrections": "Statista/Allied sizing (USD 23.6bn, 7.65% CAGR) not found on the cited page; Vernel fragrance idea removed.",
+  "base_name": "Male Grooming Structural Growth"
+ },
+ "C-09": {
+  "verdict": "MERGE INTO",
+  "target": "C-28",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Same mechanism as C-28 (scent-led premiumisation of laundry additives), a straight double count.",
+  "corrections": "'Scent boosters +15% in Southern Europe' unsourced; replaced by the Unilever-cited global series in C-28.",
+  "base_name": "Fragrance and Sensory Premiumization in Home Care"
+ },
+ "C-10": {
+  "verdict": "KEEP",
+  "target": "C-10",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, sources weak",
+  "rationale": "The single thinning-demand driver: GLP-1 shedding, tele-derm Rx, supplements and cosmetic thickening. Absorbs C-32, the hair side of C-23 and the men's slice of C-08.",
+  "corrections": "Fortune Business Insights sizing (grade D) replaced by JAAD cohort evidence and the Nutrafol GLP-1 pivot; AAD 404 removed; GP1 0.06 to 0.05; GLP-1 shedding counted once (C-02).",
+  "base_name": "Hair Loss and Thinning Treatments Enter Consumer Mainstream"
+ },
+ "C-11": {
+  "verdict": "KEEP",
+  "target": "C-11",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Dupe culture is now a cross-cohort value-equivalence norm (Circana 2026), not a Gen Z story. Kept and reframed; the LHC paragraph is owned by C-01.",
+  "corrections": "Unverified minimalist-routine claim removed; Olaplex exposure added; GP1 0.12 to 0.08; probability 5 to 4; peak 2030 to 2029.",
+  "base_name": "Gen Z Dupe Culture and Ingredient Literacy"
+ },
+ "C-13": {
+  "verdict": "DELETE",
+  "target": "T-03 (one sentence)",
+  "new_tier": "Microtrend",
+  "fc": "CONTRADICTED on the regulatory core",
+  "rationale": "PPWR sets no refill or re-use target for detergents or household chemicals; retailer refill stations remain sub-1% uptake. Not a pool driver; the brand-side refill pouch is a format inside T-03.",
+  "corrections": "'PPWR refill targets confirmed for 2030' wrong (Regulation 2025/40 targets cover take-away food and beverage, transport and white-goods packaging).",
+  "base_name": "Refill and Reuse Economy in Household Care"
+ },
+ "C-14": {
+  "verdict": "MERGE INTO",
+  "target": "C-29",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, one material error",
+  "rationale": "Refresh between washes is one occasion inside a single garment-care trend; merged into C-29.",
+  "corrections": "Febreze is an air-care brand reported in P&G Home Care and passed USD 1bn in fiscal 2011; it was not built on fabric refresh. 'Fastest-growing LHC occasion' unsupported.",
+  "base_name": "Between-Wash Fabric Care as Standalone Consumption Occasion"
+ },
+ "C-15": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Microtrend)",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, key HCB claim stale",
+  "rationale": "A real occasion (dry shampoo, styling refreshers) but a format-level Microtrend with immaterial influence (+0.04 pp); styling premium is inside C-03. Kept on the NEXT list with the Batiste and NYM Clean Freak facts.",
+  "corrections": "'Batiste 40%+ share' unverified; 'got2b under-invests versus Batiste' is stale (HCB now owns NYM Clean Freak).",
+  "base_name": "Hair Styling and Maintenance Between Washes"
+ },
+ "C-16": {
+  "verdict": "KEEP",
+  "target": "C-16",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Domestic-brand capture in China is real (57.4% domestic share in 2025, fifth year of gains) and largely realised. Kept at a lower weight.",
+  "corrections": "Share figure re-attributed to CAFFCI (not Euromonitor); 'nationalism' framing dropped; HCB exposure corrected post Vidal Sassoon; GP1 0.12 to 0.07; start 2023 to 2021; probability 5 to 4.",
+  "base_name": "China C-Beauty Nationalism and Domestic Brand Preference"
+ },
+ "C-17": {
+  "verdict": "MERGE INTO",
+  "target": "X-06",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, HCB exposure CONTRADICTED",
+  "rationale": "India is a real growth market but HCB's exposure is near zero, and the line duplicated X-06's mechanism. Carried as the India sub-exposure (about 0.03 GP1) inside the consolidated growth-market driver.",
+  "corrections": "'USD 30bn' not Redseer's figure (USD 23bn FY25 to USD 40bn by 2030); '14% washing-machine penetration' stale (about 20%).",
+  "base_name": "India Premium Affordability and Middle-Class Expansion"
+ },
+ "C-18": {
+  "verdict": "KEEP",
+  "target": "C-18",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, demand picture stale",
+  "rationale": "The Hispanic demographic dividend is real for the horizon but delayed by the 2025-27 enforcement and migration shock; kept with a later onset and lower weight. The near-term shock itself is carried by C-34 and G-15.",
+  "corrections": "Hispanic growth halved in 2025 (+1.35m vs +2.29m); 'no curl-care line' stale (NYM Curl Talk); start 2024 to 2027, peak 2031 to 2033, GP1 0.14 to 0.08, probability 5 to 4.",
+  "base_name": "US Hispanic/Latino Consumers Drive Hair and LHC Category Growth"
+ },
+ "C-19": {
+  "verdict": "MERGE INTO",
+  "target": "X-06",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Southeast Asia is a real digital-first market but the line repeated the growth-market mechanism and its channel content belongs to K-04. Carried as the SEA sub-exposure (about 0.02 GP1).",
+  "corrections": "'World's highest e-commerce growth' not established; K-beauty framing replaced by Chinese and local digital-native brands; Indonesia halal (17 Oct 2026) noted as a dated regulation.",
+  "base_name": "Southeast Asia Digital-First Beauty Market"
+ },
+ "C-20": {
+  "verdict": "MERGE INTO",
+  "target": "X-06",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED on Brazil, CONTRADICTED on nearshoring",
+  "rationale": "Mexico-anchored LatAm growth is real; the nearshoring bonus is not in the trade data and Brazil reaches HCB only through professional hair. Carried as the LatAm sub-exposure (about 0.05 GP1).",
+  "corrections": "Brazil is number three globally (not four); '+40% manufacturing investment' unsupported; Brazil premium-hair content moved to K-07.",
+  "base_name": "Brazil/Mexico Premiumization and Nearshoring Beneficiary"
+ },
+ "C-21": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Signal)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on sourcing",
+  "rationale": "A claims-language shift, not a demand mechanism; double counts C-05, C-07, C-10 and C-03. Three of four sources unverifiable.",
+  "corrections": "'USD 120bn anti-ageing by 2030' untraceable; '70% of disposable income held by 60+' not in the AARP source.",
+  "base_name": "Longevity Medicine Crossover into Beauty and Hair Care"
+ },
+ "C-22": {
+  "verdict": "MERGE INTO",
+  "target": "T-03",
+  "new_tier": "Microtrend",
+  "fc": "CONTRADICTED on performance",
+  "rationale": "Sheets test poorly (Consumer Reports, Mar 2026) and the 2026 format event is P&G's premium fibre tile, not value sheets. The dry-format shift belongs inside T-03.",
+  "corrections": "'Sheets reach 5% of a major market' trigger replaced by a dry-format share trigger on HCB's own panel data.",
+  "base_name": "Laundry Sheet/Strip Format Disruption"
+ },
+ "C-23": {
+  "verdict": "DELETE",
+  "target": "C-10 (one fact)",
+  "new_tier": "Microtrend",
+  "fc": "FABRICATED key source",
+  "rationale": "The cited Lancet paper does not exist; no HCB pool mechanism; double counts C-10, C-02 and C-09. The one useful fact (Nutrafol as GLP-1 complement) moves to C-10.",
+  "corrections": "'The Lancet: Clinical Efficacy in Hybrid Beauty (2025)' is not a real article; Harvard Chan and Circana links are homepages.",
+  "base_name": "Wellness-to-Beauty Convergence: Ingestibles + Topicals"
+ },
+ "C-24": {
+  "verdict": "KEEP",
+  "target": "C-24",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, sourcing wrong",
+  "rationale": "Textured hair as a mainstream category is real, North America first. Kept with corrected sourcing and re-weighted regional exposure.",
+  "corrections": "'65% of the world has textured hair' is a 2018 US survey statistic; 'USD 8bn+, 7-9% CAGR' unverified; 'Henkel has no credible offering' stale (NYM Curl Talk); GP1 0.08 to 0.06.",
+  "base_name": "Natural/Textured Hair as Mainstream Global Category"
+ },
+ "C-25": {
+  "verdict": "KEEP",
+  "target": "C-25",
+  "new_tier": "Megatrend",
+  "fc": "PARTLY CONFIRMED on fertility, CONTRADICTED on households",
+  "rationale": "Sub-replacement fertility is a Megatrend, but household counts still rise to 2035, so the volume effect is later and smaller than the base assumed. Kept volume-only so it does not double count C-05.",
+  "corrections": "'Fewer households forming' deleted (contradicted by Eurostat/Destatis); figures updated (EU TFR 1.34, Korea 0.80 rising); GP1 0.12 to 0.06; start 2024 to 2028, back-loaded.",
+  "base_name": "Birth Rate Collapse and Household Atomisation"
+ },
+ "C-26": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Signal)",
+  "new_tier": "Signal",
+  "fc": "PARTLY CONFIRMED, pool relevance CONTRADICTED",
+  "rationale": "Tween skincare is a discrete phenomenon with sub-threshold evidence in HCB's categories; no reshaping of the competitive set.",
+  "corrections": "Category evidence fragmentary; downgrade to Signal.",
+  "base_name": "Gen Alpha (2010+) Enters Personal-Care Category"
+ },
+ "C-27": {
+  "verdict": "KEEP",
+  "target": "C-27",
+  "new_tier": "Mesotrend",
+  "fc": "CONTRADICTED on the numbers",
+  "rationale": "The logic holds (dishwasher penetration catch-up drives ADW), the numbers did not. Re-based to HCB's real ADW geography (Southern and Eastern Europe, Türkiye, MEA).",
+  "corrections": "China penetration about 3% (not 12%); Germany 77.3% (not 71%); US 72.7% (not 68%); India/Brazil/Mexico figures unsupported; GP1 0.06 to 0.04; peak 2034 linear.",
+  "base_name": "Hand-Dish to Auto-Dish Conversion in Emerging Markets"
+ },
+ "C-28": {
+  "verdict": "KEEP",
+  "target": "C-28",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, sizes overstated",
+  "rationale": "Scent-led premiumisation of laundry additives is a real, growing pool that P&G leads. Kept as the single additive driver, absorbing C-09.",
+  "corrections": "'EU EUR 2bn, EUR 4.5bn by 2030, US USD 1.8bn' contradicted by the only public series (EUR 1.9bn global 2023, EUR 3bn by 2028); Vernel Aroma Boost / Silan Powerboosters sentences removed; start 2025 to 2023.",
+  "base_name": "Laundry Scent Boosters as Structural Premium Category"
+ },
+ "C-29": {
+  "verdict": "KEEP",
+  "target": "C-29",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Made the single fabric-care occasion driver (specialty care, fibre renewal, refresh, longevity norms), absorbing C-14, E-08 and G-12, which told one consumer story from three angles. Henkel's own reporting now confirms the commercial thesis.",
+  "corrections": "'Technical fabrics 35% of wardrobe' not found in WGSN or Textile Exchange (polyester 59% of fibre output is the verifiable fact); probability 3 to 4; GP1 0.05 to 0.08; start 2026 to 2024.",
+  "base_name": "Delicates & Performance Fabric Care Revival (Perwoll Occasion)"
+ },
+ "C-30": {
+  "verdict": "DELETE",
+  "target": "C-05 (category exposure)",
+  "new_tier": "Not a trend (slice of C-05)",
+  "fc": "UNVERIFIED throughout",
+  "rationale": "A clone of the ageing Megatrend with no verifiable numbers; the LHC ageing exposure is set through C-05's category scores instead.",
+  "corrections": "'60+ = 40% of European LHC spend', '1.8x home hygiene', 'pet ownership +38%' found in no source; Euromonitor URL dead; OECD and AARP links are homepages.",
+  "base_name": "Longevity Economy — LHC / Home Hygiene Split"
+ },
+ "C-31": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Signal)",
+  "new_tier": "Signal",
+  "fc": "UNVERIFIABLE core claim",
+  "rationale": "A single unverifiable statistic about Gen Z cleaning literacy; no mechanism that moves the pool.",
+  "corrections": "Core statistic untraceable; contradicted in spirit by available evidence.",
+  "base_name": "Cleaning-Fluency Generational Decline (Gen Z Home-Care Literacy)"
+ },
+ "C-32": {
+  "verdict": "DELETE",
+  "target": "C-10 (one caveat)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on the headline",
+  "rationale": "Tele-derm hair Rx is a channel caveat on thinning demand, not a driver: Hims & Hers' entire FY2025 revenue was USD 2.35bn across all specialties. One sentence goes to C-10.",
+  "corrections": "'USD 2bn+ run-rates in hair/scalp prescriptions' wrong.",
+  "base_name": "Beauty-as-Medicine / Tele-Derm DTC (Hair & Scalp)"
+ },
+ "C-33": {
+  "verdict": "DELETE",
+  "target": "X-16 (one watch sentence)",
+  "new_tier": "Signal",
+  "fc": "STALE, largely CONTRADICTED",
+  "rationale": "The Shein/Temu price-floor thesis was overtaken by the EU customs reform (EUR 150 exemption abolished, EUR 3 duty) and platform localisation; a watch sentence lives in X-16.",
+  "corrections": "Sources unverifiable; 2026 EU customs facts added to X-16 and G-08.",
+  "base_name": "Ultra-Fast-Fashion Beauty: Shein/Temu-Style Price Floor Collapse"
+ },
+ "C-34": {
+  "verdict": "NEW",
+  "target": "C-34",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the base had no North American volume headwind from the 2025-27 immigration reversal, which slows household formation and hits the Hispanic hair and laundry base.",
+  "corrections": "New driver, Contraction, probability 4, GP1 0.08, 2025-2029 front-loaded."
+ },
+ "C-35": {
+  "verdict": "NEW",
+  "target": "C-35",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the base modelled hair premiumisation only as an upside; the mass unit decline that funds it is the Contraction counterpart.",
+  "corrections": "New driver, Contraction, probability 4, GP1 0.10, 2025-2031 linear."
+ },
+ "C-36": {
+  "verdict": "NEW",
+  "target": "C-36",
+  "new_tier": "Macrotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the base had no currency driver while its two largest Expansion lines were stated in organic terms; Türkiye and Egypt hyperinflation and IMEA/LatAm depreciation dilute euro gross profit.",
+  "corrections": "New driver, Contraction, probability 5, GP1 0.12, 2025-2030 linear. Convention decision required (euro-reported vs constant-currency pool)."
+ },
+ "X-06": {
+  "verdict": "KEEP",
+  "target": "X-06",
+  "new_tier": "Macrotrend",
+  "fc": "CONFIRMED on organic prints",
+  "rationale": "The anchor of the consolidated growth-market driver: IMEA double-digit organic growth confirmed through H1 2026. Six regional Expansion lines modelled one mechanism six times; now one driver with sub-region weights in the regional exposure scores. Force reassigned from Competitive to Consumer.",
+  "corrections": "Stated in organic terms with the FX dilution moved to C-36; probability 5 to 4; GP1 0.14 to 0.15 for the merged driver.",
+  "base_name": "Emerging Markets Growth Divergence — IMEA Leads"
+ },
+ "X-09": {
+  "verdict": "MERGE INTO",
+  "target": "X-06",
+  "new_tier": "Mesotrend",
+  "fc": "CONTRADICTED on the headline",
+  "rationale": "Sub-Saharan Africa's demographics are real but the 'USD 200bn by 2030' figure and 'Lions on the Move III' citation do not exist. Carried as the SSA sub-exposure (about 0.03 GP1, back-loaded).",
+  "corrections": "'USD 200bn FMCG by 2030' untraceable; 'Lions on the Move III' does not exist.",
+  "base_name": "Sub-Saharan Africa: $200B FMCG Frontier by 2030"
+ },
+ "X-14": {
+  "verdict": "DELETE",
+  "target": "X-06 (dated watch note)",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED on legal facts, CONTRADICTED on relevance",
+  "rationale": "AfCFTA is a real instrument but there is no measurable intra-African preferential trade in HCB's categories yet; kept as a dated watch note inside X-06.",
+  "corrections": "'Operational tariff harmonisation 2026-28' overstated; Category B phase-down began 1 Jan 2026 for some members only.",
+  "base_name": "AfCFTA Implementation Unlocks Pan-African Competitive Pressure"
+ },
+ "K-01": {
+  "verdict": "KEEP",
+  "target": "K-01",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Discount is still the largest and, outside Germany, the fastest-growing physical channel; the pool mechanism is trade-margin dilution and price-ladder compression. Kept; variety discounters folded in.",
+  "corrections": "German plateau and US expansion added; management-response text removed; GP1 0.20 to 0.15; curve linear to s_curve; peak 2031 to 2029.",
+  "base_name": "Discount Retail Channel Expansion in Europe"
+ },
+ "K-02": {
+  "verdict": "KEEP",
+  "target": "K-02",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED, anchors unverified",
+  "rationale": "E-commerce and marketplace share gain at lower brand net margin is a 10-15 year reshaping across categories and regions; tier raised to Macrotrend. Absorbs K-06.",
+  "corrections": "'Stabilisation at 12-15%' unsourced and above German FMCG online share; Persil/Somat S&S instruction removed; GP1 0.08 to 0.10.",
+  "base_name": "E-Commerce Profit Pool Maturation"
+ },
+ "K-03": {
+  "verdict": "KEEP",
+  "target": "K-03",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Buyer-power concentration is re-forming through alliances (Concordis, Eurelec, Everest) and M&A; kept with verified facts and the EU territorial-supply-constraint watch item.",
+  "corrections": "DBA strategy text and unsourced '40-50% of European HCB revenue' removed; probability 5 to 4; peak 2031 to 2030.",
+  "base_name": "Retailer Consolidation and Power Concentration"
+ },
+ "K-04": {
+  "verdict": "KEEP",
+  "target": "K-04",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "TikTok Shop is a scaled beauty channel (US GMV USD 15.1bn in 2025; beauty the largest category) but not a top-5 FMCG channel and irrelevant for LHC. Kept, hair only; K-10 folded in.",
+  "corrections": "'Top-5 FMCG channel', Sally Beauty and '4.7% conversion' claims removed; GP1 0.10 to 0.06; probability 5 to 4.",
+  "base_name": "TikTok Shop Becomes Top-5 FMCG Channel"
+ },
+ "K-06": {
+  "verdict": "MERGE INTO",
+  "target": "K-02",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, partly STALE",
+  "rationale": "Subscription and auto-replenishment lock-in is a sub-mechanism of e-commerce economics, not a separate driver.",
+  "corrections": "Rewe left Payback (Dec 2024) and Edeka joined (Jan 2025): named examples were reversed; no public S&S metric exists.",
+  "base_name": "FMCG Subscription and Loyalty Ecosystem Lock-in"
+ },
+ "K-07": {
+  "verdict": "KEEP",
+  "target": "K-07",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, numbers corrected",
+  "rationale": "Professional and bond-repair brands crossing into retail lift the hair price ladder; confirmed by L'Oréal and Henkel reporting. Kept.",
+  "corrections": "'+15% in 2025' wrong (+7.5% LFL FY2025, +12.6% H1 2026); FMI source deleted; Kérastase-playbook strategy text removed; start 2025 to 2023.",
+  "base_name": "Professional Salon Channel to Consumer Crossover"
+ },
+ "K-08": {
+  "verdict": "MERGE INTO",
+  "target": "T-06",
+  "new_tier": "Macrotrend",
+  "fc": "CONFIRMED on numbers, duplicate",
+  "rationale": "Identical eMarketer series to T-06; merged so the retail-media tax is counted once.",
+  "corrections": "'8-12% of brand net revenue' unsourced and dropped.",
+  "base_name": "US Retail Media Networks Reshape Brand-Customer Economics"
+ },
+ "K-09": {
+  "verdict": "MERGE INTO",
+  "target": "T-11",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED by the 2026 record",
+  "rationale": "The 'retail power dissolves' premise is the opposite of what happened: OpenAI's Instant Checkout was retired in March 2026 because retailers kept checkout and data. Carried as one sub-mechanism (retailer-owned agents) inside T-11.",
+  "corrections": "Premise reversed; standalone item deleted.",
+  "base_name": "Agentic Commerce Reshapes Retailer-Brand Power Dynamics"
+ },
+ "K-10": {
+  "verdict": "MERGE INTO",
+  "target": "K-04",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, exaggerated for the West",
+  "rationale": "Live commerce is a minority format in Western TikTok Shop (Momentum Works puts US Live at about 8% of attributed GMV in H1 2026); a format within K-04, not a driver.",
+  "corrections": "Take-rate and margin caveat carried into K-04.",
+  "base_name": "Chinese Live-Commerce / Douyin Model Exports"
+ },
+ "K-11": {
+  "verdict": "MERGE INTO",
+  "target": "T-06",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, duplicate",
+  "rationale": "Loyalty data is monetised through the same retail media networks (84.51, Tesco, Payback); same money as T-06.",
+  "corrections": "Loyalty-scheme facts (Edeka to Payback 2025, Rewe Bonus, Lidl Plus) carried into T-06.",
+  "base_name": "Retailer Loyalty Program Cannibalisation of Trade Spend"
+ },
+ "K-12": {
+  "verdict": "NEW",
+  "target": "K-12",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the largest HCB-relevant channel driver missing from the base; dm, Rossmann and Müller keep gaining share in Germany and continental Europe with deep own-label ranges in hair, body and household care.",
+  "corrections": "New driver, Contraction, probability 4, GP1 0.10, 2023-2030 s_curve."
+ },
+ "X-01": {
+  "verdict": "SUBSTITUTE",
+  "target": "X-17",
+  "new_tier": "Signal",
+  "fc": "PARTLY CONFIRMED, material corrections",
+  "rationale": "A dated transaction (Signal), not a trend; replaced by the pattern-level driver X-17 (incumbent retrenchment across Vestacy, P&G exits, Beiersdorf, Coty).",
+  "corrections": "Deal was 'up to USD 4.8bn' enterprise value with Reckitt retaining 30% and about USD 2.2bn net proceeds, not a USD 4.8bn cash sale; management actions removed.",
+  "base_name": "Reckitt Essential Home Divestiture"
+ },
+ "X-02": {
+  "verdict": "MERGE INTO",
+  "target": "X-15",
+  "new_tier": "Signal",
+  "fc": "CONFIRMED on numbers, STALE on framing",
+  "rationale": "Unilever's beauty-first investment (Dove fibre repair and scalp, K18, 16.1% A&P) is evidence for the scale-leader pattern X-15, not a driver on its own.",
+  "corrections": "H1 2026 facts added to X-15.",
+  "base_name": "Unilever Beauty and Wellbeing Pivot"
+ },
+ "X-03": {
+  "verdict": "MERGE INTO",
+  "target": "X-15",
+  "new_tier": "Signal",
+  "fc": "CONFIRMED on FY2025, STALE on current",
+  "rationale": "P&G's superiority and unit-dose pressure is the laundry leg of X-15.",
+  "corrections": "'Ariel The Big One 40% of UK growth' is P&G's own claim; FY2026 organic +1% with Fabric & Home Care flat added.",
+  "base_name": "P&G Superiority Framework and Innovation Fortress"
+ },
+ "X-04": {
+  "verdict": "MERGE INTO",
+  "target": "X-16",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, numbers unverifiable",
+  "rationale": "The channel facts are real and stronger than stated; 'indie' framing too narrow. Becomes the anchor evidence of X-16 (social-native and Asian challengers).",
+  "corrections": "'3-4x YoY (Marketplace Pulse, Jungle Scout)' unverified, both URLs 404; replaced by Momentum Works GMV data.",
+  "base_name": "Indie Brand Omnichannel Pivot via TikTok Shop"
+ },
+ "X-05": {
+  "verdict": "DELETE",
+  "target": "X-16 (watch trigger)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on mechanism",
+  "rationale": "The 'tariff-free EU via Temu and TikTok Shop' thesis was overtaken by the EU customs reform; Chinese brand share in Europe remains under 2%. Watch trigger inside X-16.",
+  "corrections": "Technavio source removed; EU customs facts (EUR 150 exemption abolished, EUR 3 duty) passed to G-08.",
+  "base_name": "Chinese FMCG Brands Enter European Market"
+ },
+ "X-07": {
+  "verdict": "MERGE INTO",
+  "target": "X-15",
+  "new_tier": "Signal",
+  "fc": "PARTLY CONFIRMED, three factual errors",
+  "rationale": "L'Oréal's R&I, beauty-tech and professional omnichannel scale is the hair anchor of X-15.",
+  "corrections": "R&I EUR 1.38bn (3.1%), not EUR 1.7bn (4%); Professional Products +7.5% FY2025; K-SCAN +23% is company-stated.",
+  "base_name": "L'Oreal Tech-Beauty Platform Strategy"
+ },
+ "X-08": {
+  "verdict": "MERGE INTO",
+  "target": "X-16",
+  "new_tier": "Mesotrend (skincare) / Microtrend (hair)",
+  "fc": "PARTLY CONFIRMED on the wave, CONTRADICTED on hair specificity",
+  "rationale": "Korean cosmetics exports hit a record USD 11.4bn in 2025, but the wave is skincare-led; the hair extension is the explicit uncertainty inside X-16.",
+  "corrections": "Amorepacific share and most base numbers unverifiable; MFDS export data substituted.",
+  "base_name": "K-Beauty and J-Beauty Export Wave into NA and EU Hair Care"
+ },
+ "X-10": {
+  "verdict": "DELETE",
+  "target": "C-01 (one sentence)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED",
+  "rationale": "Amazon cut its private label to under 20 brands in 2023 (about 1% of retail sales) and its 2025 moves are food-only; marketplace fees, retail media and agents are already in K-02, T-06 and T-11.",
+  "corrections": "'US PL +4.4% vs +1.1%' is a PLMA/Circana all-outlet figure, not Amazon; Morgan Stanley URL 404.",
+  "base_name": "Amazon/Platform Vertical Integration into FMCG"
+ },
+ "X-11": {
+  "verdict": "DELETE",
+  "target": "X-15 (one sentence)",
+  "new_tier": "Signal",
+  "fc": "PARTLY CONFIRMED, wrong date and scope",
+  "rationale": "A single dated partnership (announced 17 Mar 2026 at NVIDIA GTC, not CES) and a sub-signal of X-07; one sentence of evidence in X-15.",
+  "corrections": "Date, venue and scope corrected; repeats X-07's R&I error.",
+  "base_name": "L'Oreal NVIDIA AI Molecule Discovery Partnership"
+ },
+ "X-12": {
+  "verdict": "DELETE",
+  "target": "X-15 / X-16 (evidence)",
+  "new_tier": "Signal",
+  "fc": "CONFIRMED deal list, CONTRADICTED on Henkel, double count",
+  "rationale": "A list of transactions by named actors with no mechanism of its own; the verified deals become evidence in X-15 and X-16, Wella and Coty move to X-18.",
+  "corrections": "Henkel statement corrected; e.l.f./Rhode, L'Oréal/Medik8 and Color Wow, Unilever/Dr. Squatch verified.",
+  "base_name": "DTC/Indie Brand Acquisition Arms Race Intensifies"
+ },
+ "X-13": {
+  "verdict": "DELETE",
+  "target": "C-01 / K-01 (facts)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED for HCB categories",
+  "rationale": "Retailer vertical integration into HCB categories is not happening: Walmart's plants are milk and beef, Schwarz Produktion is food and paper, Kirkland is supplier-sourced. The premium own-label tier is a C-01 mechanism; Henkel itself exited NA private-label laundry in April 2025.",
+  "corrections": "'Aldi expanding Lacura into laundry pods' wrong (Lacura is skin care; Tandil/Almat are the laundry labels); Investor Day source is a generic results page.",
+  "base_name": "Walmart / Costco / Aldi Vertical Integration into FMCG Supply"
+ },
+ "X-15": {
+  "verdict": "NEW",
+  "target": "X-15",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (consolidation)",
+  "rationale": "Replaces four named-actor Signals (X-02, X-03, X-07, X-11) with one pattern-level driver: scale-leader innovation and A&P escalation in hair and laundry.",
+  "corrections": "Contraction, probability 5, GP1 0.25, 2024-2032 linear; calibrated to reproduce the four Signals' combined 2035 contribution of about -0.9 to -1.0 pp."
+ },
+ "X-16": {
+  "verdict": "NEW",
+  "target": "X-16",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (consolidation)",
+  "rationale": "Replaces X-04, X-08, X-05, X-12 and the residue of C-33 with one driver: social-commerce-native and Asian challenger brands fragmenting hair-care share.",
+  "corrections": "Contraction, probability 4, GP1 0.15, 2024-2031 s_curve."
+ },
+ "X-17": {
+  "verdict": "NEW",
+  "target": "X-17",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (substitution)",
+  "rationale": "Replaces X-01 with a pattern across five actors: incumbent retrenchment and portfolio pruning open share windows in home care and body care.",
+  "corrections": "Expansion, probability 3, GP1 0.08, 2025-2028 front-loaded; ADW exposure 0."
+ },
+ "X-18": {
+  "verdict": "NEW",
+  "target": "X-18",
+  "new_tier": "Mesotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the contraction side of the professional hair channel (salon volume erosion, pro-brand migration to retail, L'Oréal PPD dominance, Wella re-listing, diversion), material now that M&A has doubled Henkel's professional exposure.",
+  "corrections": "Contraction, probability 4, GP1 0.12, 2023-2030 linear."
+ },
+ "T-01": {
+  "verdict": "KEEP",
+  "target": "T-01",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED, numbers wrong",
+  "rationale": "AI and automation productivity is one Macrotrend, not three; T-05, T-10 and the salon-diagnostics point of T-07 merge here. The pool effect is net of competitive reinvestment since private label and challengers get the same tools.",
+  "corrections": "L'Oréal R&I EUR 1.38bn (3.1%), not EUR 1.7bn (4%); '725 patents' and 'Deloitte 67%' unverified; combined GP1 0.24 to 0.08; probability 5 to 4.",
+  "base_name": "AI-Driven Formulation and Speed-to-Market"
+ },
+ "T-02": {
+  "verdict": "KEEP",
+  "target": "T-02",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Enzymes are commercial and growing (Novonesis), biosurfactants niche, fermentation and synthetic biology the long tail; one substitution driver, absorbing T-15 and T-16. Tier lowered to Mesotrend.",
+  "corrections": "Wrong PFAS/microplastics linkage removed; probability 4 to 3; GP1 0.10 to 0.05; start 2027, peak 2033.",
+  "base_name": "Bio-Based and Green Chemistry Alternatives"
+ },
+ "T-03": {
+  "verdict": "KEEP",
+  "target": "T-03",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, mis-scoped",
+  "rationale": "Compaction and dry formats reshape the laundry and ADW format mix, logistics and price architecture (P&G Tide evo tiles national from April 2026); tier raised to Mesotrend. Absorbs C-22, the brand-refill element of C-13 and the format mechanism of E-02 and E-10.",
+  "corrections": "'Persil Discs success' unsupported; shampoo bars moved to hair; GP1 0.07 to 0.10.",
+  "base_name": "Concentrated and Solid Formats Innovation"
+ },
+ "T-04": {
+  "verdict": "MERGE INTO",
+  "target": "C-07",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED, restatement of C-07",
+  "rationale": "Same Circana scalp figure as C-07; an ingredient and claims layer, not a driver.",
+  "corrections": "Grand View and Verified Market Research sources deleted; 'P&G front-of-pack branding' unverified.",
+  "base_name": "Microbiome Science for Hair and Skin"
+ },
+ "T-05": {
+  "verdict": "MERGE INTO",
+  "target": "T-01",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "Manufacturing automation is the plant-operations leg of the merged AI and automation driver.",
+  "corrections": "Deloitte 2026 outlook and Unilever digital-twin figures carried as evidence.",
+  "base_name": "Manufacturing Automation and Industry 4.0"
+ },
+ "T-06": {
+  "verdict": "KEEP",
+  "target": "T-06",
+  "new_tier": "Macrotrend",
+  "fc": "CONFIRMED on US figures",
+  "rationale": "The single largest verified channel-economics driver: retail media and retailer data monetisation as a visibility tax (US USD 60bn in 2025, Europe growing four times faster than digital). Absorbs K-08 and K-11; force reassigned to Customer.",
+  "corrections": "'Primary FMCG channel' title is a category error (a cost line, not a channel); '8-12% of net revenue' unsourced; Mordor/Adtelligent sources replaced; GP1 0.18 against a triple-counted 0.40; start 2024 to 2022.",
+  "base_name": "Retail Media Networks as Primary FMCG Channel"
+ },
+ "T-07": {
+  "verdict": "DELETE",
+  "target": "T-01 (one sentence)",
+  "new_tier": "Signal",
+  "fc": "PARTLY CONFIRMED",
+  "rationale": "One company's tool with company-stated uplift (K-SCAN +23%); the salon-diagnostics point sits in T-01, shade matching in C-05.",
+  "corrections": "Gartner and CB Insights URLs dead; Similarweb and L'Oréal links homepages.",
+  "base_name": "AI-Powered Personalization at Scale"
+ },
+ "T-08": {
+  "verdict": "KEEP",
+  "target": "T-08",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED on existence, CONTRADICTED on scale",
+  "rationale": "Rebuilt: OEM auto-dosing and platform-mediated replenishment shift volume, format and channel control, a mild Contraction for a brand owner. Persil Smartwash was a management response with minimal adoption and moves to the Signal watch list.",
+  "corrections": "Direction Expansion to Contraction; probability 4 to 3; GP1 0.07 to 0.05; report-mill sources removed.",
+  "base_name": "Connected Appliances and Auto-Dosing Transform Detergent Economics"
+ },
+ "T-10": {
+  "verdict": "MERGE INTO",
+  "target": "T-01",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, magnitude UNVERIFIED",
+  "rationale": "Generative-AI marketing efficiency is the marketing leg of the merged AI driver.",
+  "corrections": "'40-60% content cost reduction confirmed by P&G and Unilever' has no source; only McKinsey's 5-15% of marketing spend estimate is A-grade.",
+  "base_name": "Generative AI Content and Marketing Efficiency Revolution"
+ },
+ "T-11": {
+  "verdict": "KEEP",
+  "target": "T-11",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED, several claims STALE",
+  "rationale": "Agentic commerce intermediating low-consideration replenishment is a real Macrotrend, but one driver, not three: T-12 and K-09 merge here (combined GP1 0.44 to 0.15). Rewritten to the September 2026 state (Alexa for Shopping, Google UCP, OpenAI retreat, Visa/Mastercard protocols).",
+  "corrections": "'Alexa+ Feb 2026' wrong (Feb 2025); Kearney 60% and Gartner 25% (a B2B statistic) removed; probability 5 to 4; peak 2031 to 2032.",
+  "base_name": "Agentic Commerce: AI Agents Make Autonomous Purchase Decisions"
+ },
+ "T-12": {
+  "verdict": "MERGE INTO",
+  "target": "T-11",
+  "new_tier": "Macrotrend (part of T-11)",
+  "fc": "PARTLY CONFIRMED as mechanism",
+  "rationale": "Brand invisibility in agent ranking is a paragraph of T-11, not a separate driver.",
+  "corrections": "'58% of retailers (Deloitte)' unverified; BCG URL 404; Smartwash defence is a management response.",
+  "base_name": "AI Agent Brand Invisibility in Low-Consideration Categories"
+ },
+ "T-13": {
+  "verdict": "KEEP",
+  "target": "T-13",
+  "new_tier": "Macrotrend",
+  "fc": "PARTLY CONFIRMED, numbers wrong",
+  "rationale": "Generative search replacing search-and-browse discovery is confirmed by Adobe, McKinsey and Bain series; kept with an explicit boundary to T-11 (discovery vs purchase).",
+  "corrections": "'35% vs 13.6%', '4,700%' and CTR figures deleted; all four sources replaced; probability 5 to 4; GP1 0.12 to 0.08; start 2025 to 2024.",
+  "base_name": "Generative Search (GEO) Replaces Traditional Product Discovery — Expanded"
+ },
+ "T-14": {
+  "verdict": "MERGE INTO",
+  "target": "C-03",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED commercial, CONTRADICTED science",
+  "rationale": "Peptides and bond-builders are the reason-to-believe layer of hair premiumisation; efficacy evidence at cosmetic concentrations is thin.",
+  "corrections": "'USD 2-3bn peptide hair market' cites the peptide therapeutics (pharma) market; Grand View source deleted.",
+  "base_name": "Peptide and Bioactive Hair Science"
+ },
+ "T-15": {
+  "verdict": "MERGE INTO",
+  "target": "T-02",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on scale",
+  "rationale": "Fermentation funding fell 44% in 2025 with high-profile closures and no cost parity; a long-tail sentence inside T-02.",
+  "corrections": "'USD 36bn by 2030, 43-48% CAGR' is report-mill; GFI source is about alternative proteins.",
+  "base_name": "Precision Fermentation Disrupts FMCG Ingredient Supply Chains"
+ },
+ "T-16": {
+  "verdict": "DELETE",
+  "target": "T-02 (one sentence)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on named actors",
+  "rationale": "Zymergen was liquidated in 2024 and Ginkgo is restructuring; palm-free surfactants exist at niche scale only. One sentence on novel molecules in T-02.",
+  "corrections": "Named-actor claims wrong.",
+  "base_name": "Synthetic Biology Enables Novel Surfactants and Fragrances"
+ },
+ "T-17": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Signal)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED",
+  "rationale": "PubMed indexes ten neurocosmetics papers in total, none an RCT; no product pool, no HCB mechanism.",
+  "corrections": "IFSCC URL 404; 'peer-reviewed mechanism 2024-25' unsupported.",
+  "base_name": "Neurocosmetics and Sensory-Science Hair Care"
+ },
+ "T-18": {
+  "verdict": "DELETE",
+  "target": "T-08 (one sentence)",
+  "new_tier": "Signal",
+  "fc": "STALE and UNVERIFIED",
+  "rationale": "Connected dispensers and smart mirrors: three of four sources dead, no adoption evidence; the replenishment angle is inside T-08.",
+  "corrections": "Samsung, IDC and Miele URLs dead or irrelevant.",
+  "base_name": "Bathroom and Laundry-Room IoT — Connected Dispensers, Smart Mirrors"
+ },
+ "T-19": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Signal)",
+  "new_tier": "Signal",
+  "fc": "CONTRADICTED on sourcing",
+  "rationale": "All four sources fail (Mintel homepage, Givaudan and IFF 404, HBR article does not exist); no measurable pool.",
+  "corrections": "Sources fabricated or dead.",
+  "base_name": "Neuro-Scents: Functional Fragrance with Measured Neuro-Benefit"
+ },
+ "G-01": {
+  "verdict": "MERGE INTO",
+  "target": "G-03 (EU) / G-13 (US)",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, material corrections",
+  "rationale": "PFAS in cosmetics is one component of the EU ingredient-restriction stack (PFHxA Oct 2026, universal restriction 2029+) and of the US state bans; not a standalone line.",
+  "corrections": "'1 January 2026 EU cosmetics PFAS ban' was the French law, not EU; LHC coatings sentence deleted.",
+  "base_name": "EU PFAS Universal Restriction"
+ },
+ "G-02": {
+  "verdict": "KEEP",
+  "target": "G-02",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, central risk claim CONTRADICTED",
+  "rationale": "Real dated instrument (Regulation 2023/2055) with clear gates; kept with the PVA sentences removed because water-soluble pod film is not in scope.",
+  "corrections": "Detergents deadline corrected from 2029 to Oct 2028; PVA/pod risk deleted; GP1 0.10 to 0.05.",
+  "base_name": "EU Microplastics Ban — Phase 2 Implementation"
+ },
+ "G-03": {
+  "verdict": "KEEP",
+  "target": "G-03",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, stale on status",
+  "rationale": "The EU cosmetics ingredient-restriction stack (Omnibus VII/VIII, 56 allergens 2026/28, PFHxA, D4/D5/D6) is the live cosmetics compliance driver; kept, absorbing the EU part of G-01.",
+  "corrections": "Detergents Regulation sentence moved to G-16; allergen and PFHxA gates added; GP1 0.15 to 0.12; timing 2025-2028 linear.",
+  "base_name": "EU Cosmetics Regulation Omnibus VII/VIII Revision"
+ },
+ "G-04": {
+  "verdict": "KEEP",
+  "target": "G-04",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, most numbers wrong",
+  "rationale": "Packaging regulation and EPR fees are one cost stack (PPWR 2026/2028/2030/2038 plus EU, UK and US state eco-modulation); G-04, E-04 and the label part of G-07 triple-counted it. Merged with geography extended to the UK and US.",
+  "corrections": "Dates corrected; '3-5x trigger-spray malus' unsourced and deleted; GP1 0.07 (G-04) and 0.04 (E-04) become 0.15 for the merged stack (top of the regulatory calibration band); curve step to linear.",
+  "base_name": "EU PPWR — Packaging and Packaging Waste Regulation"
+ },
+ "G-05": {
+  "verdict": "KEEP",
+  "target": "G-05",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, conflates two files",
+  "rationale": "EmpCo (Directive 2024/825) applies from 27 September 2026 and is live; the Green Claims Directive is stalled and demoted to context.",
+  "corrections": "CMA URL 404 and EcoAct vendor source replaced; GP1 0.08 to 0.04.",
+  "base_name": "EU Green Claims Directive / EmpCo Enforcement"
+ },
+ "G-06": {
+  "verdict": "KEEP",
+  "target": "G-06",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, mechanics wrong for HCB",
+  "rationale": "EUDR (30 Dec 2026) and CSDDD (26 Jul 2029, post-Omnibus) form one nature and due-diligence stack; HCB is a downstream user with pass-through cost. Absorbs G-11.",
+  "corrections": "HCB compliance mechanics corrected; start 2026 to 2027; GP1 0.05 to 0.04.",
+  "base_name": "EU Deforestation Regulation (EUDR)"
+ },
+ "G-07": {
+  "verdict": "MERGE INTO",
+  "target": "G-16 (DPP) / G-04 (label)",
+  "new_tier": "Regulation",
+  "fc": "CONTRADICTED on mechanism and dates",
+  "rationale": "The Digital Product Passport that binds HCB comes through the Detergents Regulation (23 Sep 2029), not a generic 'QR codes from 2027'; the label element is packaging-stack cost.",
+  "corrections": "'QR codes from 2027' wrong; ESPR working plan does not cover detergents or cosmetics.",
+  "base_name": "EU Digital Product Passport (DPP)"
+ },
+ "G-08": {
+  "verdict": "KEEP",
+  "target": "G-08",
+  "new_tier": "Regulation",
+  "fc": "STALE and partly wrong",
+  "rationale": "One US tariff regime, not two: G-08 and G-09 merge, rewritten to the post-IEEPA regime (Supreme Court struck IEEPA tariffs on 20 Feb 2026; Section 301/232/122 remain).",
+  "corrections": "'Section 301 25-60% now effective' conflated three regimes; combined GP1 0.22 to 0.06; probability 5 to 4; peak 2029 to 2027.",
+  "base_name": "Tariffs, Trade Wars, and Deglobalization (US-EU-China)"
+ },
+ "G-09": {
+  "verdict": "MERGE INTO",
+  "target": "G-08",
+  "new_tier": "Regulation",
+  "fc": "CONTRADICTED",
+  "rationale": "'USTR Feb 2026 notice confirms escalation' was wrong: February 2026 was the Supreme Court striking down IEEPA tariffs; refunds offset 2026 for Church & Dwight and P&G. Merged into G-08.",
+  "corrections": "Aerosol-can metals channel and refund evidence carried into G-08.",
+  "base_name": "US Tariffs and Reshoring Pressure on Imported FMCG Inputs"
+ },
+ "G-10": {
+  "verdict": "DELETE",
+  "target": "T-01 (adoption-cost note)",
+  "new_tier": "Regulation",
+  "fc": "STALE, CONTRADICTED on applicability",
+  "rationale": "The AI Act does not classify FMCG formulation, marketing or forecasting tools as high-risk; the Digital Omnibus delayed the high-risk provisions further. Fails the relevance test.",
+  "corrections": "Dates stale after the Digital Omnibus; applicability wrong.",
+  "base_name": "EU AI Act Compliance Costs and Speed-to-Market Friction"
+ },
+ "G-11": {
+  "verdict": "MERGE INTO",
+  "target": "G-06",
+  "new_tier": "Regulation (CSDDD part)",
+  "fc": "PARTLY CONFIRMED as frameworks, CONTRADICTED as mandate",
+  "rationale": "GBF and TNFD are frameworks without a corporate compliance timetable; the one dated instrument (CSDDD 2029) is the nature component of G-06.",
+  "corrections": "GBF/TNFD/McKinsey material deleted.",
+  "base_name": "Biodiversity Regulation and Nature-Related Supply Chain Mandates"
+ },
+ "G-12": {
+  "verdict": "DELETE",
+  "target": "C-29 (consumer-norm residue)",
+  "new_tier": "Signal (for HCB)",
+  "fc": "STALE on instruments, CONTRADICTED on relevance",
+  "rationale": "The EU textile strategy's binding instruments regulate apparel, not HCB; the residual consumer-awareness effect sits inside C-29.",
+  "corrections": "ESPR destruction ban (19 Jul 2026), DPP registry (20 Jul 2026), textile EPR Directive 2025/1892 dated but not HCB-binding.",
+  "base_name": "EU Textile Strategy and Circular Fashion Mandates"
+ },
+ "G-13": {
+  "verdict": "KEEP",
+  "target": "G-13",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, several state claims wrong",
+  "rationale": "MoCRA is in force (GMP and allergen rules delayed) and US state ingredient bans are dated (WA/CO/MN/CA 2025, VT/ME 2026, OR/NM 2027); kept, absorbing the US part of G-01, with the federal deregulatory turn noted.",
+  "corrections": "NY and Prop 65 statements corrected; Washington phenylenediamine and formaldehyde-releaser bans added; probability 5 to 4; GP1 0.08 to 0.06.",
+  "base_name": "MoCRA + US State Cosmetics Regulation (CA Prop 65, NY, WA)"
+ },
+ "G-14": {
+  "verdict": "SUBSTITUTE",
+  "target": "G-16",
+  "new_tier": "Regulation",
+  "fc": "CONTRADICTED (fabricated or misattributed evidence)",
+  "rationale": "The NGO coalition, Bloomberg piece, JRC report and '15-25 bps' estimate could not be found; the real instrument is the Detergents and Surfactants Regulation 2026/405 with its film biodegradability criteria (delegated act by Mar 2029, compliance by Mar 2032).",
+  "corrections": "Evidence base replaced entirely by the EUR-Lex text; probability 3 to 4; GP1 0.18 to 0.12.",
+  "base_name": "Biodegradability Standards Tighten Around PVA Unit-Dose Films"
+ },
+ "G-15": {
+  "verdict": "NEW",
+  "target": "G-15",
+  "new_tier": "Regulation",
+  "fc": "n/a (new)",
+  "rationale": "Gap: SNAP work requirements from November 2025 and state cost-share from FY2028 are a dated federal instrument already measurable in US mass-market units.",
+  "corrections": "Contraction, probability 5, GP1 0.08, 2025-2028 front-loaded."
+ },
+ "G-16": {
+  "verdict": "NEW",
+  "target": "G-16",
+  "new_tier": "Regulation",
+  "fc": "n/a (substitution)",
+  "rationale": "EU Detergents and Surfactants Regulation 2026/405 (DPP and digital label from 23 Sep 2029, film biodegradability criteria by 2032, phosphorus review) plus CLP relabelling 2026-29; substitutes G-14 and absorbs the DPP part of G-07.",
+  "corrections": "Contraction, probability 4, GP1 0.12, 2027-2030 step_function."
+ },
+ "G-17": {
+  "verdict": "NEW",
+  "target": "G-17",
+  "new_tier": "Regulation",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the Urban Wastewater Treatment Directive (2024/3019) makes cosmetics producers fund at least 80% of quaternary treatment through extended producer responsibility (schemes by end-2028, fees from 2029); absent from the base entirely.",
+  "corrections": "Contraction, probability 4, GP1 0.15, 2029-2035 back-loaded."
+ },
+ "E-01": {
+  "verdict": "KEEP",
+  "target": "E-01",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, mis-specified",
+  "rationale": "B50 is live (blending 50% from 1 July 2026) and the squeeze runs through palm kernel and coconut oil, the oils HCB actually buys, not crude palm oil. Kept and re-titled; tier lowered to Mesotrend.",
+  "corrections": "B50 status updated from 'doubts' to live; substitution moved out (management response); probability 4 to 5; timing 2024-2027 front-loaded.",
+  "base_name": "Palm Oil Supply Chain Disruption (Indonesia B50)"
+ },
+ "E-02": {
+  "verdict": "MERGE INTO",
+  "target": "T-03",
+  "new_tier": "Mesotrend",
+  "fc": "PARTLY CONFIRMED, mechanism unsupported",
+  "rationale": "Water stress is a Megatrend context; the only pool mechanism is the format shift toward concentrated and low-water products, which T-03 already carries.",
+  "corrections": "WRI Aqueduct facts are from Aug 2023 (still current release); the three 'opportunities' were management responses.",
+  "base_name": "Water Scarcity Drives Low-Water Formulations"
+ },
+ "E-03": {
+  "verdict": "KEEP",
+  "target": "E-03",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, mechanism mis-specified",
+  "rationale": "EU carbon-cost pass-through (ETS EUR 80-90/t, ETS2 from 2028, CBAM definitive 2026, downstream metal goods 2028) is one driver; E-11 merges in. Scope 3 reporting is not a pool driver.",
+  "corrections": "Surfactant-inclusion claim deleted; combined GP1 0.09 to 0.10; curve step to linear 2026-2030.",
+  "base_name": "Carbon Border Adjustment and Scope 3 Reporting"
+ },
+ "E-04": {
+  "verdict": "MERGE INTO",
+  "target": "G-04",
+  "new_tier": "Regulation",
+  "fc": "PARTLY CONFIRMED, headline numbers unsourced",
+  "rationale": "EPR fee escalation is the same packaging cost stack as PPWR; merged with geography extended to the UK and US.",
+  "corrections": "'3-5x' figure deleted.",
+  "base_name": "EPR Fee Escalation and Eco-Modulation"
+ },
+ "E-05": {
+  "verdict": "DELETE",
+  "target": "NEXT watch list (Microtrend)",
+  "new_tier": "Microtrend",
+  "fc": "CONFIRMED vector trend, UNVERIFIED economics",
+  "rationale": "Aedes albopictus expansion is real (ECDC) but disease seasons are volatile and Insect Control is one niche category; influence +0.02 pp. Watch list with the ECDC map as refresh source.",
+  "corrections": "'4-to-7-month season extension' unsourced.",
+  "base_name": "Climate-Driven Pest Pattern Shifts (Insecticide Demand)"
+ },
+ "E-06": {
+  "verdict": "SUBSTITUTE",
+  "target": "E-07",
+  "new_tier": "Mesotrend",
+  "fc": "CONTRADICTED on headline, UNVERIFIED numbers",
+  "rationale": "Kearney's 2026 index shows US manufacturing imports at a four-year high, so the reshoring thesis is not in the data; the real upstream driver is European chemical supply-base erosion (Cefic closures), now inside E-07.",
+  "corrections": "'Chinese surfactant suppliers about 30% of European supply' and '2-5%' figures unsourced.",
+  "base_name": "Supply Chain Nearshoring and Geopolitical Diversification"
+ },
+ "E-07": {
+  "verdict": "KEEP",
+  "target": "E-07",
+  "new_tier": "Mesotrend",
+  "fc": "CONFIRMED in direction, corrected in detail",
+  "rationale": "Structural European energy disadvantage (electricity about 2x, gas 3-6x US) plus the 2026 gas shock; kept, Europe only, tier lowered to Mesotrend. Absorbs the E-06 substitute and demotes E-09 to a watch item.",
+  "corrections": "'2-3x' replaced by IEA/Eurostat figures; nuclear phase-out sentence deleted; probability 4 to 5; GP1 0.07 to 0.06; start 2024 to 2022.",
+  "base_name": "Energy Cost Volatility and European Manufacturing Competitiveness"
+ },
+ "E-08": {
+  "verdict": "MERGE INTO",
+  "target": "C-29",
+  "new_tier": "Microtrend",
+  "fc": "PARTLY CONFIRMED policy, UNVERIFIED commercial",
+  "rationale": "Textile longevity as a consumer norm is one angle of the garment-care occasion driver C-29.",
+  "corrections": "Dead sources replaced by the Commission textiles page and Textile Exchange 2025.",
+  "base_name": "Textile Longevity and Garment Life Extension Economy"
+ },
+ "E-09": {
+  "verdict": "DELETE",
+  "target": "E-07 (watch item)",
+  "new_tier": "Microtrend",
+  "fc": "CONTRADICTED",
+  "rationale": "Munich Re reports Europe 'got off rather lightly' in 2025 (USD 11bn losses vs a USD 35bn ten-year average); '15-20% annual insurance increases' unsourced. Physical risk belongs in the risk register, not the pool model.",
+  "corrections": "Both headline claims wrong or unsourced.",
+  "base_name": "Climate Adaptation Costs for European Manufacturing"
+ },
+ "E-10": {
+  "verdict": "DELETE",
+  "target": "T-03 (one sentence)",
+  "new_tier": "Not a regulation (hypothesis)",
+  "fc": "CONTRADICTED on the regulatory core",
+  "rationale": "No regulator in the EU, US, India, China or the GCC has proposed water-content limits on consumer products; the format architecture point sits in T-03.",
+  "corrections": "Regulation does not exist; statistics stale.",
+  "base_name": "Freshwater Crisis Accelerates Waterless Formulation Mandate"
+ },
+ "E-11": {
+  "verdict": "MERGE INTO",
+  "target": "E-03",
+  "new_tier": "Regulation",
+  "fc": "CONTRADICTED on central claim",
+  "rationale": "Scope 3 mandates do not price surfactants; the same ETS/CBAM driver as E-03.",
+  "corrections": "Surfactant-inclusion claim and 2030 step rationale deleted.",
+  "base_name": "Scope 3+ Value Chain Decarbonization Mandates"
+ },
+ "E-12": {
+  "verdict": "NEW",
+  "target": "E-12",
+  "new_tier": "Macrotrend",
+  "fc": "n/a (new)",
+  "rationale": "Gap: the 2026 Middle East war's oil-derived feedstock, resin and freight shock is the single largest 2026 COGS event, company-confirmed, and absent from a base last edited in July 2026.",
+  "corrections": "Contraction, probability 4, GP1 0.15, 2026-2027 front-loaded."
+ }
+}

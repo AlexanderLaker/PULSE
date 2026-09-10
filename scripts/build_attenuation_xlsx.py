@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Attenuation_Calibration_v3_5.xlsx per methodology §6.
+"""Build Attenuation_Calibration_<version>.xlsx per methodology §6 (v3.11 default).
 
 Six sheets:
   1. Summary
@@ -29,11 +29,22 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-CALIB_JSON = REPO / 'data' / 'attenuation_calibration_v3_5.json'
-OUT        = REPO / 'data' / 'Attenuation_Calibration_v3_5.xlsx'
+# Calibration version to render: `python3 scripts/build_attenuation_xlsx.py v3_11`
+# (default) or `v3_5`. The comparator columns pick up the previous version the
+# JSON carries (v3_5_* keys in the v3.11 record, v3_1_* keys in the v3.5 record).
+VER = sys.argv[1] if len(sys.argv) > 1 else 'v3_11'
+VER_LABEL = VER.replace('_', '.')
+CALIB_JSON = REPO / 'data' / f'attenuation_calibration_{VER}.json'
+OUT        = REPO / 'data' / f'Attenuation_Calibration_{VER}.xlsx'
 
 calib = json.loads(CALIB_JSON.read_text())
-trends = get_report_trends()
+PREV = next(k[:-len('_within_force_final')] for k in calib if k.endswith('_within_force_final'))
+PREV_LABEL = PREV.replace('_', '.')
+N_TRENDS = calib['n_trends']
+if VER == 'v3_11':
+    trends = get_report_trends()
+else:
+    trends = get_report_trends()  # the census sheet always shows the CURRENT seed
 
 # ── Style helpers ──────────────────────────────────────────────────────
 FONT_NAME = 'Arial'
@@ -86,7 +97,7 @@ wb = Workbook()
 s = wb.active
 s.title = 'Summary'
 
-s['A1'] = 'PRISM v3.5 — Attenuation Calibration Summary'
+s['A1'] = f'PRISM {VER_LABEL} — Attenuation Calibration Summary'
 s['A1'].font = Font(name=FONT_NAME, bold=True, size=14)
 s.merge_cells('A1:F1')
 
@@ -138,15 +149,15 @@ tot.font = BLACK_B; tot.number_format='#,##0'; tot.alignment = RIGHT; tot.border
 s.cell(r,3, f'=SUM(C{fc_start}:C{r-1})').font = BLACK_B
 s.cell(r,3).number_format='0.0%'; s.cell(r,3).border=BORDER_ALL; s.cell(r,3).alignment = RIGHT
 
-# Within-force final — comparison to v3.1
+# Within-force final — comparison to the previous calibration
 r += 3
-s.cell(r,1,'Within-force overlap — v3.5 vs v3.1'); s.cell(r,1).font = BLACK_B
+s.cell(r,1,f'Within-force overlap — {VER_LABEL} vs {PREV_LABEL}'); s.cell(r,1).font = BLACK_B
 r += 1
-for i,h in enumerate(['Force','v3.5 final','v3.1 final','Δ','Direction'], start=1):
+for i,h in enumerate(['Force',f'{VER_LABEL} final',f'{PREV_LABEL} final','Δ','Direction'], start=1):
     hdr(s.cell(r,i), h)
 r += 1
 v34_w = calib['within_force_final']
-v31_w = calib['v3_1_within_force_final']
+v31_w = calib[f'{PREV}_within_force_final']
 for f in FORCES:
     s.cell(r,1,f).font = BLACK; s.cell(r,1).border=BORDER_ALL
     a = s.cell(r,2, v34_w[f]); a.font=BLUE; a.number_format='0.000'; a.alignment=RIGHT; a.border=BORDER_ALL
@@ -157,13 +168,13 @@ for f in FORCES:
 
 # Per-force effective attenuation comparison
 r += 2
-s.cell(r,1,'Per-force effective attenuation — v3.5 vs v3.1'); s.cell(r,1).font = BLACK_B
+s.cell(r,1,f'Per-force effective attenuation — {VER_LABEL} vs {PREV_LABEL}'); s.cell(r,1).font = BLACK_B
 r += 1
-for i,h in enumerate(['Force','Row-mean cross overlap','eff_att_NEW','v3.1 eff_att','Δ'], start=1):
+for i,h in enumerate(['Force','Row-mean cross overlap','eff_att_NEW',f'{PREV_LABEL} eff_att','Δ'], start=1):
     hdr(s.cell(r,i), h)
 r += 1
 v34 = calib['per_force_effective_attenuation']
-v31 = calib['v3_1_per_force_effective_attenuation']
+v31 = calib[f'{PREV}_per_force_effective_attenuation']
 rm = calib['per_force_row_mean_cross_overlap']
 eff_start = r
 for f in FORCES:
@@ -183,7 +194,7 @@ s.cell(r,1,'Trend-weighted mean attenuation (sanity check)').font = BLACK_B
 wm_cell = s.cell(r,2,
     f'=SUMPRODUCT(B{fc_start}:B{fc_start+len(FORCES)-1},C{eff_start}:C{eff_start+len(FORCES)-1})/B{fc_start+len(FORCES)}')
 wm_cell.font = BLACK_B; wm_cell.number_format = '0.0000'; wm_cell.alignment = RIGHT
-note(s.cell(r,4), 'Expected: 0.4492 ± rounding vs v3.1 0.446')
+note(s.cell(r,4), f'Sanity: trend-weighted mean stays near 0.45 (v3.1 0.446, v3.5 0.452, {VER_LABEL} {calib["trend_weighted_mean_attenuation"]})')
 
 # Column widths
 for col, w in [(1,38),(2,16),(3,16),(4,12),(5,16),(6,40)]:
@@ -216,7 +227,9 @@ wme  = calib['within_force_mechanism_adj']
 wfi  = calib['within_force_final']
 J0   = calib['J0_baseline']
 
-rationale_within = {
+# Rationales: the v3.11 record carries them per cell; the v3.5 record does not,
+# so the v3.5 wording stays as a fallback for that version.
+_V35_WITHIN = {
     'Consumer':      'Consumer trends span premium / sustainability / demographics / occasions / geography / value-trading — little mechanism clustering. Expanded by ultra-fast-fashion; diversity preserved. Minor −0.03 anti-cluster.',
     'Customer':      'Retail-media, agentic-commerce, DTC-pivot, live-commerce — channels partially coexist but each is a distinct buying motion. No adjustment — empirical excess sufficient.',
     'Technology':    'AI cluster (8 trends) + bio/chem cluster (5) + neurocosmetics tie in bio/chem. Mild +0.05 to recognize AI-stack mechanism clustering beyond structural score.',
@@ -224,6 +237,7 @@ rationale_within = {
     'Environmental': 'Climate + water + palm + packaging mass balance — share substrate economics. +0.05 for supply-chain mechanism coupling.',
     'Competitive':   'Each trend is about a *different* competitor (P&G, Unilever, L\'Oréal, Reckitt, K-beauty, Amazon, AfCFTA local champions). Genuine diversity. −0.05 reflects structural distinction.',
 }
+rationale_within = calib.get('within_force_mechanism_reason', _V35_WITHIN)
 data_start = r
 for f in FORCES:
     n = calib['force_counts'][f]
@@ -263,7 +277,7 @@ for col, w in [(1,14),(2,8),(3,12),(4,22),(5,10),(6,16),(7,16),(8,60)]:
 # Sheet 3: Cross-Force
 # ════════════════════════════════════════════════════════════════════════
 s3 = wb.create_sheet('Cross-Force')
-s3['A1'] = 'Cross-Force Overlap Matrix (FINAL, v3.5)'
+s3['A1'] = f'Cross-Force Overlap Matrix (FINAL, {VER_LABEL})'
 s3['A1'].font = Font(name=FONT_NAME, bold=True, size=14)
 s3.merge_cells('A1:H1')
 s3['A2'] = 'Read as: row-force signal covered by column-force. Asymmetric by construction.'
@@ -307,7 +321,7 @@ for fi in FORCES:
                      calib['cross_force_final'][fi][fj]))
 flat.sort(key=lambda x: -x[6])
 
-rationale_cross = {
+_V35_CROSS = {
     ('Environmental','Government'): 'PFAS, PPWR, EUDR, Green Claims — environmental issues become regulatory.',
     ('Government','Environmental'): 'Same coupling, reverse direction; regulatory action targets env impact.',
     ('Customer','Government'):      'Retailer compliance scope expanding (GPSR, DPP, EUDR); channel carries reg burden.',
@@ -321,6 +335,10 @@ rationale_cross = {
     ('Customer','Environmental'):   'Retailer private-label pushes low-footprint positioning (e.g., Aldi, Lidl).',
     ('Environmental','Customer'):   'Sustainability claims reshape retailer gate-keeping.',
 }
+if 'cross_force_mechanism_reason' in calib:
+    rationale_cross = {tuple(k.split('->')): v for k, v in calib['cross_force_mechanism_reason'].items()}
+else:
+    rationale_cross = _V35_CROSS
 for rank, (fi, fj, raw, ex, asym, mech, fin) in enumerate(flat[:12], 1):
     s3.cell(r,1,rank).font=BLACK; s3.cell(r,1).alignment=CENTER; s3.cell(r,1).border=BORDER_ALL
     s3.cell(r,2,fi).font=BLACK;  s3.cell(r,2).border=BORDER_ALL
@@ -351,7 +369,7 @@ s4.cell(r,1,'Formulas').font = BLACK_B
 r += 1
 formulas = [
     ('Weighted Jaccard',        'J(x,y) = Σ min(e_x,c, e_y,c) / Σ max(e_x,c, e_y,c)  for c in 12 FMCG categories'),
-    ('Random-pair baseline',    'J₀ = mean J over all unordered pairs in the full 99-trend base'),
+    ('Random-pair baseline',    f'J₀ = mean J over all unordered pairs in the full {N_TRENDS}-trend base'),
     ('Excess-over-baseline',    'e(J̄) = max(0, (J̄ − J₀) / (1 − J₀))'),
     ('Asymmetric normalization','asymm_ij = e_ij × min(1.5, √(n_j / n_i))       [cross-force only]'),
     ('Final (within-force)',    'O_ii_final = clamp[0.10, 0.45]( e_ii + mech_ii )'),
@@ -369,9 +387,11 @@ for label, fx in formulas:
 r += 2
 s4.cell(r,1,'Worked example — weighted Jaccard on two trends').font = BLACK_B
 r += 1
-# pick consumer_r01 and government_r01
+# worked pair: consumer_r01 (private label) and the first Government driver
+# of the current seed (government_r01 PFAS left the base in the September 2026 review)
 ex_a = next(t for t in trends if t.id == 'consumer_r01')
-ex_b = next(t for t in trends if t.id == 'government_r01')
+ex_b = next((t for t in trends if t.id == 'government_r01'),
+            next(t for t in sorted(trends, key=lambda t: t.id) if t.force == 'Government'))
 
 s4.cell(r,1,'Trend A').font = BLACK_B
 s4.cell(r,2, f'{ex_a.id} — {ex_a.name}').font=BASE; s4.merge_cells(start_row=r, start_column=2, end_row=r, end_column=6)

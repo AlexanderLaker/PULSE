@@ -61,6 +61,12 @@ export interface Trend {
   peak_year?: number;
   /** MECE diffusion curve shape — see pulse/config.py (diffusion curves). */
   diffusion_curve?: string;
+  /** 2.11.0 (owner ruling O7): ONE uncertainty score per trend, 0–5 — the
+   *  dispersion around the modelled size and timing of the effect. Sets the
+   *  Beta-prior concentration (24/16/10/6/4/3, mean unchanged) and the
+   *  per-trend peak-year jitter (0/1/1/2/3/4 years). null = not scored: the
+   *  trend then behaves exactly as in 2.10.0 (concentration 6, global jitter). */
+  uncertainty?: number | null;
   strategic_implication?: string;
   category_exposure?: CategoryExposure;
   vc_exposure?: VCExposure;
@@ -93,6 +99,10 @@ export interface Trend {
 /** Subset of Trend fields that can be updated via PUT /trends/{id}. */
 export interface TrendUpdate {
   probability?: number;
+  /** 2.11.0 (O7): uncertainty score 0–5. Absent = unchanged; an EXPLICIT
+   *  null clears the score (back to the 2.10.0 behaviour). The editor does
+   *  not offer clearing; the API does. */
+  uncertainty?: number | null;
   direction?: Direction;
   description?: string;
   strategic_implication?: string;
@@ -127,6 +137,8 @@ export interface TrendScoreSnapshot {
   gp1_pct_affected?: number;   // 0.0-1.0
   peak_year?: number;
   diffusion_curve?: string;
+  /** 2.11.0 (O7): uncertainty score 0–5 (null/absent = not scored). */
+  uncertainty?: number | null;
   category_exposure?: CategoryExposure;
   regional_exposure?: RegionalExposure;
   vc_exposure?: VCExposure;
@@ -163,6 +175,8 @@ export interface ProposalScorer {
   gp1_pct_affected?: number;
   peak_year?: number;
   diffusion_curve?: string;
+  /** 2.11.0 (O7): this expert's uncertainty score. */
+  uncertainty?: number | null;
   /** This expert's VC profile — carried so Review & Endorse can count value-chain
    *  epicentre VOTES per stage (categorical; never averaged). July 2026. */
   vc_exposure?: VCExposure;
@@ -183,6 +197,8 @@ export interface TrendProposalsResponse {
     gp1_pct_affected?: ProposalAgg | null;
     peak_year?: ProposalAgg | null;
     diffusion_curve?: ProposalAgg | null;
+    /** 2.11.0 (O7): median of the experts' uncertainty scores. */
+    uncertainty?: ProposalAgg | null;
     category_exposure?: ProposalCellAgg;
     regional_exposure?: ProposalCellAgg;
     vc_exposure?: ProposalCellAgg;
@@ -197,5 +213,7 @@ export interface ProposalSummary {
   gp1_pct_affected?: ProposalAgg | null;
   peak_year?: ProposalAgg | null;
   diffusion_curve?: ProposalAgg | null;
+  /** 2.11.0 (O7). */
+  uncertainty?: ProposalAgg | null;
   my?: TrendProposalPatch | null;
 }

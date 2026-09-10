@@ -55,6 +55,7 @@ import {
   EXPANSION_RGB, CONTRACTION_RGB,
 } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { cellMarginals } from '@/lib/cellWeights';
 import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
@@ -1012,8 +1013,8 @@ const PeakStressTooltip: FC = () => {
           </div>
           <p className="mb-2">
             Each trend has its own diffusion curve (<em>s_curve, linear, front-loaded,
-            back-loaded, step-function</em>) and its own peak year. The 99 v3.5 trends
-            are spread across 2027–2035 peak years and five curve shapes.
+            back-loaded, step-function</em>) and its own peak year. The 51 drivers of the
+            September 2026 base are spread across 2027–2035 peak years and five curve shapes.
           </p>
           <p className="mb-2">
             That means the category grand total can be <strong>non-monotonic</strong>:
@@ -1101,6 +1102,18 @@ const ProfitPoolAnalysis2: FC<{
     [trends],
   );
 
+  // ── Category weights for every weighted total ────────────────────────
+  // 2.11.0 (O6): a persisted run carries the ROW SUMS of the cell
+  // gross-profit-share matrix it was rolled up with (category_weights_used).
+  // Those are the weights that reproduce the run's own portfolio figure, so
+  // they take precedence over the live config (which an admin may have
+  // edited since the run); pre-2.11 runs fall back to config.category_weights
+  // exactly as before.
+  const catWeightsForTotals = useMemo(
+    () => (simulation?.category_weights_used ?? config?.category_weights) as Record<string, number> | undefined,
+    [simulation?.category_weights_used, config?.category_weights],
+  );
+
   const matrixData = useMemo(() => {
     const rows = CATEGORIES.map((c) => ({
       id: c.name,                       // canonical key — drives every backend lookup
@@ -1110,13 +1123,12 @@ const ProfitPoolAnalysis2: FC<{
       fallbackId: c.id,
     }));
 
-    // ── Category weights (source: config page) ──────────────────────
-    // Keyed by display name ("Hair: Color") to match backend DEFAULT_CATEGORY_WEIGHTS
-    // and the row.id we use above. Falls back to the snake_case id (e.g. "hair_color")
+    // ── Category weights (the run's own row sums, else the config page) ──
+    // Keyed by display name ("Hair: Color") to match the backend and the
+    // row.id we use above. Falls back to the snake_case id (e.g. "hair_color")
     // in case a future backend persists either shape, and ultimately to 1.0
-    // (equal-weighted) if the config endpoint didn't return category_weights
-    // at all.
-    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    // (equal-weighted) if neither the run nor the config carries weights.
+    const catWeightsRaw = catWeightsForTotals;
     const catWeightFor = (catName: string, fallbackId: string): number =>
       resolveCatWeight(catWeightsRaw, catName, fallbackId);
     const rowWeights = rows.map((r) => catWeightFor(r.id, r.fallbackId));
@@ -1233,7 +1245,7 @@ const ProfitPoolAnalysis2: FC<{
       axisKeys, 'region',
     );
     return { columns, rows, data, rowTotals, colTotals, grandTotal, showTotals: !!decompositions, showRowTotals: true, cellDetails: undefined };
-  }, [view, simulation, selectedYear, config]);
+  }, [view, simulation, selectedYear, catWeightsForTotals]);
 
   // ── Apply impact filter to the matrix ──────────────────────────
   // Multiplies every cell, row total, and col total by the chosen
@@ -1278,7 +1290,7 @@ const ProfitPoolAnalysis2: FC<{
     // M5 (July 2026 review): this block used to RE-IMPLEMENT the weight
     // resolution rule inline — a divergent copy the single-source guard
     // couldn't see. Delegate to lib/shiftMatrix like everywhere else.
-    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    const catWeightsRaw = catWeightsForTotals;
     const rowWeights = matrixData.rows.map((r) =>
       resolveCatWeight(catWeightsRaw, r.id, r.fallbackId));
     const newColTotals: Record<string, number | null> = {};
@@ -1303,7 +1315,7 @@ const ProfitPoolAnalysis2: FC<{
       grandTotal: newGrand,
       cellDetails: undefined as typeof matrixData.cellDetails,
     };
-  }, [matrixData, impactFilter, impactFractions, config, view]);
+  }, [matrixData, impactFilter, impactFractions, catWeightsForTotals, view]);
 
     // ── Category Detail Panel data ─────────────────────────────────
   // Rebuilds only when the underlying simulation / trends / selected year
@@ -1437,6 +1449,10 @@ const ProfitPoolAnalysis2: FC<{
       contributing_trends,
       regional_shift,
       region_weights: simulation?.region_weights_used,
+      // 2.11.0 (O6): the row of the cell gross-profit-share matrix for each
+      // category — the drill-down shows the weights that rolled ITS regions
+      // up, not the portfolio-wide column sums.
+      cell_weights: simulation?.cell_weights_used ?? undefined,
       categories: cats,
     };
   }, [simulation, trends, selectedYear]);
@@ -1453,7 +1469,7 @@ const ProfitPoolAnalysis2: FC<{
     const horizon = YEARS[YEARS.length - 1]!;
     // M5 (July 2026 review): weight resolution delegates to lib/shiftMatrix
     // (this was the third inline re-implementation in this file).
-    const catWeightsRaw = config?.category_weights as Record<string, number> | undefined;
+    const catWeightsRaw = catWeightsForTotals;
     const wFor = (name: string, id: string): number =>
       resolveCatWeight(catWeightsRaw, name, id);
     const meds: Array<number | null> = [];
@@ -1494,7 +1510,7 @@ const ProfitPoolAnalysis2: FC<{
       };
     }
     return { horizon, med, p10: weightedAvg(p10s, ws), p90: weightedAvg(p90s, ws), joint: false as const, maxCat, minCat };
-  }, [simulation, config]);
+  }, [simulation, catWeightsForTotals]);
 
   // ─── Empty / error banners ────────────────────────────────────
   const showBackendOffline = !loading && !backendAvailable;
@@ -1898,7 +1914,7 @@ const ProfitPoolAnalysis2: FC<{
               <Info size={14} style={{ color: S.primary }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT }}>About this model</span>
               <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
-                Bayesian Monte Carlo · 50,000 iterations · 99 trends · run details &amp; methodology
+                Bayesian Monte Carlo · 50,000 iterations · {trends.length || 51} drivers · run details &amp; methodology
               </span>
             </span>
             <span className="flex items-center gap-3">
@@ -1948,11 +1964,29 @@ const ProfitPoolAnalysis2: FC<{
                 rows.push(['VC attribution', m.vc_attribution_basis === 'epicentre'
                   ? 'epicentre partition'
                   : 'profile-weighted (pre-2.9 run)']);
-                // F1 (2.10.0): the region GP1-share weights used in the roll-up.
+                // F1 (2.10.0) / O6 (2.11.0): the gross-profit-share weights the
+                // roll-up used. A 2.11 run carries the 12 × 4 cell matrix (shown
+                // as its region and category marginals plus the source label);
+                // a 2.10 run carries region weights only.
+                if (m.cell_weights_used) {
+                  const cw = cellMarginals(m.cell_weights_used);
+                  rows.push(['Cell weights', cw.equal
+                    ? `equal placeholder (${cw.cellCount} cells × ${(100 / cw.cellCount).toFixed(2)}%)`
+                    : `${cw.cellCount}-cell gross-profit shares`]);
+                  if (m.cell_weights_source) rows.push(['Weights source', m.cell_weights_source]);
+                }
                 if (m.region_weights_used) {
-                  rows.push(['Region weights', Object.entries(m.region_weights_used)
+                  rows.push(['Region shares', Object.entries(m.region_weights_used)
                     .map(([r, w]) => `${r} ${(Number(w) * 100).toFixed(0)}%`).join(' · ')]);
                 }
+                if (m.category_weights_used) {
+                  const ws = Object.values(m.category_weights_used).map(Number);
+                  const equalCats = ws.length > 0 && ws.every((w) => Math.abs(w - ws[0]!) < 1e-6);
+                  rows.push(['Category shares', equalCats ? `equal (${ws.length} × ${(100 / ws.length).toFixed(1)}%)` : 'per category (see Config sheet)']);
+                }
+                // O10/O11 (2.11.0): the trend base and calibration the run used.
+                if (m.trend_count != null) rows.push(['Trend base', `${m.trend_count} drivers`]);
+                if (m.attenuation_source) rows.push(['Calibration', m.attenuation_source]);
                 if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
                 if (m.model_version) rows.push(['Model', m.model_version]);
                 return (
@@ -2123,7 +2157,7 @@ const ProfitPoolAnalysis2: FC<{
                           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula'}</code>,
-          50,000 iterations, Gaussian-copula dependencies, 99 v3.5 trends). The trend
+          50,000 iterations, Gaussian-copula dependencies, the 51-driver base of September 2026). The trend
           probability priors are <strong>structured expert judgement</strong> (Beta shapes set
           from analyst 1–5 scores); the model expresses uncertainty in those judgements — it
           does not learn or update from data. Each cell is a{' '}

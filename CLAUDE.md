@@ -1,6 +1,6 @@
 # PRISM — Profit Pool Risk & Intelligence Simulation Model
 
-## Project Specification & Architecture — v3.10
+## Project Specification & Architecture — v3.11
 
 ---
 
@@ -16,6 +16,18 @@ PRISM operates on a **probabilistic profit pool shifting architecture**: directi
 - **Production simulation runs are CLI-only**: `python3 scripts/run_50k_prod.py` (scipy engine, 50k × 3 chains) computes offline and persists to Neon.
 - **The deployed service never simulates.** It is a read-only renderer of the latest persisted run; `POST /api/v1/simulate` refuses (409) on any runtime without scipy. Every data endpoint authenticates (httpOnly viewer cookie or Bearer JWT); `/health` and `/diagnostics` stay anonymous by design.
 - **Exact numerics only (D13)**: scipy is a hard engine requirement; the engine module refuses to import without it. There is no approximation fallback anywhere. Every result and persisted run carries `numerics_backend` (exact scipy/numpy versions) for the audit trail.
+
+### What Changed in v3.11 (vs. v3.10) — September 2026 Trend-Base Review, Cell Weights, Uncertainty, Recalibration
+
+Executed against the senior-partner trend-base review of 2/3 September 2026 and the owner rulings **O6–O11** (2026-09-03 / 2026-09-10; full text `docs/governance/DECISION_LOG.md` Part H). MODEL_VERSION bumped to **2.11.0**. **Numbers move for three reasons at once** — the base, the calibration and the weights — each version-stamped and each isolated by its own test; golden pins regenerated in the same commit. **Operator sequence after deploying: `scripts/replace_trend_base.py` (SQLite, then `--postgres`), then `scripts/run_50k_prod.py`.**
+
+1. **O6 — cell-level gross-profit weights.** The roll-up from the 48 composite cells to the category and portfolio numbers uses ONE 12 × 4 matrix of HCB gross-profit **shares** (`config.cell_weights`, sum 1): category shift = share-weighted mean of the category's row, portfolio = Σ share × cell, region-lens shares from the matrix. `region_weights` / `category_weights` are **derived marginals** (read-only; `PUT /config` rejects them; a legacy vector still builds the separable outer product, which reproduces 2.10.0 to 1e-12 — locked). Default: the **equal 1/48 placeholder** until the actual P&L shares are loaded via `run_50k_prod.py --cell-weights FILE` (JSON, shares or absolute figures normalised to shares before the engine is built; euro never enters or persists). Presence in a region enters through these shares, not through the exposures (**O9**: category and regional exposures are independent, mechanism-only). New contract keys `cell_weights_used`, `category_weights_used`, `cell_weights_source` (the engine applies the shares normalised to their total inside the ±0.01 tolerance and reports the applied shares); Config sheet grid with marginals and reset; About footer, drill-down row shares, Excel "Cell Weights" sheet. A jittered peak that lands at or before the onset now saturates at "peaks the year after onset" (a latent 2.10.0 defect that mapped the earliest draw to the horizon; reachable for more drivers with the O7 widths — the 2.10.0 reproduction lock is unaffected because no fixture trend triggers it).
+2. **O7 — one uncertainty score per driver** (`Trend.uncertainty` 0–5, optional; both DB tables, API, proposals aggregate, drift fingerprint key `"u"`, editor + Review & Endorse, AI snapshot). Sets the Beta concentration κ = 24/16/10/6/4/3 (mean p/6 unchanged — the F5 score→prior table stands) and the per-driver peak-year jitter width 0/1/1/2/3/4 years (inverse-CDF draw, bit-identical to the 2.10.0 `rng.choice` stream when unscored). `config.peak_year_jitter = 0` stays the engine-wide off switch. An unscored trend behaves exactly as in 2.10.0.
+3. **O10 — the 51-driver base** replaces the 99 trends. `pulse/seed_trends.py` and `data/trendCodeMap.ts` are **generated** by `scripts/generate_seed_from_core_set.py` from `data/trend_base_2026-09/` (`--check` in CI). Kept drivers keep their ids; two force moves get new ids (T-06 → K-13 `customer_r13`, X-06 → C-37 `consumer_r37`); the 65 retired codes carry merged-into / residue pointers or the review's reason, and journey evidence cards resolve through them. No provenance label on the reviewed base (`ai_suggested=False`, `user_override=False`; the chip renders only for AI-suggested or admin-edited trends). `EXPECTED_TREND_COUNT` 51. Replacement is archive-first by the owner (`scripts/replace_trend_base.py`; restores the kept ids' expert proposals across the Postgres cascade, F-29). The first 2.11.0 run reports the mass replacement as a critical input-drift event by design (D19).
+4. **O11 — v3.11 recalibration on the 51 drivers** (`scripts/compute_attenuation_v3_11.py` → `data/attenuation_calibration_v3_11.json`; mechanism adjustments re-judged per cell with reasons). Per-force attenuation Consumer 0.487 / Customer 0.418 / Technology 0.415 / Government 0.446 / Environmental 0.379 / Competitive 0.480 (trend-weighted mean 0.4520); within-force overlap Consumer 0.100 / Customer 0.223 / Technology 0.373 / Government 0.126 / Environmental 0.389 / Competitive 0.100; `DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.11_september2026"`. `DEFAULT_FORCE_CORRELATIONS` kept (min eigenvalue +0.41 on the 51 mix). **F-28 corrected:** all three calibration layers now come from one generated record, locked by `tests/test_calibration_v3_11.py` (before 2.11.0 the within-force overlap and the matrix were v3.1 numbers labelled v3.5).
+5. **O8** Türkiye sits in High Growth (applied in the reviewed exposures).
+
+**Contract additions (2.11.0):** `cell_weights_used`, `category_weights_used`, `cell_weights_source`, `meta.trend_count`, `meta.attenuation_source`; `Trend.uncertainty`. New config: `cell_weights`, `cell_weights_source`; `region_weights` / `category_weights` derived. Schema: `trends.uncertainty`, `trend_score_proposals.uncertainty` (added by `init_db` / the replacement script).
 
 ### What Changed in v3.10 (vs. v3.9) — Mathematical Review Remediation, July 2026
 
@@ -104,8 +116,9 @@ architecture** the same day. Scope, unchanged from the audit ruling:
    via `GET|PUT /api/v1/journey` (Next proxy `/api/journey`) into the
    versioned `journey_content` table.
 3. **Real trend linkage** — canonical code↔ID map `data/trendCodeMap.ts`
-   (C/T/G/K/E/X-rNN, 99 live codes; `RETIRED_CODES` C-12/K-05/T-09 must never
-   render as live drivers); evidence cards drill through to the live trend DB
+   (C/T/G/K/E/X-rNN; 51 live codes since 2.11.0 and 65 `RETIRED_CODES` with
+   merged-into / residue pointers that must never render as live drivers —
+   evidence cards resolve merged codes to the absorbing driver); evidence cards drill through to the live trend DB
    (`Trends2` `initialSearch`).
 4. **Quantitative layer — REMOVED (O3, owner ruling 2026-07-07).** The
    `journey_exposure` score table (99 trends × 260 stage scores), its seed
@@ -126,6 +139,20 @@ scores accepted under O2 were then deleted outright under O3 the same day —
 see block 4.) Remaining backlog: internal validation of Henkel claims in
 stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 
+5. **Re-based onto the 51-driver base (2026-09-10, under O10).** All 300
+   tiles and 21 stage contexts cite live codes only: merged drivers are
+   attributed to the absorbing driver, a driver that left the model is no
+   longer claimed (the sentences read as the strategist's judgment plus one
+   "left the model in the September 2026 review" sentence; 19 tiles keep no
+   modelled driver and render an honest empty driving-trends step), drivers
+   with zero exposure on the tile's journey are not cited, the tile's side is
+   never flipped. Provenance date 2026-09, `JOURNEY_CONTENT_VERSION`
+   2026-09-10. The profit-pool impact chip was re-graded by the tercile-delta
+   rule documented in `data/consumerJourney.ts` (`PoolImpactInfo`) and
+   `docs/governance/DECISION_LOG.md` Part H. The server copy
+   (`journey_content`) takes precedence over the seed, so the re-based content
+   is also written as a new row at go-live.
+
 ### Earlier release notes (condensed, still accurate)
 
 - **v3.6 (June 2026, audit remediation D1–D11):** PSD-valid correlations + spectral config gate; optimizer + Delphi deleted; analytics fixed-then-(v3.7)-deleted; attribution relabels; one-decimal display; provenance chips; GP1-only explorer; MODEL_VERSION 2.7.0. Full record: `docs/governance/DECISION_LOG.md` Part E. Block 8 of this round (Consumer Journey de-blackboxing) is documented in its own section above.
@@ -136,26 +163,26 @@ stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 - **v3.2 (April 2026):** dead-code cleanup — SensitivityEngine stub, backtesting, Causal DAG / Game Theory references removed; scalar attenuation retired.
 - **v3.0:** Production rewrite — Next.js frontend, dual-mode DB, auth, exports.
 
-### Trend Database Composition (v3.5 base, verified June 2026)
+### Trend Database Composition (2.11.0 base, September 2026 review — O10)
 
-**Total: 99 active trends.**
+**Total: 51 drivers** (generated seed; `docs/SEED_DATA_README.md`).
 
 | Force | Count |
 |-------|:---:|
-| Consumer | 32 |
-| Technology | 18 |
-| Government | 14 |
-| Competitive | 14 |
-| Environmental | 11 |
-| Customer | 10 |
+| Consumer | 20 |
+| Government | 10 |
+| Customer | 7 |
+| Technology | 6 |
+| Competitive | 4 |
+| Environmental | 4 |
 
-**Direction split:** 52 Contraction / 47 Expansion — the model preserves its honest bear tilt; under the D16 ceteris-paribus framing, totals read as *exposure if nobody acts*.
+**Direction split:** 33 Contraction / 18 Expansion — one mechanism per driver after the review; the base is more contraction-heavy by design and, under the D16 ceteris-paribus framing, totals read as *exposure if nobody acts*. Every driver carries an uncertainty score (O7) and graded sources (S/A/B).
 
 ### Implementation Status (June 2026, v3.7)
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1); 2.9.0 VC-epicentre partition (O5); **2.10.0 3D regional shift (F1), n_eff dampening (F2), peak-year jitter (F4), chain pooling + MC-SE (F7), start_year onset (F11)** |
+| Bayesian Monte Carlo with Gaussian copula | **Production** | Beta priors; Gaussian copula (t-copula deleted, D20); scipy-only (D13); 2.8.1 correctness batch (R1); 2.9.0 VC-epicentre partition (O5); 2.10.0 3D regional shift (F1), n_eff dampening (F2), peak-year jitter (F4), chain pooling + MC-SE (F7), start_year onset (F11); **2.11.0 cell gross-profit-share roll-up (O6), per-driver uncertainty (O7), 51-driver base (O10), v3.11 calibration (O11)** |
 | Continuous path modeling | **Production** | 5 MECE diffusion curves, 2026–2035, velocity per iteration |
 | Joint portfolio band + seed stability | **Production** | `totals.portfolio` (D3) + `seed_stability` (M2, re-added 2026-07-06 — populated from the first 2.8.1 run) |
 | Input-drift telemetry | **Production** | `pulse/audit/input_drift.py` (D19; L6/L7 coverage + severity, 2.8.1) |
@@ -189,7 +216,7 @@ stage contexts; Home Care journey (tab honestly reads "Laundry" until then).
 ┌────────────────────────────────────────────────────────────────────┐
 │ OFFLINE (owner's machine)                                          │
 │   python3 scripts/run_50k_prod.py                                  │
-│   ├── loads 99 trends from Neon                                    │
+│   ├── loads the 51 drivers from Neon (O10)                         │
 │   ├── BayesianMonteCarloEngine.run_multichain(3 × 50k, scipy)      │
 │   ├── input-drift diff vs previous run (D19)                       │
 │   ├── persists results bundle → Neon (simulation_runs row)         │
@@ -212,21 +239,21 @@ LOCAL DEV: python -m pulse --serve (FastAPI :8000, SQLite data/prism.db)
 
 ### The Shift Matrix contract (per persisted run)
 
-`results` bundle: `shift_matrix` (category roll-up: per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), **`regional_shift_matrix`** (2.10.0/F1: the 3D category × region shift — per (category, region) a `path`+`velocity`), **`region_weights_used`** (the region GP1-share weights applied in the roll-up), `decompositions` (force/vc/region attribution per year — the vc lens is an **epicentre partition** since 2.9.0; region is also a real shift dimension since 2.10.0), `totals` (row/column + **`portfolio`** joint percentiles — **`grand` deleted, F10**), **`mc_standard_error`** (2.10.0/F7: per-quantile MC standard error, replaces the deleted R̂/ESS `convergence` block), `integrity_events`, `seed_stability` (2.8.1+; null on older runs; carries `pooled_iterations` since 2.10.0), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `vc_attribution_basis` (2.9.0+; "epicentre"), `region_weights_used` (2.10.0+), `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff). **`force_attribution` deleted end-to-end (F9).**
+`results` bundle: `shift_matrix` (category roll-up: per-category `path` {year: {p10,p25,median/p50,p75,p90,mean,std}} + per-iteration `velocity` bands), **`regional_shift_matrix`** (2.10.0/F1: the 3D category × region shift — per (category, region) a `path`+`velocity`), **`region_weights_used`** (since 2.11.0 the column sums of **`cell_weights_used`**, the 12 × 4 gross-profit-share matrix of the roll-up, O6, with **`category_weights_used`** and **`cell_weights_source`**), `decompositions` (force/vc/region attribution per year — the vc lens is an **epicentre partition** since 2.9.0; region is also a real shift dimension since 2.10.0), `totals` (row/column + **`portfolio`** joint percentiles — **`grand` deleted, F10**), **`mc_standard_error`** (2.10.0/F7: per-quantile MC standard error, replaces the deleted R̂/ESS `convergence` block), `integrity_events`, `seed_stability` (2.8.1+; null on older runs; carries `pooled_iterations` since 2.10.0), `meta` (`engine_fidelity`, `numerics_backend`, `seed` (master), `chain_seeds`, `chains`, `model_version`, `engine_name`, `vc_attribution_basis` (2.9.0+; "epicentre"), `region_weights_used` (2.10.0+), `cell_weights_used` / `category_weights_used` / `cell_weights_source` / `trend_count` / `attenuation_source` (2.11.0+), `persisted_at_utc`, **`trend_fingerprint`** for the next run's drift diff). **`force_attribution` deleted end-to-end (F9).**
 
-Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)` — the shift is the region-GP1-weighted roll-up; apply per (category, region) with `regional_shift_matrix` when regional € pools are available.
+Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)` — the shift is the cell-share-weighted roll-up (O6); apply per (category, region) with `regional_shift_matrix` when regional € pools are available.
 
 ---
 
 ## 3. PYTHON ENGINE (`pulse/`)
 
-**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.10.0**)
-- Beta-distributed priors per trend (α, β from `probability_prior` — renamed from `probability_posterior`, F11; there is no data update, T7)
+**simulation/bayesian_mc.py** — the engine (PRODUCTION, MODEL_VERSION **2.11.0**)
+- Beta-distributed priors per trend (α, β from `probability_prior` — renamed from `probability_posterior`, F11; there is no data update, T7); **2.11.0 (O7): concentration from the uncertainty score (24/16/10/6/4/3), mean p/6 unchanged**
 - **Gaussian copula** over a trend-level correlation matrix built from `within_force_rho` + `force_correlation_matrix` (PSD-valid as entered, D1; latent-scale, F8; repair events surface as integrity events and must NOT fire on defaults)
 - Hard scipy requirement; `NUMERICS_BACKEND` constant recorded in every result (D13)
-- **3D shift (F1, 2.10.0):** `_compute_all_paths_vectorized` solves 48 composite cells (12 categories × 4 regions); each trend weighted by `category_exposure/5 × regional_exposure/5`. `_simulate_samples` reshapes to (iter, cat, region, year) and rolls up to category via `_region_weight_vector()` (region GP1 shares). `run()` attaches `regional_shift_matrix` + `region_weights_used`; region-less trends → global + `regional_exposure_coverage` event
+- **3D shift (F1, 2.10.0):** `_compute_all_paths_vectorized` solves 48 composite cells (12 categories × 4 regions); each trend weighted by `category_exposure/5 × regional_exposure/5`. `_simulate_samples` reshapes to (iter, cat, region, year) and rolls up to category with the row-normalised **cell gross-profit-share matrix** (`_row_normalised_cell_weights()`, O6) and to the portfolio with its row sums. `run()` attaches `regional_shift_matrix` + `cell_weights_used` / `category_weights_used` / `region_weights_used` / `cell_weights_source`; region-less trends → global + `regional_exposure_coverage` event; a zero-share row → `cell_weight_zero_row` event
 - **Within-force dampening = magnitude-weighted `n_eff` participation ratio (F2)** (was count-based) — restores monotonicity; zero-cell guarded
-- Per-trend materialization schedules (**start_year onset gate, F11**; peak_year × diffusion_curve; **per-iteration peak-year jitter ±1yr, F4**), multiplicative compounding with per-force attenuation, factor floor at −100%
+- Per-trend materialization schedules (**start_year onset gate, F11**; peak_year × diffusion_curve; **per-iteration peak-year jitter, F4 — width per trend from the uncertainty score since 2.11.0, global ±1 for unscored trends, `peak_year_jitter = 0` switches it off**), multiplicative compounding with per-force attenuation, factor floor at −100%
 - Quantile convention: `np.percentile` linear interpolation, engine-wide (D21)
 - `totals.portfolio` joint band (D3); **`run_multichain` POOLS the 3 chains for published percentiles (F7)** + `seed_stability` (per-chain medians; `pooled_iterations`) + `master_seed`/`chain_seeds` (L8); **`mc_standard_error`** replaces the deleted R̂/ESS `convergence` block
 - **`force_attribution.direct_effects` deleted (F9); `totals.grand` deleted (F10)**
@@ -237,9 +264,9 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)` — the s
 
 **audit/input_drift.py** — D19 fingerprint + drift-event computation (PRODUCTION); **audit/logger.py** — transactional audit log
 
-**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), **`vc_epicentre_of`/`vc_epicentre_step_of`** (2.9.0 — engine-side twin of the frontend's `epicentreOf`, parity-pinned), `compute_materialization_schedule` (**start_year onset param, F11**), defaults (`DEFAULT_PER_FORCE_ATTENUATION` v3.5, overlap matrices, `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid; **`DEFAULT_REGION_WEIGHTS` = Henkel Group FY2025 split proxy + `DEFAULT_REGION_WEIGHTS_SOURCE`, load-bearing since F1; `peak_year_jitter` F4**; `DEFAULT_VC_WEIGHTS` deleted 2.9.0), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21; the CLI pre-flight gate in `run_50k_prod.py` runs it on the loaded trend mix, F6)
+**config.py / config_validation.py** — taxonomies (6 forces, 12 categories, 8 VC steps, 4 regions), **`cell_weights` (12 × 4 gross-profit shares, O6; `cell_weights_outer` / `cell_weight_marginals`), `beta_prior_for` / `peak_jitter_for` (O7 uncertainty tables)**, **`vc_epicentre_of`/`vc_epicentre_step_of`** (2.9.0 — engine-side twin of the frontend's `epicentreOf`, parity-pinned), `compute_materialization_schedule` (**start_year onset param, F11**), defaults (`DEFAULT_PER_FORCE_ATTENUATION`, `DEFAULT_WITHIN_FORCE_OVERLAP`, `DEFAULT_FORCE_OVERLAP_MATRIX` — all three from `data/attenuation_calibration_v3_11.json` since 2.11.0 (O11, F-28); `DEFAULT_FORCE_CORRELATIONS` v3.6 PSD-valid, re-checked on the 51 mix; **`DEFAULT_CELL_WEIGHTS` = equal 1/48 placeholder + `DEFAULT_CELL_WEIGHTS_SOURCE` (O6; the FY2025 regional split of 2.10.0 is gone); `peak_year_jitter` F4**; `DEFAULT_VC_WEIGHTS` deleted 2.9.0), frozen `ModelConfig` dataclass with tolerant `from_json`; pydantic validator covering **every** engine-consumed layer + `correlation_lambda_min` population spectral gate (D1/D21; the CLI pre-flight gate in `run_50k_prod.py` runs it on the loaded trend mix, F6)
 
-**database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — 99-trend seed; **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips). Legacy-schema cleanup: `scripts/migrate_drop_delphi.py` (O1) + `scripts/migrate_drop_legacy.py` (O3/O4), both `--postgres`-gated
+**database.py** — dual-mode (Neon psycopg2 / SQLite); deterministic `ORDER BY id` trend loads (C2); no invented gp1 defaults at any layer (M1); **seed_trends.py** — the 51-driver seed, GENERATED by `scripts/generate_seed_from_core_set.py` from `data/trend_base_2026-09/` (O10; never hand-edited; `scripts/replace_trend_base.py` moves a database onto it archive-first); **ingestion/models.py** — Trend dataclasses (`ai_suggested`, `user_override` drive D7 chips; `uncertainty` O7). Legacy-schema cleanup: `scripts/migrate_drop_delphi.py` (O1) + `scripts/migrate_drop_legacy.py` (O3/O4), both `--postgres`-gated
 
 **env_loader.py** — loads the repo-root `.env` as an import side effect; shell variables win (`override=False`, M17)
 
@@ -262,7 +289,7 @@ Users apply shifts: `GP1_projected = GP1_actual × (1 + shift_median)` — the s
 | `CategoryDetailPanel.tsx` | Category drill-down drawer (percentile fan, force decomposition, contributing-trend attribution) |
 | `ConsumerJourney2.tsx` | Consumer-journey overlay (Laundry 13 / Hair 8 stages from `data/consumerJourney.ts`): "Strategist Read" authored analyses with provenance + grade chips, live trend evidence cards with Trends drill-through, computed stage-attribution chips (`journey_decomposition`, honest empty state), admin tile editing → `/api/journey` |
 | `ProfitPoolExplorer.tsx` | Beta, GP1-only pool views (D5). v2 (2026-06-11): arrows = pool development (revenue × GP1 drift, FY2025→2030, derived in `lib/profitPoolData.ts`); Laundry/Hair toggle + view pills; click drill-down decomposes pool CAGR into revenue CAGR + GP1 drift with € pools; all sources clickable URLs verified vs. FY2025 filings, graded ✅ reported / ⚡ derived / ⚠️ estimate. **v3 (2026-07-02): category views rebuilt on the Euromonitor Passport taxonomy** (Hair: 8 Passport categories incl. Salon Professional; Home Care: all 8 categories — Toilet Care & Home Insecticides finally have pool rows); sizes are public triangulations at RSP (Passport internal not shareable — licence), derivation recipes viewer-visible in the source-chip hovers; source ladder EMI → Kline (pro hair, salon-mfr level) → Circana/NIQ (scanner-POS) → filings (MSP) → tier-2; `SourceRef.denomination` guards mixed-basis sums. Audit: `docs/PROFIT_POOL_EXPLORER_SOURCES_AUDIT_2026-07-02.md` (+ the validation worklist xlsx, retained offline by the owner) for eventual Passport confirmation |
-| `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions. **v2 (2026-07-03): sheet aligned to the real GET/PUT contract** — dead dials deleted (Region select, neutral threshold, base year, residual cross-ρ: never returned by GET, silently dropped by PUT), base year now served read-only by GET; between-force overlap + force correlation matrices rendered read-only (6×6, D17/D1 wording); editable force/region/category weight grids with live Σ badges (backend rejects ≠1.0 ±0.01, no renormalization — the VC weight grid was deleted with the 2.9.0 epicentre partition, O5); diff-only PUT so the audit log records only actual changes; modal scroll fixed (grid row `minmax(0,1fr)`). `neutral_threshold` deleted end-to-end same day (engine-inert since v1; ModelConfig field, validator, defaults, router call, test fixture, TS type — `from_json` tolerates it in old snapshots) |
+| `SettingsModal.tsx` | Config sheet (read-only attenuation/overlap with D17 source tags; D8), auth & sessions. **v2 (2026-07-03): sheet aligned to the real GET/PUT contract** — dead dials deleted (Region select, neutral threshold, base year, residual cross-ρ: never returned by GET, silently dropped by PUT), base year now served read-only by GET; between-force overlap + force correlation matrices rendered read-only (6×6, D17/D1 wording); editable force weight grid with a live Σ badge (backend rejects ≠1.0 ±0.01) — since 2.11.0 the region/category grids are replaced by the 12 × 4 cell-weight grid with derived marginals (O6; shares applied normalised to their total inside the tolerance), the VC weight grid was deleted with the 2.9.0 epicentre partition (O5); diff-only PUT so the audit log records only actual changes; modal scroll fixed (grid row `minmax(0,1fr)`). `neutral_threshold` deleted end-to-end same day (engine-inert since v1; ModelConfig field, validator, defaults, router call, test fixture, TS type — `from_json` tolerates it in old snapshots) |
 | `WelcomeModal.tsx`, `ErrorBoundary.tsx`, `LoadingSkeleton.tsx` | Shell |
 
 **State:** `hooks/usePrism.ts` — single provider; renders the latest persisted run; no in-app simulate. **API client:** `api/client.ts` (typed; `normalizeSimulation` unit-tested). **Math:** `lib/shiftMatrix.ts` is the single source of truth for category-weighted aggregation (F1; enforced by `scripts/check_shiftmatrix_single_source.sh` in `npm run lint`).
@@ -281,7 +308,7 @@ Serverless (`api/requirements.txt`): fastapi, pydantic, numpy, psycopg2-binary �
 
 ## 6. DATABASE SCHEMA (production truth)
 
-Tables: `trends`, `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `session_snapshots` (capped per M12). Removed 2026-07-07 (O3/O4, via `scripts/migrate_drop_legacy.py` — run once per database): `trend_journey_exposure`, `users` (engine-side legacy; identity is Clerk, roles live in the Next-managed `user_roles` table), `scanned_trends`, and the `simulation_runs.allocation_recommendation` column. `delphi_rounds` **and** the delphi-era `trends` columns (`scorer_count/score_variance/debiasing_applied`) are **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first; extended per owner ruling O1, 2026-07-07 — run it once per database). `users.password_hash/password_salt` remains as a harmless non-delphi legacy pair nothing reads or writes (dropping it is a DX-scheduled migration — HANDOVER.md §7).
+Tables: `trends` (+ `uncertainty` INTEGER since 2.11.0), `trend_category_exposure`, `trend_vc_exposure`, `trend_regional_exposure`, `trend_sources`, `trend_score_proposals` (multi-expert proposals layer, June 2026; + `uncertainty`), `journey_content` (versioned admin tile-map blobs), `simulation_runs` (results bundle incl. integrity events, seed stability + fingerprint), `config_snapshots`, `triggers`, `ai_suggestions`, `audit_log`, `session_snapshots` (capped per M12). Removed 2026-07-07 (O3/O4, via `scripts/migrate_drop_legacy.py` — run once per database): `trend_journey_exposure`, `users` (engine-side legacy; identity is Clerk, roles live in the Next-managed `user_roles` table), `scanned_trends`, and the `simulation_runs.allocation_recommendation` column. `delphi_rounds` **and** the delphi-era `trends` columns (`scorer_count/score_variance/debiasing_applied`) are **dropped** by `scripts/migrate_drop_delphi.py` (archives JSON first; extended per owner ruling O1, 2026-07-07 — run it once per database). `users.password_hash/password_salt` remains as a harmless non-delphi legacy pair nothing reads or writes (dropping it is a DX-scheduled migration — HANDOVER.md §7).
 
 ---
 
@@ -295,7 +322,7 @@ GET|POST|PUT|DELETE /api/v1/trends[/{id}]                 (mutations: admin)
 POST          /api/v1/trends/sync, /api/v1/trends/full-reseed   (admin; full-reseed was C1)
 GET|POST      /api/v1/trends/revert-to-seed               (admin)
 GET|PUT       /api/v1/trends/{id}/proposals               (any authenticated expert: own proposal + aggregate)
-GET|PUT       /api/v1/config                              (PUT: admin; full-layer validation + spectral gate)
+GET|PUT       /api/v1/config                              (PUT: admin; full-layer validation + spectral gate; cell_weights only — region/category weights are derived, 400 if sent)
 GET|PUT       /api/v1/journey                             (GET via authed Next proxy /api/journey; PUT admin — journey content store)
 GET           /api/v1/forces, /api/v1/audit/log
 GET           /api/v1/competitors[/intelligence|/{id}]
@@ -317,7 +344,8 @@ npm run dev                        # Next.js :3000
 npm run verify                     # typecheck + lint (incl. single-source check) + vitest + pytest
 
 # Production run (owner machine; .env carries the Neon URL)
-python3 scripts/run_50k_prod.py    # persists a NEW run row (previous rows kept for diff)
+python3 scripts/replace_trend_base.py --dry-run   # 2.11.0: move the DB onto the 51-driver base (then live; --postgres for Neon)
+python3 scripts/run_50k_prod.py [--cell-weights FILE]   # persists a NEW run row (previous rows kept for diff)
 
 # Deploy: Vercel preview first, then production. The dashboard renders the
 # latest persisted run; re-run the CLI after engine-version bumps so the
@@ -335,13 +363,13 @@ Maritime light editorial system (June 2026 unification): light surfaces, deep-na
 
 ## 10. TESTING
 
-`tests/`: `conftest.py` (fixture differentiated per L29 — golden-pinned categories are pairwise distinct, one trend carries a per-trend materialization schedule, and the five DB trends carry canonical VC profiles with distinct epicentres + one deliberate collision, 2.9.0), `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + golden pins (2.8.1 values, passing unchanged on 2.9.0 — the VC rework never touched shift math) incl. the joint portfolio band + no-repair-on-defaults + version sync + **2.9.0 VC structural locks**: reconciliation, categorical-partition leak test, coverage event, basis tag; pins regenerate ONLY with deliberate model changes, same commit), `test_vc_epicentre.py` (**parity fixture table with `tests/frontend/vcEpicentre.test.ts`** — Python `vc_epicentre_of` and TS `epicentreOf` must never drift; plus drift-"ve" semantics), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_ops.py` (M10: prod-entrypoint import, H1 wrong-DB-mode exit, CLI parser, Excel writer round-trip, M4 diagnostics-outage). Frontend: `tests/frontend/` via vitest (`normalizeSimulation`, shift-matrix math, format/display-honesty pins, auth-seam, journey dialog, tab smoke, vcEpicentre parity).
+`tests/`: `conftest.py` (fixture differentiated per L29 — golden-pinned categories are pairwise distinct, one trend carries a per-trend materialization schedule, and the five DB trends carry canonical VC profiles with distinct epicentres + one deliberate collision, 2.9.0), `test_bayesian_mc.py`, `test_golden_pipeline.py` (determinism + golden pins (2.8.1 values, passing unchanged on 2.9.0 — the VC rework never touched shift math) incl. the joint portfolio band + no-repair-on-defaults + version sync + **2.9.0 VC structural locks**: reconciliation, categorical-partition leak test, coverage event, basis tag; pins regenerate ONLY with deliberate model changes, same commit), `test_vc_epicentre.py` (**parity fixture table with `tests/frontend/vcEpicentre.test.ts`** — Python `vc_epicentre_of` and TS `epicentreOf` must never drift; plus drift-"ve" semantics), `test_properties.py` (hypothesis), `test_api.py` (endpoint behavior incl. F2 409-guard + D13 backend tag), `test_input_drift.py` (D19), `test_ops.py` (M10: prod-entrypoint import, H1 wrong-DB-mode exit, CLI parser, Excel writer round-trip, M4 diagnostics-outage), **`test_cell_weights.py` (O6: 2.10.0 reproduction to 1e-12 with the separable matrix and the 2.10.0 calibration, roll-up algebra, contract, validator), `test_uncertainty.py` (O7), `test_trend_base_2026_09.py` (O10: seed integrity, generator `--check`, code map, replacement script incl. the Postgres cascade), `test_calibration_v3_11.py` (O11 / F-28)**. Frontend: `tests/frontend/` via vitest (`normalizeSimulation` incl. the cell-weight block, shift-matrix math, `cellWeights` helpers, `trendCodeMap` partition/pointers, format/display-honesty pins, auth-seam, journey dialog, tab smoke, vcEpicentre parity).
 
 ---
 
 ## 11. AUDIT TRAIL & GOVERNANCE
 
-- **Governance record (in-repo since v3.8, H5/R4):** `docs/governance/` — `DECISION_LOG.md` (D1–D21 + Sobol rider + O1–O5, full text + execution records; Part G = the 2026-07-10 VC-epicentre ruling), `FINDINGS_REGISTER.md` (open-by-decision: F-08 (D9), F-09 (D15), F-20 (D18); resolved-by-deletion: F-02..05/F-10/F-12/F-17/F-18/F-22; resolved: F-01 (D1), F-13/F-16 (D3), F-15 (D19), F-19 (D17), F-21 (D16 positioning), F-23/F-25 (D21), F-26 (files re-verified), F-27 (D8)), `CODE_REVIEW_2026-07-01_DECISIONS.md` and `REMEDIATION_2026-07-06.md` (R1–R4 + full disposition table).
+- **Governance record (in-repo since v3.8, H5/R4):** `docs/governance/` — `DECISION_LOG.md` (D1–D21 + Sobol rider + O1–O11, full text + execution records; Part G = the 2026-07-10 VC-epicentre ruling, Part H = the September 2026 review and release 2.11.0), `FINDINGS_REGISTER.md` (open-by-decision: F-08 (D9), F-09 (D15), F-20 (D18); open: F-29 (proposals cascade on Postgres); resolved-by-deletion: F-02..05/F-10/F-12/F-17/F-18/F-22; resolved: F-01 (D1), F-13/F-16 (D3), F-15 (D19), F-19 (D17), F-21 (D16 positioning), F-23/F-25 (D21), F-26 (files re-verified), F-27 (D8), F-28 (O11)), `CODE_REVIEW_2026-07-01_DECISIONS.md` and `REMEDIATION_2026-07-06.md` (R1–R4 + full disposition table).
 - **Verification artifacts** (incl. `v8_d20_tcopula_df_out.txt`, D20 evidence) are retained offline by the owner; available on request.
 - Every persisted run carries: master seed + chain seeds, chains, model version, engine fidelity, numerics backend, trend fingerprint, integrity events (incl. input drift), seed stability (2.8.1+).
 
@@ -354,7 +382,9 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 | Risk | Mitigation |
 |------|------------|
-| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.10.0 until the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate). Until then the dashboard renders the pre-2.10 run: **no `regional_shift_matrix` (region drill-down shows "pre-2.10 run — re-run the engine"), category numbers are still the old non-regional values, `mc_standard_error` absent**. The 2.10.0 numbers move (regional roll-up dilutes regionally-concentrated trends) — expect the portfolio magnitude to change on the first 2.10.0 run |
+| Persisted run lags engine version after a bump — **live right now: the persisted run is pre-2.11.0 until the base is replaced and the next 50k CLI run** | Run ribbon shows model_version; re-run CLI after deploys (gate). Until then the dashboard renders the older run (no cell-weight block in the footer, footer totals fall back to the config's derived category weights). The 2.11.0 numbers move for three stamped reasons (51-driver base, v3.11 calibration, equal 1/48 cell weights) — the acceptance-run delta table in the release summary separates them; the first run reports the mass replacement as a critical input-drift event by design |
+| Live trend base and code out of step: the deployed 2.11.0 code expects 51 drivers, a database still on the 99 base shows a loud CLI warning (`EXPECTED_TREND_COUNT`) | Run `scripts/replace_trend_base.py` once per database (archive-first); the archive is the rollback |
+| Expert proposals cascade-deleted on Postgres by every admin edit (F-29, pre-existing) | The replacement script restores the kept ids' proposals; fix `save_trends` to an upsert on the owner's decision |
 | No predictive validation (accepted, D9) | Position as structured judgment; revisit at first board citation |
 | One-sided trend grammar understates uncertainty (accepted, D15) | Disclosed; bands labeled as listed-trend magnitude uncertainty |
 | Neon connection limits / cold starts | Pooled connections, lazy init retry, SQLite locally |
@@ -363,7 +393,7 @@ Trend scoring & score overrides: Category Leads (R) / Strategy VP (A). Config ch
 
 ---
 
-*Document Version: 3.10 — July 2026 (Mathematical review remediation F1–F11; MODEL_VERSION 2.10.0)*
+*Document Version: 3.11 — September 2026 (Trend-base review O6–O11: 51 drivers, cell weights, uncertainty, v3.11 calibration; MODEL_VERSION 2.11.0)*
 *Author: Strategy × Technology × Quant Partnership*
 *Classification: CONFIDENTIAL — Internal Use Only*
 *Methodology: Beta-shaped structured-judgment priors (set from analyst 1–5 scores — magnitude-uncertainty only, NOT updated from data; T7 June 2026) + Gaussian copula dependencies + structured-judgment overlap correction + input-drift telemetry. Ceteris paribus: the engine holds strategy constant; strategic response belongs to the reader.*

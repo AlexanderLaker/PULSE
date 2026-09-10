@@ -36,6 +36,23 @@ describe('normalizeSimulation', () => {
     expect(twice).toEqual(once);
   });
 
+  it('carries the 2.11.0 cell-weight block (O6) and tolerates its absence on old runs', () => {
+    const W = { 'Hair: Color': { Europe: 0.5, 'North America': 0.5, Asia: 0, 'High Growth': 0 } };
+    const r = normalizeSimulation({
+      shift_matrix: { 'Hair: Color': { path: { 2030: cell } } },
+      cell_weights_used: W,
+      category_weights_used: { 'Hair: Color': 1 },
+      region_weights_used: { Europe: 0.5, 'North America': 0.5, Asia: 0, 'High Growth': 0 },
+      cell_weights_source: 'Equal placeholder',
+    });
+    expect(r.cell_weights_used).toEqual(W);
+    expect(r.category_weights_used).toEqual({ 'Hair: Color': 1 });
+    expect(r.cell_weights_source).toBe('Equal placeholder');
+    const old = normalizeSimulation({ shift_matrix: { 'Hair: Color': { path: { 2030: cell } } } });
+    expect(old.cell_weights_used).toBeUndefined();
+    expect(old.category_weights_used).toBeUndefined();
+  });
+
   it('degrades to empty shifts on garbage input', () => {
     expect(normalizeSimulation(null).shifts).toEqual({});
     expect(normalizeSimulation({}).shifts).toEqual({});

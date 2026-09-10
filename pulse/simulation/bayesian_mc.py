@@ -51,6 +51,8 @@ from pulse.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
                            compute_materialization_schedule,
                            DEFAULT_FORCE_OVERLAP_MATRIX,
                            DEFAULT_WITHIN_FORCE_OVERLAP,
+                           DEFAULT_CELL_WEIGHTS,
+                           peak_jitter_for,
                            vc_epicentre_step_of)
 from pulse.ingestion.models import TrendDatabase, Trend
 
@@ -72,6 +74,27 @@ class BayesianMonteCarloEngine:
     """
 
     # Model semver + engine identity. Bumped whenever the result contract changes.
+    # 2.11.0 — September 2026 release (owner rulings of 2026-09-03/10,
+    #         DECISION_LOG Part H, O6–O11). Numbers move — golden pins
+    #         regenerated in the same commit, 50k re-run required.
+    #         O6: the 48 composite cells are rolled up with a 12 × 4 matrix of
+    #         HCB gross-profit SHARES (config.cell_weights) — the relevant part
+    #         of the P&L that sits in each category × region combination —
+    #         instead of the separable region × category vectors. Category
+    #         shift = share-weighted average of the row; portfolio = Σ over
+    #         cells. Equal 1/48 placeholder until the actuals are loaded
+    #         (run_50k_prod.py --cell-weights FILE). A separable matrix
+    #         reproduces 2.10.0 exactly (regression-locked). New contract
+    #         keys: cell_weights_used, category_weights_used,
+    #         cell_weights_source; region_weights_used now = column sums.
+    #         O7: one uncertainty score per trend (0–5, optional) sets the
+    #         Beta-prior concentration (24/16/10/6/4/3; mean p/6 unchanged)
+    #         and the per-trend peak-year jitter width (0/1/1/2/3/4 years).
+    #         A trend without a score behaves exactly as in 2.10.0 (κ = 6,
+    #         global jitter) and the jitter draw reproduces the 2.10.0 random
+    #         stream bit for bit in that case. O9: exposures are mechanism-
+    #         only; HCB presence enters solely through the cell weights.
+    #         O10/O11: 51-driver base and v3.11 recalibration (config.py).
     # 2.10.0 — July 2026 mathematical review remediation (owner-directed,
     #         2026-07-13; review PRISM_Model_Review_2026-07-11). Numbers move —
     #         golden pins regenerated in the same commit, 50k re-run required.
@@ -130,7 +153,7 @@ class BayesianMonteCarloEngine:
     #         full config-layer validation (D21).
     # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
     #         removed from result contract (D4).
-    MODEL_VERSION = "2.10.0"
+    MODEL_VERSION = "2.11.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -151,9 +174,9 @@ class BayesianMonteCarloEngine:
 
         v3.2 (April 2026): the legacy ``base × (1 − mean_overlap)`` indirection
         has been removed. The engine now consumes ``config.per_force_attenuation``
-        — six calibrated values (one per force) sourced from
-        data/Attenuation_Calibration_v3_4.xlsx (Cross-Force sheet, 99-trend
-        Bain review). There is no flat 0.5 default and no scalar fallback.
+        — six calibrated values (one per force); since 2.11.0 they come from
+        data/attenuation_calibration_v3_11.json (51-driver base, O11). There is
+        no flat 0.5 default and no scalar fallback.
 
         Returns: dict {force_name: effective_attenuation}
 
@@ -170,7 +193,7 @@ class BayesianMonteCarloEngine:
             )
         logger.info(
             "Per-force attenuation (calibrated, source=%s): %s",
-            getattr(self.config, "attenuation_source", "calibrated_v3.5_april2026"),
+            getattr(self.config, "attenuation_source", "calibrated_v3.11_september2026"),
             ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES),
         )
         return per_force
@@ -181,18 +204,24 @@ class BayesianMonteCarloEngine:
 
         2.10.0 (F1): the shift math is REGIONAL. Internally the engine solves
         a 3D tensor over composite (category × region) cells, then rolls the
-        regional shifts up to the category level with the region GP1-share
-        weights (config.region_weights). The category-level `shift_matrix`
-        keeps its shape; a NEW `regional_shift_matrix` carries the full 3D
-        detail. A globally-present trend reproduces the pre-2.10 category
-        number exactly — only regionally-concentrated trends move it.
+        regional shifts up to the category level. 2.11.0 (O6): the roll-up
+        weights are the cell gross-profit shares (config.cell_weights, a
+        12 × 4 matrix) — category shift = share-weighted average of the
+        category's row, portfolio = Σ over all cells. The category-level
+        `shift_matrix` keeps its shape; `regional_shift_matrix` carries the
+        full 3D detail. A separable matrix reproduces the 2.10.0 numbers
+        exactly; a globally-present trend under equal weights reproduces the
+        pre-2.10 category number.
 
         Returns:
             dict with structure:
             {
-                "shift_matrix": {category: {"path"/"velocity": ...}},      # region roll-up
+                "shift_matrix": {category: {"path"/"velocity": ...}},      # cell-share roll-up
                 "regional_shift_matrix": {category: {region: {"path": ...}}},  # F1 3D
-                "region_weights_used": {region: weight},
+                "cell_weights_used": {category: {region: share}},          # 2.11.0 O6
+                "category_weights_used": {category: share},                # row sums
+                "region_weights_used": {region: weight},                   # column sums
+                "cell_weights_source": str,
                 "vc_decomposition": {category: {vc_step: contribution}},
                 "vc_attribution_basis": "epicentre",
                 "mc_standard_error": {category: {median_se_pp, p10_se_pp, ...}},  # F7
@@ -218,36 +247,103 @@ class BayesianMonteCarloEngine:
 
         # F1: attach the 3D regional matrix and the weights actually applied.
         result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
-        rw = self._region_weight_vector()
-        result["region_weights_used"] = {r: float(rw[i]) for i, r in enumerate(REGIONS)}
+        result.update(self._weights_used())
 
         logger.info(f"MC complete. Median portfolio shift at {self.config.path_years[-1]}: "
-                     f"{np.median(category_samples[:, :, -1].mean(axis=1)):.4f}")
+                     f"{result['totals']['portfolio'][int(self.config.path_years[-1])]['median']:.4f}")
 
         return result
 
-    def _region_weight_vector(self) -> np.ndarray:
-        """Normalized region GP1-share weights aligned to REGIONS (F1 roll-up).
+    def _cell_weight_matrix(self) -> np.ndarray:
+        """The 12 × 4 gross-profit share matrix W (2.11.0, O6), aligned to
+        (config.category_names, REGIONS), normalised to sum 1.
 
-        These are each region's share of the pool (config.region_weights,
-        default = the documented Henkel Group 2025 split proxy). They roll the
-        per-region relative shifts up to the category/portfolio level:
-        ``category_shift = Σ_r region_weight_r · regional_shift_r``. Falls back
-        to equal weights if unset.
-        """
-        rw_cfg = getattr(self.config, "region_weights", None) or {}
-        w = np.array([float(rw_cfg.get(r, 0.0)) for r in REGIONS])
-        if w.sum() <= 0:
-            return np.full(len(REGIONS), 1.0 / len(REGIONS))
-        return w / w.sum()
+        Source: config.cell_weights. Falls back to the equal 1/48 placeholder
+        when the config carries no matrix or an all-zero one (with an
+        integrity event), so a run can never silently divide by zero."""
+        cats = self.config.category_names
+        cw = getattr(self.config, "cell_weights", None) or {}
+        W = np.zeros((len(cats), len(REGIONS)))
+        for c_idx, cat in enumerate(cats):
+            row = cw.get(cat) or {}
+            for r_idx, region in enumerate(REGIONS):
+                W[c_idx, r_idx] = max(0.0, float(row.get(region, 0.0) or 0.0))
+        total = W.sum()
+        if total <= 0:
+            if not any(e.get("type") == "cell_weights_fallback" for e in self._integrity_events):
+                self._integrity_events.append({
+                    "type": "cell_weights_fallback",
+                    "severity": "warning",
+                    "message": "config.cell_weights is empty or all-zero; the roll-up used the "
+                               "equal 1/48 placeholder instead.",
+                })
+            W = np.full_like(W, 1.0 / W.size)
+            total = 1.0
+        return W / total
+
+    def _row_normalised_cell_weights(self) -> np.ndarray:
+        """Per-category region weights: each row of W divided by its sum, so
+        the category shift is the gross-profit-weighted average of its
+        regional shifts. A zero row (a category with no gross profit) gets the
+        equal 1/4 average and an integrity event — it carries weight 0 in the
+        portfolio anyway."""
+        W = self._cell_weight_matrix()
+        rows = W.sum(axis=1)
+        Wn = np.zeros_like(W)
+        zero_rows = []
+        for c_idx in range(W.shape[0]):
+            if rows[c_idx] > 0:
+                Wn[c_idx, :] = W[c_idx, :] / rows[c_idx]
+            else:
+                Wn[c_idx, :] = 1.0 / W.shape[1]
+                zero_rows.append(self.config.category_names[c_idx])
+        if zero_rows and not any(e.get("type") == "cell_weight_zero_row" for e in self._integrity_events):
+            self._integrity_events.append({
+                "type": "cell_weight_zero_row",
+                "severity": "warning",
+                "message": (
+                    f"{len(zero_rows)} categor{'y' if len(zero_rows) == 1 else 'ies'} carr"
+                    f"{'ies' if len(zero_rows) == 1 else 'y'} a zero gross-profit share in every "
+                    f"region (cell_weights row sums to 0): the category shift shown is the "
+                    f"equal-weight average of its cells and the category has weight 0 in the "
+                    f"portfolio: " + ", ".join(zero_rows)
+                ),
+                "detail": {"categories": list(zero_rows)},
+            })
+        return Wn
+
+    def _category_weight_vector(self) -> np.ndarray:
+        """Portfolio weights per category = row sums of W (2.11.0)."""
+        return self._cell_weight_matrix().sum(axis=1)
+
+    def _region_weight_vector(self) -> np.ndarray:
+        """Region shares = column sums of W. Kept for the 2.10.0 contract key
+        `region_weights_used` and the Excel writer; no longer a roll-up input."""
+        return self._cell_weight_matrix().sum(axis=0)
+
+    def _weights_used(self) -> dict:
+        """Contract block describing the weights the run actually applied."""
+        W = self._cell_weight_matrix()
+        cats = self.config.category_names
+        return {
+            "cell_weights_used": {
+                cat: {r: float(W[c_idx, r_idx]) for r_idx, r in enumerate(REGIONS)}
+                for c_idx, cat in enumerate(cats)
+            },
+            "category_weights_used": {cat: float(W[c_idx, :].sum()) for c_idx, cat in enumerate(cats)},
+            "region_weights_used": {r: float(W[:, r_idx].sum()) for r_idx, r in enumerate(REGIONS)},
+            # An empty label never masquerades as the equal placeholder text.
+            "cell_weights_source": str(getattr(self.config, "cell_weights_source", "") or "unspecified"),
+        }
 
     def _simulate_samples(self, db: TrendDatabase, n_iter: int):
         """Steps 1–3: copula draw → 3D (category×region) shift cells → roll-up.
 
         Returns ``(category_samples, regional_samples)``:
           - regional_samples: (n_iter, n_cats, n_regions, n_years) — the 3D shift
-          - category_samples: (n_iter, n_cats, n_years) — region-GP1-weighted
-            roll-up of the regional shifts (what the existing category views read)
+          - category_samples: (n_iter, n_cats, n_years) — the gross-profit-share
+            weighted average of each category's regional shifts (2.11.0 O6:
+            row-normalised config.cell_weights; what the category views read)
         """
         n_cats = len(self.config.category_names)
         n_regions = len(REGIONS)
@@ -262,8 +358,9 @@ class BayesianMonteCarloEngine:
         )
         # Cell index is c * n_regions + r, so the reshape splits cleanly.
         regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
-        rw = self._region_weight_vector()
-        category_samples = np.tensordot(regional_samples, rw, axes=([2], [0]))
+        # O6: category shift[c] = Σ_r Wn[c, r] · cell shift[c, r], Wn row-normalised.
+        Wn = self._row_normalised_cell_weights()                      # (n_cats, n_regions)
+        category_samples = np.einsum("icry,cr->icy", regional_samples, Wn)
         return category_samples, regional_samples
 
     def _build_regional_matrix(self, regional_samples: np.ndarray) -> dict:
@@ -423,6 +520,83 @@ class BayesianMonteCarloEngine:
 
         return samples
 
+    def _peak_schedule_table(self, trends: list) -> tuple:
+        """F4/F11/O7: per-trend materialisation schedules over the peak-year
+        offset grid.
+
+        Returns ``(sched_table, offsets, off_probs_by_trend)`` where
+        ``sched_table[j, k, y]`` is the materialisation of trend j at path year
+        y when its peak is shifted by ``offsets[k]``, and ``off_probs_by_trend[j]``
+        is trend j's symmetric triangular distribution over the grid (all mass
+        at 0 when its width is 0). The width is PER TREND (2.11.0, O7): from
+        the uncertainty score when the trend carries one, else the global
+        ``config.peak_year_jitter`` (the 2.10.0 behaviour); ``peak_year_jitter
+        = 0`` switches timing jitter off for everyone. start_year gates the
+        onset (F11). A jittered peak at or before the onset saturates at
+        "peaks the year after onset" (2.11.0 review fix — without the clamp
+        the earliest draw fell into the schedule's "ramp to the horizon"
+        branch and became the LATEST arrival).
+        """
+        n_trends = len(trends)
+        n_years = len(self.config.path_years)
+        jitter_global = int(getattr(self.config, "peak_year_jitter", 0) or 0)
+        trend_jitter = [peak_jitter_for(getattr(t, "uncertainty", None), jitter_global) for t in trends]
+        jitter = max(trend_jitter) if trend_jitter else 0
+        offsets = list(range(-jitter, jitter + 1)) if jitter > 0 else [0]
+        n_off = len(offsets)
+        off_probs_by_trend = np.zeros((n_trends, n_off))
+        for j, jt in enumerate(trend_jitter):
+            if jt <= 0:
+                off_probs_by_trend[j, offsets.index(0)] = 1.0
+            else:
+                # Symmetric triangular weights: ∝ (J_t + 1 − |offset|) inside ±J_t.
+                raw_w = np.array([max(0, jt + 1 - abs(o)) if abs(o) <= jt else 0 for o in offsets], dtype=float)
+                off_probs_by_trend[j, :] = raw_w / raw_w.sum()
+
+        path_years = self.config.path_years
+        sched_table = np.ones((n_trends, n_off, n_years))
+        for j, trend in enumerate(trends):
+            base_pk = getattr(trend, 'peak_year', 0) or 0
+            dc = getattr(trend, 'diffusion_curve', '') or ''
+            sy = getattr(trend, 'start_year', None)
+            onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
+            for k, off in enumerate(offsets):
+                if base_pk > 0 and dc:
+                    pk = max(base_pk + off, onset + 1)
+                    sched = compute_materialization_schedule(
+                        pk, dc, path_years, self.config.base_year,
+                        start_year=sy,
+                    )
+                else:
+                    # Legacy fallback (force/default global schedule), still
+                    # gated by start_year so F11 holds for these trends too.
+                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
+                    sched = {
+                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0))
+                             if yr > onset else 0.0)
+                        for yr in path_years
+                    }
+                for y_idx, yr in enumerate(path_years):
+                    sched_table[j, k, y_idx] = sched.get(yr, 1.0)
+        return sched_table, offsets, off_probs_by_trend
+
+    def _draw_peak_offsets(self, off_probs_by_trend: np.ndarray, n_iter: int) -> np.ndarray:
+        """Draw a peak-year offset index per (iteration, trend) — reproducible
+        under seed. Inverse-CDF sampling on one uniform block per (iteration,
+        trend): for a shared distribution this is bit-identical to the 2.10.0
+        ``rng.choice(n_off, size, p)`` draw (numpy implements choice with p the
+        same way), so runs without uncertainty scores reproduce the 2.10.0
+        random stream; with per-trend widths each trend reads its own CDF
+        row. Consumes NO randomness when the grid has a single offset."""
+        n_trends, n_off = off_probs_by_trend.shape
+        if n_off > 1:
+            cdf = np.cumsum(off_probs_by_trend, axis=1)
+            cdf = cdf / cdf[:, -1:]                      # last entry exactly 1.0 (as numpy's choice)
+            u = self.rng.random((n_iter, n_trends))
+            offset_idx = (u[:, :, None] >= cdf[None, :, :]).sum(axis=2)
+            return np.minimum(offset_idx, n_off - 1).astype(np.intp)
+        return np.zeros((n_iter, n_trends), dtype=np.intp)
+
     def _compute_all_paths_vectorized(self, trends: list, raw_samples: np.ndarray,
                                        n_iter: int, n_cats: int, n_regions: int,
                                        n_years: int) -> np.ndarray:
@@ -493,49 +667,9 @@ class BayesianMonteCarloEngine:
                 "detail": {"count": len(regionless), "trend_ids": regionless[:50]},
             })
 
-        # --- F4/F11: per-trend materialization schedules with peak-year jitter ---
-        # sched_table[j, k, y] = materialization of trend j at year y when its
-        # peak_year is shifted by offsets[k]; start_year gates the onset (F11).
-        jitter = int(getattr(self.config, "peak_year_jitter", 0) or 0)
-        offsets = list(range(-jitter, jitter + 1)) if jitter > 0 else [0]
-        n_off = len(offsets)
-        if n_off == 1:
-            off_probs = np.array([1.0])
-        else:
-            # Symmetric triangular weights: ∝ (jitter + 1 − |offset|).
-            raw_w = np.array([jitter + 1 - abs(o) for o in offsets], dtype=float)
-            off_probs = raw_w / raw_w.sum()
-
-        path_years = self.config.path_years
-        sched_table = np.ones((n_trends, n_off, n_years))
-        for j, trend in enumerate(trends):
-            base_pk = getattr(trend, 'peak_year', 0) or 0
-            dc = getattr(trend, 'diffusion_curve', '') or ''
-            sy = getattr(trend, 'start_year', None)
-            onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
-            for k, off in enumerate(offsets):
-                if base_pk > 0 and dc:
-                    sched = compute_materialization_schedule(
-                        base_pk + off, dc, path_years, self.config.base_year,
-                        start_year=sy,
-                    )
-                else:
-                    # Legacy fallback (force/default global schedule), still
-                    # gated by start_year so F11 holds for these trends too.
-                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(trend.force, {})
-                    sched = {
-                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0))
-                             if yr > onset else 0.0)
-                        for yr in path_years
-                    }
-                for y_idx, yr in enumerate(path_years):
-                    sched_table[j, k, y_idx] = sched.get(yr, 1.0)
-
-        # Draw a peak-year offset per (iteration, trend) — reproducible under seed.
-        if n_off > 1:
-            offset_idx = self.rng.choice(n_off, size=(n_iter, n_trends), p=off_probs)
-        else:
-            offset_idx = np.zeros((n_iter, n_trends), dtype=np.intp)
+        # --- F4/F11/O7: per-trend materialization schedules + peak-year jitter ---
+        sched_table, offsets, off_probs_by_trend = self._peak_schedule_table(trends)
+        offset_idx = self._draw_peak_offsets(off_probs_by_trend, n_iter)
         trend_arange = np.arange(n_trends)
 
         # --- Per-force effective attenuation (n_forces,) ---
@@ -793,7 +927,10 @@ class BayesianMonteCarloEngine:
         trends = db.trends
         cats = list(self.config.category_names)
         years = list(self.config.path_years)
-        region_weights = getattr(self.config, 'region_weights', None) or {r: 1.0 / len(REGIONS) for r in REGIONS}
+        # 2.11.0 (O6): the region lens weights each (category, region) cell by
+        # its own gross-profit share (row-normalised cell weights), not by a
+        # global region vector.
+        Wn_lens = self._row_normalised_cell_weights()
 
         # Build the force/region share structures ONCE (shares are
         # exposure-weighted and do not depend on year — the year-dependent
@@ -819,10 +956,11 @@ class BayesianMonteCarloEngine:
 
             # (VC shares: epicentre partition, computed once above — 2.9.0.)
 
-            # Region shares (exposure × region_weight × |score|)
+            # Region shares (exposure × cell gross-profit share × |score|)
             rsum = {r: 0.0 for r in REGIONS}
-            for region in REGIONS:
-                rw = region_weights.get(region, 1.0 / len(REGIONS))
+            c_idx_lens = cats.index(cat)
+            for r_idx_lens, region in enumerate(REGIONS):
+                rw = float(Wn_lens[c_idx_lens, r_idx_lens])
                 for trend in trends:
                     cat_exp = trend.category_exposure.get(cat, 0)
                     if cat_exp > 0:
@@ -894,10 +1032,10 @@ class BayesianMonteCarloEngine:
         # computed per iteration from the raw samples. NOT the category-
         # weighted average of per-category bands — that construction is
         # narrower than the truth by construction and was exactly the
-        # honesty failure F-16 flagged. Weights: config.category_weights
-        # (normalized), falling back to equal weights.
-        cw = getattr(self.config, "category_weights", None) or {}
-        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
+        # honesty failure F-16 flagged. Weights (2.11.0, O6): the category
+        # gross-profit shares = row sums of config.cell_weights, so that
+        # portfolio = Σ_c Σ_r W[c, r] · cell shift[c, r] exactly.
+        w = self._category_weight_vector()
         if w.sum() <= 0:
             w = np.full(n_cats, 1.0 / n_cats)
         else:
@@ -1029,8 +1167,8 @@ class BayesianMonteCarloEngine:
         # Per-chain PORTFOLIO median at the terminal year (seed stability) —
         # the SAME category-weighted quantity the headline reads, computed per
         # chain BEFORE pooling so the spread reflects independent seeds.
-        cw = getattr(self.config, "category_weights", None) or {}
-        w = np.array([float(cw.get(c, 0.0)) for c in self.config.category_names])
+        # 2.11.0: category weights = row sums of the cell-weight matrix.
+        w = self._category_weight_vector()
         w = (w / w.sum()) if w.sum() > 0 else np.full(
             len(self.config.category_names), 1.0 / len(self.config.category_names))
         per_chain_portfolio_medians = [
@@ -1043,15 +1181,21 @@ class BayesianMonteCarloEngine:
         pooled_reg = np.concatenate(per_chain_reg, axis=0)
         result = self._compile_results(pooled_cat, db)   # self.integrity = [vc coverage]
         result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
-        rw = self._region_weight_vector()
-        result["region_weights_used"] = {r: float(rw[i]) for i, r in enumerate(REGIONS)}
+        result.update(self._weights_used())
 
         # Integrity events: the vc-coverage events come from self._compile_results
         # above; the data-driven correlation/cholesky/regional/floor events are
         # identical every chain — take chain 0's as representative and prepend.
-        result["integrity_events"] = (
-            list(chain_engines[0]._integrity_events) + list(result.get("integrity_events", []))
-        )
+        # 2.11.0: the parent's region lens re-derives the cell-weight events
+        # (zero rows, empty matrix) that chain 0 already reported — merge by
+        # type so a warning is never listed twice.
+        merged = list(chain_engines[0]._integrity_events)
+        seen = {e.get("type") for e in merged}
+        for e in result.get("integrity_events", []):
+            if e.get("type") in ("cell_weight_zero_row", "cell_weights_fallback") and e.get("type") in seen:
+                continue
+            merged.append(e)
+        result["integrity_events"] = merged
 
         result["n_chains"] = n_chains
         # L8: the MASTER seed reproduces the run; chain seeds are derived.

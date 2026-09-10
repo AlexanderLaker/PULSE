@@ -47,7 +47,7 @@ import {
   type PoolImpactGrade, type ProvenanceGrade,
 } from '@/data/consumerJourney';
 import {
-  TREND_CODE_MAP, RETIRED_CODES, trendIdForCode,
+  TREND_CODE_MAP, RETIRED_CODES, trendIdForCode, liveCodeFor,
 } from '@/data/trendCodeMap';
 import type { Trend } from '@/types/trends';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
@@ -355,31 +355,61 @@ const TilePill: FC<{
 // ════════════════════════════════════════════════════════════════════════
 const TrendForceCard: FC<{
   code: string;
+  /** Every cited code of the tile that resolved to this card's driver (a
+   *  tile citing K-08 and T-06 renders ONE K-13 card that names both). */
+  citedCodes?: string[];
   trendsById: Map<string, Trend>;
   trendsLoaded: boolean;
   onNavigateToTrend?: (query: string) => void;
-}> = ({ code, trendsById, trendsLoaded, onNavigateToTrend }) => {
-  // Retired codes get a muted card with NO live-driver styling (fix B3).
-  const retired = RETIRED_CODES[code];
-  if (retired) {
+}> = ({ code: citedCode, citedCodes, trendsById, trendsLoaded, onNavigateToTrend }) => {
+  // Retired codes (fix B3, extended 2.11.0): a code the September 2026
+  // review MERGED into a live driver resolves to that driver's card (the
+  // tile's evidence stays usable, honestly labelled "cited as T-06"); a
+  // deleted code keeps a muted card with NO live-driver styling and the
+  // review's one-line reason, plus a pointer when a fact of it lives on
+  // inside a live driver.
+  const retired = RETIRED_CODES[citedCode];
+  const code = retired?.mergedInto?.[0] && TREND_CODE_MAP[retired.mergedInto[0]]
+    ? retired.mergedInto[0]
+    : citedCode;
+  if (retired && code === citedCode) {
+    const residue = retired.residueIn?.filter(c => TREND_CODE_MAP[c]) ?? [];
     return (
       <div
         className="rounded-xl p-3"
         style={{ backgroundColor: S.surfaceLow, border: `1px dashed ${S.cardBorder}`, opacity: 0.85 }}
-        title={retired}
+        title={`${retired.name} (retired ${retired.retiredIn})`}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span
             className="inline-flex items-center rounded-full font-bold"
             style={{ fontSize: 10, padding: '1px 7px', backgroundColor: S.surfaceContainer, color: S.mutedText, textDecoration: 'line-through', fontFamily: HEADLINE_FONT }}
           >
-            {code}
+            {citedCode}
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT }}>retired trend</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT }}>retired trend · {retired.name}</span>
         </div>
         <p style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '6px 0 0', fontStyle: 'italic' }}>
-          {retired} — kept for reference; not a live driver.
+          {retired.note} — kept for reference; not a live driver.
         </p>
+        {residue.length > 0 && (
+          <p style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '4px 0 0' }}>
+            A note from it lives on inside{' '}
+            {residue.map((c, i) => (
+              <span key={c}>
+                {i > 0 ? ', ' : ''}
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTrend?.(TREND_CODE_MAP[c].name)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: onNavigateToTrend ? 'pointer' : 'default', color: S.primary, fontWeight: 700, fontFamily: HEADLINE_FONT, fontSize: 11 }}
+                >
+                  {c}
+                </button>
+              </span>
+            ))}
+            .
+          </p>
+        )}
       </div>
     );
   }
@@ -424,6 +454,20 @@ const TrendForceCard: FC<{
           {info.force}
         </span>
       </div>
+      {(() => {
+        const merged = (citedCodes ?? [citedCode]).filter(c => c !== code && RETIRED_CODES[c]);
+        if (merged.length === 0) return null;
+        return (
+          <p
+            style={{ fontSize: 10.5, color: S.mutedText, lineHeight: 1.45, margin: '6px 0 0', fontStyle: 'italic' }}
+            title={merged.map(c => `${c}: ${RETIRED_CODES[c]!.note}`).join('\n')}
+          >
+            Cited as {merged.map((c, i) => (
+              <span key={c}>{i > 0 ? ', ' : ''}<span style={{ textDecoration: 'line-through' }}>{c}</span> ({RETIRED_CODES[c]!.name})</span>
+            ))}; carried inside {code} since the September 2026 review.
+          </p>
+        );
+      })()}
       {/* force row: direction + stage exposure (M8 2026-07-06: the dead
           "Strength" bar — Impact × Probability on a retired input — was
           removed; it had never rendered) */}
@@ -533,8 +577,12 @@ const WhyChain: FC<{
   const accent = isExp ? S.expansion : S.error;
 
   // Net effect from the live trends' OWN directions (independent of the tile map).
-  const resolved = tile.trendCodes
-    .filter(code => !RETIRED_CODES[code])
+  // 2.11.0: a cited code that the September 2026 review merged into a live
+  // driver resolves to that driver; each live driver counts once per tile
+  // (a tile citing K-08 and T-06 now counts K-13 once); deleted codes drop out.
+  const resolved = Array.from(new Set(
+    tile.trendCodes.map(code => liveCodeFor(code)).filter((c): c is string => !!c),
+  ))
     .map(code => {
       const info = TREND_CODE_MAP[code];
       const id = trendIdForCode(code);
@@ -571,15 +619,32 @@ const WhyChain: FC<{
           <div style={stepLabel}>Driving trends — links to the Trends page</div>
           <div style={{ marginTop: 8 }}>
             {tile.trendCodes.length === 0 ? (
-              <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No trends linked to this tile.</p>
+              <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
+                {tile.driverNote.startsWith('No modelled driver')
+                  ? `${tile.driverNote}. The Strategist Read below stands as authored judgment; nothing here feeds the Shift Matrix.`
+                  : 'No trends linked to this tile.'}
+              </p>
             ) : (
               <div className="flex flex-col gap-2">
-                {tile.trendCodes.map(code => (
-                  <TrendForceCard
-                    key={code} code={code}
-                    trendsById={trendsById} trendsLoaded={trendsLoaded} onNavigateToTrend={onNavigateToTrend}
-                  />
-                ))}
+                {/* 2.11.0: one card per LIVE driver — citations that the review
+                    merged into the same driver share a card; deleted codes keep
+                    their own muted card. */}
+                {(() => {
+                  const groups: Array<{ key: string; code: string; cited: string[] }> = [];
+                  for (const c of tile.trendCodes) {
+                    const live = liveCodeFor(c);
+                    const key = live ?? `retired:${c}`;
+                    const g = groups.find(x => x.key === key);
+                    if (g) g.cited.push(c);
+                    else groups.push({ key, code: live ?? c, cited: [c] });
+                  }
+                  return groups.map(g => (
+                    <TrendForceCard
+                      key={g.key} code={g.cited[0]!} citedCodes={g.cited}
+                      trendsById={trendsById} trendsLoaded={trendsLoaded} onNavigateToTrend={onNavigateToTrend}
+                    />
+                  ));
+                })()}
               </div>
             )}
           </div>
@@ -605,7 +670,7 @@ const WhyChain: FC<{
             {tile.poolImpact && (
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                  Profit-pool impact from the 99 trends
+                  Profit-pool impact (re-graded September 2026 on the 51-driver base)
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full" style={{ fontSize: 11, fontWeight: 800, padding: '1px 10px', color: '#fff', backgroundColor: accent, fontFamily: HEADLINE_FONT }}>
                   {isExp ? '▲' : '▼'} {tile.poolImpact.grade}

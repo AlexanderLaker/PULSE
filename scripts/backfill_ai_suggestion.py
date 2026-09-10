@@ -50,7 +50,7 @@ def main() -> None:
         cursor = conn.cursor()
         # Only trends with no snapshot yet.
         cursor.execute(
-            "SELECT id, probability, gp1_pct_affected, peak_year, diffusion_curve "
+            "SELECT id, probability, gp1_pct_affected, peak_year, diffusion_curve, uncertainty "
             "FROM trends WHERE ai_suggestion IS NULL"
         )
         rows = [_row_to_dict(r) for r in cursor.fetchall()]
@@ -62,6 +62,8 @@ def main() -> None:
                 "gp1_pct_affected": row.get("gp1_pct_affected"),
                 "peak_year": row.get("peak_year"),
                 "diffusion_curve": row.get("diffusion_curve"),
+                # 2.11.0 (O7): the uncertainty score is a scoreable field too.
+                "uncertainty": row.get("uncertainty"),
                 "category_exposure": _exposure_map(
                     cursor, p, "trend_category_exposure", "category", tid
                 ),

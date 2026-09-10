@@ -84,8 +84,9 @@ const FORCE_COLOR: Record<ForceName, string> = {
   Government: '#b07d2b', Environmental: '#2f8f4e', Competitive: '#b0504a',
 };
 /** v3.5 base composition — placeholder dot counts until the store loads. */
+// 2.11.0 (O10): the 51-driver base of the September 2026 review.
 const FALLBACK_FORCE_COUNTS: Record<ForceName, number> = {
-  Consumer: 32, Technology: 18, Government: 14, Competitive: 14, Environmental: 11, Customer: 10,
+  Consumer: 20, Government: 10, Customer: 7, Technology: 6, Competitive: 4, Environmental: 4,
 };
 
 // ─── Shift-matrix helpers (mirrors ProfitPoolAnalysis2's tolerant read) ──
@@ -389,7 +390,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
   const { trends, simulation } = usePrism();
   const reduced = useReducedMotion() ?? false;
 
-  // Live: trends per force (falls back to the v3.5 base until loaded).
+  // Live: trends per force (falls back to the 2.11.0 base until loaded).
   const countsByForce = useMemo<Record<ForceName, number>>(() => {
     if (!trends.length) return FALLBACK_FORCE_COUNTS;
     const counts = { ...FALLBACK_FORCE_COUNTS };
@@ -397,6 +398,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
     trends.forEach((t) => { counts[t.force] = (counts[t.force] ?? 0) + 1; });
     return counts;
   }, [trends]);
+
+  // Live driver count (the 2.11.0 base until the trends have loaded).
+  const trendCount = trends.length || Object.values(FALLBACK_FORCE_COUNTS).reduce((a, b) => a + b, 0);
 
   // Live: category medians at the terminal year, canonical CATEGORIES order.
   const matrixCells = useMemo<Array<number | null>>(
@@ -462,9 +466,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
 
       <section className="relative grid min-h-[460px] flex-1 auto-rows-[minmax(300px,1fr)] grid-cols-1 gap-[18px] sm:grid-cols-2 xl:auto-rows-auto xl:grid-cols-4">
         <Door
-          eyebrow="The input" title="Trends" caption="99 trends — the evidence."
+          eyebrow="The input" title="Trends" caption={`${trendCount} drivers — the evidence.`}
           keyHint="1" wash={WASH.trends} delay={0.08} reduced={reduced}
-          ariaLabel="Trends — the input. 99 trends, the evidence. Shortcut key 1."
+          ariaLabel={`Trends — the input. ${trendCount} drivers, the evidence. Shortcut key 1.`}
           onOpen={() => onNavigate('trends-2')}
         >
           <TrendsArt countsByForce={countsByForce} />

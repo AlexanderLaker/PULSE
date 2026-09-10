@@ -58,6 +58,7 @@ class ShiftMatrixWriter:
 
         # Sheet 2: Regional Shift (F1, 2.10.0 — the 3D category × region matrix)
         self._write_regional(wb, mc_result)
+        self._write_cell_weights(wb, mc_result)
 
         # Sheet 3: Velocity & Triggers
         self._write_velocity(wb, mc_result)
@@ -140,6 +141,44 @@ class ShiftMatrixWriter:
             ws.column_dimensions[get_column_letter(c)].width = 12
         ws.column_dimensions["A"].width = 18
 
+    def _write_cell_weights(self, wb, mc_result):
+        """2.11.0 (O6): the 12 x 4 gross-profit-share matrix the run applied
+        in the roll-up, with row and column marginals and the source label.
+        Pre-2.11 runs (no matrix) get a one-line note instead."""
+        from pulse.config import REGIONS
+        ws = wb.create_sheet("Cell Weights")
+        cw = mc_result.get("cell_weights_used") or {}
+        ws.cell(row=1, column=1, value="Category").font = HEADER_FONT
+        ws.cell(row=1, column=1).fill = HEADER_FILL
+        for j, region in enumerate(REGIONS, 2):
+            c = ws.cell(row=1, column=j, value=region)
+            c.font = HEADER_FONT; c.fill = HEADER_FILL; c.alignment = Alignment(horizontal="center")
+        c = ws.cell(row=1, column=len(REGIONS) + 2, value="Category share")
+        c.font = HEADER_FONT; c.fill = HEADER_FILL
+        if not cw:
+            ws.cell(row=2, column=1, value="pre-2.11 run: separable region x category weights, no cell matrix persisted")
+            ws.column_dimensions["A"].width = 60
+            return
+        row = 2
+        for cat in self.config.category_names:
+            ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", size=9)
+            r = cw.get(cat) or {}
+            for j, region in enumerate(REGIONS, 2):
+                cell = ws.cell(row=row, column=j, value=round(float(r.get(region, 0.0) or 0.0), 6))
+                cell.number_format = "0.00%"
+            tot = ws.cell(row=row, column=len(REGIONS) + 2, value=round(float(sum(float(v or 0.0) for v in r.values())), 6))
+            tot.number_format = "0.00%"
+            row += 1
+        ws.cell(row=row, column=1, value="Region share").font = Font(name="Inter", size=9, bold=True)
+        for j, region in enumerate(REGIONS, 2):
+            col_sum = sum(float((cw.get(cat) or {}).get(region, 0.0) or 0.0) for cat in self.config.category_names)
+            cell = ws.cell(row=row, column=j, value=round(col_sum, 6)); cell.number_format = "0.00%"
+        ws.cell(row=row + 2, column=1, value="Source: " + str(mc_result.get("cell_weights_source") or ""))
+        ws.cell(row=row + 3, column=1, value="Category shift = share-weighted average of the category's regional cells; portfolio = sum over all 48 cells (owner ruling O6, 2026-09).")
+        ws.column_dimensions["A"].width = 18
+        for j in range(2, len(REGIONS) + 3):
+            ws.column_dimensions[get_column_letter(j)].width = 14
+
     def _write_regional(self, wb, mc_result):
         """F1 (2.10.0): the 3D shift resolved by (category, region), median per
         year. Rows are category × region; a globally-present trend reproduces
@@ -159,12 +198,16 @@ class ShiftMatrixWriter:
             c.font = HEADER_FONT; c.fill = HEADER_FILL
             c.alignment = Alignment(horizontal="center")
 
+        # 2.11.0 (O6): the per-cell gross-profit share is the roll-up weight;
+        # label each region row with its own cell share when the run carries
+        # the matrix, else with the column-sum region weight (pre-2.11 runs).
+        cell_w = mc_result.get("cell_weights_used") or {}
         row = 2
         for cat in self.config.category_names:
             by_region = rsm.get(cat, {})
             for region in REGIONS:
-                wt = weights.get(region)
-                label = f"{region}" + (f" ({wt*100:.0f}%)" if isinstance(wt, (int, float)) else "")
+                wt = (cell_w.get(cat) or {}).get(region) if cell_w else weights.get(region)
+                label = f"{region}" + (f" ({wt*100:.1f}% of pool)" if isinstance(wt, (int, float)) else "")
                 ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", size=9)
                 ws.cell(row=row, column=2, value=label).font = Font(name="Inter", size=9)
                 path = (by_region.get(region, {}) or {}).get("path", {})
@@ -256,7 +299,7 @@ class ShiftMatrixWriter:
         att_source = (
             "admin override"
             if getattr(self.config, "attenuation_source", "") == "admin_override"
-            else "structured-judgment overlap correction (v3.5, Apr-2026)"
+            else "structured-judgment overlap correction (v3.11, Sep-2026, 51-driver base)"
         )
 
         data = [
@@ -294,15 +337,20 @@ class ShiftMatrixWriter:
             ("", "(category, region) cell weighted by category exposure x regional exposure."),
             ("", "Category numbers are the region-GP1-weighted roll-up (see Region weights);"),
             ("", "a regionally-concentrated trend only moves its regions' slice of the pool."),
-            ("REGION WEIGHTS", ", ".join(
+            # 2.11.0 (O6): the cell gross-profit-share matrix is the roll-up input.
+            ("CELL WEIGHTS (O6)", "Category and portfolio numbers roll the 48 category x region cells up"),
+            ("", "with the HCB gross-profit share per cell (sheet 'Cell Weights'): category"),
+            ("", "= share-weighted average of its regional cells, portfolio = sum over cells."),
+            ("", "Source: " + str(mc_result.get("cell_weights_source") or "pre-2.11 run (separable region x category weights)")),
+            ("REGION SHARES", ", ".join(
                 f"{r} {w*100:.0f}%" for r, w in (mc_result.get("region_weights_used") or {}).items()
             ) or "equal (fallback)"),
-            ("", "Proxy: Henkel Group FY2025 regional sales split (HCB not disclosed by region)."),
+            ("", "(column sums of the cell weights; equal 1/4 under the placeholder)"),
             ("", ""),
-            # F4/F5 (2.10.0): timing uncertainty + the probability-score meaning.
-            ("TIMING (F4)", "P10-P90 bands are magnitude uncertainty (fixed Beta concentration"),
-            ("", "a+b=6). Per-iteration peak-year jitter (+/-1yr triangular) gives the"),
-            ("", "velocity bands their timing content. start_year gates the onset (F11)."),
+            # F4/F5 (2.10.0) + O7 (2.11.0): timing uncertainty + the probability-score meaning.
+            ("TIMING (F4/O7)", "P10-P90 bands are magnitude uncertainty (Beta concentration a+b = 6, or"),
+            ("", "24/16/10/6/4/3 by the trend's uncertainty score 0-5 when scored, O7)."),
+            ("", "Peak-year jitter: +/-1yr triangular, or 0/1/1/2/3/4 yrs by score. start_year gates onset (F11)."),
             ("SCORE->PRIOR (F5)", "1->0.17  2->0.33  3->0.50  4->0.67  5->0.83 (Beta mean = score/6;"),
             ("", "deliberate shrinkage vs overconfidence — a '5' is five-in-six, not certainty)."),
             # F8 (2.10.0): copula scale.

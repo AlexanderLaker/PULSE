@@ -24,7 +24,7 @@ curl https://prism-hcb.vercel.app/api/v1/health
 
 ## Repository & deploy mechanism
 
-GitHub: [`AlexanderLaker/PULSE`](https://github.com/AlexanderLaker/PULSE) (branch `main`)
+GitHub: [`AlexanderLaker/PRISM`](https://github.com/AlexanderLaker/PRISM) (branch `main`) — renamed from `PULSE` on 2026-08-28; GitHub redirects the old URL, but use the new one.
 Vercel project: `prism-profit-pool` (org: `lakeralexander-8859s-projects`)
 
 Pushing to `main` auto-triggers a Vercel build (~2 min). Monitor at https://vercel.com/dashboard.
@@ -42,7 +42,7 @@ git push origin main
 ```
 
 GitHub no longer accepts password authentication for git operations. Use an
-SSH remote (`git@github.com:AlexanderLaker/PULSE.git`) or a Personal Access
+SSH remote (`git@github.com:AlexanderLaker/PRISM.git`) or a Personal Access
 Token in place of the password.
 
 ### Pushing from Cowork / a sandbox
@@ -109,7 +109,7 @@ Vercel project: prism-profit-pool
 ├── api/index.py                  ← Python serverless adapter (cold-start retry)
 │   └── pulse/api/app.py          ← FastAPI app (read-only data plane + admin writes)
 ├── pulse/                        ← Simulation engine + trend DB (Python)
-│   ├── seed_trends.py            ← 99 trends (v3.5 base)
+│   ├── seed_trends.py            ← 51 drivers (2.11.0 base, GENERATED)
 │   ├── simulation/bayesian_mc.py ← Bayesian MC + Gaussian copula engine (scipy-only, D13/D20)
 │   ├── audit/                    ← input-drift telemetry + audit log
 │   ├── excel_bridge/writer.py    ← QA workbook writer (the only export)
@@ -165,16 +165,37 @@ Copy `.env.example` and fill in: `DATABASE_URL` (or set `PRISM_DB_PATH=data/pris
 The deployed service **never simulates** — `POST /api/v1/simulate` returns **409** on any runtime without scipy (F2/D13), and the dashboard only renders the latest persisted run. The canonical production batch runs **offline on a machine with scipy**:
 
 ```bash
-python3 scripts/run_50k_prod.py
-# Loads 99 trends from prod Neon, runs a pre-flight spectral gate on the
+python3 scripts/run_50k_prod.py [--cell-weights FILE]
+# Loads the 51 drivers from prod Neon, runs a pre-flight spectral gate on the
 # loaded mix (F6), then Bayesian MC at 50k × 3 chains — pooled for the
 # published percentiles (F7) — persists the results bundle (shift_matrix +
-# regional_shift_matrix + decompositions + totals.portfolio +
-# mc_standard_error + integrity_events + seed_stability + trend_fingerprint)
-# to Neon, and writes a QA Excel to the repo root.
+# regional_shift_matrix + cell/category/region weights used +
+# decompositions + totals.portfolio + mc_standard_error + integrity_events +
+# seed_stability + trend_fingerprint) to Neon, and writes a QA Excel to the
+# repo root (with a "Cell Weights" sheet since 2.11.0).
+#
+# --cell-weights FILE (2.11.0, O6): the actual HCB gross-profit shares per
+#   category × region as JSON {"source", "basis": "gp1_share"|"gp1_absolute",
+#   "cells": {category: {region: value}}}; absolute figures are normalised to
+#   shares before the engine is built and never persisted. Keep the file out
+#   of the repository. Without it the equal 1/48 placeholder applies.
 #
 # Exit codes: 0 ok · 1 no DB URL · 2 no trends · 3 persist failed ·
-#             4 wrong DB mode · 5 correlation matrix not PSD
+#             4 wrong DB mode · 5 correlation matrix not PSD ·
+#             6 cell-weights file rejected
+```
+
+**2.11.0 base replacement (once per database, BEFORE the first 2.11.0 run):**
+
+```bash
+python3 scripts/replace_trend_base.py --dry-run     # report: kept / new / retired ids
+python3 scripts/replace_trend_base.py               # local SQLite
+python3 scripts/replace_trend_base.py --postgres    # Neon — after deploying 2.11.0
+# Archive-first (data/archive/, git-ignored): trends, exposures, sources and
+# expert proposals. Deletes the retired ids, writes the 51 reviewed drivers,
+# restores the kept ids' expert proposals, verifies, writes an audit entry.
+# Exit codes: 0 ok · 2 seed module not 51 · 3 archive failed (nothing changed) ·
+#             4 Postgres without --postgres · 5 verification problems (archive = rollback)
 ```
 
 Quality signals in the run: **seed stability** — the headline spread across
@@ -185,7 +206,10 @@ the R̂ badge, which is ≈1.0 by construction on i.i.d. Monte-Carlo draws.)
 
 After an engine-version bump, re-run the CLI so the persisted run matches
 `MODEL_VERSION`; the dashboard renders whatever run is persisted and labels a
-version mismatch honestly.
+version mismatch honestly. The first 2.11.0 run reports the base replacement
+as a critical input-drift event by design (D19) and its numbers move for
+three stamped reasons (51-driver base, v3.11 calibration, equal 1/48 cell
+weights).
 
 ## Smoke test after deploy
 

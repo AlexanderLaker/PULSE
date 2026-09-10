@@ -46,6 +46,15 @@ def load_latest_run_into_state() -> bool:
             "regional_shift_matrix": results.get("regional_shift_matrix"),
             "region_weights_used": results.get("region_weights_used")
                 or inner_meta.get("region_weights_used"),
+            # 2.11.0 (O6): the cell gross-profit-share matrix and its
+            # marginals actually applied in the roll-up (None on older runs —
+            # the footer then reads "pre-2.11 run").
+            "cell_weights_used": results.get("cell_weights_used")
+                or inner_meta.get("cell_weights_used"),
+            "category_weights_used": results.get("category_weights_used")
+                or inner_meta.get("category_weights_used"),
+            "cell_weights_source": results.get("cell_weights_source")
+                or inner_meta.get("cell_weights_source"),
             "decompositions": results.get("decompositions"),
             "totals": results.get("totals"),
             "vc_decomposition": results.get("vc_decomposition"),
@@ -97,6 +106,13 @@ def load_latest_run_into_state() -> bool:
         "vc_attribution_basis": inner_meta.get("vc_attribution_basis"),
         # 2.10.0 (F1): the region GP1-share weights applied in the roll-up.
         "region_weights_used": inner_meta.get("region_weights_used"),
+        # 2.11.0 (O6): cell weights applied in the roll-up (+ provenance label).
+        "cell_weights_used": inner_meta.get("cell_weights_used"),
+        "category_weights_used": inner_meta.get("category_weights_used"),
+        "cell_weights_source": inner_meta.get("cell_weights_source"),
+        # 2.11.0 (O10/O11): base size and calibration tag of the run.
+        "trend_count": inner_meta.get("trend_count"),
+        "attenuation_source": inner_meta.get("attenuation_source"),
         "converged_categories": inner_meta.get("converged_categories"),
         "total_categories": inner_meta.get("total_categories"),
         "persisted_at_utc": inner_meta.get("persisted_at_utc"),

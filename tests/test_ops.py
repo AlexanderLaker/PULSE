@@ -27,7 +27,7 @@ class TestProdEntrypoint:
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert callable(mod.main)
-        assert mod.EXPECTED_TREND_COUNT == 99
+        assert mod.EXPECTED_TREND_COUNT == 51  # 2.11.0 (O10): the 51-driver base
 
     def test_run_50k_refuses_wrong_db_mode(self, monkeypatch):
         """H1: a Postgres URL + SQLite fallback must abort with exit code 4."""

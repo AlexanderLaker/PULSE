@@ -41,6 +41,7 @@ import {
   useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { cellMarginals, equalCellWeights } from '@/lib/cellWeights';
 import { fmtDate, fmtDateTime } from '@/lib/format';
 import useOverlay from '@/hooks/useOverlay';
 
@@ -689,6 +690,15 @@ interface ModelConfigPayload {
   force_weights?: Record<string, number>;
   // vc_weights deleted (2.9.0, July 2026): the VC lens is an epicentre
   // partition — GET /config no longer returns a per-step weight group.
+  // 2.11.0 (O6): the 12 × 4 matrix of HCB gross-profit SHARES per
+  // category × region cell is the ONLY aggregation dial for the roll-up;
+  // region_weights / category_weights are its marginals, returned read-only
+  // by GET /config (PUT rejects them).
+  cell_weights?: Record<string, Record<string, number>>;
+  cell_weights_source?: string;
+  /** Served by GET: the label "reset to equal" writes. */
+  cell_weights_source_default?: string;
+  derived_weights?: string[];
   region_weights?: Record<string, number>;
   category_weights?: Record<string, number>;
   force_correlation_matrix?: Record<string, Record<string, number>>;
@@ -705,10 +715,10 @@ interface ModelConfigPayload {
 // (D8: changed only via a correction release / the admin API and its gates).
 const EDITABLE_KEYS = [
   'iterations', 'within_force_rho',
-  'force_weights', 'region_weights', 'category_weights',
+  'force_weights', 'cell_weights', 'cell_weights_source',
 ] as const;
 type EditableKey = typeof EDITABLE_KEYS[number];
-type WeightGroupKey = Exclude<EditableKey, 'iterations' | 'within_force_rho'>;
+type WeightGroupKey = 'force_weights';
 
 // Canonical display order — mirrors pulse/config.py taxonomies. Rendering is
 // robust to drift: missing keys are skipped, unknown keys are appended.
@@ -922,6 +932,115 @@ const WeightGrid: FC<{
   );
 };
 
+// ── 2.11.0 (O6): editable 12 × 4 cell-weight grid ───────────────────
+// Each cell is the share of the HCB gross-profit pool that sits in that
+// category × region (entered in %, stored as a share that sums to 1). The
+// row and column sums are the derived category and region weights the engine
+// reports as category_weights_used / region_weights_used — read-only here.
+const CELL_INPUT: React.CSSProperties = {
+  ...INPUT_STYLE, width: 76, padding: '5px 7px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5,
+};
+const CELL_INPUT_RO: React.CSSProperties = { ...CELL_INPUT, ...READONLY_STYLE, width: 76 };
+const fmtPct2 = (v: number): string => (Number.isFinite(v) ? v.toFixed(2) : '');
+
+const CellWeightGrid: FC<{
+  cells: Record<string, Record<string, number>>;
+  onCommit: (category: string, region: string, share: number) => void;
+  onResetEqual: () => void;
+  readOnly: boolean;
+}> = ({ cells, onCommit, onResetEqual, readOnly }) => {
+  const m = cellMarginals(cells, CATEGORY_ORDER, REGION_ORDER);
+  const { categories: cats, regions, total, ok, equal, cellCount: nCells } = m;
+  const share = (c: string, r: string) => {
+    const v = cells[c]?.[r];
+    return Number.isFinite(v) ? Number(v) : 0;
+  };
+  const rowSum = (c: string) => m.rowSums[c] ?? 0;
+  const colSum = (r: string) => m.colSums[r] ?? 0;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{
+          fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
+          letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant,
+        }}>
+          Cell weights — share of HCB gross profit per category × region (%)
+        </span>
+        <span
+          style={{
+            fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
+            padding: '2px 8px', borderRadius: 999,
+            backgroundColor: ok ? S.successContainer : S.errorContainer,
+            color: ok ? S.success : S.onErrorContainer,
+          }}
+          title={ok
+            ? 'The 48 shares sum to 100% within the ±1 pt backend tolerance.'
+            : 'The 48 shares must sum to 100% (±1 pt) — the backend rejects this save.'}
+        >
+          Σ {(total * 100).toFixed(2)}%{ok ? '' : ' · must equal 100%'}
+        </span>
+        {equal && (
+          <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: S.mutedText }}>equal placeholder (1/{nCells} each)</span>
+        )}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={onResetEqual}
+            disabled={equal}
+            style={{ ...SECONDARY_BUTTON, padding: '4px 12px', fontSize: 11, opacity: equal ? 0.5 : 1, marginLeft: 'auto' }}
+            title="Set every cell to 1/48 (the owner's placeholder until the actual P&L shares are loaded)"
+          >
+            Reset to equal
+          </button>
+        )}
+      </div>
+      <TableScroller label="Cell weights: share of HCB gross profit per category and region">
+          <thead>
+            <tr>
+              <th style={{ ...CELL_LABEL, textAlign: 'left' }}>Category</th>
+              {regions.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
+              <th style={CELL_TH} title="Row sum = the category's share of the pool (derived, read-only)">Σ category</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cats.map((c) => (
+              <tr key={c}>
+                <td style={{ ...CELL_LABEL, textAlign: 'left' }}>{c}</td>
+                {regions.map((r) => (
+                  <td key={r} style={{ padding: '3px 4px', textAlign: 'right' }}>
+                    <NumberField
+                      value={share(c, r) * 100}
+                      onCommit={(v) => onCommit(c, r, v / 100)}
+                      readOnly={readOnly}
+                      inputStyle={readOnly ? CELL_INPUT_RO : CELL_INPUT}
+                      format={fmtPct2}
+                    />
+                  </td>
+                ))}
+                <td style={{ padding: '3px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 700, color: S.onSurfaceVariant }}>
+                  {(rowSum(c) * 100).toFixed(2)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style={{ ...CELL_LABEL, textAlign: 'left' }} title="Column sum = the region's share of the pool (derived, read-only)">Σ region</td>
+              {regions.map((r) => (
+                <td key={r} style={{ padding: '6px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 700, color: S.onSurfaceVariant }}>
+                  {(colSum(r) * 100).toFixed(2)}%
+                </td>
+              ))}
+              <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 800, color: ok ? S.success : S.onErrorContainer }}>
+                {(total * 100).toFixed(2)}%
+              </td>
+            </tr>
+          </tfoot>
+      </TableScroller>
+    </div>
+  );
+};
+
 const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<ModelConfigPayload | null>(null);
@@ -1013,6 +1132,33 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
     setDraft((d) => (d ? { ...d, [group]: { ...(d[group] ?? {}), [key]: v } } : d));
   };
 
+  // 2.11.0 (O6): one cell of the 12 × 4 share matrix; the marginals shown
+  // next to the grid are recomputed from the draft on every render.
+  const patchCell = (category: string, region: string, share: number) => {
+    if (readOnly) return;
+    setDraft((d) => {
+      if (!d) return d;
+      const cells = { ...(d.cell_weights ?? {}) };
+      cells[category] = { ...(cells[category] ?? {}), [region]: share };
+      return { ...d, cell_weights: cells };
+    });
+  };
+  const resetCellsEqual = () => {
+    if (readOnly) return;
+    setDraft((d) => {
+      if (!d?.cell_weights) return d;
+      const { categories, regions, cellCount } = cellMarginals(d.cell_weights, CATEGORY_ORDER, REGION_ORDER);
+      if (!cellCount) return d;
+      return {
+        ...d,
+        cell_weights: equalCellWeights(categories, regions),
+        // The backend's own placeholder wording (served by GET) so an
+        // untouched placeholder never registers as a source change.
+        cell_weights_source: d.cell_weights_source_default ?? d.cell_weights_source,
+      };
+    });
+  };
+
   const ro = readOnly;
 
   const horizon = draft?.path_years?.length
@@ -1094,7 +1240,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Attenuation & overlap"
             icon={SlidersHorizontal}
-            description={`Read-only. The engine dampens each force's combined trend effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.5, Apr-2026)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
+            description={`Read-only. The engine dampens each force's combined trend effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.11, Sep-2026, 51-driver base)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
           >
             {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
                 silent no-op — the engine consumes six per-force values.
@@ -1126,7 +1272,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Aggregation weights"
             icon={SlidersHorizontal}
-            description="Weights the engine consumes for portfolio aggregation and the lenses. Each group must sum to 1.0 — the backend rejects saves outside ±0.01 (it does not renormalize). Since 2.10.0 (F1) region weights are LOAD-BEARING: the shift math is 3D (category × region × year) and these weights roll the regional shifts up to the category/portfolio level, so they move the published numbers. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
+            description="Weights the engine consumes for portfolio aggregation and the lenses. Force weights must sum to 1.0 and the 48 cell shares to 100% — the backend rejects saves outside ±0.01; inside that tolerance the engine applies the cell shares normalised to their total (the run reports the shares actually applied as cell_weights_used). Since 2.11.0 (owner ruling O6) the roll-up from the 48 category × region cells to the category and portfolio numbers uses ONE 12 × 4 matrix of gross-profit shares: category shift = share-weighted mean of its row, portfolio = Σ share × cell. The former region and category dials are its row and column sums and are derived, not edited. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {draft.force_weights ? (
@@ -1142,39 +1288,37 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   No force weights returned by the backend — defaults are used (equal weight per force).
                 </div>
               )}
-              {draft.region_weights && (
+              {draft.cell_weights ? (
                 <>
-                  <WeightGrid
-                    title="Region weights — each region's share of GP1 (rolls the 3D regional shifts up to category)"
-                    weights={draft.region_weights}
-                    order={REGION_ORDER}
-                    onCommit={patchWeight('region_weights')}
+                  <CellWeightGrid
+                    cells={draft.cell_weights}
+                    onCommit={patchCell}
+                    onResetEqual={resetCellsEqual}
                     readOnly={ro}
                   />
+                  <Field label="Cell weights source" hint="Provenance label stored with the weights and shown in the About-this-model footer of every run (max 400 characters).">
+                    <input
+                      type="text"
+                      value={draft.cell_weights_source ?? ''}
+                      onChange={(e) => patch({ cell_weights_source: e.target.value.slice(0, 400) })}
+                      disabled={ro}
+                      readOnly={ro}
+                      style={ro ? READONLY_STYLE : INPUT_STYLE}
+                    />
+                  </Field>
                   <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
-                    <strong>Assumption:</strong> defaults are the Henkel Group FY2025 consolidated regional
-                    sales split (Europe&nbsp;38% · North&nbsp;America&nbsp;26% · Asia-Pacific&nbsp;17% ·
-                    High&nbsp;Growth&nbsp;~19%), used as a proxy for the HCB GP1 mix — Consumer Brands is
-                    not disclosed by region. HCB is likely somewhat more Europe-weighted; refine these with
-                    an internal HCB regional GP1 split. Source: Henkel FY2025 results. The same split is
-                    applied to every category (public data has no per-category regional mix).
+                    <strong>Assumption:</strong> until the actual HCB P&amp;L is loaded every cell is 1/48
+                    (equal regions, equal categories — owner decision, September 2026). The production
+                    CLI takes the actual shares from a file kept outside the repository
+                    (<code>run_50k_prod.py --cell-weights FILE</code>); euro figures never enter PRISM,
+                    only shares. A cell with share 0 contributes nothing to the roll-up however large
+                    its mechanism score (presence in a region enters here, not through the exposures).
                   </div>
                 </>
-              )}
-              {draft.category_weights && (
-                <>
-                  <WeightGrid
-                    title="Category weights — each category's share of GP1 (rolls category shifts up to the portfolio)"
-                    weights={draft.category_weights}
-                    order={CATEGORY_ORDER}
-                    onCommit={patchWeight('category_weights')}
-                    readOnly={ro}
-                  />
-                  <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
-                    <strong>Assumption:</strong> defaults are equal (each category = 1/12). Set them to the
-                    real HCB category GP1 mix so the portfolio headline weights each pool by its actual size.
-                  </div>
-                </>
+              ) : (
+                <div style={{ color: S.mutedText, fontSize: 12.5 }}>
+                  No cell weights returned by the backend (pre-2.11 service) — the equal 1/48 placeholder applies.
+                </div>
               )}
             </div>
           </SectionCard>

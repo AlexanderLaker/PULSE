@@ -13,6 +13,11 @@ D21 (June 2026): every config layer the engine consumes is now validated —
 ``force_correlation_matrix``, ``force_overlap_matrix``,
 ``within_force_overlap``, ``category_weights`` and ``region_weights`` had
 no validation at all (audit F-23).
+
+2.11.0 (O6): ``cell_weights`` — the 12 × 4 matrix of gross-profit shares that
+rolls the composite cells up — is validated as a complete, non-negative,
+sum-to-one grid; ``region_weights``/``category_weights`` are its derived
+marginals and are still checked so the derived layer can never be invalid.
 """
 
 from typing import Optional, List, Dict
@@ -99,6 +104,11 @@ class ModelConfigValidator(BaseModel):
     # vc_weights deleted (2.9.0, July 2026): the VC lens is a categorical
     # epicentre partition — a per-step weight has no defensible meaning over
     # stage votes. Old snapshots carrying it are ignored (extra=ignore).
+    # 2.11.0 (O6): the roll-up input. Optional in the model so a pre-2.11
+    # snapshot dict (marginals only) still validates; when present it must be
+    # a complete 12 × 4 grid (see validate_cell_weights_against_names).
+    cell_weights: Optional[Dict[str, Dict[str, float]]] = None
+    cell_weights_source: Optional[str] = None
     region_weights: Dict[str, float]
     category_names: List[str]
     category_weights: Dict[str, float]
@@ -150,11 +160,13 @@ class ModelConfigValidator(BaseModel):
     @field_validator("attenuation_source")
     @classmethod
     def validate_attenuation_source(cls, v: str) -> str:
-        """Attenuation source must be v3.5 / v3.1 (legacy) / admin_override."""
-        if v not in ("calibrated_v3.5_april2026", "calibrated_v3.1_april2026", "admin_override"):
+        """Attenuation source must be v3.11 / v3.5, v3.1 (legacy) / admin_override."""
+        if v not in ("calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
+                     "calibrated_v3.1_april2026", "admin_override"):
             raise ValueError(
-                f"attenuation_source must be one of ('calibrated_v3.5_april2026', "
-                f"'calibrated_v3.1_april2026' (legacy), 'admin_override'). Got '{v}'"
+                f"attenuation_source must be one of ('calibrated_v3.11_september2026', "
+                f"'calibrated_v3.5_april2026' (legacy), 'calibrated_v3.1_april2026' (legacy), "
+                f"'admin_override'). Got '{v}'"
             )
         return v
 
@@ -438,6 +450,46 @@ class ModelConfigValidator(BaseModel):
         for cat, w in v.items():
             if w < 0:
                 raise ValueError(f"category_weights['{cat}'] is negative ({w})")
+        return self
+
+    @model_validator(mode="after")
+    def validate_cell_weights_against_names(self) -> "ModelConfigValidator":
+        """Cell weights (2.11.0, O6): one row per configured category, one
+        entry per PRISM region in every row, non-negative, sum to 1.0 within
+        0.01, at least one positive cell. Cross-field: row keys must equal
+        category_names. A zero row (a category with no gross profit) is
+        allowed — the engine reports it as an integrity event."""
+        v = self.cell_weights
+        if v is None:
+            return self
+        if not v:
+            raise ValueError("cell_weights cannot be empty")
+        provided, required = set(v.keys()), set(self.category_names)
+        if required - provided:
+            raise ValueError(f"cell_weights missing categories: {required - provided}")
+        if provided - required:
+            raise ValueError(f"cell_weights contains unknown categories: {provided - required}")
+        total = 0.0
+        for cat, row in v.items():
+            if not isinstance(row, dict) or not row:
+                raise ValueError(f"cell_weights['{cat}'] must map every region to a share")
+            rp, rr = set(row.keys()), set(REGIONS)
+            if rr - rp:
+                raise ValueError(f"cell_weights['{cat}'] missing regions: {rr - rp}")
+            if rp - rr:
+                raise ValueError(f"cell_weights['{cat}'] contains unknown regions: {rp - rr}")
+            for region, w in row.items():
+                if not isinstance(w, (int, float)) or w != w:
+                    raise ValueError(f"cell_weights['{cat}']['{region}'] must be numeric")
+                if w < 0:
+                    raise ValueError(f"cell_weights['{cat}']['{region}'] is negative ({w})")
+                total += float(w)
+        if abs(total - 1.0) > 0.01:
+            raise ValueError(
+                f"cell_weights must sum to 1.0 over all 48 cells (got {total:.4f}, tolerance ±0.01)"
+            )
+        if total <= 0:
+            raise ValueError("cell_weights must contain at least one positive cell")
         return self
 
     @model_validator(mode="after")

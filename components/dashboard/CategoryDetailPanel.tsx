@@ -32,6 +32,7 @@ import {
 } from 'recharts';
 import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct, categoryDisplay, groupDisplay } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { rowShares } from '@/lib/cellWeights';
 import useOverlay from '@/hooks/useOverlay';
 import type { ForceName, ProjectionYear } from '@/types';
 
@@ -72,8 +73,13 @@ interface CategoryDetailPanelData {
   /** F1 (2.10.0): per-category regional shift at the selected year — the 3D
    *  drill-down (region → {median, p10, p90}). */
   regional_shift?: { [categoryId: string]: Record<string, PathDataPoint> };
-  /** Region GP1-share weights used in the roll-up (region → weight 0..1). */
+  /** Region GP1-share weights used in the roll-up (region → weight 0..1);
+   *  since 2.11.0 the column sums of the cell matrix (portfolio-wide). */
   region_weights?: Record<string, number>;
+  /** 2.11.0 (O6): the cell gross-profit-share matrix the run rolled up with
+   *  (category → region → share of the whole pool). A category's row,
+   *  normalised, is the weight set that produced ITS number. */
+  cell_weights?: Record<string, Record<string, number>>;
   categories?: Array<{ id: string; name: string; group?: string }>;
 }
 
@@ -436,7 +442,7 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
 // these are the ACTUAL per-region relative shifts the engine computed; the
 // category number is their GP1-share-weighted roll-up (weights shown).
 interface RegionalRow { region: string; median: number; p10?: number; p90?: number; weight?: number; }
-const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows }) => {
+const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }> = ({ rows, cellRow = false }) => {
   if (!rows || rows.length === 0) {
     return (
       <div style={{ fontSize: 12, color: S.mutedText, fontFamily: BODY_FONT }}>
@@ -474,8 +480,9 @@ const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows }) => {
         );
       })}
       <div style={{ fontSize: 10.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.5, marginTop: 2 }}>
-        % = region&rsquo;s GP1 share used in the roll-up. The category shift above is the
-        share-weighted average of these regional shifts.
+        {cellRow
+          ? <>% = the region&rsquo;s share of THIS category&rsquo;s gross profit (its row of the cell-weight matrix, Config sheet). The category shift above is the share-weighted average of these regional shifts.</>
+          : <>% = region&rsquo;s GP1 share used in the roll-up (portfolio-wide, pre-2.11 run). The category shift above is the share-weighted average of these regional shifts.</>}
       </div>
     </div>
   );
@@ -771,7 +778,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const regionalShift = useMemo(() => {
     const byRegion = data?.regional_shift?.[categoryId];
     if (!byRegion) return [];
-    const weights = data?.region_weights ?? {};
+    // 2.11.0 (O6): prefer THIS category's row of the cell matrix, normalised
+    // to the row sum — those are the weights that rolled its regions up.
+    // Pre-2.11 runs carry only the portfolio-wide region weights.
+    const weights: Record<string, number | undefined> =
+      rowShares(data?.cell_weights, categoryId) ?? (data?.region_weights ?? {});
     return Object.entries(byRegion)
       .map(([region, cell]) => ({
         region,
@@ -782,6 +793,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       }))
       .sort((a, b) => Math.abs(b.median) - Math.abs(a.median));
   }, [data, categoryId]);
+  const regionalWeightsAreCellRow = !!data?.cell_weights?.[categoryId];
 
   const trendList = useMemo<Trend[]>(() => {
     if (!data?.contributing_trends?.[categoryId]) return [];
@@ -1171,7 +1183,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               shifts (not attribution) at the selected year, with the GP1
               weights that roll them up to the category number. */}
           <Section title="Regional Shift" icon={Globe}>
-            <RegionalDecomposition rows={regionalShift} />
+            <RegionalDecomposition rows={regionalShift} cellRow={regionalWeightsAreCellRow} />
           </Section>
           </div>
 

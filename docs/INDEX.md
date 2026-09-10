@@ -15,7 +15,7 @@ Henkel-hosted, AI-enabled version). Everything below is reference material.
 | `DEPLOYMENT_NOTES.md` | JWT-secret synchronization between the Next.js proxy and the FastAPI engine. |
 | `CLERK_MIGRATION.md` | History of the Clerk auth integration. (The legacy custom-auth pages it superseded were fully removed 2026-07-06, L26.) |
 | `CONNECTION_STATUS_GUIDE.md` | Health/connection-status behavior in the dashboard. (Since 2026-07-06/M7: reconnecting also reloads data automatically.) |
-| `SEED_DATA_README.md` | The 99-trend seed data and how it is loaded. |
+| `SEED_DATA_README.md` | The 51-driver trend base (2.11.0): the generated seed, its inputs, and how a database is moved onto it. |
 
 ## Methodology & data provenance (cited from live code)
 | Doc | What it covers |

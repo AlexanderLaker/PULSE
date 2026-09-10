@@ -4,17 +4,19 @@ Pure-Python (no FastAPI / no DB imports) so it is unit-testable and reused by
 both the proposals endpoints (pulse/api/routers/trends.py) and the cheap
 `proposal_summary` block attached to each serialized trend.
 
-A "proposal" is one user's PARTIAL opinion on the 7 scoreable fields of a
+A "proposal" is one user's PARTIAL opinion on the 8 scoreable fields of a
 trend:
 
     probability (int 1..5), gp1_pct_affected (float 0..1), peak_year (int),
-    diffusion_curve (str), category_exposure (map), regional_exposure (map),
-    vc_exposure (map)
+    diffusion_curve (str), uncertainty (int 0..5, 2.11.0 O7),
+    category_exposure (map), regional_exposure (map), vc_exposure (map)
 
 Aggregation rules (from the frontend contract):
   - probability / gp1_pct_affected      → arithmetic mean of non-null values,
                                           rounded to 2 dp, with a count.
-  - peak_year                           → median (number) of non-null values.
+  - peak_year / uncertainty             → median (number) of non-null values
+                                          (uncertainty rounded to an integer
+                                          score, half up).
   - diffusion_curve                     → mode (most frequent) + full vote
                                           distribution.
   - exposure maps                       → PER CELL across users: {avg, count}.
@@ -101,6 +103,17 @@ def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dic
     }
 
 
+def _uncertainty_agg(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """2.11.0 (O7): median of the non-null uncertainty scores, rounded half
+    up to an integer 0..5 (the engine consumes integer scores), with a count."""
+    vals = _non_null([r.get("uncertainty") for r in rows])
+    if not vals:
+        return None
+    med = _median(vals)
+    score = int(max(0, min(5, int(med + 0.5)))) if med is not None else None
+    return {"median": score, "count": len(vals)}
+
+
 def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Build the `aggregate` block from a list of proposal-row dicts."""
     agg: Dict[str, Any] = {}
@@ -111,6 +124,7 @@ def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     agg["peak_year"] = (
         {"median": _median(peak_vals), "count": len(peak_vals)} if peak_vals else None
     )
+    agg["uncertainty"] = _uncertainty_agg(rows)
 
     agg["diffusion_curve"] = _mode_distribution([r.get("diffusion_curve") for r in rows])
 
@@ -128,6 +142,7 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         "gp1_pct_affected": my_row.get("gp1_pct_affected"),
         "peak_year": my_row.get("peak_year"),
         "diffusion_curve": my_row.get("diffusion_curve"),
+        "uncertainty": my_row.get("uncertainty"),
         "category_exposure": my_row.get("category_exposure"),
         "regional_exposure": my_row.get("regional_exposure"),
         "vc_exposure": my_row.get("vc_exposure"),
@@ -154,6 +169,7 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "gp1_pct_affected": r.get("gp1_pct_affected"),
             "peak_year": r.get("peak_year"),
             "diffusion_curve": r.get("diffusion_curve"),
+            "uncertainty": r.get("uncertainty"),
             "vc_exposure": r.get("vc_exposure"),
             "comment": r.get("comment"),
         })
@@ -204,6 +220,7 @@ def build_proposal_summary(
 
     curve_full = _mode_distribution([r.get("diffusion_curve") for r in rows])
     curve = {"mode": curve_full["mode"], "count": curve_full["count"]} if curve_full else None
+    unc = _uncertainty_agg(rows)
 
     my_row = None
     if user_id is not None:
@@ -218,5 +235,6 @@ def build_proposal_summary(
         "gp1_pct_affected": gp1,
         "peak_year": peak,
         "diffusion_curve": curve,
+        "uncertainty": unc,
         "my": _my_block(my_row),
     }

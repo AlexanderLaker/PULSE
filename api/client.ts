@@ -180,6 +180,8 @@ export const saveMyProposal = (
  *     shift_matrix: { [cat]: { path: { [year]: {p10,p25,median,p75,p90,mean,std} }, velocity: {...} } },
  *     regional_shift_matrix: { [cat]: { [region]: { path: {...} } } },  // F1 (2.10.0)
  *     region_weights_used: { [region]: number },
+ *     cell_weights_used: { [cat]: { [region]: share } },               // O6 (2.11.0)
+ *     category_weights_used: { [cat]: share }, cell_weights_source,
  *     mc_standard_error: { [cat]: {median_se_pp,...} },                 // F7 (2.10.0)
  *     iterations, model_type, ...
  *   }
@@ -187,7 +189,8 @@ export const saveMyProposal = (
  * Frontend type `SimulationResult` expects:
  *   {
  *     shifts: { [cat]: { [year]: PercentileDistribution } },    // flat, no `.path`
- *     regional_shift_matrix, region_weights_used, mc_standard_error
+ *     regional_shift_matrix, region_weights_used, cell_weights_used,
+ *     category_weights_used, cell_weights_source, mc_standard_error
  *   }
  *
  * This normalizer accepts either shape (idempotent).
@@ -216,6 +219,10 @@ export function normalizeSimulation(raw: unknown): SimulationResult {
     // F1 (2.10.0): the 3D regional shift + the region GP1-share weights used.
     regional_shift_matrix: r.regional_shift_matrix as SimulationResult['regional_shift_matrix'],
     region_weights_used: r.region_weights_used as SimulationResult['region_weights_used'],
+    // O6 (2.11.0): the cell gross-profit-share matrix, its row sums and label.
+    cell_weights_used: r.cell_weights_used as SimulationResult['cell_weights_used'],
+    category_weights_used: r.category_weights_used as SimulationResult['category_weights_used'],
+    cell_weights_source: r.cell_weights_source as SimulationResult['cell_weights_source'],
     // F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS convergence;
     // F9: force_attribution deleted — neither is carried through any more).
     mc_standard_error: r.mc_standard_error as SimulationResult['mc_standard_error'],
