@@ -11,6 +11,14 @@ The code stopped creating/reading/writing all of them on 2026-07-07:
   O4 — simulation_runs.allocation_recommendation  column  (optimizer, D4 —
                                          legacy-NULL on every row)
 
+Extended 2026-09-11 (owner instruction "finalize the cleanup") with the two
+tables the v3.2 deletions left behind, found on Neon while closing F-29:
+
+  backtest_results             table   (backtesting removed in v3.2; F-08
+                                        records that no hindcast was ever run,
+                                        so the table only ever held nothing)
+  causal_edges                 table   (Causal DAG removed in v3.2)
+
 Usage:
     python scripts/migrate_drop_legacy.py             # local SQLite only
     python scripts/migrate_drop_legacy.py --dry-run   # show what would happen
@@ -32,7 +40,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pulse.env_loader  # noqa: F401,E402  (loads .env; shell wins — M17)
 from pulse.database import get_db_connection, USE_POSTGRES  # noqa: E402
 
-TABLES = ["trend_journey_exposure", "users", "scanned_trends"]
+TABLES = ["trend_journey_exposure", "users", "scanned_trends",
+          "backtest_results", "causal_edges"]
 COLUMN_DROPS = [("simulation_runs", "allocation_recommendation")]
 
 

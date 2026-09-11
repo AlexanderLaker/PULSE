@@ -1064,9 +1064,17 @@ const AiRef: FC<{ label: string }> = ({ label }) => (
 function useTrendProposals(trendId: string): { data: TrendProposalsResponse | null; loaded: boolean } {
   const [data, setData] = useState<TrendProposalsResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // A new trend id invalidates the previous payload: reset `loaded` during
+  // render (the documented React pattern) so no pass ever reports the old
+  // proposals as loaded for the new trend. The fetch itself stays in the
+  // effect and writes state only from its promise callbacks.
+  const [fetchingFor, setFetchingFor] = useState(trendId);
+  if (fetchingFor !== trendId) {
+    setFetchingFor(trendId);
+    setLoaded(false);
+  }
   useEffect(() => {
     let cancelled = false;
-    setLoaded(false);
     getTrendProposals(trendId)
       .then((r) => { if (!cancelled) { setData(r); setLoaded(true); } })
       .catch(() => { if (!cancelled) { setData(null); setLoaded(true); } });
@@ -1079,18 +1087,29 @@ function useTrendProposals(trendId: string): { data: TrendProposalsResponse | nu
 const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: TrendProposalPatch) => void }> = ({ trend, onMyChange }) => {
   const { data, loaded } = useTrendProposals(trend.id);
   const [draft, setDraft] = useState<TrendProposalPatch>({});
-  const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const draftRef = useRef<TrendProposalPatch>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Seed the draft from the server payload exactly once, on the first render
+  // in which it has loaded. `hydrated` is the synced marker: adjusting
+  // during render means the panel's first visible frame already carries the
+  // user's stored proposal instead of an empty draft for one commit.
+  const [hydrated, setHydrated] = useState(false);
+  if (loaded && !hydrated) {
+    setHydrated(true);
+    setDraft((data?.my ?? {}) as TrendProposalPatch);
+  }
+  // `draftRef` is the merge base for `patch` and the payload of the H6
+  // unmount flush. `patch` keeps it current synchronously while the user
+  // types; refs must not be written during render, so the seed above is
+  // mirrored here instead — still before any edit can reach `patch`.
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  // The parent's mirror of "my proposal" is another component's state, so it
+  // is seeded from an effect once the draft above has been hydrated.
   useEffect(() => {
-    if (loaded && !hydrated) {
-      const my = (data?.my ?? {}) as TrendProposalPatch;
-      setDraft(my); draftRef.current = my; setHydrated(true);
-      onMyChange?.(trend.id, my);
-    }
-  }, [loaded, hydrated, data, onMyChange, trend.id]);
+    if (hydrated) onMyChange?.(trend.id, draftRef.current);
+  }, [hydrated, onMyChange, trend.id]);
   // H6 (July 2026 review): FLUSH — don't drop — a pending autosave on
   // unmount. Collapsing the row (or switching tabs) within the 0.6s debounce
   // window used to cancel the timer while the screen already showed the new
@@ -1912,14 +1931,18 @@ interface Trends2Props {
 const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
   const { trends, loading, backendAvailable, updateTrend } = usePrism();
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'all'>('all');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch ?? '');
 
   // Adopt drill-through queries from the Consumer Journey whenever the
   // parent hands down a new value (including re-navigations to the same
-  // trend — page.tsx resets state between navigations).
-  useEffect(() => {
+  // trend — page.tsx resets state between navigations). Adjusted during
+  // render against the last value adopted, so the list is already filtered
+  // in the pass that follows the navigation.
+  const [adoptedSearch, setAdoptedSearch] = useState(initialSearch);
+  if (adoptedSearch !== initialSearch) {
+    setAdoptedSearch(initialSearch);
     if (initialSearch != null && initialSearch !== '') setSearch(initialSearch);
-  }, [initialSearch]);
+  }
   // Which trend row is currently expanded to show category + VC exposure.
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -1944,25 +1967,32 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
   // Scoring mode (June 2026): Trend List (truth) · Expert Input · Review &
   // Endorse. Review is admin-only; a viewer can never land on it.
   const [mode, setMode] = useState<ScoringMode>('list');
-  useEffect(() => {
-    if (!isAdmin && mode === 'review') setMode('list');
-  }, [isAdmin, mode]);
+  // Review is admin-only. The invariant is enforced during render rather
+  // than corrected after the commit, so the toggle never paints a frame in
+  // a mode the current user may not use.
+  if (!isAdmin && mode === 'review') setMode('list');
 
   // Live "my proposal" per trend so a collapsed row reflects what the user just
   // entered in the Expert Input tab (the trends-list payload only carries the
   // proposal as of page load). Seeded from the server, updated on each edit.
   const [myMap, setMyMap] = useState<Record<string, TrendProposalPatch>>({});
-  useEffect(() => {
-    setMyMap((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const t of trends) {
-        const m = t.proposal_summary?.my;
-        if (next[t.id] === undefined && m) { next[t.id] = m; changed = true; }
-      }
-      return changed ? next : prev;
-    });
-  }, [trends]);
+  // Seeded during render whenever the store hands down a new trends array,
+  // with `seededFrom` holding the array we last seeded from. Entries already
+  // in the map (live edits from the Expert Input tab) always win.
+  const [seededFrom, setSeededFrom] = useState(trends);
+  const seedMyMap = (prev: Record<string, TrendProposalPatch>) => {
+    let changed = false;
+    const next = { ...prev };
+    for (const t of trends) {
+      const m = t.proposal_summary?.my;
+      if (next[t.id] === undefined && m) { next[t.id] = m; changed = true; }
+    }
+    return changed ? next : prev;
+  };
+  if (seededFrom !== trends) {
+    setSeededFrom(trends);
+    setMyMap(seedMyMap);
+  }
   const setMyProposal = useCallback((trendId: string, my: TrendProposalPatch) => {
     setMyMap((prev) => ({ ...prev, [trendId]: my }));
   }, []);
@@ -2509,7 +2539,12 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
   );
 
   // Re-hydrate drafts every time the trend data changes (e.g. after save).
-  useEffect(() => {
+  // Adjusted during render against the trend object the drafts were last
+  // hydrated from — the drafts above already seed from the current trend on
+  // mount, so this only fires on an actual change of the incoming row.
+  const [hydratedFrom, setHydratedFrom] = useState(trend);
+  if (hydratedFrom !== trend) {
+    setHydratedFrom(trend);
     setDraftDesc(trend.description || '');
     setDraftProb(Math.round(trend.probability ?? 0));
     setDraftDir(trend.direction);
@@ -2522,7 +2557,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
     setDraftVcExp({ ...((trend.vc_exposure ?? {}) as Record<string, number>) });
     setDraftRegExp({ ...((trend as Trend & { regional_exposure?: Record<string, number> }).regional_exposure ?? {}) });
     setDraftSources((trend.sources ?? []).map((s) => ({ ...s })));
-  }, [trend]);
+  }
 
   const handleCancel = () => {
     // Reset drafts back to the persisted trend values

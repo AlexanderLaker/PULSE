@@ -25,7 +25,7 @@
 
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Info, Loader2, Sparkles, X,
@@ -829,9 +829,11 @@ const ProfitPoolExplorer: FC = () => {
   // R-19.4: the Beta notice auto-opens once per browser (the tab is
   // keep-alive-mounted, so this runs on the first Explorer visit) and
   // never again once acknowledged. "Got it" persists the ack; Escape or
-  // a backdrop click dismisses without persisting.
-  const [noticeOpen, setNoticeOpen] = useState(false);
-  useEffect(() => { if (!noticeAcked()) setNoticeOpen(true); }, []);
+  // a backdrop click dismisses without persisting. The ack is read in the
+  // state initializer — this tab is `ssr: false` (page.tsx) and
+  // `noticeAcked()` is SSR-safe anyway, so there is nothing to hydrate
+  // against and no effect is needed to reach the open state.
+  const [noticeOpen, setNoticeOpen] = useState(() => !noticeAcked());
   const closeNotice = useCallback(() => setNoticeOpen(false), []);
   const ackNotice = useCallback(() => {
     try { window.localStorage.setItem(NOTICE_ACK_KEY, '1'); } catch { /* storage unavailable — dismiss only */ }

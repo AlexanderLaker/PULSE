@@ -64,6 +64,70 @@ function usePrismStore(): UsePrismReturn {
   const connectionStateRef = useRef<'connected' | 'reconnecting' | 'offline'>('reconnecting');
   useEffect(() => { connectionStateRef.current = connectionState; }, [connectionState]);
 
+  // -- Initial load with graceful degradation -------------------
+  // Written as a promise chain rather than async/await on purpose: every
+  // state write lives in a continuation, so the mount effect below can start
+  // the load without setting state synchronously during the effect. The two
+  // commit stages (core payload, then the stored run) and the `finally` are
+  // the same ones the async version had.
+  const loadAll = useCallback(() => {
+    // M7: claim a new epoch; stale loads may not write state.
+    const epoch = ++loadEpochRef.current;
+    const fresh = () => mounted.current && epoch === loadEpochRef.current;
+    // F3: prime the httpOnly engine cookie (pulse-token) so the
+    // authenticated /api/v1 reads succeed. Errors are non-fatal here —
+    // if priming failed, the reads below 401 and we surface offline.
+    return fetch('/api/prism-cookie', { credentials: 'include' })
+      .catch(() => undefined)
+      .then(() => Promise.all([
+        api.getHealth().catch((err: Error) => { throw err; }),
+        api.getTrends().catch((): Trend[] => []),
+        api.getConfig().catch((): null => null),
+      ]))
+      .then(([h, t, c]) => {
+        if (!fresh()) return null;
+
+        setBackendAvailable(true);
+        setConnectionState('connected');
+        setHealth(h);
+        setTrends(Array.isArray(t) ? t : []);
+        setConfig(c);
+
+        // Load stored simulation if available
+        return h?.has_simulation
+          ? api.getSimulation().catch((): null => null)
+          : null;
+      })
+      .then((sim) => {
+        // If no stored simulation, leave it null -- the dashboard explains why.
+        if (sim && fresh()) setSimulation(sim);
+      })
+      .catch((e: unknown) => {
+        if (fresh()) {
+          setBackendAvailable(false);
+          setConnectionState('offline');
+          setHealth({ status: 'offline', version: 'unknown' });
+          setError(`Backend unavailable. ${(e as Error).message}`);
+        }
+      })
+      .finally(() => {
+        if (fresh()) setLoading(false);
+      });
+  }, []);
+
+  // -- Reload entry point ----------------------------------------
+  // Re-enter the loading state, then run the same load. Every caller that
+  // reaches the store from the UI (retry button, explicit reconnect, the
+  // health check's offline -> connected recovery) goes through here; the
+  // mount effect calls `loadAll` directly because the store already starts
+  // in exactly this state, so the three writes below would be no-ops.
+  const reload = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setConnectionState('reconnecting');
+    return loadAll();
+  }, [loadAll]);
+
   // -- Health check with reconnect logic ------------------------
   const performHealthCheck = useCallback(async () => {
     try {
@@ -76,7 +140,7 @@ function usePrismStore(): UsePrismReturn {
         setBackendAvailable(true);
         setConnectionState('connected');
         setError(null);
-        if (wasDisconnected) void loadAllRef.current?.();
+        if (wasDisconnected) void reload();
       }
     } catch {
       if (mounted.current) {
@@ -84,7 +148,7 @@ function usePrismStore(): UsePrismReturn {
         setConnectionState('offline');
       }
     }
-  }, []);
+  }, [reload]);
 
   // -- Schedule periodic health checks --------------------------
   const scheduleHealthCheck = useCallback(() => {
@@ -106,57 +170,6 @@ function usePrismStore(): UsePrismReturn {
       }
     };
   }, [scheduleHealthCheck]);
-
-  // -- Initial load with graceful degradation -------------------
-  const loadAll = useCallback(async () => {
-    // M7: claim a new epoch; stale loads may not write state.
-    const epoch = ++loadEpochRef.current;
-    const fresh = () => mounted.current && epoch === loadEpochRef.current;
-    setLoading(true);
-    setError(null);
-    setConnectionState('reconnecting');
-    try {
-      // F3: prime the httpOnly engine cookie (pulse-token) so the
-      // authenticated /api/v1 reads succeed. Errors are non-fatal here —
-      // if priming failed, the reads below 401 and we surface offline.
-      await fetch('/api/prism-cookie', { credentials: 'include' }).catch(() => undefined);
-      const [h, t, c] = await Promise.all([
-        api.getHealth().catch((err: Error) => { throw err; }),
-        api.getTrends().catch((): Trend[] => []),
-        api.getConfig().catch((): null => null),
-      ]);
-
-      if (!fresh()) return;
-
-      setBackendAvailable(true);
-      setConnectionState('connected');
-      setHealth(h);
-      setTrends(Array.isArray(t) ? t : []);
-      setConfig(c);
-
-      // Load stored simulation if available
-      if (h?.has_simulation) {
-        const sim = await api.getSimulation().catch((): null => null);
-        if (sim && fresh()) setSimulation(sim);
-      }
-      // If no stored simulation, leave it null -- the dashboard explains why.
-    } catch (e) {
-      if (fresh()) {
-        setBackendAvailable(false);
-        setConnectionState('offline');
-        setHealth({ status: 'offline', version: 'unknown' });
-        setError(`Backend unavailable. ${(e as Error).message}`);
-      }
-    } finally {
-      if (fresh()) setLoading(false);
-    }
-  }, []);
-
-  // Stable reference for performHealthCheck's reconnect reload (M7) —
-  // avoids a circular useCallback dependency. Written in an effect (refs
-  // must not be written during render).
-  const loadAllRef = useRef<typeof loadAll | null>(null);
-  useEffect(() => { loadAllRef.current = loadAll; }, [loadAll]);
 
   useEffect(() => {
     mounted.current = true;
@@ -182,15 +195,15 @@ function usePrismStore(): UsePrismReturn {
   }, []);
 
   // -- Explicit reconnect function --------------------------------
+  // `reload` already flips the badge to "reconnecting" before it fetches.
   const reconnect = useCallback(async () => {
-    setConnectionState('reconnecting');
-    await loadAll();
-  }, [loadAll]);
+    await reload();
+  }, [reload]);
 
   return {
     health, trends, simulation, config,
     loading, error, backendAvailable, connectionState,
-    updateTrend, reload: loadAll, reconnect,
+    updateTrend, reload, reconnect,
   };
 }
 

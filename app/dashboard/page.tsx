@@ -39,7 +39,7 @@
  * refetch is triggered on switch.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
@@ -103,6 +103,23 @@ const NAV = {
   betaActive:       S.mutedText,
 };
 
+// ─── Welcome-modal session gate ────────────────────────────────────
+const welcomeSeenKey = (sessionId: string) => `prism.welcomeSeen.${sessionId}`;
+
+/** SSR-safe read of the per-session "welcome seen" flag. On the server we
+ *  report "seen" so the modal can never try to auto-open outside the
+ *  browser; storage failures (privacy mode) read as not-seen, so the modal
+ *  still shows. Mirrors `noticeAcked()` in ProfitPoolExplorer.tsx. */
+function welcomeSeen(sessionId: string): boolean {
+  if (typeof window === 'undefined') return true;
+  try { return !!window.sessionStorage.getItem(welcomeSeenKey(sessionId)); } catch { return false; }
+}
+
+/** The gate only changes when the user dismisses the modal, which already
+ *  re-renders through `greetedSession` — there is no external event to
+ *  subscribe to, so this returns a no-op unsubscribe. */
+const subscribeToWelcomeGate = () => () => {};
+
 export default function DashboardPage() {
   // Clerk: `isLoaded` flips true once the session state has been hydrated.
   // `isSignedIn` and `user` come straight from the active session — no
@@ -137,29 +154,32 @@ export default function DashboardPage() {
   // the active Clerk session ID in sessionStorage — a tab refresh inside
   // an active session stays silent, but a new sign-in produces a new
   // session ID and the modal re-appears.
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
-  useEffect(() => {
-    if (!isSignedIn || !session?.id) return;
-    if (typeof window === 'undefined') return;
-    const key = `prism.welcomeSeen.${session.id}`;
-    try {
-      if (!window.sessionStorage.getItem(key)) {
-        setWelcomeOpen(true);
-      }
-    } catch {
-      // sessionStorage unavailable (e.g. privacy mode) — show anyway.
-      setWelcomeOpen(true);
-    }
-  }, [isSignedIn, session?.id]);
+  //
+  // The gate lives in sessionStorage — outside React — so it is read
+  // through useSyncExternalStore instead of being copied into state by an
+  // effect. The server snapshot reports "already greeted", so the modal can
+  // never auto-open during SSR/hydration; the browser snapshot takes over
+  // immediately afterwards, which is the timing the effect used to produce.
+  const sessionId = session?.id ?? null;
+  const greetedInStorage = useSyncExternalStore(
+    subscribeToWelcomeGate,
+    () => (sessionId ? welcomeSeen(sessionId) : true),
+    () => true,
+  );
+  // Dismissal of the live modal. The sessionStorage write in
+  // `handleWelcomeClose` makes it durable across refreshes; this keeps the
+  // modal closed in place without waiting for a storage round-trip.
+  const [greetedSession, setGreetedSession] = useState<string | null>(null);
+  const welcomeOpen =
+    !!isSignedIn && sessionId !== null && !greetedInStorage && greetedSession !== sessionId;
 
   const handleWelcomeClose = () => {
-    setWelcomeOpen(false);
-    if (typeof window !== 'undefined' && session?.id) {
-      try {
-        window.sessionStorage.setItem(`prism.welcomeSeen.${session.id}`, '1');
-      } catch {
-        /* noop */
-      }
+    if (!sessionId) return;
+    setGreetedSession(sessionId);
+    try {
+      window.sessionStorage.setItem(welcomeSeenKey(sessionId), '1');
+    } catch {
+      /* noop */
     }
   };
 
@@ -194,6 +214,16 @@ export default function DashboardPage() {
     })();
     return () => { cancelled = true; };
   }, [isSignedIn]);
+
+  // Middleware normally prevents an unauthenticated render, but we handle
+  // it defensively rather than rendering nothing. The full navigation to
+  // /sign-in (so the middleware re-evaluates) lives in an effect — it is a
+  // side effect on an external system, not something render may do.
+  useEffect(() => {
+    if (isLoaded && !isSignedIn && typeof window !== 'undefined') {
+      window.location.href = '/sign-in';
+    }
+  }, [isLoaded, isSignedIn]);
 
   const isAdmin = role === 'admin';
   // All tabs visible to all users; the `adminOnly` flag is no longer used.
@@ -231,10 +261,8 @@ export default function DashboardPage() {
   }
 
   if (!isSignedIn) {
-    // Middleware normally prevents this, but we handle it defensively
-    // rather than rendering nothing. Push to /sign-in via a full
-    // navigation so the middleware re-evaluates.
-    if (typeof window !== 'undefined') window.location.href = '/sign-in';
+    // The redirect itself is fired by the effect above; render nothing
+    // while the browser navigates.
     return null;
   }
 

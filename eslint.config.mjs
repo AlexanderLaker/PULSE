@@ -2,14 +2,15 @@
 // Base: eslint-config-next/core-web-vitals (natively flat-config since v16).
 import coreWebVitals from 'eslint-config-next/core-web-vitals';
 
-export default [
+const config = [
   ...coreWebVitals,
   {
     rules: {
-      // React-Compiler diagnostics (advisory): the flagged patterns are
-      // existing, working code — rewriting them is behavior risk for zero
-      // user value right now. Kept VISIBLE as warnings; burning them down
-      // belongs on the DX refactoring backlog (see HANDOVER.md).
+      // React-Compiler diagnostics. The backlog of flagged patterns was
+      // burned down on 2026-09-11 (the tree is at zero warnings), so these
+      // stay at 'warn' as a ratchet: new code that reintroduces a
+      // setState-in-effect or a flagged mutation shows up in `npm run lint`
+      // instead of accumulating silently.
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',
       'react-hooks/purity': 'warn',
@@ -31,3 +32,5 @@ export default [
     ],
   },
 ];
+
+export default config;

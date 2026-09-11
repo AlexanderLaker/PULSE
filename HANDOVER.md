@@ -180,12 +180,10 @@ Engine is **2.11.0**, and one version number is enforced everywhere: `pulse.__ve
 
 **DX backlog (known and deliberate — not regressions):**
 
-1. Replace the trend base and run the first 2.11.0 production run (§5, in that order) — until then the dashboard serves the last pre-2.11 run, honestly labeled. Load the actual cell weights (`--cell-weights FILE`) when finance provides the category × region gross-profit shares.
-2. Run the two legacy-cleanup migrations once against prod, AFTER the first deploy of this code: `python3 scripts/migrate_drop_delphi.py --postgres` (O1) and `python3 scripts/migrate_drop_legacy.py --postgres` (O3/O4). Both are archive-first, idempotent, and already executed against the local DB.
-3. Burn down the react-compiler advisory warnings (`eslint.config.mjs` keeps them visible as warnings on purpose).
-4. Consider splitting the largest dashboard components (`Trends2.tsx` is the biggest) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
-5. Three retired tombstone stubs remain in `lib/` (`auth.ts`, `calibration.ts`, `users.ts` — each a one-line `export {}`). Harmless; delete when convenient.
-6. `users.password_hash` / `password_salt` remain as a legacy pair nothing reads or writes; dropping them is a DX-scheduled migration.
+1. Load the actual cell weights (`--cell-weights FILE`, §5) when finance provides the category × region gross-profit shares. Until then every 2.11.0 run carries the equal 1/48 placeholder and says so in its source line. The trend-base replacement and the first 2.11.0 production run are DONE (2026-09-10: Neon on the 51 drivers, run #98).
+2. Consider splitting the largest dashboard components (`Trends2.tsx` is the biggest) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
+
+Closed on 2026-09-10/11, listed so nobody re-opens them: the two legacy-cleanup migrations ran against Neon (`migrate_drop_delphi.py` earlier, `migrate_drop_legacy.py` on 2026-09-11 — extended first to also drop the v3.2 leftovers `backtest_results` and `causal_edges`; archives in `data/archive/`), which also removed the `users` table and with it the dead `password_hash` / `password_salt` pair; the react-compiler warning backlog is at zero and the rules stay on as a ratchet; and the three retired tombstone stubs in `lib/` are deleted.
 
 ## 8. Who decides what
 

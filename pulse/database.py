@@ -1361,10 +1361,13 @@ def get_db_stats() -> Dict[str, int]:
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
+        # `users` was dropped with the legacy cleanup (O4, run against every
+        # database on 2026-09-11): identity is Clerk, roles live in the
+        # Next-managed `user_roles` table, the engine has no user store.
         tables = [
             "trends", "simulation_runs",
             "triggers", "ai_suggestions",
-            "audit_log", "users", "session_snapshots",
+            "audit_log", "session_snapshots",
         ]
 
         stats = {}
@@ -1374,6 +1377,10 @@ def get_db_stats() -> Dict[str, int]:
                 row = _row_to_dict(cursor.fetchone())
                 stats[table] = row["count"]
             except Exception:
+                # Postgres aborts the whole transaction on a failed statement,
+                # so clear it — otherwise one missing table would report every
+                # later table as 0 too.
+                conn.rollback()
                 stats[table] = 0
 
         return stats

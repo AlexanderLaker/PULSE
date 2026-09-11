@@ -230,10 +230,15 @@ const NumberField: FC<NumberFieldProps> = ({
   const [text, setText] = useState(() => fmt(value));
   const parse = integer ? parseInteger : parseDecimal;
   // Resync when the draft changes elsewhere (load / discard) without
-  // clobbering in-progress typing that already parses to `value`.
-  useEffect(() => {
+  // clobbering in-progress typing that already parses to `value`. Adjusted
+  // during render — the documented React pattern — with `syncedValue`
+  // holding the last value we resynced against, so the comparison runs once
+  // per incoming change instead of on every commit.
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
     setText((t) => (parse(t) === value || fmt(parse(t)) === fmt(value) ? t : fmt(value)));
-  }, [value, parse, fmt]);
+  }
   return (
     <input
       type="text"
@@ -322,12 +327,16 @@ const ProfileSection: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      setFirstName(user.firstName ?? '');
-      setLastName(user.lastName ?? '');
-    }
-  }, [user]);
+  // Hydrate the form from the Clerk user as soon as it resolves, and again
+  // whenever Clerk hands us a different user object (e.g. after a save).
+  // Adjusted during render against the last user we synced from, so the
+  // fields are already filled in the pass that first renders them.
+  const [syncedUser, setSyncedUser] = useState<typeof user>(undefined);
+  if (user && syncedUser !== user) {
+    setSyncedUser(user);
+    setFirstName(user.firstName ?? '');
+    setLastName(user.lastName ?? '');
+  }
 
   const handleSave = useCallback(async () => {
     if (!user) return;
@@ -1048,26 +1057,39 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  const load = useCallback(async () => {
+  // The fetch. Every state write happens in a promise continuation, so the
+  // mount effect below can start it without setting state synchronously.
+  const fetchConfig = useCallback(
+    () =>
+      fetch('/api/config', { credentials: 'include' })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`Load failed (${res.status})`);
+          const data = (await res.json()) as ModelConfigPayload;
+          setConfig(data);
+          setDraft(data);
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Failed to load config.';
+          setStatus({ kind: 'error', message: `${message}. Defaults are shown — save is disabled.` });
+          setConfig(null);
+          setDraft(null);
+        })
+        .finally(() => {
+          setLoading(false);
+        }),
+    [],
+  );
+
+  // "Reload from backend": re-enter the loading state, then fetch.
+  const load = useCallback(() => {
     setLoading(true);
     setStatus(null);
-    try {
-      const res = await fetch('/api/config', { credentials: 'include' });
-      if (!res.ok) throw new Error(`Load failed (${res.status})`);
-      const data = (await res.json()) as ModelConfigPayload;
-      setConfig(data);
-      setDraft(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load config.';
-      setStatus({ kind: 'error', message: `${message}. Defaults are shown — save is disabled.` });
-      setConfig(null);
-      setDraft(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return fetchConfig();
+  }, [fetchConfig]);
 
-  useEffect(() => { load(); }, [load]);
+  // Initial load. The section already mounts in exactly the state `load`
+  // would set here (loading, no status), so it goes straight to the fetch.
+  useEffect(() => { void fetchConfig(); }, [fetchConfig]);
 
   // Diff-only save: only keys the admin actually changed enter the PUT body.
   // The previous full-draft PUT audit-logged EVERY field as "changed" on
@@ -1365,24 +1387,31 @@ const UsersSection: FC<{ isAdmin: boolean; currentUserId: string | null }> = ({ 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setStatus(null);
-    try {
-      const res = await fetch('/api/users', { credentials: 'include' });
-      if (!res.ok) throw new Error(`Load failed (${res.status})`);
-      const data = (await res.json()) as { users: ManagedUser[] };
-      setUsers(data.users);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load users.';
-      setStatus({ kind: 'error', message });
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // The directory read. Every state write happens in a promise continuation,
+  // so the effect below can start it without setting state synchronously.
+  // The section mounts in the loading state this used to set on entry.
+  const load = useCallback(
+    () =>
+      fetch('/api/users', { credentials: 'include' })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`Load failed (${res.status})`);
+          const data = (await res.json()) as { users: ManagedUser[] };
+          setUsers(data.users);
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Failed to load users.';
+          setStatus({ kind: 'error', message });
+          setUsers([]);
+        })
+        .finally(() => {
+          setLoading(false);
+        }),
+    [],
+  );
 
-  useEffect(() => { if (isAdmin) load(); else setLoading(false); }, [isAdmin, load]);
+  // Non-admins render the "restricted" card below and never read `loading`,
+  // so there is nothing to fetch and nothing to clear for them.
+  useEffect(() => { if (isAdmin) void load(); }, [isAdmin, load]);
 
   const handleRoleChange = useCallback(async (userId: string, role: 'admin' | 'viewer') => {
     setUpdatingId(userId);

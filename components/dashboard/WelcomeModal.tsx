@@ -19,7 +19,7 @@
 
 'use client';
 
-import React, { FC, useEffect, useRef, useState } from 'react';
+import React, { FC, useRef, useState } from 'react';
 import useOverlay from '@/hooks/useOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -41,10 +41,15 @@ interface WelcomeModalProps {
 const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Reset to step 1 every time the modal opens.
-  useEffect(() => {
+  // Reset to step 1 every time the modal opens. Adjusted during render
+  // (the documented React pattern) rather than in an effect: `wasOpen`
+  // holds the previous `open` so the reset happens in the same pass that
+  // opens the modal, with no extra commit.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) setStep(1);
-  }, [open]);
+  }
 
   // R-03: shared overlay contract — Escape, focus trap, focus return,
   // body scroll lock (replaces the local Escape-only listener).

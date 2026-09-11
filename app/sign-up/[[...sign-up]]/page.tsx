@@ -25,7 +25,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, FormEvent } from 'react';
+import { useState, useSyncExternalStore, FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
 
 // ─── Editorial design tokens ──────────────────────────────────────
@@ -56,22 +56,32 @@ const REQUIRED_CODE =
 
 const UNLOCK_KEY = 'prism.signupCodeOk.v1';
 
-export default function SignUpPage() {
-  // Gate state — start locked; flip to true once the code is verified
-  // (or once we read a prior unlock flag from sessionStorage).
-  const [unlocked, setUnlocked] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+/** SSR-safe read of the unlock flag. The server (and the hydration pass)
+ *  always report "locked", so the gate is what renders until the browser
+ *  snapshot takes over — the job the old `hydrated` state flag did.
+ *  Storage failures (privacy mode) read as locked, keeping the gate up. */
+function unlockedInStorage(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return window.sessionStorage.getItem(UNLOCK_KEY) === '1'; } catch { return false; }
+}
 
-  useEffect(() => {
-    setHydrated(true);
-    try {
-      if (window.sessionStorage.getItem(UNLOCK_KEY) === '1') {
-        setUnlocked(true);
-      }
-    } catch {
-      /* sessionStorage unavailable — keep gate active */
-    }
-  }, []);
+/** The flag only changes through the gate's own onUnlock, which re-renders
+ *  via `codeAccepted` — there is no external event to subscribe to. */
+const subscribeToUnlockFlag = () => () => {};
+
+export default function SignUpPage() {
+  // Gate state — start locked; unlock once the code is verified in this
+  // render tree (`codeAccepted`) or once the browser snapshot reports a
+  // prior unlock. The stored flag is read through useSyncExternalStore so
+  // the read is legal during render and SSR-safe: server and hydration both
+  // see "locked", exactly as the old hydrated/effect pair produced.
+  const [codeAccepted, setCodeAccepted] = useState(false);
+  const storedUnlock = useSyncExternalStore(
+    subscribeToUnlockFlag,
+    unlockedInStorage,
+    () => false,
+  );
+  const unlocked = codeAccepted || storedUnlock;
 
   return (
     <>
@@ -166,7 +176,7 @@ export default function SignUpPage() {
             padding: '40px 32px 32px',
           }}
         >
-          {!hydrated || !unlocked ? (
+          {!unlocked ? (
             <AccessCodeGate
               onUnlock={() => {
                 try {
@@ -174,7 +184,7 @@ export default function SignUpPage() {
                 } catch {
                   /* noop */
                 }
-                setUnlocked(true);
+                setCodeAccepted(true);
               }}
             />
           ) : (
