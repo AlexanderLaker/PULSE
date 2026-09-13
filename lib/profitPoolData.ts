@@ -1037,9 +1037,9 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
     poolSizeEurBn: 185.7,
     group: 'LHC',
     kind: 'SubSegment',
-    prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad', 'lhc_hdw', 'lhc_adw', 'lhc_hsc', 'lhc_ic'],
+    prismProxyCategories: ['lhc_fcn', 'lhc_fca', 'lhc_ffi', 'lhc_lad', 'lhc_hdw', 'lhc_adw', 'lhc_hsc', 'lhc_toi', 'lhc_ic'],
     construction:
-      'v3 (2026-07-02): rows = Euromonitor Passport’s Home Care tree (Laundry Care split into Detergents / Fabric Softeners / Laundry Aids; Dishwashing split Hand / Automatic; Surface, Toilet, Bleach, Polishes, Home Insecticides, Air Care) so an internal Passport extract drops in 1:1 — and, for the first time, EVERY PRISM LHC category has a pool row (Toilet Care for Bref and Home Insecticides for IC were previously invisible). Passport values are not shareable (licence) — every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover); the 11 rows sum to $213.5bn ≈ the triangulated Home Care total. Replaces the v2 laundry format view whose bars mixed hierarchy levels (detergent formats next to categories) and overweighted stain removers ~3× via a surface-stain-inflated scope; detergent format mix (liquid ≈ half, powder ≈ ⅓, unit-dose ≈ 10–14%) now lives inside the Laundry Detergents row note, matching Passport’s drill-down level. HCB mapping: Detergents → FCN+FCA (internal split — Passport has no fine-fabric category); Softeners → FFI; Aids (+ Carpet Cleaners, folded) → LAD; Hand/Auto Dishwashing → HDW/ADW; Surface+Toilet+Bleach+Polishes → HSC cluster; Home Insecticides → IC; Air Care → no HCB category (white-space adjacency). BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value — brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
+      'v3 (2026-07-02): rows = Euromonitor Passport’s Home Care tree (Laundry Care split into Detergents / Fabric Softeners / Laundry Aids; Dishwashing split Hand / Automatic; Surface, Toilet, Bleach, Polishes, Home Insecticides, Air Care) so an internal Passport extract drops in 1:1 — and, for the first time, EVERY PRISM LHC category has a pool row (Toilet Care for Bref and Home Insecticides for IC were previously invisible). Passport values are not shareable (licence) — every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover); the 11 rows sum to $213.5bn ≈ the triangulated Home Care total. Replaces the v2 laundry format view whose bars mixed hierarchy levels (detergent formats next to categories) and overweighted stain removers ~3× via a surface-stain-inflated scope; detergent format mix (liquid ≈ half, powder ≈ ⅓, unit-dose ≈ 10–14%) now lives inside the Laundry Detergents row note, matching Passport’s drill-down level. HCB mapping: Detergents → FCN+FCA (internal split — Passport has no fine-fabric category); Softeners → FFI; Aids (+ Carpet Cleaners, folded) → LAD; Hand/Auto Dishwashing → HDW/ADW; Surface+Bleach+Polishes → HSC cluster and Toilet → TOI (2.12.0, owner ruling O13, which split Toilet Care out of Hard-Surface Cleaner); Home Insecticides → IC; Air Care → no HCB category (white-space adjacency). BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value — brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
     items: [
       {
         id: 'l_sub_1', label: 'Laundry', sublabel: 'Detergents',
@@ -1115,8 +1115,8 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.049, gp1Margin: 0.52, revenueCAGR: 0.040, gp1DeltaBps: 0,
         revenueDriver: 'Habitual replenishment; rim/gel format innovation prices above liquid bleach substitutes.',
         marginDriver: 'Specialist premium (Bref/Harpic duopoly in many markets) holds against PL.',
-        note: 'NEW ROW — Bref’s core category was previously invisible in the explorer. HSC cluster.',
-        linkedCategoryId: 'lhc_hsc',
+        note: 'NEW ROW — Bref’s core category was previously invisible in the explorer. Its own PRISM category (TOI) since 2.12.0, owner ruling O13.',
+        linkedCategoryId: 'lhc_toi',
         sources: {
           revenue: [MKT.toiletCare],
           margin: [asDerived(SRC.reckitt, 'Reckitt (Harpic) 60.8% reported group GM as ceiling; Henkel (Bref) 50.8% as floor ⇒ ~52%.'), SRC.henkel],
@@ -1127,7 +1127,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.033, gp1Margin: 0.35, revenueCAGR: 0.015, gp1DeltaBps: -50,
         revenueDriver: 'DM substitution by surface care; EM/LatAm habit keeps volume alive — net ~1–2%.',
         marginDriver: 'Commodity chemistry; price-led PL competition.',
-        note: 'NEW ROW — HSC cluster; marginal Henkel play, shown for pool completeness.',
+        note: 'NEW ROW — HSC cluster (surface, bleach and polishes; toilet care is its own TOI category since 2.12.0); marginal Henkel play, shown for pool completeness.',
         linkedCategoryId: 'lhc_hsc',
         sources: {
           revenue: [MKT.bleach],
@@ -1139,7 +1139,7 @@ export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
         revenueShare: 0.021, gp1Margin: 0.48, revenueCAGR: 0.005, gp1DeltaBps: -50,
         revenueDriver: 'Structurally flat-to-declining; hard-floor care and shoe-care niches persist.',
         marginDriver: 'Shrinking niche holds price but loses scale leverage.',
-        note: 'NEW ROW — HSC cluster; no Henkel play.',
+        note: 'NEW ROW — HSC cluster (surface, bleach and polishes; toilet care is its own TOI category since 2.12.0); no Henkel play.',
         linkedCategoryId: 'lhc_hsc',
         sources: {
           revenue: [MKT.polishes],

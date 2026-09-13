@@ -106,7 +106,7 @@ export interface ModelConfig {
    *  anywhere. Six values (one per force) sourced from
    *  data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet). */
   per_force_attenuation?: Record<ForceName, number>;
-  attenuation_source?: 'calibrated_v3.11_september2026' | 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
+  attenuation_source?: 'calibrated_v3.12_september2026' | 'calibrated_v3.11_september2026' | 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
   // neutral_threshold deleted (July 2026): engine-inert, removed end-to-end.
   base_year?: number;
   path_years?: ProjectionYear[];
@@ -114,18 +114,30 @@ export interface ModelConfig {
   force_weights?: Record<ForceName, number>;
   // vc_weights deleted (2.9.0, July 2026): the VC attribution lens is a
   // categorical epicentre partition — no per-step weight dial exists.
-  /** 2.11.0 (owner ruling O6): the 12 × 4 matrix of HCB gross-profit SHARES
-   *  per category × region cell (sums to 1). The engine rolls the 48 composite
+  /** 2.11.0 (owner ruling O6): the 13 × 4 matrix of HCB gross-profit SHARES
+   *  per category × region cell (sums to 1). The engine rolls the 52 composite
    *  cells up with it: category shift = share-weighted mean of the row,
    *  portfolio = Σ share × cell. Editable on the Config sheet (admin) and via
-   *  `--cell-weights FILE` on the production CLI; the default is the equal
-   *  1/48 placeholder until the actual P&L shares are loaded. Keyed
-   *  cell_weights[category][region]. */
+   *  `--cell-weights FILE` on the production CLI. Since 2.12.0 (owner ruling
+   *  O14) the default is an ESTIMATE of the HCB gross-profit mix built from
+   *  public reporting, not Henkel P&L and no longer the equal 1/52
+   *  placeholder; its graded derivation is shown on the Config sheet
+   *  (lib/cellWeightProvenance.ts) and the equal grid survives as the neutral
+   *  basis one click away. Keyed cell_weights[category][region]. (2.12.0 /
+   *  O13 added the 13th category, "LHC: TOI", so the grid is 13 × 4 = 52
+   *  cells.) */
   cell_weights?: Record<string, Record<string, number>>;
   /** Provenance label of the cell weights (shown in the About footer). */
   cell_weights_source?: string;
-  /** The backend's placeholder label (what "reset to equal" writes). */
+  /** The backend's DEFAULT_CELL_WEIGHTS_SOURCE label — what the "reset to
+   *  estimate" button writes; since O14 the default IS the estimate, so this
+   *  label carries the estimate's provenance, not a basis-neutral one. */
   cell_weights_source_default?: string;
+  /** The backend's EQUAL_CELL_WEIGHTS_SOURCE label — what the "reset to
+   *  equal" button writes, so the equal 1/52 grid never inherits the
+   *  estimate's provenance. Absent on a pre-O14 service: the reset then
+   *  leaves the existing source text alone rather than mislabelling. */
+  cell_weights_source_equal?: string;
   /** Names of the weight vectors GET /config derives from cell_weights
    *  (read-only; PUT rejects them). */
   derived_weights?: string[];

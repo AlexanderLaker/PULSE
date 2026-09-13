@@ -37,7 +37,7 @@ What it does, in order:
      a write and normally nothing needs restoring. The step stays as the
      safety net for a database last written by pre-2.11.0 code, where the
      cascade did fire; proposals on RETIRED ids are archived, never restored.
-  7. Verifies: 51 trends, every driver with 12 category / 4 region / 8
+  7. Verifies: 51 trends, every driver with 13 category / 4 region / 8
      value-chain rows and at least one source, proposals restored; writes
      the verification next to the archive and an audit-log entry.
 

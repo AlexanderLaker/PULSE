@@ -1,10 +1,16 @@
-"""v3.11 calibration (2.11.0, owner ruling O11): the engine defaults in
+"""v3.12 calibration (2.12.0, owner ruling O13): the engine defaults in
 pulse/config.py must be exactly the values of the generated record
-data/attenuation_calibration_v3_11.json, the record must be reproducible
-from the seed by scripts/compute_attenuation_v3_11.py, the identity
+data/attenuation_calibration_v3_12.json, the record must be reproducible
+from the seed by scripts/compute_attenuation_v3_12.py, the identity
 eff_att = 0.5 x (1 - mean cross-force row overlap) must hold between the
 matrix and the attenuation, and the default copula matrix must be PSD on
 the 51-driver population (D1 / F6).
+
+The calibration is a FUNCTION OF THE CATEGORY EXPOSURE SPACE (pairwise
+weighted Jaccard over the category vectors), so splitting "LHC: TOI" out of
+"LHC: HSC" — 12 columns to 13 — moves it. v3.12 is the same method and the
+same mechanism adjustments as v3.11 re-run on the 13-column space; the v3.11
+script and record stay in the repo as the superseded provenance.
 
 Background (FINDINGS_REGISTER F-28): before 2.11.0 the within-force overlap
 and the cross-force matrix in config.py were the v3.1 numbers labelled v3.5
@@ -23,7 +29,7 @@ from pulse import config as C
 from pulse.config_validation import ModelConfigValidator, validate_model_config
 
 REPO = Path(__file__).resolve().parent.parent
-JSON_PATH = REPO / "data" / "attenuation_calibration_v3_11.json"
+JSON_PATH = REPO / "data" / "attenuation_calibration_v3_12.json"
 
 
 @pytest.fixture(scope="module")
@@ -33,7 +39,7 @@ def cal():
 
 class TestDefaultsEqualTheRecord:
     def test_source_tag(self, cal):
-        assert C.DEFAULT_ATTENUATION_SOURCE == cal["calibration_version"] == "calibrated_v3.11_september2026"
+        assert C.DEFAULT_ATTENUATION_SOURCE == cal["calibration_version"] == "calibrated_v3.12_september2026"
 
     def test_per_force_attenuation(self, cal):
         assert C.DEFAULT_PER_FORCE_ATTENUATION == cal["per_force_effective_attenuation"]
@@ -75,8 +81,8 @@ class TestDefaultsEqualTheRecord:
 
 class TestReproducible:
     def test_script_regenerates_the_record(self, cal, tmp_path):
-        spec = importlib.util.spec_from_file_location("compute_attenuation_v3_11",
-                                                      REPO / "scripts" / "compute_attenuation_v3_11.py")
+        spec = importlib.util.spec_from_file_location("compute_attenuation_v3_12",
+                                                      REPO / "scripts" / "compute_attenuation_v3_12.py")
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         out = mod.main(out_json=tmp_path / "cal.json", verbose=False)
@@ -104,10 +110,14 @@ class TestValidatorAcceptsTheTag:
     def test_legacy_tags_still_accepted_and_unknown_rejected(self):
         base = ModelConfigValidator.model_validate(
             {k: v for k, v in C.ModelConfig().__dict__.items() if k in ModelConfigValidator.model_fields})
-        assert base.attenuation_source == "calibrated_v3.11_september2026"
+        assert base.attenuation_source == "calibrated_v3.12_september2026"
         data = base.model_dump()
-        data["attenuation_source"] = "calibrated_v3.5_april2026"
-        ModelConfigValidator.model_validate(data)
+        # A run persisted before the Toilet Care split carries the v3.11 tag,
+        # and older ones the v3.5 tag: both must still load.
+        for legacy in ("calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
+                       "calibrated_v3.1_april2026"):
+            data["attenuation_source"] = legacy
+            ModelConfigValidator.model_validate(data)
         data["attenuation_source"] = "calibrated_v9"
         with pytest.raises(Exception):
             ModelConfigValidator.model_validate(data)

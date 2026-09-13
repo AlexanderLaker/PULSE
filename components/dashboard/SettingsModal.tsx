@@ -41,7 +41,12 @@ import {
   useUser, useClerk, useSessionList, useSession,
 } from '@clerk/nextjs';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import { cellMarginals, equalCellWeights } from '@/lib/cellWeights';
+import { cellMarginals, equalCellWeights, estimatedCellWeights } from '@/lib/cellWeights';
+import {
+  BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_VERSION, GRADE_LEGEND,
+  MARGIN_INDEX, MARGIN_INDEX_NOTE, REGION_MIX, REGION_MIX_NOTE,
+} from '@/lib/cellWeightProvenance';
+import type { Grade } from '@/lib/cellWeightProvenance';
 import { fmtDate, fmtDateTime } from '@/lib/format';
 import useOverlay from '@/hooks/useOverlay';
 
@@ -699,14 +704,18 @@ interface ModelConfigPayload {
   force_weights?: Record<string, number>;
   // vc_weights deleted (2.9.0, July 2026): the VC lens is an epicentre
   // partition — GET /config no longer returns a per-step weight group.
-  // 2.11.0 (O6): the 12 × 4 matrix of HCB gross-profit SHARES per
+  // 2.11.0 (O6): the 13 × 4 matrix of HCB gross-profit SHARES per
   // category × region cell is the ONLY aggregation dial for the roll-up;
   // region_weights / category_weights are its marginals, returned read-only
   // by GET /config (PUT rejects them).
   cell_weights?: Record<string, Record<string, number>>;
   cell_weights_source?: string;
-  /** Served by GET: the label "reset to equal" writes. */
+  /** Served by GET: the label "Reset to estimate" writes. Since O14 the
+   *  backend default IS the estimate, so this is the estimate's provenance. */
   cell_weights_source_default?: string;
+  /** Served by GET: the label "Reset to equal" writes — the equal 1/52
+   *  grid's own provenance. Absent on a pre-O14 service (see resetCellsEqual). */
+  cell_weights_source_equal?: string;
   derived_weights?: string[];
   region_weights?: Record<string, number>;
   category_weights?: Record<string, number>;
@@ -738,7 +747,7 @@ const REGION_ORDER = ['Europe', 'North America', 'Asia', 'High Growth'];
 const CATEGORY_ORDER = [
   'Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
   'LHC: FCN', 'LHC: FCA', 'LHC: FFI', 'LHC: LAD',
-  'LHC: HDW', 'LHC: ADW', 'LHC: HSC', 'LHC: IC',
+  'LHC: HDW', 'LHC: ADW', 'LHC: HSC', 'LHC: TOI', 'LHC: IC',
 ];
 const FORCE_ABBR: Record<string, string> = {
   Consumer: 'Cons.', Customer: 'Cust.', Technology: 'Tech.',
@@ -941,7 +950,7 @@ const WeightGrid: FC<{
   );
 };
 
-// ── 2.11.0 (O6): editable 12 × 4 cell-weight grid ───────────────────
+// ── 2.11.0 (O6): editable 13 × 4 cell-weight grid ───────────────────
 // Each cell is the share of the HCB gross-profit pool that sits in that
 // category × region (entered in %, stored as a share that sums to 1). The
 // row and column sums are the derived category and region weights the engine
@@ -951,15 +960,253 @@ const CELL_INPUT: React.CSSProperties = {
 };
 const CELL_INPUT_RO: React.CSSProperties = { ...CELL_INPUT, ...READONLY_STYLE, width: 76 };
 const fmtPct2 = (v: number): string => (Number.isFinite(v) ? v.toFixed(2) : '');
+// The two reset bases share one shape; the estimate is the primary of the
+// pair (it is the engine default since O14), marked with the container tint
+// rather than a new button style.
+const CELL_RESET_BUTTON: React.CSSProperties = { ...SECONDARY_BUTTON, padding: '4px 12px', fontSize: 11 };
+const CELL_RESET_PRIMARY: React.CSSProperties = { ...CELL_RESET_BUTTON, backgroundColor: S.primaryContainer };
+
+// ── 2.12.0 (O14): how the 52 default shares were built ──────────────
+// The engine default is an ESTIMATE of the HCB gross-profit mix, not Henkel
+// P&L, so the derivation and the grade of every input belong on the sheet
+// instead of inside a provenance string. Every number below is read from the
+// generated record (lib/cellWeightProvenance.ts) — none is repeated here.
+const GRADE_COLOR: Record<Grade, { bg: string; fg: string }> = {
+  B: { bg: S.successContainer, fg: S.success },
+  E: { bg: S.amberContainer, fg: S.onAmberContainer },
+  G: { bg: S.errorContainer, fg: S.onErrorContainer },
+};
+
+const GradeChip: FC<{ grade: Grade }> = ({ grade }) => (
+  <span
+    title={`${grade}: ${GRADE_LEGEND[grade]}`}
+    style={{
+      display: 'inline-block', minWidth: 10, textAlign: 'center',
+      fontFamily: MONO_FONT, fontSize: 10, fontWeight: 700,
+      padding: '1px 7px', borderRadius: 999,
+      backgroundColor: GRADE_COLOR[grade].bg, color: GRADE_COLOR[grade].fg,
+    }}
+  >
+    {grade}
+  </span>
+);
+
+const PROV_TEXT: React.CSSProperties = { fontSize: 11.5, lineHeight: 1.6, color: S.mutedText };
+const PROV_HEAD: React.CSSProperties = {
+  fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 800,
+  letterSpacing: '0.06em', textTransform: 'uppercase', color: S.onSurfaceVariant,
+};
+const PROV_TH_LEFT: React.CSSProperties = { ...CELL_TH, textAlign: 'left' };
+const PROV_TH_MID: React.CSSProperties = { ...CELL_TH, textAlign: 'center' };
+const PROV_GROUP_ROW: React.CSSProperties = {
+  ...CELL_TH, textAlign: 'left', textTransform: 'none', letterSpacing: '0.03em',
+  fontSize: 11, borderTop: `1px solid ${S.cardBorder}`,
+};
+const PROV_NUM: React.CSSProperties = {
+  fontFamily: MONO_FONT, fontSize: 11.5, color: S.onSurface,
+  padding: '5px 10px', textAlign: 'right', whiteSpace: 'nowrap',
+  fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${S.cardBorder}`,
+};
+const PROV_ROW_LABEL: React.CSSProperties = {
+  fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, color: S.onSurface,
+  padding: '5px 10px', textAlign: 'left', whiteSpace: 'nowrap',
+  borderTop: `1px solid ${S.cardBorder}`,
+};
+const PROV_GRADE_CELL: React.CSSProperties = {
+  padding: '5px 10px', textAlign: 'center', borderTop: `1px solid ${S.cardBorder}`,
+};
+const PROV_NOTE_CELL: React.CSSProperties = {
+  fontSize: 10.5, lineHeight: 1.5, color: S.mutedText,
+  padding: '5px 10px', textAlign: 'left', minWidth: 210,
+  borderTop: `1px solid ${S.cardBorder}`,
+};
+
+const pct1 = (v: number): string => `${(v * 100).toFixed(1)}%`;
+
+// Derived once from the generated record: block order, the categories in
+// each block, the region columns and the marginal summary line.
+const PROV_BLOCK_SHARES: Record<string, number> = BLOCK_SPLIT.shares;
+const PROV_CATEGORIES = orderedKeys(CATEGORY_MIX, CATEGORY_ORDER);
+const PROV_BLOCKS = [
+  ...Object.keys(PROV_BLOCK_SHARES),
+  ...Array.from(new Set(PROV_CATEGORIES.map((c) => CATEGORY_MIX[c].block))).filter((b) => !(b in PROV_BLOCK_SHARES)),
+];
+const PROV_REGION_CATEGORIES = orderedKeys(REGION_MIX, CATEGORY_ORDER);
+const PROV_REGIONS = (() => {
+  const seen = Array.from(new Set(PROV_REGION_CATEGORIES.flatMap((c) => Object.keys(REGION_MIX[c].mix))));
+  return [...REGION_ORDER.filter((r) => seen.includes(r)), ...seen.filter((r) => !REGION_ORDER.includes(r))];
+})();
+const PROV_CELL_COUNT = PROV_CATEGORIES.length * PROV_REGIONS.length;
+const PROV_REGION_LINE = Object.entries(ESTIMATE_MARGINALS.region)
+  .map(([r, w]) => `${r} ${pct1(w)}`).join(' · ');
+const PROV_TOP_CATEGORIES = Object.entries(ESTIMATE_MARGINALS.category)
+  .sort((a, b) => b[1] - a[1]).slice(0, 3)
+  .map(([c, w]) => `${c} ${pct1(w)}`).join(' · ');
+
+/** The graded derivation behind the default matrix. Read-only for everyone,
+ *  admin or viewer: it explains the engine default, it never edits it. */
+const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimate }) => (
+  <details style={{
+    border: `1px solid ${S.cardBorder}`, borderRadius: 10,
+    backgroundColor: S.surfaceLow, padding: '10px 12px',
+  }}>
+    <summary style={{
+      cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5,
+      fontWeight: 700, color: S.onSurfaceVariant,
+    }}>
+      How these {PROV_CELL_COUNT} shares were built: {PROV_CATEGORIES.length} category mixes,{' '}
+      {Object.keys(MARGIN_INDEX).length} margin indices, {PROV_REGION_CATEGORIES.length} regional mixes, each graded
+    </summary>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+      {!matchesEstimate && (
+        <div style={{
+          fontSize: 11.5, lineHeight: 1.55, padding: '8px 10px', borderRadius: 8,
+          backgroundColor: S.amberContainer, color: S.onAmberContainer,
+        }}>
+          The grid above has been changed away from the estimate. What follows derives the
+          <strong> default </strong> mix, not the shares now in the grid.
+        </div>
+      )}
+      <div style={PROV_TEXT}>
+        These {PROV_CELL_COUNT} shares are an <strong>estimate</strong> of the HCB gross-profit mix, built from
+        public reporting and category knowledge. They are not Henkel P&amp;L: the finance figures replace them on
+        the production CLI (<code>run_50k_prod.py --cell-weights FILE</code>). Each cell is the category's share
+        of its block, times the block's share of HCB, times a GP1 margin index, times that category's own
+        regional mix, normalised to 1.
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+        {(Object.keys(GRADE_LEGEND) as Grade[]).map((g) => (
+          <span key={g} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <GradeChip grade={g} />
+            <span style={{ fontSize: 10.5, lineHeight: 1.5, color: S.mutedText }}>{GRADE_LEGEND[g]}</span>
+          </span>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={PROV_HEAD}>Block split</span>
+        <TableScroller label="Block split: each block's share of HCB gross profit">
+          <thead>
+            <tr>
+              {Object.keys(PROV_BLOCK_SHARES).map((b) => <th key={b} style={CELL_TH}>{b}</th>)}
+              <th style={PROV_TH_MID}>Grade</th>
+              <th style={PROV_TH_LEFT}>Basis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {Object.entries(PROV_BLOCK_SHARES).map(([b, w]) => (
+                <td key={b} style={PROV_NUM}>{pct1(w)}</td>
+              ))}
+              <td style={PROV_GRADE_CELL}><GradeChip grade={BLOCK_SPLIT.grade} /></td>
+              <td style={PROV_NOTE_CELL}>{BLOCK_SPLIT.note}</td>
+            </tr>
+          </tbody>
+        </TableScroller>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={PROV_HEAD}>Category mix and GP1 margin index</span>
+        <span style={PROV_TEXT}>{MARGIN_INDEX_NOTE}</span>
+        <TableScroller label="Category mix: each category's share of its block and its GP1 margin index">
+          <thead>
+            <tr>
+              <th style={PROV_TH_LEFT}>Category</th>
+              <th style={CELL_TH} title="The category's share of its block, before the margin index and the regional mix">
+                Share of block
+              </th>
+              <th style={PROV_TH_MID}>Grade</th>
+              <th style={CELL_TH} title="GP1 gross margin relative to the HCB average (1.00 = average)">
+                GP1 index
+              </th>
+              <th style={PROV_TH_MID}>Grade</th>
+              <th style={PROV_TH_LEFT}>Basis</th>
+            </tr>
+          </thead>
+          {PROV_BLOCKS.map((b) => (
+            <tbody key={b}>
+              <tr>
+                <td colSpan={6} style={PROV_GROUP_ROW}>
+                  {b} · {pct1(PROV_BLOCK_SHARES[b] ?? 0)} of HCB gross profit
+                </td>
+              </tr>
+              {PROV_CATEGORIES.filter((c) => CATEGORY_MIX[c].block === b).map((c) => {
+                const mix = CATEGORY_MIX[c];
+                const mi = MARGIN_INDEX[c];
+                return (
+                  <tr key={c}>
+                    <td style={PROV_ROW_LABEL}>{c}</td>
+                    <td style={PROV_NUM}>{pct1(mix.shareOfBlock)}</td>
+                    <td style={PROV_GRADE_CELL}><GradeChip grade={mix.grade} /></td>
+                    <td style={PROV_NUM}>{mi ? mi.index.toFixed(2) : ''}</td>
+                    <td style={PROV_GRADE_CELL}>{mi ? <GradeChip grade={mi.grade} /> : null}</td>
+                    <td style={PROV_NOTE_CELL}>{mix.note}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
+        </TableScroller>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={PROV_HEAD}>Regional mix inside each category</span>
+        <span style={PROV_TEXT}>{REGION_MIX_NOTE}</span>
+        <TableScroller label="Region mix: each category's own regional split, the reason the matrix is not separable">
+          <thead>
+            <tr>
+              <th style={PROV_TH_LEFT}>Category</th>
+              {PROV_REGIONS.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
+              <th style={PROV_TH_MID}>Grade</th>
+              <th style={PROV_TH_LEFT}>Basis</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PROV_REGION_CATEGORIES.map((c) => {
+              const rm = REGION_MIX[c];
+              return (
+                <tr key={c}>
+                  <td style={PROV_ROW_LABEL}>{c}</td>
+                  {PROV_REGIONS.map((r) => <td key={r} style={PROV_NUM}>{pct1(rm.mix[r] ?? 0)}</td>)}
+                  <td style={PROV_GRADE_CELL}><GradeChip grade={rm.grade} /></td>
+                  <td style={PROV_NOTE_CELL}>{rm.note}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </TableScroller>
+      </div>
+
+      <div style={PROV_TEXT}>
+        Normalised, the estimate lands on {PROV_REGION_LINE} of the gross-profit pool. Europe's share is the
+        number that matters most, because each category is rolled up on its own regional mix, so the region
+        split is what moves the category results. The heaviest categories are {PROV_TOP_CATEGORIES}.
+      </div>
+      <div style={{ fontFamily: MONO_FONT, fontSize: 10, color: S.mutedText }}>
+        estimate version {ESTIMATE_VERSION}
+      </div>
+    </div>
+  </details>
+);
 
 const CellWeightGrid: FC<{
   cells: Record<string, Record<string, number>>;
   onCommit: (category: string, region: string, share: number) => void;
+  onResetEstimate: () => void;
   onResetEqual: () => void;
   readOnly: boolean;
-}> = ({ cells, onCommit, onResetEqual, readOnly }) => {
+}> = ({ cells, onCommit, onResetEstimate, onResetEqual, readOnly }) => {
   const m = cellMarginals(cells, CATEGORY_ORDER, REGION_ORDER);
-  const { categories: cats, regions, total, ok, equal, cellCount: nCells } = m;
+  const { categories: cats, regions, total, ok, equal, matchesEstimate, cellCount: nCells } = m;
+  // Three bases, one quiet badge: the O14 estimate (the engine default), the
+  // neutral 1/n grid, or shares that are neither (loaded from finance, or
+  // hand-edited on this sheet).
+  const basis = matchesEstimate
+    ? { label: 'estimated HCB mix (O14)', title: `The engine default since owner ruling O14: the estimated HCB gross-profit mix, version ${ESTIMATE_VERSION}.` }
+    : equal
+      ? { label: `equal placeholder (1/${nCells} each)`, title: 'The neutral basis: every cell carries the same share, which weights every region equally.' }
+      : { label: 'custom (edited)', title: 'Neither the estimated HCB mix nor the equal grid: these shares were loaded or edited.' };
   const share = (c: string, r: string) => {
     const v = cells[c]?.[r];
     return Number.isFinite(v) ? Number(v) : 0;
@@ -983,24 +1230,35 @@ const CellWeightGrid: FC<{
             color: ok ? S.success : S.onErrorContainer,
           }}
           title={ok
-            ? 'The 48 shares sum to 100% within the ±1 pt backend tolerance.'
-            : 'The 48 shares must sum to 100% (±1 pt) — the backend rejects this save.'}
+            ? 'The 52 shares sum to 100% within the ±1 pt backend tolerance.'
+            : 'The 52 shares must sum to 100% (±1 pt) — the backend rejects this save.'}
         >
           Σ {(total * 100).toFixed(2)}%{ok ? '' : ' · must equal 100%'}
         </span>
-        {equal && (
-          <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: S.mutedText }}>equal placeholder (1/{nCells} each)</span>
-        )}
+        <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: S.mutedText }} title={basis.title}>
+          {basis.label}
+        </span>
         {!readOnly && (
-          <button
-            type="button"
-            onClick={onResetEqual}
-            disabled={equal}
-            style={{ ...SECONDARY_BUTTON, padding: '4px 12px', fontSize: 11, opacity: equal ? 0.5 : 1, marginLeft: 'auto' }}
-            title="Set every cell to 1/48 (the owner's placeholder until the actual P&L shares are loaded)"
-          >
-            Reset to equal
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <button
+              type="button"
+              onClick={onResetEstimate}
+              disabled={matchesEstimate}
+              style={{ ...CELL_RESET_PRIMARY, opacity: matchesEstimate ? 0.5 : 1 }}
+              title="Restore the estimated HCB gross-profit mix, the engine default since O14"
+            >
+              Reset to estimate
+            </button>
+            <button
+              type="button"
+              onClick={onResetEqual}
+              disabled={equal}
+              style={{ ...CELL_RESET_BUTTON, opacity: equal ? 0.5 : 1 }}
+              title={`Set every cell to 1/${nCells}, the neutral basis, which is itself an assumption: it weights every region equally`}
+            >
+              Reset to equal
+            </button>
+          </div>
         )}
       </div>
       <TableScroller label="Cell weights: share of HCB gross profit per category and region">
@@ -1046,6 +1304,7 @@ const CellWeightGrid: FC<{
             </tr>
           </tfoot>
       </TableScroller>
+      <CellWeightProvenance matchesEstimate={matchesEstimate} />
     </div>
   );
 };
@@ -1154,7 +1413,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
     setDraft((d) => (d ? { ...d, [group]: { ...(d[group] ?? {}), [key]: v } } : d));
   };
 
-  // 2.11.0 (O6): one cell of the 12 × 4 share matrix; the marginals shown
+  // 2.11.0 (O6): one cell of the 13 × 4 share matrix; the marginals shown
   // next to the grid are recomputed from the draft on every render.
   const patchCell = (category: string, region: string, share: number) => {
     if (readOnly) return;
@@ -1163,6 +1422,23 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
       const cells = { ...(d.cell_weights ?? {}) };
       cells[category] = { ...(cells[category] ?? {}), [region]: share };
       return { ...d, cell_weights: cells };
+    });
+  };
+  // 2.12.0 (O14): back to the engine default, the estimated HCB gross-profit
+  // mix. Same shape as the equal reset below, over the estimate's own keys.
+  const resetCellsEstimate = () => {
+    if (readOnly) return;
+    setDraft((d) => {
+      if (!d?.cell_weights) return d;
+      const cells = estimatedCellWeights();
+      if (!Object.keys(cells).length) return d;
+      return {
+        ...d,
+        cell_weights: cells,
+        // The backend's own default wording (served by GET) so an untouched
+        // default never registers as a source change.
+        cell_weights_source: d.cell_weights_source_default ?? d.cell_weights_source,
+      };
     });
   };
   const resetCellsEqual = () => {
@@ -1174,9 +1450,13 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
       return {
         ...d,
         cell_weights: equalCellWeights(categories, regions),
-        // The backend's own placeholder wording (served by GET) so an
-        // untouched placeholder never registers as a source change.
-        cell_weights_source: d.cell_weights_source_default ?? d.cell_weights_source,
+        // The equal grid's OWN wording (served by GET) so an untouched
+        // placeholder never registers as a source change. Since O14 the
+        // *default* label is the estimate's, so falling back to it here would
+        // stamp the estimate's provenance onto an equal grid; on a service
+        // that does not serve the equal label we leave the existing text
+        // alone instead — a stale label beats a wrong one.
+        cell_weights_source: d.cell_weights_source_equal ?? d.cell_weights_source,
       };
     });
   };
@@ -1294,7 +1574,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Aggregation weights"
             icon={SlidersHorizontal}
-            description="Weights the engine consumes for portfolio aggregation and the lenses. Force weights must sum to 1.0 and the 48 cell shares to 100% — the backend rejects saves outside ±0.01; inside that tolerance the engine applies the cell shares normalised to their total (the run reports the shares actually applied as cell_weights_used). Since 2.11.0 (owner ruling O6) the roll-up from the 48 category × region cells to the category and portfolio numbers uses ONE 12 × 4 matrix of gross-profit shares: category shift = share-weighted mean of its row, portfolio = Σ share × cell. The former region and category dials are its row and column sums and are derived, not edited. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
+            description="Weights the engine consumes for portfolio aggregation and the lenses. Force weights must sum to 1.0 and the 52 cell shares to 100% — the backend rejects saves outside ±0.01; inside that tolerance the engine applies the cell shares normalised to their total (the run reports the shares actually applied as cell_weights_used). Since 2.11.0 (owner ruling O6) the roll-up from the 52 category × region cells to the category and portfolio numbers uses ONE 13 × 4 matrix of gross-profit shares: category shift = share-weighted mean of its row, portfolio = Σ share × cell. The former region and category dials are its row and column sums and are derived, not edited. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {draft.force_weights ? (
@@ -1315,6 +1595,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                   <CellWeightGrid
                     cells={draft.cell_weights}
                     onCommit={patchCell}
+                    onResetEstimate={resetCellsEstimate}
                     onResetEqual={resetCellsEqual}
                     readOnly={ro}
                   />
@@ -1329,9 +1610,11 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                     />
                   </Field>
                   <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
-                    <strong>Assumption:</strong> until the actual HCB P&amp;L is loaded every cell is 1/48
-                    (equal regions, equal categories — owner decision, September 2026). The production
-                    CLI takes the actual shares from a file kept outside the repository
+                    <strong>Assumption:</strong> the default is the estimated HCB gross-profit mix
+                    (owner ruling O14, September 2026), derived cell by cell above. The equal 1/52 grid
+                    is still one click away, but it is an assumption of its own rather than a neutral
+                    choice: it weights every region equally. The production CLI still takes the real
+                    shares from a file kept outside the repository
                     (<code>run_50k_prod.py --cell-weights FILE</code>); euro figures never enter PRISM,
                     only shares. A cell with share 0 contributes nothing to the roll-up however large
                     its mechanism score (presence in a region enters here, not through the exposures).
@@ -1339,7 +1622,8 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
                 </>
               ) : (
                 <div style={{ color: S.mutedText, fontSize: 12.5 }}>
-                  No cell weights returned by the backend (pre-2.11 service) — the equal 1/48 placeholder applies.
+                  No cell weights returned by the backend (pre-2.11 service): the engine default applies, the
+                  estimated HCB gross-profit mix of owner ruling O14.
                 </div>
               )}
             </div>

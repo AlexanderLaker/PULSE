@@ -72,6 +72,61 @@ class TestExcelWriterRoundTrip:
         assert any("Shift" in s for s in sheets), sheets
         assert any("Metadata" in s or "Meta" in s for s in sheets), sheets
 
+    def test_cell_weight_sheet_carries_the_estimate_provenance(
+            self, tmp_path, mock_model_config, mock_trends_database):
+        """O14: a reader holding the QA workbook offline must be able to see
+        that the default shares are an ESTIMATE and how each was reached. A
+        source line alone invites them to be read as Henkel P&L."""
+        openpyxl = pytest.importorskip("openpyxl")
+        from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+        from pulse.excel_bridge.writer import ShiftMatrixWriter
+
+        result = BayesianMonteCarloEngine(mock_model_config, seed=42).run(
+            mock_trends_database, iterations=200)
+        out = tmp_path / "provenance.xlsx"
+        ShiftMatrixWriter(mock_model_config).write(
+            str(out), result, allocation=None,
+            metadata={"model_version": result["model_version"],
+                      "engine_name": result["engine_name"], "iterations": 200})
+
+        wb = openpyxl.load_workbook(out)
+        assert "Cell Weights" in wb.sheetnames
+        text = "\n".join(
+            str(c.value) for row in wb["Cell Weights"].iter_rows()
+            for c in row if c.value is not None)
+        assert "HOW THESE SHARES WERE BUILT" in text
+        assert "NOT Henkel P&L" in text
+        # the grade legend and at least one graded row of each input table
+        for g in ("B", "E", "G"):
+            assert f"\n{g}\n" in f"\n{text}\n" or f"\n{g}" in text, g
+        assert "Share of block" in text and "Margin index" in text
+        assert "run_50k_prod.py --cell-weights FILE" in text
+
+    def test_cell_weight_provenance_is_omitted_for_other_matrices(
+            self, tmp_path, mock_model_config, mock_trends_database):
+        """It must describe the matrix the run actually used. Under the equal
+        grid, or any loaded finance file, the derivation is not the story and
+        printing it would be a provenance lie."""
+        openpyxl = pytest.importorskip("openpyxl")
+        from pulse.config import EQUAL_CELL_WEIGHTS, EQUAL_CELL_WEIGHTS_SOURCE
+        from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+        from pulse.excel_bridge.writer import ShiftMatrixWriter
+
+        cfg = mock_model_config.copy_with(cell_weights=EQUAL_CELL_WEIGHTS,
+                                          cell_weights_source=EQUAL_CELL_WEIGHTS_SOURCE)
+        result = BayesianMonteCarloEngine(cfg, seed=42).run(mock_trends_database, iterations=200)
+        out = tmp_path / "equal.xlsx"
+        ShiftMatrixWriter(cfg).write(str(out), result, allocation=None,
+                                     metadata={"model_version": result["model_version"],
+                                               "engine_name": result["engine_name"],
+                                               "iterations": 200})
+        wb = openpyxl.load_workbook(out)
+        text = "\n".join(
+            str(c.value) for row in wb["Cell Weights"].iter_rows()
+            for c in row if c.value is not None)
+        assert "HOW THESE SHARES WERE BUILT" not in text
+        assert "Equal placeholder" in text
+
 
 class TestReproducibilityContract:
     def test_load_trends_orders_by_id(self):

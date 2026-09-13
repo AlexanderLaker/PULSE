@@ -5,6 +5,11 @@ seed and data/trendCodeMap.ts are exactly what the generator produces from
 the reviewed JSON, (c) the code map's live/retired partition and pointers,
 and (d) the archive-first replacement script on a throw-away SQLite base,
 including the Postgres-style ON DELETE CASCADE on expert proposals.
+
+2.12.0 (owner ruling O13): the reviewed core set is now core_set_51_v4.json
+— v3 plus the "LHC: TOI" column split out of "LHC: HSC" — so every driver
+carries THIRTEEN category-exposure rows. The drivers themselves (population,
+codes, probabilities, regional exposures) are unchanged by the split.
 """
 
 import importlib.util
@@ -22,7 +27,7 @@ from pulse import seed_trends
 
 REPO = Path(__file__).resolve().parent.parent
 CODEMAP = REPO / "data" / "trendCodeMap.ts"
-CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v3.json"
+CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v4.json"
 LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G",
           "Environmental": "E", "Competitive": "X"}
 SLUG = {"Consumer": "consumer", "Customer": "customer", "Technology": "technology",
@@ -62,6 +67,7 @@ class TestSeedIntegrity:
             assert t.diffusion_curve in ("s_curve", "linear", "front_loaded", "back_loaded", "step_function")
             assert t.confidence in ("Low", "Medium", "High")
             assert t.uncertainty is not None and 0 <= t.uncertainty <= 5, t.id
+            assert len(t.category_exposure) == 13  # 2.12.0/O13: HSC split into HSC + TOI
             assert set(t.category_exposure) == set(CATEGORIES) and all(0 <= v <= 5 for v in t.category_exposure.values())
             assert set(t.regional_exposure) == set(REGIONS) and all(0 <= v <= 5 for v in t.regional_exposure.values())
             assert set(t.vc_exposure) == set(VC_STEPS) and all(0 <= v <= 5 for v in t.vc_exposure.values())
@@ -91,6 +97,7 @@ class TestSeedIntegrity:
             assert sorted(t.vc_exposure.values(), reverse=True)[:1] == [5]
             assert t.probability == review["prob"] and t.gp1_pct_affected == review["gp1"]
             assert t.uncertainty == review["uncertainty"]["score"]
+            assert len(review["category_exposure"]) == 13, t.id  # the v4 column
             assert t.category_exposure == review["category_exposure"]
             assert t.regional_exposure == review["regional_exposure"]
 

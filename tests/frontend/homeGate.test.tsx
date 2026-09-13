@@ -81,7 +81,7 @@ describe('HomeGate entry view', () => {
     expect(nav).not.toHaveBeenCalled();          // hidden pane must not hijack keys
   });
 
-  /** The 12 shift-matrix cells are the only 52px-wide rects in the gate. */
+  /** The 13 shift-matrix cells are the only 52px-wide rects in the gate. */
   const matrixCellFills = (root: HTMLElement): string[] =>
     Array.from(root.querySelectorAll('rect[width="52"]'))
       .map((r) => r.getAttribute('fill') ?? '');
@@ -90,7 +90,7 @@ describe('HomeGate entry view', () => {
     STORE.store = fullStore;
     const { container, unmount } = render(<HomeGate active onNavigate={() => {}} />);
     const live = matrixCellFills(container);
-    expect(live).toHaveLength(12);
+    expect(live).toHaveLength(13);
     expect(live.some((f) => f.includes('159, 64, 61'))).toBe(true);  // contraction tint (Hair: Color)
     expect(live.some((f) => f.includes('31, 122, 61'))).toBe(true);  // expansion tint (LHC: IC)
     unmount();
@@ -98,7 +98,7 @@ describe('HomeGate entry view', () => {
     STORE.store = emptyStore;
     const { container: c2 } = render(<HomeGate active onNavigate={() => {}} />);
     const empty = matrixCellFills(c2);
-    expect(empty).toHaveLength(12);
+    expect(empty).toHaveLength(13);
     // No run loaded → every cell is the neutral base tint, never fabricated heat.
     expect(empty.every((f) => f === '#eff4ff')).toBe(true);
   });

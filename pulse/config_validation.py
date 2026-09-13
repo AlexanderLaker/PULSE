@@ -14,7 +14,7 @@ D21 (June 2026): every config layer the engine consumes is now validated —
 ``within_force_overlap``, ``category_weights`` and ``region_weights`` had
 no validation at all (audit F-23).
 
-2.11.0 (O6): ``cell_weights`` — the 12 × 4 matrix of gross-profit shares that
+2.11.0 (O6): ``cell_weights`` — the 13 × 4 matrix of gross-profit shares that
 rolls the composite cells up — is validated as a complete, non-negative,
 sum-to-one grid; ``region_weights``/``category_weights`` are its derived
 marginals and are still checked so the derived layer can never be invalid.
@@ -106,7 +106,7 @@ class ModelConfigValidator(BaseModel):
     # stage votes. Old snapshots carrying it are ignored (extra=ignore).
     # 2.11.0 (O6): the roll-up input. Optional in the model so a pre-2.11
     # snapshot dict (marginals only) still validates; when present it must be
-    # a complete 12 × 4 grid (see validate_cell_weights_against_names).
+    # a complete 13 × 4 grid (see validate_cell_weights_against_names).
     cell_weights: Optional[Dict[str, Dict[str, float]]] = None
     cell_weights_source: Optional[str] = None
     region_weights: Dict[str, float]
@@ -161,7 +161,7 @@ class ModelConfigValidator(BaseModel):
     @classmethod
     def validate_attenuation_source(cls, v: str) -> str:
         """Attenuation source must be v3.11 / v3.5, v3.1 (legacy) / admin_override."""
-        if v not in ("calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
+        if v not in ("calibrated_v3.12_september2026", "calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
                      "calibrated_v3.1_april2026", "admin_override"):
             raise ValueError(
                 f"attenuation_source must be one of ('calibrated_v3.11_september2026', "
@@ -486,7 +486,7 @@ class ModelConfigValidator(BaseModel):
                 total += float(w)
         if abs(total - 1.0) > 0.01:
             raise ValueError(
-                f"cell_weights must sum to 1.0 over all 48 cells (got {total:.4f}, tolerance ±0.01)"
+                f"cell_weights must sum to 1.0 over all 52 cells (got {total:.4f}, tolerance ±0.01)"
             )
         if total <= 0:
             raise ValueError("cell_weights must contain at least one positive cell")

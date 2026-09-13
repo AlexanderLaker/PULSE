@@ -128,9 +128,10 @@ class TestAPIConfiguration:
 
 
 class TestConfigCellWeights2_11:
-    """2.11.0 (owner ruling O6): GET /config serves the 12 × 4 cell matrix
-    with its derived marginals; PUT /config accepts cell_weights (+ source)
-    only and rejects the retired region/category dials and invalid grids."""
+    """2.11.0 (owner ruling O6): GET /config serves the 13 × 4 cell matrix
+    (12 × 4 until 2.12.0/O13 split "LHC: TOI" out of "LHC: HSC") with its
+    derived marginals; PUT /config accepts cell_weights (+ source) only and
+    rejects the retired region/category dials and invalid grids."""
 
     def _get(self, client):
         r = client.get("/api/v1/config")
@@ -148,7 +149,7 @@ class TestConfigCellWeights2_11:
         assert abs(sum(data["region_weights"].values()) - 1) < 1e-9
         assert abs(sum(data["category_weights"].values()) - 1) < 1e-9
         assert data["cell_weights_source"]
-        assert data["attenuation_source"] == "calibrated_v3.11_september2026"
+        assert data["attenuation_source"] == "calibrated_v3.12_september2026"
 
     def test_put_rejects_retired_dials(self, client):
         r = client.put("/api/v1/config", json={"region_weights": {"Europe": 1.0}})
@@ -178,10 +179,10 @@ class TestConfigCellWeights2_11:
         r = client.put("/api/v1/config", json={"cell_weights": W, "cell_weights_source": "pytest grid"})
         assert r.status_code == 200, r.text
         after = self._get(client)
-        assert after["cell_weights"][CATEGORIES[0]]["Europe"] == pytest.approx(1 / 12)
+        assert after["cell_weights"][CATEGORIES[0]]["Europe"] == pytest.approx(1 / 13)
         assert after["region_weights"]["Europe"] == pytest.approx(1.0)
         assert after["region_weights"]["Asia"] == pytest.approx(0.0)
-        assert after["category_weights"][CATEGORIES[-1]] == pytest.approx(1 / 12)
+        assert after["category_weights"][CATEGORIES[-1]] == pytest.approx(1 / 13)
         assert after["cell_weights_source"] == "pytest grid"
         # restore the default grid so later tests see the placeholder
         r = client.put("/api/v1/config", json={"cell_weights": data["cell_weights"],

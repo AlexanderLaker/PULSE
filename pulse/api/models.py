@@ -142,11 +142,13 @@ class ConfigUpdate(BaseModel):
     region_weights: Optional[dict] = None
     category_weights: Optional[dict] = None
     cell_weights: Optional[dict] = Field(None,
-        description="12 x 4 matrix of HCB gross-profit SHARES per (category, region) "
+        description="13 x 4 matrix of HCB gross-profit SHARES per (category, region) "
                     "cell: {category: {region: share}}, non-negative, sum 1.0 (±0.01). "
                     "Rolls the composite cells up to category and portfolio numbers "
-                    "(2.11.0, owner ruling O6). Equal 1/48 placeholder until the actual "
-                    "P&L shares are loaded.")
+                    "(2.11.0, owner ruling O6). Defaults to the ESTIMATED HCB mix "
+                    "since 2.12.0 / O14 (public sources, graded B/E/G, not Henkel "
+                    "P&L); the equal 1/52 grid stays available and the real shares "
+                    "still arrive via run_50k_prod.py --cell-weights FILE.")
     cell_weights_source: Optional[str] = Field(None, max_length=400,
         description="Provenance label stored with the cell weights (shown in the run footer).")
     force_correlation_matrix: Optional[dict] = Field(None,

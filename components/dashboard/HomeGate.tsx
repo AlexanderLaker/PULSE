@@ -10,7 +10,7 @@
  *   • Trends door   — LIVE: constellation dot count per force is derived
  *     from the trend store (∝ trends-per-force), so the door shows the
  *     shape of the current evidence base. Geometry only, no numbers.
- *   • Shift door    — LIVE: the 12 heat cells are the 12 categories'
+ *   • Shift door    — LIVE: the 13 heat cells are the 13 categories'
  *     MC-median shifts at the terminal year from the persisted run,
  *     tinted through lib/format's heatFill (the matrix's own ramp, F1/U3);
  *     the band below is the joint portfolio P10–median–P90 (D3). Until
@@ -110,12 +110,17 @@ function medianAt(
 }
 
 const TERMINAL_YEAR = YEARS[YEARS.length - 1];
-// 12 cells = the 12 categories, canonical CATEGORIES order, 4 × 3 grid.
+// 13 cells = the 13 categories, canonical CATEGORIES order, 4-column grid.
+// 2.12.0 (owner ruling O13): the LHC: TOI split made it 13, so the block runs
+// to a fourth row and the portfolio band below it drops by one row pitch —
+// everything still inside the shared 300 × 230 viewBox.
 const CELL_X = [10, 72, 134, 196];
-const CELL_Y = [14, 60, 106];
-// Band geometry (SVG x-range shared by rail and fill).
+const CELL_Y = [14, 60, 106, 152];
+// Band geometry (SVG x-range shared by rail and fill), under the cell block.
 const BAND_X0 = 10;
 const BAND_W = 238;
+// Rail top; the P10–P90 fill and the median tick are centred on the rail.
+const BAND_Y = 200;
 
 // ═══════════════════════════════════════════════════════════════════
 // Door artworks
@@ -195,7 +200,7 @@ const JourneyArt: FC = () => {
   );
 };
 
-/** LIVE: 12 category medians at the terminal year + joint portfolio band. */
+/** LIVE: 13 category medians at the terminal year + joint portfolio band. */
 const ShiftArt: FC<{
   cells: Array<number | null>;
   highlightIdx: number | null;
@@ -225,14 +230,14 @@ const ShiftArt: FC<{
           />
         );
       })}
-      <rect x={BAND_X0} y={162} width={BAND_W} height={5} rx={2.5} fill="rgba(0,52,94,.08)" />
+      <rect x={BAND_X0} y={BAND_Y} width={BAND_W} height={5} rx={2.5} fill="rgba(0,52,94,.08)" />
       {bandGeom && (
         <>
           <rect
-            x={bandGeom.x10} y={160} width={Math.max(bandGeom.x90 - bandGeom.x10, 6)} height={9} rx={4.5}
+            x={bandGeom.x10} y={BAND_Y - 2} width={Math.max(bandGeom.x90 - bandGeom.x10, 6)} height={9} rx={4.5}
             fill="rgba(159,64,61,.16)"
           />
-          <rect x={bandGeom.xMed - 1.25} y={155} width={2.5} height={19} rx={1.25} fill={S.onBg} />
+          <rect x={bandGeom.xMed - 1.25} y={BAND_Y - 7} width={2.5} height={19} rx={1.25} fill={S.onBg} />
         </>
       )}
     </svg>

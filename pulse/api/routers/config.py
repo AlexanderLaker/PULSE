@@ -7,7 +7,7 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Depends
 
 from pulse import __version__
-from pulse.config import ModelConfig, FORCES, CATEGORIES, REGIONS, DEFAULT_CELL_WEIGHTS_SOURCE
+from pulse.config import ModelConfig, FORCES, CATEGORIES, REGIONS, DEFAULT_CELL_WEIGHTS_SOURCE, EQUAL_CELL_WEIGHTS_SOURCE
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.api.auth import require_auth, require_admin
 from pulse.api.serialization import _sanitize, _summarize_convergence
@@ -38,14 +38,17 @@ async def get_config(user: dict = Depends(require_auth)):
         "force_weights": config.force_weights,
         # vc_weights removed (2.9.0): the VC lens is an epicentre partition —
         # no per-step weight exists anymore.
-        # 2.11.0 (O6): cell_weights is the roll-up input (12 × 4 gross-profit
+        # 2.11.0 (O6): cell_weights is the roll-up input (13 × 4 gross-profit
         # shares); region_weights / category_weights are its derived marginals
         # and are served READ-ONLY (PUT rejects them).
         "cell_weights": getattr(config, 'cell_weights', {}),
         "cell_weights_source": getattr(config, 'cell_weights_source', ''),
-        # The label the Config sheet's "reset to equal" writes, so the UI
-        # never invents its own wording for the placeholder.
+        # The two labels the Config sheet's reset buttons write, so the UI
+        # never invents its own wording for either basis. Since O14 the
+        # default IS the estimate, so the equal grid needs its own label or
+        # it would be served under the estimate's provenance (F-28 shape).
         "cell_weights_source_default": DEFAULT_CELL_WEIGHTS_SOURCE,
+        "cell_weights_source_equal": EQUAL_CELL_WEIGHTS_SOURCE,
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
         "derived_weights": ["region_weights", "category_weights"],
@@ -103,7 +106,7 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         raise HTTPException(400,
             "region_weights and category_weights are derived from cell_weights since "
             "MODEL_VERSION 2.11.0 and can no longer be set directly. Send cell_weights "
-            "({category: {region: gross-profit share}}, 12 x 4, sum 1.0) instead.")
+            "({category: {region: gross-profit share}}, 13 x 4, sum 1.0) instead.")
 
     if req.cell_weights is not None:
         cw = req.cell_weights
@@ -128,7 +131,7 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         if missing:
             raise HTTPException(400, f"cell_weights incomplete — missing: {missing[:8]}")
         if abs(total - 1.0) > 0.01:
-            raise HTTPException(400, f"cell_weights must sum to 1.0 over all 48 cells, got {total:.4f}")
+            raise HTTPException(400, f"cell_weights must sum to 1.0 over all 52 cells, got {total:.4f}")
         new_cw = {c: {r: float(cw[c][r]) for r in REGIONS} for c in config.category_names}
         old_cw = getattr(config, 'cell_weights', {})
         if new_cw != old_cw:
@@ -327,9 +330,12 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
         "force_weights": config.force_weights,
         "cell_weights": getattr(config, 'cell_weights', {}),
         "cell_weights_source": getattr(config, 'cell_weights_source', ''),
-        # The label the Config sheet's "reset to equal" writes, so the UI
-        # never invents its own wording for the placeholder.
+        # The two labels the Config sheet's reset buttons write, so the UI
+        # never invents its own wording for either basis. Since O14 the
+        # default IS the estimate, so the equal grid needs its own label or
+        # it would be served under the estimate's provenance (F-28 shape).
         "cell_weights_source_default": DEFAULT_CELL_WEIGHTS_SOURCE,
+        "cell_weights_source_equal": EQUAL_CELL_WEIGHTS_SOURCE,
         "region_weights": getattr(config, 'region_weights', {}),
         "category_weights": getattr(config, 'category_weights', {}),
         "derived_weights": ["region_weights", "category_weights"],

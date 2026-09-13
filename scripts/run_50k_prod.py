@@ -5,8 +5,8 @@ Usage (from the operator machine, repo root):
     python3 scripts/run_50k_prod.py                 # canonical: 3 × 50k vs Neon
     python3 scripts/run_50k_prod.py --iterations 5000 --allow-sqlite   # local dry run
     python3 scripts/run_50k_prod.py --cell-weights data/cell_weights.local.json
-        # 2.11.0 (O6): roll the 48 category × region cells up with the actual
-        # HCB gross-profit share per cell instead of the equal 1/48 placeholder.
+        # 2.11.0 (O6): roll the 52 category × region cells up with the actual
+        # HCB gross-profit share per cell instead of the estimated default.
         # FILE is JSON: {"source": "<provenance label>", "basis": "gp1_share" |
         # "gp1_absolute", "cells": {category: {region: value}}}. Absolute
         # figures are normalised to shares BEFORE the engine is constructed and
@@ -80,7 +80,7 @@ def load_cell_weights_file(path: "Path") -> tuple:
 
     Format: {"source": str, "basis": "gp1_share" | "gp1_absolute",
              "cells": {category: {region: value}}}. Values must be
-    non-negative and complete (12 categories × 4 regions). "gp1_absolute"
+    non-negative and complete (13 categories × 4 regions). "gp1_absolute"
     figures (any currency unit) are normalised to shares here so the engine
     and the persisted run only ever see shares — the total is not retained.
     Raises ValueError with a readable message on any defect.
@@ -120,7 +120,7 @@ def load_cell_weights_file(path: "Path") -> tuple:
     if total <= 0:
         raise ValueError("cells must contain at least one positive value")
     if basis == "gp1_share" and abs(total - 1.0) > 0.01:
-        raise ValueError(f"basis 'gp1_share' requires the 48 cells to sum to 1.0 (±0.01), got {total:.4f}")
+        raise ValueError(f"basis 'gp1_share' requires the 52 cells to sum to 1.0 (±0.01), got {total:.4f}")
     shares = {c: {r: v / total for r, v in row.items()} for c, row in shares.items()}
     source = str(raw.get("source") or f"cell-weights file {Path(path).name}")
     if basis == "gp1_absolute":
@@ -145,7 +145,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cell-weights", type=str, default=None, metavar="FILE",
                         help="JSON file with the HCB gross-profit share (or absolute "
                              "gross profit, normalised here) per category x region "
-                             "cell (2.11.0, O6). Default: equal 1/48 placeholder.")
+                             "cell (2.11.0, O6; 13 x 4 since O13). Without this the run uses the "
+                             "ESTIMATED HCB mix of O14 (public sources, graded, not P&L); "
+                             "the equal 1/52 grid is pulse.config.EQUAL_CELL_WEIGHTS.")
     args = parser.parse_args(argv)
 
     db_url = os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL")
@@ -212,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
         config.iterations, args.chains, config.iterations * args.chains,
     )
     log.info("      Horizon: %s – %s", config.path_years[0], config.path_years[-1])
-    # 2.11.0 (O6): the cell gross-profit shares that roll the 48 cells up.
+    # 2.11.0 (O6): the cell gross-profit shares that roll the 52 cells up.
     log.info("      Cell weights: %s", config.cell_weights_source)
     from pulse.config import REGIONS as _REGIONS
     log.info("      Region shares (column sums): %s",

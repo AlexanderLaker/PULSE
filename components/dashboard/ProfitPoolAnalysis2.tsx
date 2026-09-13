@@ -1204,7 +1204,7 @@ const ProfitPoolAnalysis2: FC<{
       });
 
       // Column totals: per lens-dim, category-weighted avg of the
-      // decomposition cells across all 12 categories.
+      // decomposition cells across all 13 categories.
       const colTotals: Record<string, number | null> = {};
       axisKeys.forEach((k) => {
         const vals = rows.map((r) => data[r.id]![k] ?? null);
@@ -1965,14 +1965,20 @@ const ProfitPoolAnalysis2: FC<{
                   ? 'epicentre partition'
                   : 'profile-weighted (pre-2.9 run)']);
                 // F1 (2.10.0) / O6 (2.11.0): the gross-profit-share weights the
-                // roll-up used. A 2.11 run carries the 12 × 4 cell matrix (shown
+                // roll-up used. A 2.11 run carries the 13 × 4 cell matrix (shown
                 // as its region and category marginals plus the source label);
                 // a 2.10 run carries region weights only.
                 if (m.cell_weights_used) {
                   const cw = cellMarginals(m.cell_weights_used);
-                  rows.push(['Cell weights', cw.equal
-                    ? `equal placeholder (${cw.cellCount} cells × ${(100 / cw.cellCount).toFixed(2)}%)`
-                    : `${cw.cellCount}-cell gross-profit shares`]);
+                  // O14 (2.12.0): three bases, so a reader of any run can see at a
+                  // glance whether its numbers stand on the estimated HCB mix (the
+                  // engine default, derived on the Config sheet), on the neutral
+                  // equal grid, or on shares that were loaded or edited.
+                  rows.push(['Cell weights', cw.matchesEstimate
+                    ? `estimated HCB mix (${cw.cellCount} cells, O14)`
+                    : cw.equal
+                      ? `equal placeholder (${cw.cellCount} cells × ${(100 / cw.cellCount).toFixed(2)}%)`
+                      : `${cw.cellCount}-cell gross-profit shares (loaded or edited)`]);
                   if (m.cell_weights_source) rows.push(['Weights source', m.cell_weights_source]);
                 }
                 if (m.region_weights_used) {
@@ -2057,7 +2063,7 @@ const ProfitPoolAnalysis2: FC<{
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Category codes</div>
-                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>LHC = Laundry &amp; Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · IC Insect Control.</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>LHC = Laundry &amp; Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · TOI Toilet Care · IC Insect Control.</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Attenuation</div>
@@ -2181,7 +2187,7 @@ const ProfitPoolAnalysis2: FC<{
           and is therefore identical across all four lenses. <strong>Column and grand totals
           are category-weighted averages</strong> of the per-category values, using the
           admin-editable category business-importance weights from the Config sheet —
-          so totals reflect the portfolio mix rather than simple sums of 12 categories.
+          so totals reflect the portfolio mix rather than simple sums of 13 categories.
           Because the decomposition shares sum to 1 per category, the grand total for any
           given year is identical across Time Path, Force, Value Chain and Region views.
           No frontend calibration or anchoring of cells — only the portfolio-weighted

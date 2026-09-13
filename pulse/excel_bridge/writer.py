@@ -15,7 +15,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from pulse.config import ModelConfig, FORCES
+from pulse.config import ModelConfig, FORCES, REGIONS as REGIONS_FOR_PROVENANCE
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ class ShiftMatrixWriter:
         ws.column_dimensions["A"].width = 18
 
     def _write_cell_weights(self, wb, mc_result):
-        """2.11.0 (O6): the 12 x 4 gross-profit-share matrix the run applied
+        """2.11.0 (O6): the 13 x 4 gross-profit-share matrix the run applied
         in the roll-up, with row and column marginals and the source label.
         Pre-2.11 runs (no matrix) get a one-line note instead."""
         from pulse.config import REGIONS
@@ -174,10 +174,122 @@ class ShiftMatrixWriter:
             col_sum = sum(float((cw.get(cat) or {}).get(region, 0.0) or 0.0) for cat in self.config.category_names)
             cell = ws.cell(row=row, column=j, value=round(col_sum, 6)); cell.number_format = "0.00%"
         ws.cell(row=row + 2, column=1, value="Source: " + str(mc_result.get("cell_weights_source") or ""))
-        ws.cell(row=row + 3, column=1, value="Category shift = share-weighted average of the category's regional cells; portfolio = sum over all 48 cells (owner ruling O6, 2026-09).")
+        ws.cell(row=row + 3, column=1, value="Category shift = share-weighted average of the category's regional cells; portfolio = sum over all 52 cells (owner ruling O6, 2026-09).")
+        row = self._write_cell_weight_provenance(ws, cw, row + 5)
         ws.column_dimensions["A"].width = 18
         for j in range(2, len(REGIONS) + 3):
             ws.column_dimensions[get_column_letter(j)].width = 14
+
+    # Cached so a workbook with several sheets reads the record once.
+    _ESTIMATE_RECORD = None
+
+    @classmethod
+    def _estimate_record(cls):
+        """The O14 estimated-mix record, or None if it is not on disk."""
+        if cls._ESTIMATE_RECORD is None:
+            import json
+            from pathlib import Path
+            f = Path(__file__).resolve().parents[2] / "data" / "cell_weights_estimated_v1.json"
+            try:
+                cls._ESTIMATE_RECORD = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                cls._ESTIMATE_RECORD = {}
+        return cls._ESTIMATE_RECORD or None
+
+    def _write_cell_weight_provenance(self, ws, cw, row):
+        """O14: when the run used the ESTIMATED HCB mix, put the graded
+        derivation in the workbook too, not only on the Config sheet. A reader
+        holding the QA file offline must be able to see that these shares are
+        an estimate and how each one was reached; a source line alone invites
+        the numbers to be read as P&L."""
+        rec = self._estimate_record()
+        if not rec:
+            return row
+        cells = rec.get("cells") or {}
+        same = bool(cells) and all(
+            abs(float((cw.get(c) or {}).get(r, 0.0) or 0.0) - float(cells[c][r])) < 1e-9
+            for c in cells for r in cells[c]
+        ) and set(cw) == set(cells)
+        if not same:
+            return row
+
+        bold = Font(name="Inter", size=9, bold=True)
+        body = Font(name="Inter", size=9)
+        inp = rec.get("inputs") or {}
+
+        ws.cell(row=row, column=1, value="HOW THESE SHARES WERE BUILT (owner ruling O14)").font = bold
+        row += 1
+        for line in (
+            "share = (category's share of its block x the block's share of HCB) x GP1 margin index x that category's own regional mix, normalised to 1.",
+            "This is an ESTIMATE from public reporting and category knowledge. It is NOT Henkel P&L and must not be quoted as such.",
+            "The regional mix differs by category on purpose, which is what makes the matrix non-separable: only regional concentration moves the category numbers.",
+        ):
+            ws.cell(row=row, column=1, value=line).font = body
+            row += 1
+        row += 1
+        ws.cell(row=row, column=1, value="Grade").font = bold
+        ws.cell(row=row, column=2, value="Meaning").font = bold
+        row += 1
+        for g, meaning in (rec.get("grade_legend") or {}).items():
+            ws.cell(row=row, column=1, value=g).font = body
+            ws.cell(row=row, column=2, value=meaning).font = body
+            row += 1
+        row += 1
+
+        split = inp.get("block_split") or {}
+        if split:
+            ws.cell(row=row, column=1, value="Block split").font = bold
+            ws.cell(row=row, column=2, value=f"LHC {float(split.get('LHC', 0)) * 100:.0f}% / Hair & Body "
+                                             f"{float(split.get('Hair & Body', 0)) * 100:.0f}%").font = body
+            ws.cell(row=row, column=3, value=str(split.get("grade", ""))).font = body
+            ws.cell(row=row, column=4, value=str(split.get("note", ""))).font = body
+            row += 2
+
+        heads = ["Category", "Share of block", "Grade", "Margin index", "Grade", "Basis"]
+        for j, h in enumerate(heads, 1):
+            c = ws.cell(row=row, column=j, value=h)
+            c.font = HEADER_FONT; c.fill = HEADER_FILL
+        row += 1
+        cm = inp.get("category_mix") or {}
+        mi = inp.get("margin_index") or {}
+        for cat in self.config.category_names:
+            e = cm.get(cat) or {}
+            m = mi.get(cat) or {}
+            ws.cell(row=row, column=1, value=cat).font = body
+            c = ws.cell(row=row, column=2, value=float(e.get("share_of_block", 0.0)))
+            c.number_format = "0.0%"; c.font = body
+            ws.cell(row=row, column=3, value=str(e.get("grade", ""))).font = body
+            c = ws.cell(row=row, column=4, value=float(m.get("index", 0.0)))
+            c.number_format = "0.00"; c.font = body
+            ws.cell(row=row, column=5, value=str(m.get("grade", ""))).font = body
+            ws.cell(row=row, column=6, value=str(e.get("note", ""))).font = body
+            row += 1
+        row += 1
+
+        heads = ["Category"] + list(REGIONS_FOR_PROVENANCE) + ["Grade", "Basis"]
+        for j, h in enumerate(heads, 1):
+            c = ws.cell(row=row, column=j, value=h)
+            c.font = HEADER_FONT; c.fill = HEADER_FILL
+        row += 1
+        rm = inp.get("region_mix") or {}
+        for cat in self.config.category_names:
+            e = rm.get(cat) or {}
+            mix = e.get("mix") or {}
+            ws.cell(row=row, column=1, value=cat).font = body
+            for j, region in enumerate(REGIONS_FOR_PROVENANCE, 2):
+                c = ws.cell(row=row, column=j, value=float(mix.get(region, 0.0)))
+                c.number_format = "0%"; c.font = body
+            ws.cell(row=row, column=len(REGIONS_FOR_PROVENANCE) + 2, value=str(e.get("grade", ""))).font = body
+            ws.cell(row=row, column=len(REGIONS_FOR_PROVENANCE) + 3, value=str(e.get("note", ""))).font = body
+            row += 1
+        for note in (inp.get("margin_index_note"), inp.get("region_mix_note")):
+            if note:
+                row += 1
+                ws.cell(row=row, column=1, value=str(note)).font = body
+        row += 2
+        ws.cell(row=row, column=1, value="Replace all of this with the finance figures: "
+                                         "run_50k_prod.py --cell-weights FILE.").font = bold
+        return row + 1
 
     def _write_regional(self, wb, mc_result):
         """F1 (2.10.0): the 3D shift resolved by (category, region), median per
@@ -338,14 +450,15 @@ class ShiftMatrixWriter:
             ("", "Category numbers are the region-GP1-weighted roll-up (see Region weights);"),
             ("", "a regionally-concentrated trend only moves its regions' slice of the pool."),
             # 2.11.0 (O6): the cell gross-profit-share matrix is the roll-up input.
-            ("CELL WEIGHTS (O6)", "Category and portfolio numbers roll the 48 category x region cells up"),
+            ("CELL WEIGHTS (O6)", "Category and portfolio numbers roll the 52 category x region cells up"),
             ("", "with the HCB gross-profit share per cell (sheet 'Cell Weights'): category"),
             ("", "= share-weighted average of its regional cells, portfolio = sum over cells."),
             ("", "Source: " + str(mc_result.get("cell_weights_source") or "pre-2.11 run (separable region x category weights)")),
             ("REGION SHARES", ", ".join(
                 f"{r} {w*100:.0f}%" for r, w in (mc_result.get("region_weights_used") or {}).items()
             ) or "equal (fallback)"),
-            ("", "(column sums of the cell weights; equal 1/4 under the placeholder)"),
+            ("", "(column sums of the cell weights. Under the O14 estimated mix Europe carries "
+             "about half the pool; under the equal grid every region is 25%)"),
             ("", ""),
             # F4/F5 (2.10.0) + O7 (2.11.0): timing uncertainty + the probability-score meaning.
             ("TIMING (F4/O7)", "P10-P90 bands are magnitude uncertainty (Beta concentration a+b = 6, or"),

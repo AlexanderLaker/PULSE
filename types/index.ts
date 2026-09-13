@@ -61,6 +61,7 @@ export type CategoryId =
   | 'lhc_hdw'
   | 'lhc_adw'
   | 'lhc_hsc'
+  | 'lhc_toi'
   | 'lhc_ic'
   | string; // extensible for future categories
 

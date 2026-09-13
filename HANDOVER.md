@@ -10,7 +10,7 @@
 
 PRISM is a profit-pool simulation platform for Henkel Consumer Brands category strategy: 99 scored external trends → Bayesian Monte-Carlo engine (Beta priors, Gaussian copula, scipy) → a **Shift Matrix** of relative percentage impacts per category × **region** × force × year (2026–2035), rendered in a Next.js 16 "War Room" dashboard.
 
-Since 2.10.0 the shift is genuinely three-dimensional: the engine solves 48 composite cells (12 categories × 4 regions) and each trend's contribution to a cell is weighted by **both** its category exposure and its regional exposure. The category and portfolio numbers you see are the region-GP1-share-weighted roll-up of that tensor. A trend that is globally present reproduces the old, non-regional category number exactly — only *regional concentration* moves the numbers.
+Since 2.10.0 the shift is genuinely three-dimensional: the engine solves 52 composite cells (13 categories × 4 regions — 13 categories since 2.12.0 split Toilet Care out of Hard-Surface Cleaner, owner ruling O13) and each trend's contribution to a cell is weighted by **both** its category exposure and its regional exposure. The category and portfolio numbers you see are the region-GP1-share-weighted roll-up of that tensor. A trend that is globally present reproduces the old, non-regional category number exactly — only *regional concentration* moves the numbers.
 
 Three things it deliberately is **not** (these are owner decisions, not gaps):
 
@@ -18,7 +18,7 @@ Three things it deliberately is **not** (these are owner decisions, not gaps):
 2. **Not a € calculator.** The engine outputs relative shifts only; users apply them to their own financials. The GP1-only Beta explorer is the single sanctioned exception (D5).
 3. **Not an autopilot.** Everything is ceteris paribus — no management response modeled (D16). AI-suggested content is never auto-applied; provenance chips track review state (D7).
 
-`CLAUDE.md` explains every such decision (D1–D21, R1–R4, O1–O11). Read its §1 fully before changing model code; the full decision log lives in `docs/governance/`.
+`CLAUDE.md` explains every such decision (D1–D21, R1–R4, O1–O14). Read its §1 fully before changing model code; the full decision log lives in `docs/governance/`.
 
 ## 2. The operating model — the one mental model you need
 
@@ -105,7 +105,10 @@ python3 scripts/run_50k_prod.py [--cell-weights FILE]
 #   region (JSON: {"source": "...", "basis": "gp1_share" | "gp1_absolute",
 #   "cells": {category: {region: value}}}); absolute figures are normalised
 #   to shares before the engine is built and are never persisted. Keep the
-#   file OUTSIDE the repository. Without it the equal 1/48 placeholder applies.
+#   file OUTSIDE the repository. Without it the run falls back to the O14
+#   ESTIMATED HCB mix — 13 × 4 = 52 cells, built from public reporting and
+#   graded B/E/G, NOT Henkel P&L. The file always overrides the default; O14
+#   changed only the fallback. The flat grid is pulse.config.EQUAL_CELL_WEIGHTS.
 ```
 
 **Do this once after deploying 2.11.0, in this order:**
@@ -128,6 +131,21 @@ Until both steps are done the dashboard renders the older run and labels it
 honestly (no cell-weight block in the About footer; footer totals fall back
 to the config's derived category weights).
 
+**After the 2.12.0 bump (O13 + O14, 2026-09-11)** no base replacement is due —
+the base is still the same 51 drivers — but re-run `scripts/run_50k_prod.py` so
+the persisted run matches `MODEL_VERSION`. Its numbers move for three stamped
+reasons: the 13-category taxonomy, the v3.12 recalibration the taxonomy change
+forces (the overlap correction is computed from the drivers' category exposure
+vectors, so a new category changes its input space), and the O14 estimated HCB
+cell-weight default. The first two leave the headline where it was — −4.34%
+[−4.80, −3.80] against −4.35% [−4.81, −3.80] on the 12-category equal-1/48
+basis; the split resolves a blend. The third moves it: **expect a terminal-year
+portfolio of about −5.58% [−6.16, −4.89]**, not −4.34%, because the estimate
+puts 51.4% of the pool in Europe (−7.11%) against the equal grid's 25%. Roughly
+four fifths of the gap is the regional mix, not the category mix. The mix is an
+ESTIMATE from public reporting, not Henkel P&L, and it does not replace the
+finance figures — pass `--cell-weights FILE` the moment they exist.
+
 Previous run rows are kept — the input-drift telemetry (D19) diffs each run against the previous run's trend fingerprint and surfaces "N trend score(s) changed" in the dashboard's integrity chip.
 
 **Deploy:** push to `main` → Vercel auto-builds (~2 min). Preview deploys for branches. Rollback: `git revert` + push, or promote a prior deployment in the Vercel dashboard.
@@ -139,7 +157,7 @@ curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count' 
 # /api/v1/simulation requires auth (viewer cookie or Bearer JWT) — verify via the dashboard
 ```
 
-**Other ops scripts** (`scripts/`): `replace_trend_base.py` (O10 — archive-first move of a database onto the 51-driver base, see above), `generate_seed_from_core_set.py` (regenerates `pulse/seed_trends.py` + `data/trendCodeMap.ts` from `data/trend_base_2026-09/`; `--check` in CI), `compute_attenuation_v3_11.py` + `build_attenuation_xlsx.py v3_11` (O11 calibration record and workbook), `migrate_drop_delphi.py` (O1 — archives-then-drops the `delphi_*` tables + delphi-era trend columns) and `migrate_drop_legacy.py` (O3/O4 — archives-then-drops `trend_journey_exposure`, the legacy `users` and `scanned_trends` tables and the `allocation_recommendation` column). The migration and replacement scripts REFUSE a Postgres target without an explicit `--postgres` flag; run each once against prod, only AFTER deploying this code. `promote_admin.py` (role promotion).
+**Other ops scripts** (`scripts/`): `replace_trend_base.py` (O10 — archive-first move of a database onto the 51-driver base, see above), `generate_seed_from_core_set.py` (regenerates `pulse/seed_trends.py` + `data/trendCodeMap.ts` from `data/trend_base_2026-09/`; `--check` in CI), `build_estimated_cell_weights.py` (O14 — writes `data/cell_weights_estimated_v1.json` and the generated `lib/cellWeightProvenance.ts`, emits the literal for `pulse/config.py`; `--check` in CI gates both committed outputs), `compute_attenuation_v3_12.py` + `build_attenuation_xlsx.py v3_12` (O13 calibration record and workbook — re-run whenever the category taxonomy changes, because the overlap correction is derived from the drivers' category exposure vectors; the v3_11 pair that preceded it is kept as the 2.11.0 record), `migrate_drop_delphi.py` (O1 — archives-then-drops the `delphi_*` tables + delphi-era trend columns) and `migrate_drop_legacy.py` (O3/O4 — archives-then-drops `trend_journey_exposure`, the legacy `users` and `scanned_trends` tables and the `allocation_recommendation` column). The migration and replacement scripts REFUSE a Postgres target without an explicit `--postgres` flag; run each once against prod, only AFTER deploying this code. `promote_admin.py` (role promotion).
 
 ## 6. Landmines — decisions you must not accidentally undo
 
@@ -161,14 +179,15 @@ Each of these looks like a "fix" waiting to happen. It isn't. The full rationale
 
 ## 7. State at handover
 
-Three review rounds have been executed and closed since the June 2026 baseline:
+Five review rounds have been executed and closed since the June 2026 baseline:
 
 - **v3.8 (2026-07-06) — full code review remediated.** An external-style review (July 1: 2 critical / 6 high / 17 medium / 29 low findings) was remediated end-to-end: security (the unauthenticated full-reseed closed), reproducibility (deterministic trend order), ops integrity (prod runs fail loudly), the save-integrity UI bugs, honest-display and a11y batches, dead code/deps/config removed. Per-finding dispositions with commits: `docs/governance/REMEDIATION_2026-07-06.md`.
 - **v3.9 (owner ruling O5, 2026-07-10) — VC epicentre attribution.** The value-chain lens became a categorical epicentre partition; `vc_weights` deleted end-to-end. Shift-matrix numbers were untouched, so the golden pins were deliberately *not* regenerated and passed unchanged.
 - **v3.10 (decisions 2026-07-13) — mathematical review remediation.** Executed against an 11-finding independent mathematical review. The shift math became regional (3D), within-force dampening became monotonic, per-trend peak-year jitter was added, the chains are now pooled with a reported MC standard error, and three dead result fields were removed. **Numbers move**; golden pins were regenerated in the same commit.
 - **v3.11 (owner rulings O6–O11, 2026-09-03 / 2026-09-10) — September 2026 trend-base review.** The 99-trend base became 51 reviewed drivers (generated seed, archive-first replacement script), the roll-up now uses a 12 × 4 matrix of gross-profit shares per category × region (equal 1/48 until the P&L shares are loaded via the CLI), every driver carries one uncertainty score that sets its band width and timing jitter, and the overlap correction was recalibrated on the new population (v3.11; a pre-existing provenance drift, F-28, was corrected in the process). **Numbers move**; golden pins regenerated in the same commit; the 2.10.0 numbers stay reproducible under test.
+- **v3.12 (owner rulings O13 and O14, 2026-09-11) — Toilet Care split out of Hard-Surface Cleaner, and an estimated HCB mix as the default cell weights.** Two rulings, one release. **O13:** the taxonomy became 13 categories (`"LHC: TOI"` between HSC and IC), so the roll-up matrix is 13 × 4 = 52 cells; every driver of the 51-driver base gained a TOI exposure (base file `core_set_51_v4.json` — 37 of the 51 inherit their HSC score unchanged, 14 deviate with a written reason, 663 category scores in total), and the overlap correction was recalibrated on the new exposure space (v3.12 — the calibration is a function of the category exposure vectors, so a taxonomy change forces it; method and mechanism adjustments unchanged from v3.11, the resulting shifts are a few basis points). **Numbers move, the headline does not**: terminal-year portfolio −4.34% [−4.80, −3.80] against −4.35% [−4.81, −3.80] on the 12-category basis — the split resolves a blend rather than changing the answer. **O14:** `pulse.config.DEFAULT_CELL_WEIGHTS` is no longer the equal 1/52 placeholder but an ESTIMATE of the HCB gross-profit mix per category × region, built from public reporting and category knowledge and generated — not hand-typed — by `scripts/build_estimated_cell_weights.py` into the record `data/cell_weights_estimated_v1.json` and the generated `lib/cellWeightProvenance.ts` (`--check` gates both in CI); every input carries a grade (B public reporting supports it / E defensible but unverified / G low-confidence guess), and the flat grid stays selectable and reproducible as `EQUAL_CELL_WEIGHTS`. **O6 is untouched**: the finance shares still arrive as a file kept outside git (`--cell-weights FILE`) and still override the default — only the fallback changed. **Here the headline does move**: −5.58% [−6.16, −4.89] against −4.34% [−4.80, −3.80] on the equal grid, roughly four fifths of it the regional mix rather than the category mix (Europe −7.11% at 51.4% of the pool against High Growth −3.04% at 19.8%). It is an estimate from public reporting, **not Henkel P&L**, and it does not replace the finance figures. Golden pins regenerated for each ruling, in the same commit as the change (the fixture portfolio pin −0.00433 → −0.00572 under O14); the 2.10.0 numbers stay reproducible under test, which is why `tests/test_cell_weights.py` now pins the 12-category taxonomy of that release explicitly.
 
-Engine is **2.11.0**, and one version number is enforced everywhere: `pulse.__version__` == `MODEL_VERSION` == `package.json` == 2.11.0, test-locked (M15).
+Engine is **2.12.0**, and one version number is enforced everywhere: `pulse.__version__` == `MODEL_VERSION` == `package.json` == 2.12.0, test-locked (M15).
 
 - **Repo tracks only the live product + docs.** Strategy decks, management reports, internal audits, mockups and working files live outside the tree in the git-ignored `_NOT_FOR_HANDOVER/` quarantine (inventory: `_NOT_FOR_HANDOVER/MANIFEST.md`). Spent one-time migrations stay archived under `scripts/archive/`.
 - **The handover package** is produced by `bash scripts/package_handover.sh`: a fresh-history export (single-commit git repo) that structurally cannot contain `.env`, local DBs, the quarantine folder, or secret-shaped strings (the build fails if it ever would). The old personal-GitHub history is archived privately by the owner and is NOT part of the handover (H4).
@@ -180,7 +199,7 @@ Engine is **2.11.0**, and one version number is enforced everywhere: `pulse.__ve
 
 **DX backlog (known and deliberate — not regressions):**
 
-1. Load the actual cell weights (`--cell-weights FILE`, §5) when finance provides the category × region gross-profit shares. Until then every 2.11.0 run carries the equal 1/48 placeholder and says so in its source line. The trend-base replacement and the first 2.11.0 production run are DONE (2026-09-10: Neon on the 51 drivers, run #98).
+1. Load the actual cell weights (`--cell-weights FILE`, §5) when finance provides the category × region gross-profit shares — 13 × 4 = 52 shares since the O13 Toilet Care split. **Until then the graded estimate of O14 is in force — a better default than the equal 1/52 placeholder it replaced, but still an estimate**: every 2.12.0 run carries it and says so in its source line, which opens with "ESTIMATE, not Henkel P&L". It does not replace the finance figures, and the file still overrides it. The trend-base replacement and the first 2.11.0 production run are DONE (2026-09-10: Neon on the 51 drivers, run #98).
 2. Consider splitting the largest dashboard components (`Trends2.tsx` is the biggest) — deliberately NOT done pre-handover (behavior risk without a regression window; the pure math already lives in `lib/`, shared UI in small components).
 
 Closed on 2026-09-10/11, listed so nobody re-opens them: the two legacy-cleanup migrations ran against Neon (`migrate_drop_delphi.py` earlier, `migrate_drop_legacy.py` on 2026-09-11 — extended first to also drop the v3.2 leftovers `backtest_results` and `causal_edges`; archives in `data/archive/`), which also removed the `users` table and with it the dead `password_hash` / `password_salt` pair; the react-compiler warning backlog is at zero and the rules stay on as a ratchet; and the three retired tombstone stubs in `lib/` are deleted.

@@ -19,7 +19,7 @@
 
 ```bash
 curl https://prism-hcb.vercel.app/api/v1/health
-# Expected: {"status":"ok","model_loaded":true,"trend_count":99,"categories":12,...}
+# Expected: {"status":"ok","model_loaded":true,"trend_count":99,"categories":13,...}
 ```
 
 ## Repository & deploy mechanism
@@ -30,7 +30,12 @@ Vercel project: `prism-profit-pool` (org: `lakeralexander-8859s-projects`)
 Pushing to `main` auto-triggers a Vercel build (~2 min). Monitor at https://vercel.com/dashboard.
 There is **no `next build` in CI** — the build runs only on Vercel (where the
 Clerk/Neon env vars are present). CI runs the `npm run verify` gates instead
-(typecheck + lint + vitest + pytest); see `.github/workflows/ci.yml`.
+(typecheck + lint + vitest + pytest); see `.github/workflows/ci.yml`. The
+pytest job also runs the two generated-artifact gates —
+`scripts/generate_seed_from_core_set.py --check` (seed + code map) and
+`scripts/build_estimated_cell_weights.py --check` (the O14 cell-weight record
+and `lib/cellWeightProvenance.ts`) — so no generated file can drift from its
+generator.
 
 ### Pushing from your Mac
 
@@ -109,7 +114,7 @@ Vercel project: prism-profit-pool
 ├── api/index.py                  ← Python serverless adapter (cold-start retry)
 │   └── pulse/api/app.py          ← FastAPI app (read-only data plane + admin writes)
 ├── pulse/                        ← Simulation engine + trend DB (Python)
-│   ├── seed_trends.py            ← 51 drivers (2.11.0 base, GENERATED)
+│   ├── seed_trends.py            ← 51 drivers (2.12.0 base, GENERATED)
 │   ├── simulation/bayesian_mc.py ← Bayesian MC + Gaussian copula engine (scipy-only, D13/D20)
 │   ├── audit/                    ← input-drift telemetry + audit log
 │   ├── excel_bridge/writer.py    ← QA workbook writer (the only export)
@@ -172,13 +177,18 @@ python3 scripts/run_50k_prod.py [--cell-weights FILE]
 # regional_shift_matrix + cell/category/region weights used +
 # decompositions + totals.portfolio + mc_standard_error + integrity_events +
 # seed_stability + trend_fingerprint) to Neon, and writes a QA Excel to the
-# repo root (with a "Cell Weights" sheet since 2.11.0).
+# repo root (with a "Cell Weights" sheet since 2.11.0, carrying the O14
+# graded derivation whenever the run used the estimated mix).
 #
 # --cell-weights FILE (2.11.0, O6): the actual HCB gross-profit shares per
 #   category × region as JSON {"source", "basis": "gp1_share"|"gp1_absolute",
 #   "cells": {category: {region: value}}}; absolute figures are normalised to
 #   shares before the engine is built and never persisted. Keep the file out
-#   of the repository. Without it the equal 1/48 placeholder applies.
+#   of the repository. Without it the run falls back to the ESTIMATED HCB mix
+#   of O14 (2.12.0) — 13 × 4 = 52 cells, built from public reporting and
+#   graded B/E/G, NOT Henkel P&L. The file always overrides the default; O14
+#   changed only the fallback, never O6. The flat 1/52 grid is still
+#   selectable as pulse.config.EQUAL_CELL_WEIGHTS.
 #
 # Exit codes: 0 ok · 1 no DB URL · 2 no trends · 3 persist failed ·
 #             4 wrong DB mode · 5 correlation matrix not PSD ·
@@ -233,21 +243,41 @@ as a critical input-drift event by design (D19) and its numbers move for
 three stamped reasons (51-driver base, v3.11 calibration, equal 1/48 cell
 weights).
 
+The 2.12.0 bump (owner rulings O13 and O14, 2026-09-11 — one release, two
+rulings) needs no base replacement — the base is the same 51 drivers — but the
+CLI must be re-run for the same reason: its numbers move for three stamped
+reasons, the 13-category taxonomy, the v3.12 recalibration the taxonomy change
+forces (the overlap correction is computed from the drivers' category exposure
+vectors, so a new category changes its input space), and the O14 estimated HCB
+cell-weight default that replaces the equal 1/52 grid.
+
+**What to expect from the run after this deploy:** a terminal-year portfolio of
+roughly **−5.58% [−6.16, −4.89]** (51-driver base, 3 × 50k, seed 42), **not the
+−4.34% [−4.80, −3.80] of the equal grid** — a run still reporting −4.34% is
+using the old default, not a broken engine. The first two reasons leave the
+headline where it was (−4.34% against −4.35% [−4.81, −3.80] on the 12-category
+basis; the split resolves a blend); the third moves it, and roughly four fifths
+of the move is the regional mix rather than the category mix — Europe −7.11% at
+51.4% of the pool against High Growth −3.04% at 19.8%. The About footer and the
+run's `cell_weights_source` name the basis. That mix is an ESTIMATE built from
+public reporting, not Henkel P&L, and it does not replace the finance figures:
+pass `--cell-weights FILE` as soon as they exist and the file overrides it.
+
 ## Smoke test after deploy
 
 ```bash
 # 1. Health
 curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count, .categories'
-# Expected: "ok"  99  12
+# Expected: "ok"  99  13
 
 # 2. Trends endpoint shape (auth required — get a JWT from a Clerk session)
 curl -s https://prism-hcb.vercel.app/api/v1/trends -H "Authorization: Bearer $JWT" | jq 'length'
 # Expected: 99
 
-# 3. Persisted run (read-only): verify the shift matrix is 12 categories × 10 path years
+# 3. Persisted run (read-only): verify the shift matrix is 13 categories × 10 path years
 curl -s https://prism-hcb.vercel.app/api/v1/simulation -H "Authorization: Bearer $JWT" \
   | jq '.results.shift_matrix | keys | length'
-# Expected: 12   (NOT /api/v1/simulate — that returns 409 by design on serverless)
+# Expected: 13   (NOT /api/v1/simulate — that returns 409 by design on serverless)
 ```
 
 ## Rollback

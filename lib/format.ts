@@ -60,6 +60,14 @@ export const FORCE_COLORS: Record<ForceName, string> = Object.fromEntries(
 ) as Record<ForceName, string>;
 
 // ─── Category Definitions ───────────────────────────────────────────
+// Canonical order mirrors pulse/config.py::CATEGORIES — the Shift Matrix,
+// the Config sheet's cell grid and the gate pictogram all read this list, so
+// a divergence here would re-order every view against the engine.
+// 2.12.0 (owner ruling O13, 2026-09-11): "LHC: TOI" (Toilet Care — toilet
+// cleaners, rim blocks/balls, toilet gels) split out of HSC, which keeps
+// bathroom / kitchen / floor / glass plus bleach and polishes. Its colour
+// continues the LHC ramp between HSC's purple and IC's magenta (the single
+// source for category hues — no view re-hardcodes them).
 export const CATEGORIES: CategoryDefinition[] = [
   { id: 'hair_color',   name: 'Hair: Color',   short: 'Color',   group: 'Hair', color: '#b0504a' },
   { id: 'hair_care',    name: 'Hair: Care',     short: 'Care',    group: 'Hair', color: '#b07d2b' },
@@ -72,6 +80,7 @@ export const CATEGORIES: CategoryDefinition[] = [
   { id: 'lhc_hdw',      name: 'LHC: HDW',       short: 'HDW',     group: 'LHC',  color: '#3f4fb0' },
   { id: 'lhc_adw',      name: 'LHC: ADW',       short: 'ADW',     group: 'LHC',  color: '#6b4fc4' },
   { id: 'lhc_hsc',      name: 'LHC: HSC',       short: 'HSC',     group: 'LHC',  color: '#8a4fb8' },
+  { id: 'lhc_toi',      name: 'LHC: TOI',       short: 'TOI',     group: 'LHC',  color: '#9d4bab' },
   { id: 'lhc_ic',       name: 'LHC: IC',        short: 'IC',      group: 'LHC',  color: '#b0479e' },
 ];
 
@@ -93,6 +102,7 @@ export const CATEGORY_DISPLAY: Record<string, { label: string; code?: string }> 
   'LHC: HDW':      { label: 'Hand Dishwash',        code: 'HDW' },
   'LHC: ADW':      { label: 'Auto Dishwash',        code: 'ADW' },
   'LHC: HSC':      { label: 'Hard-Surface Cleaner', code: 'HSC' },
+  'LHC: TOI':      { label: 'Toilet Care',          code: 'TOI' },
   'LHC: IC':       { label: 'Insect Control',       code: 'IC' },
 };
 

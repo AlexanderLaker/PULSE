@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Build Attenuation_Calibration_<version>.xlsx per methodology §6 (v3.11 default).
+"""Build Attenuation_Calibration_<version>.xlsx per methodology §6 (v3.12 default).
+
+Version is the first argv, e.g. `v3_12`; it selects data/attenuation_calibration_<version>.json.
 
 Six sheets:
   1. Summary

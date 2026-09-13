@@ -124,7 +124,33 @@ class TestGoldenPins:
     uncertainty score, so the O7 path is inert here and is exercised in
     tests/test_uncertainty.py.
 
-    Prior regenerations: 2026-07-13 v3.10/2.10.0 (regional 3D roll-up, n_eff
+    Regenerated 2026-09-11 for v3.12/2.12.0 (owner ruling O13): Toilet Care
+    was split out of Hard-Surface Cleaner, so the fixture now spans 13 equal
+    categories instead of 12 and the attenuation was recomputed on the wider
+    exposure space (v3.12). Both moves are small and in the expected
+    direction: the three category pins shift in the sixth decimal, the
+    portfolio band widens by about 0.005 pp. The 2.10.0 reproduction lock in
+    tests/test_cell_weights.py pins its own 12-category taxonomy explicitly,
+    so it still reproduces the historical numbers to 1e-12 and proves the
+    difference here is taxonomy plus calibration, not a defect.
+
+    Regenerated again 2026-09-11 for 2.12.0 (owner ruling O14, the LARGE move
+    in this release): the engine's default cell-weight matrix is no longer the
+    equal 1/52 grid but an ESTIMATE of the HCB gross-profit mix (public
+    sources, graded B/E/G, data/cell_weights_estimated_v1.json). The fixture
+    trends are Europe-weighted and the estimate puts about 51 percent of the
+    pool in Europe against the equal grid's 25, so every magnitude grows: the
+    portfolio pin moves from -0.00433 to -0.00572, about 32 percent deeper,
+    and the category pins move with their own regional mixes rather than
+    uniformly. This is the intended effect of the ruling, not drift. The equal
+    grid survives as pulse.config.EQUAL_CELL_WEIGHTS and
+    tests/test_cell_weights.py still exercises it, so the pre-O14 basis stays
+    reproducible; the 2.10.0 lock is unaffected because it pins its own
+    matrix and its own 12-category taxonomy explicitly.
+
+    Prior regenerations: 2026-09-11 v3.12/2.12.0 (O13 Toilet Care split,
+    13 categories, v3.12 calibration); 2026-09-10 v3.11/2.11.0 (51-driver base, cell
+    weights, v3.11 calibration); 2026-07-13 v3.10/2.10.0 (regional 3D roll-up, n_eff
     dampening, start_year onset); 2026-07-06 v3.8/2.8.1 (L3 clip, L4 floor,
     fixture differentiation); June 2026 v3.7/D20 (t-copula deleted →
     Gaussian); June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
@@ -133,18 +159,18 @@ class TestGoldenPins:
 
     PINS = {
         # cat:          (median,            p10,                p90)
-        "Hair: Color": (-0.003119105635, -0.004789608404, -0.001275106969),
-        "Hair: Care":  (-0.004026102323, -0.005571151116, -0.002186639590),
-        "LHC: FCN":    (-0.004954576037, -0.006348585044, -0.003017910387),
+        "Hair: Color": (-0.004382824607, -0.006560453979, -0.001985604025),
+        "Hair: Care":  (-0.004954295760, -0.006740405373, -0.002756923533),
+        "LHC: FCN":    (-0.006774214440, -0.008688186306, -0.004155012017),
     }
 
     # L29: the joint portfolio band (totals.portfolio) is what the dashboard
     # headline shows (D3) — pin it too, not only per-category cells.
-    PORTFOLIO_PIN = (-0.004289467411, -0.005718831386, -0.002458386817)
+    PORTFOLIO_PIN = (-0.005718585254, -0.007619757232, -0.003235896735)
 
     def test_engine_identity(self, mock_model_config, mock_trends_database):
         r = _run(mock_model_config, mock_trends_database)
-        assert r["model_version"] == "2.11.0"
+        assert r["model_version"] == "2.12.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")  # D13

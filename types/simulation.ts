@@ -104,8 +104,8 @@ export interface TotalsMatrix {
   by_force:      Record<string, Record<string, number>>;         // year → force → total
   by_vc:         Record<string, Record<string, number>>;         // year → vc_step → total
   by_region:     Record<string, Record<string, number>>;         // year → region → total
-  // (F10, 2.10.0: `grand` deleted — a raw SUM of the 12 category medians,
-  //  ≈12× the headline, unused, and "sum of medians ≠ median of sum". Use
+  // (F10, 2.10.0: `grand` deleted — a raw SUM of the 13 category medians,
+  //  ≈13× the headline, unused, and "sum of medians ≠ median of sum". Use
   //  `portfolio` below, the real per-iteration portfolio quantity.)
   /**
    * Joint portfolio percentiles (D3 / audit F-16, June 2026): true joint
@@ -177,7 +177,7 @@ export interface RunMeta {
   /** 2.10.0 (F1): the region GP1-share weights applied in the roll-up
    *  (since 2.11.0 the column sums of cell_weights_used). */
   region_weights_used?: Record<string, number> | null;
-  /** 2.11.0 (O6): the 12 × 4 gross-profit-share matrix the run rolled up
+  /** 2.11.0 (O6): the 13 × 4 gross-profit-share matrix the run rolled up
    *  with, its row sums, and the provenance label. Absent on pre-2.11 runs. */
   cell_weights_used?: Record<string, Record<string, number>> | null;
   category_weights_used?: Record<string, number> | null;

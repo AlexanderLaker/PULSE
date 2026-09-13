@@ -1,6 +1,8 @@
 # PRISM v3.1 — Attenuation Factor Calibration
 **Bain Senior Partner Review | April 2026 | 82-Trend Empirical Analysis**
 
+> **Current generation: v3.12** (release 2.12.0, owner ruling O13, 11 September 2026), sections 19 to 26, computed on the 51-driver core set over the 13-category taxonomy. The earlier generations are the historical record, correct when written and kept unchanged: v3.1 (sections 1 to 6, 82 trends), v3.5 (sections 7 to 11, 99 trends), v3.11 (sections 12 to 18, 51 drivers over 12 categories).
+
 ---
 
 ## 1. Why we recalibrated
@@ -414,3 +416,108 @@ python3 scripts/run_50k_prod.py                     # production run after deplo
 *v3.11 calibration date: 10 September 2026*
 *Input: 51 drivers x 12 categories = 612 exposure scores; 1,275 unordered pairs*
 *Baseline J0 shift: 0.4525 to 0.4265; trend-weighted mean eff_att 0.4523 to 0.452*
+
+---
+
+# PRISM v3.12 — Recalibration on the 13-Category Taxonomy (release 2.12.0)
+
+Owner ruling O13 (11 September 2026): Toilet Care becomes its own PRISM category, `"LHC: TOI"`, split out of Hard-Surface Cleaner, and the category taxonomy goes from 12 to 13. The overlap correction is computed from the weighted Jaccard overlap of the drivers' category exposure vectors, so the exposure space is the input, not a backdrop: a vector that gains a column is a different input, and every quantity derived from it has to be re-derived. Leaving v3.11 in place would have shipped an overlap correction calibrated on a taxonomy the engine no longer uses, which is the F-28 failure mode from the other side, a live layer carrying a provenance that no longer describes it. The method is unchanged from sections 2, 7 and 12: weighted Jaccard on the category exposure vectors, excess over the random-pair baseline J0, asymmetric force-size factor, per-cell mechanism adjustments, clamps [0.10, 0.45] within and [0.00, 0.45] across, and the identity eff_att = 0.5 x (1 - mean cross-force row overlap). The mechanism layer is unchanged as well: the same per-cell adjustments with the same reasons as v3.11 (sections 13 and 14), re-applied on the 13-column space. The population is the same 51 drivers with the same force counts. The thirteenth category is the only input that moved.
+
+## 19. What the taxonomy change did to the inputs
+
+- Exposure space: 13 categories (12 before). `"LHC: TOI"` sits between `"LHC: HSC"` and `"LHC: IC"`, so the LHC block still reads in shelf order.
+- Exposure scores: 51 x 13 = 663 (612 before).
+- Population unchanged: 51 drivers, Consumer 20, Government 10, Customer 7, Technology 6, Competitive 4, Environmental 4.
+- Unique pairs: 1,275 (unchanged; the population did not move, only the width of its vectors).
+- Scoring of the new column (`data/trend_base_2026-09/core_set_51_v4.json`): every driver keeps its HSC score unchanged and carries a separate TOI score. For 37 of the 51 drivers the toilet-care exposure equals the hard-surface score it was split from; 14 were differentiated, five upwards (G-04 packaging and EPR 4 to 5, G-02 microplastics 2 to 3, K-12 drugstore channel 3 to 4, X-06 growth markets 3 to 4, X-15 scale-leader escalation 2 to 3) and nine downwards (among them G-08 US tariffs 3 to 1, C-34 US household formation 3 to 1, C-18 2 to 1, T-08 2 to 1, G-13 2 to 1).
+- Random-pair baseline J0: 0.4199 (0.4265 before). The thirteenth column separates drivers that used to be forced to share one hard-surface score, so two drivers drawn at random overlap slightly less and the excess transform bites marginally earlier.
+- Trend-weighted mean effective attenuation: 0.4514 (0.4520 before).
+
+## 20. Within-force overlap (raw J, excess, mechanism, final)
+
+| Force | n | raw J | excess | mech | v3.12 final | v3.11 final | delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Consumer | 20 | 0.3495 | 0.0000 | +0.00 | **0.100** | 0.100 | 0.000 |
+| Customer | 7 | 0.5192 | 0.1711 | +0.05 | **0.221** | 0.223 | -0.002 |
+| Technology | 6 | 0.6139 | 0.3345 | +0.05 | **0.384** | 0.373 | +0.011 |
+| Government | 10 | 0.4623 | 0.0730 | +0.05 | **0.123** | 0.126 | -0.003 |
+| Environmental | 4 | 0.6234 | 0.3507 | +0.05 | **0.401** | 0.389 | +0.012 |
+| Competitive | 4 | 0.2830 | 0.0000 | +0.00 | **0.100** | 0.100 | 0.000 |
+
+The mechanism adjustments and their reasons are the v3.11 ones, unchanged cell by cell (section 13); they are carried in `data/attenuation_calibration_v3_12.json` in full so the record stands on its own.
+
+The order of the forces is the same and the two floors still bind. The raw overlap moves both ways. It rises inside Technology (0.6116 to 0.6139) and Environmental (0.6207 to 0.6234), whose few drivers score the LHC block broadly and alike, so a thirteenth LHC column adds more shared mass than differentiation; it falls inside Consumer, Customer, Government and Competitive, whose drivers are less alike on toilet care than on their average category. Measured against a baseline that itself drops 0.0065, the two rises compound into the only visible moves (+0.011 and +0.012) while the falls nearly cancel against it (-0.002 and -0.003). Consumer and Competitive are unaffected either way: their empirical excess was zero before the split and is zero after it, and the floor of 0.10 sets both values.
+
+## 21. Cross-force overlap matrix (final; rows = how much of the row force is covered by the column force)
+
+| | Consumer | Customer | Technology | Government | Environmental | Competitive |
+|---|---:|---:|---:|---:|---:|---:|
+| **Consumer** | - | 0.050 | 0.000 | 0.030 | 0.000 | 0.050 |
+| **Customer** | 0.050 | - | 0.245 | 0.206 | 0.223 | 0.110 |
+| **Technology** | 0.000 | 0.272 | - | 0.232 | 0.345 | 0.030 |
+| **Government** | 0.030 | 0.153 | 0.159 | - | 0.200 | 0.000 |
+| **Environmental** | 0.000 | 0.367 | 0.450 | 0.405 | - | 0.000 |
+| **Competitive** | 0.050 | 0.133 | 0.030 | 0.000 | 0.000 | - |
+
+Per-cell mechanism adjustments and the eight deliberate zeroes are unchanged from section 14; the empirical layers (raw J, excess, asymmetry) are recomputed on the 13-column space and are in the JSON.
+
+Fifteen of the thirty off-diagonal cells did not move at all, and no cell moved by more than 0.012 (Technology covered by Environmental, 0.333 to 0.345). The top ten couplings keep their order; the only re-orderings sit inside 0.006 of each other, Government covered by Technology now edging Government covered by Customer (0.159 against 0.153) and a shuffle inside the 0.050 tie band of the Consumer cells. Environmental covered by Technology is still clamped at the 0.45 ceiling (pre-clamp 0.493, from 0.474), which is the one place where the split is absorbed rather than shown.
+
+## 22. Effective attenuation per force
+
+| Force | row mean cross overlap | v3.12 eff_att | v3.11 eff_att | delta |
+|---|---:|---:|---:|---:|
+| Consumer | 0.0260 | **0.487** | 0.487 | 0.000 |
+| Customer | 0.1668 | **0.417** | 0.418 | -0.001 |
+| Technology | 0.1758 | **0.412** | 0.415 | -0.003 |
+| Government | 0.1084 | **0.446** | 0.446 | 0.000 |
+| Environmental | 0.2444 | **0.378** | 0.379 | -0.001 |
+| Competitive | 0.0426 | **0.479** | 0.480 | -0.001 |
+
+The reading of section 15 stands unchanged: Environmental attenuates most (0.378), covered at once by Technology, Government and Customer; Consumer and Competitive keep nearly all of their signal; Government attenuates least of the coupled forces (0.446). Technology is the only force that moves by as much as 0.003, and it moves because its row picks up the three cells the thirteenth column widened (covered by Environmental +0.012, by Government +0.009, by Customer +0.006).
+
+## 23. How far it moved against v3.11
+
+| Quantity | v3.11 | v3.12 | move |
+|---|---:|---:|---:|
+| Random-pair baseline J0 | 0.4265 | 0.4199 | -0.0065 |
+| Trend-weighted mean attenuation | 0.4520 | 0.4514 | -0.0006 |
+| Largest per-force effective attenuation move (Technology) | 0.415 | 0.412 | -0.003 |
+| Largest within-force overlap move (Environmental) | 0.389 | 0.401 | +0.012 |
+| Largest single cross-force cell move (Technology covered by Environmental) | 0.333 | 0.345 | +0.012 |
+| Copula minimum eigenvalue on the 51 drivers | +0.4135 | +0.4135 | 0.000 |
+
+No effective attenuation moves by more than 0.003, no within-force overlap by more than 0.012 and no single cross-force cell by more than 0.012. Two of the six within-force values, two of the six attenuations and fifteen of the thirty cross-force cells are identical to v3.11, and the force ordering of the within-force and attenuation layers is unchanged.
+
+This is what a resolution change looks like: the split gives the same 51 drivers one more column to be different in, it does not re-estimate the mechanism. The mechanism layer is identical to v3.11 by construction and the population is identical, so the whole recalibration lands inside a move of 0.012 on any single number and 0.0006 on the headline, far inside the +/-0.03 to +/-0.10 judgment band of the mechanism adjustments themselves. v3.12 buys correct provenance, not a different view of the system.
+
+## 24. Copula validity on the 13-category taxonomy
+
+`DEFAULT_FORCE_CORRELATIONS` (v3.6, scaled 0.73 for positive semi-definiteness) was re-checked on the 51 drivers: the implied 51 x 51 matrix has minimum eigenvalue **+0.4135**, exactly the v3.11 value. That is expected and is a check, not a coincidence: `build_trend_correlation_matrix` reads the force label of each driver and nothing else, so a change to the category taxonomy cannot move the spectrum as long as the population and its force mix hold. The matrix is kept unchanged; the golden lock "no repair fires on defaults" passes on the 2.12.0 fixture and the CLI pre-flight gate (F6) re-checks the loaded mix on every production run.
+
+## 25. Where it lands in code
+
+`pulse/config.py` carries all three layers from the one generated record: `DEFAULT_PER_FORCE_ATTENUATION`, `DEFAULT_WITHIN_FORCE_OVERLAP` and `DEFAULT_FORCE_OVERLAP_MATRIX`, with `DEFAULT_ATTENUATION_SOURCE = "calibrated_v3.12_september2026"`. `calibrated_v3.11_september2026` joins v3.5 and v3.1 as a legacy value of the enum, valid for reproduction runs and rejected nowhere. `tests/test_calibration_v3_12.py` locks the defaults to the JSON, the JSON to the script, the identity between the matrix and the attenuation, and the copula margin, the same four locks v3.11 carried.
+
+The 2.10.0 regression lock in `tests/test_cell_weights.py` is untouched by this: it pins the 2.10.0 taxonomy (twelve categories, 48 cells) and the v3.5 attenuation with v3.1 within-force dampening as literals, so the 2.12.0 engine still reproduces the 2.10.0 numbers when asked to, and the next taxonomy change cannot move that baseline either.
+
+## 26. v3.12 deliverables
+
+| File | Purpose |
+|---|---|
+| `scripts/compute_attenuation_v3_12.py` | Reproducible computation on the 13-category seed; mechanism adjustments unchanged from v3.11, with reasons; copula check |
+| `data/attenuation_calibration_v3_12.json` | The record: every layer, every reason, the previous version's values for comparison |
+| `data/Attenuation_Calibration_v3_12.xlsx` | Companion workbook (`python3 scripts/build_attenuation_xlsx.py v3_12`); not tracked in git, regenerate from the JSON |
+| `pulse/config.py` | Live defaults (all three layers) |
+| `tests/test_calibration_v3_12.py` | Lock |
+| `scripts/compute_attenuation_v3_11.py`, `data/attenuation_calibration_v3_11.json` | Kept as the superseded provenance, not consumed by the engine |
+
+```bash
+python3 scripts/compute_attenuation_v3_12.py        # recompute on the current seed
+python3 scripts/build_attenuation_xlsx.py v3_12     # regenerate the workbook
+python3 scripts/run_50k_prod.py                     # production run after deploying
+```
+
+*v3.12 calibration date: 11 September 2026*
+*Input: 51 drivers x 13 categories = 663 exposure scores; 1,275 unordered pairs*
+*Baseline J0 shift: 0.4265 to 0.4199; trend-weighted mean eff_att 0.452 to 0.4514*

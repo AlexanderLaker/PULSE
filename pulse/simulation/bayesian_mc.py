@@ -77,13 +77,13 @@ class BayesianMonteCarloEngine:
     # 2.11.0 — September 2026 release (owner rulings of 2026-09-03/10,
     #         DECISION_LOG Part H, O6–O11). Numbers move — golden pins
     #         regenerated in the same commit, 50k re-run required.
-    #         O6: the 48 composite cells are rolled up with a 12 × 4 matrix of
+    #         O6: the 52 composite cells are rolled up with a 13 × 4 matrix of
     #         HCB gross-profit SHARES (config.cell_weights) — the relevant part
     #         of the P&L that sits in each category × region combination —
     #         instead of the separable region × category vectors. Category
     #         shift = share-weighted average of the row; portfolio = Σ over
-    #         cells. Equal 1/48 placeholder until the actuals are loaded
-    #         (run_50k_prod.py --cell-weights FILE). A separable matrix
+    #         cells. Defaults to the estimated HCB mix since 2.12.0 (O14);
+    #         the actuals still arrive via run_50k_prod.py --cell-weights FILE. A separable matrix
     #         reproduces 2.10.0 exactly (regression-locked). New contract
     #         keys: cell_weights_used, category_weights_used,
     #         cell_weights_source; region_weights_used now = column sums.
@@ -153,7 +153,7 @@ class BayesianMonteCarloEngine:
     #         full config-layer validation (D21).
     # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
     #         removed from result contract (D4).
-    MODEL_VERSION = "2.11.0"
+    MODEL_VERSION = "2.12.0"
     ENGINE_NAME = "bayesian_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
@@ -206,7 +206,7 @@ class BayesianMonteCarloEngine:
         a 3D tensor over composite (category × region) cells, then rolls the
         regional shifts up to the category level. 2.11.0 (O6): the roll-up
         weights are the cell gross-profit shares (config.cell_weights, a
-        12 × 4 matrix) — category shift = share-weighted average of the
+        13 × 4 matrix) — category shift = share-weighted average of the
         category's row, portfolio = Σ over all cells. The category-level
         `shift_matrix` keeps its shape; `regional_shift_matrix` carries the
         full 3D detail. A separable matrix reproduces the 2.10.0 numbers
@@ -255,12 +255,15 @@ class BayesianMonteCarloEngine:
         return result
 
     def _cell_weight_matrix(self) -> np.ndarray:
-        """The 12 × 4 gross-profit share matrix W (2.11.0, O6), aligned to
+        """The 13 × 4 gross-profit share matrix W (2.11.0, O6), aligned to
         (config.category_names, REGIONS), normalised to sum 1.
 
-        Source: config.cell_weights. Falls back to the equal 1/48 placeholder
-        when the config carries no matrix or an all-zero one (with an
-        integrity event), so a run can never silently divide by zero."""
+        Source: config.cell_weights (the estimated HCB mix by default since O14).
+        Falls back to a FLAT 1/52 grid when the config carries no matrix or an
+        all-zero one, with an integrity event, so a run can never silently
+        divide by zero. That fallback is a guard against a broken config, not
+        a modelling choice, which is why it stays flat rather than reaching
+        for the default."""
         cats = self.config.category_names
         cw = getattr(self.config, "cell_weights", None) or {}
         W = np.zeros((len(cats), len(REGIONS)))
@@ -274,8 +277,9 @@ class BayesianMonteCarloEngine:
                 self._integrity_events.append({
                     "type": "cell_weights_fallback",
                     "severity": "warning",
-                    "message": "config.cell_weights is empty or all-zero; the roll-up used the "
-                               "equal 1/48 placeholder instead.",
+                    "message": "config.cell_weights is empty or all-zero; the roll-up fell back "
+                               "to a flat 1/52 grid. This is a broken-config guard, not the "
+                               "engine default — check what wrote the config.",
                 })
             W = np.full_like(W, 1.0 / W.size)
             total = 1.0

@@ -321,14 +321,20 @@ class TestF1RegionalShiftMath:
 
     def test_region_concentrated_trend_scales_by_weight(self, mock_model_config):
         """A Europe-only trend hits only Europe's cell; the category shift is
-        EXACTLY Europe's GP1 weight × Europe's regional shift (per-iteration
-        linear scaling ⇒ the identity holds for the median too)."""
+        EXACTLY Europe's share OF THAT CATEGORY'S ROW × Europe's regional shift
+        (per-iteration linear scaling ⇒ the identity holds for the median too).
+
+        The denominator is the row share, not `region_weights_used["Europe"]`.
+        Those coincide only while the matrix is separable, which the equal grid
+        was and the O14 estimated mix deliberately is not: every category has
+        its own regional mix, which is the entire reason for O6."""
         cfg = self._cfg(mock_model_config)
         r = BayesianMonteCarloEngine(cfg).run(_single_trend_db([5, 0, 0, 0]))
         rsm = r["regional_shift_matrix"]["Hair: Color"]
         eu_med = rsm["Europe"]["path"][2030]["median"]
         assert rsm["Asia"]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
-        rw_eu = r["region_weights_used"]["Europe"]
+        row = r["cell_weights_used"]["Hair: Color"]
+        rw_eu = row["Europe"] / sum(row.values())
         cat_med = r["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         assert cat_med == pytest.approx(rw_eu * eu_med, rel=1e-9)
 
