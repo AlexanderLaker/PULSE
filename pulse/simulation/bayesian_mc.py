@@ -512,10 +512,10 @@ class BayesianMonteCarloEngine:
             gp1 = trend.gp1_pct_affected
             if gp1 is None or gp1 <= 0 or gp1 > 1.0:
                 raise ValueError(
-                    f"Trend '{trend.id}' ({trend.name}) has invalid "
-                    f"gp1_pct_affected={gp1!r}. Every trend must carry a "
+                    f"Driver '{trend.id}' ({trend.name}) has invalid "
+                    f"gp1_pct_affected={gp1!r}. Every driver must carry a "
                     f"gp1_pct_affected in (0.0, 1.0] before the simulation "
-                    f"can be run. Fix the trend at ingestion time."
+                    f"can be run. Fix the driver at ingestion time."
                 )
 
             # Final score = probability × gp1_pct_affected × direction
@@ -662,10 +662,10 @@ class BayesianMonteCarloEngine:
                 "type": "regional_exposure_coverage",
                 "severity": "warning",
                 "message": (
-                    f"{len(regionless)} trend(s) carry no regional exposure and "
+                    f"{len(regionless)} driver(s) carry no regional exposure and "
                     f"were treated as globally present (equal across regions) in "
-                    f"the 3D shift math — score their regions in the Trends "
-                    f"editor: " + ", ".join(regionless[:10])
+                    f"the 3D shift math — score their regions on the Drivers "
+                    f"page: " + ", ".join(regionless[:10])
                     + ("…" if len(regionless) > 10 else "")
                 ),
                 "detail": {"count": len(regionless), "trend_ids": regionless[:50]},
@@ -748,7 +748,7 @@ class BayesianMonteCarloEngine:
                     f"category×region × year) compounding factors were ≤ 0 (a "
                     f"single force wiping >100% of a cell's pool) and were "
                     f"floored at −100%. If this count is material relative to "
-                    f"iterations, review trend magnitudes/attenuation."
+                    f"iterations, review driver magnitudes/attenuation."
                 ),
             })
 
@@ -824,7 +824,7 @@ class BayesianMonteCarloEngine:
         #
         # July 2026 VC redesign: experts score the value chain as ONE
         # epicentre stage per trend (the stored 8-step 0–5 profile is a
-        # serialization format — the Trends editor writes a canonical 5/3/1
+        # serialization format — the Drivers editor writes a canonical 5/3/1
         # falloff around the picked stage). The former share math
         # (exposure-profile × vc_weights smear) therefore laundered a UI
         # kernel constant into pseudo-measured cross-step attribution. The
@@ -870,11 +870,11 @@ class BayesianMonteCarloEngine:
                 "type": "vc_epicentre_coverage",
                 "severity": "warning",
                 "message": (
-                    f"{len(unscored_vc)} trend(s) carry no value-chain "
+                    f"{len(unscored_vc)} driver(s) carry no value-chain "
                     f"epicentre (empty/unscored VC profile) — the VC "
                     f"attribution lens is computed on the scored subset "
-                    f"while these trends still drive the shift numbers. "
-                    f"Score them in the Trends editor: "
+                    f"while these drivers still move the shift numbers. "
+                    f"Score them on the Drivers page: "
                     + ", ".join(unscored_vc[:10])
                     + ("…" if len(unscored_vc) > 10 else "")
                 ),
@@ -888,7 +888,7 @@ class BayesianMonteCarloEngine:
                 "message": (
                     f"{len(vc_fallback_cats)} categor"
                     f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no "
-                    f"epicentre-scored contributing trend — the VC lens shows "
+                    f"epicentre-scored contributing driver — the VC lens shows "
                     f"a uniform 1/8 spread there (structural fallback, not "
                     f"expert judgment): " + ", ".join(vc_fallback_cats)
                 ),

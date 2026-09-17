@@ -3,7 +3,7 @@
 /**
  * Chip — the ONE chip language for recurring semantics (R-18, design review
  * 2026-07-01). Direction, evidence grade and provenance were previously
- * styled three different ways across Trends / drill-down / Journey /
+ * styled three different ways across Drivers / drill-down / Journey /
  * Explorer (slate ↗ pills vs green ▲ chips vs emoji stickers). One
  * component, text + colour (never colour or emoji alone), glyph arrows
  * only for direction (matches ShiftValue).

@@ -240,7 +240,7 @@ async def update_config(req: ConfigUpdate, user: dict = Depends(require_admin)):
             if lam < -1e-9:
                 raise HTTPException(400,
                     f"Correlation settings rejected: the implied "
-                    f"{len(db_now.trends)}-trend matrix is not positive "
+                    f"{len(db_now.trends)}-driver matrix is not positive "
                     f"semi-definite (min eigenvalue {lam:.3f}). The engine "
                     f"would silently weaken all correlations to compensate. "
                     f"Lower cross-force correlations and/or within-force rho.")

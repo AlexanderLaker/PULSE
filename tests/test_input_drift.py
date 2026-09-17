@@ -30,7 +30,7 @@ def test_score_change_and_direction_flip_counted():
     curr = _fp(_T("a", p=4, g=0.12), _T("b", d="Expansion", f="Government"))
     ev = compute_input_drift_event(curr, prev, previous_run_id=7)
     assert ev["severity"] == "warning"          # direction flip escalates
-    assert "1 trend score(s) changed" in ev["message"]
+    assert "1 driver score(s) changed" in ev["message"]
     assert "(1 probability, 1 gp1)" in ev["message"]
     assert "1 direction flip" in ev["message"]
     assert ev["detail"]["direction_flips"] == ["b"]
@@ -42,7 +42,7 @@ def test_added_and_removed_trends():
     prev = _fp(_T("a"))
     curr = _fp(_T("a"), _T("c", f="Technology"))
     ev = compute_input_drift_event(curr, prev)
-    assert "1 trend(s) added, 0 removed" in ev["message"]
+    assert "1 driver(s) added, 0 removed" in ev["message"]
     assert ev["detail"]["added"] == ["c"]
 
 

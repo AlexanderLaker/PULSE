@@ -100,7 +100,7 @@ type ViewMode = 'time' | 'force' | 'vc' | 'region';
 const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
   time:   { label: 'Time Path',   description: 'MC median shifts 2026→2035, cumulative vs 2025', Icon: Calendar },
   force:  { label: 'Force attribution',       description: 'Distributes each category shift across forces by exposure — attribution, not an independent simulation', Icon: Zap },
-  vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each trend\'s contribution wholly to the single stage where its impact centres (its epicentre) — propagation up/down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },
+  vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each driver\'s contribution wholly to the single stage where its impact centres (its epicentre) — propagation up/down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },
   region: { label: 'Region attribution',      description: 'Distributes each category shift across regions by exposure — attribution, not an independent simulation', Icon: Globe2 },
 };
 
@@ -114,9 +114,9 @@ const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: Lu
 type ImpactFilter = 'total' | 'expansion' | 'contraction';
 
 const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
-  total:       { label: 'Net',             description: 'Net shift — positive and negative trend impacts combined.', Icon: Activity },
-  expansion:   { label: 'Positive-trend',  description: 'Positive-trend contribution — the share of each year\'s net shift from upside trends. Year-shape inherits from the net simulation; not a positive-only re-run.', Icon: TrendingUp },
-  contraction: { label: 'Negative-trend',  description: 'Negative-trend contribution — the share of each year\'s net shift from downside trends. Year-shape inherits from the net simulation; not a negative-only re-run.', Icon: TrendingDown },
+  total:       { label: 'Net',                 description: 'Net shift: expansion and contraction drivers combined.', Icon: Activity },
+  expansion:   { label: 'Expansion drivers',   description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingUp },
+  contraction: { label: 'Contraction drivers', description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingDown },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ const KpiTile: FC<{
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
-      aria-label={`Open ${name ?? label} drill-down — fan chart and contributing trends${bandLabel}`}
+      aria-label={`Open ${name ?? label} drill-down — fan chart and contributing drivers${bandLabel}`}
       className="relative rounded-2xl px-5 py-3.5 text-left"
       style={{ ...surface, cursor: 'pointer' }}
     >
@@ -653,7 +653,7 @@ const Matrix: FC<MatrixProps> = ({
                             onClick={(e) => { e.stopPropagation(); onRowClick(row.id); }}
                             onFocus={() => setHoverRow(row.id)}
                             onBlur={() => setHoverRow(null)}
-                            aria-label={`Open ${row.label} detail — fan chart and contributing trends`}
+                            aria-label={`Open ${row.label} detail — fan chart and contributing drivers`}
                             style={{
                               all: 'unset', cursor: 'pointer',
                               textDecoration: isRowHover ? 'underline' : 'none',
@@ -924,7 +924,7 @@ const Matrix: FC<MatrixProps> = ({
             </div>
             {hasBands && (
               <div style={{ opacity: 0.55, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-                Band = magnitude uncertainty of the listed trends only.
+                Band = magnitude uncertainty of the listed drivers only.
               </div>
             )}
             {!hasBands && cellDetails && (
@@ -1012,14 +1012,14 @@ const PeakStressTooltip: FC = () => {
             Peak stress is not always terminal
           </div>
           <p className="mb-2">
-            Each trend has its own diffusion curve (<em>s_curve, linear, front-loaded,
+            Each driver has its own diffusion curve (<em>s_curve, linear, front-loaded,
             back-loaded, step-function</em>) and its own peak year. The 51 drivers of the
             September 2026 base are spread across 2027–2035 peak years and five curve shapes.
           </p>
           <p className="mb-2">
             That means the category grand total can be <strong>non-monotonic</strong>:
             front-loaded consumer shifts and step-function regulation compound hardest
-            mid-horizon (H1→H2), while later-maturing longevity and biotech trends
+            mid-horizon (H1→H2), while later-maturing longevity and biotech drivers
             only pick up in H3 — sometimes in the opposite direction, partially
             offsetting the stress.
           </p>
@@ -1037,8 +1037,8 @@ const PeakStressTooltip: FC = () => {
 // ─── Main Component ──────────────────────────────────────────────
 const ProfitPoolAnalysis2: FC<{
   isAdmin?: boolean;
-  /** Drill-through to the Trends tab (same contract as ConsumerJourney2):
-      receives a trend NAME, applied as the Trends-tab search query. Used by
+  /** Drill-through to the Drivers tab (same contract as ConsumerJourney2):
+      receives a driver NAME, applied as the Drivers-tab search query. Used by
       the Category Detail Panel's contributing-trend rows. */
   onNavigateToTrend?: (query: string) => void;
 }> = ({ isAdmin = false, onNavigateToTrend }) => {
@@ -1558,7 +1558,7 @@ const ProfitPoolAnalysis2: FC<{
         {view === 'time' ? (
           <SegControl
             size="sm"
-            ariaLabel="Trend-impact filter"
+            ariaLabel="Driver-impact filter"
             items={(Object.keys(IMPACT_META) as ImpactFilter[]).map((f) => ({
               id: f,
               label: IMPACT_META[f].label,
@@ -1652,7 +1652,7 @@ const ProfitPoolAnalysis2: FC<{
         </AnimatePresence>
 
         {/* ── The evidence: the shift matrix ─────────────────────── */}
-        {/* R-13: page title is an h1 (matches Trends / Journey / Explorer). */}
+        {/* R-13: page title is an h1 (matches Drivers / Journey / Explorer). */}
         <div className="mb-5 pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] mb-2"
             style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
@@ -1881,7 +1881,7 @@ const ProfitPoolAnalysis2: FC<{
                 view !== 'time'
                   ? 'Switch to Time Path for P10 / P90 bands'
                   : impactFilter !== 'total'
-                  ? 'Ranges unavailable in Upside/Downside view — bands describe the unfiltered distribution'
+                  ? 'Ranges unavailable when filtered to expansion or contraction drivers; bands describe the unfiltered distribution'
                   : undefined
               }
             />
@@ -1991,7 +1991,7 @@ const ProfitPoolAnalysis2: FC<{
                   rows.push(['Category shares', equalCats ? `equal (${ws.length} × ${(100 / ws.length).toFixed(1)}%)` : 'per category (see Config sheet)']);
                 }
                 // O10/O11 (2.11.0): the trend base and calibration the run used.
-                if (m.trend_count != null) rows.push(['Trend base', `${m.trend_count} drivers`]);
+                if (m.trend_count != null) rows.push(['Driver base', `${m.trend_count} drivers`]);
                 if (m.attenuation_source) rows.push(['Calibration', m.attenuation_source]);
                 if (m.git_sha && m.git_sha !== 'unknown') rows.push(['Engine build', m.git_sha]);
                 if (m.model_version) rows.push(['Model', m.model_version]);
@@ -2067,7 +2067,7 @@ const ProfitPoolAnalysis2: FC<{
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Attenuation</div>
-                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Dampening factor applied to overlapping trends so co-occurring effects are not double-counted.</div>
+                <div className="text-[11.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.5 }}>Dampening factor applied to overlapping drivers so co-occurring effects are not double-counted.</div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>Cumulative shift</div>
@@ -2081,16 +2081,16 @@ const ProfitPoolAnalysis2: FC<{
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Reading the level</div>
               <p className="text-[12px] mb-2" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
-                Each trend&rsquo;s elicited &ldquo;share of GP1 it could touch&rdquo; is deliberately
-                scaled down before it reaches a category: a trend belongs to 1 of 6 forces
+                Each driver&rsquo;s elicited &ldquo;share of GP1 it could touch&rdquo; is deliberately
+                scaled down before it reaches a category: a driver belongs to 1 of 6 forces
                 (&divide;6 averaging) and each force is attenuated (~0.4&ndash;0.5) so overlapping
-                trends aren&rsquo;t double-counted. Net <strong>structural pass-through &asymp; 7%</strong>.
-                So a near-certain trend that could touch 20% of a category&rsquo;s GP1 moves that
+                drivers aren&rsquo;t double-counted. Net <strong>structural pass-through &asymp; 7%</strong>.
+                So a near-certain driver that could touch 20% of a category&rsquo;s GP1 moves that
                 category <strong>&asymp;1.4%</strong> at full materialization &mdash; not 20%. Read cells as a
                 conservative, comparable index and apply them with the formula
                 (GP1<sub>projected</sub> = GP1<sub>actual</sub> &times; (1 + shift)); don&rsquo;t read one cell
                 as the raw elicited magnitude. The impact is applied per <strong>category &times; region</strong>:
-                a trend only moves the categories and regions it is scored on, and the category
+                a driver only moves the categories and regions it is scored on, and the category
                 number is the region-GP1-weighted roll-up (weights above).
               </p>
               <div className="rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: S.surfaceLow }}>
@@ -2114,7 +2114,7 @@ const ProfitPoolAnalysis2: FC<{
                   overconfidence (a "5" ≈ five-in-six, not certainty). */}
               <div className="rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: S.surfaceLow }}>
                 <div className="text-[11px] font-bold mb-1.5" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>
-                  What a probability score means <span style={{ fontWeight: 400, color: S.mutedText }}>(1&ndash;5 &rarr; Beta prior; the sole stochastic driver)</span>
+                  What a probability score means <span style={{ fontWeight: 400, color: S.mutedText }}>(1&ndash;5 &rarr; Beta prior)</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="text-[11.5px]" style={{ borderCollapse: 'collapse', fontFamily: MONO_FONT, minWidth: 300 }}>
@@ -2142,9 +2142,11 @@ const ProfitPoolAnalysis2: FC<{
               </div>
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
                 style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>What the model holds constant</div>
-              {/* D16 (owner decision, June 2026) — exact owner wording. */}
+              {/* D16 (owner decision, June 2026): exact owner wording, except that
+                  "external trends" reads "external drivers" since O15 (2026-09-16,
+                  DECISION_LOG Part K). */}
               <p className="text-[12px] mb-4" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
-                PRISM holds strategy constant. The simulation propagates external trends only and
+                PRISM holds strategy constant. The simulation propagates external drivers only and
                 deliberately excludes management response — price increases, innovation launches,
                 mix shifts, competitive reaction. A negative total therefore means &ldquo;headwind to
                 today&rsquo;s business if nothing changes&rdquo;, not &ldquo;this pool will shrink&rdquo;.
@@ -2157,13 +2159,13 @@ const ProfitPoolAnalysis2: FC<{
               <ul className="text-[12px] mb-3" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, fontFamily: BODY_FONT, margin: '0 0 12px', paddingLeft: 18 }}>
                 <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs 2025 at that year — a compounded level, not a year-over-year change.</li>
                 <li style={{ marginBottom: 3 }}>Totals are category-weighted averages (not sums), so the portfolio number reads as one interpretable shift.</li>
-                <li>The model holds Henkel and competitor strategy constant — it propagates external trends only.</li>
+                <li>The model holds Henkel and competitor strategy constant — it propagates external drivers only.</li>
               </ul>
               <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
                           <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
           All cell values in this matrix are produced by the Bayesian Monte Carlo engine
           (<code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{simulation?.model_version ?? 'bayesian_copula'}</code>,
-          50,000 iterations, Gaussian-copula dependencies, the 51-driver base of September 2026). The trend
+          50,000 iterations, Gaussian-copula dependencies, the 51-driver base of September 2026). The driver
           probability priors are <strong>structured expert judgement</strong> (Beta shapes set
           from analyst 1–5 scores); the model expresses uncertainty in those judgements — it
           does not learn or update from data. Each cell is a{' '}
@@ -2171,18 +2173,18 @@ const ProfitPoolAnalysis2: FC<{
           compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
           The Force, Value Chain and Region lenses are per-year decompositions written by
           the engine. <strong>Since 2.10.0 (F1) region also enters the shift math itself</strong>:
-          the engine solves a 3D category × region × year tensor (each trend weighted by
+          the engine solves a 3D category × region × year tensor (each driver weighted by
           category exposure × regional exposure) and rolls the regional shifts up to the
           category level by each region&rsquo;s GP1 share (the Region-weights above) — so a
-          regionally-concentrated trend only moves its regions&rsquo; slice of the pool. The
+          regionally-concentrated driver only moves its regions&rsquo; slice of the pool. The
           Region lens is therefore now shift-based, not attribution-only; the full 3D detail
-          is available in the region drill-down. The Force and Region shares use the trend
+          is available in the region drill-down. The Force and Region shares use the driver
           0–5 ratings (category, force/region exposure) and the Config-sheet dimension weights; the{' '}
           <strong>Value Chain lens is a categorical epicentre partition</strong> (2.9.0) —
-          each trend's contribution is assigned wholly to the single stage where experts
+          each driver's contribution is assigned wholly to the single stage where experts
           located its impact epicentre, with no per-step weights and no modelled
           propagation up or down the chain (holding responses constant, propagation would
-          be a management/market story, not a trend property). Every row total equals the
+          be a management/market story, not a driver property). Every row total equals the
           MC median shift for that (category, year)
           and is therefore identical across all four lenses. <strong>Column and grand totals
           are category-weighted averages</strong> of the per-category values, using the

@@ -532,7 +532,7 @@ def init_db() -> None:
 
         # ── Delphi tables removed (D10, June 2026) ──────────────────
         # The Delphi elicitation capability was retired; expert consensus
-        # is entered live via the admin Trend editor (user_override=true).
+        # is entered live via the admin Driver editor (user_override=true).
         # Existing delphi_* tables are archived+dropped by
         # scripts/migrate_drop_delphi.py — no DDL is created here anymore.
 
@@ -723,7 +723,7 @@ def save_trends(trends: List[Trend]) -> None:
                 )
 
         conn.commit()
-        logger.info(f"Saved {len(trends)} trends to database")
+        logger.info(f"Saved {len(trends)} drivers to database")
 
 
 def _row_to_dict(row) -> dict:
@@ -852,7 +852,7 @@ def load_trends() -> List[Trend]:
             trend.sources = sources
             trends.append(trend)
 
-        logger.info(f"Loaded {len(trends)} trends from database")
+        logger.info(f"Loaded {len(trends)} drivers from database")
         return trends
 
 

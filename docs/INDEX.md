@@ -15,7 +15,7 @@ Henkel-hosted, AI-enabled version). Everything below is reference material.
 | `DEPLOYMENT_NOTES.md` | JWT-secret synchronization between the Next.js proxy and the FastAPI engine. |
 | `CLERK_MIGRATION.md` | History of the Clerk auth integration. (The legacy custom-auth pages it superseded were fully removed 2026-07-06, L26.) |
 | `CONNECTION_STATUS_GUIDE.md` | Health/connection-status behavior in the dashboard. (Since 2026-07-06/M7: reconnecting also reloads data automatically.) |
-| `SEED_DATA_README.md` | The 51-driver trend base (2.12.0): the generated seed, its inputs, how a database is moved onto it, and what every row carries — including how regional presence reaches the model through the cell weights. |
+| `SEED_DATA_README.md` | The 51-driver base (2.12.0): the generated seed, its inputs, how a database is moved onto it, and what every row carries — including how regional presence reaches the model through the cell weights. |
 
 ## Methodology & data provenance (cited from live code)
 | Doc | What it covers |
@@ -28,7 +28,7 @@ Henkel-hosted, AI-enabled version). Everything below is reference material.
 | Doc | What it covers |
 |-----|----------------|
 | `governance/README.md` | How the governance record is organised and cited from code. |
-| `governance/DECISION_LOG.md` | Owner rulings D1–D21 and O1–O14 with execution records (Part I = the Toilet Care split, Part J = the estimated HCB mix as the default cell weights — both release 2.12.0). |
+| `governance/DECISION_LOG.md` | Owner rulings D1–D21 and O1–O15 with execution records (Part I = the Toilet Care split, Part J = the estimated HCB mix as the default cell weights — both release 2.12.0; Part K = the Profit Pool Drivers vocabulary, O15). |
 | `governance/FINDINGS_REGISTER.md` | Audit findings F-01…F-27 incl. the open-by-decision set. |
 | `governance/CODE_REVIEW_2026-07-01_DECISIONS.md` | The July 2026 code review as presented to the owner. |
 | `governance/REMEDIATION_2026-07-06.md` | Full disposition of that review (owner decisions R1–R4, commits). |

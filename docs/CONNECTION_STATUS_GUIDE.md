@@ -5,7 +5,7 @@
 The PRISM War Room now includes a real-time backend connection status indicator in the header. This provides users with visual feedback about the API connection state and allows for manual reconnection attempts.
 
 > **Update (2026-07-06, M7):** reconnecting — whether via the button or the
-> periodic health check recovering — now also **reloads the data** (trends,
+> periodic health check recovering — now also **reloads the data** (drivers,
 > config, simulation) automatically, and in-flight loads are epoch-ordered so
 > an older response can never overwrite a newer one. The dashboard can no
 > longer read "connected" over stale or empty data.

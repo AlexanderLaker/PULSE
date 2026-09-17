@@ -1,11 +1,24 @@
 """Shared fixtures for PRISM test suite."""
 
-import pytest
-import numpy as np
-from datetime import datetime
+import os
 
-from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS, REGIONS
-from pulse.ingestion.models import Trend, TrendDatabase
+# The suite runs on SQLite. Scripts under test load .env (pulse.env_loader), and
+# whichever module imports pulse.database first fixes its database mode, so a
+# production DATABASE_URL in .env could otherwise reach tests that save and
+# delete drivers when a single test file runs on its own. python-dotenv never
+# overrides a variable that is already set, so blanking both URLs here (before
+# any pulse import) closes that for every test file. PRISM_TEST_ALLOW_POSTGRES=1
+# opts out on purpose.
+if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
+    os.environ["DATABASE_URL"] = ""
+    os.environ["POSTGRES_URL"] = ""
+
+import pytest  # noqa: E402
+import numpy as np  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS, REGIONS  # noqa: E402
+from pulse.ingestion.models import Trend, TrendDatabase  # noqa: E402
 
 
 def _reg(europe: int, na: int, asia: int, high_growth: int) -> dict:

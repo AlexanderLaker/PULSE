@@ -52,7 +52,8 @@ describe('HomeGate entry view', () => {
     STORE.store = fullStore;
     render(<HomeGate active onNavigate={() => {}} />);
     expect(screen.getByText('Profit Pool Model')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Trends — the input/ })).toBeTruthy();
+    // O15 (2026-09-16): the door reads "Drivers" (an overview: the short form).
+    expect(screen.getByRole('button', { name: /Drivers — the input\. 3 drivers, the evidence\./ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Consumer Journey — the lens/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Shift Analysis — the output/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Explorer, beta — the market/ })).toBeTruthy();

@@ -7,8 +7,8 @@
  * — and nothing else. No numbers, no run metadata, no footer.
  *
  * Honest-display notes (what is live and what is deliberately not):
- *   • Trends door   — LIVE: constellation dot count per force is derived
- *     from the trend store (∝ trends-per-force), so the door shows the
+ *   • Drivers door  — LIVE: constellation dot count per force is derived
+ *     from the driver store (∝ drivers-per-force), so the door shows the
  *     shape of the current evidence base. Geometry only, no numbers.
  *   • Shift door    — LIVE: the 13 heat cells are the 13 categories'
  *     MC-median shifts at the terminal year from the persisted run,
@@ -471,9 +471,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
 
       <section className="relative grid min-h-[460px] flex-1 auto-rows-[minmax(300px,1fr)] grid-cols-1 gap-[18px] sm:grid-cols-2 xl:auto-rows-auto xl:grid-cols-4">
         <Door
-          eyebrow="The input" title="Trends" caption={`${trendCount} drivers — the evidence.`}
+          eyebrow="The input" title="Drivers" caption={`${trendCount} drivers — the evidence.`}
           keyHint="1" wash={WASH.trends} delay={0.08} reduced={reduced}
-          ariaLabel={`Trends — the input. ${trendCount} drivers, the evidence. Shortcut key 1.`}
+          ariaLabel={`Drivers — the input. ${trendCount} drivers, the evidence. Shortcut key 1.`}
           onOpen={() => onNavigate('trends-2')}
         >
           <TrendsArt countsByForce={countsByForce} />

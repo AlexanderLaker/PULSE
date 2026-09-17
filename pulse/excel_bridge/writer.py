@@ -293,7 +293,7 @@ class ShiftMatrixWriter:
 
     def _write_regional(self, wb, mc_result):
         """F1 (2.10.0): the 3D shift resolved by (category, region), median per
-        year. Rows are category × region; a globally-present trend reproduces
+        year. Rows are category × region; a globally-present driver reproduces
         the category number, so a region's row shows where the shift concentrates.
         """
         from pulse.config import REGIONS
@@ -411,7 +411,7 @@ class ShiftMatrixWriter:
         att_source = (
             "admin override"
             if getattr(self.config, "attenuation_source", "") == "admin_override"
-            else "structured-judgment overlap correction (v3.11, Sep-2026, 51-driver base)"
+            else "structured-judgment overlap correction (v3.12, Sep-2026, 51-driver base)"
         )
 
         data = [
@@ -436,19 +436,19 @@ class ShiftMatrixWriter:
             ("", "Totals read as exposure if nobody acts, not as forecast outcomes."),
             ("", ""),
             # 2.9.0: VC-lens basis travels with every export of the run.
-            ("VC ATTRIBUTION", "Epicentre partition: each trend's contribution is assigned"),
+            ("VC ATTRIBUTION", "Epicentre partition: each driver's contribution is assigned"),
             ("", "wholly to the value-chain stage where experts located its impact"),
             ("", "epicentre. Propagation up/down the chain is not modelled."),
             ("", ""),
             # F1 (2.10.0): the structural scale chain + the regional roll-up.
             ("SCALE (F1)", "Structural pass-through per force = force weight (1/6) x attenuation"),
-            ("", "(~0.40-0.50) ~= 7%. A near-certain trend touching 20% of a category's"),
+            ("", "(~0.40-0.50) ~= 7%. A near-certain driver touching 20% of a category's"),
             ("", "GP1 moves it ~1.4% at full materialization, not 20% — read cells as a"),
             ("", "conservative, comparable index and apply with GP1_proj = GP1 x (1+shift)."),
-            ("REGIONAL (F1)", "The shift math is 3D (category x region x year): a trend hits a"),
+            ("REGIONAL (F1)", "The shift math is 3D (category x region x year): a driver hits a"),
             ("", "(category, region) cell weighted by category exposure x regional exposure."),
             ("", "Category numbers are the region-GP1-weighted roll-up (see Region weights);"),
-            ("", "a regionally-concentrated trend only moves its regions' slice of the pool."),
+            ("", "a regionally-concentrated driver only moves its regions' slice of the pool."),
             # 2.11.0 (O6): the cell gross-profit-share matrix is the roll-up input.
             ("CELL WEIGHTS (O6)", "Category and portfolio numbers roll the 52 category x region cells up"),
             ("", "with the HCB gross-profit share per cell (sheet 'Cell Weights'): category"),
@@ -462,13 +462,13 @@ class ShiftMatrixWriter:
             ("", ""),
             # F4/F5 (2.10.0) + O7 (2.11.0): timing uncertainty + the probability-score meaning.
             ("TIMING (F4/O7)", "P10-P90 bands are magnitude uncertainty (Beta concentration a+b = 6, or"),
-            ("", "24/16/10/6/4/3 by the trend's uncertainty score 0-5 when scored, O7)."),
+            ("", "24/16/10/6/4/3 by the driver's uncertainty score 0-5 when scored, O7)."),
             ("", "Peak-year jitter: +/-1yr triangular, or 0/1/1/2/3/4 yrs by score. start_year gates onset (F11)."),
             ("SCORE->PRIOR (F5)", "1->0.17  2->0.33  3->0.50  4->0.67  5->0.83 (Beta mean = score/6;"),
             ("", "deliberate shrinkage vs overconfidence — a '5' is five-in-six, not certainty)."),
             # F8 (2.10.0): copula scale.
             ("COPULA (F8)", "Configured correlations are LATENT-scale (co-movement of the underlying"),
-            ("", "drivers); realized score-score correlation is slightly lower (~0.28 at 0.30)."),
+            ("", "Gaussian variables); realized score-score correlation is slightly lower (~0.28 at 0.30)."),
             ("", ""),
             ("SECURITY NOTE", "This file contains ONLY percentage shifts."),
             ("", "No company financial data (NES, GP1, GP2) is present."),

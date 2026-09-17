@@ -14,7 +14,7 @@
  *     (fix #1, C4) — never "PRISM Analysis". Provenance + evidence-grade chips
  *     ride every tile and are never stripped.
  *   • Trend-code chips resolve through data/trendCodeMap.ts to the LIVE trend
- *     in usePrism().trends, with working "View in Trends →" drill-through
+ *     in usePrism().trends, with working "View in Drivers →" drill-through
  *     (fix #3, B1/B3). Retired codes render muted, with no live-driver styling.
  *   • (O3, owner ruling 2026-07-07: the quantitative journey layer —
  *     journey_exposure scores + engine journey_decomposition — was deleted.
@@ -56,7 +56,7 @@ import Chip, { type ChipKind } from '@/components/dashboard/Chip';
 
 /** Force colors — L11 (July 2026 review): the local bright palette rendered a
  *  SECOND force→colour scheme one tab away from the maritime one used by the
- *  Trends table and the drill-down. Force chips now read from the single
+ *  Drivers table and the drill-down. Force chips now read from the single
  *  palette in lib/format.ts (FORCE_COLORS) — one force, one colour, every tab. */
 const forceColor = (force?: string): string =>
   (force ? (FORCE_COLORS as Record<string, string>)[force] ?? S.primary : S.primary);
@@ -89,7 +89,7 @@ const CURRENT_YYYYMM = (() => {
 interface ConsumerJourney2Props {
   onNavigateProfitPoolShiftModel?: () => void;
   onNavigateTrends?: () => void;
-  /** Receives a trend NAME, used as a Trends-tab search query. */
+  /** Receives a driver NAME, used as a Drivers-tab search query. */
   onNavigateToTrend?: (query: string) => void;
   isAdmin?: boolean;
 }
@@ -199,8 +199,8 @@ const sortTilesForDisplay = (tiles: JourneyTile[]): JourneyTile[] =>
 //  built on Impact × Probability, but the model retired the 1–5 impact input
 //  over a year ago (replaced by gp1_pct_affected) — the backend never sends
 //  it, so the bar had never rendered once. Evidence cards keep the live
-//  Stage-exposure bar; the trend's real inputs are one click away via
-//  "View in Trends".)
+//  Stage-exposure bar; the driver's real inputs are one click away via
+//  "View in Drivers".)
 
 /** A long Laundry stage spans two grid columns and lays its tiles out in two
  *  readable sub-columns, so very long stages (e.g. Add Products) don't stretch
@@ -351,7 +351,7 @@ const TilePill: FC<{
 // ════════════════════════════════════════════════════════════════════════
 // Trend-force card (in the detail panel) — resolves a code to the LIVE trend
 // and reads it as a directional force: tailwind/headwind, and how hard it
-// hits THIS stage. The connect to the Trends page (B1/B3 preserved).
+// hits THIS stage. The connect to the Drivers page (B1/B3 preserved).
 // ════════════════════════════════════════════════════════════════════════
 const TrendForceCard: FC<{
   code: string;
@@ -387,7 +387,7 @@ const TrendForceCard: FC<{
           >
             {citedCode}
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT }}>retired trend · {retired.name}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT }}>retired driver · {retired.name}</span>
         </div>
         <p style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '6px 0 0', fontStyle: 'italic' }}>
           {retired.note} — kept for reference; not a live driver.
@@ -480,7 +480,7 @@ const TrendForceCard: FC<{
             color: isExp ? S.onExpansionContainer : S.onErrorContainer,
             fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
           }}
-          title={isExp ? 'Expansion trend — a tailwind for this moment' : 'Contraction trend — a headwind for this moment'}
+          title={isExp ? 'Expansion driver — a tailwind for this moment' : 'Contraction driver — a headwind for this moment'}
         >
           {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
           {isExp ? 'Tailwind' : 'Headwind'}
@@ -506,7 +506,7 @@ const TrendForceCard: FC<{
           onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
         >
           <ExternalLink size={11} strokeWidth={2.5} />
-          View in Trends
+          View in Drivers
         </button>
         {typeof sourceCount === 'number' && sourceCount > 0 && (
           <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
@@ -613,16 +613,16 @@ const WhyChain: FC<{
       </h3>
 
       <div style={{ marginTop: 14 }}>
-        {/* 1 — driving trends */}
+        {/* 1 — the drivers behind this moment (each card links to the Drivers page) */}
         <div style={stepWrap}>
           <StepDot n={1} /><span style={connector} />
-          <div style={stepLabel}>Driving trends — links to the Trends page</div>
+          <div style={stepLabel}>Drivers behind this moment</div>
           <div style={{ marginTop: 8 }}>
             {tile.trendCodes.length === 0 ? (
               <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
                 {tile.driverNote.startsWith('No modelled driver')
                   ? `${tile.driverNote}. The Strategist Read below stands as authored judgment; nothing here feeds the Shift Matrix.`
-                  : 'No trends linked to this tile.'}
+                  : 'No drivers linked to this tile.'}
               </p>
             ) : (
               <div className="flex flex-col gap-2">
@@ -744,7 +744,7 @@ const TileEditor: FC<{
       </div>
 
       <div>
-        <label style={labelStyle}>Linked trend codes</label>
+        <label style={labelStyle}>Linked driver codes</label>
         {edits.trendCodes.map((code, idx) => (
           <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <select
@@ -754,7 +754,7 @@ const TileEditor: FC<{
               })}
               style={{ ...inputStyle, backgroundColor: S.surfaceLow }}
             >
-              <option value="">Select trend…</option>
+              <option value="">Select driver…</option>
               {allCodes.map(c => (
                 <option key={c} value={c}>{c}: {TREND_CODE_MAP[c].name}</option>
               ))}
@@ -763,8 +763,8 @@ const TileEditor: FC<{
               <button
                 onClick={() => setEdits(p => ({ ...p, trendCodes: p.trendCodes.filter((_, i) => i !== idx) }))}
                 style={{ padding: '0 10px', borderRadius: 8, backgroundColor: S.errorContainer, border: 'none', color: S.onErrorContainer, cursor: 'pointer', flexShrink: 0 }}
-                title="Remove trend"
-                aria-label="Remove trend"
+                title="Remove driver"
+                aria-label="Remove driver"
               >
                 <Trash2 size={13} strokeWidth={2.5} />
               </button>
@@ -776,7 +776,7 @@ const TileEditor: FC<{
           className="inline-flex items-center gap-1.5 rounded-full font-bold"
           style={{ marginTop: 2, padding: '5px 12px', backgroundColor: S.primaryContainer, color: S.onPrimaryContainer, border: 'none', cursor: 'pointer', fontSize: 11, fontFamily: HEADLINE_FONT }}
         >
-          <Plus size={12} strokeWidth={2.5} /> Add trend
+          <Plus size={12} strokeWidth={2.5} /> Add driver
         </button>
       </div>
 
@@ -1068,7 +1068,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
               Where Profit Pools Shift Along the Journey
             </h1>
             <p className="mt-2 max-w-2xl text-[15px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
-              Trends mapped to consumer moments, tile by tile. Each tile is an authored
+              Profit Pool Drivers mapped to consumer moments, tile by tile. Each tile is an authored
               strategist read with visible provenance; click any tile for its evidence and analysis.
             </p>
           </div>
@@ -1078,7 +1078,7 @@ const ConsumerJourney2: FC<ConsumerJourney2Props> = ({
         <div className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
           <Info size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 2 }} />
           <p className="text-[12.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, margin: 0 }}>
-            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping trends to consumer moments — authored content does not feed the Shift Matrix.</strong>
+            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping drivers to consumer moments — authored content does not feed the Shift Matrix.</strong>
           </p>
         </div>
 

@@ -10,6 +10,11 @@ including the Postgres-style ON DELETE CASCADE on expert proposals.
 — v3 plus the "LHC: TOI" column split out of "LHC: HSC" — so every driver
 carries THIRTEEN category-exposure rows. The drivers themselves (population,
 codes, probabilities, regional exposures) are unchanged by the split.
+
+Owner ruling O15 (2026-09-16): the generator reads core_set_51_v5.json, which
+is v4 with four texts reworded to the Driver vocabulary (C-03, C-27, C-35,
+G-15). tests/test_driver_vocabulary.py locks that v5 differs from v4 in exactly
+those four fields.
 """
 
 import importlib.util
@@ -27,7 +32,7 @@ from pulse import seed_trends
 
 REPO = Path(__file__).resolve().parent.parent
 CODEMAP = REPO / "data" / "trendCodeMap.ts"
-CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v4.json"
+CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v5.json"
 LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G",
           "Environmental": "E", "Competitive": "X"}
 SLUG = {"Consumer": "consumer", "Customer": "customer", "Technology": "technology",

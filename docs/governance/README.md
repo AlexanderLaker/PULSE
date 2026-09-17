@@ -8,7 +8,7 @@ Reading order:
 
 | Doc | What it is |
 |-----|------------|
-| `DECISION_LOG.md` | The owner rulings D1–D21 (June 2026 strategy-review rounds) with full decision text and execution records. `CLAUDE.md` §1 summarises them; this is the source. |
+| `DECISION_LOG.md` | The owner rulings D1–D21 (June 2026 strategy-review rounds) and O1–O15 (July to September 2026, the latest being the Profit Pool Drivers vocabulary of Part K) with full decision text and execution records. `CLAUDE.md` §1 summarises them; this is the source. |
 | `FINDINGS_REGISTER.md` | The strategy-review findings register (F-01…F-27): every audit finding with evidence, status, and — where the owner ruled a finding *open-by-decision* — the standing rationale (F-08 no hindcast, F-09 one-sided trend grammar, F-20 no Henkel-position overlay). |
 | `CODE_REVIEW_2026-07-01_DECISIONS.md` | The July 2026 external-style code review: 2 critical / 6 high / 17 medium / 29 low findings with options and recommendations, as presented to the owner. |
 | `REMEDIATION_2026-07-06.md` | What was actually done about it — the July 6 handover-review remediation record: every finding's disposition (fixed / owner-decided / declined-with-reason), the owner decisions R1–R4, and the commits that carry each fix. |

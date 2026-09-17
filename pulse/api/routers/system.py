@@ -131,7 +131,7 @@ async def manual_seed(user: dict = Depends(require_admin)):
         _state["config"] = config
         # Mark simulation as stale — admin must press Simulate
         _state["simulation_stale"] = True
-        _state["stale_reason"] = "Trends re-seeded. Press Simulate to update results."
+        _state["stale_reason"] = "Drivers re-seeded. Press Simulate to update results."
         steps.append("simulation marked stale (press Simulate to run)")
 
         return {"status": "ok", "steps": steps}

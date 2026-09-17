@@ -165,7 +165,7 @@ def compute_input_drift_event(
             "type": "input_drift",
             "severity": "info",
             "message": f"Input drift vs {ref}: no score changes — "
-                       f"trend inputs identical to the previous accepted run.",
+                       f"driver inputs identical to the previous accepted run.",
             "detail": {"previous_run_id": previous_run_id, "scores_changed": 0,
                        "direction_flips": 0, "structure_changes": 0,
                        "added": 0, "removed": 0,
@@ -178,7 +178,7 @@ def compute_input_drift_event(
     ) if balance_delta else ""
     add_rm_txt = ""
     if added or removed:
-        add_rm_txt = f"; {len(added)} trend(s) added, {len(removed)} removed"
+        add_rm_txt = f"; {len(added)} driver(s) added, {len(removed)} removed"
     struct_txt = (
         f"; {len(structure_changes)} structural change(s) "
         f"(exposures/peak-year/curve)"
@@ -195,7 +195,7 @@ def compute_input_drift_event(
         "type": "input_drift",
         "severity": severity,
         "message": (
-            f"Input drift vs {ref}: {n_changed} trend score(s) changed "
+            f"Input drift vs {ref}: {n_changed} driver score(s) changed "
             f"({len(prob_changes)} probability, {len(gp1_changes)} gp1) "
             f"({len(direction_flips)} direction flip(s){struct_txt}{add_rm_txt}{bal_txt})."
         ),

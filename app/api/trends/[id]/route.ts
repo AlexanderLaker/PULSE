@@ -85,7 +85,7 @@ export async function PUT(req: Request, { params }: Params) {
     const admin = await requireAdmin();
     const { id } = await params;
     if (!id) {
-      return NextResponse.json({ error: 'Missing trend id' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing driver id' }, { status: 400 });
     }
 
     const body = await req.json().catch(() => null);
@@ -135,6 +135,6 @@ export async function PUT(req: Request, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: 403 });
     }
     console.error('[/api/trends/:id PUT] error:', err);
-    return NextResponse.json({ error: 'Failed to update trend' }, { status: 502 });
+    return NextResponse.json({ error: 'Failed to update driver' }, { status: 502 });
   }
 }

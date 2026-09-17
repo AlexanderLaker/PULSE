@@ -87,9 +87,9 @@ interface CategoryDetailPanelProps {
   data: CategoryDetailPanelData;
   categoryId: string;
   onClose: () => void;
-  /** Drill-through to the Trends tab: receives the trend NAME (used as the
-      Trends search query — same contract as the Consumer Journey evidence
-      cards). When provided, every contributing-trend row becomes a link. */
+  /** Drill-through to the Drivers tab: receives the driver NAME (used as the
+      Drivers search query — same contract as the Consumer Journey evidence
+      cards). When provided, every contributing-driver row becomes a link. */
   onOpenTrend?: (name: string) => void;
 }
 
@@ -502,7 +502,7 @@ interface TrendCardProps {
   trend: Trend;
   index: number;
   rank: number;
-  /** When provided, the card is a link into the Trends explorer. */
+  /** When provided, the card is a link into the Drivers page. */
   onOpen?: () => void;
 }
 
@@ -536,7 +536,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
       onMouseLeave={interactive ? () => setHovered(false) : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={interactive ? `Open "${trend.name}" in the Trends explorer` : undefined}
+      aria-label={interactive ? `Open "${trend.name}" on the Drivers page` : undefined}
       onKeyDown={interactive ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(); }
       } : undefined}
@@ -717,7 +717,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
         </div>
       </div>
 
-      {/* Link affordance — the card opens this trend in the Trends explorer */}
+      {/* Link affordance — the card opens this driver on the Drivers page */}
       {interactive && (
         <ArrowUpRight
           size={15}
@@ -1114,7 +1114,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                Trends
+                Drivers
               </div>
               <div
                 style={{
@@ -1192,7 +1192,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           {/* Contributing trends — ranked by scaled attribution share */}
           {trendList.length > 0 && (
             <Section
-              title="Contributing Trends"
+              title="Contributing Drivers"
               icon={Layers}
               trailing={
                 <span

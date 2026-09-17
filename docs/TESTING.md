@@ -1,6 +1,6 @@
 # PRISM Testing Guide
 
-Reconciled to the tree on 2026-09-11 (release 2.12.0). CI runs the same gates (`.github/workflows/ci.yml`): frontend typecheck, lint, vitest; scipy engine pytest.
+Reconciled to the tree on 2026-09-17 (release 2.12.0 plus the O15 Driver vocabulary). CI runs the same gates (`.github/workflows/ci.yml`): frontend typecheck, lint, vitest; scipy engine pytest.
 
 ## Quick start
 
@@ -12,16 +12,17 @@ python3 scripts/generate_seed_from_core_set.py --check   # committed seed + code
 python3 scripts/build_estimated_cell_weights.py --check  # committed cell-weight record + lib/cellWeightProvenance.ts == generator output (O14)
 ```
 
-## Python suite (`tests/`, 208 tests)
+## Python suite (`tests/`, 267 tests)
 
 | File | Tests | Locks |
 |------|:---:|-------|
-| `conftest.py` | – | Fixture DB (five differentiated trends with canonical VC profiles, L29) and `mock_model_config` (defaults, 1,000 iterations, 2026–2030, jitter OFF) |
+| `conftest.py` | – | Fixture DB (five differentiated trends with canonical VC profiles, L29) and `mock_model_config` (defaults, 1,000 iterations, 2026–2030, jitter OFF). Blanks `DATABASE_URL` and `POSTGRES_URL` before any import (O15), so a production URL in `.env` never reaches a test; `PRISM_TEST_ALLOW_POSTGRES=1` opts out |
 | `test_bayesian_mc.py` | 30 | Engine behaviour: priors, copula, materialisation, dampening, velocity, peak-year jitter (F4), multichain pooling |
 | `test_golden_pipeline.py` | 17 | Determinism; **golden pins** (seed 42, 500 iterations, regenerated only with deliberate model changes in the same commit — last 2026-09-11 for 2.12.0, twice: the O13 Toilet Care split, then the O14 estimated HCB cell-weight default, which is the large move of the release and deepens the fixture portfolio pin from −0.00433 to −0.00572); joint portfolio band pin; no repair fires on defaults (D1); one version everywhere (M15); VC structural locks (2.9.0) |
 | `test_cell_weights.py` | 26 | **O6**: the 2.12.0 engine with the separable Group-split matrix, the 2.10.0 calibration and the explicitly pinned 12-category taxonomy `CATEGORIES_2_10_0` reproduces the 2.10.0 fixture run to 1e-12 — 3.47e-18 on the 2.12.0 code (category cells, portfolio band, velocity bands with jitter on, region lens); roll-up algebra over the 13 × 4 grid; contract keys; validator and config construction. **O14** (`TestEstimatedMixProvenance`, 7): the constants match `data/cell_weights_estimated_v1.json`, the record matches the generator (`build_estimated_cell_weights.py --check`, which also covers `lib/cellWeightProvenance.ts`), the source string is the record's own, every input carries a B/E/G grade, the published inputs re-derive the 52 cells, and the matrix must never become effectively separable |
 | `test_uncertainty.py` | 19 | **O7**: prior table and floors, unscored = 2.10.0, `peak_year_jitter = 0` as the off switch, per-trend jitter widths drawn by the engine's own sampler, the onset clamp (an early draw never becomes the latest arrival), multichain event dedupe, reproducibility, drift key `"u"`, SQLite and proposals round trip |
-| `test_trend_base_2026_09.py` | 13 | **O10 / O13**: seed integrity (51 drivers generated from `core_set_51_v4.json`, 13-category exposures, ranges, sources, scores, no provenance label, snapshot), generator `--check`, code map partition and pointers, journey citations, the replacement script (dry run without schema writes, live run with the Postgres-style cascade, second-run refusal unless `--force`, Postgres refusal) |
+| `test_trend_base_2026_09.py` | 13 | **O10 / O13**: seed integrity (51 drivers generated from `core_set_51_v5.json`, 13-category exposures, ranges, sources, scores, no provenance label, snapshot), generator `--check`, code map partition and pointers, journey citations, the replacement script (dry run without schema writes, live run with the Postgres-style cascade, second-run refusal unless `--force`, Postgres refusal) |
+| `test_driver_vocabulary.py` | 59 | **O15**: the repository content carries the Driver vocabulary (every new phrase of `scripts/apply_driver_vocabulary.py` in the Consumer Journey seed and none of the old, order-independent edits, `core_set_51_v5.json` = v4 plus exactly the four text edits, no "trend" in any generated driver text); the text the engine, the input-drift audit, the credibility gate, the QA workbook and the API hand to people never says trend (an AST sweep over error calls, messages, stale reasons and audit texts, plus runtime checks: an engine run with a region-less driver and one with no value-chain epicentre, and the driver endpoints' errors, audit rows and stale reasons); the content script on a throw-away SQLite base that the fixtures force even when `.env` names Postgres (dry run, apply and its audit texts, idempotence, reworded phrases reported not forced, every exit code, the database-mode guard incl. the psycopg2 fallback, the target named without credentials, no database file created, a no-overwrite archive that must read back, the audit entry inside the transaction, compare-and-swap against a save before the write, during the read and during the write, a write-back after the commit, an unconfirmed commit, a failed read-back, a missing privilege) and the statements the Postgres branch sends, in order (lock timeout, table lock, check, insert, updates, audit, commit) |
 | `test_calibration_v3_12.py` | 11 | **O11 / O13 / F-28**: defaults == calibration record, record == script output, eff_att identity, copula PSD margin on the 51 mix, validator source tags. Recomputed for 2.12.0 because the overlap correction is a function of the category exposure space, so the Toilet Care split changes its input (renamed from `test_calibration_v3_11.py`) |
 | `test_trend_persistence.py` | 8 | **O12 / F-29**: the `save_trends` upsert — an admin edit of a driver no longer cascades that driver's expert score proposals away (run with foreign keys enforced so the SQLite path behaves like Neon) |
 | `test_vc_epicentre.py` | 13 | Parity fixture table with `tests/frontend/vcEpicentre.test.ts` (Python `vc_epicentre_of` == TS `epicentreOf`); drift semantics |
@@ -30,7 +31,7 @@ python3 scripts/build_estimated_cell_weights.py --check  # committed cell-weight
 | `test_api.py` | 50 | Endpoint behaviour incl. the F2 409 guard, F3 read authentication, D13 backend tag, the 2.12.0 config contract (cell weights only, derived marginals, 13 × 4 grid validation), the uncertainty field (range, round trip, explicit-null clearing) and the reseed/sync base-replacement guard |
 | `test_ops.py` | 9 | M10: prod entrypoint import, `EXPECTED_TREND_COUNT` (51), H1 wrong-DB-mode exit, CLI parser, Excel writer round trip, diagnostics outage; **O14**: the QA workbook's "Cell Weights" sheet carries the graded derivation under the estimated mix and omits it under any other matrix |
 
-## Frontend suite (`tests/frontend/`, vitest, 84 tests)
+## Frontend suite (`tests/frontend/`, vitest, 90 tests)
 
 | File | Locks |
 |------|-------|
@@ -42,6 +43,7 @@ python3 scripts/build_estimated_cell_weights.py --check  # committed cell-weight
 | `vcEpicentre.test.ts` | Parity with the Python epicentre rule |
 | `format.test.ts` | Display-honesty pins (one decimal, sign always visible) |
 | `authRoutes.test.ts`, `prismCookie.test.ts` | Auth seam |
+| `driverVocabulary.test.tsx` | **O15**: no user-facing "trend" in any string literal, template chunk or JSX text under `app/`, `components/`, `hooks/`, `lib/`, `api/` (six-entry allowlist of identifiers and third-party names, with a probe proving the sweep catches a planted label); render checks that the entry gate and the Drivers page read "Drivers" / "Profit Pool Drivers", including the page before the drivers load |
 | `consumerJourneyDialog.test.tsx`, `homeGate.test.tsx`, `tabSmoke.test.tsx`, `usePrism.test.tsx` | Component smoke tests |
 
 ## Rules
@@ -59,5 +61,6 @@ python3 -m pytest tests -q -x                                      # stop at the
 python3 -m pytest tests -q --durations=10                          # slowest tests
 python3 -m pytest tests/test_cell_weights.py -q -k EstimatedMix    # the O14 provenance locks only
 npx vitest run tests/frontend/trendCodeMap.test.ts                 # one frontend file
-PRISM_DB_PATH=/tmp/x.db python3 scripts/replace_trend_base.py --dry-run   # replacement report on any SQLite copy
+DATABASE_URL= POSTGRES_URL= PRISM_DB_PATH=/tmp/x.db python3 scripts/replace_trend_base.py --dry-run      # replacement report on any SQLite copy (blank URLs win over .env)
+DATABASE_URL= POSTGRES_URL= PRISM_DB_PATH=/tmp/x.db python3 scripts/apply_driver_vocabulary.py --dry-run # O15 content report on any SQLite copy
 ```

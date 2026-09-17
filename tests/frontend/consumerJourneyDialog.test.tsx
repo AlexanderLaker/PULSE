@@ -53,7 +53,7 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
     expect(container.textContent).not.toContain('(auto-dose)');
   });
 
-  it('opens a full-screen dialog with the Why-chain and the Trends connect', () => {
+  it('opens a full-screen dialog with the Why-chain and the Drivers connect', () => {
     render(<ConsumerJourney2 onNavigateToTrend={() => {}} />);
 
     fireEvent.click(screen.getByText('AI stain/fabric recognition apps'));
@@ -61,19 +61,19 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
     const dialog = screen.getByRole('dialog');
     const u = within(dialog);
 
-    // two-step ladder: driving trends -> net effect
+    // two-step ladder: drivers -> net effect (O15 vocabulary, 2026-09-16)
     expect(u.getByText(/Why this moment is (expanding|under pressure)/)).toBeTruthy();
-    expect(u.getByText('Driving trends — links to the Trends page')).toBeTruthy();
+    expect(u.getByText('Drivers behind this moment')).toBeTruthy();
     expect(u.getByText('Net effect')).toBeTruthy();
 
-    // trend-force card resolved against the LIVE trend
+    // driver-force card resolved against the LIVE driver
     expect(u.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
     // M8 (2026-07-06): the "Strength" bar is GONE (retired impact input).
     // O3 (2026-07-07): "Stage exposure" is GONE too — the quantitative
     // journey layer was deleted. Lock both in.
     expect(u.queryByText('Strength')).toBeNull();
     expect(u.queryByText('Stage exposure')).toBeNull();
-    expect(u.getAllByText('View in Trends').length).toBeGreaterThan(0);
+    expect(u.getAllByText('View in Drivers').length).toBeGreaterThan(0);
 
     // refinement 2026-06-29: "This moment" + "Computed attribution" steps and
     // the honesty footer were removed; lock that in.

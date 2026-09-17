@@ -116,7 +116,7 @@ async def run_simulation(req: SimulationRequest, user: dict = Depends(require_ad
 
         db = _state.get("db")
         if not db or db.trend_count == 0:
-            raise HTTPException(404, "No trends found. Add trends before simulating.")
+            raise HTTPException(404, "No drivers found. Add drivers before simulating.")
 
         config = _state["config"]
 

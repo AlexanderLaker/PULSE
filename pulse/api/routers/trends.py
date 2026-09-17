@@ -136,7 +136,7 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
     # API caller sees a structured rejection rather than a 500.
     from pulse.seed_trends import assert_trend_credible, TierEGateError
     try:
-        assert_trend_credible(f"new_trend({req.name!r})", req.sources or [])
+        assert_trend_credible(req.name, req.sources or [])
     except TierEGateError as gate_err:
         raise HTTPException(
             status_code=422,
@@ -144,7 +144,7 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
                 "error": "Source credibility gate failed",
                 "reason": str(gate_err),
                 "guidance": "Attach at least one source rated S/A/A-/B+/B/B-/C "
-                            "before the trend can be added to the model.",
+                            "before the driver can be added to the model.",
             },
         )
 
@@ -197,7 +197,7 @@ async def create_trend(req: TrendCreate, user: dict = Depends(require_admin)):
 
     # Mark simulation as stale
     _state["simulation_stale"] = True
-    _state["stale_reason"] = f"New trend '{req.name}' was added"
+    _state["stale_reason"] = f"New driver '{req.name}' was added"
 
     return {
         "status": "created",
@@ -241,12 +241,12 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
             t.__post_init__()
 
     if not changes:
-        return {"status": "no_changes", "message": "All trends already match seed values"}
+        return {"status": "no_changes", "message": "All drivers already match seed values"}
 
     try:
         save_trends(db_trends)
     except Exception as e:
-        raise HTTPException(500, f"Failed to save reverted trends: {e}")
+        raise HTTPException(500, f"Failed to save reverted drivers: {e}")
 
     # Refresh in-memory state
     db_trends = load_trends()
@@ -254,14 +254,14 @@ async def revert_trends_to_seed(user: dict = Depends(require_admin)):
     if db:
         db.trends = db_trends
         _state["simulation_stale"] = True
-        _state["stale_reason"] = f"Reverted {len(changes)} trends to seed values"
+        _state["stale_reason"] = f"Reverted {len(changes)} drivers to seed values"
 
     try:
         log_audit(
             "trends_reverted_to_seed",
             "trend",
             "all",
-            old_value=f"{len(changes)} trends had modified probabilities",
+            old_value=f"{len(changes)} drivers had modified probabilities",
             new_value="All probabilities reset to seed_trends.py",
             reason="User requested revert to seed scores",
             user_id=identity_from_user(user)[0],
@@ -316,7 +316,7 @@ async def full_reseed(user: dict = Depends(require_admin)):
     if old_count and len(orphan_ids) + len(added_ids) > BASE_REPLACEMENT_THRESHOLD:
         raise HTTPException(409,
             f"full-reseed refused: the seed and the database differ by {len(orphan_ids)} retired "
-            f"and {len(added_ids)} new ids — that is a trend-base replacement. Run "
+            f"and {len(added_ids)} new ids — that is a driver-base replacement. Run "
             f"scripts/replace_trend_base.py (archive-first) instead.")
 
     # Delete orphans from all related tables before upserting the new seed
@@ -333,12 +333,12 @@ async def full_reseed(user: dict = Depends(require_admin)):
                     cursor.execute(f"DELETE FROM trends WHERE id = {p}", (oid,))
                 conn.commit()
         except Exception as e:
-            raise HTTPException(500, f"Failed to delete orphaned trends: {e}")
+            raise HTTPException(500, f"Failed to delete orphaned drivers: {e}")
 
     try:
         save_trends(seed_trends)
     except Exception as e:
-        raise HTTPException(500, f"Failed to save reseeded trends: {e}")
+        raise HTTPException(500, f"Failed to save reseeded drivers: {e}")
 
     # Reload from DB and refresh in-memory state
     db_trends = load_trends()
@@ -353,8 +353,8 @@ async def full_reseed(user: dict = Depends(require_admin)):
             "trends_full_reseed",
             "trend",
             "all",
-            old_value=f"{old_count} trends replaced (orphans removed: {orphan_ids})",
-            new_value=f"{len(db_trends)} trends from seed_trends.py",
+            old_value=f"{old_count} drivers replaced (orphans removed: {orphan_ids})",
+            new_value=f"{len(db_trends)} drivers from seed_trends.py",
             reason="Full reseed — descriptions, parameters, exposures all refreshed",
             user_id=identity_from_user(user)[0],
         )
@@ -367,7 +367,7 @@ async def full_reseed(user: dict = Depends(require_admin)):
         "new_count": len(db_trends),
         "orphans_deleted": orphan_ids,
         "orphans_deleted_count": len(orphan_ids),
-        "message": f"All {len(db_trends)} trends replaced from seed_trends.py",
+        "message": f"All {len(db_trends)} drivers replaced from seed_trends.py",
     }
 
 @router.get("/api/v1/trends/{trend_id}")
@@ -377,7 +377,7 @@ async def get_trend(trend_id: str, user: dict = Depends(require_auth)):
         raise HTTPException(404, "No model loaded")
     trend = db.get_trend_by_id(trend_id)
     if not trend:
-        raise HTTPException(404, f"Trend {trend_id} not found")
+        raise HTTPException(404, f"Driver {trend_id} not found")
 
     # Multi-expert proposal summary (June 2026): cheap per-trend load.
     from pulse.api.proposals import build_proposal_summary
@@ -415,7 +415,7 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
         raise HTTPException(404, "No model loaded")
     trend = db.get_trend_by_id(trend_id)
     if not trend:
-        raise HTTPException(404, f"Trend {trend_id} not found")
+        raise HTTPException(404, f"Driver {trend_id} not found")
 
     audit = _state["audit"]
     actor_id, _, _ = identity_from_user(user)  # M3: attribute edits to the verified JWT identity
@@ -490,7 +490,7 @@ async def update_trend(trend_id: str, update: TrendUpdate, user: dict = Depends(
 
     # Mark simulation as stale
     _state["simulation_stale"] = True
-    _state["stale_reason"] = f"Trend '{trend_id}' was updated"
+    _state["stale_reason"] = f"Driver '{trend_id}' was updated"
 
     return {"status": "updated", "trend_id": trend_id}
 
@@ -518,7 +518,7 @@ async def get_trend_proposals(trend_id: str, user: dict = Depends(require_auth))
     if not db:
         raise HTTPException(404, "No model loaded")
     if not db.get_trend_by_id(trend_id):
-        raise HTTPException(404, f"Trend {trend_id} not found")
+        raise HTTPException(404, f"Driver {trend_id} not found")
     user_id, _, _ = _identity_from_user(user)
     try:
         from pulse.database import init_db
@@ -548,7 +548,7 @@ async def put_trend_proposal(
     if not db:
         raise HTTPException(404, "No model loaded")
     if not db.get_trend_by_id(trend_id):
-        raise HTTPException(404, f"Trend {trend_id} not found")
+        raise HTTPException(404, f"Driver {trend_id} not found")
 
     user_id, user_name, user_role = _identity_from_user(user)
 
@@ -616,7 +616,7 @@ async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):
         raise HTTPException(404, "No model loaded")
     trend = db.get_trend_by_id(trend_id)
     if not trend:
-        raise HTTPException(404, f"Trend {trend_id} not found")
+        raise HTTPException(404, f"Driver {trend_id} not found")
 
     # Remove from in-memory database
     db.trends = [t for t in db.trends if t.id != trend_id]
@@ -639,14 +639,14 @@ async def delete_trend(trend_id: str, user: dict = Depends(require_admin)):
     try:
         from pulse.database import log_audit
         log_audit("trend_deleted", "trend", trend_id, old_value=trend.name,
-                  reason="User deleted trend",
+                  reason="User deleted driver",
                   user_id=identity_from_user(user)[0])
     except Exception:
         pass
 
     # Mark simulation as stale
     _state["simulation_stale"] = True
-    _state["stale_reason"] = f"Trend '{trend_id}' was deleted"
+    _state["stale_reason"] = f"Driver '{trend_id}' was deleted"
 
     return {"status": "deleted", "trend_id": trend_id, "trend_count": db.trend_count}
 
@@ -677,14 +677,14 @@ async def delete_all_trends(user: dict = Depends(require_admin)):
     try:
         from pulse.database import log_audit
         log_audit("all_trends_deleted", "trend", "all",
-                  reason=f"Cleared {count} trends",
+                  reason=f"Cleared {count} drivers",
                   user_id=identity_from_user(user)[0])
     except Exception:
         pass
 
     # Mark simulation as stale
     _state["simulation_stale"] = True
-    _state["stale_reason"] = f"All {count} trends were deleted"
+    _state["stale_reason"] = f"All {count} drivers were deleted"
 
     return {"status": "deleted_all", "trends_deleted": count}
 
@@ -712,7 +712,7 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
     if db_trends and len(missing_ids) + len(db_ids - seed_ids) > BASE_REPLACEMENT_THRESHOLD:
         raise HTTPException(409,
             f"sync refused: {len(missing_ids)} seed ids are missing and {len(db_ids - seed_ids)} "
-            f"database ids are not in the seed — that is a trend-base replacement. Run "
+            f"database ids are not in the seed — that is a driver-base replacement. Run "
             f"scripts/replace_trend_base.py (archive-first) instead.")
 
     if not missing_ids:
@@ -732,7 +732,7 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
     try:
         save_trends(merged)
     except Exception as e:
-        raise HTTPException(500, f"Failed to save trends: {e}")
+        raise HTTPException(500, f"Failed to save drivers: {e}")
 
     # Reload from DB and refresh in-memory state
     db_trends = load_trends()
@@ -740,7 +740,7 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
     if db:
         db.trends = db_trends
         _state["simulation_stale"] = True
-        _state["stale_reason"] = f"Synced {len(missing_ids)} missing trends"
+        _state["stale_reason"] = f"Synced {len(missing_ids)} missing drivers"
 
     # Audit log
     try:
@@ -749,7 +749,7 @@ async def sync_missing_trends(user: dict = Depends(require_admin)):
             "trends_synced",
             "trend",
             ",".join(sorted(missing_ids)),
-            reason=f"Added {len(missing_ids)} missing trends from seed_trends.py",
+            reason=f"Added {len(missing_ids)} missing drivers from seed_trends.py",
             user_id=identity_from_user(user)[0],
         )
     except Exception:

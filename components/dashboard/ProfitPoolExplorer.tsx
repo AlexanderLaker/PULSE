@@ -278,10 +278,10 @@ const DetailPanel: FC<{
     revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
     gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
     revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(slide.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
-    revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nDriver: ${item.revenueDriver}\nSource: ${revSrcNames || '—'} (grade: ${item.sources.revenue[0]?.grade ?? 'estimate'}).`,
+    revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nRationale: ${item.revenueDriver}\nSource: ${revSrcNames || '—'} (grade: ${item.sources.revenue[0]?.grade ?? 'estimate'}).`,
     revEnd: `2030 revenue = today × (1 + CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(revEur)} × (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(revEnd)} (nominal).`,
     gp1Today: `GP1/CM1 proxy ${pct(item.gp1Margin)} — PRISM structured estimate CALIBRATED against reported FY2025 gross margins (GP1 is not separately disclosed at this level, so it is never graded 'reported').\n\nCalibration anchors: ${mgnSrcNames || '—'}.`,
-    gp1Pa: `Margin drift ${gp1Rating.label} over ${POOL_HORIZON_LABEL} — structured judgment (⚠️).\n\nDriver: ${item.marginDriver}`,
+    gp1Pa: `Margin drift ${gp1Rating.label} over ${POOL_HORIZON_LABEL} — structured judgment (⚠️).\n\nRationale: ${item.marginDriver}`,
     gp1End: `2030 GP1 = today + drift:\n${pct(item.gp1Margin)} ${item.gp1DeltaBps >= 0 ? '+' : '−'} ${Math.abs(item.gp1DeltaBps)}bps = ${pct(gp1EndPct)}.`,
     poolToday: `${fmtEurBn(gp1Now)} = revenue ${fmtEurBn(revEur)} × GP1 ${pct(item.gp1Margin)}.\n\nSources: size — ${revSrcNames || '—'}; margin calibration — ${mgnSrcNames || '—'}.`,
     poolPa: `Pool CAGR = (1 + revenue CAGR) × (1 + margin CAGR) − 1\n= (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))}) × (1 ${marginCagr >= 0 ? '+' : '−'} ${pct(Math.abs(marginCagr), 2)}) − 1 = ${poolRating.label} p.a.\n\nMargin CAGR is the ${item.gp1DeltaBps >= 0 ? '+' : ''}${item.gp1DeltaBps}bps drift spread over ${POOL_HORIZON_YEARS} years.`,
@@ -862,7 +862,7 @@ const ProfitPoolExplorer: FC = () => {
       className="min-h-screen"
       style={{
         // Shared maritime page shell — centered max-w-1440 with px-8 py-10,
-        // matching Profit Pool Exposure / Trends / Consumer Journey.
+        // matching Profit Pool Exposure / Drivers / Consumer Journey.
         maxWidth: 1440,
         margin: '0 auto',
         padding: '40px 32px',

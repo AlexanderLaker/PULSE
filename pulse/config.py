@@ -31,7 +31,7 @@ def vc_epicentre_of(vc_exposure: Optional[dict]) -> Optional[int]:
     """1-based value-chain epicentre stage of a vc_exposure profile, or None.
 
     2.9.0 (July 2026 VC-epicentre redesign): experts score the value chain
-    as a SINGLE epicentre stage (the Trends editor's slider); the stored
+    as a SINGLE epicentre stage (the Drivers editor's slider); the stored
     8-step 0–5 profile is a serialization format, not eight independent
     judgments. This function is the engine-side twin of ``epicentreOf`` in
     components/dashboard/Trends2.tsx and MUST stay behaviourally identical —

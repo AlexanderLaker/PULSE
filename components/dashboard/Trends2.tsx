@@ -1,7 +1,13 @@
 /**
- * Trends 2 — Editorial Intelligence View
+ * Trends 2 — Editorial Intelligence View (the Drivers page)
  *
- * Alternative visualisation for the trends page, inspired by the Stitch
+ * Product vocabulary (owner ruling O15, 2026-09-16): the modelled items are
+ * "Profit Pool Drivers", shortened to "Drivers" in menus, headers and
+ * overviews. Every user-facing string here says driver; the component name,
+ * the Trend types, the /trends API routes and the database keep the `trend`
+ * identifiers on purpose (no contract or schema change).
+ *
+ * Alternative visualisation for the drivers page, inspired by the Stitch
  * "Digital Curator" design language (docs/DESIGN.md in stitch_fmcg_trend_navigator-3).
  *
  * Design principles applied:
@@ -490,13 +496,13 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
 
 // ─── Per-field help copy (shared by the "?" tooltips on the section cards) ─
 const FIELD_HELP = {
-  probability: 'Likelihood this trend materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. This 1–5 score sets a Beta prior whose MEAN is score/6 — deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five-in-six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (2.11.0; 6 for an unscored trend), sampled by the Monte Carlo.',
-  uncertainty: 'How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction — one score per trend (2.11.0, owner ruling O7). It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (24/16/10/6/4/3 — the mean stays probability/6) and the peak-year jitter (0/1/1/2/3/4 years). Unscored = the 2.10.0 behaviour (concentration 6, global ±1 year).',
-  gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this trend can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
-  timing: 'When the trend reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
-  category: 'How hard this trend hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
-  regional: 'How strongly this trend plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
-  vc: 'The stage of the value chain — from raw materials through to the consumer — where this trend’s impact centres (its epicentre). One stage per trend; the engine’s VC attribution assigns the trend’s whole contribution to exactly this stage (2.9.0 epicentre partition — the pick is stored as a canonical eight-step profile for compatibility).',
+  probability: 'Likelihood this driver materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. This 1–5 score sets a Beta prior whose MEAN is score/6 — deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five-in-six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (2.11.0; 6 for an unscored driver), sampled by the Monte Carlo.',
+  uncertainty: 'How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction — one score per driver (2.11.0, owner ruling O7). It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (24/16/10/6/4/3 — the mean stays probability/6) and the peak-year jitter (0/1/1/2/3/4 years). Unscored = the 2.10.0 behaviour (concentration 6, global ±1 year).',
+  gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this driver can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
+  timing: 'When the driver reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
+  category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored; leaving a cell blank falls back to the AI baseline.',
+  regional: 'How strongly this driver plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
+  vc: 'The stage of the value chain — from raw materials through to the consumer — where this driver’s impact centres (its epicentre). One stage per driver; the engine’s VC attribution assigns the driver’s whole contribution to exactly this stage (2.9.0 epicentre partition — the pick is stored as a canonical eight-step profile for compatibility).',
 } as const;
 
 // ─── Meta chip (direction/confidence/data-source pill) ─────────────
@@ -653,16 +659,16 @@ function sortValue(t: Trend, key: SortKey): string | number | null | undefined {
 type ScoringMode = 'list' | 'input' | 'review';
 
 // ── R-08 (design review 2026-07): table column templates, per sub-view ──
-// TREND is the single flexible column (~60% of the row in Trend List at
+// DRIVER is the single flexible column (~60% of the row in Driver List at
 // 1512px, ≥47% in the 6-column views) with min-width 0 + ellipsis + hover
 // title, so names stop truncating mid-word. PROBABILITY is tightened to the
 // 5-dot cluster (dots need 74px; the tracked 11px "PROBABILITY" header label
 // is the binding ~122px) — Review & Endorse gets extra room for the expert-ø
-// value + delta chip. The Trend List has NO review-status column: it rendered
+// value + delta chip. The Driver List has NO review-status column: it rendered
 // "—" on every row; real review status lives in Expert Rating's YOUR REVIEW.
 // Header and rows read the same template so columns always align.
 // Owner request 2026-07-10 (supersedes the R-08 drop, now that endorsements
-// are live): the Trend List carries a REVIEWED tick column after SHIFT —
+// are live): the Driver List carries a REVIEWED tick column after SHIFT —
 // blank until an admin endorses, so it never renders a dead "—" per row.
 const ROW_GRID: Record<ScoringMode, string> = {
   list:   'minmax(0, 1fr) 130px 128px 170px 100px 110px',
@@ -825,7 +831,7 @@ const ProbCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposal
     const my = myProposal?.probability ?? trend.proposal_summary?.my?.probability;
     return (
       <ColorDots value={my != null ? Math.round(my) : 0} color={S.primary} muted={my == null}
-        title={ai != null ? `AI suggests ${Math.round(ai)} / 5 — open the trend to score` : 'Open the trend to score'} />
+        title={ai != null ? `AI suggests ${Math.round(ai)} / 5 — open the driver to score` : 'Open the driver to score'} />
     );
   }
   const agg = trend.proposal_summary?.probability;
@@ -857,7 +863,7 @@ const Gp1Cell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendProposalP
     const my = myProposal?.gp1_pct_affected ?? trend.proposal_summary?.my?.gp1_pct_affected;
     return (
       <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
-        title={ai != null ? `AI suggests ${pctI(ai)} — open the trend to score` : 'Open the trend to score'}>
+        title={ai != null ? `AI suggests ${pctI(ai)} — open the driver to score` : 'Open the driver to score'}>
         {my != null ? pctI(my) : '—'}
       </span>
     );
@@ -898,7 +904,7 @@ const RowEndCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: TrendPropos
     );
   }
 
-  // Trend List & Review — the model's current (truth) shift, calc on hover.
+  // Driver List & Review — the model's current (truth) shift, calc on hover.
   const shift = trend.gp1_shift;
   const probClamped = Math.max(1, Math.min(5, Math.round(trend.probability ?? 0)));
   const gp1 = (trend as Trend & { gp1_pct_affected?: number }).gp1_pct_affected ?? 0;
@@ -987,7 +993,7 @@ const ReviewStatusCell: FC<{ trend: Trend; mode: ScoringMode; myProposal?: Trend
 // ── Mode toggle (Review tab is admin-only) ──
 const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; isAdmin: boolean }> = ({ mode, onChange, isAdmin }) => {
   const opts: Array<{ id: ScoringMode; label: string; dot: string }> = [
-    { id: 'list', label: 'Trend List', dot: REVIEWED_COLOR },
+    { id: 'list', label: 'Driver List', dot: REVIEWED_COLOR },
     { id: 'input', label: 'Expert Rating', dot: S.primary },
     ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
   ];
@@ -1192,7 +1198,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </div>
           </SectionCard>
 
-          <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this trend can move at full materialization.">
+          <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialization.">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
@@ -1225,7 +1231,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </div>
           </SectionCard>
 
-          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this trend; the mean stays where probability puts it.">
+          <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
               <UncertaintyPicker value={draft.uncertainty} ai={aiU} allowClear={false} onChange={(v) => patch({ uncertainty: v })} />
               <AiRef label={aiU != null ? `AI ${aiU}/5` : 'AI —'} />
@@ -1255,7 +1261,7 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
                 {vcStageLabel(myVcStage)}
               </span>
             }
-            footnote="One choice — the stage where this trend’s impact centres. The engine assigns this trend’s whole contribution to this stage in the value-chain attribution (2.9.0 epicentre partition); leave it unscored and the AI baseline applies."
+            footnote="One choice — the stage where this driver’s impact centres. The engine assigns this driver’s whole contribution to this stage in the value-chain attribution (2.9.0 epicentre partition); leave it unscored and the AI baseline applies."
           >
             <EpicentreSlider value={myVcStage} ai={aiVcStage} onChange={(st) => patch({ vc_exposure: canonicalVcProfile(st) })} />
           </SectionCard>
@@ -1729,7 +1735,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
       {loaded && count === 0 ? (
         <div style={{ padding: '26px 0', textAlign: 'center', color: S.onSurfaceVariant }}>
           <Sparkles size={20} style={{ color: S.primary }} />
-          <div style={{ marginTop: 8, fontSize: 14 }}>No expert proposals yet for this trend.</div>
+          <div style={{ marginTop: 8, fontSize: 14 }}>No expert proposals yet for this driver.</div>
         </div>
       ) : (
         <>
@@ -1752,7 +1758,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                   result={resolveProb() ?? '—'} />
               </SectionCard>
 
-              <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this trend can move at full materialization.">
+              <SectionCard title="Impact — GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialization.">
                 <CompareStack who={whoFor('gp1_pct_affected')}
                   ai={<MiniBar v={aG} color={S.onSurface} />}
                   expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && aG != null ? <DeltaChip value={(eG - aG) * 100} unit="pp" digits={0} /> : null}</>} />
@@ -1845,7 +1851,7 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
               title={`Expert Comments · ${comments.length}`}
               icon={MessageSquare}
               accent={EXPERT_COLOR}
-              footnote="Free-text notes left by experts on the Expert Rating tab. Advisory context — they are not written into the trend on endorse."
+              footnote="Free-text notes left by experts on the Expert Rating tab. Advisory context — they are not written into the driver on endorse."
             >
               {comments.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 13, color: S.mutedText }}>
@@ -1905,14 +1911,14 @@ const ReviewPanel: FC<{ trend: Trend; updateTrend?: (trendId: string, updates: T
                 style={{ padding: '9px 20px', borderRadius: 999, border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
                   fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
                   backgroundColor: S.onSurface, color: '#fff', opacity: saving ? 0.6 : 1 }}>
-                {saving ? 'Endorsing…' : done ? 'Endorse again' : 'Endorse trend →'}
+                {saving ? 'Endorsing…' : done ? 'Endorse again' : 'Endorse driver →'}
               </button>
             </div>
           </div>
 
           <div className="inline-flex items-center gap-1.5" style={{ marginTop: 14, padding: '8px 14px', borderRadius: 10, backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 12.5, lineHeight: 1.5 }}>
             <Check size={13} style={{ flexShrink: 0, color: REVIEWED_COLOR }} />
-            <span>Endorsing writes the selected values as the trend&apos;s truth (validated &amp; audited) and flags the run stale. Shifts refresh after the next model run.</span>
+            <span>Endorsing writes the selected values as the driver&apos;s truth (validated &amp; audited) and flags the run stale. Shifts refresh after the next model run.</span>
           </div>
         </>
       )}
@@ -1964,7 +1970,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
     return () => { cancelled = true; };
   }, []);
 
-  // Scoring mode (June 2026): Trend List (truth) · Expert Input · Review &
+  // Scoring mode (June 2026): Driver List (truth) · Expert Input · Review &
   // Endorse. Review is admin-only; a viewer can never land on it.
   const [mode, setMode] = useState<ScoringMode>('list');
   // Review is admin-only. The invariant is enforced during render rather
@@ -2073,7 +2079,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               className="text-xs font-semibold uppercase tracking-[0.18em] mb-2"
               style={{ color: S.onSurfaceVariant }}
             >
-              Trends
+              Drivers
             </div>
             <h1
               className="font-extrabold tracking-tight"
@@ -2090,8 +2096,8 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               className="mt-2 max-w-2xl text-[15px]"
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
-              A curated lens on the {trends?.length ?? 0} signals driving
-              profit-pool reallocation across categories through 2035.
+              {trends?.length ? `The ${trends.length} Profit Pool Drivers` : 'The Profit Pool Drivers'} behind each category&apos;s
+              shift to 2035.
             </p>
           </div>
 
@@ -2105,7 +2111,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search trends…"
+              placeholder="Search drivers…"
               className="w-full pl-11 pr-4 py-2.5 rounded-full text-sm focus:outline-none focus:ring-2"
               style={{
                 backgroundColor: S.surfaceLow,
@@ -2121,10 +2127,10 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
           <ModeToggle mode={mode} onChange={setMode} isAdmin={isAdmin} />
           <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
             {mode === 'list'
-              ? 'The agreed truth that feeds the model. Reviewed trends that differ from the AI baseline show green dots; hover any score for the AI suggestion.'
+              ? 'The agreed truth that feeds the model. Reviewed drivers that differ from the AI baseline show green dots; hover any score for the AI suggestion.'
               : mode === 'input'
-              ? 'Score any trend from a blank slate — open a row and your changes auto-save. Hover a grey dot or blank field to see the AI suggestion.'
-              : 'Compare the expert average against the AI suggestion and endorse one trend at a time. Hover an expert score to see who scored what.'}
+              ? 'Score any driver from a blank slate — open a row and your changes auto-save. Hover a grey dot or blank field to see the AI suggestion.'
+              : 'Compare the expert average against the AI suggestion and endorse one driver at a time. Hover an expert score to see who scored what.'}
           </p>
         </div>
 
@@ -2167,7 +2173,7 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
               color: S.onSurfaceVariant,
             }}
           >
-            <SortHeader label="Trend"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
+            <SortHeader label="Driver"          sortKey="name"        currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Direction"      sortKey="direction"   currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Probability"    sortKey="probability" currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} />
             <span className="inline-flex items-center justify-end w-full">
@@ -2185,13 +2191,13 @@ const Trends2: FC<Trends2Props> = ({ initialSearch }) => {
           {/* Rows */}
           <div>
             {loading && (
-              <EmptyRow text="Loading trend intelligence…" icon={<Sparkles size={20} />} />
+              <EmptyRow text="Loading drivers…" icon={<Sparkles size={20} />} />
             )}
             {!loading && !backendAvailable && (
-              <EmptyRow text="Backend unavailable — reconnect to view live trend data." icon={<Sparkles size={20} />} />
+              <EmptyRow text="Backend unavailable — reconnect to view live driver data." icon={<Sparkles size={20} />} />
             )}
             {!loading && backendAvailable && sorted.length === 0 && (
-              <EmptyRow text="No trends match the current filter." icon={<Sparkles size={20} />} />
+              <EmptyRow text="No drivers match the current filter." icon={<Sparkles size={20} />} />
             )}
             {sorted.map((t, idx) => {
               const key = t.id ?? String(idx);
@@ -2289,7 +2295,7 @@ const Gp1InfoTip: FC = () => {
           letterSpacing: 0, textAlign: 'left', boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
           pointerEvents: 'none', whiteSpace: 'normal' }}>
           <b>GP1 % Affected</b> — the share of a category&apos;s GP1 (gross profit after cost of goods)
-          that this trend can realistically move at full materialization. Multiplied by probability and
+          that this driver can realistically move at full materialization. Multiplied by probability and
           direction, it produces the Shift column.
         </span>
       )}
@@ -2693,7 +2699,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
         {(trend.ai_suggested || trend.user_override) && (
           <span
             title={trend.user_override
-              ? 'Scores have been reviewed/adjusted by an expert via the Trend editor.'
+              ? 'Scores have been reviewed or adjusted by an expert.'
               : 'Scores are AI-preset from the evidence base — not yet expert-reviewed.'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -2778,7 +2784,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             icon={BarChart3}
             footnote={
               <>
-                What fraction of a category&apos;s GP1 can this trend realistically affect at full
+                What fraction of a category&apos;s GP1 can this driver realistically affect at full
                 materialization?
               </>
             }
@@ -2839,7 +2845,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             title="Probability"
             icon={Zap}
             footnote={
-              <>Likelihood this trend materialises at the stated severity.
+              <>Likelihood this driver materialises at the stated severity.
               Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.</>
             }
           >
@@ -2864,7 +2870,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
           <SectionCard
             title="Materialization Timing"
             icon={Clock}
-            footnote="When does this trend reach full impact, and how does it build over time?"
+            footnote="When does this driver reach full impact, and how does it build over time?"
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -3112,7 +3118,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
             style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
               fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}
-            title="Trend inputs are maintained by PRISM admins. Ask an administrator for changes.">
+            title="Driver inputs are maintained by PRISM admins. Ask an administrator for changes.">
             <Lock size={11} strokeWidth={2.4} />
             Read-only · admin-maintained
           </span>

@@ -3,7 +3,7 @@
  *
  * Step 1: MVP disclaimer + feedback channel (Alexander Laker).
  * Step 2: Brief explainer of the three production views, in header order:
- *           Trends (input) -> Consumer Journey -> Profit Pool Shift Analysis.
+ *           Drivers (input) -> Consumer Journey -> Profit Pool Shift Analysis.
  *           The Profit Pool Explorer (Beta) tab is not introduced here —
  *           it lives to the right of the top nav.
  *
@@ -367,8 +367,8 @@ const Step2Views: FC = () => (
       }}
     >
       Three views, in the order shown in the header.{' '}
-      <strong style={{ color: S.onBg }}>Trends is the main input page</strong>{' '}
-      — the other two are output views built on top of it.
+      <strong style={{ color: S.onBg }}>Start with Drivers, the main input page.</strong>{' '}
+      The other two views are built on it.
     </p>
 
     {/* INPUT */}
@@ -376,8 +376,8 @@ const Step2Views: FC = () => (
     <ViewCard
       number="1"
       icon={Activity}
-      title="Trends"
-      body="The main input page. All categories, signals, and assumptions are set here and feed into the output views."
+      title="Drivers"
+      body="Lists each Profit Pool Driver with its scores: probability, share of GP1 affected, timing, and exposure by category and region."
     />
 
     {/* OUTPUTS */}
@@ -393,7 +393,7 @@ const Step2Views: FC = () => (
       icon={TrendingUp}
       title="Profit Pool Shift Analysis"
       body="Visualizes where value is migrating, sliced by time path, force, region, and value chain step."
-      note="Values reflect the isolated trend impact on HCB's current business — excluding price moves, innovations, or competitor actions."
+      note="Values reflect the isolated driver impact on HCB's current business — excluding price moves, innovations, or competitor actions."
     />
   </div>
 );

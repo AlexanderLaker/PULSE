@@ -1,8 +1,10 @@
 # PRISM — Profit Pool Simulation Platform
 
-PRISM (formerly PULSE) is a profit-pool simulation and trend-intelligence platform
-for FMCG category strategy. It combines a Bayesian Monte-Carlo simulation engine
-(Python) with an interactive analysis dashboard (Next.js) deployed on Vercel.
+PRISM (formerly PULSE) is a profit-pool simulation platform for FMCG category
+strategy, built on scored Profit Pool Drivers. It combines a Bayesian Monte-Carlo
+simulation engine (Python) with an interactive analysis dashboard (Next.js)
+deployed on Vercel. (The app says "Drivers"; the code, the API routes and the
+database keep the older name `trend`, owner ruling O15.)
 
 ## Architecture
 
@@ -30,14 +32,14 @@ endpoints. The engine has no user store of its own.
 | Path | Purpose |
 |------|---------|
 | `app/` | Next.js pages + API routes (BFF: Clerk→engine auth bridge, user/role admin) |
-| `components/dashboard/` | Dashboard views (Trends, Consumer Journey, Profit Pool Shift Analysis, Profit Pool Explorer) |
+| `components/dashboard/` | Dashboard views (Drivers, Consumer Journey, Profit Pool Shift Analysis, Profit Pool Explorer) |
 | `hooks/usePrism.ts` | Central data hook — single source of truth for engine state |
 | `api/client.ts` | Typed API client for all `/api/v1/*` calls (20 s timeout on every request) |
 | `lib/` | Server-side helpers (roles, db, Clerk→PRISM JWT bridge) + pure display/math modules (`format.ts`, `shiftMatrix.ts` — lint-guarded single sources) |
 | `types/` | Shared TypeScript types |
 | `api/index.py` | Vercel serverless adapter wrapping the FastAPI app |
 | `pulse/` | Python simulation engine + FastAPI app |
-| `data/` | Static front-end content (consumer journey tiles, trend code map) + attenuation calibration JSON |
+| `data/` | Static front-end content (consumer journey tiles, driver code map `trendCodeMap.ts`) + attenuation calibration JSON |
 | `tests/` | pytest suite (engine, API, ops) + `tests/frontend/` vitest suite |
 | `scripts/` | Production run, ops helpers, `package_handover.sh` (`scripts/archive/` holds spent one-off migrations) |
 | `docs/` | Deep-dive docs incl. `docs/governance/` (decision log, findings register, remediation records) — see `docs/INDEX.md` |
@@ -78,7 +80,7 @@ npm run dev                                                 # frontend on :3000
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | frontend | Clerk publishable key (`pk_…`) |
 | `CLERK_SECRET_KEY` | yes | Next server | Clerk secret key (`sk_…`) |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | yes (prod) | Next server | Verifies Clerk `user.*` webhooks (svix) |
-| `DATABASE_URL` (or `POSTGRES_URL`) | yes | Next server + engine | Neon Postgres (roles, trends, audit) |
+| `DATABASE_URL` (or `POSTGRES_URL`) | yes | Next server + engine | Neon Postgres (roles, drivers, audit) |
 | `PRISM_JWT_SECRET` | yes | Next server + engine | Shared secret for the Clerk→engine JWT bridge (≥32 chars) |
 | `NEXT_PUBLIC_SIGNUP_CODE` | recommended | frontend | Access code required on the sign-up page |
 | `ADMIN_BOOTSTRAP_SECRET` | optional | Next server | Shared secret for `/api/admin/bootstrap` (first admin) |
@@ -101,7 +103,7 @@ npm run verify                 # the full local gate: typecheck + eslint +
 ```
 
 Engine determinism: simulations use a fixed master seed (42) via
-`np.random.default_rng`; trends load in a fixed order (`ORDER BY id`, C2) —
+`np.random.default_rng`; drivers load in a fixed order (`ORDER BY id`, C2) —
 identical inputs produce identical results by design (reproducibility for
 audits). Multi-chain runs derive distinct chain seeds from the master and
 persist both; the cross-seed spread is reported as `seed_stability`.

@@ -18,7 +18,7 @@ Requirements:
       psycopg2-binary, openpyxl, python-dotenv)
 
 What it does:
-    1. Loads the trend base from prod Neon via pulse.database.load_trends
+    1. Loads the driver base from prod Neon via pulse.database.load_trends
     2. Runs BayesianMonteCarloEngine.run_multichain (3 × 50k, master seed 42)
     3. Computes the input-drift integrity event vs the previous run (D19)
     4. Persists the results bundle as a NEW simulation_runs row
@@ -27,12 +27,12 @@ What it does:
 Exit codes (H2, July 2026 review — cron/operators must see failures):
     0  success (run persisted; Excel best-effort)
     1  no database URL configured
-    2  no trends loaded
+    2  no drivers loaded
     3  simulation succeeded but PERSIST FAILED — the dashboard will still
        show the previous run; nothing was written
     4  wrong database mode (Postgres URL set but SQLite fallback active —
        usually a missing psycopg2; H1) and --allow-sqlite not passed
-    5  correlation matrix not positive semi-definite on the LOADED trend mix
+    5  correlation matrix not positive semi-definite on the LOADED driver mix
        (F6 pre-flight spectral gate) and --allow-nonpsd not passed — the
        engine would silently repair it at runtime, making configured ≠
        effective correlations. Lower the cross-force correlations or override.
@@ -140,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-nonpsd", action="store_true",
                         help="override the F6 pre-flight spectral gate and run "
                              "even if the correlation matrix is not PSD on the "
-                             "loaded trend mix (the engine will repair it at "
+                             "loaded driver mix (the engine will repair it at "
                              "runtime — configured ≠ effective correlations)")
     parser.add_argument("--cell-weights", type=str, default=None, metavar="FILE",
                         help="JSON file with the HCB gross-profit share (or absolute "
@@ -179,10 +179,10 @@ def main(argv: list[str] | None = None) -> int:
                     "results will not reach production.")
 
     # ── 1) Load trends ───────────────────────────────────────────────
-    log.info("[1/5] Loading trends (%s)…", "Neon prod" if USE_POSTGRES else "SQLite")
+    log.info("[1/5] Loading drivers (%s)…", "Neon prod" if USE_POSTGRES else "SQLite")
     trends = load_trends()
     if not trends:
-        log.error("No trends returned from DB — aborting.")
+        log.error("No drivers returned from DB — aborting.")
         return 2
     trend_db = TrendDatabase(
         trends=trends,
@@ -191,11 +191,11 @@ def main(argv: list[str] | None = None) -> int:
         source_file="neon_prod" if USE_POSTGRES else "sqlite_local",
     )
     log.info(
-        "      %d trends, %d categories, %d forces",
+        "      %d drivers, %d categories, %d forces",
         len(trend_db.trends), len(trend_db.categories), len(trend_db.forces),
     )
     if len(trend_db.trends) != EXPECTED_TREND_COUNT:
-        log.warning("Expected %d trends, found %d — the input-drift event "
+        log.warning("Expected %d drivers, found %d — the input-drift event "
                     "will report the delta.", EXPECTED_TREND_COUNT, len(trend_db.trends))
 
     # ── 2) Configure ─────────────────────────────────────────────────
@@ -235,10 +235,10 @@ def main(argv: list[str] | None = None) -> int:
         [t.force for t in trend_db.trends],
     )
     log.info("[2b/5] Correlation pre-flight: min eigenvalue on the loaded "
-             "%d-trend mix = %+.4f", len(trend_db.trends), lam_min)
+             "%d-driver mix = %+.4f", len(trend_db.trends), lam_min)
     if lam_min < 0 and not args.allow_nonpsd:
         log.error("Correlation matrix is NOT positive semi-definite on the "
-                  "loaded trend mix (min eigenvalue %+.4f). The engine would "
+                  "loaded driver mix (min eigenvalue %+.4f). The engine would "
                   "repair it at runtime, making configured ≠ effective "
                   "correlations (audit F-01/F6).", lam_min)
         log.error("Lower the cross-force correlations in Config, or pass "

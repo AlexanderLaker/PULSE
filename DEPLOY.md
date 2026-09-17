@@ -19,7 +19,8 @@
 
 ```bash
 curl https://prism-hcb.vercel.app/api/v1/health
-# Expected: {"status":"ok","model_loaded":true,"trend_count":99,"categories":13,...}
+# Expected: {"status":"ok","model_loaded":true,"trend_count":51,"categories":13,...}
+# (trend_count keeps its code name; it counts the Profit Pool Drivers, O15)
 ```
 
 ## Repository & deploy mechanism
@@ -113,12 +114,12 @@ Vercel project: prism-profit-pool
 ├── lib/                          ← auth bridge (prismJwt, roles), shiftMatrix, format, helpers
 ├── api/index.py                  ← Python serverless adapter (cold-start retry)
 │   └── pulse/api/app.py          ← FastAPI app (read-only data plane + admin writes)
-├── pulse/                        ← Simulation engine + trend DB (Python)
+├── pulse/                        ← Simulation engine + driver DB (Python)
 │   ├── seed_trends.py            ← 51 drivers (2.12.0 base, GENERATED)
 │   ├── simulation/bayesian_mc.py ← Bayesian MC + Gaussian copula engine (scipy-only, D13/D20)
 │   ├── audit/                    ← input-drift telemetry + audit log
 │   ├── excel_bridge/writer.py    ← QA workbook writer (the only export)
-│   └── ingestion/                ← Trend models
+│   └── ingestion/                ← Trend models (the drivers; code name kept, O15)
 ├── public/                       ← Static assets
 └── vercel.json                   ← Routes /api/v1/* → api/index.py, rest → Next.js
 ```
@@ -190,7 +191,7 @@ python3 scripts/run_50k_prod.py [--cell-weights FILE]
 #   changed only the fallback, never O6. The flat 1/52 grid is still
 #   selectable as pulse.config.EQUAL_CELL_WEIGHTS.
 #
-# Exit codes: 0 ok · 1 no DB URL · 2 no trends · 3 persist failed ·
+# Exit codes: 0 ok · 1 no DB URL · 2 no drivers · 3 persist failed ·
 #             4 wrong DB mode · 5 correlation matrix not PSD ·
 #             6 cell-weights file rejected
 ```
@@ -211,11 +212,11 @@ python3 scripts/replace_trend_base.py --postgres    # Neon — after deploying 2
 
 **Two operational notes from the 2026-09-10 go-live.**
 
-*Redeploy after the base replacement.* The FastAPI lambda loads the trend list
+*Redeploy after the base replacement.* The FastAPI lambda loads the driver list
 into memory at cold start (`pulse/api/state.py`), and `/api/v1/trends` and the
 `trend_count` in `/health` serve that cache; `latest_run_id` and the rendered
 run come from the database on every request. A serverless instance that was
-warm before the replacement therefore keeps reporting the OLD trend count until
+warm before the replacement therefore keeps reporting the OLD driver count until
 it recycles. After replacing the base, redeploy the current production
 deployment from the Vercel dashboard (or push again) so every instance reloads.
 
@@ -263,16 +264,63 @@ run's `cell_weights_source` name the basis. That mix is an ESTIMATE built from
 public reporting, not Henkel P&L, and it does not replace the finance figures:
 pass `--cell-weights FILE` as soon as they exist and the file overrides it.
 
+**O15, Driver vocabulary (owner ruling of 2026-09-16), no engine version bump.**
+The interface copy ships with the deploy. Two things do not: the database copies
+of authored content, and the text stored with runs that are already persisted.
+
+```bash
+# The local SQLite copy first. If .env names the Neon database, blank the URLs
+# (a variable set in the shell, even empty, wins over .env):
+DATABASE_URL= POSTGRES_URL= python3 scripts/apply_driver_vocabulary.py --dry-run
+DATABASE_URL= POSTGRES_URL= python3 scripts/apply_driver_vocabulary.py
+# Neon, right before the production deploy:
+python3 scripts/apply_driver_vocabulary.py --dry-run
+python3 scripts/apply_driver_vocabulary.py --postgres
+# Neon again, after that deploy: expect nothing to change
+python3 scripts/apply_driver_vocabulary.py --dry-run
+# The first line names the target (the SQLite file, or the Postgres host and
+# database). The report: how many phrases will change, how many already have,
+# each phrase not found (an admin may have reworded it; reported, never forced),
+# the four driver texts, and every place where "trend" is still left in the
+# server copy (ordinary English stays).
+# Archive-first (data/archive/driver_vocabulary_<mode>_<stamp>.json), then ONE
+# transaction with compare-and-swap and the audit entry: a new journey_content
+# row with the 26 phrases of JOURNEY_EDITS rewritten (earlier rows kept) and the
+# description / strategic_implication of C-03, C-27, C-35 and G-15. The journey
+# table is locked while the write runs, so an admin save waits and lands after
+# it. Scores, exposures, sources, provenance flags and expert proposals are not
+# touched, so the next run reports no input drift. Idempotent.
+# Exit codes: 0 ok or nothing to change · 2 cannot read, or no database file ·
+#             3 archive failed · 4 Postgres without --postgres, or --postgres on
+#             a connection that is not Postgres (no database URL, or psycopg2
+#             missing) · 5 problems after the write, or the commit did not
+#             confirm (run --dry-run; re-running is safe) · 6 write failed, lock
+#             timeout or content changed meanwhile (rolled back; re-run)
+```
+
+Run it right before the production deploy, then repeat the dry run after it.
+Old text can still come back in two ways. Until the deploy replaces them, warm
+API instances keep serving the old driver texts and write them back when an
+admin next saves one of those drivers. And a Drivers or Consumer Journey page
+opened before the deploy keeps the old text in the browser and saves it back
+with its next edit, even after the deploy, so after the deploy ask admins to
+reload any open PRISM page before they edit. The second dry run shows anything
+saved up to then: it must report `0 phrase(s) to change` and `done` for the four driver
+texts; if it reports anything to change, run the script with `--postgres` once
+more. Integrity events are stored with each run, so the persisted run keeps the
+wording it was saved with in the About footer ("N trend score(s) changed")
+until the next `run_50k_prod.py` writes a new run.
+
 ## Smoke test after deploy
 
 ```bash
 # 1. Health
 curl -s https://prism-hcb.vercel.app/api/v1/health | jq '.status, .trend_count, .categories'
-# Expected: "ok"  99  13
+# Expected: "ok"  51  13
 
-# 2. Trends endpoint shape (auth required — get a JWT from a Clerk session)
+# 2. Drivers endpoint shape (the route keeps its code name; auth required — get a JWT from a Clerk session)
 curl -s https://prism-hcb.vercel.app/api/v1/trends -H "Authorization: Bearer $JWT" | jq 'length'
-# Expected: 99
+# Expected: 51
 
 # 3. Persisted run (read-only): verify the shift matrix is 13 categories × 10 path years
 curl -s https://prism-hcb.vercel.app/api/v1/simulation -H "Authorization: Bearer $JWT" \

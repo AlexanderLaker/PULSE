@@ -1510,11 +1510,11 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Copula dependence — Gaussian"
             icon={SlidersHorizontal}
-            description="How trend correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD trend-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired. F8 (2.10.0): these correlations are LATENT-SCALE — they parameterise the co-movement of the underlying Gaussian drivers, not the delivered Beta scores; the realised score-to-score correlation is a touch lower (≈0.28 for a latent 0.30). The [0,1] restriction means negative dependence is not expressible (a documented limitation)."
+            description="How driver correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD driver-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired. F8 (2.10.0): these correlations are LATENT-SCALE — they parameterise the co-movement of the underlying Gaussian variables, not the delivered Beta scores; the realised score-to-score correlation is a touch lower (≈0.28 for a latent 0.30). The [0,1] restriction means negative dependence is not expressible (a documented limitation)."
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-                <Field label="Within-force ρ" hint="Correlation between trends of the same force. Bounds 0–0.9 · default 0.30.">
+                <Field label="Within-force ρ" hint="Correlation between drivers of the same force. Bounds 0–0.9 · default 0.30.">
                   <NumberField
                     value={draft.within_force_rho ?? 0.3}
                     onCommit={(v) => patch({ within_force_rho: v })}
@@ -1526,7 +1526,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
               {draft.force_correlation_matrix && (
                 <SubBlock
                   label="Force correlation matrix (read-only)"
-                  hint="Cross-force correlations, PSD-valid as entered (v3.6 recalibration, D1). Pairs not covered by a trend's force row fall back to residual ρ = 0.05. Editable via the admin API only — symmetry, unit diagonal and the spectral gate are enforced there."
+                  hint="Cross-force correlations, PSD-valid as entered (v3.6 recalibration, D1). Pairs not covered by a driver's force row fall back to residual ρ = 0.05. Editable via the admin API only — symmetry, unit diagonal and the spectral gate are enforced there."
                 >
                   <ForceMatrixTable
                     matrix={draft.force_correlation_matrix}
@@ -1542,7 +1542,7 @@ const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
           <SectionCard
             title="Attenuation & overlap"
             icon={SlidersHorizontal}
-            description={`Read-only. The engine dampens each force's combined trend effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.11, Sep-2026, 51-driver base)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
+            description={`Read-only. The engine dampens each force's combined driver effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.12, Sep-2026, 51-driver base)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
           >
             {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
                 silent no-op — the engine consumes six per-force values.

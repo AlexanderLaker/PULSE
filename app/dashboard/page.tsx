@@ -23,7 +23,7 @@
  *   including Profit Pool Explorer, is visible to all signed-in users.
  *
  * Tab navigation (constant across all pages):
- *   Trends | Consumer Journey | Profit Pool Shift Analysis
+ *   Drivers | Consumer Journey | Profit Pool Shift Analysis
  *   [+ Profit Pool Explorer — Beta, pinned right]
  *   Below md: a menu button opens the same tab list as a sheet.
  *
@@ -82,7 +82,7 @@ const TABS: TabDef[] = [
   // Entry view — the gate. Not in the top nav; the PRISM wordmark opens it.
   { id: 'home',                  label: 'Home', hidden: true },
   // Production views — left side of the top nav, in maritime blue.
-  { id: 'trends-2',              label: 'Trends' },
+  { id: 'trends-2',              label: 'Drivers' },
   { id: 'consumer-journey-2',    label: 'Consumer Journey' },
   { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
   // Beta views — pinned to the right side of the top nav, in muted gray.
@@ -133,10 +133,11 @@ export default function DashboardPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // ─── Journey → Trends drill-through (v3.6 journey layer) ─────────
-  // The Consumer Journey's evidence cards navigate to the Trends tab
-  // with a search query (trend name) pre-applied via Trends2's
-  // initialSearch prop.
+  // ─── Journey → Drivers drill-through (v3.6 journey layer) ────────
+  // The Consumer Journey's evidence cards navigate to the Drivers tab
+  // with a search query (driver name) pre-applied via Trends2's
+  // initialSearch prop. (O15, 2026-09-16: the tab reads "Drivers"; the
+  // component and the `trends-2` id keep their code names.)
   const [trendsSearch, setTrendsSearch] = useState<string | null>(null);
 
   // ─── Keep-alive tabs ─────────────────────────────────────────────

@@ -8,7 +8,7 @@
 
 ## 1. What you are looking at
 
-PRISM is a profit-pool simulation platform for consumer-brands category strategy. 99 scored external trends feed a Bayesian Monte-Carlo engine (Beta priors, Gaussian copula, scipy) which produces a **Shift Matrix**: relative percentage impacts per category × region × force × year (2026–2035). A Next.js dashboard renders it.
+PRISM is a profit-pool simulation platform for consumer-brands category strategy. 51 scored external drivers (the Profit Pool Drivers; the code calls them trends, owner ruling O15) feed a Bayesian Monte-Carlo engine (Beta priors, Gaussian copula, scipy) which produces a **Shift Matrix**: relative percentage impacts per category × region × force × year (2026–2035). A Next.js dashboard renders it.
 
 **The one architectural fact that shapes every integration decision:**
 
@@ -43,7 +43,7 @@ Everything below is the live product unless the last column says otherwise.
 | Path | What it is | Matters for integration |
 |---|---|---|
 | `app/` | Next.js 16 App Router. Dashboard page, Clerk sign-in/sign-up, and **9 server API routes** under `app/api/` that act as the BFF: they verify the Clerk session and mint the short-lived JWT the Python engine accepts. | **Yes — auth seam** |
-| `components/dashboard/` | 12 React components. The heavy ones are `ProfitPoolAnalysis2.tsx` (Shift Matrix + lenses), `Trends2.tsx` (trend explorer/editor), `ConsumerJourney2.tsx`, `ProfitPoolExplorer.tsx`, `CategoryDetailPanel.tsx`, `SettingsModal.tsx`. | Presentation only |
+| `components/dashboard/` | 12 React components. The heavy ones are `ProfitPoolAnalysis2.tsx` (Shift Matrix + lenses), `Trends2.tsx` (the Drivers page: explorer and editor), `ConsumerJourney2.tsx`, `ProfitPoolExplorer.tsx`, `CategoryDetailPanel.tsx`, `SettingsModal.tsx`. | Presentation only |
 | `hooks/usePrism.ts` | The single data provider for the whole dashboard. One place to look for client state. | Useful |
 | `api/client.ts` | Typed client for every `/api/v1/*` call (20 s timeout per request). | Useful |
 | `api/index.py` | Vercel serverless adapter — imports the FastAPI app, with cold-start retry. **The hosting seam.** | **Yes — hosting** |
@@ -79,7 +79,7 @@ Clerk owns sign-in, sign-up and sessions. The Next.js layer verifies the Clerk s
 Two artifacts define it: `vercel.json` (build + the `/api/v1/*` rewrite) and `api/index.py` (the ASGI adapter). Moving to containers means replacing both with your own ingress and an ASGI server in front of `pulse.api.app:app`. Nothing in `pulse/` knows it is on Vercel.
 
 **4. The offline compute job.**
-`scripts/run_50k_prod.py` is the only thing that writes a simulation run. Today a person runs it. The target state is a scheduled job on infrastructure that has scipy. Exit codes are meaningful: `0` ok · `1` no DB URL · `2` no trends · `3` persist failed · `4` wrong DB mode · `5` non-PSD correlation matrix. Runtime is roughly 2–6 minutes.
+`scripts/run_50k_prod.py` is the only thing that writes a simulation run. Today a person runs it. The target state is a scheduled job on infrastructure that has scipy. Exit codes are meaningful: `0` ok · `1` no DB URL · `2` no drivers · `3` persist failed · `4` wrong DB mode · `5` non-PSD correlation matrix · `6` cell-weights file rejected. Runtime is roughly 2–6 minutes.
 
 **5. Secrets and configuration.**
 `.env.example` is the template; `README.md` has the full variable table. All credentials are rotated at handover. The one that trips people up: `PRISM_JWT_SECRET` is a **single shared secret** read by both the Next.js side and the FastAPI side — a mismatch produces 401s on every data call and nothing else. See `docs/DEPLOYMENT_NOTES.md`.
