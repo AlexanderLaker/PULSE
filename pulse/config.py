@@ -630,9 +630,9 @@ class ModelConfig:
     region: str = "Global"
     aggregation_method: str = "Multiplicative"
     # v3.2: scalar ``attenuation`` removed. The engine consumes a per-force
-    # dict directly. Source-of-truth is data/Attenuation_Calibration.xlsx.
+    # dict directly. Source of truth: data/attenuation_calibration_v3_12.json.
     per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
-    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.5_april2026" | "calibrated_v3.1_april2026" (legacy) | "admin_override"
+    attenuation_source: str = DEFAULT_ATTENUATION_SOURCE  # "calibrated_v3.12_september2026" | "calibrated_v3.11_september2026" / "calibrated_v3.5_april2026" / "calibrated_v3.1_april2026" (legacy) | "admin_override"
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))
     materialization: dict = field(default_factory=lambda: dict(DEFAULT_MATERIALIZATION))

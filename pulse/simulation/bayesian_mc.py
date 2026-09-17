@@ -193,7 +193,7 @@ class BayesianMonteCarloEngine:
             )
         logger.info(
             "Per-force attenuation (calibrated, source=%s): %s",
-            getattr(self.config, "attenuation_source", "calibrated_v3.11_september2026"),
+            getattr(self.config, "attenuation_source", "calibrated_v3.12_september2026"),
             ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES),
         )
         return per_force

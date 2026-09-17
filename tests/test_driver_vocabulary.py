@@ -30,6 +30,7 @@ prose.
 import ast
 import copy
 import datetime
+import hashlib
 import importlib.util
 import json
 import os
@@ -77,19 +78,190 @@ def sqlite_db(monkeypatch, tmp_path):
 
 # ── (a) authored content in the repository ──────────────────────────────────
 
+#: Table entries that only correct a claim (the owner follow-up of 2026-09-17)
+#: and were never a vocabulary edit.
+CORRECTION_ONLY = frozenset({
+    "In the September 2026 review the conscious-consumption part of C-04 left the model and neurocosmetics moved to the watch list.",
+    "(since the September 2026 review, C-04 covers only clinical-efficacy premiumisation, and neurocosmetics is on the watch list)",
+    "In the September 2026 review the conscious-consumption part of C-04 left the model and neurocosmetic sensory science moved to the watch list, so this moment carries no modelled driver.",
+    "(T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)",
+    "(T-08's connected-appliance part and E-02 left the base: T-08 is narrowed to auto-dosing and replenishment, E-02 merged into T-03)",
+    "(regulators forcing water efficiency) left the model in the September 2026 review; no mandate carries this tile",
+    "because it binds apparel, not fabric care.",
+    "(bathroom and laundry-room IoT, the longevity economy's home-hygiene dimension) left the model in the September 2026 review.",
+    "the longevity home-hygiene driver adopted in its place left the model in the September 2026 review.",
+    "AI personalisation as a standalone driver left the model in the September 2026 review",
+    "(C-04's conscious-consumption part left the base: C-04 is narrowed to clinical-efficacy premiumisation)",
+    "(G-01 EU PFAS restriction left the base for laundry, and C-04's conscious-consumption part left the base)",
+    "(T-08 now covers only auto-dosing and replenishment)",
+    "(T-08 connected appliances left the base for hair: T-08 is narrowed to auto-dosing and replenishment in laundry and home care)",
+    "(T-08) is modelled only as auto-dosing and replenishment in laundry and home care since the September 2026 review",
+    "(connected appliances left the base for hair: T-08 covers only auto-dosing and replenishment in laundry and home care)",
+    "since T-08 is modelled only as auto-dosing and replenishment in laundry and home care after the September 2026 review",
+    "(the EU PFAS restriction is modelled for cosmetics only, G-03)",
+    "and the EU PFAS rules, which the September 2026 review kept only inside the cosmetics stack (G-03)",
+    "(G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
+    "(the EU PFAS restriction is kept only inside the cosmetics stack, G-03)",
+    "(the EU PFAS restriction now sits inside the cosmetics ingredient-restriction stack G-03)",
+    "the old second leg of this tile, left the model in the September 2026 review; the moat",
+    "Platform vertical integration left the model in the September 2026 review; the modelled mechanism",
+    "The AI Act left the model in the September 2026 review (FMCG tools are not high-risk and the high-risk provisions were delayed)",
+    "align with the regulatory squeeze on PFCs and chlorine (G-02 microplastics; the EU PFAS rules are the strategist's read here, since G-03 models them for cosmetics only)",
+    "driven by G-02 (microplastics restriction) and, as the strategist's read, the EU PFAS rules (modelled for cosmetics only, G-03) and a conscious-consumption preference",
+    "connected-appliance water sensing and replenishment (the strategist's read, since T-08 is not modelled for hair) make generic chelation obsolete",
+    "connected-water diagnostics and AI-guided personalisation (T-01) make hard-water effects visible",
+    "chemical supply-base erosion (which replaced the old nearshoring vector)",
+    "and the EU universal PFAS restriction is advancing through the ECHA process",
+    "and the EU universal PFAS restriction from 2029, which the September 2026 review models for cosmetics only (G-03)",
+})
+
+#: The corrected claims, as the seed states them.
+CORRECTED = (
+    "(merged into T-03; only the format-shift mechanism survives there)",
+    "The tile also cited E-02, but that was the water-scarcity driver, which the September 2026 review merged into T-03; the energy case rests on E-07.",
+    "No modelled driver carries the standards escalation, so it is the strategist's read;",
+    "(T-08 now covers only auto-dosing and replenishment, and water scarcity was merged into T-03 as format-shift context)",
+    "(C-04 now covers only clinical-efficacy premiumisation)",
+    "neurocosmetics moved to the watch list",
+    "(T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)",
+    "(regulators forcing water efficiency) left the model in the September 2026 review; no mandate carries this tile",
+    "(C-04's conscious-consumption part left the base: C-04 is narrowed to clinical-efficacy premiumisation)",
+    "and C-04's conscious-consumption part left the base)",
+    "(T-08 now covers only auto-dosing and replenishment)",
+    "auto-dosing and replenishment in laundry and home care",
+    "(the EU PFAS restriction is modelled for cosmetics only, G-03)",
+    "(G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
+    "and the EU PFAS rules, which the September 2026 review kept only inside the cosmetics stack (G-03)",
+    "(the EU PFAS restriction is kept only inside the cosmetics stack, G-03)",
+    "(the EU PFAS restriction now sits inside the cosmetics ingredient-restriction stack G-03)",
+    "the old second leg of this tile, left the model in the September 2026 review; the moat",
+    "Platform vertical integration left the model in the September 2026 review; the modelled mechanism",
+    "The AI Act left the model in the September 2026 review (FMCG tools are not high-risk",
+    "(G-02 microplastics; the EU PFAS rules are the strategist's read here, since G-03 models them for cosmetics only)",
+    "the EU PFAS rules (modelled for cosmetics only, G-03)",
+    "(the strategist's read, since T-08 is not modelled for hair)",
+    "personalisation (T-01) make hard-water effects visible",
+    "(which replaced the old nearshoring vector)",
+    "and the EU universal PFAS restriction",
+)
+
+#: What the first O15 table (commit 5813c33) wrote for the entries the corrections
+#: changed, copied from that commit's seed: the script must map each to its
+#: corrected phrase. Kept here, apart from the script, so a dropped mapping fails.
+WORDING_2026_09_16 = {
+    "the conscious-consumption part of C-04 behind that read left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation).":
+        "the conscious-consumption driver behind that read left the model in the September 2026 review (watch list).",
+    "the water-scarcity driver (E-02) that carried that read left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "the water-scarcity driver (E-02) that carried that read left the model in the September 2026 review (watch list).",
+    "The tile also cited E-02, but that was the water-scarcity driver, which the September 2026 review merged into T-03; the energy case rests on E-07.":
+        "The energy-efficiency driver (E-02) that the tile also cited left the model in the September 2026 review (watch list).",
+    "The water-scarcity driver (E-02) cited for reduced softener demand left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "The water-scarcity driver (E-02) cited for reduced softener demand left the model in the September 2026 review (watch list).",
+    "the water-scarcity driver (E-02) behind it left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "the water-scarcity driver (E-02) behind it left the model in the September 2026 review (watch list).",
+    "The conscious-consumption part of C-04 that the tile also cited left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation).":
+        "The conscious-consumption driver the tile also cited left the model in the September 2026 review (watch list).",
+    "No modelled driver carries the standards escalation, so it is the strategist's read; E-02, once cited for it, was the water-scarcity driver, which the September 2026 review merged into T-03.":
+        "The energy-efficiency driver (E-02) that carried the standards escalation and the sales projection left the model in the September 2026 review (watch list).",
+    "Since the September 2026 review neither cited driver carries this tile (T-08 now covers only auto-dosing and replenishment, and water scarcity was merged into T-03 as format-shift context).":
+        "Since the September 2026 review neither cited driver carries this tile (connected appliances now only auto-dosing; water scarcity watch-listed).",
+    "even though the conscious-consumption part of C-04 left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation),":
+        "even though the conscious-consumption driver left the model in the September 2026 review (watch list),",
+    "the connected-appliance part of T-08 once cited for steamers left the model in the September 2026 review)":
+        "the connected-appliance part of T-08 once cited for steamers left the model in the September 2026 review, watch list)",
+    "single-use gimmick formats (strategist's read; the conscious-consumption part of C-04 left the model":
+        "single-use gimmick formats (strategist's read; the conscious-consumption driver left the model",
+}
+
+#: Claims the review record contradicts: items the review folded into live
+#: drivers (E-10 into T-03, G-12 into C-29, T-18 into T-08, C-30 into C-05, T-07
+#: and G-10 into T-01, X-10 into C-01, X-13 into C-01 and K-01) described as
+#: watch-listed, C-04 described as gone (these were written without a code, so
+#: the per-sentence checks below cannot see them), T-08 described without its
+#: replenishment half, the PFAS restriction said to be modelled for cosmetics
+#: only without naming it the EU one, G-03 credited on laundry tiles and T-08 on
+#: a hair tile, and E-07 said to hold the nearshoring thesis it replaced.
+STALE = (
+    "(regulators forcing water efficiency) left the model in the September 2026 review (watch list)",
+    "not fabric care (watch list)",
+    "home-hygiene dimension) left the model in the September 2026 review (watch list)",
+    "adopted in its place left the model in the September 2026 review (watch list)",
+    "AI personalisation as a standalone driver left the model in the September 2026 review (watch list)",
+    "C-04 conscious consumption left the base",
+    "watch-listed",
+    "(T-08 now covers only auto-dosing)",
+    "laundry auto-dosing",
+    "the PFAS restriction is",
+    "the PFAS restriction now",
+    "G-01 PFAS restriction",
+    "the PFAS rules, which",
+    "(watch list); the moat",
+    "(watch list); the modelled mechanism",
+    "(watch list: FMCG tools",
+    "(G-03 ingredient restrictions",
+    "driven by G-03",
+    "(T-08) make generic chelation",
+    "(T-01, T-08)",
+    "where the old nearshoring vector now sits",
+    "and the universal PFAS restriction",
+)
+
 class TestRepositoryContent:
     def test_journey_seed_carries_every_new_phrase_and_no_old_one(self, vocab):
         seed = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
-        assert len(vocab.JOURNEY_EDITS) == 26
+        assert len(vocab.JOURNEY_EDITS) == 58
         for old, new in vocab.JOURNEY_EDITS:
-            # either a trend -> driver rewrite, or a wording that would now read
-            # as the product term ("a profit-pool driver", "an expansion trend")
             assert not WORD.search(new), new
-            assert WORD.search(old) or "driver" in old, old
+            if new not in CORRECTION_ONLY:
+                # a trend -> driver rewrite (some extended by a correction), or a
+                # wording that would now read as the product term
+                assert WORD.search(old) or "driver" in old, old
             assert old not in seed, old
             assert new in seed, new
-        assert sum(seed.count(new) for _old, new in vocab.JOURNEY_EDITS) == 30
-        assert "export const JOURNEY_CONTENT_VERSION = '2026-09-16';" in seed
+        assert sum(seed.count(new) for _old, new in vocab.JOURNEY_EDITS) == 70
+        assert "export const JOURNEY_CONTENT_VERSION = '2026-09-17';" in seed
+
+    def test_the_corrected_claims_stay_corrected(self):
+        # Owner follow-up of 2026-09-17: what the September 2026 review record
+        # (verdicts_99_v1.json, trendCodeMap.ts) contradicts must not come back.
+        text = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
+        seed = text[text.index("export const LHC_JOURNEY"):]  # the content, not the header comment
+        for phrase in CORRECTED:
+            assert phrase in seed, phrase
+        for phrase in STALE:
+            assert phrase not in seed, phrase
+        for sentence in re.split(r"(?<=[.;])\s+|\\\\n", seed):
+            if "E-02" in sentence:  # merged into T-03, and it is water scarcity
+                assert "watch" not in sentence and "energy-efficien" not in sentence, sentence
+            if "T-08" in sentence:  # still live, narrowed to auto-dosing and replenishment
+                assert "watch" not in sentence and "T-08 connected appliances left the base:" not in sentence, sentence
+            if re.search(r"conscious[- ]consumption", sentence, re.I) and "watch" in sentence:
+                # C-04 was kept and narrowed; only neurocosmetics went to the watch list
+                assert re.search(r"neurocosmetic\w*( sensory science)? (moved to|is on) the watch list", sentence), sentence
+            if "T-08" in sentence and "auto-dosing" in sentence and re.search(r"\bonly\b|narrowed", sentence):
+                # T-08 covers auto-dosing and replenishment, across laundry and home care
+                assert "replenishment" in sentence, sentence
+            if re.search(r"\b(?:the|G-01)(?: universal)? PFAS (?:restriction|rules)\b", sentence, re.I):
+                # G-03 carries the EU restriction only; G-13 carries US state bans on cleaning products
+                assert not re.search(r"cosmetics|G-03|left the base", sentence), sentence
+
+        # A driver that scores zero in every category of a journey is not credited there
+        # without saying so: G-03, K-04 and K-07 have no laundry and home care exposure,
+        # and T-08 has no hair exposure.
+        cut = {name: text.index(f"export const {name}") for name in ("LHC_JOURNEY", "HAIR_JOURNEY", "LHC_CTX", "HAIR_CTX")}
+        journeys = {
+            "LHC": text[cut["LHC_JOURNEY"]:cut["HAIR_JOURNEY"]] + text[cut["LHC_CTX"]:cut["HAIR_CTX"]],
+            "Hair": text[cut["HAIR_JOURNEY"]:cut["LHC_CTX"]] + text[cut["HAIR_CTX"]:],
+        }
+        scoped = {"LHC": (("G-03", "K-04", "K-07"), r"hair|cosmetic"), "Hair": (("T-08",), r"hair|laundry and home care")}
+        exposure = {d["code"]: d["category_exposure"] for d in json.loads((BASE / "core_set_51_v5.json").read_text(encoding="utf-8"))}
+        for journey, (codes, marker) in scoped.items():
+            for code in codes:  # the premise, from the base file
+                assert not any(v for k, v in exposure[code].items() if k.startswith(journey + ":")), code
+            for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', journeys[journey]):
+                for sentence in re.split(r"(?<=[.;])\s+|\\\\n", literal):
+                    if any(re.search(rf"\b{code}\b", sentence) for code in codes):
+                        assert re.search(marker, sentence), (journey, sentence)
 
     def test_journey_phrases_are_plain_text_and_independent(self, vocab):
         olds = [o for o, _ in vocab.JOURNEY_EDITS]
@@ -114,6 +286,15 @@ class TestRepositoryContent:
             assert text == seed
         news = [n for _, n in vocab.JOURNEY_EDITS]
         assert not any(n != other and n in other for n in news for other in news)
+        for phrase in CORRECTED:  # a correction only in the seed would never reach a database
+            assert phrase not in before, phrase
+        # ... and so would any other edit made only in the seed: undoing the table must
+        # give back the Consumer Journey content of 37ae35c (the 2026-09-10 go-live)
+        # exactly. A later content change that is not part of O15 needs its own
+        # script and its own record, and then moves this pin.
+        content = before[before.index("export const LHC_JOURNEY"):]
+        assert hashlib.sha256(content.encode("utf-8")).hexdigest() == \
+            "fe35305847418ea99566ec4ebdf51d3b5a80651d12f9634c43d804a1ffca31ee"
 
     def test_ordinary_trend_prose_is_left_alone(self):
         seed = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
@@ -440,7 +621,7 @@ class TestContentScript:
         archive = tmp_path / "archive"
         assert vocab.main(dry_run=True, allow_postgres=False, archive_dir=str(archive)) == 0
         out = capsys.readouterr().out
-        assert "26 phrase(s) to change (30 occurrence(s))" in out  # 26, the driver note and three in the second tile
+        assert "58 phrase(s) to change (62 occurrence(s))" in out  # 58, the driver note and three in the second tile
         assert "driver consumer_r27.strategic_implication: apply" in out
         assert re.search(r"Probe tile / analysis: \.\.\..*pronounced premiumisation trend in colour", out)
         assert _journey_rows(db) == 1 and _texts(db) == before
@@ -477,7 +658,7 @@ class TestContentScript:
         audit = _audit_rows(db)
         assert len(audit) == 1 and audit[0]["entity_id"] == "O15" and audit[0]["entity_type"] == "content"
         assert re.fullmatch(r"archive driver_vocabulary_sqlite_\d{8}_\d{6}_\d{6}\.json", audit[0]["old_value"])
-        assert audit[0]["new_value"] == "journey phrases 26 (30 places), driver texts 4"
+        assert audit[0]["new_value"] == "journey phrases 58 (62 places), driver texts 4"
         assert audit[0]["reason"].startswith("Owner ruling O15 (2026-09-16)") and audit[0]["user_id"] == "owner-cli"
 
     def test_second_run_changes_nothing(self, db, vocab, capsys):
@@ -494,7 +675,7 @@ class TestContentScript:
         assert vocab.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
         out = capsys.readouterr().out
         assert f"not found (reworded by an admin?): {dropped!r}" in out
-        assert "25 phrase(s) to change" in out and "need a look by hand" in out
+        assert "57 phrase(s) to change" in out and "need a look by hand" in out
         assert "The neuro-scent driver left the model" not in json.dumps(db.load_journey_content())
 
     def test_missing_items_are_not_reported_as_done(self, db, vocab, capsys):
@@ -820,7 +1001,7 @@ class TestContentScript:
         assert "nothing changed" not in out
         monkeypatch.setattr(vocab, "get_db_connection", real_connection)
         assert vocab.main(dry_run=True, allow_postgres=False) == 0  # here it did land
-        assert "0 phrase(s) to change (0 occurrence(s)), 26 already changed" in capsys.readouterr().out
+        assert "0 phrase(s) to change (0 occurrence(s)), 58 already changed" in capsys.readouterr().out
 
     def test_a_missing_privilege_is_named(self, db, vocab, capsys):
         db.save_journey_content(_journey_blob(vocab), updated_by="seed")
@@ -878,7 +1059,7 @@ class TestContentScript:
         monkeypatch.setattr(dbm, "USE_POSTGRES", True)  # placeholder() and ph() read it
         monkeypatch.setattr(vocab, "get_db_connection", connection)
         old, new = vocab.JOURNEY_EDITS[0]
-        j_apply = [{"old": old, "new": new, "count": 1}] if journey_edits else []
+        j_apply = [{"old": old, "olds": [old], "new": new, "count": 1}] if journey_edits else []
         _tid, col, d_old, d_new = vocab.DRIVER_EDITS[1]
         drivers = {"consumer_r27": {col: f"text {d_old} text"}}
         d_apply = [{"id": "consumer_r27", "column": col, "old": d_old, "new": d_new}]
@@ -900,3 +1081,36 @@ class TestContentScript:
             with pytest.raises(vocab._Conflict):
                 vocab._write({"lhc": [], "hair": []}, 6, j_apply, drivers, d_apply, ("x",) * 7)
             assert log[-1] == "ROLLBACK" and not any(line.startswith("INSERT") for line in log)
+
+    def test_a_database_moved_by_the_first_o15_table_is_finished_too(self, db, vocab, capsys):
+        # Commit 5813c33 shipped the table before the corrections of 2026-09-17. A
+        # database it moved carries that table's wording; this run must take it to
+        # the corrected text and report nothing as not found.
+        blob = _journey_blob(vocab)
+        for old, new in vocab.JOURNEY_EDITS:
+            if new in CORRECTION_ONLY:
+                continue  # the first table did not touch these
+            blob, _ = vocab._replace_in_strings(blob, old, WORDING_2026_09_16.get(new, new))
+        db.save_journey_content(blob, updated_by="moved by commit 5813c33")
+        middle = len(WORDING_2026_09_16)
+        assert vocab.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
+        out = capsys.readouterr().out
+        changed = middle + len(CORRECTION_ONLY)
+        assert (f"{changed} phrase(s) to change" in out and f"{len(vocab.JOURNEY_EDITS) - changed} already changed, 0 not found" in out
+                and "not found (reworded" not in out)
+        text = json.dumps(db.load_journey_content(), ensure_ascii=False)
+        for old, new in vocab.JOURNEY_EDITS:
+            assert old not in text and new in text, new
+        for earlier in WORDING_2026_09_16.values():
+            assert earlier not in text, earlier
+        assert vocab.main(dry_run=True, allow_postgres=False) == 0
+        assert f"0 phrase(s) to change (0 occurrence(s)), {len(vocab.JOURNEY_EDITS)} already changed, 0 not found" in capsys.readouterr().out
+
+    def test_the_2026_09_16_wordings_cannot_collide(self, vocab):
+        assert vocab.JOURNEY_EDITS_FROM_2026_09_16 == WORDING_2026_09_16
+        olds = [o for o, _ in vocab.JOURNEY_EDITS]
+        news = [n for _, n in vocab.JOURNEY_EDITS]
+        for new, earlier in vocab.JOURNEY_EDITS_FROM_2026_09_16.items():
+            assert new in news and earlier not in olds, earlier
+            # never found inside a corrected phrase or another entry's old phrase
+            assert not any(earlier in text for text in news + olds), earlier

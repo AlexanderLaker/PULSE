@@ -12,11 +12,22 @@ authored text live in the database and would otherwise keep saying "trend"
 where they mean a modelled driver:
 
   1. the Consumer Journey server copy (the latest `journey_content` row takes
-     precedence over data/consumerJourney.ts): the 26 phrases of
-     JOURNEY_EDITS (30 places in the seed). Most are the "... trend left the
+     precedence over data/consumerJourney.ts): the 58 phrases of
+     JOURNEY_EDITS (70 places in the seed). Many are the "... trend left the
      model in the September 2026 review" line of the 2026-09-10 re-basing;
      two reword text that would now read as the product term ("a profit-pool
-     driver", "an expansion trend");
+     driver", "an expansion trend"); and some carry the content corrections
+     the owner approved on 2026-09-17 after the O15 review (reads that said
+     E-02 or conscious consumption went to the watch list, E-02 called energy
+     efficiency, a live driver said to have left, items folded into live
+     drivers put on the watch list, T-08 described without its replenishment
+     half, the PFAS restriction said to be modelled for cosmetics only without
+     naming it the EU one, a driver credited where it scores zero), so one run
+     takes a database from the
+     2026-09-10 wording straight to the corrected one. A database already
+     moved by the first O15 table (commit 5813c33) is finished too:
+     JOURNEY_EDITS_FROM_2026_09_16 maps that table's wording to the same
+     corrected phrases;
   2. four driver texts from the September review (DRIVER_EDITS: C-03, C-27,
      C-35, G-15).
 
@@ -68,9 +79,9 @@ write them back when an admin next saves one of those drivers; and a Drivers or
 Consumer Journey page opened before the deploy keeps the old text in the
 browser and saves it back with its next edit, even after the deploy. So after
 the deploy, ask admins to reload any open PRISM page before they edit. The
-second dry run shows anything saved up to then: expect 0 phrases to change and
-"done" for the four driver texts; if it reports anything to change, run the
-script again.
+second dry run shows anything saved up to then: expect 0 phrases to change, 0
+not found and "done" for the four driver texts; if it reports anything to
+change, run the script again, and read a phrase not found by hand.
 """
 from __future__ import annotations
 
@@ -105,22 +116,31 @@ JOURNEY_EDITS: list[tuple[str, str]] = [
     ("the DB split this trend out from generic premiumisation", "the DB split this driver out from generic premiumisation"),
     ("The trend itself remains the model's largest distribution threat", "T-11 itself remains the model's largest distribution threat"),
     ("The neuro-scent trend left the model", "The neuro-scent driver left the model"),
-    ("the conscious-consumption trend behind that read left the model", "the conscious-consumption driver behind that read left the model"),
-    ("the water-scarcity trend (E-02) that carried that read left the model", "the water-scarcity driver (E-02) that carried that read left the model"),
-    ("The energy-efficiency trend (E-02) that the tile also cited left the model", "The energy-efficiency driver (E-02) that the tile also cited left the model"),
-    ("The water-scarcity trend (E-02) cited for reduced softener demand", "The water-scarcity driver (E-02) cited for reduced softener demand"),
-    ("the water-scarcity trend (E-02) behind it left the model", "the water-scarcity driver (E-02) behind it left the model"),
-    ("The conscious-consumption trend the tile also cited left the model", "The conscious-consumption driver the tile also cited left the model"),
-    ("The energy-efficiency trend (E-02) that carried the standards escalation", "The energy-efficiency driver (E-02) that carried the standards escalation"),
-    ("Both cited trends left the model in the September 2026 review",
-     "Since the September 2026 review neither cited driver carries this tile"),
-    ("even though the conscious-consumption trend left the model", "even though the conscious-consumption driver left the model"),
-    # T-08 is still a live driver (narrowed to OEM auto-dosing): what left is its
-    # connected-appliance part, so these must not say that a driver left.
+    ("the conscious-consumption trend behind that read left the model in the September 2026 review (watch list).",
+     "the conscious-consumption part of C-04 behind that read left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation)."),
+    ("the water-scarcity trend (E-02) that carried that read left the model in the September 2026 review (watch list).",
+     "the water-scarcity driver (E-02) that carried that read left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there)."),
+    ("The energy-efficiency trend (E-02) that the tile also cited left the model in the September 2026 review (watch list).",
+     "The tile also cited E-02, but that was the water-scarcity driver, which the September 2026 review merged into T-03; the energy case rests on E-07."),
+    ("The water-scarcity trend (E-02) cited for reduced softener demand left the model in the September 2026 review (watch list).",
+     "The water-scarcity driver (E-02) cited for reduced softener demand left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there)."),
+    ("the water-scarcity trend (E-02) behind it left the model in the September 2026 review (watch list).",
+     "the water-scarcity driver (E-02) behind it left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there)."),
+    ("The conscious-consumption trend the tile also cited left the model in the September 2026 review (watch list).",
+     "The conscious-consumption part of C-04 that the tile also cited left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation)."),
+    ("The energy-efficiency trend (E-02) that carried the standards escalation and the sales projection left the model in the September 2026 review (watch list).",
+     "No modelled driver carries the standards escalation, so it is the strategist's read; E-02, once cited for it, was the water-scarcity driver, which the September 2026 review merged into T-03."),
+    ("Both cited trends left the model in the September 2026 review (connected appliances now only auto-dosing; water scarcity watch-listed).",
+     "Since the September 2026 review neither cited driver carries this tile (T-08 now covers only auto-dosing and replenishment, and water scarcity was merged into T-03 as format-shift context)."),
+    ("even though the conscious-consumption trend left the model in the September 2026 review (watch list),",
+     "even though the conscious-consumption part of C-04 left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation),"),
+    # T-08 is still a live driver (narrowed to OEM auto-dosing and
+    # replenishment): what left is its connected-appliance part, so these must
+    # not say that a driver left.
     ("the connected-appliance trend once cited here left the model",
      "the connected-appliance part of T-08 that this tile cited left the model"),
-    ("the connected-appliance trend once cited for steamers left the model",
-     "the connected-appliance part of T-08 once cited for steamers left the model"),
+    ("the connected-appliance trend once cited for steamers left the model in the September 2026 review, watch list)",
+     "the connected-appliance part of T-08 once cited for steamers left the model in the September 2026 review)"),
     ("that trend (E-05) left the model", "that driver (E-05) left the model"),
     ("the between-wash styling trend left the model", "the between-wash styling driver left the model"),
     ("The trend itself left the model in the September 2026 review (watch list); this is the strategist's read, not a modelled driver.",
@@ -128,7 +148,7 @@ JOURNEY_EDITS: list[tuple[str, str]] = [
     ("C-10 hair-thinning demand medicalises (core trend)", "C-10 hair-thinning demand medicalises (core driver)"),
     ("C-03 hair-care premiumisation (colour, core trend)", "C-03 hair-care premiumisation (colour, core driver)"),
     ("single-use gimmick formats (strategist's read; the trend left the model",
-     "single-use gimmick formats (strategist's read; the conscious-consumption driver left the model"),
+     "single-use gimmick formats (strategist's read; the conscious-consumption part of C-04 left the model"),
     ("rather than a modelled driver (the conscious-consumption trend left the model", "rather than a modelled driver (it left the model"),
     ("as the climate-driven pest trend left the model", "as E-05 (climate-driven pest shifts) left the model"),
     ("the trend left the model in the September 2026 review as immaterial",
@@ -136,7 +156,112 @@ JOURNEY_EDITS: list[tuple[str, str]] = [
     # Not "trend" but a wording that would now read as the product term.
     ("a silent pool contraction masquerading as an expansion trend.", "a silent pool contraction masquerading as growth."),
     ("makes dermatological credibility a profit-pool driver", "makes dermatological credibility a profit-pool lever"),
+    # Content corrections the owner approved on 2026-09-17 after the O15 review
+    # (DECISION_LOG Part K, owner follow-up). Eleven entries above were extended
+    # or reworded for the same reason; these thirty-two were untouched by the
+    # rename. They fix what a tile claims, not a word.
+    ("Conscious consumption and neurocosmetics left the model in the September 2026 review (watch list).",
+     "In the September 2026 review the conscious-consumption part of C-04 left the model and neurocosmetics moved to the watch list."),
+    ("(that driver and neurocosmetics left the model in the September 2026 review, watch list)",
+     "(since the September 2026 review, C-04 covers only clinical-efficacy premiumisation, and neurocosmetics is on the watch list)"),
+    ("Conscious consumption and neurocosmetic sensory science left the model as drivers in the September 2026 review (watch list), so this moment carries no modelled driver.",
+     "In the September 2026 review the conscious-consumption part of C-04 left the model and neurocosmetic sensory science moved to the watch list, so this moment carries no modelled driver."),
+    ("(T-08 connected appliances left the base: narrowed to auto-dosing and replenishment)",
+     "(T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)"),
+    ("(T-08 connected appliances and E-02 left the base: narrowed to auto-dosing; water stress immaterial)",
+     "(T-08's connected-appliance part and E-02 left the base: T-08 is narrowed to auto-dosing and replenishment, E-02 merged into T-03)"),
+    ("(regulators forcing water efficiency) left the model in the September 2026 review (watch list); no mandate carries this tile",
+     "(regulators forcing water efficiency) left the model in the September 2026 review; no mandate carries this tile"),
+    ("because it binds apparel, not fabric care (watch list).",
+     "because it binds apparel, not fabric care."),
+    ("(bathroom and laundry-room IoT, the longevity economy's home-hygiene dimension) left the model in the September 2026 review (watch list).",
+     "(bathroom and laundry-room IoT, the longevity economy's home-hygiene dimension) left the model in the September 2026 review."),
+    ("the longevity home-hygiene driver adopted in its place left the model in the September 2026 review (watch list).",
+     "the longevity home-hygiene driver adopted in its place left the model in the September 2026 review."),
+    ("AI personalisation as a standalone driver left the model in the September 2026 review (watch list)",
+     "AI personalisation as a standalone driver left the model in the September 2026 review"),
+    ("(old C-04 conscious consumption left the base: code reassigned to hair and body clinical efficacy)",
+     "(C-04's conscious-consumption part left the base: C-04 is narrowed to clinical-efficacy premiumisation)"),
+    ("(G-01 PFAS restriction and C-04 conscious consumption left the base for laundry)",
+     "(G-01 EU PFAS restriction left the base for laundry, and C-04's conscious-consumption part left the base)"),
+    # T-08 covers replenishment as well as auto-dosing, across laundry and home
+    # care; and the PFAS restriction the review keeps only in the cosmetics
+    # stack G-03 is the EU one (G-13 carries US state bans on cleaning products).
+    ("(T-08 now covers only auto-dosing)",
+     "(T-08 now covers only auto-dosing and replenishment)"),
+    ("(T-08 connected appliances left the base for hair: narrowed to laundry auto-dosing)",
+     "(T-08 connected appliances left the base for hair: T-08 is narrowed to auto-dosing and replenishment in laundry and home care)"),
+    ("(T-08) is modelled as laundry auto-dosing only since the September 2026 review",
+     "(T-08) is modelled only as auto-dosing and replenishment in laundry and home care since the September 2026 review"),
+    ("(connected appliances left the base for hair: T-08 is laundry auto-dosing only)",
+     "(connected appliances left the base for hair: T-08 covers only auto-dosing and replenishment in laundry and home care)"),
+    ("since T-08 is modelled as laundry auto-dosing only after the September 2026 review",
+     "since T-08 is modelled only as auto-dosing and replenishment in laundry and home care after the September 2026 review"),
+    ("(the PFAS restriction is modelled for cosmetics only, G-03)",
+     "(the EU PFAS restriction is modelled for cosmetics only, G-03)"),
+    ("and the PFAS rules, which the September 2026 review kept only inside the cosmetics stack (G-03)",
+     "and the EU PFAS rules, which the September 2026 review kept only inside the cosmetics stack (G-03)"),
+    ("(G-01 PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
+     "(G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)"),
+    ("(the PFAS restriction is kept only inside the cosmetics stack, G-03)",
+     "(the EU PFAS restriction is kept only inside the cosmetics stack, G-03)"),
+    ("(the PFAS restriction now sits inside the G-03 ingredient-restriction stack)",
+     "(the EU PFAS restriction now sits inside the cosmetics ingredient-restriction stack G-03)"),
+    # Found by the final review: X-13, X-10 and G-10 are residue inside live
+    # drivers (C-01, K-01, T-01), not watch-listed; G-03 scores zero for laundry
+    # and home care and T-08 zero for hair, so neither is credited there; E-07
+    # replaced the nearshoring thesis instead of absorbing it; and the universal
+    # PFAS restriction is the EU one.
+    ("the old second leg of this tile, left the model in the September 2026 review (watch list); the moat",
+     "the old second leg of this tile, left the model in the September 2026 review; the moat"),
+    ("Platform vertical integration left the model in the September 2026 review (watch list); the modelled mechanism",
+     "Platform vertical integration left the model in the September 2026 review; the modelled mechanism"),
+    ("The AI Act left the model in the September 2026 review (watch list: FMCG tools are not high-risk and the high-risk provisions were delayed)",
+     "The AI Act left the model in the September 2026 review (FMCG tools are not high-risk and the high-risk provisions were delayed)"),
+    ("align with the regulatory squeeze on PFCs and chlorine (G-03 ingredient restrictions, G-02 microplastics)",
+     "align with the regulatory squeeze on PFCs and chlorine (G-02 microplastics; the EU PFAS rules are the strategist's read here, since G-03 models them for cosmetics only)"),
+    ("driven by G-03 (EU ingredient-restriction stack, now carrying PFAS), G-02 (microplastics restriction) and, as the strategist's read, conscious-consumption preference",
+     "driven by G-02 (microplastics restriction) and, as the strategist's read, the EU PFAS rules (modelled for cosmetics only, G-03) and a conscious-consumption preference"),
+    ("connected-appliance water sensing and replenishment (T-08) make generic chelation obsolete",
+     "connected-appliance water sensing and replenishment (the strategist's read, since T-08 is not modelled for hair) make generic chelation obsolete"),
+    ("connected-water diagnostics and AI-guided personalisation (T-01, T-08) make hard-water effects visible",
+     "connected-water diagnostics and AI-guided personalisation (T-01) make hard-water effects visible"),
+    ("chemical supply-base erosion (where the old nearshoring vector now sits)",
+     "chemical supply-base erosion (which replaced the old nearshoring vector)"),
+    ("and the universal PFAS restriction is advancing through the ECHA process",
+     "and the EU universal PFAS restriction is advancing through the ECHA process"),
+    ("and the universal PFAS restriction from 2029, which the September 2026 review models for cosmetics only (G-03)",
+     "and the EU universal PFAS restriction from 2029, which the September 2026 review models for cosmetics only (G-03)"),
 ]
+
+#: The wording the first O15 table (commit 5813c33, 2026-09-16) wrote for the
+#: entries the corrections of 2026-09-17 changed, keyed by the corrected phrase.
+#: A database moved by that table carries these; each maps to the same corrected
+#: phrase, so a second run finishes the job instead of reporting them not found.
+JOURNEY_EDITS_FROM_2026_09_16: dict[str, str] = {
+    "the conscious-consumption part of C-04 behind that read left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation).":
+        "the conscious-consumption driver behind that read left the model in the September 2026 review (watch list).",
+    "the water-scarcity driver (E-02) that carried that read left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "the water-scarcity driver (E-02) that carried that read left the model in the September 2026 review (watch list).",
+    "The tile also cited E-02, but that was the water-scarcity driver, which the September 2026 review merged into T-03; the energy case rests on E-07.":
+        "The energy-efficiency driver (E-02) that the tile also cited left the model in the September 2026 review (watch list).",
+    "The water-scarcity driver (E-02) cited for reduced softener demand left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "The water-scarcity driver (E-02) cited for reduced softener demand left the model in the September 2026 review (watch list).",
+    "the water-scarcity driver (E-02) behind it left the model in the September 2026 review (merged into T-03; only the format-shift mechanism survives there).":
+        "the water-scarcity driver (E-02) behind it left the model in the September 2026 review (watch list).",
+    "The conscious-consumption part of C-04 that the tile also cited left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation).":
+        "The conscious-consumption driver the tile also cited left the model in the September 2026 review (watch list).",
+    "No modelled driver carries the standards escalation, so it is the strategist's read; E-02, once cited for it, was the water-scarcity driver, which the September 2026 review merged into T-03.":
+        "The energy-efficiency driver (E-02) that carried the standards escalation and the sales projection left the model in the September 2026 review (watch list).",
+    "Since the September 2026 review neither cited driver carries this tile (T-08 now covers only auto-dosing and replenishment, and water scarcity was merged into T-03 as format-shift context).":
+        "Since the September 2026 review neither cited driver carries this tile (connected appliances now only auto-dosing; water scarcity watch-listed).",
+    "even though the conscious-consumption part of C-04 left the model in the September 2026 review (C-04 now covers only clinical-efficacy premiumisation),":
+        "even though the conscious-consumption driver left the model in the September 2026 review (watch list),",
+    "the connected-appliance part of T-08 once cited for steamers left the model in the September 2026 review)":
+        "the connected-appliance part of T-08 once cited for steamers left the model in the September 2026 review, watch list)",
+    "single-use gimmick formats (strategist's read; the conscious-consumption part of C-04 left the model":
+        "single-use gimmick formats (strategist's read; the conscious-consumption driver left the model",
+}
 
 #: (driver id, column, old phrase, new phrase). The same four edits turn
 #: data/trend_base_2026-09/core_set_51_v4.json into core_set_51_v5.json.
@@ -255,15 +380,16 @@ def _read_state() -> tuple[int | None, dict | None, dict]:
 
 
 def plan(journey: dict | None, drivers: dict) -> dict:
-    """Pure: what a run would change. Status per item: 'apply' (old phrase
-    found), 'done' (only the new phrase found), 'missing' (neither), and for
-    drivers 'no-such-driver'."""
+    """Pure: what a run would change. Status per item: 'apply' (the old phrase,
+    or its 2026-09-16 wording, found), 'done' (only the new phrase found),
+    'missing' (none of them), and for drivers 'no-such-driver'."""
     j_items = []
     if journey is not None:
         for old, new in JOURNEY_EDITS:
-            n_old = _count_in_strings(journey, old)
+            olds = [old] + ([JOURNEY_EDITS_FROM_2026_09_16[new]] if new in JOURNEY_EDITS_FROM_2026_09_16 else [])
+            n_old = sum(_count_in_strings(journey, o) for o in olds)
             status = "apply" if n_old else ("done" if _count_in_strings(journey, new) else "missing")
-            j_items.append({"old": old, "new": new, "count": n_old, "status": status})
+            j_items.append({"old": old, "olds": olds, "new": new, "count": n_old, "status": status})
     d_items = []
     for tid, col, old, new in DRIVER_EDITS:
         row = drivers.get(tid)
@@ -290,7 +416,7 @@ def _print_plan(p: dict, journey: dict | None) -> None:
               f"({sum(i['count'] for i in by['apply'])} occurrence(s)), {len(by['done'])} already changed, "
               f"{len(by['missing'])} not found")
         for i in by["missing"]:
-            print(f"  not found (reworded by an admin?): {i['old']!r}")
+            print(f"  not found (reworded by an admin?): {' or '.join(repr(o) for o in i['olds'])}")
     for i in p["drivers"]:
         print(f"driver {i['id']}.{i['column']}: {i['status']}")
 
@@ -380,7 +506,8 @@ def _write_statements(conn, cur, p: str, journey: dict | None, journey_id: int |
             raise _Conflict("a new journey_content row was written after the read")
         blob = journey
         for i in j_apply:
-            blob, _ = _replace_in_strings(blob, i["old"], i["new"])
+            for old in i["olds"]:
+                blob, _ = _replace_in_strings(blob, old, i["new"])
         cur.execute(
             f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})",
             (_safe_dumps(blob), UPDATED_BY),
@@ -442,7 +569,8 @@ def main(dry_run: bool, allow_postgres: bool, archive_dir: str | None = None) ->
         if j_apply:
             preview = journey
             for i in j_apply:
-                preview, _ = _replace_in_strings(preview, i["old"], i["new"])
+                for old in i["olds"]:
+                    preview, _ = _replace_in_strings(preview, old, i["new"])
             _report_remaining(preview)
         else:
             _report_remaining(journey)
@@ -482,7 +610,8 @@ def main(dry_run: bool, allow_postgres: bool, archive_dir: str | None = None) ->
         "driver_vocabulary_applied", "content", "O15",
         f"archive {os.path.basename(archive_path)}",
         f"journey phrases {len(j_apply)} ({sum(i['count'] for i in j_apply)} places), driver texts {len(d_apply)}",
-        "Owner ruling O15 (2026-09-16): 'Profit Pool Drivers' replaces 'trends' in authored content",
+        "Owner ruling O15 (2026-09-16): 'Profit Pool Drivers' replaces 'trends' in authored content, "
+        "with the content corrections approved on 2026-09-17",
         "owner-cli",
     )
     try:

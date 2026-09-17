@@ -119,5 +119,7 @@ class TestValidatorAcceptsTheTag:
             data["attenuation_source"] = legacy
             ModelConfigValidator.model_validate(data)
         data["attenuation_source"] = "calibrated_v9"
-        with pytest.raises(Exception):
+        with pytest.raises(Exception) as err:
             ModelConfigValidator.model_validate(data)
+        # the message names the current tag first and marks the older ones legacy
+        assert "one of ('calibrated_v3.12_september2026', 'calibrated_v3.11_september2026' (legacy)" in str(err.value)

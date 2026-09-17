@@ -160,13 +160,13 @@ class ModelConfigValidator(BaseModel):
     @field_validator("attenuation_source")
     @classmethod
     def validate_attenuation_source(cls, v: str) -> str:
-        """Attenuation source must be v3.11 / v3.5, v3.1 (legacy) / admin_override."""
+        """Attenuation source must be v3.12, v3.11 / v3.5 / v3.1 (legacy) or admin_override."""
         if v not in ("calibrated_v3.12_september2026", "calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
                      "calibrated_v3.1_april2026", "admin_override"):
             raise ValueError(
-                f"attenuation_source must be one of ('calibrated_v3.11_september2026', "
-                f"'calibrated_v3.5_april2026' (legacy), 'calibrated_v3.1_april2026' (legacy), "
-                f"'admin_override'). Got '{v}'"
+                f"attenuation_source must be one of ('calibrated_v3.12_september2026', "
+                f"'calibrated_v3.11_september2026' (legacy), 'calibrated_v3.5_april2026' (legacy), "
+                f"'calibrated_v3.1_april2026' (legacy), 'admin_override'). Got '{v}'"
             )
         return v
 

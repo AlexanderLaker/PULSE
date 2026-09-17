@@ -183,7 +183,7 @@ export interface RunMeta {
   category_weights_used?: Record<string, number> | null;
   cell_weights_source?: string | null;
   /** 2.11.0 (O10/O11): number of drivers the run loaded and the calibration
-   *  tag of its config (e.g. 'calibrated_v3.11_september2026'). */
+   *  tag of its config (e.g. 'calibrated_v3.12_september2026'). */
   trend_count?: number | null;
   attenuation_source?: string | null;
   converged_categories?: number | null;

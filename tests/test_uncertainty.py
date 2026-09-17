@@ -8,11 +8,14 @@ prior (p, 6 − p) and the global config.peak_year_jitter. The bit-identity of
 the no-score jitter stream with 2.10.0 is locked in tests/test_cell_weights.py.
 """
 
+import re
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from pulse.config import (beta_prior_for, peak_jitter_for, UNCERTAINTY_KAPPA,
-                          UNCERTAINTY_PEAK_JITTER, CATEGORIES)
+                          UNCERTAINTY_PEAK_JITTER, CATEGORIES, DEFAULT_PEAK_YEAR_JITTER)
 from pulse.ingestion.models import Trend, TrendDatabase
 from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
 from pulse.audit.input_drift import trend_fingerprint, compute_input_drift_event
@@ -38,6 +41,21 @@ class TestPriorMapping:
     def test_out_of_range_scores_are_clamped(self):
         assert beta_prior_for(4, 9) == beta_prior_for(4, 5)
         assert beta_prior_for(4, -2) == beta_prior_for(4, 0)
+
+    def test_the_about_footer_states_these_tables(self):
+        # About this model (ProfitPoolAnalysis2.tsx) describes the prior and the
+        # jitter in words; it still said "fixed Beta concentration" and "±1yr"
+        # after O7 made both depend on the score (owner follow-up, 2026-09-17).
+        src = (Path(__file__).resolve().parent.parent / "components" / "dashboard"
+               / "ProfitPoolAnalysis2.tsx").read_text(encoding="utf-8")
+        assert "&plusmn;1yr" not in src
+        assert not re.search(r"fixed[^.;]{0,30}(concentration|spread)", src)
+        k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER
+        assert f"keep the mean and narrow or widen the band, from &alpha;+&beta;={k[0]} at score 0 to {k[5]} at score 5" in src
+        assert f"the prior at uncertainty score 3, the same as for an unscored driver (&alpha;+&beta;={k[3]})" in src
+        assert beta_prior_for(4, None) == pytest.approx(beta_prior_for(4, 3))
+        assert f"peak-year jitter of &plusmn;{min(j.values())} to &plusmn;{max(j.values())} years" in src
+        assert f"(&plusmn;{DEFAULT_PEAK_YEAR_JITTER} year by default for an unscored driver)" in src
 
     def test_jitter_table(self):
         assert [peak_jitter_for(u, 1) for u in range(6)] == [0, 1, 1, 2, 3, 4]

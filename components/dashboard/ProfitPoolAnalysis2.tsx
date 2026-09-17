@@ -2106,7 +2106,7 @@ const ProfitPoolAnalysis2: FC<{
                   ))}
                 </div>
                 <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-                  Shown at default attenuation (admin-editable in the Config sheet). Timing: P10&ndash;P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo (fixed Beta concentration); per-iteration peak-year jitter (&plusmn;1yr) gives velocity bands their timing spread. Confidence is AI-scored display metadata &mdash; it does not drive the bands.
+                  Shown at default attenuation (admin-editable in the Config sheet). Timing: P10&ndash;P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; per-iteration peak-year jitter of &plusmn;0 to &plusmn;4 years, also set by that score (&plusmn;1 year by default for an unscored driver), gives velocity bands their timing spread. Confidence is AI-scored display metadata &mdash; it does not drive the bands.
                 </div>
               </div>
               {/* F5 (2.10.0): publish what a 1–5 probability score means as a
@@ -2137,7 +2137,7 @@ const ProfitPoolAnalysis2: FC<{
                   </table>
                 </div>
                 <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-                  The scale never reaches 0 or 1 &mdash; a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The band width comes from the fixed Beta concentration (&alpha;+&beta;=6).
+                  The scale never reaches 0 or 1 &mdash; a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The table shows the prior at uncertainty score 3, the same as for an unscored driver (&alpha;+&beta;=6). Other uncertainty scores keep the mean and narrow or widen the band, from &alpha;+&beta;=24 at score 0 to 3 at score 5.
                 </div>
               </div>
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"

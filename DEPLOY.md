@@ -285,7 +285,7 @@ python3 scripts/apply_driver_vocabulary.py --dry-run
 # server copy (ordinary English stays).
 # Archive-first (data/archive/driver_vocabulary_<mode>_<stamp>.json), then ONE
 # transaction with compare-and-swap and the audit entry: a new journey_content
-# row with the 26 phrases of JOURNEY_EDITS rewritten (earlier rows kept) and the
+# row with the 58 phrases of JOURNEY_EDITS rewritten (earlier rows kept) and the
 # description / strategic_implication of C-03, C-27, C-35 and G-15. The journey
 # table is locked while the write runs, so an admin save waits and lands after
 # it. Scores, exposures, sources, provenance flags and expert proposals are not
@@ -305,11 +305,13 @@ admin next saves one of those drivers. And a Drivers or Consumer Journey page
 opened before the deploy keeps the old text in the browser and saves it back
 with its next edit, even after the deploy, so after the deploy ask admins to
 reload any open PRISM page before they edit. The second dry run shows anything
-saved up to then: it must report `0 phrase(s) to change` and `done` for the four driver
-texts; if it reports anything to change, run the script with `--postgres` once
-more. Integrity events are stored with each run, so the persisted run keeps the
-wording it was saved with in the About footer ("N trend score(s) changed")
-until the next `run_50k_prod.py` writes a new run.
+saved up to then: it must report `0 phrase(s) to change`, `0 not found` and
+`done` for the four driver texts; if it reports anything to change, run the
+script with `--postgres` once more, and read any phrase it reports as not found
+by hand (an admin may have reworded it). Integrity events are stored with each
+run, so the persisted run keeps the wording it was saved with in the About
+footer ("N trend score(s) changed") until the next `run_50k_prod.py` writes a
+new run.
 
 ## Smoke test after deploy
 
