@@ -37,7 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "pulse",
+    "prism",
     "_NOT_FOR_HANDOVER"
   ]
 }

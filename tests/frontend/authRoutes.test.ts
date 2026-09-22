@@ -37,7 +37,7 @@ vi.mock('next/headers', () => ({
 
 import { GET as meGET } from '@/app/api/me/route';
 import { GET as cfgGET, PUT as cfgPUT } from '@/app/api/config/route';
-import { PUT as trendPUT } from '@/app/api/trends/[id]/route';
+import { PUT as driverPUT } from '@/app/api/drivers/[id]/route';
 
 const signedOut = () => clerk.auth.mockResolvedValue({ userId: null });
 const signedIn = (role: 'admin' | 'viewer') => {
@@ -113,30 +113,30 @@ describe('/api/config', () => {
   });
 });
 
-describe('/api/trends/[id] (endorse / admin trend edit)', () => {
+describe('/api/drivers/[id] (endorse / admin trend edit)', () => {
   const params = { params: Promise.resolve({ id: 'trend_42' }) };
-  const putReq = () => new Request('http://x/api/trends/trend_42', {
+  const putReq = () => new Request('http://x/api/drivers/trend_42', {
     method: 'PUT', body: JSON.stringify({ probability: 4 }),
   });
 
   it('PUT: 401 anonymous', async () => {
     signedOut();
-    const res = await trendPUT(putReq(), params);
+    const res = await driverPUT(putReq(), params);
     expect(res.status).toBe(401);
     expect(fetch).not.toHaveBeenCalled();
   });
   it('PUT: 403 for viewer — the admin gate is the proxy, not the client', async () => {
     signedIn('viewer');
-    const res = await trendPUT(putReq(), params);
+    const res = await driverPUT(putReq(), params);
     expect(res.status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('PUT: 200 for admin — forwards to /api/v1/trends/{id} with a Bearer JWT', async () => {
+  it('PUT: 200 for admin — forwards to /api/v1/drivers/{id} with a Bearer JWT', async () => {
     signedIn('admin');
-    const res = await trendPUT(putReq(), params);
+    const res = await driverPUT(putReq(), params);
     expect(res.status).toBe(200);
     const call = vi.mocked(fetch).mock.calls[0];
-    expect(String(call[0])).toBe('http://backend.test/api/v1/trends/trend_42');
+    expect(String(call[0])).toBe('http://backend.test/api/v1/drivers/trend_42');
     const hdrs = (call[1] as RequestInit).headers as Record<string, string>;
     expect(hdrs.Authorization).toMatch(/^Bearer /);
     expect((call[1] as RequestInit).method).toBe('PUT');
@@ -151,7 +151,7 @@ describe('/api/trends/[id] (endorse / admin trend edit)', () => {
       }] }),
       { status: 422, headers: { 'Content-Type': 'application/json' } },
     )));
-    const res = await trendPUT(putReq(), params);
+    const res = await driverPUT(putReq(), params);
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(typeof body.error).toBe('string');

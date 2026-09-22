@@ -15,9 +15,9 @@ vi.mock('@/hooks/usePrism', () => ({
   default: () => STORE.store,
   PrismProvider: ({ children }: { children: unknown }) => children,
 }));
-vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(), updateTrend: vi.fn() }));
+vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(), updateDriver: vi.fn() }));
 
-import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
+import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 
 // T-01 → technology_r01 (the first Sorting / benefiting tile links it).
 // (M8, 2026-07-06: the phantom impact/score fields were removed from the
@@ -35,7 +35,7 @@ const t01 = {
 };
 
 STORE.store = {
-  trends: [t01],
+  drivers: [t01],
   simulation: {},
   loading: false,
   error: null,
@@ -45,7 +45,7 @@ afterEach(() => cleanup());
 
 describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
   it('strips trailing parentheticals from tile names in the rail', () => {
-    const { container } = render(<ConsumerJourney2 />);
+    const { container } = render(<ConsumerJourney />);
     // a known parenthetical tile renders its stripped name…
     expect(container.textContent).toContain('Garment care advisory service');
     // …and the parenthetical itself is gone from the rail
@@ -54,7 +54,7 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
   });
 
   it('opens a full-screen dialog with the Why-chain and the Drivers connect', () => {
-    render(<ConsumerJourney2 onNavigateToTrend={() => {}} />);
+    render(<ConsumerJourney onNavigateToDriver={() => {}} />);
 
     fireEvent.click(screen.getByText('AI stain/fabric recognition apps'));
 
@@ -83,7 +83,7 @@ describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
   });
 
   it('closes on Escape', async () => {
-    render(<ConsumerJourney2 />);
+    render(<ConsumerJourney />);
     fireEvent.click(screen.getByText('AI stain/fabric recognition apps'));
     expect(screen.queryByRole('dialog')).not.toBeNull();
     fireEvent.keyDown(window, { key: 'Escape' });

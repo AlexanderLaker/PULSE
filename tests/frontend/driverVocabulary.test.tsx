@@ -49,7 +49,7 @@ function uiFiles(): string[] {
   return out;
 }
 
-function userFacingTrendStrings(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
+function userFacingDriverStrings(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true,
     file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const hits: string[] = [];
@@ -80,13 +80,13 @@ describe('O15 driver vocabulary: static sweep of interface strings', () => {
   it('no user-facing string in app/, components/, hooks/, lib/ or api/ says trend', () => {
     const files = uiFiles();
     expect(files.length).toBeGreaterThan(20);
-    const offenders = files.flatMap((f) => userFacingTrendStrings(f));
+    const offenders = files.flatMap((f) => userFacingDriverStrings(f));
     expect(offenders).toEqual([]);
   });
 
   it('the top nav names the input page "Drivers"', () => {
     const page = fs.readFileSync(path.join(REPO, 'app', 'dashboard', 'page.tsx'), 'utf8');
-    expect(page).toMatch(/\{ id: 'trends-2',\s+label: 'Drivers' \}/);
+    expect(page).toMatch(/\{ id: 'drivers',\s+label: 'Drivers' \}/);
   });
 
   it('the sweep itself catches user-facing trend strings and spares identifiers', () => {
@@ -95,7 +95,7 @@ describe('O15 driver vocabulary: static sweep of interface strings', () => {
       "const TABS = [{ id: 'trends-2', label: 'Trends' }];",
       "export const P = () => <span title=\"Open the trend\" data-k={TABS[0].id}>Megatrend context</span>;",
     ].join('\n');
-    const hits = userFacingTrendStrings(path.join(REPO, 'components', 'probe.tsx'), probe);
+    const hits = userFacingDriverStrings(path.join(REPO, 'components', 'probe.tsx'), probe);
     expect(hits.map((h) => h.replace(/^.*? /, ''))).toEqual(['"Trends"', '"Open the trend"']);
   });
 });
@@ -110,13 +110,13 @@ vi.mock('@/hooks/usePrism', () => ({
 }));
 vi.mock('@/api/client', () => ({
   getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  getTrendProposals: vi.fn(async () => null),
+  getDriverProposals: vi.fn(async () => null),
   saveMyProposal: vi.fn(async () => null),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
 import HomeGate from '@/components/dashboard/HomeGate';
-import Trends2 from '@/components/dashboard/Trends2';
+import Drivers from '@/components/dashboard/Drivers';
 
 const driver = {
   id: 'consumer_r01', name: 'Private label structural penetration', force: 'Consumer',
@@ -128,11 +128,11 @@ const driver = {
 
 STORE.store = {
   health: { status: 'ok', version: 'test', has_simulation: true },
-  trends: [driver, { ...driver, id: 'government_r04', name: 'Packaging regulation cost stack', force: 'Government' }],
+  drivers: [driver, { ...driver, id: 'government_r04', name: 'Packaging regulation cost stack', force: 'Government' }],
   simulation: null,
   config: {},
   loading: false, error: null, backendAvailable: true, connectionState: 'connected',
-  updateTrend: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
+  updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
 };
 
 afterEach(() => cleanup());
@@ -154,7 +154,7 @@ describe('O15 driver vocabulary: rendered surfaces', () => {
   });
 
   it('Drivers page: header, search, mode tab and column say driver, nothing says trend', () => {
-    const { container } = render(<Trends2 />);
+    const { container } = render(<Drivers />);
     expect(container.textContent).toContain('Drivers');
     expect(container.textContent).toContain("The 2 Profit Pool Drivers behind each category's shift to 2035.");
     expect(screen.getByPlaceholderText('Search drivers…')).toBeTruthy();
@@ -164,14 +164,14 @@ describe('O15 driver vocabulary: rendered surfaces', () => {
   });
 
   it('Drivers page before the drivers load: no "The 0 Profit Pool Drivers"', () => {
-    const loaded = STORE.store.trends;
-    STORE.store.trends = [];
+    const loaded = STORE.store.drivers;
+    STORE.store.drivers = [];
     try {
-      const { container } = render(<Trends2 />);
+      const { container } = render(<Drivers />);
       expect(container.textContent).toContain("The Profit Pool Drivers behind each category's shift to 2035.");
       expect(container.textContent).not.toMatch(/The 0 /);
     } finally {
-      STORE.store.trends = loaded;
+      STORE.store.drivers = loaded;
     }
   });
 });

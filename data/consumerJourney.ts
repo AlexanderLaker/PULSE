@@ -85,7 +85,7 @@ export interface JourneyTile {
   name: string;
   type: TileType;
   /** Canonical trend codes (see data/trendCodeMap.ts). */
-  trendCodes: string[];
+  driverCodes: string[];
   /** Short display rationale ("T-07 digital replaces static instructions"). */
   driverNote: string;
   /** Impact intensity on this product type at this stage: 1 mild · 2 moderate · 3 strong. */
@@ -121,7 +121,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI stain/fabric recognition apps",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -141,7 +141,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart fabric scanner & QR tools",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -161,7 +161,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Garment care advisory service (digital)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (social commerce is the strategist's read; K-04 is modelled for hair only)",
@@ -181,7 +181,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart home integration platforms",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "T-08"
         ],
@@ -202,7 +202,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "DPP-enabled garment care scanners",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "G-16",
           "T-01"
         ],
@@ -223,7 +223,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Large-print accessible care labels",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-05"
         ],
         "driverNote": "C-05 ageing consumers",
@@ -245,7 +245,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Manual sorting aids (baskets, dividers)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -265,7 +265,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic care label guides (print)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -285,7 +285,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric identification cards",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -311,7 +311,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Enzyme-based stain removers (bio-actives)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -332,7 +332,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Targeted stain pens & precision sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift",
@@ -352,7 +352,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Ultrasonic stain erasers (devices)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -372,7 +372,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Plant-based odor neutralizers",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "C-04"
         ],
@@ -393,7 +393,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart stain analyzer (app + device)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -413,7 +413,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Sustainable stain removal subscriptions",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-04",
           "K-02"
         ],
@@ -434,7 +434,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Concentrated stain remover refill pouches",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (refill pouches)",
@@ -456,7 +456,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Chlorine-based pre-treaters",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-02"
         ],
         "driverNote": "G-02 EU microplastics restriction (the EU PFAS restriction is modelled for cosmetics only, G-03)",
@@ -476,7 +476,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Solvent-based fabric protectors",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
         "intensity": 3,
         "provenance": {
@@ -494,7 +494,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Soil-release coatings (PFCs)",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
         "intensity": 3,
         "provenance": {
@@ -512,7 +512,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heavy chemical stain blockers",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules",
@@ -532,7 +532,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic perfume-heavy pre-treaters",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-04",
           "G-05"
         ],
@@ -553,7 +553,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Retailer own-brand stain removers (premium PL)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-01"
         ],
         "driverNote": "C-01 private label structural penetration",
@@ -573,7 +573,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Skill-dependent multi-step treatment products (cleaning-fluency decline)",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (C-31 left the base: single unverifiable Gen Z cleaning-literacy statistic)",
         "intensity": 2,
         "provenance": {
@@ -597,7 +597,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Microfibre filters (catch clothing shedding)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-02"
         ],
         "driverNote": "G-02 EU microplastics restriction",
@@ -617,7 +617,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart load sensors / weight add-ons",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
@@ -637,7 +637,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Laundry optimization balls",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift",
@@ -657,7 +657,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Auto-load-weighing machine adapters",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "T-08"
         ],
@@ -678,7 +678,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric care dispensing systems",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "T-08"
         ],
@@ -701,7 +701,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Delicate bags / drum accessories",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
@@ -721,7 +721,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Manual dosing aids / scoops",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
@@ -741,7 +741,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric softening balls (low-tech)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift",
@@ -761,7 +761,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic load guides (printed)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity",
@@ -787,7 +787,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Concentrated / ultra-compact detergents",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "G-04"
         ],
@@ -808,7 +808,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Detergent sheets & pods (eco-formats)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "G-04"
         ],
@@ -829,7 +829,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Refill systems & eco-subscriptions",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "G-04",
           "T-03",
           "C-04"
@@ -851,7 +851,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Bio-enzymatic booster packs",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -872,7 +872,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Premium fragrance bead boosters",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
@@ -892,7 +892,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Plant-based washing pod tablets",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "G-05"
         ],
@@ -913,7 +913,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Modular detergent mix-your-own systems",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "T-03"
         ],
@@ -934,7 +934,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Subscription laundry boxes (recurring)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-02"
         ],
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in)",
@@ -954,7 +954,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Discount-exclusive branded value formats",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-01"
         ],
         "driverNote": "K-01 discount channel share gain (Aldi, Lidl)",
@@ -974,7 +974,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart auto-dosing detergent cartridges",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
@@ -994,7 +994,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hispanic-household laundry formats (US growth segment)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-18"
         ],
         "driverNote": "C-18 US Hispanic demographic dividend in hair and laundry",
@@ -1014,7 +1014,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Detergent sheets & ultra-light strips (Earth Breeze / Tru Earth model)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (sheets)",
@@ -1034,7 +1034,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Auto-dish tabs for first-time dishwasher households (EM conversion)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-27"
         ],
         "driverNote": "C-27 dishwasher penetration catch-up drives auto-dish consumption",
@@ -1054,7 +1054,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "In-wash scent boosters as routine add-on (Unstoppables archetype)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
@@ -1074,7 +1074,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Specialist delicates & performance-fabric detergents (Perwoll occasion)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (specialty care, fibre renewal and refresh occasions)",
@@ -1094,7 +1094,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI shopping agents & auto-replenishment subscriptions",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-11"
         ],
         "driverNote": "T-11 AI shopping agents (agentic commerce)",
@@ -1114,7 +1114,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Bio-manufactured surfactant & fragrance formulations",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution (fermentation and synthetic biology long tail)",
@@ -1134,7 +1134,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Film-free unit-dose alternatives (coated tablets, moulded concentrates)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-16",
           "T-03"
         ],
@@ -1157,7 +1157,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Traditional bulk powder detergent",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift displaces dilute powders",
@@ -1177,7 +1177,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Conventional large liquid bottles",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "G-04"
         ],
@@ -1198,7 +1198,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Chlorine-based whiteners / bleach",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-02"
         ],
         "driverNote": "G-02 EU microplastics restriction (the EU PFAS restriction is modelled for cosmetics only, G-03)",
@@ -1218,7 +1218,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Separate water softening salts",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated water treatment in machines)",
@@ -1238,7 +1238,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic optical brighteners",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules (Green Claims Directive stalled)",
@@ -1258,7 +1258,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-greying chemical additives",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-03 narrowed to the cosmetics stack: hair and body only)",
         "intensity": 2,
         "provenance": {
@@ -1276,7 +1276,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "DIY home-made detergent kits",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-06",
           "C-25"
         ],
@@ -1297,7 +1297,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Branded detergents losing share to premium PL",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-01"
         ],
         "driverNote": "C-01 private label structural penetration and premium own-label tiers (X-13 retailer vertical integration left the base)",
@@ -1317,7 +1317,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mid-tier detergent range (squeezed middle)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-06",
           "C-01"
         ],
@@ -1338,7 +1338,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Import-dependent raw material formulations",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-08",
           "E-01"
         ],
@@ -1359,7 +1359,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mid-tier branded SKUs under retailer range rationalisation",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-03"
         ],
         "driverNote": "K-03 European retailer buyer-power concentration (alliances, M&A, cross-border sourcing) cuts branded assortment",
@@ -1379,7 +1379,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Input-cost & compliance pass-through on branded price ladders",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "E-03",
           "E-07"
         ],
@@ -1400,7 +1400,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hard-to-recycle trigger sprays & multi-material packs (EPR fee loading)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-04"
         ],
         "driverNote": "G-04 packaging regulation and EPR cost stack (eco-modulation) penalises trigger sprays and multi-material packaging",
@@ -1420,7 +1420,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Retail-media-gated shelf & search placement (pay-to-play discovery)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-13"
         ],
         "driverNote": "K-13 retail media and retailer data monetisation (Amazon and Walmart take 89% of the US increment)",
@@ -1440,7 +1440,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Retailer-agent baskets defaulting to PL & margin-optimised SKUs",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-11"
         ],
         "driverNote": "T-11 AI shopping agents (retailer-owned agents default to retailer economics)",
@@ -1460,7 +1460,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Promo economics rerouted through retailer loyalty apps",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-13"
         ],
         "driverNote": "K-13 retail media and retailer data monetisation (dm App and Clubcard pricing as data toll-booths)",
@@ -1480,7 +1480,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Branded variety & impulse purchasing collapsed into agent auto-baskets",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-11"
         ],
         "driverNote": "T-11 AI shopping agents (agentic commerce and brand invisibility in low-consideration categories)",
@@ -1500,7 +1500,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "US import-cost pass-through on EU-made premium SKUs",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-08"
         ],
         "driverNote": "G-08 US tariff regime after IEEPA (Section 301/232/122), Henkel US operations exposed on imported inputs and finished goods",
@@ -1520,7 +1520,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Palm-derivative surfactant formulas under biodiversity sourcing mandates",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-06"
         ],
         "driverNote": "G-06 nature and supply-chain due-diligence stack (EUDR, CSDDD), palm-derived surfactant chains under traceability pressure",
@@ -1540,7 +1540,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "PVA-film pods & discs under biodegradability challenge",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-16"
         ],
         "driverNote": "G-16 EU Detergents and Surfactants Regulation 2026/405 (film biodegradability criteria by 2032), unit-dose film chemistry contested",
@@ -1560,7 +1560,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Data-driven platform private label in replenishment categories",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-02"
         ],
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in); platform private label itself left the base",
@@ -1586,7 +1586,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart home apps (auto program selection)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances)",
@@ -1606,7 +1606,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI-based wash cycle advisors",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI advisors for fabric optimization)",
@@ -1626,7 +1626,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Auto-dosing machine ecosystems",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08",
           "T-01"
         ],
@@ -1647,7 +1647,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Voice-activated wash controls",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity + smart home voice assistants",
@@ -1667,7 +1667,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mobile app machine pairing",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI diagnostics; social commerce is not a modelled laundry driver)",
@@ -1687,7 +1687,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI-optimized cold-wash cycle programs",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "E-07"
         ],
@@ -1710,7 +1710,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Manual mechanical program dials",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances displace manual controls)",
@@ -1730,7 +1730,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic dosing instructions (packaging)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (data-driven dosing replaces generic tables)",
@@ -1750,7 +1750,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Paper washing guides / manuals",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (digital instructions replace paper)",
@@ -1776,7 +1776,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart / connected washers (auto-dose)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08",
           "T-01"
         ],
@@ -1797,7 +1797,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Cold-wash optimized detergents",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (formulation for cold-water efficiency)",
@@ -1817,7 +1817,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Water softening integrated systems",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated water treatment)",
@@ -1837,7 +1837,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Maintenance & care subscriptions",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-02"
         ],
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in) + post-purchase services",
@@ -1857,7 +1857,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Energy-monitor detergents (IoT-linked)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances report water and energy use)",
@@ -1877,7 +1877,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Machine health predictive services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (automation and IoT monitoring)",
@@ -1897,7 +1897,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Wash-cycle additives from divesting brands",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "X-17"
         ],
         "driverNote": "X-17 incumbent retrenchment and portfolio pruning (Reckitt Essential Home carve-out, now Vestacy) share capture",
@@ -1917,7 +1917,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Low-water wash programs & waterless cleaning formats",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (pulled by water stress); the freshwater-mandate driver left the base",
@@ -1939,7 +1939,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Standard non-connected machines",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment obsoletes legacy hardware",
@@ -1959,7 +1959,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hot-wash detergent formulas",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (cold-wash formulation) + energy efficiency",
@@ -1979,7 +1979,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Standalone Calgon-type water softeners",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated machine water treatment)",
@@ -1999,7 +1999,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Static water-hardness testing strips",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (machines auto-detect water hardness)",
@@ -2019,7 +2019,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "High-temperature wash detergents",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "E-07",
           "T-03"
         ],
@@ -2040,7 +2040,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Energy-intensive hot-wash programs",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "E-07"
         ],
         "driverNote": "E-07 structural European energy-price disadvantage (electricity about 2x, gas 3-6x US)",
@@ -2066,7 +2066,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-mustiness freshness solutions",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-04"
         ],
         "driverNote": "C-04 clinical-efficacy (cleanical) premiumisation wants fresh at source, not masked",
@@ -2086,7 +2086,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-wrinkle post-cycle sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift enables targeted sprays",
@@ -2106,7 +2106,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart unload reminders (app notifications)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances send completion alerts)",
@@ -2126,7 +2126,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Odor-elimination fabric mists",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-04"
         ],
         "driverNote": "C-04 clinical-efficacy (cleanical) premiumisation + bio-based solutions",
@@ -2146,7 +2146,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Microfiber-safe freshness products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-02"
         ],
         "driverNote": "G-02 EU microplastics restriction creates a new care category",
@@ -2166,7 +2166,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Functional neuro-scent finishers (calm / focus-positioned freshness)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers (neuro-scent driver T-19 left the base)",
@@ -2188,7 +2188,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Standalone fabric softeners (liquid)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "T-08"
         ],
@@ -2209,7 +2209,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heavy perfumed rinse aids",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers (substitution pressure on heavy rinse aids)",
@@ -2229,7 +2229,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic static-control sheets",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules",
@@ -2255,7 +2255,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heat pump dryers (energy-efficient)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "E-07"
         ],
         "driverNote": "E-07 structural European energy-price disadvantage (headwind working through this moment as a tailwind for efficient drying)",
@@ -2275,7 +2275,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dryer sheets with scent boosters",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
@@ -2295,7 +2295,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Tumble dryer balls (eco-friendly)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-04"
         ],
         "driverNote": "G-04 packaging regulation and EPR cost stack (headwind on disposables working through this moment as a tailwind for reusables)",
@@ -2315,7 +2315,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dehumidifiers for air-dry optimization",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (E-02 left the base: water stress kept only as format-shift context)",
         "intensity": 1,
         "provenance": {
@@ -2333,7 +2333,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart dryer sensors & IoT tracking",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (headwind working through this moment as a data tailwind)",
@@ -2353,7 +2353,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Gentle-dry garment longevity products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (specialty care, fibre renewal, longevity norms)",
@@ -2375,7 +2375,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Traditional vented tumble dryers",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "E-07"
         ],
         "driverNote": "E-07 structural European energy-price disadvantage",
@@ -2395,7 +2395,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic drying racks (commoditized)",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-08's connected-appliance part and E-02 left the base: T-08 is narrowed to auto-dosing and replenishment, E-02 merged into T-03)",
         "intensity": 1,
         "provenance": {
@@ -2413,7 +2413,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Chemical static-removing sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules",
@@ -2433,7 +2433,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dryer perfume papers (PVA-based)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-16",
           "G-02"
         ],
@@ -2460,7 +2460,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Garment steamers (replacing irons)",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)",
         "intensity": 3,
         "provenance": {
@@ -2478,7 +2478,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-wrinkle fabric treatment sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (ultra-concentrates, refill pouches)",
@@ -2498,7 +2498,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Wrinkle-release fabric technologies (apparel)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation",
@@ -2518,7 +2518,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Steam closets / smart garment refresh cabinets",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)",
         "intensity": 2,
         "provenance": {
@@ -2536,7 +2536,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Portable cordless garment steamers",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation, marketing and manufacturing",
@@ -2556,7 +2556,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart garment care services (on-demand)",
         "type": "service",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (K-04 left the base for LHC: social commerce scoped hair-only)",
         "intensity": 2,
         "provenance": {
@@ -2574,7 +2574,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Spray-and-wear anti-wrinkle solutions",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-05",
           "T-03"
         ],
@@ -2597,7 +2597,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Traditional irons & ironing boards",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-08's connected-appliance part left the base: T-08 is narrowed to auto-dosing and replenishment)",
         "intensity": 3,
         "provenance": {
@@ -2615,7 +2615,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Ironing starch sprays (traditional)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift",
@@ -2635,7 +2635,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Ironing accessories (covers, pads, stands)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-06"
         ],
         "driverNote": "C-06 cost-of-living squeeze, round two",
@@ -2655,7 +2655,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Starch and sizing products (classic)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (tailwind working through this moment as a headwind for sizing)",
@@ -2681,7 +2681,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart anti-moth & fabric protection",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "T-02"
         ],
@@ -2702,7 +2702,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric perfumes & closet scents (premium)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
@@ -2722,7 +2722,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart wardrobe management apps",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-11",
           "T-08"
         ],
@@ -2743,7 +2743,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-humidity & moisture control devices",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (water-stress pull on rewashing)",
@@ -2763,7 +2763,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Bio-based garment protection solutions",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution",
@@ -2783,7 +2783,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart storage container systems",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment + home automation",
@@ -2803,7 +2803,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Extended-range pest protection products",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (E-05 left the base: climate-driven pest shifts immaterial, one niche category)",
         "intensity": 2,
         "provenance": {
@@ -2823,7 +2823,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mothballs (chemical, declining appeal)",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-01 EU PFAS restriction left the base for laundry, and C-04's conscious-consumption part left the base)",
         "intensity": 2,
         "provenance": {
@@ -2841,7 +2841,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic storage boxes & organizers",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment obsoletes manual systems",
@@ -2861,7 +2861,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic fragrance closet bars",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28"
         ],
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers (trade-up away from synthetic bars)",
@@ -2881,7 +2881,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Wool blanket storage treatments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution replaces synthetic treatments",
@@ -2907,7 +2907,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "On-the-go clothing refresh sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-06"
         ],
         "driverNote": "C-06 cost-of-living squeeze (round two) reduces dry cleaning",
@@ -2927,7 +2927,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Deodorizing mists (quick freshening)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift enables portable bottles",
@@ -2947,7 +2947,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fragrance refresh boosters (natural)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-28",
           "T-02"
         ],
@@ -2968,7 +2968,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric care on-demand services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (refresh occasions) + convenience premium",
@@ -2988,7 +2988,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart scent dispensers",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected fabric-care devices)",
@@ -3010,7 +3010,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Full re-wash cycle (replaced by refresh)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-06"
         ],
         "driverNote": "C-06 cost-of-living squeeze (round two)",
@@ -3030,7 +3030,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heavy synthetic fragrance products",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (C-04's conscious-consumption part left the base: C-04 is narrowed to clinical-efficacy premiumisation)",
         "intensity": 1,
         "provenance": {
@@ -3048,7 +3048,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Conventional dry cleaning services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-06",
           "T-03"
         ],
@@ -3075,7 +3075,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-stain / anti-odor smart textiles",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "T-02"
         ],
@@ -3096,7 +3096,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Garment protection nano-coatings",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -3117,7 +3117,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Textile softeners (beyond wash cycle)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift enables targeted application",
@@ -3137,7 +3137,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Clothing repair kits & devices",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (longevity norms) + garment lifecycle extension",
@@ -3157,7 +3157,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fashion lifecycle services (repair/resale)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (refresh occasions, longevity norms) extends to fashion services",
@@ -3177,7 +3177,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Stain-guard pre-treatment services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (specialty-care premium) + professional laundry services",
@@ -3197,7 +3197,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Garment-longevity care claims aligned to EU textile mandates",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (longevity norms): care products as longevity enablers",
@@ -3219,7 +3219,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fast fashion disposable garments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29",
           "G-06"
         ],
@@ -3240,7 +3240,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Single-use stain wipes (plastic)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-04",
           "G-02"
         ],
@@ -3261,7 +3261,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Quick-fix synthetic patches",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules (Green Claims Directive stalled)",
@@ -3281,7 +3281,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Chemical-heavy protective sprays",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-01 EU PFAS restriction left the base for laundry: kept only inside the cosmetics stack G-03)",
         "intensity": 2,
         "provenance": {
@@ -3305,7 +3305,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric refresh sprays (concentrated)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "C-06"
         ],
@@ -3326,7 +3326,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "On-the-go freshener/anti-static mists",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (portable concentrates) + convenience trend",
@@ -3346,7 +3346,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Portable garment steaming devices",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (manufacturing automation enables compact design)",
@@ -3366,7 +3366,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart refreshing cabinets / steam closets",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08",
           "T-01"
         ],
@@ -3387,7 +3387,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "UV garment sanitizers (portable)",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-18 and C-30 left the base: no adoption evidence, no verifiable numbers)",
         "intensity": 2,
         "provenance": {
@@ -3405,7 +3405,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dry shampoo for clothes (spray)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "C-06"
         ],
@@ -3426,7 +3426,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Odor-elimination enzyme sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -3447,7 +3447,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Smart garment freshness alerts (app)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
@@ -3467,7 +3467,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Branded fabric refresh spray range",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-29"
         ],
         "driverNote": "C-29 garment care beyond cleaning (between-wash refresh occasions; Market Gap score 0.82)",
@@ -3487,7 +3487,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Antibacterial garment hygiene sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution (bio-based antimicrobial actives)",
@@ -3509,7 +3509,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Full wash cycle (over-washing declining)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-06",
           "T-03"
         ],
@@ -3530,7 +3530,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fabric de-wrinkling gadgets (niche)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-08"
         ],
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (appliance integration displaces niche gadgets)",
@@ -3550,7 +3550,7 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heavy synthetic fabric refreshers",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules",
@@ -3579,7 +3579,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Shade finders & AR try-on tools",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI diagnostics and colour simulation)",
@@ -3599,7 +3599,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Style inspiration apps & platforms",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "K-04"
         ],
         "driverNote": "K-04 social commerce (TikTok Shop)",
@@ -3619,7 +3619,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Creator & community platforms",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-04"
         ],
         "driverNote": "K-04 social commerce (TikTok Shop becomes a scaled beauty channel)",
@@ -3639,7 +3639,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Trend-led inspiration collections",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation",
@@ -3659,7 +3659,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Digital consultation (AI-matched looks)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI-driven matching and diagnostics)",
@@ -3679,7 +3679,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Influencer shade collaborations",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-04",
           "C-03"
         ],
@@ -3700,7 +3700,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI-generated personalized content at scale",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (generative-content leg, 40-60% cost reduction)",
@@ -3720,7 +3720,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Shopee/TikTok-native beauty discovery formats (SEA)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-37",
           "K-04"
         ],
@@ -3741,7 +3741,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Gen-Alpha 'first routine' starter lines & age-gated entry formats",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (C-26 left the base: sub-threshold evidence in HCB categories)",
         "intensity": 2,
         "provenance": {
@@ -3759,7 +3759,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Live-commerce shoppable streams (Douyin model in EU)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-04"
         ],
         "driverNote": "K-04 social commerce (TikTok Shop) becomes a scaled beauty channel, live streams a minority format now arriving via TikTok Shop EU",
@@ -3781,7 +3781,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Print shade & style lookbooks",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in marketing: digital AR replaces static print",
@@ -3801,7 +3801,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Occasion-based hair collections",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-11"
         ],
         "driverNote": "C-11 dupe economy and value-equivalence normalisation (all cohorts) seeks value",
@@ -3821,7 +3821,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Traditional salon consultations (walk-in)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity: AI look prediction and digital booking reduce walk-in consultations",
@@ -3841,7 +3841,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic brochure-based color guides",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity: AI shade simulation obsoletes static charts",
@@ -3861,7 +3861,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Search-dependent product discovery (SEO)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-13"
         ],
         "driverNote": "T-13 generative search and AI answers (GEO) replace search-and-browse product discovery",
@@ -3881,7 +3881,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Value-tier color kits (TikTok-native alternatives)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-04",
           "C-11"
         ],
@@ -3902,7 +3902,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Western-brand colour & care lines in China retail (C-beauty preference)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-16"
         ],
         "driverNote": "C-16 China domestic-brand capture in beauty and hair (Douyin-native competition)",
@@ -3922,7 +3922,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Organic brand discovery displaced by sponsored retail-media placements",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-13"
         ],
         "driverNote": "K-13 retail media and retailer data monetisation: sponsored placements colonise the beauty discovery surface",
@@ -3942,7 +3942,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Post-acquisition indie brands armed with big-FMCG distribution",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "X-15",
           "X-16"
         ],
@@ -3969,7 +3969,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp & hair scanners (camera-based)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "C-07"
         ],
@@ -3990,7 +3990,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI hair profiling (color, damage, texture)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI-driven analysis and personalisation)",
@@ -4010,7 +4010,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Porosity & damage diagnostic tests",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation, science-led tiers outgrow mass (detailed diagnostics)",
@@ -4030,7 +4030,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dermatological & trichology assessments",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx) + clinical validation",
@@ -4050,7 +4050,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hormonal & nutritional deficiency screening",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-05",
           "C-10"
         ],
@@ -4071,7 +4071,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "At-home scalp microbiome testing",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care (skinification of hair) as a regimen step, microbiome science (at-home kits)",
@@ -4091,7 +4091,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "DNA-based hair type profiling",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI-driven genetic matching) + premiumisation",
@@ -4111,7 +4111,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Male-specific hair thinning pattern analyzers",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "C-10",
           "T-01"
         ],
@@ -4132,7 +4132,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Post-medication hair health monitors",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "C-02",
           "T-01"
         ],
@@ -4153,7 +4153,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hair-longevity diagnostics & biomarker panels",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-10",
           "C-07"
         ],
@@ -4174,7 +4174,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Tele-derm hair & scalp prescription platforms (Hims/Hers model)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises: tele-derm Rx platforms (Hims/Hers model)",
@@ -4196,7 +4196,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp analysis kits (basic / manual)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity: AI cameras obsolete basic kits",
@@ -4216,7 +4216,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic hair type classification guides",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI personalisation) > generic guides",
@@ -4236,7 +4236,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Weather/environment tracking (low engagement)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity: personalisation shifts from weather to microbiome",
@@ -4256,7 +4256,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "One-size-fits-all consultation models",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (AI diagnostics, personalisation) demands custom diagnostics",
@@ -4276,7 +4276,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "AI diagnostic tools facing EU AI-Act conformity gates",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (G-10 left the base: AI Act not high-risk for FMCG tools)",
         "intensity": 2,
         "provenance": {
@@ -4294,7 +4294,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Competitor-owned diagnostic ecosystems set the category standard",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "X-15"
         ],
         "driverNote": "X-15 scale-leader innovation and A&P escalation (L'Oréal K-SCAN, Modiface, NVIDIA molecule discovery)",
@@ -4320,7 +4320,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp protection & comfort systems",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "C-04"
         ],
@@ -4341,7 +4341,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Bond builders (pre-color treatment)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (AI-optimised bond science) + premiumisation",
@@ -4361,7 +4361,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Heat & UV protectants (advanced)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -4382,7 +4382,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-humidity & anti-frizz primers",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -4403,7 +4403,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp detox & exfoliation scrubs",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care (skinification of hair) becomes a regimen step",
@@ -4423,7 +4423,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Pre-treatment precision applicators (tech)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in manufacturing (precision dosing)",
@@ -4443,7 +4443,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Pre-color pH adjustment products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (AI colour formulation, pH optimisation)",
@@ -4463,7 +4463,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp barrier repair serums",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care becomes a regimen step (microbiome layer included)",
@@ -4483,7 +4483,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "India affordable-premium sachets & small-pack regimens",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-37"
         ],
         "driverNote": "C-37 growth-market expansion (IMEA and India led): sachet-led affordable-premium entry",
@@ -4503,7 +4503,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Curl & coil-specific cleansing systems (co-wash, low-poo)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-24"
         ],
         "driverNote": "C-24 textured and curly hair as a mainstream category: 65% of global population, portfolios designed for straight hair",
@@ -4523,7 +4523,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Africa-first hair care ranges (textured-hair leadership at AfCFTA scale)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-37"
         ],
         "driverNote": "C-37 growth-market expansion (Sub-Saharan Africa sub-exposure); AfCFTA harmonisation kept as a watch note",
@@ -4545,7 +4545,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic pre-color treatments (commoditized)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation displaces the commodity tier",
@@ -4565,7 +4565,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Chelation treatments (niche, low awareness)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (AI-guided personalisation) requires new patient education",
@@ -4585,7 +4585,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Manual sectioning clips & tools",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (manufacturing automation + AI-guided precision)",
@@ -4605,7 +4605,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic heat protection sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation demands advanced formulas",
@@ -4625,7 +4625,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "UV-filter-dependent protectants (restricted ingredients)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-03"
         ],
         "driverNote": "G-03 EU cosmetics ingredient-restriction stack (Omnibus VII/VIII, SCCS restrictions)",
@@ -4651,7 +4651,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Hair loss & thinning growth serums",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10",
           "C-05"
         ],
@@ -4672,7 +4672,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp care & barrier repair products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care becomes a regimen step (emerging category)",
@@ -4692,7 +4692,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Regenerative scalp devices (LED, microcurrent)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "C-07"
         ],
@@ -4713,7 +4713,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-dandruff & sensitive scalp remedies",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care becomes a regimen step (clinical positioning)",
@@ -4733,7 +4733,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dermatological consultation services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx channel caveat) + clinical approach",
@@ -4753,7 +4753,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Low-level light therapy (LLLT) scalp tools",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in manufacturing + clinical efficacy",
@@ -4773,7 +4773,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Prebiotic & probiotic scalp treatments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care as a regimen step (microbiome science layer)",
@@ -4793,7 +4793,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Nutritional supplementation programs",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-05",
           "C-10"
         ],
@@ -4814,7 +4814,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "US Hispanic-consumer hair care ranges & bilingual merchandising",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-18"
         ],
         "driverNote": "C-18 US Hispanic demographic dividend in hair and laundry (delayed 2025-27); Henkel US portfolio under-indexed",
@@ -4834,7 +4834,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Longevity-positioned scalp & hair actives (NAD+, senolytic-inspired)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (science-led tiers, carrying the peptide and bioactive layer)",
@@ -4854,7 +4854,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Ingestible + topical combined hair regimens (Nutrafol model)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (supplement tier; Unilever/Nutrafol proof)",
@@ -4874,7 +4874,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Peptide & bioactive repair lines (GHK-Cu, NAD+ precursors)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (peptide and bioactive science layer)",
@@ -4894,7 +4894,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "K-beauty scalp serums & glass-hair treatment imports",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "X-16"
         ],
         "driverNote": "X-16 social-commerce-native and Asian challenger brands (K-beauty first), treatment-stage entry, headwind for HCB share",
@@ -4916,7 +4916,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Generic dandruff shampoo (commoditized)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03",
           "C-07"
         ],
@@ -4937,7 +4937,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Water softening devices for hair",
         "type": "tech",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (T-08 connected appliances left the base for hair: T-08 is narrowed to auto-dosing and replenishment in laundry and home care)",
         "intensity": 1,
         "provenance": {
@@ -4955,7 +4955,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Life-phase condition-based programs",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI personalization and diagnostics) > generic life-phase segments",
@@ -4975,7 +4975,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic scalp cooling treatments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution replaces synthetics",
@@ -4995,7 +4995,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mass-market anti-hair-loss treatments (indie pressure)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "X-16"
         ],
         "driverNote": "X-16 social-commerce-native challenger brands fragment hair-care share (K18, Olaplex, Virtue pressure)",
@@ -5015,7 +5015,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "OTC retail hair-loss products (prescription bypass)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx channel caveat routes demand around the retail shelf)",
@@ -5041,7 +5041,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Permanent & demi-permanent color (advanced)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (colour, core driver)",
@@ -5061,7 +5061,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Balayage, highlight & brow tints",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03",
           "K-07"
         ],
@@ -5082,7 +5082,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Bond repair & strengthen treatments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "K-07"
         ],
@@ -5103,7 +5103,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Texture changers (perms, relaxers, keratin)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "C-24"
         ],
@@ -5124,7 +5124,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Salon coloration & blending services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-07",
           "C-03"
         ],
@@ -5145,7 +5145,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Color application tools (precision devices)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (manufacturing automation leg) + precision dosing",
@@ -5165,7 +5165,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Brow, lash & hair growth serums",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (cosmetic thickening) extends to brows/lashes",
@@ -5185,7 +5185,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Digital color matching & consultation",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (AI personalization and diagnostics) for shade match",
@@ -5205,7 +5205,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Professional-grade at-home color systems",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-07"
         ],
         "driverNote": "K-07 professional and bond-repair hair brands cross into retail and e-commerce",
@@ -5225,7 +5225,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "LatAm salon-inspired premium colour lines",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-37"
         ],
         "driverNote": "C-37 growth-market expansion (LatAm-Mexico sub-exposure; Brazil via professional hair)",
@@ -5247,7 +5247,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Temporary color (declining vs. permanent)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation drives permanent investment",
@@ -5267,7 +5267,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic shampoos & cleansers (frequent use decline)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03",
           "C-35"
         ],
@@ -5288,7 +5288,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Gray blending (niche positioning)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-05"
         ],
         "driverNote": "C-05 ageing consumers and grey-coverage colour demand (tailwind routed to full coverage, not blending)",
@@ -5308,7 +5308,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Synthetic wigs & hair systems (stigma)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (tailwind routing transformation demand to colour and treatments)",
@@ -5328,7 +5328,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Budget color boxes (home-use)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-11",
           "C-03"
         ],
@@ -5349,7 +5349,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mid-price permanent color (squeezed middle)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-01",
           "C-06"
         ],
@@ -5370,7 +5370,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Standard salon-quality retail products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "X-15"
         ],
         "driverNote": "X-15 scale-leader innovation and A&P escalation (Unilever beauty investment, P&G superiority)",
@@ -5390,7 +5390,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Import & indie colour SKUs lacking MoCRA compliance infrastructure",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-13"
         ],
         "driverNote": "G-13 MoCRA and US state ingredient bans: compliance cliff for facility registration, safety substantiation and disclosure",
@@ -5416,7 +5416,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "pH balance & neutralization systems",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (pH science and colour lock)",
@@ -5436,7 +5436,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "After-color bond protection / cuticle sealing",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "C-03"
         ],
@@ -5457,7 +5457,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Color stabilizers & color-lock serums",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation (colour chemistry, extended fade resistance)",
@@ -5477,7 +5477,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Premium hair perfumes & scent finishing",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (prestige scent finishing; T-17 neurocosmetics left the base)",
@@ -5497,7 +5497,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Post-color stabilization services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-07"
         ],
         "driverNote": "K-07 professional and bond-repair brands cross into retail (premium service)",
@@ -5517,7 +5517,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Color-protective oil treatments",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "C-03"
         ],
@@ -5538,7 +5538,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Ionic sealing hair tools",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in manufacturing (precision sealing tools)",
@@ -5558,7 +5558,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Texture-first styling & definition lines",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-24"
         ],
         "driverNote": "C-24 textured and curly hair as a mainstream category: definition, frizz and hold needs unserved by straight-hair styling stacks",
@@ -5580,7 +5580,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Basic hold & fix products (commoditized)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation eliminates the low-end tier (tailwind working through this moment as a headwind)",
@@ -5600,7 +5600,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Shine-only products (low differentiation)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity in innovation outcompetes commodity shine boost (tailwind working through this moment as a headwind)",
@@ -5620,7 +5620,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Conventional plastic hair accessories",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-04"
         ],
         "driverNote": "G-04 packaging regulation and EPR cost stack",
@@ -5640,7 +5640,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Cheap fragrance finishing sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-35"
         ],
         "driverNote": "C-35 mass hair unit decline, value migrates to prestige (budget fragrance sprays decline)",
@@ -5660,7 +5660,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Unsubstantiated \"natural\" finishing products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "G-05"
         ],
         "driverNote": "G-05 EU EmpCo greenwashing rules (applying September 2026; Green Claims Directive stalled)",
@@ -5680,7 +5680,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Mass styling & body-care tiers under ultra-fast-fashion price floor",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-11"
         ],
         "driverNote": "C-11 dupe economy and value-equivalence normalisation (C-33 Shein/Temu price-floor and X-05 Chinese EU entry left the base)",
@@ -5706,7 +5706,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Color protection systems (UV, heat, pollution)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02",
           "T-01"
         ],
@@ -5727,7 +5727,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Climate-adaptive protection shields",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-02"
         ],
         "driverNote": "T-02 bio-based ingredient substitution (E-05 climate pest shifts left the base)",
@@ -5747,7 +5747,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Anti-frizz & smoothing sprays (advanced)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "C-03"
         ],
@@ -5768,7 +5768,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp stimulation & regeneration devices",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01",
           "C-07"
         ],
@@ -5789,7 +5789,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Biological support (ingestibles, supplements)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10",
           "C-05"
         ],
@@ -5810,7 +5810,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Condition tracking & smart reminders (app)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (diagnostics) + smart scheduling",
@@ -5830,7 +5830,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Subscription / programmatic care services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-02",
           "C-03"
         ],
@@ -5851,7 +5851,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Weekly intensive treatment protocols",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (multi-step routines)",
@@ -5871,7 +5871,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Personalized rinse cycle optimization",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (connected appliances left the base for hair: T-08 covers only auto-dosing and replenishment in laundry and home care)",
@@ -5891,7 +5891,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Emerging-market hair care regimens (IMEA)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-37"
         ],
         "driverNote": "C-37 growth-market expansion (IMEA led; AfCFTA a watch note)",
@@ -5913,7 +5913,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Tone & fade protection (anti-yellowing)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (colour stability integrated in core formulas)",
@@ -5933,7 +5933,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Fragrance refresh boosters (undifferentiated)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-35"
         ],
         "driverNote": "C-35 mass hair unit decline: value migrates to prestige and specialty (undifferentiated boosters lose the shelf)",
@@ -5953,7 +5953,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Deodorizing mists for hair (niche)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-06"
         ],
         "driverNote": "C-06 cost-of-living squeeze, round two, pressures accessory buys",
@@ -5973,7 +5973,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "One-time treatments (low engagement)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-02"
         ],
         "driverNote": "K-02 e-commerce auto-replenishment and subscription lock-in displaces single-use",
@@ -5993,7 +5993,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Online-listed care products (retail media tax)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "K-13"
         ],
         "driverNote": "K-13 retail media and retailer data monetisation as a structural visibility tax",
@@ -6013,7 +6013,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "E-commerce replenishment margins (pay-to-play)",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-02"
         ],
         "driverNote": "K-02 e-commerce and marketplace share gain at lower brand net margin (auto-replenishment lock-in)",
@@ -6039,7 +6039,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Dry shampoo (volume & convenience)",
         "type": "product",
-        "trendCodes": [],
+        "driverCodes": [],
         "driverNote": "No modelled driver since the September 2026 review (C-15 left the base: between-wash styling immaterial, moved to watch list)",
         "intensity": 3,
         "provenance": {
@@ -6057,7 +6057,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Root retouch sprays (instant color refresh)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "C-06"
         ],
@@ -6078,7 +6078,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Color correction & neutralization products",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (colour-correction formulation) + on-demand",
@@ -6098,7 +6098,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Leave-in & overnight treatments (intensive)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation (multi-step routines)",
@@ -6118,7 +6118,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp care & balance mists",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care becomes a regimen step (new category growth)",
@@ -6138,7 +6138,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Portable styling tools (cordless)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "T-01"
         ],
         "driverNote": "T-01 AI and automation productivity (manufacturing leg) enables portability",
@@ -6158,7 +6158,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Quick salon express refresh services",
         "type": "service",
-        "trendCodes": [
+        "driverCodes": [
           "K-04",
           "K-07"
         ],
@@ -6179,7 +6179,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "At-home color touch-up sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03",
           "C-05"
         ],
@@ -6200,7 +6200,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Scalp wellness weekly protocols",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care becomes a regimen step",
@@ -6220,7 +6220,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Male dry styling & texture sprays",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-10"
         ],
         "driverNote": "C-10 hair-thinning demand medicalises (incl. men; carries male grooming)",
@@ -6242,7 +6242,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Glosses (limited repeat purchase)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-03"
         ],
         "driverNote": "C-03 hair-care premiumisation shifts to permanent investment",
@@ -6262,7 +6262,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Garment steaming for hair (novelty)",
         "type": "tech",
-        "trendCodes": [
+        "driverCodes": [
           "C-06"
         ],
         "driverNote": "C-06 cost-of-living squeeze, round two + low engagement trend",
@@ -6282,7 +6282,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "On-the-go freshener sprays (generic)",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "C-07"
         ],
         "driverNote": "C-07 scalp care as a regimen step replaces generic \"freshener\" category",
@@ -6302,7 +6302,7 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
       {
         "name": "Temporary touch-up chalks",
         "type": "product",
-        "trendCodes": [
+        "driverCodes": [
           "T-03"
         ],
         "driverNote": "T-03 compaction and dry-format shift (concentrated sprays) displaces chalks",

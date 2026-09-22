@@ -25,27 +25,27 @@ import {
 } from 'react';
 import * as api from '@/api/client';
 import type {
-  HealthStatus, Trend, SimulationResult, ModelConfig, TrendUpdate,
+  HealthStatus, Driver, SimulationResult, ModelConfig, DriverUpdate,
 } from '@/types';
 
 /** Return type for the usePrism hook. */
 export interface UsePrismReturn {
   health: HealthStatus | null;
-  trends: Trend[];
+  drivers: Driver[];
   simulation: SimulationResult | null;
   config: ModelConfig | null;
   loading: boolean;
   error: string | null;
   backendAvailable: boolean;
   connectionState: 'connected' | 'reconnecting' | 'offline';
-  updateTrend: (trendId: string, updates: TrendUpdate) => Promise<void>;
+  updateDriver: (driverId: string, updates: DriverUpdate) => Promise<void>;
   reload: () => Promise<void>;
   reconnect: () => Promise<void>;
 }
 
 function usePrismStore(): UsePrismReturn {
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [trends, setTrends] = useState<Trend[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +81,7 @@ function usePrismStore(): UsePrismReturn {
       .catch(() => undefined)
       .then(() => Promise.all([
         api.getHealth().catch((err: Error) => { throw err; }),
-        api.getTrends().catch((): Trend[] => []),
+        api.getDrivers().catch((): Driver[] => []),
         api.getConfig().catch((): null => null),
       ]))
       .then(([h, t, c]) => {
@@ -90,7 +90,7 @@ function usePrismStore(): UsePrismReturn {
         setBackendAvailable(true);
         setConnectionState('connected');
         setHealth(h);
-        setTrends(Array.isArray(t) ? t : []);
+        setDrivers(Array.isArray(t) ? t : []);
         setConfig(c);
 
         // Load stored simulation if available
@@ -178,20 +178,20 @@ function usePrismStore(): UsePrismReturn {
   }, [loadAll]);
 
   // -- Update trend score ----------------------------------------
-  const updateTrend = useCallback(async (trendId: string, updates: TrendUpdate) => {
+  const updateDriver = useCallback(async (driverId: string, updates: DriverUpdate) => {
     // M6 (July 2026 review): ALWAYS attempt the write and rethrow on
     // failure. The old `if (!backendAvailable) return;` guard silently
     // dropped saves whenever the (up to 60s stale) offline flag was up,
     // while callers' success paths showed "✓ saved". Callers already have
     // try/catch + error UI — they just never received the rejection.
     try {
-      await api.updateTrend(trendId, updates);
+      await api.updateDriver(driverId, updates);
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
       throw e;
     }
-    const t = await api.getTrends().catch((): Trend[] => []);
-    if (mounted.current) setTrends(t);
+    const t = await api.getDrivers().catch((): Driver[] => []);
+    if (mounted.current) setDrivers(t);
   }, []);
 
   // -- Explicit reconnect function --------------------------------
@@ -201,9 +201,9 @@ function usePrismStore(): UsePrismReturn {
   }, [reload]);
 
   return {
-    health, trends, simulation, config,
+    health, drivers, simulation, config,
     loading, error, backendAvailable, connectionState,
-    updateTrend, reload, reconnect,
+    updateDriver, reload, reconnect,
   };
 }
 

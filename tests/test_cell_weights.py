@@ -31,19 +31,19 @@ import pathlib
 import numpy as np
 import pytest
 
-from pulse.config import (ModelConfig, CATEGORIES, REGIONS, cell_weights_outer,
+from prism.config import (ModelConfig, CATEGORIES, REGIONS, cell_weights_outer,
                           cell_weight_marginals, DEFAULT_CELL_WEIGHTS,
                           DEFAULT_CELL_WEIGHTS_SOURCE, EQUAL_CELL_WEIGHTS,
                           EQUAL_CELL_WEIGHTS_SOURCE)
-from pulse.config_validation import validate_model_config
-from pulse.ingestion.models import Trend, TrendDatabase
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.config_validation import validate_model_config
+from prism.drivers import Driver, DriverSet
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 # The estimated-mix record (2.12.0 / O14). Tests read the numbers from it
 # rather than restating them, so a regeneration can never leave the lock
 # asserting a mix the engine no longer uses.
 RECORD = json.loads((pathlib.Path(__file__).resolve().parents[1]
-                     / "data" / "cell_weights_estimated_v1.json").read_text(encoding="utf-8"))
+                     / "data" / "calibration" / "cell_weights_estimate.json").read_text(encoding="utf-8"))
 
 SEED, ITER = 42, 500
 GROUP_SPLIT_2_10_0 = {"Europe": 0.38, "North America": 0.26, "Asia": 0.17, "High Growth": 0.19}
@@ -144,13 +144,13 @@ def _equal_matrix():
 class TestRegressionAgainst2_10_0:
     """The separable Group-split matrix must reproduce the 2.10.0 numbers."""
 
-    def test_separable_matrix_reproduces_2_10_0_cells_and_portfolio(self, mock_model_config, mock_trends_database):
+    def test_separable_matrix_reproduces_2_10_0_cells_and_portfolio(self, mock_model_config, mock_drivers_database):
         cfg = _cfg_2_10_0(mock_model_config)
         # The 2.10.0 world, explicitly: twelve categories, 48 cells, each
         # category 1/12 of the pool split over the Group regional shares.
         assert cfg.category_names == CATEGORIES_2_10_0 and len(cfg.cell_weights) == 12
         assert cfg.cell_weights["Hair: Color"]["Europe"] == pytest.approx(0.38 / 12)
-        r = _run(cfg, mock_trends_database)
+        r = _run(cfg, mock_drivers_database)
         ly = max(r["shift_matrix"]["Hair: Color"]["path"].keys())
         for cat, (med, p10, p90) in REF_2_10_0_JITTER0.items():
             cell = r["shift_matrix"][cat]["path"][ly]
@@ -164,20 +164,20 @@ class TestRegressionAgainst2_10_0:
         assert port["p90"] == pytest.approx(p90, abs=1e-12)
         assert r["integrity_events"] == []
 
-    def test_separable_matrix_reproduces_2_10_0_region_lens(self, mock_model_config, mock_trends_database):
+    def test_separable_matrix_reproduces_2_10_0_region_lens(self, mock_model_config, mock_drivers_database):
         cfg = _cfg_2_10_0(mock_model_config)
-        r = _run(cfg, mock_trends_database)
+        r = _run(cfg, mock_drivers_database)
         ly = max(r["shift_matrix"]["Hair: Color"]["path"].keys())
         for cat, row in REF_2_10_0_REGION_LENS_LAST_JITTER0.items():
             for region, v in row.items():
                 assert r["decompositions"]["region"][int(ly)][cat][region] == pytest.approx(v, abs=1e-12), (cat, region)
 
-    def test_jitter_stream_matches_2_10_0(self, mock_model_config, mock_trends_database):
+    def test_jitter_stream_matches_2_10_0(self, mock_model_config, mock_drivers_database):
         """No fixture trend carries an uncertainty score, so the per-trend
         inverse-CDF draw must reproduce the 2.10.0 rng.choice draw bit for
         bit (velocity bands are the jitter-sensitive quantity)."""
         cfg = _cfg_2_10_0(mock_model_config, peak_year_jitter=1)
-        r = _run(cfg, mock_trends_database)
+        r = _run(cfg, mock_drivers_database)
         vel = r["shift_matrix"]["Hair: Color"]["velocity"]
         for year, (med, p10, p90) in REF_2_10_0_VELOCITY_HAIR_COLOR_JITTER1.items():
             assert vel[year]["median"] == pytest.approx(med, abs=1e-12), year
@@ -186,7 +186,7 @@ class TestRegressionAgainst2_10_0:
 
 
 class TestRollUpAlgebra:
-    def test_equal_weights_equal_plain_mean(self, mock_model_config, mock_trends_database):
+    def test_equal_weights_equal_plain_mean(self, mock_model_config, mock_drivers_database):
         # This is a property of the EQUAL grid, so pin it explicitly: since
         # 2.12.0 / O14 the config default is the estimated HCB mix, under which
         # the category roll-up is a weighted mean, not a plain one.
@@ -197,24 +197,24 @@ class TestRollUpAlgebra:
         # category_samples must equal the plain mean of the 4 regional
         # samples under equal weights. Re-run the private step to get both.
         eng = BayesianMonteCarloEngine(cfg, seed=SEED)
-        cat_s, reg_s = eng._simulate_samples(mock_trends_database, ITER)
+        cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
         assert np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-15)
 
-    def test_estimated_weights_are_not_a_plain_mean(self, mock_model_config, mock_trends_database):
+    def test_estimated_weights_are_not_a_plain_mean(self, mock_model_config, mock_drivers_database):
         """The counterpart: under the O14 default the roll-up must actually
         weight, otherwise the estimate would be decorative."""
         eng = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        cat_s, reg_s = eng._simulate_samples(mock_trends_database, ITER)
+        cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
         assert not np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-9)
 
-    def test_zero_share_cell_contributes_nothing(self, mock_model_config, mock_trend):
+    def test_zero_share_cell_contributes_nothing(self, mock_model_config, mock_driver):
         """A Europe-only trend under a matrix that gives Europe zero share in
         the category it hits must move neither the category nor the portfolio."""
-        t = Trend(id="eu_only", force="Consumer", name="EU only", direction="Contraction",
+        t = Driver(id="eu_only", force="Consumer", name="EU only", direction="Contraction",
                   probability=5, start_year=2025, gp1_pct_affected=0.30, peak_year=2028,
                   diffusion_curve="linear", category_exposure={"Hair: Color": 5},
                   regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5})
-        db = TrendDatabase(trends=[t], categories=list(CATEGORIES), forces=["Consumer"])
+        db = DriverSet(drivers=[t], categories=list(CATEGORIES), forces=["Consumer"])
         W = _equal_matrix()
         W["Hair: Color"]["Europe"] = 0.0
         W["Hair: Color"]["North America"] = 2.0 / 52  # keep the row alive and the total at 1
@@ -225,14 +225,14 @@ class TestRollUpAlgebra:
         assert r["totals"]["portfolio"][int(ly)]["median"] == 0.0
         assert r["regional_shift_matrix"]["Hair: Color"]["Europe"]["path"][ly]["median"] < 0  # the cell itself still moves
 
-    def test_full_share_cell_equals_regional_cell(self, mock_model_config, mock_trend):
+    def test_full_share_cell_equals_regional_cell(self, mock_model_config, mock_driver):
         """If a category's whole gross profit sits in one region, the category
         shift IS that cell's shift and the portfolio weight is the row sum."""
-        t = Trend(id="eu_only", force="Consumer", name="EU only", direction="Contraction",
+        t = Driver(id="eu_only", force="Consumer", name="EU only", direction="Contraction",
                   probability=4, start_year=2025, gp1_pct_affected=0.20, peak_year=2028,
                   diffusion_curve="linear", category_exposure={"Hair: Color": 5},
                   regional_exposure={"Europe": 5, "Asia": 3}, vc_exposure={"Marketing": 5})
-        db = TrendDatabase(trends=[t], categories=list(CATEGORIES), forces=["Consumer"])
+        db = DriverSet(drivers=[t], categories=list(CATEGORIES), forces=["Consumer"])
         W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
         W["Hair: Color"]["Europe"] = 0.6
         W["Hair: Care"]["Asia"] = 0.4
@@ -250,13 +250,13 @@ class TestRollUpAlgebra:
         zero_rows = [e for e in r["integrity_events"] if e["type"] == "cell_weight_zero_row"]
         assert len(zero_rows) == 1 and "Hair: Styling" in zero_rows[0]["detail"]["categories"]
 
-    def test_region_weights_used_are_column_sums(self, mock_model_config, mock_trends_database):
+    def test_region_weights_used_are_column_sums(self, mock_model_config, mock_drivers_database):
         W = _equal_matrix()
         W["Hair: Color"]["Europe"] = 3.0 / 52
         W["Hair: Color"]["Asia"] = 0.0
         W["Hair: Color"]["High Growth"] = 0.0
         cfg = mock_model_config.copy_with(cell_weights=W)
-        r = _run(cfg, mock_trends_database, iterations=200)
+        r = _run(cfg, mock_drivers_database, iterations=200)
         rw, cw = cell_weight_marginals(W)
         for region in REGIONS:
             assert r["region_weights_used"][region] == pytest.approx(rw[region])
@@ -268,8 +268,8 @@ class TestRollUpAlgebra:
 
 
 class TestContract:
-    def test_result_carries_weight_block(self, mock_model_config, mock_trends_database):
-        r = _run(mock_model_config, mock_trends_database, iterations=200)
+    def test_result_carries_weight_block(self, mock_model_config, mock_drivers_database):
+        r = _run(mock_model_config, mock_drivers_database, iterations=200)
         for key in ("cell_weights_used", "category_weights_used", "region_weights_used", "cell_weights_source"):
             assert key in r, key
         assert set(r["cell_weights_used"].keys()) == set(CATEGORIES)
@@ -278,9 +278,9 @@ class TestContract:
         assert r["cell_weights_source"].startswith("ESTIMATE, not Henkel P&L")
         assert r["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
 
-    def test_multichain_carries_weight_block(self, mock_model_config, mock_trends_database):
+    def test_multichain_carries_weight_block(self, mock_model_config, mock_drivers_database):
         r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_trends_database, n_chains=2, iterations=150)
+            mock_drivers_database, n_chains=2, iterations=150)
         assert r["cell_weights_used"]["LHC: IC"]["High Growth"] == pytest.approx(
             RECORD["cells"]["LHC: IC"]["High Growth"])
         assert r["category_weights_used"]["LHC: IC"] == pytest.approx(
@@ -392,7 +392,7 @@ class TestEstimatedMixProvenance:
         import sys
         repo = pathlib.Path(__file__).resolve().parents[1]
         out = subprocess.run(
-            [sys.executable, str(repo / "scripts" / "build_estimated_cell_weights.py"), "--check"],
+            [sys.executable, str(repo / "scripts" / "build_cell_weights.py"), "--check"],
             capture_output=True, text=True, cwd=str(repo))
         assert out.returncode == 0, out.stdout + out.stderr
 

@@ -22,17 +22,17 @@ class TestProdEntrypoint:
         instead of on run day.
         """
         spec = importlib.util.spec_from_file_location(
-            "run_50k_prod", REPO / "scripts" / "run_50k_prod.py"
+            "run_production", REPO / "scripts" / "run_production.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert callable(mod.main)
-        assert mod.EXPECTED_TREND_COUNT == 51  # 2.11.0 (O10): the 51-driver base
+        assert mod.EXPECTED_DRIVER_COUNT == 51  # 2.11.0 (O10): the 51-driver base
 
     def test_run_50k_refuses_wrong_db_mode(self, monkeypatch):
         """H1: a Postgres URL + SQLite fallback must abort with exit code 4."""
         spec = importlib.util.spec_from_file_location(
-            "run_50k_prod_h1", REPO / "scripts" / "run_50k_prod.py"
+            "run_production_h1", REPO / "scripts" / "run_production.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
@@ -42,14 +42,14 @@ class TestProdEntrypoint:
         assert mod.main([]) == 4
 
 class TestExcelWriterRoundTrip:
-    def test_writer_produces_workbook(self, tmp_path, mock_model_config, mock_trends_database):
+    def test_writer_produces_workbook(self, tmp_path, mock_model_config, mock_drivers_database):
         """M10: engine result → xlsx → reopen → expected sheets + a value."""
         openpyxl = pytest.importorskip("openpyxl")
-        from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-        from pulse.excel_bridge.writer import ShiftMatrixWriter
+        from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+        from prism.workbook import ShiftMatrixWriter
 
         result = BayesianMonteCarloEngine(mock_model_config, seed=42).run(
-            mock_trends_database, iterations=200
+            mock_drivers_database, iterations=200
         )
         out = tmp_path / "roundtrip.xlsx"
         writer = ShiftMatrixWriter(mock_model_config)
@@ -65,16 +65,16 @@ class TestExcelWriterRoundTrip:
         assert any("Metadata" in s or "Meta" in s for s in sheets), sheets
 
     def test_cell_weight_sheet_carries_the_estimate_provenance(
-            self, tmp_path, mock_model_config, mock_trends_database):
+            self, tmp_path, mock_model_config, mock_drivers_database):
         """O14: a reader holding the QA workbook offline must be able to see
         that the default shares are an ESTIMATE and how each was reached. A
         source line alone invites them to be read as Henkel P&L."""
         openpyxl = pytest.importorskip("openpyxl")
-        from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-        from pulse.excel_bridge.writer import ShiftMatrixWriter
+        from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+        from prism.workbook import ShiftMatrixWriter
 
         result = BayesianMonteCarloEngine(mock_model_config, seed=42).run(
-            mock_trends_database, iterations=200)
+            mock_drivers_database, iterations=200)
         out = tmp_path / "provenance.xlsx"
         ShiftMatrixWriter(mock_model_config).write(
             str(out), result, allocation=None,
@@ -92,21 +92,21 @@ class TestExcelWriterRoundTrip:
         for g in ("B", "E", "G"):
             assert f"\n{g}\n" in f"\n{text}\n" or f"\n{g}" in text, g
         assert "Share of block" in text and "Margin index" in text
-        assert "run_50k_prod.py --cell-weights FILE" in text
+        assert "run_production.py --cell-weights FILE" in text
 
     def test_cell_weight_provenance_is_omitted_for_other_matrices(
-            self, tmp_path, mock_model_config, mock_trends_database):
+            self, tmp_path, mock_model_config, mock_drivers_database):
         """It must describe the matrix the run actually used. Under the equal
         grid, or any loaded finance file, the derivation is not the story and
         printing it would be a provenance lie."""
         openpyxl = pytest.importorskip("openpyxl")
-        from pulse.config import EQUAL_CELL_WEIGHTS, EQUAL_CELL_WEIGHTS_SOURCE
-        from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-        from pulse.excel_bridge.writer import ShiftMatrixWriter
+        from prism.config import EQUAL_CELL_WEIGHTS, EQUAL_CELL_WEIGHTS_SOURCE
+        from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+        from prism.workbook import ShiftMatrixWriter
 
         cfg = mock_model_config.copy_with(cell_weights=EQUAL_CELL_WEIGHTS,
                                           cell_weights_source=EQUAL_CELL_WEIGHTS_SOURCE)
-        result = BayesianMonteCarloEngine(cfg, seed=42).run(mock_trends_database, iterations=200)
+        result = BayesianMonteCarloEngine(cfg, seed=42).run(mock_drivers_database, iterations=200)
         out = tmp_path / "equal.xlsx"
         ShiftMatrixWriter(cfg).write(str(out), result, allocation=None,
                                      metadata={"model_version": result["model_version"],
@@ -121,14 +121,14 @@ class TestExcelWriterRoundTrip:
 
 
 class TestReproducibilityContract:
-    def test_load_trends_orders_by_id(self):
+    def test_load_drivers_orders_by_id(self):
         """C2 upstream pin (adversarial re-review 2026-07-06): the engine-level
         order-sensitivity test proves order MATTERS; this guards the SQL that
         pins the order. If someone rewrites the query, this fails until the
         deterministic-order contract is preserved."""
         import inspect
-        import pulse.database as pdb
-        src = inspect.getsource(pdb.load_trends)
+        import prism.database as pdb
+        src = inspect.getsource(pdb.load_drivers)
         assert "ORDER BY id" in src, (
             "load_trends() must return trends in a deterministic order — "
             "reproducibility depends on it (C2)."
@@ -139,8 +139,8 @@ class TestDiagnosticsFailureBranch:
     def test_diagnostics_survives_db_outage(self, monkeypatch):
         """M4: /diagnostics must EXPLAIN a DB outage, not crash on it."""
         from fastapi.testclient import TestClient
-        from pulse.api.app import app
-        import pulse.database as pdb
+        from prism.api.app import app
+        import prism.database as pdb
 
         def _boom():
             raise RuntimeError("simulated Neon outage")

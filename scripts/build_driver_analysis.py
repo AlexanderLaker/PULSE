@@ -13,7 +13,7 @@ Files
   data/trend_base_2026-09/driver_attribution_v1.json   the numbers (GENERATED, never hand-edited)
   data/trend_base_2026-09/driver_analysis_v1.json      the authored readings: one template per driver
                                                        (hand-written) and its rendered text (GENERATED)
-  pulse/seed_trends.py                                 strategic_implication = the rendered text
+  prism/seed_drivers.py                                 analysis = the rendered text
                                                        (scripts/generate_seed_from_core_set.py)
 
 What the record is
@@ -96,13 +96,13 @@ os.environ["POSTGRES_URL"] = ""
 
 import numpy as np  # noqa: E402
 
-from pulse.config import ModelConfig, FORCES, REGIONS  # noqa: E402
-from pulse.ingestion.models import TrendDatabase  # noqa: E402
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
+from prism.config import ModelConfig, FORCES, REGIONS  # noqa: E402
+from prism.drivers import DriverSet  # noqa: E402
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
 
-DATA_DIR = os.path.join(REPO, "data", "trend_base_2026-09")
-ATTRIBUTION_PATH = os.path.join(DATA_DIR, "driver_attribution_v1.json")
-ANALYSIS_PATH = os.path.join(DATA_DIR, "driver_analysis_v1.json")
+DATA_DIR = os.path.join(REPO, "data", "drivers")
+ATTRIBUTION_PATH = os.path.join(DATA_DIR, "driver_attribution.json")
+ANALYSIS_PATH = os.path.join(DATA_DIR, "driver_analysis.json")
 #: Parity fixture for lib/driverAttribution.ts (the category drill-down uses
 #: the same decomposition): the inputs and the unscaled expected outputs.
 FIXTURE_PATH = os.path.join(REPO, "tests", "frontend", "fixtures", "driverAttribution.fixture.json")
@@ -123,15 +123,15 @@ TOP_PARTNERS = 3
 
 def load_drivers() -> list:
     """The committed seed, in the order the CLI loads it (ORDER BY id, C2)."""
-    from pulse.seed_trends import TRENDS
-    return sorted(TRENDS, key=lambda t: t.id)
+    from prism.seed_drivers import DRIVERS
+    return sorted(DRIVERS, key=lambda t: t.id)
 
 
-def code_of(trend) -> str:
-    m = re.search(r"_r(\d{2})$", trend.id)
+def code_of(driver) -> str:
+    m = re.search(r"_r(\d{2})$", driver.id)
     if not m:
-        raise ValueError(f"cannot derive a display code from id {trend.id!r}")
-    return f"{FORCE_LETTER[trend.force]}-{m.group(1)}"
+        raise ValueError(f"cannot derive a display code from id {driver.id!r}")
+    return f"{FORCE_LETTER[driver.force]}-{m.group(1)}"
 
 
 def load_cell_weights_file(path: str) -> tuple:
@@ -144,24 +144,24 @@ def load_cell_weights_file(path: str) -> tuple:
 
 # ── the decomposition ──────────────────────────────────────────────────
 
-def decompose(config: ModelConfig, trends: list) -> dict:
+def decompose(config: ModelConfig, drivers: list) -> dict:
     """Evaluate the engine's arithmetic at the score means, per driver."""
     eng = BayesianMonteCarloEngine(config, seed=42)
     cats = list(config.category_names)
     years = [int(y) for y in config.path_years]
-    n, nc, nr, ny = len(trends), len(cats), len(REGIONS), len(years)
+    n, nc, nr, ny = len(drivers), len(cats), len(REGIONS), len(years)
     ncell = nc * nr
     forces = list(FORCES)
     nf = len(forces)
 
     fw = np.array([config.force_weights.get(f, 1.0 / nf) for f in forces])
     att = np.array([eng._effective_attenuation[f] for f in forces])
-    fidx = np.array([forces.index(t.force) for t in trends])
+    fidx = np.array([forces.index(t.force) for t in drivers])
 
     # F1: composite cell exposure, exactly as the engine builds it.
     region_w = np.zeros((n, nr))
     regionless = []
-    for j, t in enumerate(trends):
+    for j, t in enumerate(drivers):
         reg = getattr(t, "regional_exposure", None) or {}
         vals = np.array([min(float(reg.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
         if vals.sum() <= 0:
@@ -169,7 +169,7 @@ def decompose(config: ModelConfig, trends: list) -> dict:
             regionless.append(t.id)
         region_w[j, :] = vals
     E = np.zeros((n, ncell))
-    for j, t in enumerate(trends):
+    for j, t in enumerate(drivers):
         for c, cat in enumerate(cats):
             exp = t.category_exposure.get(cat, 0)
             ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
@@ -179,7 +179,7 @@ def decompose(config: ModelConfig, trends: list) -> dict:
                 E[j, c * nr + r] = ce * region_w[j, r]
 
     # F2: magnitude-weighted within-force dampening, exactly as the engine.
-    abs_score = np.array([abs(float(t.normalized_score)) for t in trends])
+    abs_score = np.array([abs(float(t.normalized_score)) for t in drivers])
     contrib = abs_score[:, None] * E
     damp = np.ones((nf, ncell))
     n_eff_all = np.zeros((nf, ncell))
@@ -201,9 +201,9 @@ def decompose(config: ModelConfig, trends: list) -> dict:
         damp[f, :] = np.clip(d, 0.1, 1.0)
 
     # F4/F11/O7: the schedule averaged over each driver's peak-jitter grid.
-    sched, offsets, off_probs = eng._peak_schedule_table(trends)     # (n, n_off, ny)
+    sched, offsets, off_probs = eng._peak_schedule_table(drivers)     # (n, n_off, ny)
     e_mat = np.einsum("jk,jky->jy", off_probs, sched)                # (n, ny)
-    s_mean = np.array([float(t.normalized_score) for t in trends])   # E[p] x gp1 x sign
+    s_mean = np.array([float(t.normalized_score) for t in drivers])   # E[p] x gp1 x sign
 
     # Additive terms a[j, cell, y] and the per-cell compounding at the means.
     A = (fw[fidx][:, None, None] * att[fidx][:, None, None]
@@ -245,7 +245,7 @@ def decompose(config: ModelConfig, trends: list) -> dict:
     }
 
 
-def band_analysis(config: ModelConfig, trends: list, dec: dict, factor: float) -> tuple:
+def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) -> tuple:
     """Each driver's own terminal-year contribution at P10 / P50 / P90, and its
     share of the portfolio band.
 
@@ -267,9 +267,9 @@ def band_analysis(config: ModelConfig, trends: list, dec: dict, factor: float) -
     A_cell, E, damp, fw, att, fidx, W = (dec["A_cell"], dec["E"], dec["damp"],
                                           dec["fw"], dec["att"], dec["fidx"], dec["W"])
     w_cell = W.reshape(-1)
-    n = len(trends)
+    n = len(drivers)
     K = np.zeros(n)
-    for j, t in enumerate(trends):
+    for j, t in enumerate(drivers):
         f = fidx[j]
         term_const = fw[f] * att[f] * damp[f, :] * E[j, :]            # per cell, before score x materialisation
         a_raw = term_const * dec["s_mean"][j] * dec["e_mat"][j, y_last]
@@ -279,8 +279,8 @@ def band_analysis(config: ModelConfig, trends: list, dec: dict, factor: float) -
         K[j] = float((w_cell * term_const * sp).sum()) * factor
 
     eng = BayesianMonteCarloEngine(config, seed=BAND_SEED)
-    R = eng._build_correlation_matrix(trends)
-    samples = eng._generate_copula_samples(trends, R, BAND_DRAWS)      # p x gp1 x sign, (draws, n)
+    R = eng._build_correlation_matrix(drivers)
+    samples = eng._generate_copula_samples(drivers, R, BAND_DRAWS)      # p x gp1 x sign, (draws, n)
     off_idx = eng._draw_peak_offsets(dec["off_probs"], BAND_DRAWS)      # (draws, n)
     mat = dec["sched"][np.arange(n)[None, :], off_idx, y_last]          # (draws, n)
     terms = samples * mat * K[None, :]
@@ -303,7 +303,7 @@ def band_analysis(config: ModelConfig, trends: list, dec: dict, factor: float) -
                  "draws": BAND_DRAWS, "seed": BAND_SEED}
 
 
-def inputs_hash(config: ModelConfig, trends: list) -> str:
+def inputs_hash(config: ModelConfig, drivers: list) -> str:
     """A digest of everything the reference run depends on: the scoring
     state of every driver (the D19 fingerprint plus the onset year), the
     force layers, the cell weights, the path and the engine version. The
@@ -311,9 +311,9 @@ def inputs_hash(config: ModelConfig, trends: list) -> str:
     match its reference run is refused, so that a re-scored seed cannot be
     reconciled to a median it does not produce."""
     import hashlib
-    from pulse.audit.input_drift import trend_fingerprint
-    fp = trend_fingerprint(trends)
-    for t in trends:
+    from prism.audit.input_drift import driver_fingerprint
+    fp = driver_fingerprint(drivers)
+    for t in drivers:
         fp[str(t.id)]["sy"] = int(getattr(t, "start_year", 0) or 0)
     payload = {
         "trends": fp,
@@ -331,10 +331,10 @@ def inputs_hash(config: ModelConfig, trends: list) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
-def reference_run(config: ModelConfig, trends: list, chains: int, iterations: int) -> dict:
+def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
     """The production recipe: run_multichain(3 x 50k, master seed 42)."""
-    db = TrendDatabase(trends=list(trends), categories=list(config.category_names),
-                       forces=list(FORCES), source_file="seed_trends")
+    db = DriverSet(drivers=list(drivers), categories=list(config.category_names),
+                       forces=list(FORCES), source_file="seed_drivers")
     eng = BayesianMonteCarloEngine(config, seed=42)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
     tot = res["totals"]["portfolio"]
@@ -351,7 +351,7 @@ def reference_run(config: ModelConfig, trends: list, chains: int, iterations: in
         "model_version": res.get("model_version") or getattr(BayesianMonteCarloEngine, "MODEL_VERSION", ""),
         "portfolio_terminal": {k: round(float(term[k]), 6) for k in ("p10", "p25", "median", "p75", "p90", "mean")},
         "categories_terminal": cats,
-        "inputs_hash": inputs_hash(config, trends),
+        "inputs_hash": inputs_hash(config, drivers),
         "run_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }
 
@@ -408,8 +408,8 @@ def r4(x: float) -> float:
     return round(float(x), 4)
 
 
-def build_record(config: ModelConfig, trends: list, reference: dict, persisted: dict | None = None) -> dict:
-    dec = decompose(config, trends)
+def build_record(config: ModelConfig, drivers: list, reference: dict, persisted: dict | None = None) -> dict:
+    dec = decompose(config, drivers)
     cats, years, forces = dec["cats"], dec["years"], dec["forces"]
     y_last = len(years) - 1
     port_raw = dec["port"]
@@ -423,7 +423,7 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
     A_cell = dec["A_cell"] * factor
     w_cell = dec["W"].reshape(-1)
 
-    bands, band_total = band_analysis(config, trends, dec, factor)
+    bands, band_total = band_analysis(config, drivers, dec, factor)
 
     term = port[:, y_last]
     gross_hw = float(term[term < 0].sum())
@@ -444,8 +444,8 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
     cat_tot = cat_pp[:, :, y_last].sum(axis=0)                # (nc,) category shift at the means, scaled
     reg_tot = reg_pp[:, :, y_last].sum(axis=0)
 
-    drivers = {}
-    for j, t in enumerate(trends):
+    per_driver = {}
+    for j, t in enumerate(drivers):
         f = int(dec["fidx"][j])
         cells_term = A_cell[j, :, y_last] * w_cell                 # portfolio pp by cell
         top = [int(i) for i in np.argsort(-np.abs(cells_term))[:TOP_CELLS] if abs(cells_term[i]) > 0]
@@ -454,10 +454,10 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
         for i in top:
             c, r = divmod(i, len(REGIONS))
             partners = []
-            same_force = [k for k in range(len(trends)) if dec["fidx"][k] == f and k != j and abs(A_cell[k, i, y_last]) > 0]
+            same_force = [k for k in range(len(drivers)) if dec["fidx"][k] == f and k != j and abs(A_cell[k, i, y_last]) > 0]
             same_force.sort(key=lambda k: -abs(A_cell[k, i, y_last]))
             for k in same_force[:TOP_PARTNERS]:
-                partners.append({"id": trends[k].id, "code": code_of(trends[k]),
+                partners.append({"id": drivers[k].id, "code": code_of(drivers[k]),
                                  "pp": r4(A_cell[k, i, y_last] * w_cell[i] * 100)})
             cells.append({
                 "category": cats[c], "region": REGIONS[r],
@@ -498,7 +498,7 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
         for yi, y in enumerate(years):
             share_realised[str(y)] = r4(dec["e_mat"][j, yi] / e_last) if e_last > 0 else 0.0
         half_year = next((y for yi, y in enumerate(years) if e_last > 0 and dec["e_mat"][j, yi] / e_last >= 0.5), None)
-        drivers[t.id] = {
+        per_driver[t.id] = {
             "code": code_of(t), "name": t.name, "force": t.force, "direction": t.direction,
             "portfolio_pp": {str(y): r4(port[j, yi] * 100) for yi, y in enumerate(years)},
             "share_of_gross": r4(own / gross_hw) if own < 0 else (r4(own / gross_tw) if own > 0 else 0.0),
@@ -545,7 +545,7 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
             "median headline the dashboard shows. Attribution, not simulation (D6)."
         ),
         "basis": {
-            "drivers": len(trends),
+            "drivers": len(drivers),
             "model_version": reference.get("model_version"),
             "cell_weights_source": str(getattr(config, "cell_weights_source", "")),
             "attenuation_source": str(getattr(config, "attenuation_source", "")),
@@ -582,27 +582,27 @@ def build_record(config: ModelConfig, trends: list, reference: dict, persisted: 
             # the additive-sum band of the band analysis, next to the run's band above
             "band_additive_sum": band_total,
         },
-        "drivers": drivers,
+        "drivers": per_driver,
     }
     return record
 
 
 # ── parity fixture for the TypeScript port ─────────────────────────────
 
-def build_fixture(config: ModelConfig, trends: list, dec: dict) -> dict:
+def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
     """Inputs exactly as the frontend receives them and the unscaled
     decomposition (no reconciliation factor), full float precision."""
     cats, years = dec["cats"], dec["years"]
     W = dec["W"]
     inputs = {
-        "trends": [{
+        "drivers": [{
             "id": t.id, "force": t.force,
             "normalized_score": float(t.normalized_score),
             "category_exposure": {k: int(v) for k, v in t.category_exposure.items()},
             "regional_exposure": {k: int(v) for k, v in (t.regional_exposure or {}).items()},
             "uncertainty": t.uncertainty, "peak_year": t.peak_year,
             "diffusion_curve": t.diffusion_curve, "start_year": t.start_year,
-        } for t in trends],
+        } for t in drivers],
         "categories": list(cats),
         "config": {
             "force_weights": {f: float(config.force_weights[f]) for f in FORCES},
@@ -619,7 +619,7 @@ def build_fixture(config: ModelConfig, trends: list, dec: dict) -> dict:
                 "portfolio": {str(y): float(dec["port"][j, yi]) for yi, y in enumerate(years)},
                 "category": {cat: {str(y): float(dec["cat_pp"][j, c, yi]) for yi, y in enumerate(years)}
                              for c, cat in enumerate(cats)},
-            } for j, t in enumerate(trends)
+            } for j, t in enumerate(drivers)
         },
         "portfolioShift": {str(y): float(dec["port"][:, yi].sum()) for yi, y in enumerate(years)},
         "categoryShift": {cat: {str(y): float(dec["cat_pp"][:, c, yi].sum()) for yi, y in enumerate(years)}
@@ -694,17 +694,17 @@ def main(argv: list[str] | None = None) -> int:
                          "records which run the reference reproduces")
     args = ap.parse_args(argv)
 
-    trends = load_drivers()
+    drivers = load_drivers()
     config = ModelConfig()
     if args.cell_weights:
         shares, source = load_cell_weights_file(args.cell_weights)
         config = config.copy_with(cell_weights=shares, cell_weights_source=source)
 
     committed = _load_json(ATTRIBUTION_PATH) if os.path.exists(ATTRIBUTION_PATH) else None
-    current_hash = inputs_hash(config, trends)
+    current_hash = inputs_hash(config, drivers)
     if args.reference or committed is None:
         print(f"reference run: {args.chains} x {args.iterations} iterations, seed 42 ...", flush=True)
-        reference = reference_run(config, trends, args.chains, args.iterations)
+        reference = reference_run(config, drivers, args.chains, args.iterations)
         print(f"  terminal-year portfolio median {reference['portfolio_terminal']['median']*100:+.3f} pp "
               f"[{reference['portfolio_terminal']['p10']*100:+.3f}, {reference['portfolio_terminal']['p90']*100:+.3f}]")
     else:
@@ -721,8 +721,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     persisted = read_workbook(args.workbook) if args.workbook else (committed or {}).get("persisted_run")
-    record = build_record(config, trends, reference, persisted)
-    fixture = build_fixture(config, trends, decompose(config, trends))
+    record = build_record(config, drivers, reference, persisted)
+    fixture = build_fixture(config, drivers, decompose(config, drivers))
     analysis = _load_json(ANALYSIS_PATH) if os.path.exists(ANALYSIS_PATH) else {"drivers": {}}
     texts = render_all(record, analysis) if analysis.get("drivers") else {}
 

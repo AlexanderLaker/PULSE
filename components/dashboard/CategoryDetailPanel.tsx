@@ -48,7 +48,7 @@ interface PathData {
   [key: string]: PathDataPoint;
 }
 
-interface Trend {
+interface Driver {
   id: string;
   name: string;
   force: ForceName;
@@ -71,7 +71,7 @@ interface Trend {
 interface CategoryDetailPanelData {
   shifts_path?: { [categoryId: string]: PathData };
   force_decomposition?: { [categoryId: string]: Record<ForceName, number> };
-  contributing_trends?: { [categoryId: string]: Trend[] };
+  contributing_drivers?: { [categoryId: string]: Driver[] };
   /** F1 (2.10.0): per-category regional shift at the selected year — the 3D
    *  drill-down (region → {median, p10, p90}). */
   regional_shift?: { [categoryId: string]: Record<string, PathDataPoint> };
@@ -101,7 +101,7 @@ interface CategoryDetailPanelProps {
   /** Drill-through to the Drivers tab: receives the driver NAME (used as the
       Drivers search query — same contract as the Consumer Journey evidence
       cards). When provided, every contributing-driver row becomes a link. */
-  onOpenTrend?: (name: string) => void;
+  onOpenDriver?: (name: string) => void;
 }
 
 interface ChartDataPoint {
@@ -512,25 +512,25 @@ const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }
 // Since 2026-09-17 the contribution is the engine's arithmetic at the score
 // means (lib/driverAttribution.ts, rescaled to the row's median), the same
 // basis as the PRISM Analysis on the Drivers page; see `attribution_basis`.
-interface TrendCardProps {
-  trend: Trend;
+interface DriverCardProps {
+  driver: Driver;
   index: number;
   rank: number;
   /** When provided, the card is a link into the Drivers page. */
   onOpen?: () => void;
 }
 
-const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => {
+const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) => {
   const [hovered, setHovered] = useState(false);
-  const contribution = trend.contribution ?? 0;
-  const share = trend.attribution_share ?? 0;
+  const contribution = driver.contribution ?? 0;
+  const share = driver.attribution_share ?? 0;
   const isExpansion = contribution !== 0
     ? contribution > 0
-    : trend.direction === 'Expansion';
+    : driver.direction === 'Expansion';
   const dirColor = isExpansion ? S.expansion : S.contraction;
   const dirBg = isExpansion ? S.expansionDim : S.contractionDim;
   const dirInk = isExpansion ? S.expansionInk : S.contractionInk;
-  const forceColor = FORCE_COLORS[trend.force] ?? S.primary;
+  const forceColor = FORCE_COLORS[driver.force] ?? S.primary;
 
   // Width of the inline share bar (cap at 100%, floor at 2% so non-zero trends
   // are still visible even when they're tiny relative to the top driver).
@@ -550,7 +550,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
       onMouseLeave={interactive ? () => setHovered(false) : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={interactive ? `Open "${trend.name}" on the Drivers page` : undefined}
+      aria-label={interactive ? `Open "${driver.name}" on the Drivers page` : undefined}
       onKeyDown={interactive ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(); }
       } : undefined}
@@ -600,9 +600,9 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
             textOverflow: 'ellipsis',
             overflow: 'hidden',
           }}
-          title={trend.name}
+          title={driver.name}
         >
-          {trend.name}
+          {driver.name}
         </div>
 
         {/* Meta row: force tag + exposure chip + direction pill */}
@@ -620,9 +620,9 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
         >
           <span style={{ color: forceColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: forceColor, display: 'inline-block', flexShrink: 0 }} />
-            {trend.force}
+            {driver.force}
           </span>
-          {trend.exposure_level != null && (
+          {driver.exposure_level != null && (
             <span
               style={{
                 display: 'inline-flex',
@@ -638,7 +638,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
                 textTransform: 'uppercase',
               }}
             >
-              Exposure {trend.exposure_level}/5
+              Exposure {driver.exposure_level}/5
             </span>
           )}
           <span
@@ -752,7 +752,7 @@ const TrendCard: React.FC<TrendCardProps> = ({ trend, index, rank, onOpen }) => 
 // ─── CategoryDetailPanel ───────────────────────────────────────────────────
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
-  data, categoryId, onClose, onOpenTrend,
+  data, categoryId, onClose, onOpenDriver,
 }) => {
   const category = useMemo(() => {
     if (!categoryId || !data) return null;
@@ -809,13 +809,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   }, [data, categoryId]);
   const regionalWeightsAreCellRow = !!data?.cell_weights?.[categoryId];
 
-  const trendList = useMemo<Trend[]>(() => {
-    if (!data?.contributing_trends?.[categoryId]) return [];
+  const driverList = useMemo<Driver[]>(() => {
+    if (!data?.contributing_drivers?.[categoryId]) return [];
     // Rank by |scaled contribution| primarily; fall back to |normalized_score|
     // when the scaled attribution field isn't populated (legacy data).
     // (M8, July 2026 review: the old fallback read `score`, a field the
     // backend never sends — the tiebreak was a permanent no-op.)
-    return [...data.contributing_trends[categoryId]].sort((a, b) => {
+    return [...data.contributing_drivers[categoryId]].sort((a, b) => {
       const ca = Math.abs(a.contribution ?? 0);
       const cb = Math.abs(b.contribution ?? 0);
       if (Math.abs(ca - cb) > 1e-9) return cb - ca;
@@ -825,17 +825,17 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
 
   // Aggregates for the Contributing Trends section header and narrative.
   const totalAttribution = useMemo(() => {
-    return trendList.reduce((acc, t) => acc + Math.abs(t.contribution ?? 0), 0);
-  }, [trendList]);
+    return driverList.reduce((acc, t) => acc + Math.abs(t.contribution ?? 0), 0);
+  }, [driverList]);
   const topShare = useMemo(() => {
-    const topN = Math.min(5, trendList.length);
+    const topN = Math.min(5, driverList.length);
     if (totalAttribution <= 1e-9) return 0;
-    const sumTop = trendList.slice(0, topN).reduce(
+    const sumTop = driverList.slice(0, topN).reduce(
       (acc, t) => acc + Math.abs(t.contribution ?? 0),
       0,
     );
     return sumTop / totalAttribution;
-  }, [trendList, totalAttribution]);
+  }, [driverList, totalAttribution]);
   // Horizon endpoints — summary KPIs
   const horizonEnd = YEARS[YEARS.length - 1];
   const horizonStart = YEARS[0];
@@ -1140,7 +1140,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   lineHeight: 1,
                 }}
               >
-                {trendList.length}
+                {driverList.length}
               </div>
             </div>
           </div>
@@ -1204,7 +1204,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           {/* Right column — the drivers behind the shift */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {/* Contributing trends — ranked by scaled attribution share */}
-          {trendList.length > 0 && (
+          {driverList.length > 0 && (
             <Section
               title="Contributing Drivers"
               icon={Layers}
@@ -1218,7 +1218,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                     fontFamily: HEADLINE_FONT,
                   }}
                 >
-                  {trendList.length} TOTAL
+                  {driverList.length} TOTAL
                   {topShare > 0 ? ' \u00B7 TOP-5 ' + fmtPct(topShare, 0) : ''}
                 </span>
               }
@@ -1274,13 +1274,13 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {trendList.map((trend, idx) => (
-                  <TrendCard
-                    key={trend.id}
-                    trend={trend}
+                {driverList.map((driver, idx) => (
+                  <DriverCard
+                    key={driver.id}
+                    driver={driver}
                     index={idx}
                     rank={idx + 1}
-                    onOpen={onOpenTrend ? () => onOpenTrend(trend.name) : undefined}
+                    onOpen={onOpenDriver ? () => onOpenDriver(driver.name) : undefined}
                   />
                 ))}
               </div>

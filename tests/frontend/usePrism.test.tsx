@@ -14,10 +14,10 @@ import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
 vi.mock('@/api/client', () => ({
   getHealth: vi.fn(),
-  getTrends: vi.fn(),
+  getDrivers: vi.fn(),
   getConfig: vi.fn(),
   getSimulation: vi.fn(),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
 import * as api from '@/api/client';
@@ -27,12 +27,12 @@ const HEALTH_OK = { status: 'ok', version: 't', has_simulation: true } as never;
 const SIM = { shifts: { 'Hair: Color': { 2030: { median: -0.01 } } } } as never;
 
 function Probe() {
-  const { connectionState, backendAvailable, trends, simulation, error, loading, reconnect } = usePrism();
+  const { connectionState, backendAvailable, drivers, simulation, error, loading, reconnect } = usePrism();
   return (
     <div>
       <span data-testid="conn">{connectionState}</span>
       <span data-testid="avail">{String(backendAvailable)}</span>
-      <span data-testid="trends">{trends.length}</span>
+      <span data-testid="trends">{drivers.length}</span>
       <span data-testid="sim">{simulation ? 'yes' : 'no'}</span>
       <span data-testid="err">{error ?? ''}</span>
       <span data-testid="loading">{String(loading)}</span>
@@ -54,7 +54,7 @@ afterEach(() => {
 describe('usePrism', () => {
   it('happy load: connected, data set, simulation loaded when has_simulation', async () => {
     vi.mocked(api.getHealth).mockResolvedValue(HEALTH_OK);
-    vi.mocked(api.getTrends).mockResolvedValue([{ id: 't1' }] as never);
+    vi.mocked(api.getDrivers).mockResolvedValue([{ id: 't1' }] as never);
     vi.mocked(api.getConfig).mockResolvedValue({ iterations: 1000 } as never);
     vi.mocked(api.getSimulation).mockResolvedValue(SIM);
     mount();
@@ -68,7 +68,7 @@ describe('usePrism', () => {
 
   it('backend down: offline + error + backendAvailable=false', async () => {
     vi.mocked(api.getHealth).mockRejectedValue(new Error('boom'));
-    vi.mocked(api.getTrends).mockResolvedValue([] as never);
+    vi.mocked(api.getDrivers).mockResolvedValue([] as never);
     vi.mocked(api.getConfig).mockResolvedValue(null as never);
     mount();
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
@@ -80,7 +80,7 @@ describe('usePrism', () => {
 
   it('reconnect(): offline -> connected when backend answers again', async () => {
     vi.mocked(api.getHealth).mockRejectedValueOnce(new Error('cold'));
-    vi.mocked(api.getTrends).mockResolvedValue([] as never);
+    vi.mocked(api.getDrivers).mockResolvedValue([] as never);
     vi.mocked(api.getConfig).mockResolvedValue(null as never);
     mount();
     await waitFor(() => expect(screen.getByTestId('conn').textContent).toBe('offline'));
@@ -93,7 +93,7 @@ describe('usePrism', () => {
 
   it('has_simulation=false: simulation stays null, getSimulation never called', async () => {
     vi.mocked(api.getHealth).mockResolvedValue({ status: 'ok', version: 't', has_simulation: false } as never);
-    vi.mocked(api.getTrends).mockResolvedValue([] as never);
+    vi.mocked(api.getDrivers).mockResolvedValue([] as never);
     vi.mocked(api.getConfig).mockResolvedValue(null as never);
     mount();
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));

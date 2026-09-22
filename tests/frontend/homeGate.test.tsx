@@ -31,7 +31,7 @@ const shifts: Record<string, Record<number, unknown>> = {
 };
 
 const fullStore = {
-  trends: [
+  drivers: [
     { id: 'c1', name: 't1', force: 'Consumer' },
     { id: 'c2', name: 't2', force: 'Consumer' },
     { id: 'g1', name: 't3', force: 'Government' },
@@ -43,7 +43,7 @@ const fullStore = {
   loading: false, error: null,
 };
 
-const emptyStore = { trends: [], simulation: null, loading: true, error: null };
+const emptyStore = { drivers: [], simulation: null, loading: true, error: null };
 
 afterEach(() => cleanup());
 
@@ -64,7 +64,7 @@ describe('HomeGate entry view', () => {
     const nav = vi.fn();
     render(<HomeGate active onNavigate={nav} />);
     fireEvent.click(screen.getByRole('button', { name: /the output/ }));
-    expect(nav).toHaveBeenCalledWith('profit-pool-2');
+    expect(nav).toHaveBeenCalledWith('shift-analysis');
   });
 
   it('keys 1–4 navigate only while the gate is the active pane', () => {
@@ -72,7 +72,7 @@ describe('HomeGate entry view', () => {
     const nav = vi.fn();
     const { rerender } = render(<HomeGate active onNavigate={nav} />);
     fireEvent.keyDown(window, { key: '1' });
-    expect(nav).toHaveBeenCalledWith('trends-2');
+    expect(nav).toHaveBeenCalledWith('drivers');
     fireEvent.keyDown(window, { key: '4' });
     expect(nav).toHaveBeenCalledWith('profit-pool-explorer');
 

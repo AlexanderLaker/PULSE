@@ -43,9 +43,9 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
-import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
-import Trends2 from '@/components/dashboard/Trends2';
-import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
+import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
+import Drivers from '@/components/dashboard/Drivers';
+import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 // The Profit Pool Explorer (Beta) tab is dynamically imported (review
 // F10): it pulls lib/profitPoolData, which does not belong in the
 // initial bundle of the three production tabs.
@@ -63,9 +63,9 @@ import { S, HEADLINE_FONT } from '@/lib/theme';
 
 type DashboardTab =
   | 'home'
-  | 'profit-pool-2'
-  | 'trends-2'
-  | 'consumer-journey-2'
+  | 'shift-analysis'
+  | 'drivers'
+  | 'consumer-journey'
   | 'profit-pool-explorer';
 
 interface TabDef {
@@ -82,9 +82,9 @@ const TABS: TabDef[] = [
   // Entry view — the gate. Not in the top nav; the PRISM wordmark opens it.
   { id: 'home',                  label: 'Home', hidden: true },
   // Production views — left side of the top nav, in maritime blue.
-  { id: 'trends-2',              label: 'Drivers' },
-  { id: 'consumer-journey-2',    label: 'Consumer Journey' },
-  { id: 'profit-pool-2',         label: 'Profit Pool Shift Analysis' },
+  { id: 'drivers',              label: 'Drivers' },
+  { id: 'consumer-journey',    label: 'Consumer Journey' },
+  { id: 'shift-analysis',         label: 'Profit Pool Shift Analysis' },
   // Beta views — pinned to the right side of the top nav, in muted gray.
   { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
@@ -138,7 +138,7 @@ export default function DashboardPage() {
   // with a search query (driver name) pre-applied via Trends2's
   // initialSearch prop. (O15, 2026-09-16: the tab reads "Drivers"; the
   // component and the `trends-2` id keep their code names.)
-  const [trendsSearch, setTrendsSearch] = useState<string | null>(null);
+  const [driversSearch, setDriversSearch] = useState<string | null>(null);
 
   // ─── Keep-alive tabs ─────────────────────────────────────────────
   // A tab is mounted the first time it is visited and stays mounted
@@ -443,23 +443,23 @@ export default function DashboardPage() {
         {tabPane('home', (
           <HomeGate active={activeTab === 'home'} onNavigate={openTab} />
         ))}
-        {tabPane('profit-pool-2', (
-          <ProfitPoolAnalysis2
+        {tabPane('shift-analysis', (
+          <ShiftAnalysis
             isAdmin={isAdmin}
-            onNavigateToTrend={(query: string) => {
-              setTrendsSearch(query);
-              openTab('trends-2');
+            onNavigateToDriver={(query: string) => {
+              setDriversSearch(query);
+              openTab('drivers');
             }}
           />
         ))}
-        {tabPane('trends-2', <Trends2 initialSearch={trendsSearch} />)}
-        {tabPane('consumer-journey-2', (
-          <ConsumerJourney2
-            onNavigateProfitPoolShiftModel={() => openTab('profit-pool-2')}
-            onNavigateTrends={() => openTab('trends-2')}
-            onNavigateToTrend={(query: string) => {
-              setTrendsSearch(query);
-              openTab('trends-2');
+        {tabPane('drivers', <Drivers initialSearch={driversSearch} />)}
+        {tabPane('consumer-journey', (
+          <ConsumerJourney
+            onNavigateProfitPoolShiftModel={() => openTab('shift-analysis')}
+            onNavigateDrivers={() => openTab('drivers')}
+            onNavigateToDriver={(query: string) => {
+              setDriversSearch(query);
+              openTab('drivers');
             }}
             isAdmin={isAdmin}
           />

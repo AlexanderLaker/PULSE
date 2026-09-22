@@ -22,7 +22,7 @@ const config = [
     ignores: [
       '.next/**',
       'node_modules/**',
-      'pulse/**',        // Python engine — not JS-lint territory
+      'prism/**',        // Python engine — not JS-lint territory
       'public/**',
       'data/**',
       // Vitest specs are typechecked (tsconfig.check.json) but not lint-gated —

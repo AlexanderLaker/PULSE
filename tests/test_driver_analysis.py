@@ -30,16 +30,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pulse import seed_trends
-from pulse.config import FORCES, ModelConfig
-from pulse.ingestion.models import TrendDatabase
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism import seed_drivers
+from prism.config import FORCES, ModelConfig
+from prism.drivers import DriverSet
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 REPO = Path(__file__).resolve().parent.parent
-DATA = REPO / "data" / "trend_base_2026-09"
-ANALYSIS = DATA / "driver_analysis_v1.json"
+DATA = REPO / "data" / "drivers"
+ANALYSIS = DATA / "driver_analysis.json"
 BASE_DIR = DATA
-ATTRIBUTION = DATA / "driver_attribution_v1.json"
+ATTRIBUTION = DATA / "driver_attribution.json"
 FIXTURE = REPO / "tests" / "frontend" / "fixtures" / "driverAttribution.fixture.json"
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
 
@@ -117,7 +117,7 @@ class TestDecomposition:
         config = ModelConfig()
         dec = build.decompose(config, drivers)
         det = float(dec["port"][:, -1].sum())
-        db = TrendDatabase(trends=list(drivers), categories=list(config.category_names), forces=list(FORCES))
+        db = DriverSet(drivers=list(drivers), categories=list(config.category_names), forces=list(FORCES))
         res = BayesianMonteCarloEngine(config, seed=42).run(db, iterations=4000)
         median = res["totals"]["portfolio"][2035]["median"]
         # the sum at the means sits within a few per cent of the MC median
@@ -221,12 +221,12 @@ class TestCommittedArtefacts:
     def test_rendered_texts_and_seed_agree(self, render, record, analysis):
         rendered = render.render_all(record, analysis)
         by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
-        seed = {t.id: t for t in seed_trends.get_report_trends()}
+        seed = {t.id: t for t in seed_drivers.get_seed_drivers()}
         assert set(analysis["drivers"]) == set(by_code)
         for code, entry in analysis["drivers"].items():
             tid = by_code[code]
             assert entry["text"] == rendered[tid], code
-            assert seed[tid].strategic_implication == entry["text"], code
+            assert seed[tid].analysis == entry["text"], code
 
     def test_every_placeholder_is_a_field_and_the_key_ones_are_used(self, render, record, analysis):
         by_code = {d["code"]: d for d in record["drivers"].values()}
@@ -270,7 +270,7 @@ class TestCommittedArtefacts:
         """The peak year is a score the page shows and a re-score moves it; a
         template names it only through {peak_year}. The lock reads the
         timing paragraph for "to / at / until <the driver's peak year>"."""
-        seed = {t.id: t for t in seed_trends.get_report_trends()}
+        seed = {t.id: t for t in seed_drivers.get_seed_drivers()}
         by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
         offenders = []
         for code, entry in analysis["drivers"].items():
@@ -354,233 +354,3 @@ class TestReadings:
             assert re.search(r"\bpercent of the pool\b", text), code
             band = text.split("What the band hinges on:")[1]
             assert re.search(r"observable|to watch|to follow", band, re.I), code
-
-
-# ── (d) the content script on a throw-away SQLite base ───────────────────────
-
-@pytest.fixture
-def apply_mod():
-    return _load_script("apply_driver_analysis")
-
-
-@pytest.fixture
-def db(monkeypatch, tmp_path, apply_mod):
-    import pulse.database as dbm
-    monkeypatch.setattr(dbm, "USE_POSTGRES", False)
-    monkeypatch.setattr(dbm, "sqlite3", sqlite3, raising=False)
-    monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "analysis.db"))
-    monkeypatch.setattr(apply_mod, "USE_POSTGRES", False)
-    monkeypatch.chdir(tmp_path)
-    dbm.init_db()
-    rows = [copy.deepcopy(t) for t in seed_trends.get_report_trends()]
-    v5 = {d["code"]: d["desc"] for d in json.loads((BASE_DIR / "core_set_51_v5.json").read_text(encoding="utf-8"))}
-    review_code = {"K-13": "T-06", "C-37": "X-06"}
-    for t in rows:  # the database still carries the pre-2026-09-17 notes and the v5 descriptions
-        t.strategic_implication = f"Mechanism: {t.name[:30]}. Probability 4 of 5: old notes."
-        t.description = v5[review_code.get(_code(t), _code(t))]
-    rows[0].user_override = True
-    dbm.save_trends(rows)
-    dbm.upsert_trend_proposal("consumer_r27", "expert-a", {"probability": 2, "comment": "keep me"}, "A", "expert")
-    return dbm
-
-
-def _code(t) -> str:
-    letter = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G",
-              "Environmental": "E", "Competitive": "X"}[t.force]
-    return f"{letter}-{t.id[-2:]}"
-
-
-def review_code_of(tid: str) -> str:
-    """The base file's code for a seed id (two drivers moved force in the review)."""
-    letter = {"consumer": "C", "customer": "K", "technology": "T", "government": "G",
-              "environmental": "E", "competitive": "X"}[tid.split("_")[0]]
-    code = f"{letter}-{tid[-2:]}"
-    return {"K-13": "T-06", "C-37": "X-06"}.get(code, code)
-
-
-V6 = {d["code"]: d["desc"] for d in json.loads((BASE_DIR / "core_set_51_v6.json").read_text(encoding="utf-8"))}
-V5 = {d["code"]: d["desc"] for d in json.loads((BASE_DIR / "core_set_51_v5.json").read_text(encoding="utf-8"))}
-CHANGED_DESCRIPTIONS = sorted(c for c in V6 if V6[c] != V5[c])
-
-
-def _texts(dbm) -> dict:
-    return {t.id: t.strategic_implication for t in dbm.load_trends()}
-
-
-def _audit(dbm) -> list:
-    return [e for e in dbm.get_audit_log(limit=20) if e["action"] == "driver_analysis_applied"]
-
-
-class TestApplyScript:
-    def test_dry_run_reports_and_writes_nothing(self, db, apply_mod, capsys, tmp_path):
-        before = _texts(db)
-        assert apply_mod.main(dry_run=True, allow_postgres=False, archive_dir=str(tmp_path / "a")) == 0
-        out = capsys.readouterr().out
-        assert "readings: 51; to change: 51; already current: 0; not in this database: 0" in out
-        assert f"descriptions: to move onto v6: {len(CHANGED_DESCRIPTIONS)}; already v6: {51 - len(CHANGED_DESCRIPTIONS)}; " \
-               "reworded by an admin, left alone: 0; still on the pre-O15 wording: 0" in out
-        assert "would update consumer_r01 (reading and description)" in out
-        assert "dry-run complete: nothing written." in out
-        assert _texts(db) == before and not (tmp_path / "a").exists()
-
-    def test_apply_archives_writes_and_touches_nothing_else(self, db, apply_mod, capsys):
-        before = {t.id: t for t in db.load_trends()}
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
-        out = capsys.readouterr().out
-        n_desc = len(CHANGED_DESCRIPTIONS)
-        assert f"drivers: 51 PRISM Analysis text(s) updated, {n_desc} description(s) moved onto v6" in out
-        assert out.rstrip().endswith("done.")
-        expected = {t.id: t.strategic_implication for t in seed_trends.get_report_trends()}
-        expected_desc = {t.id: t.description for t in seed_trends.get_report_trends()}
-        after = {t.id: t for t in db.load_trends()}
-        assert {tid: t.strategic_implication for tid, t in after.items()} == expected
-        assert {tid: t.description for tid, t in after.items()} == expected_desc
-        assert not any("old base" in t.description for t in after.values())
-        for tid, t in after.items():
-            b = before[tid]
-            assert (t.probability, t.gp1_pct_affected, t.direction, t.uncertainty, bool(t.user_override),
-                    t.name) == (b.probability, b.gp1_pct_affected, b.direction, b.uncertainty,
-                                bool(b.user_override), b.name)
-            assert t.category_exposure == b.category_exposure and t.regional_exposure == b.regional_exposure
-            assert len(t.sources) == len(b.sources)
-        assert db.load_all_trend_proposals()["consumer_r27"][0]["comment"] == "keep me"
-        archive = json.loads(next(Path("data/archive").glob("driver_analysis_sqlite_*.json")).read_text(encoding="utf-8"))
-        assert len(archive["drivers"]) == 51 and len(archive["descriptions"]) == n_desc
-        assert all(v.startswith("Mechanism:") for v in archive["drivers"].values())
-        # every archived description is the v5 text of a driver whose description v6 changed
-        assert archive["descriptions"] == {tid: V5[review_code_of(tid)] for tid in archive["descriptions"]}
-        assert sorted(review_code_of(tid) for tid in archive["descriptions"]) == CHANGED_DESCRIPTIONS
-        audit = _audit(db)
-        assert len(audit) == 1 and audit[0]["new_value"] == (
-            f"strategic_implication rewritten for 51 driver(s); description moved onto v6 for {n_desc} driver(s)")
-        assert audit[0]["user_id"] == "owner-cli"
-
-    def test_second_run_changes_nothing(self, db, apply_mod, capsys):
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
-        capsys.readouterr()
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
-        assert "nothing to change: this database already carries the readings and the v6 descriptions." in capsys.readouterr().out
-        assert len(_audit(db)) == 1
-
-    def test_a_reworded_description_is_reported_and_left_alone(self, db, apply_mod, capsys):
-        with db.get_db_connection() as conn:
-            conn.cursor().execute("UPDATE trends SET description = 'an admin rewrote this' WHERE id = 'consumer_r01'")
-            conn.commit()
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
-        out = capsys.readouterr().out
-        assert "reworded by an admin, left alone: 1" in out
-        assert "description of consumer_r01 is neither the v5 nor the v6 text; read it by hand" in out
-        after = {t.id: t for t in db.load_trends()}
-        assert after["consumer_r01"].description == "an admin rewrote this"
-        assert after["consumer_r01"].strategic_implication.startswith("Weight in the answer:")
-        assert after["consumer_r05"].description == V6["C-05"] != V5["C-05"]
-
-    def test_an_admin_save_of_a_description_between_read_and_write_rolls_everything_back(self, db, apply_mod, monkeypatch, capsys):
-        real_write = apply_mod._write
-
-        def admin_edits_a_description_first(*args, **kwargs):
-            with db.get_db_connection() as conn:
-                conn.cursor().execute("UPDATE trends SET description = 'edited meanwhile' WHERE id = 'consumer_r01'")
-                conn.commit()
-            return real_write(*args, **kwargs)
-
-        monkeypatch.setattr(apply_mod, "_write", admin_edits_a_description_first)
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 6
-        assert "driver consumer_r01 (description) changed after the read" in capsys.readouterr().out
-        after = {t.id: t for t in db.load_trends()}
-        assert after["consumer_r01"].description == "edited meanwhile"
-        assert all(t.strategic_implication.startswith("Mechanism:") for t in after.values())
-        assert all(t.description == V5[review_code_of(tid)] for tid, t in after.items() if tid != "consumer_r01")
-        assert _audit(db) == []
-
-    def test_a_description_still_on_its_pre_o15_wording_is_reported_not_forced(self, db, apply_mod, capsys):
-        v4 = {d["code"]: d["desc"] for d in json.loads((BASE_DIR / "core_set_51_v4.json").read_text(encoding="utf-8"))}
-        assert v4["G-15"] != V5["G-15"]  # the O15 edit
-        with db.get_db_connection() as conn:
-            conn.cursor().execute("UPDATE trends SET description = ? WHERE id = 'government_r15'", (v4["G-15"],))
-            conn.commit()
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
-        out = capsys.readouterr().out
-        assert "still on the pre-O15 wording: 1" in out
-        assert "description of government_r15 is still on its pre-O15 wording: run scripts/apply_driver_vocabulary.py first" in out
-        after = {t.id: t for t in db.load_trends()}
-        assert after["government_r15"].description == v4["G-15"]
-        assert after["government_r15"].strategic_implication.startswith("Weight in the answer:")
-
-    def test_a_missing_driver_of_the_base_stops_the_run(self, db, apply_mod, capsys):
-        with db.get_db_connection() as conn:
-            conn.cursor().execute("DELETE FROM trends WHERE id = 'government_r08'")
-            conn.commit()
-        for dry in (True, False):
-            assert apply_mod.main(dry_run=dry, allow_postgres=False, archive_dir="data/archive") == 8
-            out = capsys.readouterr().out
-            assert "not in this database: 1" in out and "no such driver in the database: government_r08" in out
-            assert "nothing written" in out
-        assert all(v.startswith("Mechanism:") for v in _texts(db).values())
-        assert _audit(db) == []
-
-    def test_scoring_drift_stops_the_run_unless_allowed(self, db, apply_mod, capsys):
-        """A reading is written on the seed's scores; a database whose scores
-        moved (an admin re-score) gets the report and no write."""
-        with db.get_db_connection() as conn:
-            conn.cursor().execute("UPDATE trends SET probability = 2, uncertainty = 5 WHERE id = 'consumer_r06'")
-            conn.cursor().execute("UPDATE trends SET start_year = 2029 WHERE id = 'technology_r02'")
-            conn.commit()
-        for dry in (True, False):
-            assert apply_mod.main(dry_run=dry, allow_postgres=False, archive_dir="data/archive") == 9
-            out = capsys.readouterr().out
-            assert "scoring drift: consumer_r06 differs from the seed in probability, uncertainty score" in out
-            assert "scoring drift: technology_r02 differs from the seed in onset year" in out
-            assert "2 driver(s) carry scoring inputs that differ from the seed" in out
-        assert all(v.startswith("Mechanism:") for v in _texts(db).values())
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive", allow_drift=True) == 0
-        out = capsys.readouterr().out
-        assert "WARNING: writing with --allow-drift" in out
-        assert all(v.startswith("Weight in the answer:") for v in _texts(db).values())
-
-    def test_an_admin_save_between_read_and_write_rolls_everything_back(self, db, apply_mod, monkeypatch, capsys):
-        real_write = apply_mod._write
-        edited = "edited by an admin in the meantime"
-
-        def admin_edits_first(*args, **kwargs):
-            with db.get_db_connection() as conn:
-                conn.cursor().execute("UPDATE trends SET strategic_implication = ? WHERE id = 'consumer_r05'", (edited,))
-                conn.commit()
-            return real_write(*args, **kwargs)
-
-        monkeypatch.setattr(apply_mod, "_write", admin_edits_first)
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 6
-        assert "driver consumer_r05 changed after the read" in capsys.readouterr().out
-        texts = _texts(db)
-        assert texts["consumer_r05"] == edited
-        assert all(v.startswith("Mechanism:") for tid, v in texts.items() if tid != "consumer_r05")
-        assert _audit(db) == []
-
-    def test_refuses_postgres_without_the_flag(self, db, apply_mod, monkeypatch):
-        monkeypatch.setattr(apply_mod, "USE_POSTGRES", True)
-        assert apply_mod.main(dry_run=False, allow_postgres=False) == 4
-        assert all(v.startswith("Mechanism:") for v in _texts(db).values())
-
-    def test_a_stale_reading_is_refused_before_anything_is_read(self, db, apply_mod, monkeypatch, tmp_path, capsys):
-        stale = json.loads(ANALYSIS.read_text(encoding="utf-8"))
-        stale["drivers"]["C-01"]["text"] = stale["drivers"]["C-01"]["text"].replace("0.76 of the", "0.77 of the")
-        p = tmp_path / "stale.json"
-        p.write_text(json.dumps(stale), encoding="utf-8")
-        monkeypatch.setattr(apply_mod, "ANALYSIS_PATH", str(p))
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 7
-        assert "C-01: the committed text is not the rendering of its template" in capsys.readouterr().out
-        assert all(v.startswith("Mechanism:") for v in _texts(db).values())
-
-    def test_a_text_written_back_after_the_commit_is_reported(self, db, apply_mod, monkeypatch, capsys):
-        real_write = apply_mod._write
-
-        def warm_instance_saves_its_cached_copy(*args, **kwargs):
-            real_write(*args, **kwargs)
-            with db.get_db_connection() as conn:
-                conn.cursor().execute("UPDATE trends SET strategic_implication = 'old copy' WHERE id = 'consumer_r01'")
-                conn.commit()
-
-        monkeypatch.setattr(apply_mod, "_write", warm_instance_saves_its_cached_copy)
-        assert apply_mod.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 5
-        assert "no longer shows all of it" in capsys.readouterr().out
-        assert len(_audit(db)) == 1

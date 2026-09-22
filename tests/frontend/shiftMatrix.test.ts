@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   weightedAvg, catWeightFor, getYearPercentiles, computeImpactFractions,
 } from '@/lib/shiftMatrix';
-import type { Trend, CategoryDefinition } from '@/types';
+import type { Driver, CategoryDefinition } from '@/types';
 
 describe('weightedAvg', () => {
   it('computes a normalized weighted average (weights need not sum to 1)', () => {
@@ -72,26 +72,26 @@ describe('computeImpactFractions', () => {
   const cats: CategoryDefinition[] = [
     { id: 'hair_color', name: 'Hair: Color', short: 'Color', group: 'Hair', color: '#fff' },
   ];
-  const trend = (gp1: number, exp = 5): Trend => ({
+  const driver = (gp1: number, exp = 5): Driver => ({
     id: 't', force: 'Consumer', name: 't', description: '', direction: 'Expansion',
     probability: 3, start_year: 2025,
     gp1_shift: gp1,
     category_exposure: { 'Hair: Color': exp },
-  } as unknown as Trend);
+  } as unknown as Driver);
 
   it('splits expansion vs contraction so the fractions sum to 1', () => {
-    const f = computeImpactFractions([trend(0.3), trend(-0.1)], cats)['Hair: Color'];
+    const f = computeImpactFractions([driver(0.3), driver(-0.1)], cats)['Hair: Color'];
     expect(f.expansion + f.contraction).toBeCloseTo(1, 12);
     expect(f.expansion).toBeCloseTo(1.5, 12);     // 0.3 / 0.2
     expect(f.contraction).toBeCloseTo(-0.5, 12);  // -0.1 / 0.2
   });
   it('falls back to magnitude shares when pos and neg cancel exactly', () => {
-    const f = computeImpactFractions([trend(0.2), trend(-0.2)], cats)['Hair: Color'];
+    const f = computeImpactFractions([driver(0.2), driver(-0.2)], cats)['Hair: Color'];
     expect(f.expansion).toBeCloseTo(0.5, 12);
     expect(f.contraction).toBeCloseTo(-0.5, 12);
   });
   it('yields zeros when no trend touches the category', () => {
-    const f = computeImpactFractions([trend(0.3, 0)], cats)['Hair: Color'];
+    const f = computeImpactFractions([driver(0.3, 0)], cats)['Hair: Color'];
     expect(f).toEqual({ expansion: 0, contraction: 0 });
   });
 });

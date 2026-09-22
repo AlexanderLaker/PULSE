@@ -24,18 +24,18 @@ vi.mock('@/hooks/usePrism', () => ({
 }));
 vi.mock('@/api/client', () => ({
   getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  getTrendProposals: vi.fn(async () => null),
+  getDriverProposals: vi.fn(async () => null),
   saveMyProposal: vi.fn(async () => null),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
-import Trends2, { splitAnalysis } from '@/components/dashboard/Trends2';
+import Drivers, { splitAnalysis } from '@/components/dashboard/Drivers';
 
 const REPO = path.resolve(__dirname, '..', '..');
 const ANALYSIS = JSON.parse(fs.readFileSync(
-  path.join(REPO, 'data', 'trend_base_2026-09', 'driver_analysis_v1.json'), 'utf8'));
+  path.join(REPO, 'data', 'drivers', 'driver_analysis.json'), 'utf8'));
 const RECORD = JSON.parse(fs.readFileSync(
-  path.join(REPO, 'data', 'trend_base_2026-09', 'driver_attribution_v1.json'), 'utf8'));
+  path.join(REPO, 'data', 'drivers', 'driver_attribution.json'), 'utf8'));
 const LABELS = ['Weight in the answer', 'Where it lands', 'When it lands', 'What the band hinges on'];
 // the headline the basis line names, from the record (never a typed number)
 const HEADLINE = (RECORD.reference_run.portfolio_terminal.median * 100).toFixed(1);
@@ -47,18 +47,18 @@ const driver = {
   id: 'consumer_r01', name: 'Private label structural penetration', force: 'Consumer',
   direction: 'Contraction', probability: 5, confidence: 'High', gp1_pct_affected: 0.22,
   description: 'Retailer brands keep gaining share.', normalized_score: -0.183, gp1_shift: -0.183,
-  strategic_implication: reading,
+  analysis: reading,
   category_exposure: { 'Hair: Color': 2 }, regional_exposure: { Europe: 5 }, vc_exposure: {},
   source_type: 'seed', data_source: 's', peak_year: 2030, diffusion_curve: 'front_loaded', uncertainty: 2,
 };
 
 STORE.store = {
   health: { status: 'ok', version: 'test', has_simulation: true },
-  trends: [driver],
+  drivers: [driver],
   simulation: null,
   config: {},
   loading: false, error: null, backendAvailable: true, connectionState: 'connected',
-  updateTrend: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
+  updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
 };
 
 afterEach(() => cleanup());
@@ -82,7 +82,7 @@ describe('splitAnalysis', () => {
 
 describe('Drivers page: the PRISM Analysis card', () => {
   it('shows the labelled reading, the basis line and the provenance footnote once expanded', () => {
-    const { container } = render(<Trends2 />);
+    const { container } = render(<Drivers />);
     fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
     const card = container.querySelector('[data-testid="prism-analysis"]') as HTMLElement;
     expect(card).toBeTruthy();

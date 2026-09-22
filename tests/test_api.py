@@ -9,7 +9,7 @@ import json
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
-from pulse.api.app import create_app  # noqa: E402
+from prism.api.app import create_app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
@@ -22,7 +22,7 @@ def app():
     before admin-auth was added and had been failing with 401 ever since —
     asserting on auth instead of the behaviour they document.
     """
-    from pulse.api.auth import require_auth, require_admin
+    from prism.api.auth import require_auth, require_admin
     application = create_app()
     _fake_admin = {"email": "pytest@prism.local", "role": "admin", "user_id": "pytest"}
     application.dependency_overrides[require_auth] = lambda: _fake_admin
@@ -67,33 +67,33 @@ class TestAPIHealth:
             assert "version" in data or "build" in data or data is not None
 
 
-class TestAPITrends:
+class TestAPIDrivers:
     """Test trend endpoints."""
 
-    def test_trends_endpoint_exists(self, client):
+    def test_drivers_endpoint_exists(self, client):
         """Should have trends endpoint."""
-        response = client.get("/api/v1/trends")
+        response = client.get("/api/v1/drivers")
         # May 404 if not fully implemented
         assert response.status_code in [200, 404]
 
-    def test_trends_returns_list(self, client):
+    def test_drivers_returns_list(self, client):
         """Should return list of trends."""
-        response = client.get("/api/v1/trends")
+        response = client.get("/api/v1/drivers")
         if response.status_code == 200:
             data = response.json()
             # Should be iterable (list or dict with trends)
             assert data is not None
 
-    def test_create_trend_requires_data(self, client):
+    def test_create_driver_requires_data(self, client):
         """Should reject trend creation without required data."""
         # Empty payload missing required fields: force, name
-        response = client.post("/api/v1/trends", json={})
+        response = client.post("/api/v1/drivers", json={})
         # Should fail validation (422) or 404 if not implemented
         assert response.status_code in [400, 404, 422]
 
-    def test_trend_update_endpoint(self, client):
+    def test_driver_update_endpoint(self, client):
         """Should have trend update endpoint."""
-        response = client.put("/api/v1/trends/test_id", json={})
+        response = client.put("/api/v1/drivers/test_id", json={})
         # May 404 if not implemented
         assert response.status_code in [404, 422, 200, 400]
 
@@ -139,7 +139,7 @@ class TestConfigCellWeights2_11:
         return r.json()
 
     def test_get_serves_matrix_and_derived_marginals(self, client):
-        from pulse.config import CATEGORIES, REGIONS
+        from prism.config import CATEGORIES, REGIONS
         data = self._get(client)
         assert set(data["cell_weights"]) == set(CATEGORIES)
         for c in CATEGORIES:
@@ -158,7 +158,7 @@ class TestConfigCellWeights2_11:
         assert r.status_code == 400
 
     def test_put_rejects_incomplete_or_unbalanced_grid(self, client):
-        from pulse.config import CATEGORIES, REGIONS
+        from prism.config import CATEGORIES, REGIONS
         data = self._get(client)
         W = {c: dict(data["cell_weights"][c]) for c in CATEGORIES}
         W[CATEGORIES[0]][REGIONS[0]] += 0.5  # sums to 1.5
@@ -170,7 +170,7 @@ class TestConfigCellWeights2_11:
         assert client.put("/api/v1/config", json={"cell_weights": W3}).status_code == 400
 
     def test_put_accepts_a_valid_grid_and_derives_marginals(self, client):
-        from pulse.config import CATEGORIES, REGIONS
+        from prism.config import CATEGORIES, REGIONS
         data = self._get(client)
         W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
         # everything in Europe, equally over the categories
@@ -190,51 +190,51 @@ class TestConfigCellWeights2_11:
         assert r.status_code == 200, r.text
 
 
-class TestTrendUncertainty2_11:
+class TestDriverUncertainty2_11:
     """2.11.0 (owner ruling O7): the uncertainty score travels through the
     trend list and the update endpoint with its 0–5 validation."""
 
-    def test_trend_list_carries_uncertainty_key(self, client):
-        r = client.get("/api/v1/trends")
+    def test_driver_list_carries_uncertainty_key(self, client):
+        r = client.get("/api/v1/drivers")
         assert r.status_code == 200
         rows = r.json()
         assert rows and all("uncertainty" in t for t in rows)
 
     def test_update_validates_range(self, client):
-        rows = client.get("/api/v1/trends").json()
+        rows = client.get("/api/v1/drivers").json()
         tid = rows[0]["id"]
-        assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": 9}).status_code == 422
-        assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": -1}).status_code == 422
+        assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": 9}).status_code == 422
+        assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": -1}).status_code == 422
 
     def test_update_round_trip_recomputes_prior_and_explicit_null_clears(self, client):
-        from pulse.config import beta_prior_for
-        rows = client.get("/api/v1/trends").json()
+        from prism.config import beta_prior_for
+        rows = client.get("/api/v1/drivers").json()
         t0 = rows[0]
         tid, p = t0["id"], int(t0["probability"])
         before = {"uncertainty": t0["uncertainty"], "user_override": t0["user_override"]}
         try:
-            r = client.put(f"/api/v1/trends/{tid}", json={"uncertainty": 5})
+            r = client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": 5})
             assert r.status_code == 200, r.text
-            row = next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)
+            row = next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)
             assert row["uncertainty"] == 5 and row["user_override"] is True
             a, b = beta_prior_for(p, 5)
             assert row["probability_posterior"]["alpha"] == pytest.approx(a)
             assert row["probability_posterior"]["beta"] == pytest.approx(b)
             # absent field: unchanged
-            assert client.put(f"/api/v1/trends/{tid}", json={"description": row["description"]}).status_code == 200
-            assert next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)["uncertainty"] == 5
+            assert client.put(f"/api/v1/drivers/{tid}", json={"description": row["description"]}).status_code == 200
+            assert next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)["uncertainty"] == 5
             # explicit null: cleared, back to the 2.10.0 prior (p, 6 − p)
-            assert client.put(f"/api/v1/trends/{tid}", json={"uncertainty": None}).status_code == 200
-            row = next(t for t in client.get("/api/v1/trends").json() if t["id"] == tid)
+            assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": None}).status_code == 200
+            row = next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)
             assert row["uncertainty"] is None
             assert (row["probability_posterior"]["alpha"], row["probability_posterior"]["beta"]) == beta_prior_for(p, None)
         finally:
             # restore the fixture DB row (uncertainty + user_override) for the other tests
-            client.put(f"/api/v1/trends/{tid}", json={"uncertainty": before["uncertainty"]})
-            from pulse.database import get_db_connection, placeholder
+            client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": before["uncertainty"]})
+            from prism.database import get_db_connection, placeholder
             with get_db_connection() as conn:
                 conn.cursor().execute(
-                    f"UPDATE trends SET user_override = {placeholder()} WHERE id = {placeholder()}",
+                    f"UPDATE drivers SET user_override = {placeholder()} WHERE id = {placeholder()}",
                     (bool(before["user_override"]), tid))
                 conn.commit()
 
@@ -320,10 +320,10 @@ class TestAPIErrorHandling:
 class TestAPIDataValidation:
     """Test data validation on API requests."""
 
-    def test_trend_update_validates_scores(self, client):
+    def test_driver_update_validates_scores(self, client):
         """Should validate probability scores (1-5) and gp1_pct_affected (0-1)."""
         response = client.put(
-            "/api/v1/trends/test_id",
+            "/api/v1/drivers/test_id",
             json={"probability": 10}  # Out of range
         )
         # Should reject or validate
@@ -427,7 +427,7 @@ class TestAPIEdgeCases:
     def test_unicode_in_requests(self, client):
         """Should handle Unicode in requests."""
         response = client.post(
-            "/api/v1/trends",
+            "/api/v1/drivers",
             json={
                 "force": "Consumer",
                 "name": "Spécial Café ñ é ü",
@@ -459,7 +459,7 @@ class TestF2OnlineNeverSimulates:
         sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
         token = f"{h}.{p}.{sig}"
 
-        import pulse.api.routers.simulation as sim_router
+        import prism.api.routers.simulation as sim_router
         monkeypatch.setattr(sim_router, "_scipy_available", lambda: False)
         r = client.post("/api/v1/simulate", json={"iterations": 1000},
                         headers={"Authorization": f"Bearer {token}"})
@@ -469,7 +469,7 @@ class TestF2OnlineNeverSimulates:
     def test_engine_hard_requires_scipy(self):
         """D13: the engine module must carry a non-empty scipy-versioned
         numerics backend tag — proof the exact-math import path is live."""
-        from pulse.simulation.bayesian_mc import NUMERICS_BACKEND
+        from prism.simulation.bayesian_mc import NUMERICS_BACKEND
         assert NUMERICS_BACKEND.startswith("scipy ")
         assert "numpy" in NUMERICS_BACKEND
 
@@ -502,7 +502,7 @@ class TestF3ReadAuthentication:
 
     def test_reads_reject_anonymous(self, raw_client):
         client = raw_client
-        for path in ["/api/v1/trends", "/api/v1/simulation",
+        for path in ["/api/v1/drivers", "/api/v1/simulation",
                      "/api/v1/simulation/status", "/api/v1/config"]:
             r = client.get(path)
             assert r.status_code == 401, (path, r.status_code)
@@ -510,9 +510,9 @@ class TestF3ReadAuthentication:
     def test_reads_accept_viewer_cookie(self, raw_client):
         client = raw_client
         token = self._jwt("viewer")
-        r = client.get("/api/v1/trends", cookies={"pulse-token": token})
+        r = client.get("/api/v1/drivers", cookies={"prism-token": token})
         assert r.status_code == 200
-        r = client.get("/api/v1/simulation/status", cookies={"pulse-token": token})
+        r = client.get("/api/v1/simulation/status", cookies={"prism-token": token})
         assert r.status_code == 200
 
     def test_reads_accept_bearer(self, raw_client):
@@ -525,7 +525,7 @@ class TestF3ReadAuthentication:
         client = raw_client
         token = self._jwt("viewer")
         r = client.post("/api/v1/simulate", json={"iterations": 1000},
-                        cookies={"pulse-token": token})
+                        cookies={"prism-token": token})
         assert r.status_code == 403  # require_admin rejects role=viewer
 
     def test_health_and_diagnostics_stay_public(self, raw_client):
@@ -557,7 +557,7 @@ class TestJourneyContentStore:
                 "id": "sorting", "label": "Sorting",
                 "benefiting": [{
                     "name": "AI stain recognition", "type": "tech",
-                    "trendCodes": ["T-01"], "driverNote": "test",
+                    "driverCodes": ["T-01"], "driverNote": "test",
                     "intensity": 2,
                     "provenance": {"author": "strategist", "date": "2026-06", "grade": "estimate"},
                     "analysis": None, "id": "lhc.sorting.exp.test",

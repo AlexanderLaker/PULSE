@@ -1,6 +1,6 @@
 """D19 (June 2026): input-drift telemetry unit tests."""
-from pulse.audit.input_drift import (
-    trend_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
+from prism.audit.input_drift import (
+    driver_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
 )
 
 
@@ -9,8 +9,8 @@ class _T:
         self.id, self.probability, self.gp1_pct_affected, self.direction, self.force = id, p, g, d, f
 
 
-def _fp(*trends):
-    return trend_fingerprint(list(trends))
+def _fp(*drivers):
+    return driver_fingerprint(list(drivers))
 
 
 def test_no_previous_returns_none():
@@ -38,7 +38,7 @@ def test_score_change_and_direction_flip_counted():
     assert ev["detail"]["per_force_balance_delta"] == {"Government": 2}
 
 
-def test_added_and_removed_trends():
+def test_added_and_removed_drivers():
     prev = _fp(_T("a"))
     curr = _fp(_T("a"), _T("c", f="Technology"))
     ev = compute_input_drift_event(curr, prev)
@@ -52,6 +52,6 @@ def test_previous_fingerprint_extraction_tolerates_legacy_rows():
     )
     assert fp is None and rid == 9 and rdate.startswith("2026-06-10")
     fp2, rid2, _ = previous_fingerprint_from_runs(
-        [{"id": 10, "results": {"meta": {"trend_fingerprint": {"x": {"p": 3}}}}}]
+        [{"id": 10, "results": {"meta": {"driver_fingerprint": {"x": {"p": 3}}}}}]
     )
     assert fp2 == {"x": {"p": 3}} and rid2 == 10

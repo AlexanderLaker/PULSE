@@ -27,7 +27,7 @@ vi.mock('@/hooks/usePrism', () => ({
 }));
 vi.mock('@/api/client', () => ({
   getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
 // The drill-down's fan chart renders in a Recharts ResponsiveContainer, which
@@ -39,7 +39,7 @@ class ResizeObserverStub {
 }
 (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
 
-import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
+import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 
 const REPO = path.resolve(__dirname, '..', '..');
 const FIXTURE = JSON.parse(fs.readFileSync(
@@ -47,7 +47,7 @@ const FIXTURE = JSON.parse(fs.readFileSync(
 const YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
 const FCN = 'LHC: FCN';
 
-type FixtureTrend = {
+type FixtureDriver = {
   id: string; force: string; normalized_score: number;
   category_exposure: Record<string, number>; regional_exposure: Record<string, number>;
   uncertainty: number | null; peak_year: number | null; diffusion_curve: string | null; start_year: number | null;
@@ -61,13 +61,13 @@ const NAMES: Record<string, string> = {
 };
 
 function buildStore(withConfigLayers: boolean) {
-  const trends = (FIXTURE.inputs.trends as FixtureTrend[]).map((t) => ({
+  const drivers = (FIXTURE.inputs.drivers as FixtureDriver[]).map((t) => ({
     ...t,
     name: NAMES[t.id] ?? `Driver ${t.id}`,
     direction: t.normalized_score < 0 ? 'Contraction' : 'Expansion',
     probability: 4, confidence: 'Medium', description: 'd',
     gp1_shift: t.normalized_score, vc_exposure: {}, source_type: 'seed', data_source: 's',
-    strategic_implication: 'Weight in the answer: x.',
+    analysis: 'Weight in the answer: x.',
   }));
   const shifts: Record<string, Record<number, unknown>> = {};
   for (const cat of FIXTURE.inputs.categories as string[]) {
@@ -80,7 +80,7 @@ function buildStore(withConfigLayers: boolean) {
   const cfg = FIXTURE.inputs.config;
   return {
     health: { status: 'ok', version: 'test', has_simulation: true },
-    trends,
+    drivers,
     simulation: {
       shifts,
       cell_weights_used: FIXTURE.inputs.cellWeights,
@@ -91,7 +91,7 @@ function buildStore(withConfigLayers: boolean) {
           within_force_overlap: cfg.within_force_overlap, base_year: cfg.base_year, path_years: cfg.path_years }
       : { iterations: 500 },
     loading: false, error: null, backendAvailable: true, connectionState: 'connected',
-    updateTrend: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
+    updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
   };
 }
 
@@ -116,7 +116,7 @@ afterEach(() => cleanup());
 describe('category drill-down: contributing drivers at the score means', () => {
   it('names the score-means basis and ranks the fabric-clean drivers as the fixture does', () => {
     STORE.store = buildStore(true);
-    const { container } = render(<ProfitPoolAnalysis2 />);
+    const { container } = render(<ShiftAnalysis />);
     const aside = openFabricClean(container);
     expect(aside.textContent).toContain('the same decomposition as the PRISM Analysis');
     expect(aside.textContent).not.toContain('exposure proxy');
@@ -135,7 +135,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
 
   it('falls back to the labelled exposure proxy when the configuration layers are not served', () => {
     STORE.store = buildStore(false);
-    const { container } = render(<ProfitPoolAnalysis2 />);
+    const { container } = render(<ShiftAnalysis />);
     const aside = openFabricClean(container);
     expect(aside.textContent).toContain('Contributing drivers: exposure proxy');
     expect(aside.textContent).not.toContain('the same decomposition as the PRISM Analysis');

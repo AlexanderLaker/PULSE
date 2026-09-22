@@ -27,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-import pulse
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+import prism
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 ITER = 500
 SEED = 42
@@ -41,9 +41,9 @@ def _run(config, db, seed=SEED, iterations=ITER):
 class TestDeterminism:
     """Same seed → identical output; different seed → different output."""
 
-    def test_same_seed_reproduces_exactly(self, mock_model_config, mock_trends_database):
-        r1 = _run(mock_model_config, mock_trends_database)
-        r2 = _run(mock_model_config, mock_trends_database)
+    def test_same_seed_reproduces_exactly(self, mock_model_config, mock_drivers_database):
+        r1 = _run(mock_model_config, mock_drivers_database)
+        r2 = _run(mock_model_config, mock_drivers_database)
         sm1, sm2 = r1["shift_matrix"], r2["shift_matrix"]
         assert sm1.keys() == sm2.keys()
         for cat in sm1:
@@ -51,16 +51,16 @@ class TestDeterminism:
                 for k, v in cell.items():
                     assert sm2[cat]["path"][year][k] == v, (cat, year, k)
 
-    def test_different_seed_diverges(self, mock_model_config, mock_trends_database):
-        r1 = _run(mock_model_config, mock_trends_database, seed=42)
-        r2 = _run(mock_model_config, mock_trends_database, seed=43)
+    def test_different_seed_diverges(self, mock_model_config, mock_drivers_database):
+        r1 = _run(mock_model_config, mock_drivers_database, seed=42)
+        r2 = _run(mock_model_config, mock_drivers_database, seed=43)
         cat = next(iter(r1["shift_matrix"]))
         path1 = r1["shift_matrix"][cat]["path"]
         path2 = r2["shift_matrix"][cat]["path"]
         last = max(path1.keys())
         assert path1[last]["median"] != path2[last]["median"]
 
-    def test_trend_order_does_not_change_results(self, mock_model_config, mock_trends_database):
+    def test_driver_order_does_not_change_results(self, mock_model_config, mock_drivers_database):
         """C2 (July 2026 review): reproducibility must not depend on the
         physical order trends arrive from the database. The engine is fed
         id-ordered trends (ORDER BY id in load_trends); this test locks the
@@ -70,10 +70,10 @@ class TestDeterminism:
         list, the copula assignment logic changed and C2 should be revisited.
         """
         import dataclasses
-        from pulse.ingestion.models import TrendDatabase
-        db1 = mock_trends_database
-        db2 = TrendDatabase(
-            trends=list(reversed(db1.trends)),
+        from prism.drivers import DriverSet
+        db1 = mock_drivers_database
+        db2 = DriverSet(
+            drivers=list(reversed(db1.drivers)),
             categories=db1.categories,
             forces=db1.forces,
             source_file=db1.source_file,
@@ -89,11 +89,11 @@ class TestDeterminism:
             "contract (C2) may be obsolete; review before removing it."
         )
 
-    def test_multichain_same_seed_reproduces(self, mock_model_config, mock_trends_database):
+    def test_multichain_same_seed_reproduces(self, mock_model_config, mock_drivers_database):
         e1 = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
         e2 = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r1 = e1.run_multichain(mock_trends_database, n_chains=2, iterations=200)
-        r2 = e2.run_multichain(mock_trends_database, n_chains=2, iterations=200)
+        r1 = e1.run_multichain(mock_drivers_database, n_chains=2, iterations=200)
+        r2 = e2.run_multichain(mock_drivers_database, n_chains=2, iterations=200)
         assert r1["chain_seeds"] == r2["chain_seeds"]
         cat = next(iter(r1["shift_matrix"]))
         assert r1["shift_matrix"][cat] == r2["shift_matrix"][cat]
@@ -143,7 +143,7 @@ class TestGoldenPins:
     portfolio pin moves from -0.00433 to -0.00572, about 32 percent deeper,
     and the category pins move with their own regional mixes rather than
     uniformly. This is the intended effect of the ruling, not drift. The equal
-    grid survives as pulse.config.EQUAL_CELL_WEIGHTS and
+    grid survives as prism.config.EQUAL_CELL_WEIGHTS and
     tests/test_cell_weights.py still exercises it, so the pre-O14 basis stays
     reproducible; the 2.10.0 lock is unaffected because it pins its own
     matrix and its own 12-category taxonomy explicitly.
@@ -168,8 +168,8 @@ class TestGoldenPins:
     # headline shows (D3) — pin it too, not only per-category cells.
     PORTFOLIO_PIN = (-0.005718585254, -0.007619757232, -0.003235896735)
 
-    def test_engine_identity(self, mock_model_config, mock_trends_database):
-        r = _run(mock_model_config, mock_trends_database)
+    def test_engine_identity(self, mock_model_config, mock_drivers_database):
+        r = _run(mock_model_config, mock_drivers_database)
         assert r["model_version"] == "2.12.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
@@ -181,12 +181,12 @@ class TestGoldenPins:
         the API/package version, the engine MODEL_VERSION, and package.json
         must agree, so the live API can never again advertise a version
         three releases stale."""
-        assert pulse.__version__ == BayesianMonteCarloEngine.MODEL_VERSION
+        assert prism.__version__ == BayesianMonteCarloEngine.MODEL_VERSION
         pkg = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_text())
         assert pkg["version"] == BayesianMonteCarloEngine.MODEL_VERSION
 
-    def test_golden_values_seed42(self, mock_model_config, mock_trends_database):
-        r = _run(mock_model_config, mock_trends_database)
+    def test_golden_values_seed42(self, mock_model_config, mock_drivers_database):
+        r = _run(mock_model_config, mock_drivers_database)
         sm = r["shift_matrix"]
         last_year = max(sm["Hair: Color"]["path"].keys())
         assert last_year == 2030  # fixture horizon (prod runs use the config horizon)
@@ -201,8 +201,8 @@ class TestGoldenPins:
         values = list(self.PINS.values())
         assert len(set(values)) == len(values), "golden pins must be pairwise distinct"
 
-    def test_portfolio_band_pin(self, mock_model_config, mock_trends_database):
-        r = _run(mock_model_config, mock_trends_database)
+    def test_portfolio_band_pin(self, mock_model_config, mock_drivers_database):
+        r = _run(mock_model_config, mock_drivers_database)
         last_year = max(r["shift_matrix"]["Hair: Color"]["path"].keys())
         cell = r["totals"]["portfolio"][int(last_year)]
         median, p10, p90 = self.PORTFOLIO_PIN
@@ -210,29 +210,29 @@ class TestGoldenPins:
         assert cell["p10"] == pytest.approx(p10, rel=1e-6)
         assert cell["p90"] == pytest.approx(p90, rel=1e-6)
 
-    def test_no_integrity_events_on_defaults(self, mock_model_config, mock_trends_database):
+    def test_no_integrity_events_on_defaults(self, mock_model_config, mock_drivers_database):
         """D1 regression lock (L29): default correlations are PSD-valid as
         entered — if any repair (PSD shift, Cholesky clip, compounding floor)
         fires on the default config + fixture, that is a model regression,
         not noise."""
-        r = _run(mock_model_config, mock_trends_database)
+        r = _run(mock_model_config, mock_drivers_database)
         assert r["integrity_events"] == []
 
 
 class TestMultichainContract:
     """run_multichain result contract: master seed + seed stability (M2/L8)."""
 
-    def test_master_seed_and_chain_seeds_persisted(self, mock_model_config, mock_trends_database):
+    def test_master_seed_and_chain_seeds_persisted(self, mock_model_config, mock_drivers_database):
         e = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r = e.run_multichain(mock_trends_database, n_chains=3, iterations=200)
+        r = e.run_multichain(mock_drivers_database, n_chains=3, iterations=200)
         assert r["master_seed"] == SEED
         assert r["seed"] == SEED  # the reproducible input, not a derived chain seed
         assert len(r["chain_seeds"]) == 3
         assert r["chain_seeds"][0] == SEED  # first chain runs the master seed
 
-    def test_seed_stability_block(self, mock_model_config, mock_trends_database):
+    def test_seed_stability_block(self, mock_model_config, mock_drivers_database):
         e = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r = e.run_multichain(mock_trends_database, n_chains=3, iterations=200)
+        r = e.run_multichain(mock_drivers_database, n_chains=3, iterations=200)
         ss = r["seed_stability"]
         assert ss["metric"] == "terminal_year_portfolio_median"
         assert ss["n_chains"] == 3
@@ -253,7 +253,7 @@ class TestStructuralIdentities:
     """Invariants that must hold in EVERY environment."""
 
     def test_force_decomposition_reconciles_to_median(
-        self, mock_model_config, mock_trends_database,
+        self, mock_model_config, mock_drivers_database,
     ):
         """Σ_force decomp[force][year][cat] == MC median for (cat, year).
 
@@ -261,7 +261,7 @@ class TestStructuralIdentities:
         median and rely on the decomposition being exhaustive (shares sum
         to 1). If this breaks, the dashboard's lenses stop reconciling.
         """
-        r = _run(mock_model_config, mock_trends_database)
+        r = _run(mock_model_config, mock_drivers_database)
         sm, dec = r["shift_matrix"], r["decompositions"]["force"]
         for ykey, by_cat in dec.items():
             for cat, row in by_cat.items():
@@ -269,13 +269,13 @@ class TestStructuralIdentities:
                 assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
 
     def test_vc_decomposition_reconciles_to_median(
-        self, mock_model_config, mock_trends_database,
+        self, mock_model_config, mock_drivers_database,
     ):
         """2.9.0: the epicentre partition stays exhaustive — Σ over VC steps
         of decomp[vc][year][cat] == MC median for every (cat, year), the
         same identity the force lens carries. Shares sum to 1 per category
         by construction of the partition."""
-        r = _run(mock_model_config, mock_trends_database)
+        r = _run(mock_model_config, mock_drivers_database)
         sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
         for ykey, by_cat in dec.items():
             for cat, row in by_cat.items():
@@ -283,7 +283,7 @@ class TestStructuralIdentities:
                 assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
 
     def test_vc_attribution_is_categorical_partition(
-        self, mock_model_config, mock_trends_database,
+        self, mock_model_config, mock_drivers_database,
     ):
         """2.9.0: the VC lens is a hard partition by epicentre stage.
 
@@ -295,11 +295,11 @@ class TestStructuralIdentities:
         smear, no uniform residue). Also locks the terminal-year
         vc_decomposition to the per-year block's terminal slice (single
         source of shares)."""
-        from pulse.config import vc_epicentre_step_of
-        r = _run(mock_model_config, mock_trends_database)
+        from prism.config import vc_epicentre_step_of
+        r = _run(mock_model_config, mock_drivers_database)
         expected_steps = {
             vc_epicentre_step_of(t.vc_exposure)
-            for t in mock_trends_database.trends
+            for t in mock_drivers_database.drivers
         }
         assert expected_steps == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
 
@@ -322,20 +322,20 @@ class TestStructuralIdentities:
         for cat, row in r["vc_decomposition"].items():
             assert row == pytest.approx(dec[last_year][cat]), cat
 
-    def test_vc_coverage_integrity_event_on_unscored_trend(
-        self, mock_model_config, mock_trends_database,
+    def test_vc_coverage_integrity_event_on_unscored_driver(
+        self, mock_model_config, mock_drivers_database,
     ):
         """A trend without a VC epicentre must surface as an integrity event
         (the lens silently ignoring contributors was the pre-2.9 behavior),
         while the partition identity still holds on the scored subset."""
         import copy
-        db = copy.deepcopy(mock_trends_database)
-        db.trends[0].vc_exposure = {}   # unscore one contributor
+        db = copy.deepcopy(mock_drivers_database)
+        db.drivers[0].vc_exposure = {}   # unscore one contributor
         r = _run(mock_model_config, db)
         events = [e for e in r["integrity_events"] if e["type"] == "vc_epicentre_coverage"]
         assert len(events) == 1
         assert events[0]["severity"] == "warning"
-        assert db.trends[0].id in events[0]["message"]
+        assert db.drivers[0].id in events[0]["message"]
         # Identity survives: shares renormalize over the scored subset.
         sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
         for ykey, by_cat in dec.items():
@@ -347,7 +347,7 @@ class TestStructuralIdentities:
     #  quantitative journey layer, owner ruling O3 2026-07-07 — the negative
     #  contract lock lives in test_bayesian_mc.TestJourneyLayerRemoved.)
 
-    def test_all_lenses_present(self, mock_model_config, mock_trends_database):
-        r = _run(mock_model_config, mock_trends_database)
+    def test_all_lenses_present(self, mock_model_config, mock_drivers_database):
+        r = _run(mock_model_config, mock_drivers_database)
         for lens in ("force", "vc", "region"):
             assert lens in r["decompositions"], lens

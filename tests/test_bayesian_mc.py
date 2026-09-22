@@ -2,53 +2,53 @@
 
 import pytest
 import numpy as np
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.config import CATEGORIES, REGIONS, FORCES
-from pulse.ingestion.models import Trend, TrendDatabase
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.config import CATEGORIES, REGIONS, FORCES
+from prism.drivers import Driver, DriverSet
 
 
-def _single_trend_db(regional, cat="Hair: Color", cat_exp=5, prob=4,
+def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4,
                      gp1=0.10, direction="Contraction", peak_year=2026,
                      curve="linear", start_year=2025):
-    t = Trend(id="t1", force="Consumer", direction=direction, gp1_pct_affected=gp1,
+    t = Driver(id="t1", force="Consumer", direction=direction, gp1_pct_affected=gp1,
               probability=prob, peak_year=peak_year, diffusion_curve=curve,
               start_year=start_year)
     t.category_exposure = {cat: cat_exp}
     t.regional_exposure = dict(zip(REGIONS, regional))
-    return TrendDatabase(trends=[t], categories=CATEGORIES, forces=FORCES)
+    return DriverSet(drivers=[t], categories=CATEGORIES, forces=FORCES)
 
 
 class TestBayesianMCBasics:
     """Test basic Monte Carlo operation."""
 
-    def test_mc_runs_without_error(self, mock_model_config, mock_trends_database):
+    def test_mc_runs_without_error(self, mock_model_config, mock_drivers_database):
         """Should complete MC simulation without error."""
         config = mock_model_config
         config = config.copy_with(iterations=100)  # Fast run
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         assert result is not None
         assert "shift_matrix" in result
 
-    def test_mc_returns_all_categories(self, mock_model_config, mock_trends_database):
+    def test_mc_returns_all_categories(self, mock_model_config, mock_drivers_database):
         """Should return results for all 13 categories."""
         config = mock_model_config
         config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         shift_matrix = result["shift_matrix"]
         assert len(shift_matrix) == len(CATEGORIES)
         for cat in CATEGORIES:
             assert cat in shift_matrix
 
-    def test_mc_returns_all_path_years(self, mock_model_config, mock_trends_database):
+    def test_mc_returns_all_path_years(self, mock_model_config, mock_drivers_database):
         """Should return results for all path years."""
         config = mock_model_config
         config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         shift_matrix = result["shift_matrix"]
         for cat in CATEGORIES:
@@ -56,12 +56,12 @@ class TestBayesianMCBasics:
             for year in config.path_years:
                 assert year in shift_matrix[cat]["path"]
 
-    def test_mc_returns_all_percentiles(self, mock_model_config, mock_trends_database):
+    def test_mc_returns_all_percentiles(self, mock_model_config, mock_drivers_database):
         """Should return p10, p25, p50, p75, p90 percentiles."""
         config = mock_model_config
         config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         shift_matrix = result["shift_matrix"]
         percentiles = ["p10", "p25", "p50", "p75", "p90"]
@@ -76,12 +76,12 @@ class TestBayesianMCBasics:
 class TestBayesianMCStatistics:
     """Test statistical properties of MC results."""
 
-    def test_percentile_ordering(self, mock_model_config, mock_trends_database):
+    def test_percentile_ordering(self, mock_model_config, mock_drivers_database):
         """Should verify p10 < p25 < p50 < p75 < p90."""
         config = mock_model_config
         config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         shift_matrix = result["shift_matrix"]
 
@@ -98,12 +98,12 @@ class TestBayesianMCStatistics:
                 assert p10 <= p25 <= p50 <= p75 <= p90, \
                     f"{cat} {year}: {p10} <= {p25} <= {p50} <= {p75} <= {p90}"
 
-    def test_standard_deviation_computed(self, mock_model_config, mock_trends_database):
+    def test_standard_deviation_computed(self, mock_model_config, mock_drivers_database):
         """Should compute and return standard deviation."""
         config = mock_model_config
         config = config.copy_with(iterations=500)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         shift_matrix = result["shift_matrix"]
 
@@ -117,7 +117,7 @@ class TestBayesianMCStatistics:
 class TestBayesianMCConvergence:
     """Test Monte Carlo convergence properties."""
 
-    def test_percentile_spread_is_iteration_consistent(self, mock_model_config, mock_trends_database):
+    def test_percentile_spread_is_iteration_consistent(self, mock_model_config, mock_drivers_database):
         """The P10–P90 band estimates a POPULATION quantity — it must be
         non-degenerate and consistent across iteration counts.
 
@@ -131,10 +131,10 @@ class TestBayesianMCConvergence:
         fails this).
         """
         config_100 = mock_model_config.copy_with(iterations=100)
-        result_100 = BayesianMonteCarloEngine(config_100).run(mock_trends_database)
+        result_100 = BayesianMonteCarloEngine(config_100).run(mock_drivers_database)
 
         config_500 = mock_model_config.copy_with(iterations=500)
-        result_500 = BayesianMonteCarloEngine(config_500).run(mock_trends_database)
+        result_500 = BayesianMonteCarloEngine(config_500).run(mock_drivers_database)
 
         cell_100 = result_100["shift_matrix"]["Hair: Color"]["path"][2030]
         cell_500 = result_500["shift_matrix"]["Hair: Color"]["path"][2030]
@@ -148,12 +148,12 @@ class TestBayesianMCConvergence:
         assert result_100["iterations"] == 100
         assert result_500["iterations"] == 500
 
-    def test_returns_mc_standard_error(self, mock_model_config, mock_trends_database):
+    def test_returns_mc_standard_error(self, mock_model_config, mock_drivers_database):
         """F7 (2.10.0): the vacuous i.i.d. split-R̂/ESS 'convergence' block was
         replaced by a per-quantile Monte-Carlo standard error at the terminal
         year. It must be present for every category, in pp, non-negative."""
         config = mock_model_config.copy_with(iterations=500)
-        result = BayesianMonteCarloEngine(config).run(mock_trends_database)
+        result = BayesianMonteCarloEngine(config).run(mock_drivers_database)
 
         assert "convergence" not in result  # R̂/ESS deleted
         mc_se = result["mc_standard_error"]
@@ -167,19 +167,19 @@ class TestBayesianMCConvergence:
 class TestBayesianMCCopulaAndDAG:
     """Test copula dependency integration."""
 
-    def test_correlation_matrix_positive_definite(self, mock_model_config, mock_trends_database):
+    def test_correlation_matrix_positive_definite(self, mock_model_config, mock_drivers_database):
         """Should produce positive definite correlation matrix."""
         engine = BayesianMonteCarloEngine(mock_model_config)
-        corr_matrix = engine._build_correlation_matrix(mock_trends_database.trends)
+        corr_matrix = engine._build_correlation_matrix(mock_drivers_database.drivers)
 
         # Check positive definiteness: all eigenvalues > 0
         eigvals = np.linalg.eigvalsh(corr_matrix)
         assert np.all(eigvals > -1e-6)  # Allow small numerical errors
 
-    def test_correlation_matrix_has_structure(self, mock_model_config, mock_trends_database):
+    def test_correlation_matrix_has_structure(self, mock_model_config, mock_drivers_database):
         """Should build correlation matrix respecting force structure."""
         engine = BayesianMonteCarloEngine(mock_model_config)
-        corr_matrix = engine._build_correlation_matrix(mock_trends_database.trends)
+        corr_matrix = engine._build_correlation_matrix(mock_drivers_database.drivers)
 
         # Should be symmetric
         assert np.allclose(corr_matrix, corr_matrix.T)
@@ -193,8 +193,8 @@ class TestBayesianMCEdgeCases:
 
     def test_mc_with_empty_database(self, mock_model_config):
         """Should handle empty database gracefully."""
-        from pulse.ingestion.models import TrendDatabase
-        empty_db = TrendDatabase(trends=[], categories=CATEGORIES, forces=[])
+        from prism.drivers import DriverSet
+        empty_db = DriverSet(drivers=[], categories=CATEGORIES, forces=[])
 
         config = mock_model_config
         config = config.copy_with(iterations=100)
@@ -204,10 +204,10 @@ class TestBayesianMCEdgeCases:
         # Should return structure but with near-zero shifts
         assert "shift_matrix" in result
 
-    def test_mc_with_single_trend(self, mock_model_config, mock_trend):
+    def test_mc_with_single_driver(self, mock_model_config, mock_driver):
         """Should handle single trend database."""
-        from pulse.ingestion.models import TrendDatabase
-        db = TrendDatabase(trends=[mock_trend], categories=CATEGORIES, forces=["Consumer"])
+        from prism.drivers import DriverSet
+        db = DriverSet(drivers=[mock_driver], categories=CATEGORIES, forces=["Consumer"])
 
         config = mock_model_config
         config = config.copy_with(iterations=100)
@@ -218,7 +218,7 @@ class TestBayesianMCEdgeCases:
         for cat in CATEGORIES:
             assert cat in result["shift_matrix"]
 
-    def test_custom_iterations_parameter(self, mock_model_config, mock_trends_database):
+    def test_custom_iterations_parameter(self, mock_model_config, mock_drivers_database):
         """Should respect custom iterations parameter."""
         config = mock_model_config
         config = config.copy_with(iterations=100)  # Config default
@@ -226,8 +226,8 @@ class TestBayesianMCEdgeCases:
         engine = BayesianMonteCarloEngine(config)
 
         # Override at runtime
-        result_50 = engine.run(mock_trends_database, iterations=50)
-        result_200 = engine.run(mock_trends_database, iterations=200)
+        result_50 = engine.run(mock_drivers_database, iterations=50)
+        result_200 = engine.run(mock_drivers_database, iterations=200)
 
         # Both should return valid results
         assert "shift_matrix" in result_50
@@ -237,7 +237,7 @@ class TestBayesianMCEdgeCases:
 class TestBayesianMCBayesianPriors:
     """Test Bayesian prior handling in MC."""
 
-    def test_mc_uses_trend_priors(self, mock_model_config, mock_trends_database):
+    def test_mc_uses_driver_priors(self, mock_model_config, mock_drivers_database):
         """Should use the structured-judgment Beta priors from trends.
 
         F11 (2.10.0): the field was renamed probability_posterior →
@@ -246,19 +246,19 @@ class TestBayesianMCBayesianPriors:
         """
         config = mock_model_config.copy_with(iterations=100)
 
-        for trend in mock_trends_database.trends:
-            assert trend.probability_prior is not None
-            assert trend.probability_posterior == trend.probability_prior  # alias
+        for driver in mock_drivers_database.drivers:
+            assert driver.probability_prior is not None
+            assert driver.probability_posterior == driver.probability_prior  # alias
 
-        result = BayesianMonteCarloEngine(config).run(mock_trends_database)
+        result = BayesianMonteCarloEngine(config).run(mock_drivers_database)
         assert "shift_matrix" in result
 
-    def test_raw_samples_available(self, mock_model_config, mock_trends_database):
+    def test_raw_samples_available(self, mock_model_config, mock_drivers_database):
         """Should return raw MC samples for diagnostics."""
         config = mock_model_config
         config = config.copy_with(iterations=100)
         engine = BayesianMonteCarloEngine(config)
-        result = engine.run(mock_trends_database)
+        result = engine.run(mock_drivers_database)
 
         assert "raw_samples" in result
         raw_samples = result["raw_samples"]
@@ -274,13 +274,13 @@ class TestJourneyLayerRemoved:
     deleted — the result contract must NOT carry journey_decomposition,
     and Trend must not grow a journey_exposure field back silently."""
 
-    def test_result_has_no_journey_decomposition(self, mock_model_config, mock_trends_database):
+    def test_result_has_no_journey_decomposition(self, mock_model_config, mock_drivers_database):
         result = BayesianMonteCarloEngine(mock_model_config).run(
-            mock_trends_database, iterations=100)
+            mock_drivers_database, iterations=100)
         assert "journey_decomposition" not in result
 
-    def test_trend_has_no_journey_exposure_field(self, mock_trend):
-        assert not hasattr(mock_trend, "journey_exposure")
+    def test_driver_has_no_journey_exposure_field(self, mock_driver):
+        assert not hasattr(mock_driver, "journey_exposure")
 
 
 class TestF1RegionalShiftMath:
@@ -290,27 +290,27 @@ class TestF1RegionalShiftMath:
     def _cfg(self, mock_model_config):
         return mock_model_config.copy_with(iterations=4000, peak_year_jitter=0)
 
-    def test_region_weights_used_sum_to_one(self, mock_model_config, mock_trends_database):
-        r = BayesianMonteCarloEngine(self._cfg(mock_model_config)).run(mock_trends_database)
+    def test_region_weights_used_sum_to_one(self, mock_model_config, mock_drivers_database):
+        r = BayesianMonteCarloEngine(self._cfg(mock_model_config)).run(mock_drivers_database)
         rw = r["region_weights_used"]
         assert set(rw.keys()) == set(REGIONS)
         assert sum(rw.values()) == pytest.approx(1.0, abs=1e-9)
 
-    def test_regional_shift_matrix_present_and_shaped(self, mock_model_config, mock_trends_database):
-        r = BayesianMonteCarloEngine(self._cfg(mock_model_config)).run(mock_trends_database)
+    def test_regional_shift_matrix_present_and_shaped(self, mock_model_config, mock_drivers_database):
+        r = BayesianMonteCarloEngine(self._cfg(mock_model_config)).run(mock_drivers_database)
         rsm = r["regional_shift_matrix"]
         for cat in CATEGORIES:
             assert set(rsm[cat].keys()) == set(REGIONS)
             for region in REGIONS:
                 assert 2030 in rsm[cat][region]["path"]
 
-    def test_global_trend_reproduces_across_regions(self, mock_model_config):
+    def test_global_driver_reproduces_across_regions(self, mock_model_config):
         """A globally-present trend (region exposure full everywhere) moves
         every region's cell identically, and the category roll-up equals that
         common value (Σ_r weight_r · x = x). This is the 'global trend
         reproduces the 2D number' property."""
         cfg = self._cfg(mock_model_config)
-        r = BayesianMonteCarloEngine(cfg).run(_single_trend_db([5, 5, 5, 5]))
+        r = BayesianMonteCarloEngine(cfg).run(_single_driver_db([5, 5, 5, 5]))
         rsm = r["regional_shift_matrix"]["Hair: Color"]
         med = {reg: rsm[reg]["path"][2030]["median"] for reg in REGIONS}
         # all regional cells identical for a global trend
@@ -319,7 +319,7 @@ class TestF1RegionalShiftMath:
         cat_med = r["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         assert cat_med == pytest.approx(med["Europe"], rel=1e-9)
 
-    def test_region_concentrated_trend_scales_by_weight(self, mock_model_config):
+    def test_region_concentrated_driver_scales_by_weight(self, mock_model_config):
         """A Europe-only trend hits only Europe's cell; the category shift is
         EXACTLY Europe's share OF THAT CATEGORY'S ROW × Europe's regional shift
         (per-iteration linear scaling ⇒ the identity holds for the median too).
@@ -329,7 +329,7 @@ class TestF1RegionalShiftMath:
         was and the O14 estimated mix deliberately is not: every category has
         its own regional mix, which is the entire reason for O6."""
         cfg = self._cfg(mock_model_config)
-        r = BayesianMonteCarloEngine(cfg).run(_single_trend_db([5, 0, 0, 0]))
+        r = BayesianMonteCarloEngine(cfg).run(_single_driver_db([5, 0, 0, 0]))
         rsm = r["regional_shift_matrix"]["Hair: Color"]
         eu_med = rsm["Europe"]["path"][2030]["median"]
         assert rsm["Asia"]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
@@ -342,18 +342,18 @@ class TestF1RegionalShiftMath:
         """Category bucketing: a trend scored on only Hair: Color moves only
         that category; all others are exactly 0."""
         cfg = self._cfg(mock_model_config)
-        r = BayesianMonteCarloEngine(cfg).run(_single_trend_db([5, 3, 2, 2]))
+        r = BayesianMonteCarloEngine(cfg).run(_single_driver_db([5, 3, 2, 2]))
         sm = r["shift_matrix"]
         assert sm["Hair: Color"]["path"][2030]["median"] != 0.0
         for cat in CATEGORIES:
             if cat != "Hair: Color":
                 assert sm[cat]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
 
-    def test_regionless_trend_emits_coverage_event(self, mock_model_config):
+    def test_regionless_driver_emits_coverage_event(self, mock_model_config):
         """A trend with no regional exposure is treated as globally present
         and surfaces a regional_exposure_coverage integrity event."""
         cfg = self._cfg(mock_model_config)
-        r = BayesianMonteCarloEngine(cfg).run(_single_trend_db([0, 0, 0, 0]))
+        r = BayesianMonteCarloEngine(cfg).run(_single_driver_db([0, 0, 0, 0]))
         evs = [e for e in r["integrity_events"] if e["type"] == "regional_exposure_coverage"]
         assert len(evs) == 1 and evs[0]["severity"] == "warning"
 
@@ -364,14 +364,14 @@ class TestF2Monotonicity:
 
     def test_tiny_tailwind_does_not_worsen(self, mock_model_config):
         cfg = mock_model_config.copy_with(iterations=20000, peak_year_jitter=0)
-        big = Trend(id="big", force="Consumer", direction="Expansion", gp1_pct_affected=0.20,
+        big = Driver(id="big", force="Consumer", direction="Expansion", gp1_pct_affected=0.20,
                     probability=4, peak_year=2028, diffusion_curve="s_curve", start_year=2025)
         big.category_exposure = {"Hair: Color": 5}; big.regional_exposure = dict(zip(REGIONS, [5,5,5,5]))
-        db1 = TrendDatabase(trends=[big], categories=CATEGORIES, forces=FORCES)
-        tiny = Trend(id="tiny", force="Consumer", direction="Expansion", gp1_pct_affected=0.005,
+        db1 = DriverSet(drivers=[big], categories=CATEGORIES, forces=FORCES)
+        tiny = Driver(id="tiny", force="Consumer", direction="Expansion", gp1_pct_affected=0.005,
                      probability=5, peak_year=2028, diffusion_curve="s_curve", start_year=2025)
         tiny.category_exposure = {"Hair: Color": 1}; tiny.regional_exposure = dict(zip(REGIONS, [5,5,5,5]))
-        db2 = TrendDatabase(trends=[big, tiny], categories=CATEGORIES, forces=FORCES)
+        db2 = DriverSet(drivers=[big, tiny], categories=CATEGORIES, forces=FORCES)
         m1 = BayesianMonteCarloEngine(cfg, seed=42).run(db1)["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         m2 = BayesianMonteCarloEngine(cfg, seed=42).run(db2)["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         # both are expansion (positive); adding a tailwind must not reduce it.
@@ -383,10 +383,10 @@ class TestF4PeakYearJitter:
     timing content; off by config, deterministic under seed."""
 
     def _db(self):
-        t = Trend(id="j", force="Consumer", direction="Contraction", gp1_pct_affected=0.20,
+        t = Driver(id="j", force="Consumer", direction="Contraction", gp1_pct_affected=0.20,
                   probability=4, peak_year=2028, diffusion_curve="s_curve", start_year=2025)
         t.category_exposure = {"Hair: Color": 5}; t.regional_exposure = dict(zip(REGIONS, [5,5,5,5]))
-        return TrendDatabase(trends=[t], categories=CATEGORIES, forces=FORCES)
+        return DriverSet(drivers=[t], categories=CATEGORIES, forces=FORCES)
 
     def test_jitter_widens_velocity_band(self, mock_model_config):
         base = mock_model_config.copy_with(iterations=20000)
@@ -410,9 +410,9 @@ class TestF7ChainPooling:
     """F7 (2.10.0): the 3 chains are pooled for the published percentiles and
     an MC standard error replaces the vacuous R̂/ESS block."""
 
-    def test_pooled_iterations_and_mc_se(self, mock_model_config, mock_trends_database):
+    def test_pooled_iterations_and_mc_se(self, mock_model_config, mock_drivers_database):
         e = BayesianMonteCarloEngine(mock_model_config.copy_with(peak_year_jitter=0), seed=42)
-        r = e.run_multichain(mock_trends_database, n_chains=3, iterations=400)
+        r = e.run_multichain(mock_drivers_database, n_chains=3, iterations=400)
         assert r["seed_stability"]["pooled_iterations"] == 1200
         assert "mc_standard_error" in r and "convergence" not in r
         assert "regional_shift_matrix" in r
@@ -423,7 +423,7 @@ class TestF11StartYear:
 
     def test_no_materialization_before_start_year(self, mock_model_config):
         cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=0)
-        db = _single_trend_db([5, 5, 5, 5], prob=5, gp1=0.20, direction="Contraction",
+        db = _single_driver_db([5, 5, 5, 5], prob=5, gp1=0.20, direction="Contraction",
                               peak_year=2030, curve="linear", start_year=2028)
         p = BayesianMonteCarloEngine(cfg, seed=1).run(db)["shift_matrix"]["Hair: Color"]["path"]
         assert p[2026]["median"] == pytest.approx(0.0, abs=1e-12)

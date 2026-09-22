@@ -1,7 +1,7 @@
 {
  "generated_by": "scripts/build_driver_analysis.py",
  "inputs": {
-  "trends": [
+  "drivers": [
    {
     "id": "competitive_r15",
     "force": "Competitive",

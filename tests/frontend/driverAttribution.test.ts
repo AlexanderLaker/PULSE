@@ -143,7 +143,7 @@ describe('materialisation schedule and jitter (ports of pulse.config)', () => {
 
   it('flags a driver without peak year or curve as approximate instead of failing', () => {
     const r = computeDriverAttribution({
-      trends: [{ id: 'a', force: 'Consumer', normalized_score: -0.1, category_exposure: { 'Hair: Color': 5 }, regional_exposure: { Europe: 5 } }],
+      drivers: [{ id: 'a', force: 'Consumer', normalized_score: -0.1, category_exposure: { 'Hair: Color': 5 }, regional_exposure: { Europe: 5 } }],
       categories: ['Hair: Color'],
       config: { force_weights: { Consumer: 1 / 6 }, per_force_attenuation: { Consumer: 0.5 }, within_force_overlap: { Consumer: 0.1 } },
       cellWeights: { 'Hair: Color': { Europe: 1 } },

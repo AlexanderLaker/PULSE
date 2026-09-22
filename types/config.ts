@@ -58,7 +58,7 @@ export interface HealthStatus {
   status: string;
   version: string;
   db_stats?: {
-    trends: number;
+    drivers: number;
     simulations: number;
   };
   backtest_accuracy?: number;
@@ -68,7 +68,7 @@ export interface HealthStatus {
   simulation_error?: string | null;
   latest_run_id?: number | null;
   model_loaded?: boolean;
-  trend_count?: number;
+  driver_count?: number;
   categories?: number;
 }
 
@@ -159,7 +159,7 @@ export interface ModelConfig {
 /** Force summary from GET /forces. */
 export interface ForceSummary {
   name: ForceName;
-  trend_count?: number;
+  driver_count?: number;
   avg_impact?: number;
   net_direction?: string;
 }

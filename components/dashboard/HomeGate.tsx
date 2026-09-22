@@ -41,9 +41,9 @@ import type { PercentileDistribution, ShiftPath } from '@/types/simulation';
 
 /** Tabs the gate can open — mirrors the dashboard's production tab ids. */
 export type GateRoom =
-  | 'trends-2'
-  | 'consumer-journey-2'
-  | 'profit-pool-2'
+  | 'drivers'
+  | 'consumer-journey'
+  | 'shift-analysis'
   | 'profit-pool-explorer';
 
 interface HomeGateProps {
@@ -57,7 +57,7 @@ interface HomeGateProps {
 // Colour is used as light: a white→tint gradient per door plus one soft
 // radial glow. Values are gate-specific by design — not shared tokens.
 const WASH = {
-  trends:   { bg: 'linear-gradient(180deg,#ffffff 0%,#f2f7ff 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,93,181,.07), transparent 70%)' },
+  drivers:   { bg: 'linear-gradient(180deg,#ffffff 0%,#f2f7ff 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,93,181,.07), transparent 70%)' },
   journey:  { bg: 'linear-gradient(180deg,#ffffff 0%,#f5f3fe 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(107,79,196,.07), transparent 70%)' },
   shift:    { bg: 'linear-gradient(180deg,#ffffff 0%,#eef3fb 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,52,94,.06), transparent 70%)' },
   explorer: { bg: 'linear-gradient(180deg,#ffffff 0%,#f0faf8 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(15,155,142,.07), transparent 70%)' },
@@ -126,7 +126,7 @@ const BAND_Y = 200;
 // Door artworks
 // ═══════════════════════════════════════════════════════════════════
 
-const TrendsArt: FC<{ countsByForce: Record<ForceName, number> }> = ({ countsByForce }) => (
+const DriversArt: FC<{ countsByForce: Record<ForceName, number> }> = ({ countsByForce }) => (
   <svg width="300" height="230" viewBox="0 0 300 230" fill="none" aria-hidden="true">
     {CLUSTER_ORDER.map((force, i) => {
       const dots = Math.max(3, Math.round((countsByForce[force] ?? 0) / 4));
@@ -385,27 +385,27 @@ const Door: FC<{
 // ═══════════════════════════════════════════════════════════════════
 
 const ROOM_KEYS: Record<string, GateRoom> = {
-  '1': 'trends-2',
-  '2': 'consumer-journey-2',
-  '3': 'profit-pool-2',
+  '1': 'drivers',
+  '2': 'consumer-journey',
+  '3': 'shift-analysis',
   '4': 'profit-pool-explorer',
 };
 
 const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
-  const { trends, simulation } = usePrism();
+  const { drivers, simulation } = usePrism();
   const reduced = useReducedMotion() ?? false;
 
   // Live: trends per force (falls back to the 2.11.0 base until loaded).
   const countsByForce = useMemo<Record<ForceName, number>>(() => {
-    if (!trends.length) return FALLBACK_FORCE_COUNTS;
+    if (!drivers.length) return FALLBACK_FORCE_COUNTS;
     const counts = { ...FALLBACK_FORCE_COUNTS };
     (Object.keys(counts) as ForceName[]).forEach((f) => { counts[f] = 0; });
-    trends.forEach((t) => { counts[t.force] = (counts[t.force] ?? 0) + 1; });
+    drivers.forEach((t) => { counts[t.force] = (counts[t.force] ?? 0) + 1; });
     return counts;
-  }, [trends]);
+  }, [drivers]);
 
   // Live driver count (the 2.11.0 base until the trends have loaded).
-  const trendCount = trends.length || Object.values(FALLBACK_FORCE_COUNTS).reduce((a, b) => a + b, 0);
+  const driverCount = drivers.length || Object.values(FALLBACK_FORCE_COUNTS).reduce((a, b) => a + b, 0);
 
   // Live: category medians at the terminal year, canonical CATEGORIES order.
   const matrixCells = useMemo<Array<number | null>>(
@@ -471,19 +471,19 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
 
       <section className="relative grid min-h-[460px] flex-1 auto-rows-[minmax(300px,1fr)] grid-cols-1 gap-[18px] sm:grid-cols-2 xl:auto-rows-auto xl:grid-cols-4">
         <Door
-          eyebrow="The input" title="Drivers" caption={`${trendCount} drivers — the evidence.`}
-          keyHint="1" wash={WASH.trends} delay={0.08} reduced={reduced}
-          ariaLabel={`Drivers — the input. ${trendCount} drivers, the evidence. Shortcut key 1.`}
-          onOpen={() => onNavigate('trends-2')}
+          eyebrow="The input" title="Drivers" caption={`${driverCount} drivers — the evidence.`}
+          keyHint="1" wash={WASH.drivers} delay={0.08} reduced={reduced}
+          ariaLabel={`Drivers — the input. ${driverCount} drivers, the evidence. Shortcut key 1.`}
+          onOpen={() => onNavigate('drivers')}
         >
-          <TrendsArt countsByForce={countsByForce} />
+          <DriversArt countsByForce={countsByForce} />
         </Door>
 
         <Door
           eyebrow="The lens" title="Consumer Journey" caption="Pool impact, stage by stage."
           keyHint="2" wash={WASH.journey} delay={0.16} reduced={reduced}
           ariaLabel="Consumer Journey — the lens. Pool impact, stage by stage. Shortcut key 2."
-          onOpen={() => onNavigate('consumer-journey-2')}
+          onOpen={() => onNavigate('consumer-journey')}
         >
           <JourneyArt />
         </Door>
@@ -492,7 +492,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
           eyebrow="The output" title="Profit Pool Shift Analysis" caption="Every category's shift to 2035."
           keyHint="3" wash={WASH.shift} delay={0.24} reduced={reduced}
           ariaLabel="Profit Pool Shift Analysis — the output. Every category's shift to 2035. Shortcut key 3."
-          onOpen={() => onNavigate('profit-pool-2')}
+          onOpen={() => onNavigate('shift-analysis')}
         >
           <ShiftArt cells={matrixCells} highlightIdx={highlightIdx} band={band} />
         </Door>

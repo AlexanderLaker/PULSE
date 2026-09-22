@@ -15,12 +15,12 @@ vi.mock('@/hooks/usePrism', () => ({
   PrismProvider: ({ children }: { children: unknown }) => children,
 }));
 vi.mock('@/api/client', () => ({
-  getTrendProposals: vi.fn(),
+  getDriverProposals: vi.fn(),
   saveMyProposal: vi.fn(),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
-import { epicentreOf, canonicalVcProfile } from '@/components/dashboard/Trends2';
+import { epicentreOf, canonicalVcProfile } from '@/components/dashboard/Drivers';
 
 const STEPS = [
   'Raw Materials', 'Formulation', 'Manufacturing', 'Packaging',

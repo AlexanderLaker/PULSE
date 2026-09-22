@@ -26,7 +26,7 @@ def _create_app_with_retry(max_retries: int = 3, backoff: float = 0.5):
     last_error = None
     for attempt in range(max_retries):
         try:
-            from pulse.api.app import create_app
+            from prism.api.app import create_app
             application = create_app()
             if attempt > 0:
                 logger.info(f"App created successfully on attempt {attempt + 1}")
@@ -62,7 +62,7 @@ def _create_app_with_retry(max_retries: int = 3, backoff: float = 0.5):
             "error": str(last_error),
             "version": "unknown",
             "model_loaded": False,
-            "trend_count": 0,
+            "driver_count": 0,
             "categories": 0,
             "has_simulation": False,
         }

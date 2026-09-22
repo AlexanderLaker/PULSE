@@ -5,8 +5,8 @@
  */
 
 import type {
-  Trend, TrendUpdate,
-  TrendProposalPatch, TrendProposalsResponse,
+  Driver, DriverUpdate,
+  DriverProposalPatch, DriverProposalsResponse,
   SimulationResult,
   HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
 } from '@/types';
@@ -134,17 +134,17 @@ export const getDiagnostics = async (): Promise<DiagnosticsResult> => {
 
 // ── Trends ───────────────────────────────────────────────────────
 
-export const getTrends = (force?: string): Promise<Trend[]> =>
-  request(`/trends${force ? `?force=${encodeURIComponent(force)}` : ''}`);
+export const getDrivers = (force?: string): Promise<Driver[]> =>
+  request(`/drivers${force ? `?force=${encodeURIComponent(force)}` : ''}`);
 
-export const getTrend = (id: string): Promise<Trend> =>
-  request(`/trends/${id}`);
+export const getDriver = (id: string): Promise<Driver> =>
+  request(`/drivers/${id}`);
 
 // Admin-only. Routes through the Next.js proxy /api/trends/{id} (which mints
 // a role=admin Bearer token), NOT the viewer-cookie /api/v1 path — otherwise
 // the backend's require_admin answers 403 even for real admins.
-export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
-  adminRequest(`/trends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const updateDriver = (id: string, data: DriverUpdate): Promise<Driver> =>
+  adminRequest(`/drivers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // ── Trend score proposals (multi-expert scoring) ─────────────────
 // Any authenticated user may read aggregates and write THEIR OWN proposal
@@ -155,17 +155,17 @@ export const updateTrend = (id: string, data: TrendUpdate): Promise<Trend> =>
 
 /** GET /api/v1/trends/{id}/proposals — the caller's own proposal, the expert
  *  aggregate, and the named "who scored what" breakdown. */
-export const getTrendProposals = (id: string): Promise<TrendProposalsResponse> =>
-  request(`/trends/${id}/proposals`);
+export const getDriverProposals = (id: string): Promise<DriverProposalsResponse> =>
+  request(`/drivers/${id}/proposals`);
 
 /** PUT /api/v1/trends/{id}/proposals — upsert the caller's own proposal.
  *  Partial patch: only the provided fields are written. Returns the refreshed
  *  proposals payload. */
 export const saveMyProposal = (
   id: string,
-  patch: TrendProposalPatch,
-): Promise<TrendProposalsResponse> =>
-  request(`/trends/${id}/proposals`, {
+  patch: DriverProposalPatch,
+): Promise<DriverProposalsResponse> =>
+  request(`/drivers/${id}/proposals`, {
     method: 'PUT',
     body: JSON.stringify(patch),
   });

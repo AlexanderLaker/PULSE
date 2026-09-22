@@ -1434,14 +1434,14 @@ export function toGp1Rating(deltaBps: number | null | undefined): CagrRating {
 
 // ─── 0-3 Rating (PRISM-driven, red/green) — unchanged from v1 ──────
 
-export interface TrendRating {
+export interface DriverRating {
   direction: 'increasing' | 'declining' | 'stable' | 'n/a';
   score: 0 | 1 | 2 | 3;
   label: string;
   tone: 'green' | 'red' | 'neutral' | 'muted';
 }
 
-export function toTrendRating(shift: number | null | undefined): TrendRating {
+export function toDriverRating(shift: number | null | undefined): DriverRating {
   if (shift == null || !isFinite(shift)) {
     return { direction: 'n/a', score: 0, label: 'No PRISM signal', tone: 'muted' };
   }

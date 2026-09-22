@@ -184,7 +184,7 @@ export interface RunMeta {
   cell_weights_source?: string | null;
   /** 2.11.0 (O10/O11): number of drivers the run loaded and the calibration
    *  tag of its config (e.g. 'calibrated_v3.12_september2026'). */
-  trend_count?: number | null;
+  driver_count?: number | null;
   attenuation_source?: string | null;
   converged_categories?: number | null;
   total_categories?: number | null;

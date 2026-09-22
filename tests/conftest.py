@@ -25,8 +25,8 @@ import pytest  # noqa: E402
 import numpy as np  # noqa: E402
 from datetime import datetime  # noqa: E402
 
-from pulse.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS, REGIONS  # noqa: E402
-from pulse.ingestion.models import Trend, TrendDatabase  # noqa: E402
+from prism.config import ModelConfig, CATEGORIES, FORCES, VC_STEPS, REGIONS  # noqa: E402
+from prism.drivers import Driver, DriverSet  # noqa: E402
 
 
 def _reg(europe: int, na: int, asia: int, high_growth: int) -> dict:
@@ -57,9 +57,9 @@ def _canonical_vc(stage: int) -> dict:
 
 
 @pytest.fixture
-def mock_trend() -> Trend:
+def mock_driver() -> Driver:
     """Create a single mock trend for basic testing."""
-    trend = Trend(
+    driver = Driver(
         id="test_trend_01",
         force="Consumer",
         sub_category="Trends",
@@ -79,24 +79,24 @@ def mock_trend() -> Trend:
     # resolve toward the exposure-weighted centroid (stage 4, "Packaging"),
     # exercising the legacy-collapse path.
     for cat in CATEGORIES:
-        trend.category_exposure[cat] = 2 if "Hair" in cat else 1
+        driver.category_exposure[cat] = 2 if "Hair" in cat else 1
     for vc in VC_STEPS:
-        trend.vc_exposure[vc] = 2
-    trend.regional_exposure = _reg(5, 3, 2, 2)
-    return trend
+        driver.vc_exposure[vc] = 2
+    driver.regional_exposure = _reg(5, 3, 2, 2)
+    return driver
 
 
 @pytest.fixture
-def mock_trends_database(mock_trend) -> TrendDatabase:
+def mock_drivers_database(mock_driver) -> DriverSet:
     """Create a mock TrendDatabase with 5 sample trends across different forces."""
-    trends = []
+    drivers = []
 
     # Consumer force
     # L29 (July 2026 review): exposures deliberately DIFFER between
     # "Hair: Color" (3) and "Hair: Care" (2) so no two golden-pinned
     # categories are numerically identical — identical pins couldn't
     # distinguish a category-mixup regression from a pass.
-    consumer_trend = Trend(
+    consumer_driver = Driver(
         id="consumer_01",
         force="Consumer",
         name="Natural/Clean Beauty",
@@ -109,24 +109,24 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
     )
     for cat in CATEGORIES:
         if cat == "Hair: Color":
-            consumer_trend.category_exposure[cat] = 3
+            consumer_driver.category_exposure[cat] = 3
         elif "Hair" in cat:
-            consumer_trend.category_exposure[cat] = 2
+            consumer_driver.category_exposure[cat] = 2
         else:
-            consumer_trend.category_exposure[cat] = 1
+            consumer_driver.category_exposure[cat] = 1
     # 2.9.0 VC-epicentre fixture profiles: canonical slider serializations
     # with DISTINCT stages (plus one deliberate collision, Technology +
     # Competitive both at Commercial, so the partition's grouping is
     # exercised). vc_exposure feeds ONLY the VC attribution lens — never
     # the shift math — so these assignments leave the golden pins intact.
-    consumer_trend.vc_exposure = _canonical_vc(6)   # epicentre: Marketing
-    consumer_trend.regional_exposure = _reg(5, 3, 2, 2)   # Europe-heavy
-    trends.append(consumer_trend)
+    consumer_driver.vc_exposure = _canonical_vc(6)   # epicentre: Marketing
+    consumer_driver.regional_exposure = _reg(5, 3, 2, 2)   # Europe-heavy
+    drivers.append(consumer_driver)
 
     # Government force — carries a per-trend materialization schedule
     # (peak_year + diffusion curve) so the golden pins exercise
     # compute_materialization_schedule, not only the force-level fallback.
-    gov_trend = Trend(
+    gov_driver = Driver(
         id="government_01",
         force="Government",
         name="Microplastics Ban",
@@ -140,13 +140,13 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         data_source="test",
     )
     for cat in CATEGORIES:
-        gov_trend.category_exposure[cat] = 2 if "Body" in cat or "Styling" in cat else 3
-    gov_trend.vc_exposure = _canonical_vc(2)        # epicentre: Formulation
-    gov_trend.regional_exposure = _reg(5, 4, 1, 2)  # EU regulatory, low Asia
-    trends.append(gov_trend)
+        gov_driver.category_exposure[cat] = 2 if "Body" in cat or "Styling" in cat else 3
+    gov_driver.vc_exposure = _canonical_vc(2)        # epicentre: Formulation
+    gov_driver.regional_exposure = _reg(5, 4, 1, 2)  # EU regulatory, low Asia
+    drivers.append(gov_driver)
 
     # Technology force
-    tech_trend = Trend(
+    tech_driver = Driver(
         id="technology_01",
         force="Technology",
         name="AI Personalization",
@@ -158,13 +158,13 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         data_source="test",
     )
     for cat in CATEGORIES:
-        tech_trend.category_exposure[cat] = 2
-    tech_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial
-    tech_trend.regional_exposure = _reg(3, 5, 4, 2)  # NA/Asia tech-led
-    trends.append(tech_trend)
+        tech_driver.category_exposure[cat] = 2
+    tech_driver.vc_exposure = _canonical_vc(7)       # epicentre: Commercial
+    tech_driver.regional_exposure = _reg(3, 5, 4, 2)  # NA/Asia tech-led
+    drivers.append(tech_driver)
 
     # Environmental force
-    env_trend = Trend(
+    env_driver = Driver(
         id="environmental_01",
         force="Environmental",
         name="Water Scarcity",
@@ -176,13 +176,13 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         data_source="test",
     )
     for cat in CATEGORIES:
-        env_trend.category_exposure[cat] = 2
-    env_trend.vc_exposure = _canonical_vc(3)        # epicentre: Manufacturing
-    env_trend.regional_exposure = _reg(4, 3, 3, 4)  # broad, High-Growth tilt
-    trends.append(env_trend)
+        env_driver.category_exposure[cat] = 2
+    env_driver.vc_exposure = _canonical_vc(3)        # epicentre: Manufacturing
+    env_driver.regional_exposure = _reg(4, 3, 3, 4)  # broad, High-Growth tilt
+    drivers.append(env_driver)
 
     # Competitive force
-    comp_trend = Trend(
+    comp_driver = Driver(
         id="competitive_01",
         force="Competitive",
         name="Private Label Growth",
@@ -194,13 +194,13 @@ def mock_trends_database(mock_trend) -> TrendDatabase:
         data_source="test",
     )
     for cat in CATEGORIES:
-        comp_trend.category_exposure[cat] = 3
-    comp_trend.vc_exposure = _canonical_vc(7)       # epicentre: Commercial (collides with tech)
-    comp_trend.regional_exposure = _reg(5, 2, 2, 1)  # Europe PL pressure
-    trends.append(comp_trend)
+        comp_driver.category_exposure[cat] = 3
+    comp_driver.vc_exposure = _canonical_vc(7)       # epicentre: Commercial (collides with tech)
+    comp_driver.regional_exposure = _reg(5, 2, 2, 1)  # Europe PL pressure
+    drivers.append(comp_driver)
 
-    db = TrendDatabase(
-        trends=trends,
+    db = DriverSet(
+        drivers=drivers,
         categories=CATEGORIES,
         forces=FORCES,
         source_file="test.xlsx",

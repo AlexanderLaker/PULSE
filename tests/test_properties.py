@@ -19,15 +19,15 @@ import numpy as np
 import pytest
 from hypothesis import given, settings, strategies as st, HealthCheck
 
-from pulse.config import ModelConfig
-from pulse.ingestion.models import TrendDatabase
-from pulse.seed_trends import get_report_trends
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.config import ModelConfig
+from prism.drivers import DriverSet
+from prism.seed_drivers import get_seed_drivers
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 
 @pytest.fixture(scope="module")
 def db():
-    return TrendDatabase(trends=get_report_trends())
+    return DriverSet(drivers=get_seed_drivers())
 
 
 # ── Invariant 1: percentile ordering ────────────────────────────────
@@ -83,7 +83,7 @@ def test_seed_reproducibility(db, seed):
        iters=st.integers(min_value=100, max_value=50_000))
 def test_copy_with_is_pure(att, iters):
     """v3.2: validate copy_with on per_force_attenuation (no scalar)."""
-    from pulse.config import FORCES
+    from prism.config import FORCES
     base = ModelConfig()
     original_pfa = dict(base.per_force_attenuation)
     original_iters = base.iterations
@@ -107,7 +107,7 @@ def test_copy_with_is_pure(att, iters):
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
 def test_attenuation_monotonic_in_headline(db, seed):
-    from pulse.config import FORCES
+    from prism.config import FORCES
     base_pfa = ModelConfig().per_force_attenuation
 
     def _headline(factor):

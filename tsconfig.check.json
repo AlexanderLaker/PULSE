@@ -4,7 +4,7 @@
     "node_modules",
     ".next",
     "next-env.d.ts",
-    "pulse",
+    "prism",
     "_NOT_FOR_HANDOVER"
   ]
 }

@@ -36,11 +36,11 @@ describe('/api/prism-cookie', () => {
     const res = await cookieGET();
     expect(res.status).toBe(200);
     const sc = res.headers.get('set-cookie')!;
-    expect(sc).toContain('pulse-token=');
+    expect(sc).toContain('prism-token=');
     expect(sc.toLowerCase()).toContain('httponly');
     expect(sc.toLowerCase()).toContain('samesite=lax');
     expect(sc).toContain('Path=/api/v1');
-    const token = /pulse-token=([^;]+)/.exec(sc)![1];
+    const token = /prism-token=([^;]+)/.exec(sc)![1];
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
     expect(payload.role).toBe('viewer');
     expect(payload.sub).toBe('user_admin');

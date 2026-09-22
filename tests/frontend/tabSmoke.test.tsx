@@ -17,14 +17,14 @@ vi.mock('@/hooks/usePrism', () => ({
 }));
 vi.mock('@/api/client', () => ({
   getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  updateTrend: vi.fn(),
+  updateDriver: vi.fn(),
 }));
 
-import ProfitPoolAnalysis2 from '@/components/dashboard/ProfitPoolAnalysis2';
-import Trends2 from '@/components/dashboard/Trends2';
-import ConsumerJourney2 from '@/components/dashboard/ConsumerJourney2';
+import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
+import Drivers from '@/components/dashboard/Drivers';
+import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 
-const trend = {
+const driver = {
   id: 'consumer_r1', name: 'Test trend', force: 'Consumer',
   direction: 'Contraction', probability: 4, confidence: 'High',
   description: 'd', normalized_score: -0.02, gp1_shift: -0.02,
@@ -41,7 +41,7 @@ for (const cat of ['Hair: Color', 'Hair: Care']) {
 
 STORE.store = {
   health: { status: 'ok', version: 'test', has_simulation: true },
-  trends: [trend],
+  drivers: [driver],
   simulation: {
     shifts,
     convergence: { 'Hair: Color': { r_hat: 1.01, ess: 400, converged: true } },
@@ -50,27 +50,27 @@ STORE.store = {
   config: { category_weights: { 'Hair: Color': 2 }, iterations: 500 },
   loading: false, error: null, backendAvailable: true,
   connectionState: 'connected',
-  updateTrend: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
+  updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
 };
 
 afterEach(() => cleanup());
 
 describe('production tab smoke renders', () => {
   it('ProfitPoolAnalysis2 mounts with canned store', () => {
-    const { container } = render(<ProfitPoolAnalysis2 />);
+    const { container } = render(<ShiftAnalysis />);
     expect(container.textContent).toBeTruthy();
     expect(container.textContent!.length).toBeGreaterThan(100);
   });
   it('Trends2 mounts with canned store', () => {
-    const { container } = render(<Trends2 />);
+    const { container } = render(<Drivers />);
     expect(container.textContent).toBeTruthy();
     expect(container.textContent).toContain('Test trend');
   });
   it('ConsumerJourney2 mounts (static content page)', () => {
     const { container } = render(
-      <ConsumerJourney2
+      <ConsumerJourney
         onNavigateProfitPoolShiftModel={() => {}}
-        onNavigateTrends={() => {}}
+        onNavigateDrivers={() => {}}
       />,
     );
     expect(container.textContent).toBeTruthy();

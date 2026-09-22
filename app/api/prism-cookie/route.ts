@@ -50,7 +50,7 @@ export async function GET() {
       );
     }
     const res = NextResponse.json({ ok: true, configured });
-    res.cookies.set('pulse-token', token, {
+    res.cookies.set('prism-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

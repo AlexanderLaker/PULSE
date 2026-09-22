@@ -2,7 +2,7 @@
 
 2.9.0 (July 2026 VC-epicentre attribution): the engine consumes the value
 chain as ONE categorical epicentre stage per trend, derived from the stored
-8-step profile by ``pulse.config.vc_epicentre_of``. That function and the
+8-step profile by ``prism.config.vc_epicentre_of``. That function and the
 frontend's ``epicentreOf`` (components/dashboard/Trends2.tsx) MUST stay
 behaviourally identical — this file pins the Python side against the SAME
 fixture table the vitest suite pins the TS side against. If one side
@@ -15,8 +15,8 @@ pre-2.9 dict-format back-compat path.
 
 import pytest
 
-from pulse.config import VC_STEPS, vc_epicentre_of, vc_epicentre_step_of
-from pulse.audit.input_drift import trend_fingerprint, compute_input_drift_event
+from prism.config import VC_STEPS, vc_epicentre_of, vc_epicentre_step_of
+from prism.audit.input_drift import driver_fingerprint, compute_input_drift_event
 
 
 def _canonical(stage: int) -> dict:
@@ -104,14 +104,14 @@ class TestDriftVeSemantics:
     """2.9.0: "ve" fingerprints the DERIVED stage, not the raw profile."""
 
     def test_fingerprint_stores_stage_not_profile(self):
-        fp = trend_fingerprint([_T("a", vc=_canonical(6))])
+        fp = driver_fingerprint([_T("a", vc=_canonical(6))])
         assert fp["a"]["ve"] == 6
-        fp_unscored = trend_fingerprint([_T("b", vc={})])
+        fp_unscored = driver_fingerprint([_T("b", vc={})])
         assert fp_unscored["b"]["ve"] is None
 
     def test_epicentre_flip_is_structural_drift(self):
-        prev = trend_fingerprint([_T("a", vc=_canonical(6))])
-        curr = trend_fingerprint([_T("a", vc=_canonical(2))])
+        prev = driver_fingerprint([_T("a", vc=_canonical(6))])
+        curr = driver_fingerprint([_T("a", vc=_canonical(2))])
         ev = compute_input_drift_event(curr, prev, previous_run_id=1)
         assert ev["detail"]["structure_changes"] == ["a"]
 
@@ -120,8 +120,8 @@ class TestDriftVeSemantics:
         # the SAME epicentre must not read as drift — only the stage feeds
         # the attribution, and the stage did not move.
         legacy = {"Supply Chain": 2, "Marketing": 4, "Commercial": 1}   # epicentre 6
-        prev = trend_fingerprint([_T("a", vc=legacy)])
-        curr = trend_fingerprint([_T("a", vc=_canonical(6))])
+        prev = driver_fingerprint([_T("a", vc=legacy)])
+        curr = driver_fingerprint([_T("a", vc=_canonical(6))])
         ev = compute_input_drift_event(curr, prev, previous_run_id=1)
         # Zero-drift confirmation event — the rewrite is invisible, as designed.
         assert "no score changes" in ev["message"]
@@ -130,7 +130,7 @@ class TestDriftVeSemantics:
         # A pre-2.9 persisted fingerprint carries the raw profile dict for
         # "ve". The comparison collapses it to a stage first — same stage →
         # no false structural drift on the first post-upgrade run.
-        curr = trend_fingerprint([_T("a", vc=_canonical(6))])
+        curr = driver_fingerprint([_T("a", vc=_canonical(6))])
         prev = {"a": dict(curr["a"], ve={"Marketing": 4.0, "Supply Chain": 2.0})}  # epicentre 6
         ev = compute_input_drift_event(curr, prev, previous_run_id=1)
         assert "no score changes" in ev["message"]

@@ -5,7 +5,7 @@ script and the tests share one renderer.
 
 A template is prose with named placeholders in braces. Every figure in a
 reading comes from a placeholder; the rendered text is what
-`pulse/seed_trends.py` carries as `strategic_implication` and what the
+`prism/seed_drivers.py` carries as `analysis` and what the
 Drivers page shows. The vocabulary is documented in
 docs/DRIVER_ANALYSIS_CONCEPT.md and enumerated by `render_fields`.
 

@@ -19,7 +19,7 @@
  * lifted unchanged into any future rewrite.
  */
 
-import type { PercentileDistribution, ShiftPath, Trend, CategoryDefinition } from '@/types';
+import type { PercentileDistribution, ShiftPath, Driver, CategoryDefinition } from '@/types';
 
 /** Get the full percentile distribution (median + p10/p25/p75/p90) for a
  *  category at a given year. Returns `null` if the cell has no data. If the
@@ -104,7 +104,7 @@ export function catWeightFor(
  * the category) we fall back to magnitude shares so the filter is still
  * meaningful. */
 export function computeImpactFractions(
-  trends: Trend[],
+  drivers: Driver[],
   categories: CategoryDefinition[],
 ): Record<string, { expansion: number; contraction: number }> {
   const out: Record<string, { expansion: number; contraction: number }> = {};
@@ -113,7 +113,7 @@ export function computeImpactFractions(
     const cidSnake = cat.id;
     let rawPos = 0;
     let rawNeg = 0;
-    (trends ?? []).forEach((t) => {
+    (drivers ?? []).forEach((t) => {
       const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
       const exp = exposureRaw[cidName] ?? exposureRaw[cidSnake] ?? 0;
       if (!(exp > 0)) return;

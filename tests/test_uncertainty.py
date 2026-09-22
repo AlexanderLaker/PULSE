@@ -14,11 +14,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pulse.config import (beta_prior_for, peak_jitter_for, UNCERTAINTY_KAPPA,
+from prism.config import (beta_prior_for, peak_jitter_for, UNCERTAINTY_KAPPA,
                           UNCERTAINTY_PEAK_JITTER, CATEGORIES, DEFAULT_PEAK_YEAR_JITTER)
-from pulse.ingestion.models import Trend, TrendDatabase
-from pulse.simulation.bayesian_mc import BayesianMonteCarloEngine
-from pulse.audit.input_drift import trend_fingerprint, compute_input_drift_event
+from prism.drivers import Driver, DriverSet
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.audit.input_drift import driver_fingerprint, compute_input_drift_event
 
 
 class TestPriorMapping:
@@ -47,7 +47,7 @@ class TestPriorMapping:
         # jitter in words; it still said "fixed Beta concentration" and "±1yr"
         # after O7 made both depend on the score (owner follow-up, 2026-09-17).
         src = (Path(__file__).resolve().parent.parent / "components" / "dashboard"
-               / "ProfitPoolAnalysis2.tsx").read_text(encoding="utf-8")
+               / "ShiftAnalysis.tsx").read_text(encoding="utf-8")
         assert "&plusmn;1yr" not in src
         assert not re.search(r"fixed[^.;]{0,30}(concentration|spread)", src)
         k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER
@@ -70,9 +70,9 @@ class TestPriorMapping:
         assert all(peak_jitter_for(u, 0) == 0 for u in range(6))
 
 
-class TestTrendModel:
-    def test_trend_prior_uses_score_and_recomputes_on_post_init(self):
-        t = Trend(id="u1", force="Consumer", probability=5, gp1_pct_affected=0.2)
+class TestDriverModel:
+    def test_driver_prior_uses_score_and_recomputes_on_post_init(self):
+        t = Driver(id="u1", force="Consumer", probability=5, gp1_pct_affected=0.2)
         assert t.probability_prior == (5, 1)
         assert t.uncertainty is None
         t.uncertainty = 1
@@ -85,23 +85,23 @@ class TestTrendModel:
         assert t.uncertainty == 5  # clamped
 
     def test_fingerprint_carries_score_and_diffs_it(self):
-        base = Trend(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
+        base = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
                      category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
                      vc_exposure={"Marketing": 5}, peak_year=2029, diffusion_curve="linear")
-        fp0 = trend_fingerprint([base])
+        fp0 = driver_fingerprint([base])
         assert fp0["u1"]["u"] is None
         base.uncertainty = 4
         base.__post_init__()
-        fp1 = trend_fingerprint([base])
+        fp1 = driver_fingerprint([base])
         assert fp1["u1"]["u"] == 4
         ev = compute_input_drift_event(fp1, fp0, previous_run_id=1)
         assert ev is not None and "u1" in (ev.get("detail", {}).get("structure_changes") or [])
 
     def test_pre_2_11_fingerprint_without_u_diffs_cleanly(self):
-        t = Trend(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
+        t = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
                   category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
                   vc_exposure={"Marketing": 5}, uncertainty=2)
-        cur = trend_fingerprint([t])
+        cur = driver_fingerprint([t])
         prev = {"u1": {k: v for k, v in cur["u1"].items() if k != "u"}}  # pre-2.11 shape
         ev = compute_input_drift_event(cur, prev, previous_run_id=1)
         assert ev is not None
@@ -109,16 +109,16 @@ class TestTrendModel:
 
 
 def _db(uncertainties):
-    trends = []
+    drivers = []
     for i, u in enumerate(uncertainties):
-        trends.append(Trend(
+        drivers.append(Driver(
             id=f"t{i}", force="Consumer", name=f"t{i}", direction="Contraction",
             probability=4, start_year=2025, gp1_pct_affected=0.20, peak_year=2029,
             diffusion_curve="linear", category_exposure={"Hair: Care": 5},
             regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5},
             uncertainty=u,
         ))
-    return TrendDatabase(trends=trends, categories=list(CATEGORIES), forces=["Consumer"])
+    return DriverSet(drivers=drivers, categories=list(CATEGORIES), forces=["Consumer"])
 
 
 def _velocity_width(r, cat="Hair: Care"):
@@ -148,7 +148,7 @@ class TestEngine:
         assert w3 > w0
         assert w5 > w3
 
-    def test_global_switch_off_silences_scored_trends_too(self, mock_model_config):
+    def test_global_switch_off_silences_scored_drivers_too(self, mock_model_config):
         cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=0)
         # With the global switch off a U5 trend draws no offset at all;
         # switching it on makes the ±4 offsets live and widens the timing
@@ -178,7 +178,7 @@ class TestEngine:
         c = BayesianMonteCarloEngine(cfg, seed=4).run(db)
         assert a["shift_matrix"] != c["shift_matrix"]
 
-    def test_mixed_scores_keep_each_trends_own_offset_range(self, mock_model_config):
+    def test_mixed_scores_keep_each_drivers_own_offset_range(self, mock_model_config):
         """Directly inspect the offset draw: a U0 trend never moves its peak,
         a U5 trend uses offsets up to ±4, an unscored trend stays inside the
         global ±1."""
@@ -187,11 +187,11 @@ class TestEngine:
         eng = BayesianMonteCarloEngine(cfg, seed=8)
         # Re-create the offset draw the engine performs (same RNG consumption
         # order as _compute_all_paths_vectorized): copula draws first.
-        trends = db.trends
-        R = eng._build_correlation_matrix(trends)
-        eng._generate_copula_samples(trends, R, 5000)
-        from pulse.config import peak_jitter_for as pj
-        widths = [pj(getattr(t, "uncertainty", None), 1) for t in trends]
+        drivers = db.drivers
+        R = eng._build_correlation_matrix(drivers)
+        eng._generate_copula_samples(drivers, R, 5000)
+        from prism.config import peak_jitter_for as pj
+        widths = [pj(getattr(t, "uncertainty", None), 1) for t in drivers]
         assert widths == [1, 0, 4]
         jmax = max(widths)
         offsets = list(range(-jmax, jmax + 1))
@@ -215,29 +215,29 @@ class TestDatabaseRoundTrip:
     def test_uncertainty_persists_in_sqlite(self, monkeypatch, tmp_path):
         monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "unc.db"))
         import importlib
-        import pulse.database as dbm
+        import prism.database as dbm
         importlib.reload(dbm)
         dbm.init_db()
-        t = Trend(id="unc_1", force="Consumer", name="x", direction="Contraction",
+        t = Driver(id="unc_1", force="Consumer", name="x", direction="Contraction",
                   probability=4, start_year=2025, gp1_pct_affected=0.2, peak_year=2029,
                   diffusion_curve="linear", category_exposure={"Hair: Care": 5},
                   regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5}, uncertainty=2)
-        t2 = Trend(id="unc_2", force="Consumer", name="y", direction="Expansion",
+        t2 = Driver(id="unc_2", force="Consumer", name="y", direction="Expansion",
                    probability=3, start_year=2025, gp1_pct_affected=0.1, peak_year=2030,
                    diffusion_curve="linear", category_exposure={"Hair: Care": 5},
                    regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5})
-        dbm.save_trends([t, t2])
-        loaded = {x.id: x for x in dbm.load_trends()}
+        dbm.save_drivers([t, t2])
+        loaded = {x.id: x for x in dbm.load_drivers()}
         assert loaded["unc_1"].uncertainty == 2
         assert loaded["unc_1"].probability_prior == pytest.approx(beta_prior_for(4, 2))
         assert loaded["unc_2"].uncertainty is None
         assert loaded["unc_2"].probability_prior == (3, 3)
         # proposals carry the field too
-        row = dbm.upsert_trend_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A", "expert")
+        row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A", "expert")
         assert row["uncertainty"] == 4
-        rows = dbm.load_trend_proposals("unc_1")
+        rows = dbm.load_driver_proposals("unc_1")
         assert rows[0]["uncertainty"] == 4
-        from pulse.api.proposals import aggregate_proposals, build_proposal_summary
+        from prism.api.proposals import aggregate_proposals, build_proposal_summary
         agg = aggregate_proposals(rows)
         assert agg["uncertainty"] == {"median": 4, "count": 1}
         summ = build_proposal_summary(rows, "expert-a")
@@ -250,8 +250,8 @@ class TestOnsetClamp:
     never fall into the schedule's "peak ≤ onset ⇒ ramp to the horizon"
     branch (which turned the earliest draw into the latest arrival)."""
 
-    def _trend(self, u):
-        return Trend(id="clamp", force="Consumer", name="c", direction="Contraction", probability=5,
+    def _driver(self, u):
+        return Driver(id="clamp", force="Consumer", name="c", direction="Contraction", probability=5,
                      start_year=2025, gp1_pct_affected=0.2, peak_year=2027, diffusion_curve="linear",
                      category_exposure={"Hair: Care": 5}, regional_exposure={"Europe": 5},
                      vc_exposure={"Marketing": 5}, uncertainty=u)
@@ -261,7 +261,7 @@ class TestOnsetClamp:
                                           path_years=[2026, 2027, 2028, 2029, 2030])
         eng = BayesianMonteCarloEngine(cfg, seed=1)
         # start 2025, peak 2027, U3 → ±2: offsets −2/−1 land at/before the onset
-        sched, offsets, probs = eng._peak_schedule_table([self._trend(3)])
+        sched, offsets, probs = eng._peak_schedule_table([self._driver(3)])
         assert offsets == [-2, -1, 0, 1, 2]
         first = {o: sched[0, k, 0] for k, o in enumerate(offsets)}   # 2026 materialisation
         for o1, o2 in zip(offsets[:-1], offsets[1:]):
@@ -271,14 +271,14 @@ class TestOnsetClamp:
         assert 0 < first[2] < first[0]              # later peak, less in by 2026
         assert probs[0].sum() == pytest.approx(1.0) and probs[0][2] == pytest.approx(3 / 9)
 
-    def test_offset_draw_uses_each_trends_own_width(self, mock_model_config):
+    def test_offset_draw_uses_each_drivers_own_width(self, mock_model_config):
         """The engine's own draw (not a re-implementation): a U0 trend never
         moves, an unscored trend stays inside the global ±1, a U5 trend uses
         offsets up to ±4."""
         cfg = mock_model_config.copy_with(peak_year_jitter=1)
         eng = BayesianMonteCarloEngine(cfg, seed=8)
-        trends = _db([None, 0, 5]).trends
-        _sched, offsets, probs = eng._peak_schedule_table(trends)
+        drivers = _db([None, 0, 5]).drivers
+        _sched, offsets, probs = eng._peak_schedule_table(drivers)
         idx = eng._draw_peak_offsets(probs, 6000)
         off = np.array(offsets)[idx]
         assert set(np.unique(off[:, 1])) == {0}
@@ -286,7 +286,7 @@ class TestOnsetClamp:
         assert off[:, 2].min() == -4 and off[:, 2].max() == 4
         # a single-offset grid consumes no randomness
         eng2 = BayesianMonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=8)
-        _s, o2, p2 = eng2._peak_schedule_table(trends)
+        _s, o2, p2 = eng2._peak_schedule_table(drivers)
         assert o2 == [0] and eng2._draw_peak_offsets(p2, 10).sum() == 0
         assert eng2.rng.random() == BayesianMonteCarloEngine(cfg, seed=8).rng.random()
 
@@ -296,7 +296,7 @@ class TestOnsetClamp:
         ABOVE the no-jitter 2026 level in magnitude, not far below it as the
         broken mapping produced."""
         cfg = mock_model_config.copy_with(iterations=4000, path_years=[2026, 2027, 2028, 2029, 2030])
-        db = TrendDatabase(trends=[self._trend(3)], categories=list(CATEGORIES), forces=["Consumer"])
+        db = DriverSet(drivers=[self._driver(3)], categories=list(CATEGORIES), forces=["Consumer"])
         r_on = BayesianMonteCarloEngine(cfg.copy_with(peak_year_jitter=1), seed=3).run(db)
         r_off = BayesianMonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=3).run(db)
         m_on = r_on["shift_matrix"]["Hair: Care"]["path"][2026]["median"]
@@ -306,14 +306,14 @@ class TestOnsetClamp:
 
 
 class TestMultichainEvents:
-    def test_zero_row_event_listed_once_in_multichain(self, mock_model_config, mock_trends_database):
-        from pulse.config import CATEGORIES as CATS, REGIONS
+    def test_zero_row_event_listed_once_in_multichain(self, mock_model_config, mock_drivers_database):
+        from prism.config import CATEGORIES as CATS, REGIONS
         W = {c: {r: 1.0 / (len(CATS) * len(REGIONS)) for r in REGIONS} for c in CATS}
         gone = CATS[0]
         freed = sum(W[gone].values())
         W[gone] = {r: 0.0 for r in REGIONS}
         W[CATS[1]] = {r: v + freed / len(REGIONS) for r, v in W[CATS[1]].items()}
         cfg = mock_model_config.copy_with(cell_weights=W, iterations=200)
-        r = BayesianMonteCarloEngine(cfg, seed=1).run_multichain(mock_trends_database, n_chains=2, iterations=200)
+        r = BayesianMonteCarloEngine(cfg, seed=1).run_multichain(mock_drivers_database, n_chains=2, iterations=200)
         zero = [e for e in r["integrity_events"] if e.get("type") == "cell_weight_zero_row"]
         assert len(zero) == 1
