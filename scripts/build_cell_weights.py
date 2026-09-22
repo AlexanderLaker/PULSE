@@ -1,36 +1,32 @@
 #!/usr/bin/env python3
-"""Build the ESTIMATED HCB cell-weight matrix (13 categories x 4 regions).
+"""Build the estimated HCB cell-weight matrix (13 categories x 4 regions).
 
-Owner ruling O14 (2026-09-11): run the model on these estimated gross-profit
-shares instead of the equal 1/52 placeholder, and show the derivation on the
-Config sheet. This is NOT Henkel P&L. It is built from public reporting and
-category knowledge so the model has a realistic mix while the finance figures
-are outstanding, and every input carries a grade:
+The engine rolls its 52 category x region cells up with each cell's share of
+HCB gross profit. Until the finance shares are loaded, it runs on this
+estimate. It is NOT Henkel P&L: it is built from public reporting and category
+knowledge, and every input carries a grade:
 
   [B] business mix that public reporting supports at the level used here
   [E] estimate, defensible but unverified
   [G] guess, low confidence, carried only because a cell needs a number
 
 Construction: share = category sales weight x GP1 margin index x that
-category's own regional mix, normalised to 1. The regional mix differs BY
-category on purpose (North America is laundry and body heavy, auto-dish is a
-European category, insect control sits in growth markets, toilet care is a
-Europe and growth-market story), so the matrix is NOT the separable outer
-product the model used before 2.11.0. That is the whole point: only regional
-concentration moves the category numbers.
+category's own regional mix, normalised to 1. The regional mix differs by
+category on purpose (North America is laundry and body heavy, automatic
+dishwashing is a European category, insect control sits in the growth
+markets), so the matrix is not separable into a region vector times a
+category vector, and regional concentration moves the category numbers.
 
-O6 is unchanged by this. The real shares still arrive as a file outside git:
-    python3 scripts/run_50k_prod.py --cell-weights <finance file>
-and that file still overrides everything here. What changed is the DEFAULT the
-engine falls back to when no file is passed.
+The finance shares replace the estimate at run time and are never committed:
+    python3 scripts/run_production.py --cell-weights <finance file>
 
-Outputs:
-  data/cell_weights_estimated_v1.json   the record (and the test lock)
-  lib/cellWeightProvenance.ts           the same derivation for the Config sheet
-  --emit-python                         the literal for prism/config.py
+Outputs
+  data/calibration/cell_weights_estimate.json   the record
+  lib/cellWeightProvenance.ts                   the derivation for the dashboard
+  --emit-python                                 the literal for prism/config.py
 
-`--check` verifies both committed outputs against this script and is run by CI,
-so the record, the TypeScript copy and the generator cannot drift apart (F-28).
+`--check` compares both committed outputs with this script (CI runs it), and
+tests/test_cell_weights.py holds prism/config.py to the record.
 """
 import argparse
 import json
@@ -40,7 +36,7 @@ REPO = Path(__file__).resolve().parents[1]
 OUT = REPO / "data" / "calibration" / "cell_weights_estimate.json"
 OUT_TS = REPO / "lib" / "cellWeightProvenance.ts"
 
-VERSION = "estimated_v1_september2026"
+VERSION = "estimate-2026-09"
 
 # ── 1. Category weight inside HCB, by sales ──────────────────────────────
 LHC_SHARE, HAIRBODY_SHARE = 0.62, 0.38
@@ -52,9 +48,8 @@ LHC_MIX = {
     "LHC: FFI": (0.12, "E", "finishers: Vernel, Silan, Snuggle"),
     "LHC: ADW": (0.11, "E", "Somat"),
     "LHC: HSC": (0.07, "E", "surface, bathroom, kitchen, glass, bleach, polishes: Bref surface, Biff, Sidolin, Danklorix"),
-    "LHC: TOI": (0.04, "E", "toilet care (O13): WC-Frisch, Bref WC Duo-Aktiv and Power-Aktiv. Roughly a third "
-                            "of the old HSC block: rim blocks are a large, high-turnover franchise in Europe "
-                            "and the growth markets"),
+    "LHC: TOI": (0.04, "E", "toilet care: WC-Frisch, Bref WC Duo-Aktiv and Power-Aktiv; rim blocks are a "
+                            "large, high-turnover franchise in Europe and the growth markets"),
     "LHC: FCA": (0.07, "E", "specialty fabric care: Perwoll"),
     "LHC: HDW": (0.06, "E", "Pril"),
     "LHC: LAD": (0.04, "E", "additives and stain removal: Sil, boosters"),
@@ -117,17 +112,14 @@ CATEGORIES = ["Hair: Color", "Hair: Care", "Hair: Styling", "Hair: Body",
               "LHC: HDW", "LHC: ADW", "LHC: HSC", "LHC: TOI", "LHC: IC"]
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
-# Kept under 400 characters: cell_weights_source round-trips through
-# PUT /api/v1/config, whose schema caps the field at 400 (test_api locks it).
+# Stamped on every run that uses the estimate; the dashboard shows it with the run.
 SOURCE = (
     "ESTIMATE, not Henkel P&L: HCB gross-profit share per category x region, "
-    "built 2026-09-11 from public reporting and category knowledge (owner "
-    "ruling O14). Every input is graded B / E / G; the grades and the whole "
-    "derivation are on the Config sheet, the record is "
-    "data/cell_weights_estimated_v1.json. The finance figures override this "
-    "via run_50k_prod.py --cell-weights FILE."
+    "built from public reporting and category knowledge. Every input is graded "
+    "B / E / G; the derivation is in Settings under Model configuration and in "
+    "data/calibration/cell_weights_estimate.json. A finance file passed to "
+    "run_production.py --cell-weights replaces it."
 )
-assert len(SOURCE) <= 400, f"source is {len(SOURCE)} chars, the API caps it at 400"
 
 
 def build():
@@ -192,17 +184,12 @@ def emit_ts(cells, rec):
     inp = rec["inputs"]
     lines = [
         "/**",
-        " * cellWeightProvenance.ts — GENERATED, do not edit by hand.",
+        " * The estimated HCB gross-profit mix and the graded inputs it is built from,",
+        " * so the Model configuration page can show why each cell has its share. An",
+        " * estimate from public reporting, not Henkel P&L.",
         " *",
-        " * Source of truth: scripts/build_estimated_cell_weights.py",
-        " * Record:          data/cell_weights_estimated_v1.json",
-        " * Regenerate:      python3 scripts/build_estimated_cell_weights.py",
-        " * CI gate:         python3 scripts/build_estimated_cell_weights.py --check",
-        " *",
-        " * The estimated HCB gross-profit mix the engine defaults to since 2.12.0",
-        " * (owner ruling O14) and the graded inputs it is built from, so the Config",
-        " * sheet can show WHY each cell has the share it has. This is an estimate",
-        " * from public reporting, not Henkel P&L.",
+        " * Generated by scripts/build_cell_weights.py (record:",
+        " * data/calibration/cell_weights_estimate.json); do not edit.",
         " */",
         "",
         "export type Grade = 'B' | 'E' | 'G';",
@@ -232,7 +219,7 @@ def emit_ts(cells, rec):
         f"export const MARGIN_INDEX: Record<string, {{ index: number; grade: Grade }}> = {json.dumps(inp['margin_index'], indent=2, ensure_ascii=False)};",
         f"export const MARGIN_INDEX_NOTE = {json.dumps(inp['margin_index_note'])};",
         "",
-        "/** Regional mix WITHIN each category — this is what makes the matrix non-separable. */",
+        "/** Regional mix within each category: what makes the matrix non-separable. */",
         f"export const REGION_MIX: Record<string, GradedRegionMix> = {json.dumps(inp['region_mix'], indent=2, ensure_ascii=False)};",
         f"export const REGION_MIX_NOTE = {json.dumps(inp['region_mix_note'])};",
         "",

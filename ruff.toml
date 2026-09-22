@@ -1,0 +1,8 @@
+# Python lint settings (ruff): syntax errors, unused code and likely bugs.
+target-version = "py310"
+line-length = 120
+
+[lint]
+select = ["F", "E9", "B", "W6"]
+# FastAPI declares dependencies as Depends(...) defaults; zip() lengths are the tests' business.
+ignore = ["B008", "B905"]

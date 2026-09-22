@@ -1,35 +1,22 @@
-# PRISM — Profit Pool Risk & Intelligence Simulation Model
-# Local/offline-dev + CI dependencies (reconciled 2026-07-06, handover review).
-#
-# This file reflects what the code ACTUALLY imports. The serverless runtime
-# deps are separate (api/requirements.txt) and intentionally minimal — that
-# runtime never computes (F2/D13). CI installs from THIS file so the tested
-# environment always matches the documented one (M9, July 2026 review).
-#
-# Pruned over the 2026 reviews (zero imports anywhere in the live tree):
-# pandas, networkx, arviz, statsmodels, newspaper3k, jinja2, gdeltdoc, praw,
-# pytrends, fredapi, openmeteo-requests, python-epo-ops-client,
-# google-api-python-client, SALib (D14), anthropic + feedparser +
-# beautifulsoup4 (pulse/ai removed 2026-07-06), python-pptx + reportlab
-# (ad-hoc export modules removed earlier; deps were orphaned).
+# Everything needed to develop and test PRISM: the engine, the production run,
+# the API and the test suite. CI installs this file; the Vercel function
+# installs only api/requirements.txt.
 
-# Core engine — scipy is a HARD requirement (D13); no fallback exists
+# Engine and production run
 numpy>=1.26,<3
-scipy>=1.12,<2
-openpyxl>=3.1,<4
-python-dotenv>=1.0,<2
+scipy>=1.12,<2          # the engine's distributions; there is no fallback
+openpyxl>=3.1,<4        # the QA workbook
+python-dotenv>=1.0,<2   # loads .env in the command-line scripts
 
-# API server
+# API
 fastapi>=0.110,<1
-uvicorn>=0.27,<1
 pydantic>=2.6,<3
-
-# Database (production Postgres driver — the prod run script REFUSES to run
-# without an active Postgres connection unless --allow-sqlite is passed)
+uvicorn>=0.27,<1        # local API server
 psycopg2-binary>=2.9,<3
 
-# Testing — httpx backs FastAPI's TestClient
+# Tests
 pytest>=8.0
-pytest-cov>=4.1
+pytest-xdist>=3.5
 hypothesis>=6.98
-httpx>=0.27
+httpx>=0.27             # FastAPI's TestClient
+ruff>=0.6               # Python lint (ruff.toml)

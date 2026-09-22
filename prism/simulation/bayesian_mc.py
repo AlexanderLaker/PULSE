@@ -1,158 +1,55 @@
-"""Bayesian Monte Carlo engine with copula-based dependency structure.
+"""Monte Carlo engine: Beta priors, a Gaussian copula and regional compounding.
 
-Replaces simplistic triangular distributions with:
-- Beta-distributed priors per trend (T7, June 2026 honesty note: the Beta
-  shape is set deterministically from the analyst's 1–5 probability score —
-  these are STRUCTURED-JUDGMENT priors that quantify magnitude uncertainty;
-  there is no Bayesian prior→data→posterior update anywhere in the engine,
-  so do not describe this as "learning from data")
-- Gaussian copula for cross-trend dependency (D20 June 2026: the t-copula
-  tail layer was deleted — its df dial was inert, <2% band effect)
-- Continuous path modeling (annual granularity across the config horizon)
+Each iteration draws every driver's materialisation probability from its Beta
+prior, correlated across drivers through a Gaussian copula, and turns it into
+a signed score (probability x GP1 share x direction). The scores are spread
+over the 52 composite cells (13 categories x 4 regions) by category and
+regional exposure, materialised year by year along each driver's schedule,
+summed per force with the within-force overlap correction, weighted,
+attenuated, and compounded multiplicatively across forces. The cell shifts
+roll up to categories and to the portfolio with the gross-profit cell weights.
 
-Quantile convention (D21): every percentile in this engine is computed with
-``np.percentile`` linear interpolation (the numpy default) — one convention,
-engine-wide, including velocity bands and any future band logic.
+The Beta priors are structured judgment set from the 1-5 scores; nothing in
+the engine updates them from data. A Gaussian copula has no tail dependence.
+
+Every percentile uses ``np.percentile`` with linear interpolation.
+
+scipy is a hard requirement: the engine computes with exact numerics or not
+at all. The read-only API runtime does not install scipy and never imports
+this module.
 """
 
 import logging
 from typing import Optional
 
 import numpy as np
+import scipy as _scipy
+from scipy.linalg import cholesky
+from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-# D13 (June 2026, owner decision): exact scipy math is the ONLY math.
-# scipy is a hard engine requirement — this module fails loudly at import
-# if scipy is absent. The former _scipy_compat numpy-approximation layer
-# was deleted; deployed/serverless surfaces never compute (F2: read-only
-# over persisted runs), so nothing legitimate imports the engine without
-# scipy. There is deliberately no fallback.
-try:
-    import scipy as _scipy
-    from scipy.linalg import cholesky
-    from scipy.stats import beta as _beta_dist, norm as _norm_dist
-except ImportError as _e:  # pragma: no cover — exercised only in broken envs
-    raise ImportError(
-        "PRISM engine requires scipy (D13: exact numerics only; the numpy "
-        "approximation fallback was removed June 2026). Install scipy, or "
-        "use the read-only API service which never imports the engine."
-    ) from _e
+from prism.config import (FORCES, REGIONS, VC_STEPS, FORCE_MATERIALIZATION_OVERRIDES,
+                          ModelConfig, build_driver_correlation_matrix,
+                          compute_materialization_schedule, peak_jitter_for,
+                          vc_epicentre_step_of)
+from prism.drivers import DriverSet
 
 beta_ppf = _beta_dist.ppf
 norm_cdf = _norm_dist.cdf
 
-#: Recorded in every result + persisted run_meta for the audit trail (D13).
+#: The exact numerics behind a result, recorded with every run for the audit trail.
 NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
-
-from prism.config import (ModelConfig, FORCES, REGIONS, VC_STEPS,
-                           DEFAULT_WITHIN_FORCE_RHO,
-                           DEFAULT_RESIDUAL_CROSS_RHO,
-                           build_driver_correlation_matrix,
-                           FORCE_MATERIALIZATION_OVERRIDES,
-                           compute_materialization_schedule,
-                           DEFAULT_FORCE_OVERLAP_MATRIX,
-                           DEFAULT_WITHIN_FORCE_OVERLAP,
-                           DEFAULT_CELL_WEIGHTS,
-                           peak_jitter_for,
-                           vc_epicentre_step_of)
-from prism.drivers import DriverSet, Driver
 
 logger = logging.getLogger(__name__)
 
+PERCENTILES = [10, 25, 50, 75, 90]
+
 
 class BayesianMonteCarloEngine:
-    """
-    Bayesian Monte Carlo with copula dependencies.
+    """Simulates the relative shift of every category and cell over the horizon."""
 
-    Key differences from v1.2:
-    - Beta priors instead of triangular (shape from the analyst 1–5 score;
-      structured judgment, NOT learned/updated from data — see module docstring)
-    - Copula-based cross-trend dependency instead of flat ρ (a Gaussian
-      copula over force_correlation_matrix — L14 honesty note: a Gaussian
-      copula has NO tail dependence; do not claim otherwise)
-    - Multiplicative compounding across forces
-    - Continuous annual paths instead of 2 discrete points
-    """
-
-    # Model semver + engine identity. Bumped whenever the result contract changes.
-    # 2.11.0 — September 2026 release (owner rulings of 2026-09-03/10,
-    #         DECISION_LOG Part H, O6–O11). Numbers move — golden pins
-    #         regenerated in the same commit, 50k re-run required.
-    #         O6: the 52 composite cells are rolled up with a 13 × 4 matrix of
-    #         HCB gross-profit SHARES (config.cell_weights) — the relevant part
-    #         of the P&L that sits in each category × region combination —
-    #         instead of the separable region × category vectors. Category
-    #         shift = share-weighted average of the row; portfolio = Σ over
-    #         cells. Defaults to the estimated HCB mix since 2.12.0 (O14);
-    #         the actuals still arrive via run_50k_prod.py --cell-weights FILE. A separable matrix
-    #         reproduces 2.10.0 exactly (regression-locked). New contract
-    #         keys: cell_weights_used, category_weights_used,
-    #         cell_weights_source; region_weights_used now = column sums.
-    #         O7: one uncertainty score per trend (0–5, optional) sets the
-    #         Beta-prior concentration (24/16/10/6/4/3; mean p/6 unchanged)
-    #         and the per-trend peak-year jitter width (0/1/1/2/3/4 years).
-    #         A trend without a score behaves exactly as in 2.10.0 (κ = 6,
-    #         global jitter) and the jitter draw reproduces the 2.10.0 random
-    #         stream bit for bit in that case. O9: exposures are mechanism-
-    #         only; HCB presence enters solely through the cell weights.
-    #         O10/O11: 51-driver base and v3.11 recalibration (config.py).
-    # 2.10.0 — July 2026 mathematical review remediation (owner-directed,
-    #         2026-07-13; review PRISM_Model_Review_2026-07-11). Numbers move —
-    #         golden pins regenerated in the same commit, 50k re-run required.
-    #         F1: the shift math is now REGIONAL — a 3D (category × region ×
-    #         year) tensor. Each trend's contribution to a (category, region)
-    #         cell is weighted by BOTH category_exposure/5 AND
-    #         regional_exposure/5, so a regionally-concentrated trend now hits
-    #         only its regions' slice of the pool (previously every trend was
-    #         treated as global). Category/portfolio numbers are the region-
-    #         GP1-weighted roll-up (config.region_weights); a globally-present
-    #         trend reproduces the old 2D number exactly, so only regional
-    #         concentration moves the numbers. New `regional_shift_matrix` in
-    #         the result; the Region lens is now shift-based, not attribution-
-    #         only. F2: within-force overlap dampening uses the magnitude-
-    #         weighted effective number n_eff = (Σm)²/Σm² (participation ratio)
-    #         instead of a raw count — restores monotonicity (adding a tiny
-    #         trend no longer worsens the outlook). F4: per-iteration peak-year
-    #         jitter (±1yr triangular) gives velocity/timing bands real content.
-    #         F7: the 3 chains are POOLED for the published percentiles (√3
-    #         noise cut); the vacuous i.i.d. R̂/ESS block is replaced by a
-    #         per-quantile Monte-Carlo standard error (mc_standard_error).
-    #         F9: force_attribution.direct_effects deleted (dormant, unstable
-    #         near cancellation). F10: totals.grand deleted (raw sum of medians,
-    #         unused, 12× the headline). F11: start_year now gates materialization
-    #         onset; probability_posterior renamed probability_prior.
-    # 2.9.0 — July 2026 VC-epicentre attribution (owner-directed, 2026-07-10):
-    #         the value-chain lens is now a categorical EPICENTRE PARTITION,
-    #         structurally parallel to the force lens. Experts score the VC as
-    #         one epicentre stage per trend (July 2026 Trends-editor redesign);
-    #         the old share math smeared each trend across steps through the
-    #         editor's 5/3/1 serialization kernel × vc_weights — a UI constant
-    #         laundered into pseudo-measured attribution. Now each trend's
-    #         contribution (|normalized_score| × cat_exposure/5) is assigned
-    #         wholly to vc_epicentre_step_of(vc_exposure); vc_weights is
-    #         deleted end-to-end (inert at equal defaults, meaningless over
-    #         categorical votes); unscored trends and uniform-fallback
-    #         categories emit integrity events instead of failing silently;
-    #         results carry vc_attribution_basis="epicentre". Shift-matrix
-    #         numbers are UNTOUCHED (VC never fed the shift math) — golden
-    #         shift/portfolio pins unchanged; decompositions.vc /
-    #         vc_decomposition values move.
-    # 2.8.1 — July 2026 handover review (owner-approved batch, 2026-07-06):
-    #         C2 deterministic trend load order (ORDER BY id — reproducibility
-    #         was silently order-dependent); M1 missing gp1_pct_affected now
-    #         hard-fails instead of silently becoming 10%; L3 copula uniforms
-    #         clipped at float-safety (1e-12) instead of 0.001 (the old clip
-    #         biased std/mean inward); L4 compounding factors floored at 0
-    #         (−100% shift) with an integrity event counting affected
-    #         iterations; seed_stability re-added to the multichain result
-    #         (owner re-ruling of T18); master seed persisted alongside chain
-    #         seeds. Golden pins regenerated in the same commit.
-    # 2.8.0 — v3.7 June 2026 (second ruling round, D12–D21): Gaussian copula
-    #         replaces the inert t-copula (D20); scipy-only exact numerics with
-    #         numerics_backend in the result contract (D13); analytics suite
-    #         deleted (D14 + Sobol rider); input-drift integrity event (D19);
-    #         full config-layer validation (D21).
-    # 2.7.0 — v3.6 June 2026: PSD-valid default correlations (D1); allocation
-    #         removed from result contract (D4).
+    #: Version of the model and of the result contract. Changing the numbers or
+    #: the shape of a result means a new version, regenerated golden pins in the
+    #: same commit, and a new production run.
     MODEL_VERSION = "2.12.0"
     ENGINE_NAME = "bayesian_copula"
 
@@ -160,112 +57,61 @@ class BayesianMonteCarloEngine:
         self.config = config
         self.seed = seed
         self.rng = np.random.default_rng(seed=seed)
-        # Integrity events: anything the engine had to repair or coerce at runtime
-        # is appended here and surfaced in the result dict for the Integrity drawer.
+        # Anything the engine had to repair, assume or clip at runtime; returned
+        # with the result and shown next to the run.
         self._integrity_events: list[dict] = []
-        # L4 floor guard counter — cells where a compounding factor hit ≤ 0.
         self._floored_factor_cells: int = 0
-        # Pre-compute per-force effective attenuation from overlap matrix
         self._effective_attenuation = self._compute_effective_attenuation()
 
     def _compute_effective_attenuation(self) -> dict:
-        """
-        Return per-force effective attenuation directly from configuration.
-
-        v3.2 (April 2026): the legacy ``base × (1 − mean_overlap)`` indirection
-        has been removed. The engine now consumes ``config.per_force_attenuation``
-        — six calibrated values (one per force); since 2.11.0 they come from
-        data/attenuation_calibration_v3_11.json (51-driver base, O11). There is
-        no flat 0.5 default and no scalar fallback.
-
-        Returns: dict {force_name: effective_attenuation}
-
-        Raises: KeyError if any of the six forces is missing from the config
-                (validated upstream by ModelConfigValidator).
-        """
+        """Per-force attenuation from the configuration; all six forces required."""
         per_force = dict(self.config.per_force_attenuation)
-        # Defensive: fail loudly if any force is missing.
         missing = [f for f in FORCES if f not in per_force]
         if missing:
-            raise KeyError(
-                f"per_force_attenuation missing forces: {missing}. "
-                f"All six forces required: {FORCES}"
-            )
-        logger.info(
-            "Per-force attenuation (calibrated, source=%s): %s",
-            getattr(self.config, "attenuation_source", "calibrated_v3.12_september2026"),
-            ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES),
-        )
+            raise KeyError(f"per_force_attenuation missing forces: {missing}. All six forces required: {FORCES}")
+        logger.info("Per-force attenuation (source=%s): %s", self.config.attenuation_source,
+                    ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
 
     def run(self, db: DriverSet, iterations: Optional[int] = None) -> dict:
-        """
-        Run Bayesian Monte Carlo simulation.
+        """Run one chain and compile the result.
 
-        2.10.0 (F1): the shift math is REGIONAL. Internally the engine solves
-        a 3D tensor over composite (category × region) cells, then rolls the
-        regional shifts up to the category level. 2.11.0 (O6): the roll-up
-        weights are the cell gross-profit shares (config.cell_weights, a
-        13 × 4 matrix) — category shift = share-weighted average of the
-        category's row, portfolio = Σ over all cells. The category-level
-        `shift_matrix` keeps its shape; `regional_shift_matrix` carries the
-        full 3D detail. A separable matrix reproduces the 2.10.0 numbers
-        exactly; a globally-present trend under equal weights reproduces the
-        pre-2.10 category number.
-
-        Returns:
-            dict with structure:
-            {
-                "shift_matrix": {category: {"path"/"velocity": ...}},      # cell-share roll-up
-                "regional_shift_matrix": {category: {region: {"path": ...}}},  # F1 3D
-                "cell_weights_used": {category: {region: share}},          # 2.11.0 O6
-                "category_weights_used": {category: share},                # row sums
-                "region_weights_used": {region: weight},                   # column sums
-                "cell_weights_source": str,
-                "vc_decomposition": {category: {vc_step: contribution}},
-                "vc_attribution_basis": "epicentre",
-                "mc_standard_error": {category: {median_se_pp, p10_se_pp, ...}},  # F7
-                "raw_samples": np.ndarray,  # (iterations, categories, years) — region roll-up
-                "model_version": str, "engine_name": str,
-                "seed": int, "integrity_events": list[dict],
-            }
+        The result carries ``shift_matrix`` (per category: percentile ``path``
+        by year and per-iteration ``velocity`` bands), ``regional_shift_matrix``
+        (the same per category x region), ``decompositions`` and ``totals`` (the
+        force, value-chain and region attribution lenses and the joint portfolio
+        band), ``mc_standard_error``, the weights actually applied
+        (``cell_weights_used``, ``category_weights_used``,
+        ``region_weights_used``, ``cell_weights_source``), ``integrity_events``,
+        ``raw_samples`` (iterations x categories x years) and the engine
+        identity (``model_version``, ``engine_name``, ``numerics_backend``,
+        ``seed``, ``iterations``).
         """
         n_iter = iterations or self.config.iterations
-        n_cats = len(self.config.category_names)
-        n_years = len(self.config.path_years)
-        drivers = db.drivers
+        logger.info("Running Monte Carlo: %d iterations, %d drivers, %d categories, %d regions, %d years",
+                    n_iter, len(db.drivers), len(self.config.category_names), len(REGIONS),
+                    len(self.config.path_years))
 
-        logger.info(f"Running Bayesian MC: {n_iter} iterations, "
-                     f"{len(drivers)} trends, {n_cats} categories, "
-                     f"{len(REGIONS)} regions, {n_years} years")
-
-        # Steps 1–3 → regional (3D) samples + the region-weighted category roll-up.
         category_samples, regional_samples = self._simulate_samples(db, n_iter)
-
-        # Step 4: category-level percentiles + diagnostics (interior unchanged).
         result = self._compile_results(category_samples, db)
-
-        # F1: attach the 3D regional matrix and the weights actually applied.
         result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
         result.update(self._weights_used())
 
-        logger.info(f"MC complete. Median portfolio shift at {self.config.path_years[-1]}: "
-                     f"{result['totals']['portfolio'][int(self.config.path_years[-1])]['median']:.4f}")
-
+        terminal = int(self.config.path_years[-1])
+        logger.info("Median portfolio shift at %d: %.4f", terminal, result["totals"]["portfolio"][terminal]["median"])
         return result
 
-    def _cell_weight_matrix(self) -> np.ndarray:
-        """The 13 × 4 gross-profit share matrix W (2.11.0, O6), aligned to
-        (config.category_names, REGIONS), normalised to sum 1.
+    # ── Cell weights ────────────────────────────────────────────────────────
 
-        Source: config.cell_weights (the estimated HCB mix by default since O14).
-        Falls back to a FLAT 1/52 grid when the config carries no matrix or an
-        all-zero one, with an integrity event, so a run can never silently
-        divide by zero. That fallback is a guard against a broken config, not
-        a modelling choice, which is why it stays flat rather than reaching
-        for the default."""
+    def _cell_weight_matrix(self) -> np.ndarray:
+        """Gross-profit share matrix W, (categories x regions), normalised to sum 1.
+
+        An empty or all-zero configuration falls back to a flat grid with an
+        integrity event; that is a guard against a broken config, not a
+        modelling choice.
+        """
         cats = self.config.category_names
-        cw = getattr(self.config, "cell_weights", None) or {}
+        cw = self.config.cell_weights or {}
         W = np.zeros((len(cats), len(REGIONS)))
         for c_idx, cat in enumerate(cats):
             row = cw.get(cat) or {}
@@ -277,20 +123,20 @@ class BayesianMonteCarloEngine:
                 self._integrity_events.append({
                     "type": "cell_weights_fallback",
                     "severity": "warning",
-                    "message": "config.cell_weights is empty or all-zero; the roll-up fell back "
-                               "to a flat 1/52 grid. This is a broken-config guard, not the "
-                               "engine default — check what wrote the config.",
+                    "message": "config.cell_weights is empty or all-zero; the roll-up used a flat "
+                               "grid instead. This guards against a broken configuration and is not "
+                               "the engine default; check what produced the configuration.",
                 })
             W = np.full_like(W, 1.0 / W.size)
             total = 1.0
         return W / total
 
     def _row_normalised_cell_weights(self) -> np.ndarray:
-        """Per-category region weights: each row of W divided by its sum, so
-        the category shift is the gross-profit-weighted average of its
-        regional shifts. A zero row (a category with no gross profit) gets the
-        equal 1/4 average and an integrity event — it carries weight 0 in the
-        portfolio anyway."""
+        """Each row of W divided by its sum: a category's regional weights.
+
+        A category with no gross profit in any region is averaged with equal
+        weights and reported; it carries weight 0 in the portfolio anyway.
+        """
         W = self._cell_weight_matrix()
         rows = W.sum(axis=1)
         Wn = np.zeros_like(W)
@@ -302,31 +148,26 @@ class BayesianMonteCarloEngine:
                 Wn[c_idx, :] = 1.0 / W.shape[1]
                 zero_rows.append(self.config.category_names[c_idx])
         if zero_rows and not any(e.get("type") == "cell_weight_zero_row" for e in self._integrity_events):
+            one = len(zero_rows) == 1
             self._integrity_events.append({
                 "type": "cell_weight_zero_row",
                 "severity": "warning",
                 "message": (
-                    f"{len(zero_rows)} categor{'y' if len(zero_rows) == 1 else 'ies'} carr"
-                    f"{'ies' if len(zero_rows) == 1 else 'y'} a zero gross-profit share in every "
-                    f"region (cell_weights row sums to 0): the category shift shown is the "
-                    f"equal-weight average of its cells and the category has weight 0 in the "
-                    f"portfolio: " + ", ".join(zero_rows)
+                    f"{len(zero_rows)} categor{'y' if one else 'ies'} carr{'ies' if one else 'y'} a zero "
+                    f"gross-profit share in every region: the category shift shown is the equal-weight "
+                    f"average of its cells and the category has weight 0 in the portfolio: "
+                    + ", ".join(zero_rows)
                 ),
                 "detail": {"categories": list(zero_rows)},
             })
         return Wn
 
     def _category_weight_vector(self) -> np.ndarray:
-        """Portfolio weights per category = row sums of W (2.11.0)."""
+        """Portfolio weight of each category: the row sums of W."""
         return self._cell_weight_matrix().sum(axis=1)
 
-    def _region_weight_vector(self) -> np.ndarray:
-        """Region shares = column sums of W. Kept for the 2.10.0 contract key
-        `region_weights_used` and the Excel writer; no longer a roll-up input."""
-        return self._cell_weight_matrix().sum(axis=0)
-
     def _weights_used(self) -> dict:
-        """Contract block describing the weights the run actually applied."""
+        """The weights the run actually applied, as returned with the result."""
         W = self._cell_weight_matrix()
         cats = self.config.category_names
         return {
@@ -336,18 +177,17 @@ class BayesianMonteCarloEngine:
             },
             "category_weights_used": {cat: float(W[c_idx, :].sum()) for c_idx, cat in enumerate(cats)},
             "region_weights_used": {r: float(W[:, r_idx].sum()) for r_idx, r in enumerate(REGIONS)},
-            # An empty label never masquerades as the equal placeholder text.
-            "cell_weights_source": str(getattr(self.config, "cell_weights_source", "") or "unspecified"),
+            "cell_weights_source": str(self.config.cell_weights_source or "unspecified"),
         }
 
-    def _simulate_samples(self, db: DriverSet, n_iter: int):
-        """Steps 1–3: copula draw → 3D (category×region) shift cells → roll-up.
+    # ── Sampling ────────────────────────────────────────────────────────────
 
-        Returns ``(category_samples, regional_samples)``:
-          - regional_samples: (n_iter, n_cats, n_regions, n_years) — the 3D shift
-          - category_samples: (n_iter, n_cats, n_years) — the gross-profit-share
-            weighted average of each category's regional shifts (2.11.0 O6:
-            row-normalised config.cell_weights; what the category views read)
+    def _simulate_samples(self, db: DriverSet, n_iter: int):
+        """Draw and compound one chain.
+
+        Returns ``(category_samples, regional_samples)``: the cell shifts as
+        (iterations, categories, regions, years) and their gross-profit-weighted
+        category roll-up as (iterations, categories, years).
         """
         n_cats = len(self.config.category_names)
         n_regions = len(REGIONS)
@@ -356,36 +196,28 @@ class BayesianMonteCarloEngine:
 
         corr_matrix = self._build_correlation_matrix(drivers)
         raw_samples = self._generate_copula_samples(drivers, corr_matrix, n_iter)
-        # 3D shift over the n_cats × n_regions composite cells (F1).
         cell_samples = self._compute_all_paths_vectorized(
             drivers, raw_samples, n_iter, n_cats, n_regions, n_years
         )
         # Cell index is c * n_regions + r, so the reshape splits cleanly.
         regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
-        # O6: category shift[c] = Σ_r Wn[c, r] · cell shift[c, r], Wn row-normalised.
-        Wn = self._row_normalised_cell_weights()                      # (n_cats, n_regions)
+        Wn = self._row_normalised_cell_weights()
         category_samples = np.einsum("icry,cr->icy", regional_samples, Wn)
         return category_samples, regional_samples
 
     def _build_regional_matrix(self, regional_samples: np.ndarray) -> dict:
-        """Per-(category, region) percentile paths from the 3D samples (F1).
-
-        Same per-cell shape as `shift_matrix` entries (path percentiles +
-        velocity), so the frontend region drill-down can reuse the cell
-        renderer. regional_samples: (n_iter, n_cats, n_regions, n_years).
-        """
-        percentiles = [10, 25, 50, 75, 90]
+        """Percentile paths and velocity bands per (category, region)."""
         cats = self.config.category_names
         years = self.config.path_years
         out: dict = {}
         for c_idx, cat in enumerate(cats):
             out[cat] = {}
             for r_idx, region in enumerate(REGIONS):
-                series = regional_samples[:, c_idx, r_idx, :]  # (n_iter, n_years)
+                series = regional_samples[:, c_idx, r_idx, :]
                 path = {}
                 for y_idx, year in enumerate(years):
                     ys = series[:, y_idx]
-                    cell = {f"p{p}": float(np.percentile(ys, p)) for p in percentiles}
+                    cell = {f"p{p}": float(np.percentile(ys, p)) for p in PERCENTILES}
                     cell["median"] = cell["p50"]
                     cell["mean"] = float(np.mean(ys))
                     cell["std"] = float(np.std(ys))
@@ -402,149 +234,87 @@ class BayesianMonteCarloEngine:
         return out
 
     def _build_correlation_matrix(self, drivers: list) -> np.ndarray:
-        """
-        Build correlation matrix from force correlation matrix.
-
-        Within-force: Gaussian copula with ρ from config
-        Cross-force: ρ from force_correlation_matrix or residual macro correlation
-        """
+        """Driver-level correlation matrix, repaired (and reported) if not positive definite."""
         n = len(drivers)
         if n == 0:
             return np.eye(0)
-
-        # T16 (June 2026): single source of truth for the raw matrix — shared
-        # with the config validator's spectral gate so they cannot drift.
         R = build_driver_correlation_matrix(
-            [t.force for t in drivers],
-            self.config.within_force_rho,
-            getattr(self.config, 'force_correlation_matrix', {}),
+            [d.force for d in drivers], self.config.within_force_rho, self.config.force_correlation_matrix,
         )
-
-        # Ensure positive definiteness
         eigvals = np.linalg.eigvalsh(R)
         if eigvals.min() < 0:
             self._integrity_events.append({
                 "type": "correlation_pd_repair",
                 "severity": "warning",
-                "message": f"Correlation matrix was not positive-definite "
-                           f"(min eigenvalue={eigvals.min():.4f}); repaired via "
-                           f"diagonal shift + renormalization.",
+                "message": f"The correlation matrix was not positive definite (minimum "
+                           f"eigenvalue {eigvals.min():.4f}); it was repaired by a diagonal "
+                           f"shift and renormalisation, which weakens every correlation.",
             })
             R += (abs(eigvals.min()) + 0.01) * np.eye(n)
-            # Re-normalize diagonal
             d = np.sqrt(np.diag(R))
             R = R / np.outer(d, d)
-
         return R
 
-    def _generate_copula_samples(self, drivers: list, R: np.ndarray,
-                                  n_iter: int) -> np.ndarray:
-        """
-        Generate correlated probability samples via a Gaussian copula.
+    def _generate_copula_samples(self, drivers: list, R: np.ndarray, n_iter: int) -> np.ndarray:
+        """Correlated signed scores, (iterations, drivers).
 
-        Each trend's probability of materialization is sampled from its Beta
-        posterior, correlated across trends via the copula structure.
-
-        D20 (June 2026, owner decision): the former t-copula tail layer was
-        deleted. Post-D1 re-test (verification/v8_d20_tcopula_df_out.txt)
-        showed the df dial inert — portfolio P10–P90 band width moved <2%
-        across df 4 → ∞ on PSD-valid defaults (one-signed bounded marginals
-        and cross-category averaging wash the tail mixing out). Marketed
-        complexity with no observable output effect is deleted, not kept:
-        the Gaussian copula is what the engine honestly runs.
-
-        Returns: (n_iter, n_trends) array of normalized_score samples
+        Z ~ N(0, R), U = Phi(Z), probability = BetaInv(U; alpha, beta), and the
+        score is probability x gp1_pct_affected x direction. Uniforms are
+        clipped only at float safety, so the Beta tails are not truncated.
         """
         n_drivers = len(drivers)
         if n_drivers == 0:
             return np.zeros((n_iter, 0))
 
-        # L2 (July 2026 review): the redundant SILENT PSD repair that used to
-        # sit here was removed. _build_correlation_matrix() has already
-        # repaired R (with an integrity event) before this method is called;
-        # any residual numerical failure is caught by the audited
-        # eigenvalue-clip fallback around the Cholesky below. One repair path
-        # per failure mode, each one visible in the integrity log.
-
-        # Generate correlated uniform samples via Gaussian copula
         try:
             L = cholesky(R, lower=True)
         except (np.linalg.LinAlgError, ValueError):
             self._integrity_events.append({
                 "type": "cholesky_repair",
                 "severity": "warning",
-                "message": "Cholesky decomposition failed; correlation matrix "
-                           "repaired via eigenvalue clipping (min eigenvalue "
-                           "clipped to 1e-6).",
+                "message": "The Cholesky decomposition failed; the correlation matrix was "
+                           "repaired by clipping its eigenvalues at 1e-6.",
             })
-            logger.warning("Correlation matrix not positive definite — repairing via eigenvalue decomposition")
+            logger.warning("Correlation matrix not positive definite; repairing via eigenvalue clipping")
             eigvals, eigvecs = np.linalg.eigh(R)
             eigvals = np.maximum(eigvals, 1e-6)
             R = eigvecs @ np.diag(eigvals) @ eigvecs.T
             L = cholesky(R, lower=True)
 
-        # Gaussian copula: Z ~ N(0, R); U = Φ(Z)  (D20: t-copula deleted)
         Z = self.rng.standard_normal((n_iter, n_drivers))
         Z_correlated = Z @ L.T
-
         U = norm_cdf(Z_correlated)
-        # L3 (July 2026 review): clip at float-safety only. The old
-        # [0.001, 0.999] clip truncated every marginal beyond the copula's
-        # ±3.09σ, biasing std/mean inward on all 99 trends. beta_ppf is
-        # well-defined on the open interval; 1e-12 only guards the exact
-        # 0.0/1.0 values norm_cdf can emit for |z| ≳ 8σ.
         U = np.clip(U, 1e-12, 1.0 - 1e-12)
 
-        # Transform uniforms to Beta-distributed probability samples
         samples = np.zeros((n_iter, n_drivers))
         for j, driver in enumerate(drivers):
-            # Probability of materialization: Beta(α, β) → [0, 1]
-            # The sole stochastic driver — "how likely does this trend fully play out?"
             a_p, b_p = driver.probability_prior
             prob_01 = beta_ppf(U[:, j], a_p, b_p)
-
-            # gp1_pct_affected: economic magnitude — "what fraction of the
-            # category's GP1 can this trend touch at full materialization?"
-            # AI-determined per trend, no default — must be set when trend is created.
-            # HARD FAIL (B3): a missing or invalid gp1_pct_affected silently
-            # dropped the trend from the simulation and degraded the correlation
-            # structure. We now refuse to run so the data-quality issue is visible.
             gp1 = driver.gp1_pct_affected
             if gp1 is None or gp1 <= 0 or gp1 > 1.0:
                 raise ValueError(
-                    f"Driver '{driver.id}' ({driver.name}) has invalid "
-                    f"gp1_pct_affected={gp1!r}. Every driver must carry a "
-                    f"gp1_pct_affected in (0.0, 1.0] before the simulation "
-                    f"can be run. Fix the driver at ingestion time."
+                    f"Driver '{driver.id}' ({driver.name}) has an invalid "
+                    f"gp1_pct_affected={gp1!r}. Every driver needs a value in "
+                    f"(0, 1] before it can be simulated."
                 )
-
-            # Final score = probability × gp1_pct_affected × direction
-            # Clean separation: probability = likelihood, gp1_pct = magnitude
             samples[:, j] = prob_01 * gp1 * driver.direction_sign
-
         return samples
 
     def _peak_schedule_table(self, drivers: list) -> tuple:
-        """F4/F11/O7: per-trend materialisation schedules over the peak-year
-        offset grid.
+        """Materialisation schedules over each driver's peak-year offsets.
 
-        Returns ``(sched_table, offsets, off_probs_by_trend)`` where
-        ``sched_table[j, k, y]`` is the materialisation of trend j at path year
-        y when its peak is shifted by ``offsets[k]``, and ``off_probs_by_trend[j]``
-        is trend j's symmetric triangular distribution over the grid (all mass
-        at 0 when its width is 0). The width is PER TREND (2.11.0, O7): from
-        the uncertainty score when the trend carries one, else the global
-        ``config.peak_year_jitter`` (the 2.10.0 behaviour); ``peak_year_jitter
-        = 0`` switches timing jitter off for everyone. start_year gates the
-        onset (F11). A jittered peak at or before the onset saturates at
-        "peaks the year after onset" (2.11.0 review fix — without the clamp
-        the earliest draw fell into the schedule's "ramp to the horizon"
-        branch and became the LATEST arrival).
+        Returns ``(sched_table, offsets, off_probs_by_driver)``:
+        ``sched_table[j, k, y]`` is driver j's materialisation in path year y
+        when its peak moves by ``offsets[k]``; ``off_probs_by_driver[j]`` is
+        driver j's symmetric triangular distribution over the offsets (all mass
+        at 0 when its width is 0). A jittered peak never falls on or before the
+        onset: it saturates at the year after onset. Drivers without a peak year
+        or curve follow the force's default schedule, gated by their onset.
         """
         n_drivers = len(drivers)
         n_years = len(self.config.path_years)
-        jitter_global = int(getattr(self.config, "peak_year_jitter", 0) or 0)
-        driver_jitter = [peak_jitter_for(getattr(t, "uncertainty", None), jitter_global) for t in drivers]
+        jitter_global = int(self.config.peak_year_jitter or 0)
+        driver_jitter = [peak_jitter_for(d.uncertainty, jitter_global) for d in drivers]
         jitter = max(driver_jitter) if driver_jitter else 0
         offsets = list(range(-jitter, jitter + 1)) if jitter > 0 else [0]
         n_off = len(offsets)
@@ -553,31 +323,25 @@ class BayesianMonteCarloEngine:
             if jt <= 0:
                 off_probs_by_driver[j, offsets.index(0)] = 1.0
             else:
-                # Symmetric triangular weights: ∝ (J_t + 1 − |offset|) inside ±J_t.
                 raw_w = np.array([max(0, jt + 1 - abs(o)) if abs(o) <= jt else 0 for o in offsets], dtype=float)
                 off_probs_by_driver[j, :] = raw_w / raw_w.sum()
 
         path_years = self.config.path_years
         sched_table = np.ones((n_drivers, n_off, n_years))
         for j, driver in enumerate(drivers):
-            base_pk = getattr(driver, 'peak_year', 0) or 0
-            dc = getattr(driver, 'diffusion_curve', '') or ''
-            sy = getattr(driver, 'start_year', None)
+            base_pk = driver.peak_year or 0
+            dc = driver.diffusion_curve or ""
+            sy = driver.start_year
             onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
             for k, off in enumerate(offsets):
                 if base_pk > 0 and dc:
                     pk = max(base_pk + off, onset + 1)
-                    sched = compute_materialization_schedule(
-                        pk, dc, path_years, self.config.base_year,
-                        start_year=sy,
-                    )
+                    sched = compute_materialization_schedule(pk, dc, path_years, self.config.base_year,
+                                                             start_year=sy)
                 else:
-                    # Legacy fallback (force/default global schedule), still
-                    # gated by start_year so F11 holds for these trends too.
                     force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(driver.force, {})
                     sched = {
-                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0))
-                             if yr > onset else 0.0)
+                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0)) if yr > onset else 0.0)
                         for yr in path_years
                     }
                 for y_idx, yr in enumerate(path_years):
@@ -585,67 +349,58 @@ class BayesianMonteCarloEngine:
         return sched_table, offsets, off_probs_by_driver
 
     def _draw_peak_offsets(self, off_probs_by_driver: np.ndarray, n_iter: int) -> np.ndarray:
-        """Draw a peak-year offset index per (iteration, trend) — reproducible
-        under seed. Inverse-CDF sampling on one uniform block per (iteration,
-        trend): for a shared distribution this is bit-identical to the 2.10.0
-        ``rng.choice(n_off, size, p)`` draw (numpy implements choice with p the
-        same way), so runs without uncertainty scores reproduce the 2.10.0
-        random stream; with per-trend widths each trend reads its own CDF
-        row. Consumes NO randomness when the grid has a single offset."""
+        """Peak-year offset index per (iteration, driver), by inverse-CDF sampling.
+
+        One uniform per (iteration, driver) against the driver's own CDF row.
+        For drivers that share one distribution this is the same draw as
+        ``rng.choice(n_off, size, p)``. No randomness is consumed when there is
+        a single offset.
+        """
         n_drivers, n_off = off_probs_by_driver.shape
         if n_off > 1:
             cdf = np.cumsum(off_probs_by_driver, axis=1)
-            cdf = cdf / cdf[:, -1:]                      # last entry exactly 1.0 (as numpy's choice)
+            cdf = cdf / cdf[:, -1:]
             u = self.rng.random((n_iter, n_drivers))
             offset_idx = (u[:, :, None] >= cdf[None, :, :]).sum(axis=2)
             return np.minimum(offset_idx, n_off - 1).astype(np.intp)
         return np.zeros((n_iter, n_drivers), dtype=np.intp)
 
     def _compute_all_paths_vectorized(self, drivers: list, raw_samples: np.ndarray,
-                                       n_iter: int, n_cats: int, n_regions: int,
-                                       n_years: int) -> np.ndarray:
-        """
-        Vectorized shift computation over the n_cats × n_regions composite cells
-        (F1, 2.10.0). Each composite cell (category c, region r) has index
-        ``c * n_regions + r`` and combined exposure ``(cat_exp/5) × (region_exp/5)``
-        — so a trend hits a cell to the extent it is exposed to that category
-        AND present in that region. The existing force-compounding machinery
-        runs unchanged on the cells; the caller reshapes/rolls up.
+                                      n_iter: int, n_cats: int, n_regions: int,
+                                      n_years: int) -> np.ndarray:
+        """Shift of every composite cell, (iterations, cells, years).
 
-        Also carries F2 (magnitude-weighted n_eff dampening), F4 (per-iteration
-        peak-year jitter) and F11 (start_year materialization onset).
-
-        Returns: (n_iter, n_cells, n_years) with n_cells = n_cats × n_regions.
+        Cell (c, r) has index ``c * n_regions + r``. A driver reaches it with
+        exposure ``(category exposure / 5) x (regional exposure / 5)``. Per year
+        and force: the materialised scores are summed over the force's drivers,
+        dampened for within-force overlap, weighted and attenuated; the forces
+        then compound multiplicatively, each factor floored at zero (a cell
+        cannot lose more than its whole pool).
         """
         categories = self.config.category_names
         n_drivers = len(drivers)
         n_cells = n_cats * n_regions
-
         if n_drivers == 0:
             return np.zeros((n_iter, n_cells, n_years))
 
         force_list = list(FORCES)
         n_forces = len(force_list)
         force_idx_map = {f: i for i, f in enumerate(force_list)}
-        driver_force_idx = np.array([force_idx_map.get(t.force, 0) for t in drivers])
+        driver_force_idx = np.array([force_idx_map.get(d.force, 0) for d in drivers])
         fw = np.array([self.config.force_weights.get(f, 1.0 / n_forces) for f in force_list])
 
-        # --- F1: per-trend regional weight (region_exposure/5), global fallback ---
+        # Regional weight per driver. A driver without any regional exposure is
+        # treated as present everywhere rather than dropped, and reported.
         region_weight = np.zeros((n_drivers, n_regions))
         regionless: list = []
         for j, driver in enumerate(drivers):
-            reg_map = getattr(driver, 'regional_exposure', None) or {}
+            reg_map = driver.regional_exposure or {}
             vals = np.array([min(float(reg_map.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
             if vals.sum() <= 0:
-                # A trend with no regional exposure is treated as globally
-                # present (equal across regions) so it is not silently dropped;
-                # the integrity event below makes that assumption visible.
                 vals = np.ones(n_regions)
                 regionless.append(driver.id)
             region_weight[j, :] = vals
 
-        # --- F1: composite cell exposure (n_trends, n_cells) ---
-        # cell (c, r) at column c*n_regions + r; exposure = (cat/5)·(region/5).
         exposure_matrix = np.zeros((n_drivers, n_cells))
         for j, driver in enumerate(drivers):
             for c_idx, cat in enumerate(categories):
@@ -662,34 +417,29 @@ class BayesianMonteCarloEngine:
                 "type": "regional_exposure_coverage",
                 "severity": "warning",
                 "message": (
-                    f"{len(regionless)} driver(s) carry no regional exposure and "
-                    f"were treated as globally present (equal across regions) in "
-                    f"the 3D shift math — score their regions on the Drivers "
-                    f"page: " + ", ".join(regionless[:10])
+                    f"{len(regionless)} driver(s) carry no regional exposure and were "
+                    f"treated as present in every region; score their regions on the "
+                    f"Drivers page: " + ", ".join(regionless[:10])
                     + ("…" if len(regionless) > 10 else "")
                 ),
                 "detail": {"count": len(regionless), "driver_ids": regionless[:50]},
             })
 
-        # --- F4/F11/O7: per-trend materialization schedules + peak-year jitter ---
         sched_table, offsets, off_probs_by_driver = self._peak_schedule_table(drivers)
         offset_idx = self._draw_peak_offsets(off_probs_by_driver, n_iter)
         driver_arange = np.arange(n_drivers)
 
-        # --- Per-force effective attenuation (n_forces,) ---
         eff_att = np.array([self._effective_attenuation[f] for f in force_list])
 
-        # --- F2: magnitude-weighted within-force dampening (per force, per cell) ---
-        # Replaces the count-based 1 − ov·(n−1)/n. The effective number is the
-        # participation ratio n_eff = (Σ m)² / Σ m² over the force's trends'
-        # DETERMINISTIC mean |contribution| m = |normalized_score|·cell_exposure
-        # (deterministic → preserves the vectorized shape + reproducibility).
-        # n_eff = count for equal contributions, → 1 as one trend dominates, and
-        # is essentially unchanged by a negligible trend — so adding a tiny trend
-        # no longer re-scales an entire force (audit F2 monotonicity fix).
-        wf_overlap = getattr(self.config, 'within_force_overlap', {})
-        abs_score = np.array([abs(float(getattr(t, 'normalized_score', 0.0))) for t in drivers])
-        contrib = abs_score[:, np.newaxis] * exposure_matrix  # (n_trends, n_cells)
+        # Within-force dampening per force and cell: 1 - overlap x (n_eff - 1) / n_eff,
+        # where n_eff = (sum m)^2 / sum m^2 is the participation ratio of the
+        # force's deterministic mean contributions m = |normalized_score| x exposure.
+        # n_eff equals the count for equal contributions, tends to 1 as one driver
+        # dominates, and barely moves when a negligible driver is added, so adding
+        # a small driver can never make a force's total smaller.
+        wf_overlap = self.config.within_force_overlap
+        abs_score = np.array([abs(float(d.normalized_score)) for d in drivers])
+        contrib = abs_score[:, np.newaxis] * exposure_matrix
         wf_dampen = np.ones((n_forces, n_cells))
         for f_idx, force in enumerate(force_list):
             mask = driver_force_idx == f_idx
@@ -698,45 +448,37 @@ class BayesianMonteCarloEngine:
             ov = wf_overlap.get(force, 0.0)
             if ov <= 0:
                 continue
-            M = contrib[mask, :]                 # (n_force_trends, n_cells)
-            s1 = M.sum(axis=0)                    # Σ m
-            s2 = (M * M).sum(axis=0)             # Σ m²
+            M = contrib[mask, :]
+            s1 = M.sum(axis=0)
+            s2 = (M * M).sum(axis=0)
             n_eff = np.where(s2 > 0.0, (s1 * s1) / np.where(s2 > 0.0, s2, 1.0), 0.0)
-            # Guard the denominator: np.where evaluates BOTH branches, so divide
-            # on a floored n_eff to avoid a spurious 0-division warning for cells
-            # with no active trend (n_eff = 0 → dampen = 1.0, the True-branch
-            # value is discarded). Same pattern as the F-25 count-based guard.
+            # np.where evaluates both branches; dividing by a floored n_eff keeps
+            # empty cells (n_eff = 0, dampening 1.0) free of division warnings.
             n_eff_safe = np.maximum(n_eff, 1.0)
             dampen = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
             wf_dampen[f_idx, :] = np.clip(dampen, 0.1, 1.0)
 
-        # --- VECTORIZED CORE (over composite cells) ---
         shift_samples = np.zeros((n_iter, n_cells, n_years))
         for y_idx in range(n_years):
-            # F4: per-(iteration, trend) materialization for this year via the
-            # drawn peak-year offset. Shape (n_iter, n_trends).
             mat_y = sched_table[driver_arange[np.newaxis, :], offset_idx, y_idx]
-            effective = raw_samples * mat_y  # (n_iter, n_trends)
+            effective = raw_samples * mat_y
 
             force_contrib = np.zeros((n_iter, n_forces, n_cells))
             for f_idx in range(n_forces):
                 mask = driver_force_idx == f_idx
                 if not mask.any():
                     continue
-                # (n_iter, n_force_trends) @ (n_force_trends, n_cells) → (n_iter, n_cells)
                 raw_sum = effective[:, mask] @ exposure_matrix[mask, :]
                 force_contrib[:, f_idx, :] = raw_sum * wf_dampen[f_idx, :][np.newaxis, :]
 
             weighted = force_contrib * fw[:, np.newaxis]
             attenuated = weighted * eff_att[:, np.newaxis]
-            # L4: floor each compounding factor at 0 (−100% is the lower bound of
-            # a relative pool shift); count the affected cells for the audit log.
             factors = 1.0 + attenuated
             n_floored = int((factors <= 0.0).sum())
             if n_floored > 0:
                 self._floored_factor_cells += n_floored
                 factors = np.maximum(factors, 0.0)
-            product = np.prod(factors, axis=1)  # (n_iter, n_cells)
+            product = np.prod(factors, axis=1)
             shift_samples[:, :, y_idx] = product - 1.0
 
         if self._floored_factor_cells > 0:
@@ -744,52 +486,39 @@ class BayesianMonteCarloEngine:
                 "type": "compounding_floor",
                 "severity": "warning",
                 "message": (
-                    f"{self._floored_factor_cells} (iteration × force × "
-                    f"category×region × year) compounding factors were ≤ 0 (a "
-                    f"single force wiping >100% of a cell's pool) and were "
-                    f"floored at −100%. If this count is material relative to "
-                    f"iterations, review driver magnitudes/attenuation."
+                    f"{self._floored_factor_cells} compounding factors (iteration x force x "
+                    f"cell x year) were at or below zero, a single force removing more than a "
+                    f"cell's whole pool, and were floored at -100%. If the count is material "
+                    f"relative to the iterations, review the driver magnitudes and attenuation."
                 ),
             })
-
         return shift_samples
 
-    def _compile_results(self, samples: np.ndarray, db: DriverSet) -> dict:
-        """Compute percentiles, per-quantile Monte-Carlo standard error, and
-        the Force / Value-chain / Region attribution lenses.
+    # ── Results ─────────────────────────────────────────────────────────────
 
-        ``samples`` is the region-GP1-weighted category roll-up
-        (n_iter, n_cats, n_years) — see run()/_simulate_samples (F1).
+    def _compile_results(self, samples: np.ndarray, db: DriverSet) -> dict:
+        """Percentiles, velocity, Monte Carlo standard error and the three lenses.
+
+        ``samples`` is the category roll-up, (iterations, categories, years).
         """
         n_iter, n_cats, n_years = samples.shape
-        percentiles = [10, 25, 50, 75, 90]
-
+        years = self.config.path_years
         shift_matrix = {}
 
         for c_idx, cat in enumerate(self.config.category_names):
             cat_data = samples[:, c_idx, :]
-
             path = {}
-            for y_idx, year in enumerate(self.config.path_years):
+            for y_idx, year in enumerate(years):
                 year_samples = cat_data[:, y_idx]
-                path[year] = {
-                    f"p{p}": float(np.percentile(year_samples, p))
-                    for p in percentiles
-                }
+                path[year] = {f"p{p}": float(np.percentile(year_samples, p)) for p in PERCENTILES}
                 path[year]["median"] = path[year]["p50"]
                 path[year]["mean"] = float(np.mean(year_samples))
                 path[year]["std"] = float(np.std(year_samples))
 
-            # D5: Velocity computed PER ITERATION first, then percentiled.
-            # The old code subtracted the median of year t from the median
-            # of year t-1, which conflates two different distributions and
-            # hides how fast individual simulation paths are actually moving.
-            # The correct quantity for early-warning triggers is the
-            # distribution of year-over-year deltas across the full sample.
-            years = self.config.path_years
+            # Velocity is the distribution of each iteration's year-on-year
+            # change, not the difference of two medians.
             velocity = {}
             for i in range(1, len(years)):
-                # Per-iteration delta between adjacent years (shape: n_iter)
                 deltas = cat_data[:, i] - cat_data[:, i - 1]
                 velocity[years[i]] = {
                     "median": float(np.percentile(deltas, 50)),
@@ -800,47 +529,21 @@ class BayesianMonteCarloEngine:
                     "mean": float(np.mean(deltas)),
                     "std": float(np.std(deltas)),
                 }
+            shift_matrix[cat] = {"path": path, "velocity": velocity}
 
-            shift_matrix[cat] = {
-                "path": path,
-                "velocity": velocity,
-            }
-
-            # (F9, 2.10.0: the force_attribution.direct_effects block was deleted
-            #  here — a dormant, numerically-unstable signed attribution scaled to
-            #  the MC median that no consumer read and that blew up ±1,000× near
-            #  cancellation. The shipped Force lens is decompositions.force below,
-            #  computed on |score| shares. F7: the vacuous single-chain split-R̂/
-            #  ESS block was also deleted — R̂≈1 on i.i.d. draws by construction;
-            #  the honest diagnostic is the per-quantile MC standard error,
-            #  computed once after this loop.)
-
-        # F7: per-category Monte-Carlo standard error of the published quantiles.
         mc_standard_error = self._mc_standard_error(samples)
 
-        # ── Value-chain EPICENTRE shares (2.9.0) ────────────────────────
-        # Computed ONCE and consumed by BOTH the terminal-year back-compat
-        # block below and the per-year decompositions.vc (single source).
+        # ── Attribution lenses ──────────────────────────────────────────────
+        # Each lens splits the Monte Carlo median of a category and year into
+        # shares, so every lens adds up to the same row total. They are
+        # attributions of one simulated number, not separate simulations.
         #
-        # July 2026 VC redesign: experts score the value chain as ONE
-        # epicentre stage per trend (the stored 8-step 0–5 profile is a
-        # serialization format — the Drivers editor writes a canonical 5/3/1
-        # falloff around the picked stage). The former share math
-        # (exposure-profile × vc_weights smear) therefore laundered a UI
-        # kernel constant into pseudo-measured cross-step attribution. The
-        # lens is now a hard categorical partition, exactly parallel to the
-        # force lens: each trend's relevance — |normalized_score| ×
-        # (category exposure / 5) — is assigned WHOLLY to its epicentre
-        # stage (pulse.config.vc_epicentre_step_of, the engine-side twin of
-        # the frontend's epicentreOf). Propagation up/downstream the chain
-        # is deliberately NOT modelled: under D16 ceteris paribus that is a
-        # market/management-response story, not a trend property.
+        # Value chain: each driver's relevance, |normalized_score| x category
+        # exposure / 5, goes wholly to its epicentre stage. Propagation along
+        # the chain is not modelled.
         drivers = db.drivers
-        driver_epicentre = {
-            t.id: vc_epicentre_step_of(getattr(t, 'vc_exposure', None) or {})
-            for t in drivers
-        }
-        unscored_vc = sorted(tid for tid, s in driver_epicentre.items() if s is None)
+        driver_epicentre = {d.id: vc_epicentre_step_of(d.vc_exposure or {}) for d in drivers}
+        unscored_vc = sorted(did for did, s in driver_epicentre.items() if s is None)
 
         vc_shares: dict = {}
         vc_fallback_cats: list = []
@@ -855,13 +558,8 @@ class BayesianMonteCarloEngine:
             if vtot > 0:
                 vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
             else:
-                # Degenerate guard ONLY: no contributing trend carries a VC
-                # epicentre. Uniform shares keep the lens exhaustive (the
-                # Σ-over-steps == MC-median identity that PPA2 anchors row
-                # totals on), and the integrity event below makes the
-                # fabricated flatness visible instead of silent. Never fires
-                # on the seeded 99-trend base — every stored profile
-                # resolves to an epicentre.
+                # No contributing driver has an epicentre: an even spread keeps
+                # the lens adding up, and the integrity event below says so.
                 vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
                 vc_fallback_cats.append(cat)
 
@@ -870,16 +568,13 @@ class BayesianMonteCarloEngine:
                 "type": "vc_epicentre_coverage",
                 "severity": "warning",
                 "message": (
-                    f"{len(unscored_vc)} driver(s) carry no value-chain "
-                    f"epicentre (empty/unscored VC profile) — the VC "
-                    f"attribution lens is computed on the scored subset "
-                    f"while these drivers still move the shift numbers. "
-                    f"Score them on the Drivers page: "
+                    f"{len(unscored_vc)} driver(s) carry no value-chain epicentre, so the "
+                    f"value-chain lens leaves them out while they still move the shift "
+                    f"numbers. Score them on the Drivers page: "
                     + ", ".join(unscored_vc[:10])
                     + ("…" if len(unscored_vc) > 10 else "")
                 ),
-                "detail": {"count": len(unscored_vc),
-                           "unscored_driver_ids": unscored_vc[:50]},
+                "detail": {"count": len(unscored_vc), "unscored_driver_ids": unscored_vc[:50]},
             })
         if vc_fallback_cats:
             self._integrity_events.append({
@@ -887,65 +582,21 @@ class BayesianMonteCarloEngine:
                 "severity": "warning",
                 "message": (
                     f"{len(vc_fallback_cats)} categor"
-                    f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no "
-                    f"epicentre-scored contributing driver — the VC lens shows "
-                    f"a uniform 1/8 spread there (structural fallback, not "
-                    f"expert judgment): " + ", ".join(vc_fallback_cats)
+                    f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no contributing "
+                    f"driver with a value-chain epicentre; the value-chain lens shows an "
+                    f"even 1/8 spread there, a structural fallback rather than expert "
+                    f"judgment: " + ", ".join(vc_fallback_cats)
                 ),
                 "detail": {"categories": list(vc_fallback_cats)},
             })
 
-        # ── Value Chain Decomposition (terminal-year, back-compat) ─────
-        # The same epicentre shares applied to the terminal-year median;
-        # kept because the persisted-run contract and GET /simulation carry
-        # this key alongside decompositions.vc (which holds every year).
-        vc_decomposition = {}
-        last_year = self.config.path_years[-1]
-        for cat in self.config.category_names:
-            median_shift = shift_matrix[cat]["path"][last_year]["median"]
-            vc_decomposition[cat] = {
-                step: float(share * median_shift)
-                for step, share in vc_shares[cat].items()
-            }
-
-        # (O3, owner ruling 2026-07-07: the consumer-journey decomposition —
-        #  the quantitative journey lens introduced as v3.6 block 8 — was
-        #  removed together with the never-activated `journey_exposure`
-        #  score layer it depended on. The qualitative journey overlay
-        #  (tiles, Strategist Reads, trend evidence cards) is unaffected.
-        #  Removal is contract-symmetric with the June addition, which was
-        #  ruled additive with no MODEL_VERSION bump: shift numbers and
-        #  golden pins are untouched.)
-
-        # ═══════════════════════════════════════════════════════════════
-        # PER-YEAR DECOMPOSITIONS (Force / VC / Region)
-        # ═══════════════════════════════════════════════════════════════
-        # All three lenses decompose the SAME MC-median category shift for
-        # each (cat, year), so by construction:
-        #   sum over force  of force_decomp[y][c][f]  ==  mc_median[c][y]
-        #   sum over vc_step of vc_decomp[y][c][s]    ==  mc_median[c][y]
-        #   sum over region  of region_decomp[y][c][r] ==  mc_median[c][y]
-        # Row totals (per category, per year) are identical across lenses.
-        # Column totals (summed across categories) are unique per lens but
-        # share the same grand total per year.
-        drivers = db.drivers
         cats = list(self.config.category_names)
-        years = list(self.config.path_years)
-        # 2.11.0 (O6): the region lens weights each (category, region) cell by
-        # its own gross-profit share (row-normalised cell weights), not by a
-        # global region vector.
+        # Region lens: each (category, region) cell weighted by its own share
+        # of the category's gross profit.
         Wn_lens = self._row_normalised_cell_weights()
-
-        # Build the force/region share structures ONCE (shares are
-        # exposure-weighted and do not depend on year — the year-dependent
-        # magnitude enters via mc_median[c][y]). The VC shares were computed
-        # above as the epicentre partition (2.9.0) and are reused here —
-        # one share computation per lens, engine-wide.
         force_shares: dict = {}
         region_shares: dict = {}
-
         for cat in cats:
-            # Force shares (exposure × force_weight × |score|)
             fsum = {f: 0.0 for f in FORCES}
             for driver in drivers:
                 cat_exp = driver.category_exposure.get(cat, 0)
@@ -958,9 +609,6 @@ class BayesianMonteCarloEngine:
             else:
                 force_shares[cat] = {f: 1.0 / len(FORCES) for f in FORCES}
 
-            # (VC shares: epicentre partition, computed once above — 2.9.0.)
-
-            # Region shares (exposure × cell gross-profit share × |score|)
             rsum = {r: 0.0 for r in REGIONS}
             c_idx_lens = cats.index(cat)
             for r_idx_lens, region in enumerate(REGIONS):
@@ -968,44 +616,29 @@ class BayesianMonteCarloEngine:
                 for driver in drivers:
                     cat_exp = driver.category_exposure.get(cat, 0)
                     if cat_exp > 0:
-                        reg_exp_map = getattr(driver, 'regional_exposure', {}) or {}
-                        r_exp = float(reg_exp_map.get(region, 0.0))
+                        r_exp = float((driver.regional_exposure or {}).get(region, 0.0))
                         rsum[region] += abs(driver.normalized_score) * (cat_exp / 5.0) * (r_exp / 5.0) * rw
             rtot = sum(rsum.values())
             if rtot > 0:
                 region_shares[cat] = {r: v / rtot for r, v in rsum.items()}
             else:
-                # Fallback — if no trend carries regional_exposure, use equal weights
                 region_shares[cat] = {r: 1.0 / len(REGIONS) for r in REGIONS}
 
-        # Now materialize the per-year decompositions keyed by year → cat → dim
         force_decomp = {int(y): {} for y in years}
         vc_decomp = {int(y): {} for y in years}
         region_decomp = {int(y): {} for y in years}
-
         for year in years:
             yi = int(year)
             for cat in cats:
                 median_cy = float(shift_matrix[cat]["path"][year]["median"])
-                force_decomp[yi][cat] = {
-                    f: float(force_shares[cat][f] * median_cy) for f in FORCES
-                }
-                vc_decomp[yi][cat] = {
-                    s: float(vc_shares[cat][s] * median_cy) for s in VC_STEPS
-                }
-                region_decomp[yi][cat] = {
-                    r: float(region_shares[cat][r] * median_cy) for r in REGIONS
-                }
+                force_decomp[yi][cat] = {f: float(force_shares[cat][f] * median_cy) for f in FORCES}
+                vc_decomp[yi][cat] = {s: float(vc_shares[cat][s] * median_cy) for s in VC_STEPS}
+                region_decomp[yi][cat] = {r: float(region_shares[cat][r] * median_cy) for r in REGIONS}
 
-        # ── Totals ─────────────────────────────────────────────────────
-        # Row totals: per-category MC median at each year (identical across lenses).
+        # ── Totals ──────────────────────────────────────────────────────────
         category_path_totals: dict = {
-            cat: {
-                int(y): float(shift_matrix[cat]["path"][y]["median"]) for y in years
-            }
-            for cat in cats
+            cat: {int(y): float(shift_matrix[cat]["path"][y]["median"]) for y in years} for cat in cats
         }
-        # Column totals: aggregate across categories, per (dim, year).
         by_force_totals: dict = {int(y): {f: 0.0 for f in FORCES} for y in years}
         by_vc_totals: dict = {int(y): {s: 0.0 for s in VC_STEPS} for y in years}
         by_region_totals: dict = {int(y): {r: 0.0 for r in REGIONS} for y in years}
@@ -1020,86 +653,63 @@ class BayesianMonteCarloEngine:
                     by_region_totals[yi][r] += region_decomp[yi][cat][r]
 
         decompositions = {
-            "force":  force_decomp,   # year → cat → force  → shift
-            "vc":     vc_decomp,      # year → cat → vc     → shift
-            "region": region_decomp,  # year → cat → region → shift
+            "force": force_decomp,    # year -> category -> force  -> shift
+            "vc": vc_decomp,          # year -> category -> step   -> shift
+            "region": region_decomp,  # year -> category -> region -> shift
             "dimensions": {
-                "forces":    list(FORCES),
-                "vc_steps":  list(VC_STEPS),
-                "regions":   list(REGIONS),
+                "forces": list(FORCES),
+                "vc_steps": list(VC_STEPS),
+                "regions": list(REGIONS),
                 "categories": cats,
-                "years":     [int(y) for y in years],
+                "years": [int(y) for y in years],
             },
         }
-        # ── Joint portfolio band (D3 / audit F-16) ──────────────────────
-        # True joint percentiles of the category-weighted portfolio shift,
-        # computed per iteration from the raw samples. NOT the category-
-        # weighted average of per-category bands — that construction is
-        # narrower than the truth by construction and was exactly the
-        # honesty failure F-16 flagged. Weights (2.11.0, O6): the category
-        # gross-profit shares = row sums of config.cell_weights, so that
-        # portfolio = Σ_c Σ_r W[c, r] · cell shift[c, r] exactly.
+
+        # The portfolio band is the joint percentile of the per-iteration
+        # portfolio shift (category shifts weighted by their gross-profit
+        # shares), not an average of the category bands, which would be
+        # narrower than the truth.
         w = self._category_weight_vector()
-        if w.sum() <= 0:
-            w = np.full(n_cats, 1.0 / n_cats)
-        else:
-            w = w / w.sum()
-        port = np.tensordot(samples, w, axes=([1], [0]))  # (n_iter, n_years)
+        w = np.full(n_cats, 1.0 / n_cats) if w.sum() <= 0 else w / w.sum()
+        port = np.tensordot(samples, w, axes=([1], [0]))
         portfolio_path = {}
-        for y_idx, year in enumerate(self.config.path_years):
+        for y_idx, year in enumerate(years):
             ys = port[:, y_idx]
-            cell = {f"p{p}": float(np.percentile(ys, p)) for p in percentiles}
+            cell = {f"p{p}": float(np.percentile(ys, p)) for p in PERCENTILES}
             cell["median"] = cell["p50"]
             cell["mean"] = float(np.mean(ys))
             cell["std"] = float(np.std(ys))
             portfolio_path[int(year)] = cell
 
         totals = {
-            "category_path":  category_path_totals,  # row totals
-            "by_force":       by_force_totals,       # column totals (Force lens)
-            "by_vc":          by_vc_totals,          # column totals (VC lens)
-            "by_region":      by_region_totals,      # column totals (Region lens)
-            # (F10, 2.10.0: totals.grand deleted — it was a raw SUM of the 12
-            #  category medians, ≈12× the headline, unused, and "sum of medians
-            #  ≠ median of sum". The portfolio band below is the real portfolio
-            #  quantity, computed per-iteration.)
-            # Joint portfolio percentiles (category-weighted mean per
-            # iteration). The headline band reads THIS, not an average of
-            # per-category bands.
-            "portfolio":      portfolio_path,
+            "category_path": category_path_totals,  # row totals
+            "by_force": by_force_totals,            # column totals per lens
+            "by_vc": by_vc_totals,
+            "by_region": by_region_totals,
+            "portfolio": portfolio_path,            # the headline band
         }
 
         return {
             "shift_matrix": shift_matrix,
-            # F7: per-quantile Monte-Carlo standard error replaces the vacuous
-            # i.i.d. split-R̂/ESS "convergence" block (R̂≈1 by construction).
             "mc_standard_error": mc_standard_error,
-            "vc_decomposition": vc_decomposition,
             "decompositions": decompositions,
             "totals": totals,
             "raw_samples": samples,
             "iterations": n_iter,
-            "model_type": "bayesian_copula",
             "model_version": self.MODEL_VERSION,
             "engine_name": self.ENGINE_NAME,
             "numerics_backend": NUMERICS_BACKEND,
-            # 2.9.0: how the VC lens was computed. "epicentre" = categorical
-            # partition by vc_epicentre_step_of; pre-2.9 runs carry no tag
-            # (the dashboard labels those "profile-weighted, pre-2.9").
-            "vc_attribution_basis": "epicentre",
             "seed": self.seed,
             "integrity_events": list(self._integrity_events),
         }
 
     def _mc_standard_error(self, samples: np.ndarray, n_boot: int = 200) -> dict:
-        """F7: per-quantile Monte-Carlo standard error at the terminal year.
+        """Bootstrap standard error of the terminal-year median, P10 and P90, in pp.
 
-        Honest replacement for the i.i.d.-vacuous split-R̂/ESS: this is the
-        sampling noise of THIS run's published percentiles at the configured
-        iteration count (bootstrap; ≈0.001 pp at 50k, two orders below the
-        0.1 pp display precision — and √3 smaller once the 3 chains are pooled).
-        It measures MC noise only, never model error. Reproducible sub-RNG so
-        the reported SE is itself deterministic.
+        This is the sampling noise of the published percentiles at the run's
+        iteration count (about 0.001 pp at 3 x 50,000, far below the 0.1 pp
+        display precision). It measures Monte Carlo noise only, never model
+        error. A fixed sub-generator keeps the reported value reproducible.
         """
         n_iter, n_cats, n_years = samples.shape
         last = n_years - 1
@@ -1108,7 +718,9 @@ class BayesianMonteCarloEngine:
         out: dict = {}
         for c_idx, cat in enumerate(self.config.category_names):
             col = samples[:, c_idx, last]
-            meds = np.empty(n_boot); p10s = np.empty(n_boot); p90s = np.empty(n_boot)
+            meds = np.empty(n_boot)
+            p10s = np.empty(n_boot)
+            p90s = np.empty(n_boot)
             for b in range(n_boot):
                 r = col[rng.integers(0, n_iter, n_iter)]
                 meds[b] = np.percentile(r, 50)
@@ -1124,39 +736,30 @@ class BayesianMonteCarloEngine:
             }
         return out
 
-    def run_multichain(self, db: DriverSet,
-                        n_chains: int = 3,
-                        iterations: Optional[int] = None,
-                        seeds: Optional[list] = None) -> dict:
-        """
-        Run ``n_chains`` independent simulations from different seeds and
-        POOL them for the published percentiles (F7, 2.10.0).
+    def run_multichain(self, db: DriverSet, n_chains: int = 3,
+                       iterations: Optional[int] = None, seeds: Optional[list] = None) -> dict:
+        """Run ``n_chains`` independently seeded chains and pool them.
 
-        F7: the old code ran 3 chains but published only the last chain's
-        percentiles and threw the other 2/3 of the samples away, keeping a
-        vacuous split-R̂/ESS block (R̂≈1 on i.i.d. draws by construction). Now
-        the chains are concatenated and the published shift_matrix / totals /
-        regional matrix / decompositions / MC standard error are all computed
-        on the POOLED sample (√3 noise reduction for free). Seed stability
-        keeps its per-chain terminal-year portfolio medians unchanged.
+        The published percentiles, lenses and standard errors come from the
+        pooled sample. ``seed_stability`` reports the spread of the per-chain
+        terminal-year portfolio medians, which is Monte Carlo noise only.
+        Chain seeds derive from the master seed, so the master seed alone
+        reproduces the run.
         """
         if n_chains < 1:
             raise ValueError("n_chains must be >= 1")
         if seeds is None:
-            # Deterministic, distinct seed sequence derived from self.seed
             seeds = [int(self.seed) + i * 1000003 for i in range(n_chains)]
         if len(seeds) != n_chains:
             raise ValueError("len(seeds) must equal n_chains")
 
-        # This method compiles the pooled result on SELF, which appends VC
-        # integrity events to self._integrity_events. Reset the parent's
-        # accumulators so a reused engine instance (e.g. .run() then
-        # .run_multichain()) cannot double-count events.
+        # The pooled result is compiled on this instance; start from a clean
+        # event list so a reused engine cannot report an event twice.
         self._integrity_events = []
         self._floored_factor_cells = 0
 
-        per_chain_cat = []   # list of (n_iter, n_cats, n_years)
-        per_chain_reg = []   # list of (n_iter, n_cats, n_regions, n_years)
+        per_chain_cat = []
+        per_chain_reg = []
         chain_engines = []
         for s in seeds:
             engine = BayesianMonteCarloEngine(self.config, seed=s)
@@ -1168,10 +771,7 @@ class BayesianMonteCarloEngine:
         last_idx = per_chain_cat[0].shape[2] - 1
         terminal_year = int(self.config.path_years[-1])
 
-        # Per-chain PORTFOLIO median at the terminal year (seed stability) —
-        # the SAME category-weighted quantity the headline reads, computed per
-        # chain BEFORE pooling so the spread reflects independent seeds.
-        # 2.11.0: category weights = row sums of the cell-weight matrix.
+        # Per-chain portfolio median at the terminal year, before pooling.
         w = self._category_weight_vector()
         w = (w / w.sum()) if w.sum() > 0 else np.full(
             len(self.config.category_names), 1.0 / len(self.config.category_names))
@@ -1179,20 +779,15 @@ class BayesianMonteCarloEngine:
             float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(n_chains)
         ]
 
-        # F7: POOL the chains, then compile the published views once on the
-        # full sample (this is what cuts the MC noise by √n_chains).
         pooled_cat = np.concatenate(per_chain_cat, axis=0)
         pooled_reg = np.concatenate(per_chain_reg, axis=0)
-        result = self._compile_results(pooled_cat, db)   # self.integrity = [vc coverage]
+        result = self._compile_results(pooled_cat, db)
         result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
         result.update(self._weights_used())
 
-        # Integrity events: the vc-coverage events come from self._compile_results
-        # above; the data-driven correlation/cholesky/regional/floor events are
-        # identical every chain — take chain 0's as representative and prepend.
-        # 2.11.0: the parent's region lens re-derives the cell-weight events
-        # (zero rows, empty matrix) that chain 0 already reported — merge by
-        # type so a warning is never listed twice.
+        # The data-driven events (correlation, regional coverage, floor) are the
+        # same in every chain: report chain 0's once. The value-chain events come
+        # from the pooled compilation; cell-weight events are merged by type.
         merged = list(chain_engines[0]._integrity_events)
         seen = {e.get("type") for e in merged}
         for e in result.get("integrity_events", []):
@@ -1202,21 +797,9 @@ class BayesianMonteCarloEngine:
         result["integrity_events"] = merged
 
         result["n_chains"] = n_chains
-        # L8: the MASTER seed reproduces the run; chain seeds are derived.
         result["seed"] = int(self.seed)
-        result["master_seed"] = int(self.seed)
         result["chain_seeds"] = [int(s) for s in seeds]
-        result["chain_summaries"] = [
-            {"seed": int(seeds[i]), "terminal_year": terminal_year,
-             "median_terminal": per_chain_portfolio_medians[i]}
-            for i in range(n_chains)
-        ]
-
-        # Seed stability (M2): spread of the terminal-year portfolio median
-        # across independently-seeded chains. MC sampling noise only — cannot
-        # detect model error; ≈0 pp expected at 50k × 3.
-        spread_pp = (max(per_chain_portfolio_medians) -
-                     min(per_chain_portfolio_medians)) * 100.0
+        spread_pp = (max(per_chain_portfolio_medians) - min(per_chain_portfolio_medians)) * 100.0
         result["seed_stability"] = {
             "metric": "terminal_year_portfolio_median",
             "terminal_year": terminal_year,
@@ -1227,4 +810,3 @@ class BayesianMonteCarloEngine:
             "pooled_iterations": int(pooled_cat.shape[0]),
         }
         return result
-

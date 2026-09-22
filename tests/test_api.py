@@ -1,585 +1,344 @@
-"""Tests for FastAPI backend — health checks, endpoints, data flow."""
+"""The API: routes, authentication, the served run, the drivers editor, proposals, config and journey."""
+import base64
+import hashlib
+import hmac
+import importlib.util
+import json
+import os
+import re
+import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
 
 import pytest
-import json
+from fastapi.testclient import TestClient
 
-# Skip the entire file when server deps aren't installed. Keeps the
-# tests alive for any env that ships fastapi+httpx, while letting the
-# core numerical test suite run anywhere.
-pytest.importorskip("fastapi")
-pytest.importorskip("httpx")
+from prism.api import state
+from prism.api.app import create_app
 
-from prism.api.app import create_app  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+REPO = Path(__file__).resolve().parents[1]
+SECRET = "pytest-secret-" + "x" * 40
+
+
+def token(role="viewer", sub="user-1", email="ana@example.com", exp_offset=300, secret=SECRET, **claims) -> str:
+    def b64(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    header = b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    payload = b64(json.dumps({"sub": sub, "email": email, "role": role,
+                              "exp": int(time.time()) + exp_offset, **claims}).encode())
+    signature = b64(hmac.new(secret.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
+    return f"{header}.{payload}.{signature}"
+
+
+def bearer(role="viewer", **kw) -> dict:
+    return {"Authorization": f"Bearer {token(role, **kw)}"}
+
+
+def persist(results: dict, iterations: int = 200) -> int:
+    """Store a run the way the production job does (it creates the schema first)."""
+    from prism.database import init_db, save_simulation_run
+    init_db()
+    return save_simulation_run(iterations, results)
 
 
 @pytest.fixture
-def app():
-    """Create test FastAPI application.
-
-    June 2026: auth dependencies are overridden with a fake admin so these
-    tests exercise the endpoints' validation logic again. They were written
-    before admin-auth was added and had been failing with 401 ever since —
-    asserting on auth instead of the behaviour they document.
-    """
-    from prism.api.auth import require_auth, require_admin
-    application = create_app()
-    _fake_admin = {"email": "pytest@prism.local", "role": "admin", "user_id": "pytest"}
-    application.dependency_overrides[require_auth] = lambda: _fake_admin
-    application.dependency_overrides[require_admin] = lambda: _fake_admin
-    return application
+def api(monkeypatch, tmp_path):
+    """A client on a fresh SQLite database, with a real token secret."""
+    monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "prism.db"))
+    monkeypatch.setenv("PRISM_JWT_SECRET", SECRET)
+    state.reset()
+    yield TestClient(create_app())
+    state.reset()
 
 
 @pytest.fixture
-def client(app):
-    """Create test client."""
-    return TestClient(app)
-
-
-class TestAPIHealth:
-    """Test health and status endpoints."""
-
-    def test_health_endpoint_exists(self, client):
-        """Should have /health endpoint."""
-        response = client.get("/api/v1/health")
-        assert response.status_code in [200, 404]  # 404 if not implemented yet
-
-    def test_health_returns_json(self, client):
-        """Should return JSON from health endpoint."""
-        response = client.get("/api/v1/health")
-        if response.status_code == 200:
-            assert response.headers["content-type"] == "application/json"
-            data = response.json()
-            assert isinstance(data, dict)
-
-    def test_health_includes_status(self, client):
-        """Should include status field in health response."""
-        response = client.get("/api/v1/health")
-        if response.status_code == 200:
-            data = response.json()
-            assert "status" in data
-
-    def test_health_includes_version(self, client):
-        """Should include version in health response."""
-        response = client.get("/api/v1/health")
-        if response.status_code == 200:
-            data = response.json()
-            assert "version" in data or "build" in data or data is not None
-
-
-class TestAPIDrivers:
-    """Test trend endpoints."""
-
-    def test_drivers_endpoint_exists(self, client):
-        """Should have trends endpoint."""
-        response = client.get("/api/v1/drivers")
-        # May 404 if not fully implemented
-        assert response.status_code in [200, 404]
-
-    def test_drivers_returns_list(self, client):
-        """Should return list of trends."""
-        response = client.get("/api/v1/drivers")
-        if response.status_code == 200:
-            data = response.json()
-            # Should be iterable (list or dict with trends)
-            assert data is not None
-
-    def test_create_driver_requires_data(self, client):
-        """Should reject trend creation without required data."""
-        # Empty payload missing required fields: force, name
-        response = client.post("/api/v1/drivers", json={})
-        # Should fail validation (422) or 404 if not implemented
-        assert response.status_code in [400, 404, 422]
-
-    def test_driver_update_endpoint(self, client):
-        """Should have trend update endpoint."""
-        response = client.put("/api/v1/drivers/test_id", json={})
-        # May 404 if not implemented
-        assert response.status_code in [404, 422, 200, 400]
-
-
-class TestAPIConfiguration:
-    """Test configuration endpoints."""
-
-    def test_config_endpoint_exists(self, client):
-        """Should have /config endpoint."""
-        response = client.get("/api/v1/config")
-        assert response.status_code in [200, 404]
-
-    def test_config_returns_model_config(self, client):
-        """Should return ModelConfig structure."""
-        response = client.get("/api/v1/config")
-        if response.status_code == 200:
-            data = response.json()
-            assert isinstance(data, dict)
-
-    def test_config_includes_key_fields(self, client):
-        """Should include per_force_attenuation, iterations, etc. (v3.2: scalar
-        attenuation removed; per-force dict is now the source of truth)."""
-        response = client.get("/api/v1/config")
-        if response.status_code == 200:
-            data = response.json()
-            # Should have model configuration
-            expected_fields = ["region", "per_force_attenuation", "iterations", "path_years"]
-            for field in expected_fields:
-                # At least some should be present
-                if field in data:
-                    assert data[field] is not None
-
-
-class TestConfigCellWeights2_11:
-    """2.11.0 (owner ruling O6): GET /config serves the 13 × 4 cell matrix
-    (12 × 4 until 2.12.0/O13 split "LHC: TOI" out of "LHC: HSC") with its
-    derived marginals; PUT /config accepts cell_weights (+ source) only and
-    rejects the retired region/category dials and invalid grids."""
-
-    def _get(self, client):
-        r = client.get("/api/v1/config")
-        assert r.status_code == 200
-        return r.json()
-
-    def test_get_serves_matrix_and_derived_marginals(self, client):
-        from prism.config import CATEGORIES, REGIONS
-        data = self._get(client)
-        assert set(data["cell_weights"]) == set(CATEGORIES)
-        for c in CATEGORIES:
-            assert set(data["cell_weights"][c]) == set(REGIONS)
-        assert abs(sum(sum(r.values()) for r in data["cell_weights"].values()) - 1) < 1e-9
-        assert data["derived_weights"] == ["region_weights", "category_weights"]
-        assert abs(sum(data["region_weights"].values()) - 1) < 1e-9
-        assert abs(sum(data["category_weights"].values()) - 1) < 1e-9
-        assert data["cell_weights_source"]
-        assert data["attenuation_source"] == "calibrated_v3.12_september2026"
-
-    def test_put_rejects_retired_dials(self, client):
-        r = client.put("/api/v1/config", json={"region_weights": {"Europe": 1.0}})
-        assert r.status_code == 400
-        r = client.put("/api/v1/config", json={"category_weights": {"Hair: Color": 1.0}})
-        assert r.status_code == 400
-
-    def test_put_rejects_incomplete_or_unbalanced_grid(self, client):
-        from prism.config import CATEGORIES, REGIONS
-        data = self._get(client)
-        W = {c: dict(data["cell_weights"][c]) for c in CATEGORIES}
-        W[CATEGORIES[0]][REGIONS[0]] += 0.5  # sums to 1.5
-        assert client.put("/api/v1/config", json={"cell_weights": W}).status_code == 400
-        W2 = {c: dict(data["cell_weights"][c]) for c in CATEGORIES[1:]}  # a row missing
-        assert client.put("/api/v1/config", json={"cell_weights": W2}).status_code == 400
-        W3 = {c: dict(data["cell_weights"][c]) for c in CATEGORIES}
-        W3[CATEGORIES[0]]["Atlantis"] = 0.0  # unknown region
-        assert client.put("/api/v1/config", json={"cell_weights": W3}).status_code == 400
-
-    def test_put_accepts_a_valid_grid_and_derives_marginals(self, client):
-        from prism.config import CATEGORIES, REGIONS
-        data = self._get(client)
-        W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
-        # everything in Europe, equally over the categories
-        for c in CATEGORIES:
-            W[c]["Europe"] = 1.0 / len(CATEGORIES)
-        r = client.put("/api/v1/config", json={"cell_weights": W, "cell_weights_source": "pytest grid"})
-        assert r.status_code == 200, r.text
-        after = self._get(client)
-        assert after["cell_weights"][CATEGORIES[0]]["Europe"] == pytest.approx(1 / 13)
-        assert after["region_weights"]["Europe"] == pytest.approx(1.0)
-        assert after["region_weights"]["Asia"] == pytest.approx(0.0)
-        assert after["category_weights"][CATEGORIES[-1]] == pytest.approx(1 / 13)
-        assert after["cell_weights_source"] == "pytest grid"
-        # restore the default grid so later tests see the placeholder
-        r = client.put("/api/v1/config", json={"cell_weights": data["cell_weights"],
-                                               "cell_weights_source": data["cell_weights_source"]})
-        assert r.status_code == 200, r.text
-
-
-class TestDriverUncertainty2_11:
-    """2.11.0 (owner ruling O7): the uncertainty score travels through the
-    trend list and the update endpoint with its 0–5 validation."""
-
-    def test_driver_list_carries_uncertainty_key(self, client):
-        r = client.get("/api/v1/drivers")
-        assert r.status_code == 200
-        rows = r.json()
-        assert rows and all("uncertainty" in t for t in rows)
-
-    def test_update_validates_range(self, client):
-        rows = client.get("/api/v1/drivers").json()
-        tid = rows[0]["id"]
-        assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": 9}).status_code == 422
-        assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": -1}).status_code == 422
-
-    def test_update_round_trip_recomputes_prior_and_explicit_null_clears(self, client):
-        from prism.config import beta_prior_for
-        rows = client.get("/api/v1/drivers").json()
-        t0 = rows[0]
-        tid, p = t0["id"], int(t0["probability"])
-        before = {"uncertainty": t0["uncertainty"], "user_override": t0["user_override"]}
-        try:
-            r = client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": 5})
-            assert r.status_code == 200, r.text
-            row = next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)
-            assert row["uncertainty"] == 5 and row["user_override"] is True
-            a, b = beta_prior_for(p, 5)
-            assert row["probability_posterior"]["alpha"] == pytest.approx(a)
-            assert row["probability_posterior"]["beta"] == pytest.approx(b)
-            # absent field: unchanged
-            assert client.put(f"/api/v1/drivers/{tid}", json={"description": row["description"]}).status_code == 200
-            assert next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)["uncertainty"] == 5
-            # explicit null: cleared, back to the 2.10.0 prior (p, 6 − p)
-            assert client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": None}).status_code == 200
-            row = next(t for t in client.get("/api/v1/drivers").json() if t["id"] == tid)
-            assert row["uncertainty"] is None
-            assert (row["probability_posterior"]["alpha"], row["probability_posterior"]["beta"]) == beta_prior_for(p, None)
-        finally:
-            # restore the fixture DB row (uncertainty + user_override) for the other tests
-            client.put(f"/api/v1/drivers/{tid}", json={"uncertainty": before["uncertainty"]})
-            from prism.database import get_db_connection, placeholder
-            with get_db_connection() as conn:
-                conn.cursor().execute(
-                    f"UPDATE drivers SET user_override = {placeholder()} WHERE id = {placeholder()}",
-                    (bool(before["user_override"]), tid))
-                conn.commit()
-
-
-class TestAPISimulation:
-    """Test simulation endpoints."""
-
-    def test_simulation_endpoint_exists(self, client):
-        """Should have simulation POST endpoint."""
-        response = client.post(
-            "/api/v1/simulate",
-            json={"iterations": 100, "scenario": "base"}
-        )
-        assert response.status_code in [200, 404, 422]
-
-
-class TestAPIOptimization:
-    """Test optimization endpoints."""
-
-    def test_allocation_endpoint_removed(self, client):
-        """D4 (June 2026): the allocation optimizer was removed — endpoint must 404/405."""
-        response = client.post("/api/v1/optimize/allocation", json={})
-        assert response.status_code in [401, 403, 404, 405]
-
-    def test_sensitivity_tornado_endpoint_removed(self, client):
-        """T2 (June 2026): no live sensitivity exhibit — /sensitivity/tornado
-        must NOT be served (was previously asserted as possibly-200)."""
-        assert client.get("/api/v1/sensitivity/tornado").status_code in (404, 405)
-        assert client.post("/api/v1/sensitivity/tornado", json={}).status_code in (404, 405)
-
-    def test_sensitivity_breakeven_endpoint_removed(self, client):
-        """T2 (June 2026): /sensitivity/breakeven must NOT be served."""
-        assert client.get("/api/v1/sensitivity/breakeven").status_code in (404, 405)
-        assert client.post(
-            "/api/v1/sensitivity/breakeven", json={"category": "Hair: Color"}
-        ).status_code in (404, 405)
-
-
-class TestAPIErrorHandling:
-    """Test error handling and validation."""
-
-    def test_invalid_category_rejected(self, client):
-        """Should reject invalid category names."""
-        # Try with GET first
-        response = client.get("/api/v1/sensitivity/tornado?category=Invalid:%20Category")
-        if response.status_code == 405:
-            # Fallback to POST
-            response = client.post(
-                "/api/v1/sensitivity/tornado",
-                json={"category": "Invalid: Category"}
-            )
-        # Should either reject or not support this endpoint
-        assert response.status_code in [400, 404, 422]
-
-    def test_out_of_range_iterations(self, client):
-        """Should validate iteration count."""
-        response = client.post(
-            "/api/v1/simulate",
-            json={"iterations": 1000000}  # Very high — exceeds max 50k
-        )
-        # Should either process (if no max), reject (if validation), or 404 (if not loaded)
-        assert response.status_code in [200, 400, 422, 404]
-
-    def test_negative_values_rejected(self, client):
-        """Should reject negative values where inappropriate."""
-        response = client.post(
-            "/api/v1/simulate",
-            json={"iterations": -100}
-        )
-        # Should reject negative iterations
-        assert response.status_code in [400, 422, 404]
-
-    def test_invalid_json_rejected(self, client):
-        """Should reject malformed JSON."""
-        response = client.post(
-            "/api/v1/simulate",
-            data="not json",
-            headers={"content-type": "application/json"}
-        )
-        assert response.status_code in [400, 422]
-
-
-class TestAPIDataValidation:
-    """Test data validation on API requests."""
-
-    def test_driver_update_validates_scores(self, client):
-        """Should validate probability scores (1-5) and gp1_pct_affected (0-1)."""
-        response = client.put(
-            "/api/v1/drivers/test_id",
-            json={"probability": 10}  # Out of range
-        )
-        # Should reject or validate
-        assert response.status_code in [400, 404, 422]
-
-    def test_simulation_validates_scenario(self, client):
-        """Should validate scenario name."""
-        response = client.post(
-            "/api/v1/simulate",
-            json={"scenario": "nonexistent_scenario"}
-        )
-        # Should reject unknown scenario
-        assert response.status_code in [200, 400, 404, 422]
-
-
-class TestAPICORS:
-    """Test CORS configuration."""
-
-    def test_cors_headers_present(self, client):
-        """Should have CORS headers if configured."""
-        response = client.get("/api/v1/health")
-        # May or may not have CORS configured
-        assert response is not None
-
-    def test_options_request_handled(self, client):
-        """Should handle OPTIONS requests (CORS preflight)."""
-        response = client.options("/api/v1/health")
-        # FastAPI with CORSMiddleware should handle OPTIONS as 200 or 405
-        # If 405, it means the endpoint explicitly doesn't support OPTIONS
-        # which is acceptable with proper CORS middleware
-        assert response.status_code in [200, 404, 405]
-
-
-class TestAPIResponseFormat:
-    """Test response format consistency."""
-
-    def test_all_responses_json(self, client):
-        """Should return JSON for all successful responses."""
-        endpoints = [
-            ("GET", "/api/v1/health"),
-            ("GET", "/api/v1/config"),
-        ]
-
-        for method, endpoint in endpoints:
-            if method == "GET":
-                response = client.get(endpoint)
-            else:
-                response = client.post(endpoint, json={})
-
-            if response.status_code == 200:
-                assert response.headers["content-type"] == "application/json"
-
-    def test_error_responses_include_detail(self, client):
-        """Should include error detail in responses."""
-        response = client.post(
-            "/api/v1/simulate",
-            json={"iterations": "not a number"}  # Wrong type
-        )
-
-        if response.status_code >= 400:
-            # Should have error detail
-            assert response.text is not None
-
-
-class TestAPIPerformance:
-    """Test performance-related concerns."""
-
-    def test_health_endpoint_fast(self, client):
-        """Health endpoint should respond quickly."""
-        response = client.get("/api/v1/health")
-        # Should be instant (< 100ms)
-        assert response is not None
-
-    def test_config_endpoint_fast(self, client):
-        """Config endpoint should respond quickly."""
-        response = client.get("/api/v1/config")
-        # Should be instant
-        assert response is not None
-
-
-class TestAPIEdgeCases:
-    """Test edge cases and boundary conditions."""
-
-    def test_very_large_payload(self, client):
-        """Should handle large payloads gracefully."""
-        large_json = {
-            "iterations": 10000,  # Within valid range (1-50000)
-            "iterations": 500
+def valid_run(mock_model_config, mock_drivers_database):
+    """A results bundle exactly as the production run persists it."""
+    from prism.input_drift import driver_fingerprint
+    from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+    spec = importlib.util.spec_from_file_location("run_production", REPO / "scripts" / "run_production.py")
+    production = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(production)
+    result = BayesianMonteCarloEngine(mock_model_config, seed=42).run_multichain(
+        mock_drivers_database, n_chains=2, iterations=200)
+    return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_drivers_database.drivers))
+
+
+class TestRoutes:
+    def test_the_route_table(self, api):
+        routes = {(method.upper(), path) for path, operations in api.app.openapi()["paths"].items()
+                  for method in operations}
+        assert routes == {
+            ("GET", "/api/v1/health"), ("GET", "/api/v1/diagnostics"), ("GET", "/api/v1/simulation"),
+            ("GET", "/api/v1/drivers"), ("PUT", "/api/v1/drivers/{driver_id}"),
+            ("GET", "/api/v1/drivers/{driver_id}/proposals"), ("PUT", "/api/v1/drivers/{driver_id}/proposals"),
+            ("GET", "/api/v1/config"), ("GET", "/api/v1/journey"), ("PUT", "/api/v1/journey"),
         }
-        response = client.post("/api/v1/simulate", json=large_json)
-        # Should either process (if model loaded) or 404 if not loaded
-        # Valid request should not return 405
-        assert response.status_code in [200, 400, 422, 404]
 
-    def test_empty_payload(self, client):
-        """Should handle empty POST bodies."""
-        response = client.post("/api/v1/simulate", json={})
-        # Empty payload uses defaults — should either process or 404
-        assert response.status_code in [200, 400, 422, 404]
+    def test_the_vercel_entry_point_serves_the_same_app(self):
+        spec = importlib.util.spec_from_file_location("vercel_index", REPO / "api" / "index.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.app.title == "PRISM API"
 
-    def test_unicode_in_requests(self, client):
-        """Should handle Unicode in requests."""
-        response = client.post(
-            "/api/v1/drivers",
-            json={
-                "force": "Consumer",
-                "name": "Spécial Café ñ é ü",
-                "direction": "Expansion",
-                "probability": 3,
-                "gp1_pct_affected": 0.15
-            }
+    def test_the_api_needs_neither_numpy_nor_scipy(self, api, valid_run):
+        """The Vercel function installs api/requirements.txt only, so every route,
+        including the served run, must work with the engine libraries blocked."""
+        persist(valid_run)
+        script = (
+            "import sys, os\n"
+            "sys.modules['numpy'] = None\n"
+            "sys.modules['scipy'] = None\n"
+            "from fastapi.testclient import TestClient\n"
+            "from prism.api.app import create_app\n"
+            "client = TestClient(create_app())\n"
+            "headers = {'Authorization': 'Bearer ' + os.environ['TEST_TOKEN']}\n"
+            "for path in ['/api/v1/health', '/api/v1/diagnostics', '/api/v1/drivers', '/api/v1/simulation',\n"
+            "             '/api/v1/config', '/api/v1/drivers/consumer_r01/proposals']:\n"
+            "    assert client.get(path, headers=headers).status_code == 200, path\n"
+            "assert client.put('/api/v1/drivers/consumer_r01', headers=headers, json={'probability': 3}).status_code == 200\n"
+            "assert client.put('/api/v1/journey', headers=headers, json={'lhc': [], 'hair': []}).status_code == 200\n"
         )
-        # Should handle Unicode gracefully in trend creation
-        # May be 201, 200, or 404 if model not loaded
-        assert response.status_code in [200, 400, 404, 422]
+        env = {**os.environ, "TEST_TOKEN": token("admin")}
+        result = subprocess.run([sys.executable, "-c", script], cwd=REPO, env=env, capture_output=True, text=True,
+                                timeout=120)
+        assert result.returncode == 0, result.stderr[-2000:]
+
+    def test_the_function_requirements_are_what_the_api_imports(self):
+        lines = (REPO / "api" / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        packages = {re.split(r"[<>=]", line)[0] for line in lines if line.strip() and not line.startswith("#")}
+        assert packages == {"fastapi", "pydantic", "psycopg2-binary"}
 
 
-class TestF2OnlineNeverSimulates:
-    """F2 (June 2026, owner decision): the online service never generates
-    numbers. Without scipy, POST /simulate must refuse with 409 before
-    touching the engine — consistency with the offline calibrated runs.
-    D13: the probe is an environment check, never a math fallback — the
-    _scipy_compat approximation layer was deleted."""
+class TestAuthentication:
+    READS = ["/api/v1/drivers", "/api/v1/simulation", "/api/v1/config", "/api/v1/journey",
+             "/api/v1/drivers/consumer_r01/proposals"]
 
-    def test_simulate_409_without_scipy(self, client, monkeypatch):
-        import hmac, hashlib, json as _json, time, base64, os
-        os.environ.setdefault("PRISM_JWT_SECRET", "x" * 48)
-        secret = os.environ["PRISM_JWT_SECRET"]
-        def b64(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
-        h = b64(_json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-        p = b64(_json.dumps({"sub": "t", "email": "t@t", "role": "admin",
-                             "exp": int(time.time()) + 300}).encode())
-        sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
-        token = f"{h}.{p}.{sig}"
+    def test_reads_need_a_token(self, api):
+        for path in self.READS:
+            assert api.get(path).status_code == 401, path
 
-        import prism.api.routers.simulation as sim_router
-        monkeypatch.setattr(sim_router, "_scipy_available", lambda: False)
-        r = client.post("/api/v1/simulate", json={"iterations": 1000},
-                        headers={"Authorization": f"Bearer {token}"})
-        assert r.status_code == 409
-        assert "offline" in r.json()["detail"]
+    def test_the_viewer_cookie_and_a_bearer_token_are_accepted(self, api):
+        assert api.get("/api/v1/config", headers=bearer()).status_code == 200
+        api.cookies.set("prism-token", token())
+        assert api.get("/api/v1/drivers").status_code == 200
 
-    def test_engine_hard_requires_scipy(self):
-        """D13: the engine module must carry a non-empty scipy-versioned
-        numerics backend tag — proof the exact-math import path is live."""
-        from prism.simulation.bayesian_mc import NUMERICS_BACKEND
-        assert NUMERICS_BACKEND.startswith("scipy ")
-        assert "numpy" in NUMERICS_BACKEND
+    @pytest.mark.parametrize("bad", ["not-a-token", "a.b.c", token(exp_offset=-10), token(secret="z" * 40)])
+    def test_an_invalid_token_is_refused(self, api, bad):
+        assert api.get("/api/v1/drivers", headers={"Authorization": f"Bearer {bad}"}).status_code == 401
+
+    def test_without_a_usable_secret_every_token_is_refused(self, api, monkeypatch):
+        monkeypatch.setenv("PRISM_JWT_SECRET", "short")
+        assert api.get("/api/v1/drivers", headers=bearer(secret="short")).status_code == 401
+
+    def test_a_viewer_cannot_write(self, api):
+        assert api.put("/api/v1/drivers/consumer_r01", json={"probability": 2}, headers=bearer()).status_code == 403
+        assert api.put("/api/v1/journey", json={"lhc": [], "hair": []}, headers=bearer()).status_code == 403
+
+    def test_health_and_diagnostics_are_anonymous(self, api):
+        assert api.get("/api/v1/health").status_code == 200
+        assert api.get("/api/v1/diagnostics").status_code == 200
 
 
-@pytest.fixture
-def raw_client():
-    """TestClient WITHOUT the fake-admin dependency overrides — for tests
-    that assert on the real auth behavior (F3). Ensures a JWT secret is
-    present so token verification is exercised for real (CI has none)."""
-    import os
-    os.environ.setdefault("PRISM_JWT_SECRET", "pytest-secret-" + "x" * 36)
-    return TestClient(create_app())
+class TestHealthAndDiagnostics:
+    def test_a_new_database_is_seeded(self, api):
+        body = api.get("/api/v1/health").json()
+        assert body == {"status": "ok", "version": "2.12.0", "driver_count": 51, "categories": 13,
+                        "has_simulation": False, "simulation_reason": "no_rows", "latest_run_id": None}
+
+    def test_a_persisted_run_is_reported(self, api, valid_run):
+        run_id = persist(valid_run)
+        body = api.get("/api/v1/health").json()
+        assert body["has_simulation"] is True and body["latest_run_id"] == run_id
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["db_reachable"] is True and diag["simulation_reason"] == "ok"
+        assert diag["latest_run_id"] == run_id and diag["simulation_run_count"] == 1
+
+    def test_a_malformed_run_is_explained(self, api, valid_run):
+        broken = {k: v for k, v in valid_run.items() if k != "seed_stability"}
+        run_id = persist(broken)
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["simulation_reason"] == "malformed" and "seed_stability" in diag["error"]
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404
+        assert response.json()["detail"]["reason"] == "malformed" and str(run_id) in response.json()["detail"]["error"]
+
+    def test_an_outage_is_reported_not_raised(self, api, monkeypatch):
+        import prism.database as dbm
+        monkeypatch.setattr(dbm, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route to host")))
+        monkeypatch.setattr(dbm.time, "sleep", lambda s: None)
+        assert api.get("/api/v1/health").json()["status"] == "degraded"
+        diag = api.get("/api/v1/diagnostics").json()
+        assert diag["db_reachable"] is False and diag["simulation_reason"] == "db_error"
+        assert "no route to host" in diag["error"]
+
+    def test_a_database_of_the_previous_schema_asks_for_the_migration(self, api, monkeypatch, tmp_path):
+        legacy = tmp_path / "legacy.db"
+        sqlite3.connect(legacy).execute("CREATE TABLE trends (id TEXT PRIMARY KEY)").connection.close()
+        monkeypatch.setenv("PRISM_DB_PATH", str(legacy))
+        state.reset()
+        response = api.get("/api/v1/drivers", headers=bearer())
+        assert response.status_code == 503 and "migrations/0001_driver_schema" in response.json()["detail"]
+        assert api.get("/api/v1/health").json()["status"] == "degraded"
 
 
-class TestF3ReadAuthentication:
-    """F3 (June 2026): every data endpoint authenticates. Reads accept the
-    httpOnly viewer cookie (pulse-token) or a Bearer token; /health and
-    /diagnostics stay anonymous by design."""
+class TestSimulation:
+    def test_no_run_yet(self, api):
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "no_rows"
 
-    @staticmethod
-    def _jwt(role="viewer"):
-        import hmac, hashlib, json as _json, time, base64, os
-        secret = os.environ["PRISM_JWT_SECRET"]
-        def b64(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
-        h = b64(_json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-        p = b64(_json.dumps({"sub": "t", "email": "t@t", "role": role,
-                             "exp": int(time.time()) + 300}).encode())
-        sig = b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest())
-        return f"{h}.{p}.{sig}"
-
-    def test_reads_reject_anonymous(self, raw_client):
-        client = raw_client
-        for path in ["/api/v1/drivers", "/api/v1/simulation",
-                     "/api/v1/simulation/status", "/api/v1/config"]:
-            r = client.get(path)
-            assert r.status_code == 401, (path, r.status_code)
-
-    def test_reads_accept_viewer_cookie(self, raw_client):
-        client = raw_client
-        token = self._jwt("viewer")
-        r = client.get("/api/v1/drivers", cookies={"prism-token": token})
-        assert r.status_code == 200
-        r = client.get("/api/v1/simulation/status", cookies={"prism-token": token})
-        assert r.status_code == 200
-
-    def test_reads_accept_bearer(self, raw_client):
-        client = raw_client
-        token = self._jwt("viewer")
-        r = client.get("/api/v1/config", headers={"Authorization": f"Bearer {token}"})
-        assert r.status_code == 200
-
-    def test_viewer_cookie_cannot_mutate(self, raw_client):
-        client = raw_client
-        token = self._jwt("viewer")
-        r = client.post("/api/v1/simulate", json={"iterations": 1000},
-                        cookies={"prism-token": token})
-        assert r.status_code == 403  # require_admin rejects role=viewer
-
-    def test_health_and_diagnostics_stay_public(self, raw_client):
-        client = raw_client
-        assert client.get("/api/v1/health").status_code == 200
-        assert client.get("/api/v1/diagnostics").status_code == 200
+    def test_the_newest_run_is_served(self, api, valid_run):
+        from prism.api.runs import META_KEYS, REQUIRED_KEYS
+        persist(valid_run, 100)
+        newest = persist(valid_run, 200)
+        body = api.get("/api/v1/simulation", headers=bearer()).json()
+        assert set(body) == (set(REQUIRED_KEYS) - {"meta"}) | {"run_meta"}
+        meta = body["run_meta"]
+        assert meta["run_id"] == newest and meta["iterations"] == 200 and meta["run_date"]
+        assert set(META_KEYS) <= set(meta) and meta["driver_count"] == 5
+        assert "driver_fingerprint" not in meta
+        assert body["totals"]["portfolio"]["2030"]["median"] == pytest.approx(
+            valid_run["totals"]["portfolio"][2030]["median"])
 
 
-class TestJourneyContentStore:
-    """v3.6 journey layer (block 8, restored 2026-06-10): the admin-managed
-    Consumer Journey content store. GET requires a viewer token at the FastAPI
-    layer (defense-in-depth on top of the Next.js /api/journey proxy auth) and
-    PUT is admin-only inside the router."""
+class TestDrivers:
+    def test_the_list(self, api):
+        drivers = api.get("/api/v1/drivers", headers=bearer()).json()
+        assert len(drivers) == 51 and [d["id"] for d in drivers] == sorted(d["id"] for d in drivers)
+        first = drivers[0]
+        assert set(first) == {
+            "id", "force", "name", "description", "direction", "probability", "start_year", "peak_year",
+            "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "normalized_score",
+            "category_exposure", "vc_exposure", "regional_exposure", "analysis", "data_source", "sources",
+            "baseline", "scores_edited", "proposal_summary"}
+        assert first["baseline"]["probability"] == first["probability"] and first["scores_edited"] is False
+        assert first["proposal_summary"]["count"] == 0 and first["analysis"].startswith("Weight in the answer:")
 
-    def test_get_rejects_anonymous(self, raw_client):
-        # T5 (June 2026): GET /journey now authenticates at the FastAPI layer —
-        # it no longer relies solely on the Next.js proxy for auth.
-        assert raw_client.get("/api/v1/journey").status_code == 401
+    def test_an_admin_edit(self, api):
+        from prism.database import get_db_connection
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"probability": 4, "uncertainty": 3, "name": "Private label, edited"})
+        assert response.status_code == 200
+        assert response.json() == {"status": "updated", "driver_id": "consumer_r01",
+                                   "changed": ["name", "probability", "uncertainty"]}
+        edited = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        assert (edited["probability"], edited["uncertainty"], edited["name"]) == (4, 3, "Private label, edited")
+        assert edited["scores_edited"] is True and edited["baseline"]["probability"] == 5
+        assert edited["normalized_score"] == pytest.approx(-4 / 6 * 0.22)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT reason, old_value, new_value, user_id FROM audit_log "
+                           "WHERE action = 'driver_updated' ORDER BY id")
+            rows = [tuple(r) for r in cursor.fetchall()]
+        assert rows == [("name", json.dumps("Private label structural penetration and premium own-label tiers (Europe)"),
+                         json.dumps("Private label, edited"), "user-1"),
+                        ("probability", "5", "4", "user-1"), ("uncertainty", "2", "3", "user-1")]
 
-    def test_get_returns_404_when_store_empty(self, client, monkeypatch, tmp_path):
-        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_empty.db"))
-        r = client.get("/api/v1/journey")
-        assert r.status_code == 404
+    def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
+        sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "note": "Apr 2026"}]
+        response = api.put("/api/v1/drivers/consumer_r02", headers=bearer("admin"),
+                           json={"description": "New text.", "confidence": "Low", "sources": sources})
+        assert response.status_code == 200
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r02")
+        assert driver["description"] == "New text." and driver["confidence"] == "Low"
+        assert driver["sources"] == sources and driver["scores_edited"] is False
 
-    def test_put_then_get_roundtrip(self, client, monkeypatch, tmp_path):
-        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_rt.db"))
-        blob = {
-            "lhc": [{
-                "id": "sorting", "label": "Sorting",
-                "benefiting": [{
-                    "name": "AI stain recognition", "type": "tech",
-                    "driverCodes": ["T-01"], "driverNote": "test",
-                    "intensity": 2,
-                    "provenance": {"author": "strategist", "date": "2026-06", "grade": "estimate"},
-                    "analysis": None, "id": "lhc.sorting.exp.test",
-                }],
-                "negativelyImpacted": [],
-            }],
-            "hair": [],
-        }
-        r = client.put("/api/v1/journey", json=blob)
-        assert r.status_code == 200
-        assert r.json() == {"status": "saved", "tiles": 1}
-        r2 = client.get("/api/v1/journey")
-        assert r2.status_code == 200
-        assert r2.json()["lhc"][0]["id"] == "sorting"
-        assert r2.json()["lhc"][0]["benefiting"][0]["provenance"]["author"] == "strategist"
+    def test_an_unchanged_edit_writes_nothing(self, api):
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 5})
+        assert response.json() == {"status": "unchanged", "driver_id": "consumer_r01"}
 
-    def test_put_rejects_malformed_body(self, client, monkeypatch, tmp_path):
-        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "journey_bad.db"))
-        assert client.put("/api/v1/journey", json={"lhc": "not-a-list"}).status_code == 422
-        assert client.put("/api/v1/journey", json={"lhc": []}).status_code == 422  # hair missing
+    @pytest.mark.parametrize("body", [
+        {"probability": 9}, {"uncertainty": 6}, {"gp1_pct_affected": 0}, {"direction": "Sideways"},
+        {"diffusion_curve": "exponential"}, {"name": None}, {"analysis": "typed by hand"},
+        {"category_exposure": {"Hair: Care": "high"}}, {"sources": [{"title": "", "url": ""}]},
+        {"sources": [{"title": "x", "tier": "Z"}]},
+    ])
+    def test_invalid_edits_are_refused(self, api, body):
+        assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json=body).status_code == 422
 
-    def test_put_requires_admin(self, raw_client):
-        # No token at all → the require_admin dependency rejects the write.
-        r = raw_client.put("/api/v1/journey", json={"lhc": [], "hair": []})
-        assert r.status_code in (401, 403)
+    def test_exposures_are_clamped_to_0_to_5(self, api):
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                json={"category_exposure": {"Hair: Care": 9, "Hair: Color": -2}})
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        assert driver["category_exposure"] == {"Hair: Care": 5, "Hair: Color": 0}
+
+    def test_an_unknown_driver_is_404(self, api):
+        assert api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"probability": 3}).status_code == 404
+
+    def test_a_change_made_elsewhere_reaches_the_next_request(self, api):
+        """Another server instance or a script writes the database; the cached drivers follow."""
+        from prism.database import load_drivers, save_drivers
+        api.get("/api/v1/drivers", headers=bearer())
+        driver = next(d for d in load_drivers() if d.id == "technology_r01")
+        driver.name = "Renamed by a script"
+        save_drivers([driver])
+        names = {d["id"]: d["name"] for d in api.get("/api/v1/drivers", headers=bearer()).json()}
+        assert names["technology_r01"] == "Renamed by a script"
+
+
+class TestProposals:
+    def test_propose_merge_and_aggregate(self, api):
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        assert api.get(path, headers=bearer()).json() == {
+            "driver_id": "consumer_r01", "my": None, "scorers": [],
+            "aggregate": {"probability": None, "gp1_pct_affected": None, "peak_year": None, "uncertainty": None,
+                          "diffusion_curve": None, "category_exposure": {}, "regional_exposure": {},
+                          "vc_exposure": {}}}
+        api.put(path, headers=bearer(sub="ana", name="Ana"), json={"probability": 4, "comment": "  looks high  "})
+        body = api.put(path, headers=bearer(sub="ana", name="Ana"), json={"peak_year": 2031}).json()
+        assert body["my"]["probability"] == 4 and body["my"]["peak_year"] == 2031 and body["my"]["comment"] == "looks high"
+        api.put(path, headers=bearer(sub="ben", email="ben@example.com"),
+                json={"probability": 2, "category_exposure": {"Hair: Care": 7}})
+        body = api.get(path, headers=bearer(sub="ben", email="ben@example.com")).json()
+        assert body["aggregate"]["probability"] == {"avg": 3.0, "count": 2}
+        assert body["aggregate"]["category_exposure"] == {"Hair: Care": {"avg": 5.0, "count": 1}}
+        assert [s["name"] for s in body["scorers"]] == ["Ana", "ben"]
+        assert body["my"]["probability"] == 2
+        summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
+                       if d["id"] == "consumer_r01")["proposal_summary"]
+        assert summary["count"] == 2 and summary["probability"] == {"avg": 3.0, "count": 2}
+
+    def test_a_proposal_survives_an_admin_edit(self, api):
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        api.put(path, headers=bearer(sub="ana"), json={"probability": 4})
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4})
+        assert len(api.get(path, headers=bearer()).json()["scorers"]) == 1
+
+    def test_invalid_proposals(self, api):
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 400
+        assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
+        assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404
+
+
+class TestConfig:
+    def test_the_configuration_is_read_only(self, api):
+        from prism.config import DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_PER_FORCE_ATTENUATION
+        body = api.get("/api/v1/config", headers=bearer()).json()
+        assert body["per_force_attenuation"] == DEFAULT_PER_FORCE_ATTENUATION
+        assert body["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
+        assert body["path_years"] == list(range(2026, 2036)) and body["base_year"] == 2025
+        assert api.put("/api/v1/config", headers=bearer("admin"), json={}).status_code == 405
+
+
+class TestJourney:
+    BLOB = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [{
+        "id": "lhc.sorting.exp.test", "name": "AI stain recognition", "type": "tech", "driverCodes": ["T-01"],
+        "driverNote": "T-01", "intensity": 2, "analysis": None,
+        "provenance": {"author": "strategist", "date": "2026-09", "grade": "estimate"}}],
+        "negativelyImpacted": []}], "hair": []}
+
+    def test_the_bundled_content_applies_until_an_admin_saves(self, api):
+        assert api.get("/api/v1/journey", headers=bearer()).status_code == 404
+
+    def test_save_and_read(self, api):
+        response = api.put("/api/v1/journey", headers=bearer("admin"), json=self.BLOB)
+        assert response.json() == {"status": "saved", "tiles": 1}
+        assert api.get("/api/v1/journey", headers=bearer()).json() == self.BLOB
+
+    def test_a_malformed_body_is_refused(self, api):
+        assert api.put("/api/v1/journey", headers=bearer("admin"), json={"lhc": "x", "hair": []}).status_code == 422
+        assert api.put("/api/v1/journey", headers=bearer("admin"), json={"lhc": []}).status_code == 422

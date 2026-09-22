@@ -1,29 +1,10 @@
-"""System routes: health, diagnostics, seed — extracted from prism/api/app.py (June 2026 split, review F4)."""
-import json
+"""Health and diagnostics. Both are anonymous and expose no credentials."""
 import logging
-from typing import Optional, Any
 
-import numpy as np
-from fastapi import APIRouter, HTTPException, Depends
-# M4 (July 2026 review): JSONResponse is used by /diagnostics' DB-failure
-# branch — the missing import made the endpoint crash (NameError → 500) on
-# exactly the outage it exists to explain. Locked by a test now.
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter
 
 from prism import __version__
-from prism.config import ModelConfig, FORCES, CATEGORIES
-from prism.drivers import Driver, DriverSet
-from prism.api.auth import require_auth, require_admin
-from prism.api.serialization import _sanitize, _summarize_convergence
-from prism.api.state import _state, _state_lock, _load_driver_set, _backfill_diffusion_fields
-from prism.api.schemas import (
-    SimulationRequest, DriverCreate, DriverUpdate, ShockRequest,
-    ConfigUpdate, SnapshotCreate,
-)
-from prism.api.services.simulation_service import (
-    load_latest_run_into_state,
-    _persisted_simulation_state, _has_persisted_simulation,
-)
+from prism.config import CATEGORIES
 
 logger = logging.getLogger(__name__)
 
@@ -31,116 +12,52 @@ router = APIRouter()
 
 
 @router.get("/api/v1/health")
-async def health():
-    db = _state.get("db")
-    in_memory = _state.get("mc_result") is not None
-    persisted = _persisted_simulation_state()
-    has_sim = in_memory or persisted["has"]
-    # `simulation_reason` is the diagnostic code when has_simulation is False:
-    #   "ok"        — simulation is available (in-memory or DB-persisted)
-    #   "no_rows"   — DB reachable, simulation_runs is empty
-    #   "malformed" — rows exist but latest is missing shift_matrix
-    #   "db_error"  — DB unreachable / query failed (error in `simulation_error`)
+def health():
+    """Liveness plus the two facts the dashboard needs: drivers and a run exist.
+
+    Cheap on purpose (the dashboard polls it): it reads the run's id, never
+    its results. A run that exists but cannot be served shows up in
+    /api/v1/diagnostics and /api/v1/simulation.
+    """
+    from prism.api import state
+    from prism.database import latest_run_summary
+    try:
+        drivers = state.driver_set()
+        latest = latest_run_summary()
+    except Exception as e:  # noqa: BLE001 (reported as degraded, never raised)
+        logger.warning("health: database unavailable: %s", e)
+        return {"status": "degraded", "version": __version__, "driver_count": 0,
+                "categories": len(CATEGORIES), "has_simulation": False,
+                "simulation_reason": "db_error", "latest_run_id": None}
     return {
         "status": "ok",
         "version": __version__,
-        "model_loaded": db is not None,
-        "driver_count": db.driver_count if db else 0,
-        "categories": len(db.categories) if db else 0,
-        "has_simulation": has_sim,
-        "simulation_reason": "ok" if has_sim else persisted["reason"],
-        "simulation_error": None if has_sim else persisted.get("error"),
-        "latest_run_id": persisted.get("latest_run_id"),
+        "driver_count": drivers.driver_count,
+        "categories": len(CATEGORIES),
+        "has_simulation": latest is not None,
+        "simulation_reason": "ok" if latest else "no_rows",
+        "latest_run_id": latest["id"] if latest else None,
     }
 
-# ── Diagnostics (public — no auth, no credentials exposed) ─────
+
 @router.get("/api/v1/diagnostics")
-async def diagnostics():
-    """Diagnostic snapshot for dashboard + the scripts/diagnose_prism.py tool.
+def diagnostics():
+    """What this server instance sees of the database and the latest run.
 
-    Returns the same shape as prism.database.diagnose_connection() plus
-    a simulation_reason code that mirrors /api/v1/health. No credentials
-    or secrets are ever returned — only the DB hostname.
+    Lets the dashboard tell "cannot reach the database" from "reachable but
+    empty" from "the latest run cannot be served". Only the database host
+    name is shown, never a credential.
     """
+    from prism.api import state
+    from prism.api.runs import run_status
+    from prism.database import diagnose_connection
+    diag = diagnose_connection()
+    if not diag["db_reachable"]:
+        return {**diag, "simulation_reason": "db_error", "version": __version__}
     try:
-        from prism.database import diagnose_connection
-        diag = diagnose_connection()
-    except Exception as e:
-        return JSONResponse(
-            status_code=200,
-            content={
-                "db_mode": "unknown",
-                "db_host": None,
-                "db_url_env": None,
-                "db_reachable": False,
-                "simulation_run_count": 0,
-                "latest_run_id": None,
-                "latest_run_date": None,
-                "latest_iterations": None,
-                "latest_has_shift_matrix": False,
-                "latest_has_decompositions": False,
-                "latest_has_totals": False,
-                "latest_has_vc_decomposition": False,
-                "error": f"{type(e).__name__}: {e}",
-                "simulation_reason": "db_error",
-                "in_memory_simulation": _state.get("mc_result") is not None,
-                "version": __version__,
-            },
-        )
-    persisted = _persisted_simulation_state()
-    return {
-        **diag,
-        "simulation_reason": "ok" if (persisted["has"] or _state.get("mc_result")) else persisted["reason"],
-        "in_memory_simulation": _state.get("mc_result") is not None,
-        "version": __version__,
-    }
-
-# ── Manual Seed + Simulate (for Vercel debugging) ──────────────
-@router.post("/api/v1/seed")
-async def manual_seed(user: dict = Depends(require_admin)):
-    """Manually trigger seeding + simulation. Use when auto-seed fails."""
-    import traceback
-    steps = []
-    try:
-        from prism.database import init_db, load_drivers, save_drivers, USE_POSTGRES, POSTGRES_URL
-        steps.append(f"db_mode=postgres:{USE_POSTGRES}, url_set={bool(POSTGRES_URL)}")
-
-        init_db()
-        steps.append("init_db OK")
-
-        db_drivers = load_drivers()
-        steps.append(f"existing_trends={len(db_drivers)}")
-
-        # Always re-seed to update source URLs and any trend metadata changes
-        from prism.seed_drivers import get_seed_drivers
-        seed = get_seed_drivers()
-        steps.append(f"seed_trends_loaded={len(seed)}")
-        save_drivers(seed)
-        steps.append("save_trends OK (re-seeded)")
-        db_drivers = load_drivers()
-        steps.append(f"after_seed_count={len(db_drivers)}")
-
-        # Rebuild TrendDatabase in memory
-        _state["db"] = DriverSet(
-            drivers=db_drivers, categories=CATEGORIES, forces=FORCES, source_file="database",
-        )
-        steps.append(f"trend_database_count={_state['db'].driver_count}")
-
-        # Ensure config is initialized (but do NOT auto-simulate)
-        config = _state.get("config") or ModelConfig()
-        _state["config"] = config
-        # Mark simulation as stale — admin must press Simulate
-        _state["simulation_stale"] = True
-        _state["stale_reason"] = "Drivers re-seeded. Press Simulate to update results."
-        steps.append("simulation marked stale (press Simulate to run)")
-
-        return {"status": "ok", "steps": steps}
-
-    except Exception as e:
-        steps.append(f"ERROR: {type(e).__name__}: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "steps": steps, "traceback": traceback.format_exc()},
-        )
-
-# ── Trends ──────────────────────────────────────────────────────
+        status = run_status(state.latest_run())
+    except Exception as e:  # noqa: BLE001 (reported, never raised)
+        return {**diag, "simulation_reason": "db_error", "error": f"{type(e).__name__}: {e}",
+                "version": __version__}
+    return {**diag, "simulation_reason": status["reason"],
+            "error": diag["error"] or status["error"], "version": __version__}

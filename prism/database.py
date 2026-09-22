@@ -1,1395 +1,613 @@
-"""Database persistence for PRISM — dual-mode Postgres (Vercel) / SQLite (local).
+"""Persistence: PostgreSQL in production, SQLite for local work and tests.
 
-When POSTGRES_URL is set (Vercel Postgres / Neon), uses psycopg2.
-Otherwise falls back to SQLite for local development.
+Setting ``POSTGRES_URL`` or ``DATABASE_URL`` selects PostgreSQL (psycopg2);
+otherwise the database is the SQLite file at ``PRISM_DB_PATH`` (default
+``data/prism.db``). All SQL is written once, with ``placeholder()`` / ``ph()``
+for the parameter style of the active backend.
 
-Implements all tables from the CLAUDE.md specification:
-- trends, driver_category_exposure, driver_vc_exposure
-- journey_content (admin-managed Consumer Journey tile map, versioned blob)
-- config_snapshots, simulation_runs
-- triggers, ai_suggestions, audit_log
-
-NOTE: causal_edges, competitors, and backtest_results tables were removed in v2.4
-as the underlying modules (causal DAG, game theory, backtesting) were not implemented.
-
-CRITICAL: No financial data (€M values) stored anywhere.
-All monetary values are relative (percentages, weights, shifts).
+The database holds relative figures only (scores, shares, percentage shifts);
+no currency amount is ever stored.
 """
 
 import json
 import logging
 import os
-from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Optional, Any
+import time
 from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from prism.drivers import Driver
 
 logger = logging.getLogger(__name__)
 
-
-# ── JSON serialization helpers ───────────────────────────────────────
-# NumPy / SciPy produce np.bool_, np.int64, np.float64, etc., which the
-# stdlib json encoder rejects with "Object of type bool is not JSON
-# serializable". Route everything through this helper so the simulation
-# engine's diagnostic dicts (convergence, force attribution, etc.) can
-# round-trip into Postgres JSONB columns.
-def _json_default(o):
-    try:
-        import numpy as _np  # local import — avoid circular at module load
-        if isinstance(o, _np.bool_):
-            return bool(o)
-        if isinstance(o, _np.integer):
-            return int(o)
-        if isinstance(o, _np.floating):
-            return float(o)
-        if isinstance(o, _np.ndarray):
-            return o.tolist()
-    except ImportError:
-        pass
-    if isinstance(o, (set, frozenset)):
-        return list(o)
-    if isinstance(o, datetime):
-        return o.isoformat()
-    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
-
-
-def _safe_dumps(obj) -> str:
-    """json.dumps wrapper that handles numpy scalars, ndarrays, sets, datetimes."""
-    return json.dumps(obj, default=_json_default)
-
-# ── Detect database mode ─────────────────────────────────────────────
 POSTGRES_URL = os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL")
 USE_POSTGRES = bool(POSTGRES_URL)
 
 if USE_POSTGRES:
-    try:
-        import psycopg2
-        import psycopg2.extras
-        logger.info("Database mode: PostgreSQL (Vercel Postgres / Neon)")
-    except ImportError:
-        logger.warning("psycopg2 not installed — falling back to SQLite")
-        USE_POSTGRES = False
-
-if not USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+else:
     import sqlite3
-    logger.info("Database mode: SQLite (local development)")
+
+#: Migrations whose result the schema below already contains. init_db records
+#: them on a new database so a migration script never runs on it.
+SCHEMA_MIGRATIONS = ("0001_driver_schema",)
 
 
-# ── Connection helpers ────────────────────────────────────────────────
-
-def _get_sqlite_path() -> Path:
-    """Get SQLite database file path."""
-    _is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-    default = "/tmp/prism.db" if _is_vercel else "data/prism.db"
-    db_path = os.environ.get("PRISM_DB_PATH", default)
-    return Path(db_path)
+class LegacySchemaError(RuntimeError):
+    """The database predates the current schema and must be migrated first."""
 
 
-def _pg_connect():
-    """Create a new PostgreSQL connection."""
-    conn = psycopg2.connect(POSTGRES_URL, sslmode="require")
-    conn.autocommit = False
-    return conn
+# ── JSON ────────────────────────────────────────────────────────────────────
+
+def _json_default(o):
+    if isinstance(o, datetime):
+        return o.isoformat()
+    if hasattr(o, "tolist"):  # numpy scalars and arrays, without importing numpy
+        return o.tolist()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 
-def _sqlite_connect():
-    """Create a new SQLite connection."""
-    db_path = _get_sqlite_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
+def dumps(obj) -> str:
+    """json.dumps that also accepts numpy scalars and arrays and datetimes."""
+    return json.dumps(obj, default=_json_default)
+
+
+def _loads(val):
+    """Decode a JSON text column; None for NULL or empty text."""
+    if val is None or val == "":
+        return None
+    return json.loads(val) if isinstance(val, str) else val
+
+
+# ── Connections ─────────────────────────────────────────────────────────────
+
+def sqlite_path() -> Path:
+    """Path of the SQLite file (``/tmp`` on Vercel, whose code folder is read-only)."""
+    on_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+    return Path(os.environ.get("PRISM_DB_PATH", "/tmp/prism.db" if on_vercel else "data/prism.db"))
+
+
+def _connect():
+    if USE_POSTGRES:
+        # TLS is required unless the URL says otherwise (a local server for tests).
+        conn = psycopg2.connect(POSTGRES_URL, **({} if "sslmode=" in POSTGRES_URL else {"sslmode": "require"}))
+        conn.autocommit = False
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
+        return conn
+    path = sqlite_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
-
-
-# ── Diagnostics helper ────────────────────────────────────────────────
-# Used by the FastAPI /api/v1/diagnostics endpoint. Returns a structured
-# view of "what is this process actually seeing" — DB mode, host
-# (credentials stripped), row count, latest run id, and any error — so
-# dashboard users can distinguish "backend cannot reach Neon" from
-# "Neon is reachable but empty" from "rows exist but latest is malformed".
-# Never raises — always returns a dict with an "error" key on failure.
-def diagnose_connection() -> Dict[str, Any]:
-    """Return a structured diagnostic snapshot of the DB layer.
-
-    Shape::
-
-        {
-          "db_mode": "postgres" | "sqlite",
-          "db_host": "ep-xxx.neon.tech" | "<sqlite:/path>",
-          "db_url_env": "POSTGRES_URL" | "DATABASE_URL" | None,
-          "db_reachable": bool,
-          "simulation_run_count": int,
-          "latest_run_id": int | None,
-          "latest_run_date": str | None,
-          "latest_iterations": int | None,
-          "latest_has_shift_matrix": bool,
-          "latest_has_decompositions": bool,
-          "latest_has_totals": bool,
-          "latest_has_vc_decomposition": bool,
-          "error": str | None,
-        }
-    """
-    from urllib.parse import urlparse
-
-    which_env = None
-    if os.environ.get("POSTGRES_URL"):
-        which_env = "POSTGRES_URL"
-    elif os.environ.get("DATABASE_URL"):
-        which_env = "DATABASE_URL"
-
-    out: Dict[str, Any] = {
-        "db_mode": "postgres" if USE_POSTGRES else "sqlite",
-        "db_host": None,
-        "db_url_env": which_env,
-        "db_reachable": False,
-        "simulation_run_count": 0,
-        "latest_run_id": None,
-        "latest_run_date": None,
-        "latest_iterations": None,
-        "latest_has_shift_matrix": False,
-        "latest_has_decompositions": False,
-        "latest_has_totals": False,
-        "latest_has_vc_decomposition": False,
-        "error": None,
-    }
-
-    # resolve host (credential-free)
-    if USE_POSTGRES and POSTGRES_URL:
-        try:
-            out["db_host"] = urlparse(POSTGRES_URL).hostname or "unknown"
-        except Exception:
-            out["db_host"] = "unparseable"
-    else:
-        try:
-            out["db_host"] = f"<sqlite:{_get_sqlite_path()}>"
-        except Exception:
-            out["db_host"] = "<sqlite>"
-
-    # probe DB
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            # count rows
-            cur.execute("SELECT COUNT(*) AS n FROM simulation_runs")
-            row = cur.fetchone()
-            n = row["n"] if isinstance(row, dict) else row[0]
-            out["db_reachable"] = True
-            out["simulation_run_count"] = int(n or 0)
-
-            if out["simulation_run_count"] > 0:
-                cur.execute(
-                    "SELECT id, run_date, iterations, results "
-                    "FROM simulation_runs ORDER BY run_date DESC LIMIT 1"
-                )
-                raw = cur.fetchone()
-                row = _row_to_dict(raw) if raw is not None else None
-                if row:
-                    out["latest_run_id"] = int(row["id"])
-                    run_date = row["run_date"]
-                    out["latest_run_date"] = (
-                        run_date.isoformat() if hasattr(run_date, "isoformat")
-                        else str(run_date) if run_date is not None else None
-                    )
-                    out["latest_iterations"] = int(row["iterations"]) if row["iterations"] is not None else None
-                    results = row["results"]
-                    if isinstance(results, str):
-                        try:
-                            results = json.loads(results)
-                        except Exception:
-                            results = {}
-                    if isinstance(results, dict):
-                        out["latest_has_shift_matrix"] = "shift_matrix" in results
-                        out["latest_has_decompositions"] = "decompositions" in results
-                        out["latest_has_totals"] = "totals" in results
-                        out["latest_has_vc_decomposition"] = "vc_decomposition" in results
-    except Exception as e:
-        out["error"] = f"{type(e).__name__}: {e}"
-        logger.warning("diagnose_connection: DB probe failed: %s", out["error"])
-
-    return out
 
 
 @contextmanager
 def get_db_connection():
+    """A connection that commits on success and rolls back on error.
+
+    Connecting is retried three times with backoff, because a serverless
+    PostgreSQL endpoint can take a moment to wake up.
     """
-    Context manager for database connections with auto-commit.
-    Includes retry logic for cold-start connection failures (Neon/Postgres).
-
-    Returns a connection + a dict-like row factory regardless of backend.
-    Uses %s placeholders for Postgres, ? for SQLite — callers should use
-    the sql() helper or write backend-aware queries.
-
-    Usage:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(...)
-            conn.commit()
-    """
-    max_retries = 3
-    last_error = None
-    conn = None
-
-    for attempt in range(max_retries):
+    conn, last_error = None, None
+    for attempt in range(3):
         try:
-            if USE_POSTGRES:
-                conn = _pg_connect()
-                conn.cursor_factory = psycopg2.extras.RealDictCursor
-            else:
-                conn = _sqlite_connect()
+            conn = _connect()
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 (any driver error is retried)
             last_error = e
-            if attempt < max_retries - 1:
-                import time
+            if attempt < 2:
                 wait = 0.5 * (2 ** attempt)
-                logger.warning(
-                    f"DB connection attempt {attempt + 1}/{max_retries} failed: {e}. "
-                    f"Retrying in {wait:.1f}s..."
-                )
+                logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs", attempt + 1, e, wait)
                 time.sleep(wait)
-            else:
-                logger.error(f"All {max_retries} DB connection attempts failed: {e}")
-
     if conn is None:
-        raise RuntimeError(
-            f"Failed to connect to database after {max_retries} attempts: {last_error}"
-        )
-
+        raise RuntimeError(f"Failed to connect to the database after 3 attempts: {last_error}")
     try:
         yield conn
         conn.commit()
     except Exception as e:
         conn.rollback()
-        logger.error(f"Database error: {e}")
+        logger.error("Database error: %s", e)
         raise
     finally:
         conn.close()
 
 
 def placeholder() -> str:
-    """Return the correct SQL placeholder for the current backend."""
+    """SQL parameter placeholder of the active backend."""
     return "%s" if USE_POSTGRES else "?"
 
 
 def ph(count: int = 1) -> str:
-    """Return comma-separated placeholders. ph(3) → '%s, %s, %s' or '?, ?, ?'"""
-    p = placeholder()
-    return ", ".join([p] * count)
+    """``count`` comma-separated placeholders, e.g. ph(3) == "?, ?, ?"."""
+    return ", ".join([placeholder()] * count)
 
 
-# ── Schema initialization ─────────────────────────────────────────────
+def _row(row) -> dict:
+    return row if isinstance(row, dict) else dict(row)
 
-def _serial_pk() -> str:
-    """Return the correct auto-increment primary key syntax."""
-    return "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+def _int_or_none(val):
+    return None if val is None or val == "" else int(val)
+
+
+# ── Schema ──────────────────────────────────────────────────────────────────
+
+def _schema() -> List[str]:
+    serial = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    return [
+        """CREATE TABLE IF NOT EXISTS drivers (
+            id TEXT PRIMARY KEY,
+            force TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            direction TEXT,
+            probability INTEGER,
+            start_year INTEGER,
+            peak_year INTEGER DEFAULT 0,
+            diffusion_curve TEXT DEFAULT 's_curve',
+            gp1_pct_affected REAL,
+            uncertainty INTEGER,
+            confidence TEXT DEFAULT 'Medium',
+            analysis TEXT,
+            data_source TEXT,
+            baseline TEXT,
+            scores_edited BOOLEAN DEFAULT FALSE,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS driver_category_exposure (
+            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            category TEXT NOT NULL,
+            exposure_score INTEGER,
+            PRIMARY KEY (driver_id, category)
+        )""",
+        """CREATE TABLE IF NOT EXISTS driver_vc_exposure (
+            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            vc_step TEXT NOT NULL,
+            exposure_score INTEGER,
+            PRIMARY KEY (driver_id, vc_step)
+        )""",
+        """CREATE TABLE IF NOT EXISTS driver_regional_exposure (
+            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            region TEXT NOT NULL,
+            exposure_score INTEGER,
+            PRIMARY KEY (driver_id, region)
+        )""",
+        f"""CREATE TABLE IF NOT EXISTS driver_sources (
+            id {serial},
+            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            tier TEXT DEFAULT '',
+            note TEXT DEFAULT ''
+        )""",
+        # One row per (driver, expert): any signed-in user can propose scores
+        # for a driver; admins endorse by editing the driver itself.
+        f"""CREATE TABLE IF NOT EXISTS driver_score_proposals (
+            id {serial},
+            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL,
+            user_name TEXT,
+            user_role TEXT,
+            probability INTEGER,
+            gp1_pct_affected REAL,
+            peak_year INTEGER,
+            diffusion_curve TEXT,
+            uncertainty INTEGER,
+            category_exposure TEXT,
+            regional_exposure TEXT,
+            vc_exposure TEXT,
+            comment TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (driver_id, user_id)
+        )""",
+        # Append-only versions of the Consumer Journey content; the newest row wins.
+        f"""CREATE TABLE IF NOT EXISTS journey_content (
+            id {serial},
+            content TEXT NOT NULL,
+            updated_by TEXT DEFAULT '',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        f"""CREATE TABLE IF NOT EXISTS simulation_runs (
+            id {serial},
+            run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            iterations INTEGER,
+            results TEXT
+        )""",
+        f"""CREATE TABLE IF NOT EXISTS audit_log (
+            id {serial},
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id TEXT,
+            old_value TEXT,
+            new_value TEXT,
+            reason TEXT,
+            user_id TEXT DEFAULT 'system'
+        )""",
+        """CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_drivers_force ON drivers(force)",
+        "CREATE INDEX IF NOT EXISTS idx_driver_score_proposals_driver ON driver_score_proposals(driver_id)",
+        "CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)",
+    ]
+
+
+def table_names(cursor) -> set:
+    """Names of the tables in the connected database."""
+    if USE_POSTGRES:
+        cursor.execute("SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()")
+    else:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    return {_row(r)["name"] for r in cursor.fetchall()}
 
 
 def init_db() -> None:
-    """
-    Initialize database schema.
+    """Create any missing table; safe to call on every start.
 
-    Creates all tables if they don't exist. Safe to call multiple times.
-    Works for both Postgres and SQLite.
+    Refuses a database that still has the tables of the previous schema,
+    because creating the new tables next to them would hide the real data
+    behind an empty driver base.
     """
-    serial = _serial_pk()
-    p = placeholder()
-
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        # ── Core trends table ────────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS drivers (
-                id TEXT PRIMARY KEY,
-                force TEXT NOT NULL,
-                sub_category TEXT,
-                name TEXT NOT NULL,
-                description TEXT,
-                direction TEXT,
-                probability INTEGER,
-                start_year INTEGER,
-                normalized_score REAL,
-                analysis TEXT,
-                data_source TEXT,
-                source_type TEXT,
-                confidence TEXT DEFAULT 'Medium',
-                ai_suggested BOOLEAN DEFAULT FALSE,
-                user_override BOOLEAN DEFAULT FALSE,
-                probability_posterior TEXT,
-                gp1_pct_affected REAL DEFAULT 0.10,
-                peak_year INTEGER DEFAULT 0,
-                diffusion_curve TEXT DEFAULT 's_curve',
-                ai_suggestion TEXT,
-                uncertainty INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Migration: add columns if missing (for existing DBs)
-        for col_sql in [
-            "ALTER TABLE drivers ADD COLUMN gp1_pct_affected REAL DEFAULT 0.10",
-            "ALTER TABLE drivers ADD COLUMN peak_year INTEGER DEFAULT 0",
-            "ALTER TABLE drivers ADD COLUMN diffusion_curve TEXT DEFAULT 's_curve'",
-            # Multi-expert proposals layer (June 2026): immutable AI baseline
-            # snapshot of the originally-seeded scoreable fields, stored as a
-            # JSON blob so the "AI suggestion" reference survives admin edits.
-            "ALTER TABLE drivers ADD COLUMN ai_suggestion TEXT",
-            # 2.11.0 (owner ruling O7): one uncertainty score per trend (0-5,
-            # NULL = not scored → 2.10.0 behaviour). Nullable, no backfill.
-            "ALTER TABLE drivers ADD COLUMN uncertainty INTEGER",
-            "ALTER TABLE driver_score_proposals ADD COLUMN uncertainty INTEGER",
-            "ALTER TABLE driver_sources ADD COLUMN tier TEXT DEFAULT ''",
-            # Free-text expert comment on a trend score proposal (June 2026).
-            # On a fresh DB the proposals table doesn't exist yet at this point
-            # (it is created with the column below); the failure is swallowed
-            # and the CREATE TABLE adds the column. On an existing DB this adds
-            # the column in place.
-            "ALTER TABLE driver_score_proposals ADD COLUMN comment TEXT",
-        ]:
-            try:
-                if POSTGRES_URL:
-                    cursor.execute("SAVEPOINT sp_migrate_col")
-                cursor.execute(col_sql)
-                conn.commit()
-            except Exception:
-                if POSTGRES_URL:
-                    cursor.execute("ROLLBACK TO SAVEPOINT sp_migrate_col")
-                pass  # Column already exists
-
-        # ── Category exposure ────────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS driver_category_exposure (
-                driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-                category TEXT NOT NULL,
-                exposure_score INTEGER,
-                PRIMARY KEY (driver_id, category)
-            )
-        """)
-
-        # ── Value chain exposure ─────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS driver_vc_exposure (
-                driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-                vc_step TEXT NOT NULL,
-                exposure_score INTEGER,
-                PRIMARY KEY (driver_id, vc_step)
-            )
-        """)
-
-        # ── Regional exposure ──────────────────────────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS driver_regional_exposure (
-                driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-                region TEXT NOT NULL,
-                exposure_score INTEGER,
-                PRIMARY KEY (driver_id, region)
-            )
-        """)
-
-        # (trend_journey_exposure removed 2026-07-07, owner ruling O3 —
-        #  the quantitative journey layer was deleted; the qualitative
-        #  journey_content tile store below is unaffected. Existing
-        #  databases: scripts/migrate_drop_legacy.py drops the table.)
-
-        # ── Multi-expert trend score proposals (June 2026) ──────────────
-        # One row per (trend, user): any authenticated user proposes scores
-        # for the 7 scoreable fields of a trend. Aggregates + a named
-        # "who scored what" breakdown are served back via
-        # GET /api/v1/trends/{id}/proposals. Endorsement is NOT a separate
-        # action — the frontend reuses PUT /trends/{id} with chosen values.
-        # Exposure maps are stored as JSON text (same approach as everywhere
-        # else), nullable so a partial proposal never wipes unspecified
-        # fields. UNIQUE(trend_id, user_id) enforces one row per scorer; the
-        # PUT handler upserts/merges into it.
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS driver_score_proposals (
-                id {serial},
-                driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-                user_id TEXT NOT NULL,
-                user_name TEXT,
-                user_role TEXT,
-                probability INTEGER,
-                gp1_pct_affected REAL,
-                peak_year INTEGER,
-                diffusion_curve TEXT,
-                uncertainty INTEGER,
-                category_exposure TEXT,
-                regional_exposure TEXT,
-                vc_exposure TEXT,
-                comment TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE (driver_id, user_id)
-            )
-        """)
-
-        # ── Consumer-journey content store (admin tile map) ─────────────
-        # Versioned single-blob store for the {lhc, hair} journey tile map
-        # edited via the admin UI (PUT /api/v1/journey). The frontend falls
-        # back to its bundled seed module (data/consumerJourney.ts) when no
-        # server-managed content exists yet. Tile-level merging is done
-        # client-side; every save appends a new version row.
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS journey_content (
-                id {serial},
-                content TEXT NOT NULL,
-                updated_by TEXT DEFAULT '',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # ── Trend sources (evidence URLs) ────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS driver_sources (
-                id {serial},
-                driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-                title TEXT NOT NULL,
-                url TEXT NOT NULL,
-                source_type TEXT DEFAULT '',
-                tier TEXT DEFAULT ''
-            )
-        """)
-
-        # NOTE: causal_edges and competitors tables removed in v2.4
-        # (underlying modules not implemented)
-
-        # ── Model configuration snapshots ────────────────────────────
-        # `config_json` + `label` capture the AuditLogger.save_snapshot()
-        # payload (a single serialised blob of the full config + an
-        # operator-supplied label). The structured columns alongside
-        # them are retained for queries that need to filter snapshots
-        # without parsing the JSON blob. `attenuation` (scalar, v3.2) and
-        # `vc_weights` (2.9.0 epicentre partition) are inert legacy
-        # columns — nothing reads or writes them (save_snapshot writes
-        # config_json + label only); dropping them is a DX-scheduled
-        # migration alongside users.password_* (HANDOVER.md §7).
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS config_snapshots (
-                id {serial},
-                snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                region TEXT,
-                attenuation REAL,
-                attenuation_source TEXT,
-                force_weights TEXT,
-                vc_weights TEXT,
-                category_names TEXT,
-                path_years TEXT,
-                materialization_schedule TEXT,
-                config_json TEXT,
-                label TEXT
-            )
-        """)
-
-        # v3.3 migration: databases created before the config_json/label
-        # columns were added need idempotent ALTERs so AuditLogger.save_snapshot()
-        # does not fail with "no column named config_json". Follows the
-        # same pattern as the causal_decomposition → force_attribution
-        # migration a few lines below.
-        for col_ddl in ("config_json TEXT", "label TEXT"):
-            try:
-                if POSTGRES_URL:
-                    cursor.execute("SAVEPOINT sp_add_col")
-                cursor.execute(f"ALTER TABLE config_snapshots ADD COLUMN {col_ddl}")
-                if POSTGRES_URL:
-                    cursor.execute("RELEASE SAVEPOINT sp_add_col")
-            except Exception:
-                if POSTGRES_URL:
-                    cursor.execute("ROLLBACK TO SAVEPOINT sp_add_col")
-                pass  # column already exists
-
-        # ── Simulation runs ──────────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS simulation_runs (
-                id {serial},
-                run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                iterations INTEGER,
-                model_type TEXT,
-                config_snapshot_id INTEGER,
-                results TEXT,
-                force_attribution TEXT,
-                convergence_diagnostics TEXT
-            )
-        """)
-
-        # A6: historical databases had this column named causal_decomposition.
-        # The field was never actually causal — it was always a static force
-        # attribution. Migrate idempotently so old databases keep working.
-        try:
-            if POSTGRES_URL:
-                cursor.execute("SAVEPOINT sp_rename_col")
-            cursor.execute("ALTER TABLE simulation_runs RENAME COLUMN causal_decomposition TO force_attribution")
-            if POSTGRES_URL:
-                cursor.execute("RELEASE SAVEPOINT sp_rename_col")
-        except Exception:
-            if POSTGRES_URL:
-                cursor.execute("ROLLBACK TO SAVEPOINT sp_rename_col")
-            pass  # column already renamed or never existed under old name
-
-        # NOTE: backtest_results table removed in v2.4
-        # (backtesting module not implemented)
-
-        # ── Delphi tables removed (D10, June 2026) ──────────────────
-        # The Delphi elicitation capability was retired; expert consensus
-        # is entered live via the admin Driver editor (user_override=true).
-        # Existing delphi_* tables are archived+dropped by
-        # scripts/migrate_drop_delphi.py — no DDL is created here anymore.
-
-        # ── Early-warning triggers ───────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS triggers (
-                id {serial},
-                category TEXT NOT NULL,
-                condition_type TEXT,
-                threshold REAL,
-                target_year INTEGER,
-                action_text TEXT,
-                status TEXT DEFAULT 'active',
-                fired_date TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # ── AI suggestions queue ─────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS ai_suggestions (
-                id {serial},
-                suggestion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                suggestion_type TEXT,
-                content TEXT,
-                source_urls TEXT,
-                status TEXT DEFAULT 'pending',
-                user_decision_date TIMESTAMP,
-                user_notes TEXT
-            )
-        """)
-
-        # ── Audit log ────────────────────────────────────────────────
-        cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id {serial},
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                action TEXT NOT NULL,
-                entity_type TEXT,
-                entity_id TEXT,
-                old_value TEXT,
-                new_value TEXT,
-                reason TEXT,
-                user_id TEXT DEFAULT 'system'
-            )
-        """)
-
-        # (users table removed 2026-07-07, owner ruling O4 — the engine has
-        #  no user store; Clerk owns identity, roles live in the Next-managed
-        #  user_roles table. scripts/migrate_drop_legacy.py archives+drops
-        #  the legacy table from existing databases.)
-
-        # ── Session snapshots (permanent history) ────────────────────
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS session_snapshots (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                shifts TEXT NOT NULL,
-                trends TEXT,
-                driver_count INTEGER DEFAULT 0,
-                net_shift REAL DEFAULT 0,
-                notes TEXT,
-                created_by TEXT DEFAULT 'system',
-                model_version TEXT,
-                iterations INTEGER
-            )
-        """)
-
-        # (scanned_trends table removed 2026-07-07, owner ruling O4 — the
-        #  scanner was deleted with the AI layer (R2); nothing wrote it since.)
-
-        # ── Indexes ──────────────────────────────────────────────────
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_drivers_force ON drivers(force)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_snapshots_created_at ON session_snapshots(created_at)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_driver_score_proposals_driver ON driver_score_proposals(driver_id)")
-
-        conn.commit()
-        logger.info(f"Database initialized (mode: {'postgres' if USE_POSTGRES else 'sqlite'})")
+        existing = table_names(cursor)
+        if "trends" in existing and "drivers" not in existing:
+            raise LegacySchemaError(
+                "This database uses the previous schema (table 'trends'). Run "
+                "migrations/0001_driver_schema/migrate.py against it before starting PRISM.")
+        for statement in _schema():
+            cursor.execute(statement)
+        for version in SCHEMA_MIGRATIONS:
+            cursor.execute(f"SELECT 1 FROM schema_migrations WHERE version = {placeholder()}", (version,))
+            if cursor.fetchone() is None:
+                cursor.execute(f"INSERT INTO schema_migrations (version) VALUES ({placeholder()})", (version,))
+    logger.info("Database initialised (%s)", "postgres" if USE_POSTGRES else "sqlite")
 
 
-# ── TRENDS ──────────────────────────────────────────────────────────────
+def diagnose_connection() -> Dict[str, Any]:
+    """What this process sees of the database, for /api/v1/diagnostics.
 
-# Columns of `trends` that save_trends writes, in statement order. The id is
-# the conflict target of the upsert below; every other column is overwritten
-# from the incoming object, so a save is a complete replacement of the row's
-# content without the row ever ceasing to exist (F-29).
-_DRIVER_WRITE_COLUMNS = (
-    "id", "force", "sub_category", "name", "description", "direction",
-    "probability", "start_year", "normalized_score",
-    "analysis", "data_source", "source_type", "confidence",
-    "ai_suggested", "user_override", "probability_posterior",
-    "gp1_pct_affected", "peak_year", "diffusion_curve", "ai_suggestion",
-    "uncertainty",
+    Never raises: a failure is reported in ``error``, so the dashboard can tell
+    "cannot reach the database" from "reachable but empty".
+    """
+    which_env = "POSTGRES_URL" if os.environ.get("POSTGRES_URL") else (
+        "DATABASE_URL" if os.environ.get("DATABASE_URL") else None)
+    out: Dict[str, Any] = {
+        "db_mode": "postgres" if USE_POSTGRES else "sqlite",
+        "db_host": (urlparse(POSTGRES_URL).hostname or "unknown") if USE_POSTGRES else f"<sqlite:{sqlite_path()}>",
+        "db_url_env": which_env,
+        "db_reachable": False,
+        "simulation_run_count": 0,
+        "latest_run_id": None,
+        "latest_run_date": None,
+        "error": None,
+    }
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) AS n FROM simulation_runs")
+            out["simulation_run_count"] = int(_row(cursor.fetchone())["n"] or 0)
+            out["db_reachable"] = True
+        latest = latest_run_summary()
+        if latest:
+            out["latest_run_id"] = latest["id"]
+            out["latest_run_date"] = latest["run_date"]
+    except Exception as e:  # noqa: BLE001 (reported, never raised)
+        out["error"] = f"{type(e).__name__}: {e}"
+        logger.warning("diagnose_connection: database probe failed: %s", out["error"])
+    return out
+
+
+# ── Drivers ─────────────────────────────────────────────────────────────────
+
+_DRIVER_COLUMNS = (
+    "id", "force", "name", "description", "direction", "probability", "start_year",
+    "peak_year", "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence",
+    "analysis", "data_source", "baseline", "scores_edited",
 )
 
 
 def save_drivers(drivers: List[Driver]) -> None:
-    """Save trends to database, replacing the content of any trend with the same ID.
+    """Insert or replace drivers, keeping each row (and its proposals) alive.
 
-    F-29 (September 2026): the trend row is UPSERTED, never deleted and
-    re-inserted. `driver_score_proposals` references `trends(id)` with ON
-    DELETE CASCADE, so the old delete-then-insert silently destroyed every
-    expert proposal on a trend each time an admin edited it (PUT
-    /api/v1/drivers/{id}, Review & Endorse, sync, reseed, revert). Postgres
-    enforces the cascade, SQLite does not by default, so it never showed
-    locally. Proposals must only disappear when a trend is genuinely deleted
-    (DELETE /api/v1/drivers/{id}, or the retired ids in
-    scripts/replace_trend_base.py), which still cascades as intended.
-
-    The four derived child tables (category, VC and regional exposure, and
-    sources) are rewritten from the incoming object on every save, so they
-    keep their delete-then-insert. `created_at` survives an edit;
-    `updated_at` is refreshed.
+    The driver row is upserted, never deleted, because expert proposals
+    reference it with ON DELETE CASCADE: deleting and re-inserting on every
+    edit would erase them. The exposure and source rows are rewritten from the
+    object. ``created_at`` survives an edit; ``updated_at`` is refreshed and
+    ``revision`` goes up by one (see drivers_stamp).
     """
     p = placeholder()
-    cols = ", ".join(_DRIVER_WRITE_COLUMNS)
-    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in _DRIVER_WRITE_COLUMNS if c != "id")
+    cols = ", ".join(_DRIVER_COLUMNS)
+    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in _DRIVER_COLUMNS if c != "id")
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        for driver in drivers:
-            cursor.execute(f"DELETE FROM driver_sources WHERE driver_id = {p}", (driver.id,))
-            cursor.execute(f"DELETE FROM driver_category_exposure WHERE driver_id = {p}", (driver.id,))
-            cursor.execute(f"DELETE FROM driver_vc_exposure WHERE driver_id = {p}", (driver.id,))
-            cursor.execute(f"DELETE FROM driver_regional_exposure WHERE driver_id = {p}", (driver.id,))
-
+        for d in drivers:
             cursor.execute(
-                f"""
-                INSERT INTO drivers ({cols}) VALUES ({ph(21)})
-                ON CONFLICT (id) DO UPDATE SET
-                    {updates},
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (
-                    driver.id, driver.force, driver.sub_category, driver.name,
-                    driver.description, driver.direction,
-                    driver.probability, driver.start_year, driver.normalized_score,
-                    driver.analysis, driver.data_source, driver.source_type,
-                    driver.confidence, driver.ai_suggested, driver.user_override,
-                    # F11 rename: probability_prior (was probability_posterior).
-                    # The DB column name stays `probability_posterior` (no
-                    # migration) but the Python field is now probability_prior.
-                    json.dumps(driver.probability_prior) if driver.probability_prior else None,
-                    # M1: persist the actual value (None included) — never
-                    # invent a 10% default at the persistence boundary.
-                    getattr(driver, 'gp1_pct_affected', None),
-                    getattr(driver, 'peak_year', 0),
-                    getattr(driver, 'diffusion_curve', 's_curve'),
-                    # ai_suggestion: immutable AI baseline snapshot (June 2026
-                    # proposals layer). Written on every save from the incoming
-                    # object, so an admin edit or endorsement never erases the
-                    # baseline. None for legacy trends until
-                    # scripts/backfill_ai_suggestion.py runs.
-                    (_safe_dumps(getattr(driver, 'ai_suggestion', None))
-                     if getattr(driver, 'ai_suggestion', None) else None),
-                    # 2.11.0 (O7): uncertainty score, NULL when not scored.
-                    getattr(driver, 'uncertainty', None),
-                ),
+                f"""INSERT INTO drivers ({cols}) VALUES ({ph(len(_DRIVER_COLUMNS))})
+                    ON CONFLICT (id) DO UPDATE SET {updates}, revision = drivers.revision + 1,
+                        updated_at = CURRENT_TIMESTAMP""",
+                (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
+                 d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.confidence,
+                 d.analysis, d.data_source, dumps(d.baseline) if d.baseline else None, d.scores_edited),
             )
-
-            for category, score in driver.category_exposure.items():
+            for table in ("driver_category_exposure", "driver_vc_exposure", "driver_regional_exposure", "driver_sources"):
+                cursor.execute(f"DELETE FROM {table} WHERE driver_id = {p}", (d.id,))
+            for category, score in d.category_exposure.items():
+                cursor.execute(f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
+                               (d.id, category, score))
+            for step, score in d.vc_exposure.items():
+                cursor.execute(f"INSERT INTO driver_vc_exposure (driver_id, vc_step, exposure_score) VALUES ({ph(3)})",
+                               (d.id, step, score))
+            for region, score in d.regional_exposure.items():
+                cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
+                               (d.id, region, score))
+            for src in d.sources or []:
                 cursor.execute(
-                    f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
-                    (driver.id, category, score),
+                    f"INSERT INTO driver_sources (driver_id, title, url, tier, note) VALUES ({ph(5)})",
+                    (d.id, src.get("title", ""), src.get("url", ""), src.get("tier", ""), src.get("note", "")),
                 )
-
-            for vc_step, score in driver.vc_exposure.items():
-                cursor.execute(
-                    f"INSERT INTO driver_vc_exposure (driver_id, vc_step, exposure_score) VALUES ({ph(3)})",
-                    (driver.id, vc_step, score),
-                )
-
-            for region, score in driver.regional_exposure.items():
-                cursor.execute(
-                    f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
-                    (driver.id, region, score),
-                )
-
-            # Save source URLs if available
-            sources = getattr(driver, 'sources', None) or []
-            for src in sources:
-                cursor.execute(
-                    f"INSERT INTO driver_sources (driver_id, title, url, source_type, tier) VALUES ({ph(5)})",
-                    (driver.id, src.get("title", ""), src.get("url", ""), src.get("source_type", src.get("data", "")), src.get("tier", "")),
-                )
-
-        conn.commit()
-        logger.info(f"Saved {len(drivers)} drivers to database")
-
-
-def _row_to_dict(row) -> dict:
-    """Convert a database row to a plain dict (works for both backends)."""
-    if isinstance(row, dict):
-        return row
-    # sqlite3.Row
-    return dict(row)
-
-
-def _int_or_none(val):
-    """Nullable integer column reader (uncertainty, 2.11.0)."""
-    if val is None or val == "":
-        return None
-    try:
-        return int(val)
-    except (TypeError, ValueError):
-        return None
-
-
-def _parse_json_blob(val):
-    """Parse a JSON text column, or pass through dicts/lists.
-
-    SQLite stores JSON as TEXT; Postgres may return native dict/list for
-    JSONB-typed columns. Returns None for empty/None/invalid values.
-    """
-    if val is None:
-        return None
-    if isinstance(val, (dict, list)):
-        return val
-    try:
-        return json.loads(val)
-    except (json.JSONDecodeError, TypeError):
-        return None
+    logger.info("Saved %d drivers", len(drivers))
 
 
 def load_drivers() -> List[Driver]:
-    """Load all trends from database."""
-    p = placeholder()
+    """All drivers with their exposures and sources, ordered by id.
+
+    The order is part of the reproducibility contract: the copula pairs draws
+    with drivers by position, so the same inputs and seed give the same result
+    only if the drivers always arrive in the same order.
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        # C2 (July 2026 review): deterministic load order is part of the
-        # reproducibility contract — "same inputs + seed → same result" is
-        # only true if the trend vector always arrives in the same order.
-        # Physical row order changes after edits/VACUUM; never rely on it.
         cursor.execute("SELECT * FROM drivers ORDER BY id")
-        driver_rows = cursor.fetchall()
+        rows = [_row(r) for r in cursor.fetchall()]
+        exposures: Dict[str, Dict[str, dict]] = {r["id"]: {"category": {}, "vc": {}, "region": {}} for r in rows}
+        for table, key, column in (("driver_category_exposure", "category", "category"),
+                                   ("driver_vc_exposure", "vc", "vc_step"),
+                                   ("driver_regional_exposure", "region", "region")):
+            cursor.execute(f"SELECT driver_id, {column} AS k, exposure_score FROM {table}")
+            for r in cursor.fetchall():
+                r = _row(r)
+                if r["driver_id"] in exposures:
+                    exposures[r["driver_id"]][key][r["k"]] = r["exposure_score"]
+        sources: Dict[str, list] = {r["id"]: [] for r in rows}
+        cursor.execute("SELECT driver_id, title, url, tier, note FROM driver_sources ORDER BY id")
+        for r in cursor.fetchall():
+            r = _row(r)
+            if r["driver_id"] in sources:
+                sources[r["driver_id"]].append({"title": r["title"], "url": r["url"],
+                                                "tier": r["tier"] or "", "note": r["note"] or ""})
 
-        drivers = []
-        for raw_row in driver_rows:
-            row = _row_to_dict(raw_row)
-
-            cursor.execute(
-                f"SELECT category, exposure_score FROM driver_category_exposure WHERE driver_id = {p}",
-                (row["id"],),
-            )
-            cat_exposures = {_row_to_dict(r)["category"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
-
-            cursor.execute(
-                f"SELECT vc_step, exposure_score FROM driver_vc_exposure WHERE driver_id = {p}",
-                (row["id"],),
-            )
-            vc_exposures = {_row_to_dict(r)["vc_step"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
-
-            cursor.execute(
-                f"SELECT region, exposure_score FROM driver_regional_exposure WHERE driver_id = {p}",
-                (row["id"],),
-            )
-            regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
-
-
-            prob_posterior = (
-                tuple(json.loads(row["probability_posterior"]))
-                if row.get("probability_posterior")
-                else None
-            )
-
-            ai_suggestion = _parse_json_blob(row.get("ai_suggestion"))
-
-            # Load source URLs
-            try:
-                cursor.execute(
-                    f"SELECT title, url, source_type, tier FROM driver_sources WHERE driver_id = {p}",
-                    (row["id"],),
-                )
-                sources = [
-                    {"title": _row_to_dict(r)["title"], "url": _row_to_dict(r)["url"], "data": _row_to_dict(r).get("source_type", ""), "tier": _row_to_dict(r).get("tier", "")}
-                    for r in cursor.fetchall()
-                ]
-            except Exception:
-                sources = []
-
-            driver = Driver(
-                id=row["id"],
-                force=row["force"],
-                sub_category=row.get("sub_category"),
-                name=row["name"],
-                description=row.get("description"),
-                direction=row.get("direction"),
-                probability=row.get("probability"),
-                start_year=row.get("start_year"),
-                normalized_score=row.get("normalized_score"),
-                analysis=row.get("analysis"),
-                category_exposure=cat_exposures,
-                vc_exposure=vc_exposures,
-                regional_exposure=regional_exposures,
-                data_source=row.get("data_source"),
-                source_type=row.get("source_type"),
-                confidence=row.get("confidence", "Medium"),
-                last_updated=row["updated_at"] if isinstance(row.get("updated_at"), datetime) else (datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow()),
-                ai_suggested=row.get("ai_suggested", False),
-                user_override=row.get("user_override", False),
-                # M1 (July 2026 review): pass missing gp1 through as None so the
-                # engine's deliberate data-quality stop fires. The old
-                # `… , 0.10) or 0.10` silently invented a 10% magnitude for
-                # missing/zero values, defeating the hard-fail in
-                # _generate_copula_samples.
-                gp1_pct_affected=row.get("gp1_pct_affected"),
-                peak_year=row.get("peak_year", 0) or 0,
-                diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
-                probability_prior=prob_posterior,
-                ai_suggestion=ai_suggestion,
-                uncertainty=_int_or_none(row.get("uncertainty")),
-            )
-            # Attach sources as transient attribute (not in dataclass)
-            driver.sources = sources
-            drivers.append(driver)
-
-        logger.info(f"Loaded {len(drivers)} drivers from database")
-        return drivers
+    drivers = []
+    for r in rows:
+        e = exposures[r["id"]]
+        drivers.append(Driver(
+            id=r["id"],
+            force=r["force"],
+            name=r["name"],
+            description=r["description"] or "",
+            direction=r["direction"],
+            probability=r["probability"],
+            start_year=r["start_year"],
+            analysis=r["analysis"] or "",
+            category_exposure=e["category"],
+            vc_exposure=e["vc"],
+            regional_exposure=e["region"],
+            data_source=r["data_source"] or "",
+            sources=sources[r["id"]],
+            confidence=r["confidence"] or "Medium",
+            # A missing GP1 share stays missing so the engine refuses to run.
+            gp1_pct_affected=r["gp1_pct_affected"],
+            peak_year=r["peak_year"] or 0,
+            diffusion_curve=r["diffusion_curve"] or "s_curve",
+            uncertainty=_int_or_none(r["uncertainty"]),
+            baseline=_loads(r["baseline"]),
+            scores_edited=bool(r["scores_edited"]),
+        ))
+    logger.info("Loaded %d drivers", len(drivers))
+    return drivers
 
 
-def get_driver_by_id(driver_id: str) -> Optional[Driver]:
-    """Load a single trend by ID."""
-    p = placeholder()
+def drivers_stamp() -> tuple:
+    """(row count, sum of row revisions) of the drivers table.
+
+    Every write to a driver row raises its revision by one and rows are never
+    deleted by the application, so the pair changes with every committed save,
+    however close together two saves are. (A timestamp would not do: two saves
+    can share one, and a transaction that started earlier can commit later.)
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM drivers WHERE id = {p}", (driver_id,))
-        raw_row = cursor.fetchone()
-
-        if not raw_row:
-            return None
-
-        row = _row_to_dict(raw_row)
-
-        cursor.execute(
-            f"SELECT category, exposure_score FROM driver_category_exposure WHERE driver_id = {p}",
-            (driver_id,),
-        )
-        cat_exposures = {_row_to_dict(r)["category"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
-
-        cursor.execute(
-            f"SELECT vc_step, exposure_score FROM driver_vc_exposure WHERE driver_id = {p}",
-            (driver_id,),
-        )
-        vc_exposures = {_row_to_dict(r)["vc_step"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
-
-        cursor.execute(
-            f"SELECT region, exposure_score FROM driver_regional_exposure WHERE driver_id = {p}",
-            (driver_id,),
-        )
-        regional_exposures = {_row_to_dict(r)["region"]: _row_to_dict(r)["exposure_score"] for r in cursor.fetchall()}
+        cursor.execute("SELECT COUNT(*) AS n, COALESCE(SUM(revision), 0) AS revisions FROM drivers")
+        r = _row(cursor.fetchone())
+    return int(r["n"] or 0), int(r["revisions"] or 0)
 
 
-        prob_posterior = (
-            tuple(json.loads(row["probability_posterior"]))
-            if row.get("probability_posterior")
-            else None
-        )
+# ── Simulation runs ─────────────────────────────────────────────────────────
 
-        ai_suggestion = _parse_json_blob(row.get("ai_suggestion"))
-
-        return Driver(
-            id=row["id"],
-            force=row["force"],
-            sub_category=row.get("sub_category"),
-            name=row["name"],
-            description=row.get("description"),
-            direction=row.get("direction"),
-            probability=row.get("probability"),
-            start_year=row.get("start_year"),
-            normalized_score=row.get("normalized_score"),
-            analysis=row.get("analysis"),
-            category_exposure=cat_exposures,
-            vc_exposure=vc_exposures,
-            regional_exposure=regional_exposures,
-            data_source=row.get("data_source"),
-            source_type=row.get("source_type"),
-            confidence=row.get("confidence", "Medium"),
-            last_updated=row["updated_at"] if isinstance(row.get("updated_at"), datetime) else (datetime.fromisoformat(row["updated_at"]) if row.get("updated_at") else datetime.utcnow()),
-            ai_suggested=row.get("ai_suggested", False),
-            user_override=row.get("user_override", False),
-            # July 2026 review: these three were silently dropped here, so any
-            # caller that round-tripped this object into save_trends() wiped
-            # the trend's magnitude/timing fields. Keep in sync with
-            # load_trends().
-            gp1_pct_affected=row.get("gp1_pct_affected"),
-            peak_year=row.get("peak_year", 0) or 0,
-            diffusion_curve=row.get("diffusion_curve", "s_curve") or "s_curve",
-            probability_prior=prob_posterior,  # F11 rename (the dataclass field)
-            ai_suggestion=ai_suggestion,
-            uncertainty=_int_or_none(row.get("uncertainty")),
-        )
-
-
-# ── CAUSAL EDGES ────────────────────────────────────────────────────────
-
-# ── SIMULATION RUNS ────────────────────────────────────────────────────
-
-def save_simulation_run(
-    iterations: int,
-    model_type: str,
-    results: dict,
-    force_attribution: Optional[dict] = None,
-    convergence_diagnostics: Optional[dict] = None,
-    config_snapshot_id: Optional[int] = None,
-    # A6 backward-compat alias — old callers can still pass causal_decomposition
-    causal_decomposition: Optional[dict] = None,
-) -> int:
-    """Save a simulation run result to database."""
-    # A6: accept the old kwarg name as an alias for one release cycle
-    if force_attribution is None and causal_decomposition is not None:
-        logger.warning(
-            "causal_decomposition parameter is deprecated — use force_attribution instead"
-        )
-        force_attribution = causal_decomposition
-
-    p = placeholder()
+def save_simulation_run(iterations: int, results: dict) -> int:
+    """Persist a run's results bundle and return its id."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
+        sql = f"INSERT INTO simulation_runs (iterations, results) VALUES ({ph(2)})"
         if USE_POSTGRES:
-            cursor.execute(
-                f"""
-                INSERT INTO simulation_runs (
-                    iterations, model_type, results,
-                    force_attribution,
-                    convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(6)}) RETURNING id
-                """,
-                (
-                    iterations, model_type, _safe_dumps(results),
-                    _safe_dumps(force_attribution) if force_attribution else None,
-                    _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
-                    config_snapshot_id,
-                ),
-            )
-            run_id = cursor.fetchone()["id"]
+            cursor.execute(sql + " RETURNING id", (iterations, dumps(results)))
+            run_id = _row(cursor.fetchone())["id"]
         else:
-            cursor.execute(
-                f"""
-                INSERT INTO simulation_runs (
-                    iterations, model_type, results,
-                    force_attribution,
-                    convergence_diagnostics, config_snapshot_id
-                ) VALUES ({ph(6)})
-                """,
-                (
-                    iterations, model_type, _safe_dumps(results),
-                    _safe_dumps(force_attribution) if force_attribution else None,
-                    _safe_dumps(convergence_diagnostics) if convergence_diagnostics else None,
-                    config_snapshot_id,
-                ),
-            )
+            cursor.execute(sql, (iterations, dumps(results)))
             run_id = cursor.lastrowid
-
-        conn.commit()
-        logger.info(f"Saved simulation run {run_id}: ({iterations} iterations)")
-        return run_id
+    logger.info("Saved simulation run %s (%d iterations)", run_id, iterations)
+    return run_id
 
 
-def load_simulation_runs(
-    limit: int = 100
-) -> List[Dict[str, Any]]:
-    """Load simulation runs from database."""
-    p = placeholder()
+def _as_datetime(val):
+    return datetime.fromisoformat(val) if isinstance(val, str) else val
+
+
+def load_latest_run() -> Optional[Dict[str, Any]]:
+    """The newest persisted run with its decoded results, or None."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        cursor.execute(
-            f"""
-            SELECT id, run_date, iterations, model_type,
-                   results, force_attribution,
-                   convergence_diagnostics
-            FROM simulation_runs
-            ORDER BY run_date DESC
-            LIMIT {p}
-            """,
-            (limit,),
-        )
-
-        runs = []
-        for raw_row in cursor.fetchall():
-            row = _row_to_dict(raw_row)
-            run_date = row["run_date"]
-            if isinstance(run_date, str):
-                run_date = datetime.fromisoformat(run_date)
-
-            def _safe_json(val):
-                """Parse JSON string or return dict as-is (Postgres returns dicts for JSONB)."""
-                if val is None:
-                    return None
-                if isinstance(val, (dict, list)):
-                    return val
-                try:
-                    return json.loads(val)
-                except (json.JSONDecodeError, TypeError):
-                    return {}
-
-            run = {
-                "id": row["id"],
-                "run_date": run_date,
-                "iterations": row["iterations"],
-                "model_type": row["model_type"],
-                "results": _safe_json(row["results"]) or {},
-                "force_attribution": _safe_json(row.get("force_attribution")),
-                "convergence_diagnostics": _safe_json(row.get("convergence_diagnostics")),
-            }
-            runs.append(run)
-
-        logger.info(f"Loaded {len(runs)} simulation runs from database")
-        return runs
+        cursor.execute("SELECT id, run_date, iterations, results FROM simulation_runs "
+                       "ORDER BY run_date DESC, id DESC LIMIT 1")
+        raw = cursor.fetchone()
+    if raw is None:
+        return None
+    r = _row(raw)
+    return {"id": r["id"], "run_date": _as_datetime(r["run_date"]), "iterations": r["iterations"],
+            "results": _loads(r["results"]) or {}}
 
 
-# ── CONSUMER JOURNEY CONTENT (admin-managed tile map) ───────────────────
+def latest_run_summary() -> Optional[Dict[str, Any]]:
+    """Id and date of the newest run, without loading its results."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, run_date FROM simulation_runs ORDER BY run_date DESC, id DESC LIMIT 1")
+        raw = cursor.fetchone()
+    if raw is None:
+        return None
+    r = _row(raw)
+    run_date = _as_datetime(r["run_date"])
+    return {"id": int(r["id"]), "run_date": run_date.isoformat() if run_date else None}
+
+
+# ── Consumer Journey content ────────────────────────────────────────────────
 
 def save_journey_content(content: dict, updated_by: str = "") -> None:
-    """Persist the full journey content blob ({lhc, hair} tile map).
-
-    Append-only versioning: every save inserts a new row; readers take the
-    latest. Validation of the {lhc: [...], hair: [...]} shape happens in
-    the API layer (prism/api/routers/journey.py)."""
-    p = placeholder()
+    """Store a new version of the journey content ({lhc, hair} tile map)."""
     with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})",
-            (_safe_dumps(content), updated_by or ""),
-        )
-        conn.commit()
-        logger.info(f"Saved journey content version (by {updated_by or 'unknown'})")
+        conn.cursor().execute(f"INSERT INTO journey_content (content, updated_by) VALUES ({ph(2)})",
+                              (dumps(content), updated_by or ""))
+    logger.info("Saved journey content (by %s)", updated_by or "unknown")
 
 
 def load_journey_content() -> Optional[dict]:
-    """Load the latest admin-managed journey content blob, or None when no
-    server-managed content exists yet (frontend then uses its bundled
-    seed module data/consumerJourney.ts)."""
+    """The newest journey content, or None when only the bundled seed exists."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1"
-        )
+        cursor.execute("SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")
         row = cursor.fetchone()
-        if not row:
-            return None
-        content = _row_to_dict(row).get("content")
-        if content is None:
-            return None
-        return json.loads(content) if isinstance(content, str) else content
+    return _loads(_row(row)["content"]) if row else None
 
 
-# ── TREND SCORE PROPOSALS (multi-expert) ────────────────────────────────
-# One row per (trend, user). Exposure maps are stored as JSON text and
-# read back as dicts. A proposal is PARTIAL: any subset of the 7 scoreable
-# fields may be set; NULL/absent fields mean "this user did not score that".
+# ── Expert score proposals ──────────────────────────────────────────────────
+# A proposal is partial: any subset of the scoreable fields may be set, and a
+# NULL field means "this expert did not score that".
 
 _PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty")
 _PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
-# Plain-text fields merged verbatim (no JSON encode, no numeric clamp).
 _PROPOSAL_TEXT_FIELDS = ("comment",)
+_PROPOSAL_COLUMNS = ("user_id, user_name, user_role, probability, gp1_pct_affected, peak_year, "
+                     "diffusion_curve, uncertainty, category_exposure, regional_exposure, vc_exposure, "
+                     "comment, updated_at")
 
 
-def _proposal_row_to_dict(raw) -> dict:
-    """Normalize one driver_score_proposals row into a plain dict, decoding
-    the JSON exposure-map columns."""
-    row = _row_to_dict(raw)
+def _proposal(raw) -> dict:
+    r = _row(raw)
     return {
-        "user_id": row.get("user_id"),
-        "user_name": row.get("user_name"),
-        "user_role": row.get("user_role"),
-        "probability": row.get("probability"),
-        "gp1_pct_affected": row.get("gp1_pct_affected"),
-        "peak_year": row.get("peak_year"),
-        "diffusion_curve": row.get("diffusion_curve"),
-        "uncertainty": _int_or_none(row.get("uncertainty")),
-        "category_exposure": _parse_json_blob(row.get("category_exposure")),
-        "regional_exposure": _parse_json_blob(row.get("regional_exposure")),
-        "vc_exposure": _parse_json_blob(row.get("vc_exposure")),
-        "comment": row.get("comment"),
-        "updated_at": row.get("updated_at"),
+        "user_id": r.get("user_id"),
+        "user_name": r.get("user_name"),
+        "user_role": r.get("user_role"),
+        "probability": r.get("probability"),
+        "gp1_pct_affected": r.get("gp1_pct_affected"),
+        "peak_year": r.get("peak_year"),
+        "diffusion_curve": r.get("diffusion_curve"),
+        "uncertainty": _int_or_none(r.get("uncertainty")),
+        "category_exposure": _loads(r.get("category_exposure")),
+        "regional_exposure": _loads(r.get("regional_exposure")),
+        "vc_exposure": _loads(r.get("vc_exposure")),
+        "comment": r.get("comment"),
+        "updated_at": r.get("updated_at"),
     }
 
 
 def load_driver_proposals(driver_id: str) -> List[Dict[str, Any]]:
-    """Load all score proposals for a trend, decoded into dicts.
-
-    Returns [] if the table is empty for that trend. Never raises on a
-    missing table — callers may run before init_db on a fresh DB.
-    """
-    p = placeholder()
+    """Every expert proposal for one driver, oldest first."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        try:
-            cursor.execute(
-                f"""
-                SELECT user_id, user_name, user_role, probability,
-                       gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
-                       category_exposure, regional_exposure, vc_exposure,
-                       comment, updated_at
-                FROM driver_score_proposals
-                WHERE driver_id = {p}
-                ORDER BY updated_at ASC, user_id ASC
-                """,
-                (driver_id,),
-            )
-        except Exception as e:
-            logger.warning(f"load_trend_proposals: query failed ({e}) — returning []")
-            return []
-        return [_proposal_row_to_dict(r) for r in cursor.fetchall()]
+        cursor.execute(f"SELECT {_PROPOSAL_COLUMNS} FROM driver_score_proposals "
+                       f"WHERE driver_id = {placeholder()} ORDER BY updated_at ASC, user_id ASC", (driver_id,))
+        return [_proposal(r) for r in cursor.fetchall()]
 
 
 def load_all_driver_proposals() -> Dict[str, List[Dict[str, Any]]]:
-    """Load every score proposal grouped by driver_id (one DB round-trip).
-
-    Used to attach `proposal_summary` to the trend list cheaply. Returns
-    {} on a missing table.
-    """
+    """Every proposal grouped by driver id, in one query."""
     out: Dict[str, List[Dict[str, Any]]] = {}
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        try:
-            cursor.execute(
-                """
-                SELECT driver_id, user_id, user_name, user_role, probability,
-                       gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
-                       category_exposure, regional_exposure, vc_exposure,
-                       comment, updated_at
-                FROM driver_score_proposals
-                ORDER BY updated_at ASC, user_id ASC
-                """
-            )
-        except Exception as e:
-            logger.warning(f"load_all_trend_proposals: query failed ({e}) — returning {{}}")
-            return {}
+        cursor.execute(f"SELECT driver_id, {_PROPOSAL_COLUMNS} FROM driver_score_proposals "
+                       "ORDER BY updated_at ASC, user_id ASC")
         for raw in cursor.fetchall():
-            row = _row_to_dict(raw)
-            tid = row.get("driver_id")
-            if tid is None:
-                continue
-            out.setdefault(tid, []).append(_proposal_row_to_dict(row))
+            r = _row(raw)
+            out.setdefault(r["driver_id"], []).append(_proposal(r))
     return out
 
 
-def upsert_driver_proposal(
-    driver_id: str,
-    user_id: str,
-    fields: Dict[str, Any],
-    user_name: str = "",
-    user_role: str = "",
-) -> Dict[str, Any]:
-    """Merge a partial proposal into this user's row (insert or update).
+def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
+                           user_name: str = "", user_role: str = "") -> Dict[str, Any]:
+    """Merge a partial proposal into this expert's row and return the merged row.
 
-    `fields` carries only the keys the caller is changing. Scalar fields are
-    written as-is; map fields (category/regional/vc exposure) are JSON-encoded.
-    Keys NOT present in `fields` are LEFT UNTOUCHED on an existing row (never
-    wiped). Returns the merged row as a dict.
+    Only the keys present in ``fields`` change; everything else on an existing
+    row is left as it was.
     """
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
-
-        # Load any existing row for this (trend, user) to merge into.
-        cursor.execute(
-            f"""
-            SELECT user_id, user_name, user_role, probability, gp1_pct_affected,
-                   peak_year, diffusion_curve, uncertainty, category_exposure,
-                   regional_exposure, vc_exposure, comment, updated_at
-            FROM driver_score_proposals
-            WHERE driver_id = {p} AND user_id = {p}
-            """,
-            (driver_id, user_id),
-        )
+        cursor.execute(f"SELECT {_PROPOSAL_COLUMNS} FROM driver_score_proposals "
+                       f"WHERE driver_id = {p} AND user_id = {p}", (driver_id, user_id))
         existing = cursor.fetchone()
-        merged = _proposal_row_to_dict(existing) if existing else {
-            "probability": None, "gp1_pct_affected": None, "peak_year": None,
-            "diffusion_curve": None, "uncertainty": None, "category_exposure": None,
-            "regional_exposure": None, "vc_exposure": None, "comment": None,
-        }
-
-        # Apply the partial update (only keys present in `fields`).
+        merged = _proposal(existing) if existing else {
+            k: None for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS}
         for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS:
             if k in fields:
                 merged[k] = fields[k]
 
-        def _enc(v):
-            return _safe_dumps(v) if v is not None else None
+        def enc(v):
+            return dumps(v) if v is not None else None
 
-        now = datetime.utcnow()
+        values = (user_name or "", user_role or "",
+                  merged.get("probability"), merged.get("gp1_pct_affected"), merged.get("peak_year"),
+                  merged.get("diffusion_curve"), merged.get("uncertainty"),
+                  enc(merged.get("category_exposure")), enc(merged.get("regional_exposure")),
+                  enc(merged.get("vc_exposure")), merged.get("comment"))
         if existing:
             cursor.execute(
-                f"""
-                UPDATE driver_score_proposals
-                SET user_name = {p}, user_role = {p}, probability = {p},
-                    gp1_pct_affected = {p}, peak_year = {p}, diffusion_curve = {p},
-                    uncertainty = {p},
-                    category_exposure = {p}, regional_exposure = {p},
-                    vc_exposure = {p}, comment = {p}, updated_at = {p}
-                WHERE driver_id = {p} AND user_id = {p}
-                """,
-                (
-                    user_name or "", user_role or "",
-                    merged.get("probability"), merged.get("gp1_pct_affected"),
-                    merged.get("peak_year"), merged.get("diffusion_curve"),
-                    merged.get("uncertainty"),
-                    _enc(merged.get("category_exposure")),
-                    _enc(merged.get("regional_exposure")),
-                    _enc(merged.get("vc_exposure")),
-                    merged.get("comment"),
-                    now, driver_id, user_id,
-                ),
-            )
+                f"""UPDATE driver_score_proposals
+                    SET user_name = {p}, user_role = {p}, probability = {p}, gp1_pct_affected = {p},
+                        peak_year = {p}, diffusion_curve = {p}, uncertainty = {p},
+                        category_exposure = {p}, regional_exposure = {p}, vc_exposure = {p},
+                        comment = {p}, updated_at = CURRENT_TIMESTAMP
+                    WHERE driver_id = {p} AND user_id = {p}""",
+                values + (driver_id, user_id))
         else:
             cursor.execute(
-                f"""
-                INSERT INTO driver_score_proposals (
-                    driver_id, user_id, user_name, user_role, probability,
-                    gp1_pct_affected, peak_year, diffusion_curve, uncertainty,
-                    category_exposure, regional_exposure, vc_exposure,
-                    comment, updated_at
-                ) VALUES ({ph(14)})
-                """,
-                (
-                    driver_id, user_id, user_name or "", user_role or "",
-                    merged.get("probability"), merged.get("gp1_pct_affected"),
-                    merged.get("peak_year"), merged.get("diffusion_curve"),
-                    merged.get("uncertainty"),
-                    _enc(merged.get("category_exposure")),
-                    _enc(merged.get("regional_exposure")),
-                    _enc(merged.get("vc_exposure")),
-                    merged.get("comment"),
-                    now,
-                ),
-            )
-        conn.commit()
+                f"""INSERT INTO driver_score_proposals (driver_id, user_id, user_name, user_role, probability,
+                        gp1_pct_affected, peak_year, diffusion_curve, uncertainty, category_exposure,
+                        regional_exposure, vc_exposure, comment)
+                    VALUES ({ph(13)})""",
+                (driver_id, user_id) + values)
 
-    merged["user_id"] = user_id
-    merged["user_name"] = user_name or ""
-    merged["user_role"] = user_role or ""
+    merged.update(user_id=user_id, user_name=user_name or "", user_role=user_role or "")
     return merged
 
 
-# ── AUDIT LOG ───────────────────────────────────────────────────────────
+# ── Audit log ───────────────────────────────────────────────────────────────
 
-def log_audit(
-    action: str,
-    entity_type: str,
-    entity_id: str,
-    old_value: Optional[str] = None,
-    new_value: Optional[str] = None,
-    reason: Optional[str] = None,
-    user_id: str = "system",
-) -> None:
-    """Log an action to the audit trail."""
-    p = placeholder()
+def log_audit(action: str, entity_type: str, entity_id: str, old_value: Optional[str] = None,
+              new_value: Optional[str] = None, reason: Optional[str] = None,
+              user_id: str = "system") -> None:
+    """Append one entry to the audit log."""
     with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"""
-            INSERT INTO audit_log (
-                action, entity_type, entity_id, old_value, new_value, reason, user_id
-            ) VALUES ({ph(7)})
-            """,
-            (action, entity_type, entity_id, old_value, new_value, reason, user_id),
-        )
-        conn.commit()
-
-
-def get_audit_log(
-    limit: int = 100, entity_type: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """Get audit log entries."""
-    p = placeholder()
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-
-        if entity_type:
-            cursor.execute(
-                f"""
-                SELECT id, timestamp, action, entity_type, entity_id,
-                       old_value, new_value, reason, user_id
-                FROM audit_log
-                WHERE entity_type = {p}
-                ORDER BY timestamp DESC
-                LIMIT {p}
-                """,
-                (entity_type, limit),
-            )
-        else:
-            cursor.execute(
-                f"""
-                SELECT id, timestamp, action, entity_type, entity_id,
-                       old_value, new_value, reason, user_id
-                FROM audit_log
-                ORDER BY timestamp DESC
-                LIMIT {p}
-                """,
-                (limit,),
-            )
-
-        logs = []
-        for raw_row in cursor.fetchall():
-            row = _row_to_dict(raw_row)
-            ts = row["timestamp"]
-            if isinstance(ts, str):
-                ts = datetime.fromisoformat(ts)
-            logs.append({
-                "id": row["id"],
-                "timestamp": ts,
-                "action": row["action"],
-                "entity_type": row["entity_type"],
-                "entity_id": row["entity_id"],
-                "old_value": row["old_value"],
-                "new_value": row["new_value"],
-                "reason": row["reason"],
-                "user_id": row["user_id"],
-            })
-
-        return logs
-
-
-# ── Database Health & Stats ────────────────────────────────────────────
-
-def get_db_stats() -> Dict[str, int]:
-    """Get database statistics (record counts per table)."""
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-
-        # `users` was dropped with the legacy cleanup (O4, run against every
-        # database on 2026-09-11): identity is Clerk, roles live in the
-        # Next-managed `user_roles` table, the engine has no user store.
-        tables = [
-            "trends", "simulation_runs",
-            "triggers", "ai_suggestions",
-            "audit_log", "session_snapshots",
-        ]
-
-        stats = {}
-        for table in tables:
-            try:
-                cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-                row = _row_to_dict(cursor.fetchone())
-                stats[table] = row["count"]
-            except Exception:
-                # Postgres aborts the whole transaction on a failed statement,
-                # so clear it — otherwise one missing table would report every
-                # later table as 0 too.
-                conn.rollback()
-                stats[table] = 0
-
-        return stats
-
-
-if __name__ == "__main__":
-    init_db()
-    stats = get_db_stats()
-    print(f"Database mode: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
-    print("Database statistics:")
-    for table, count in stats.items():
-        print(f"  {table}: {count}")
+        conn.cursor().execute(
+            f"INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id) "
+            f"VALUES ({ph(7)})",
+            (action, entity_type, entity_id, old_value, new_value, reason, user_id))

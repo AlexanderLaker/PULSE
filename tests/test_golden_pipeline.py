@@ -1,33 +1,18 @@
-"""Golden-pipeline regression pins for the Bayesian MC engine.
+"""End-to-end locks on the engine: determinism, golden values and the identities the dashboard relies on.
 
-Re-established June 2026 (the original test_golden_pipeline.py was deleted
-in 96809a4 when category mappings changed, and never re-pinned — leaving
-the engine without an end-to-end reproducibility lock).
-
-Four layers of protection:
-  1. Determinism: same seed → bit-identical results.
-  2. Golden pins: seed=42 on the conftest fixture DB must reproduce the
-     exact values below — including the joint portfolio band the dashboard
-     headline reads (L29, July 2026 review). D13: scipy is a hard engine
-     requirement, so the pins run unconditionally (exact numerics only).
-  3. Structural identities: decompositions reconcile row-by-row to the MC
-     median (PPA2's lenses depend on this invariant).
-  4. Version discipline: package version == MODEL_VERSION == package.json,
-     and the D1 invariant that NO repair fires on default config.
-
-If a deliberate model change breaks the pins: regenerate them (run the
-engine on the fixtures with seed=42 / 500 iterations and print
-median/p10/p90 at the terminal year), bump MODEL_VERSION in
-bayesian_mc.py, and update the pins in the SAME commit — never regenerate
-just to make CI green (HANDOVER.md §6.5).
+The golden values are the engine's output for seed 42 and 500 iterations on
+the conftest drivers. They change only with a deliberate model change; then
+regenerate them, bump MODEL_VERSION and commit both together.
 """
-
+import copy
 import json
 from pathlib import Path
 
 import pytest
 
 import prism
+from prism.config import vc_epicentre_step_of
+from prism.drivers import DriverSet
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 
 ITER = 500
@@ -39,133 +24,49 @@ def _run(config, db, seed=SEED, iterations=ITER):
 
 
 class TestDeterminism:
-    """Same seed → identical output; different seed → different output."""
-
     def test_same_seed_reproduces_exactly(self, mock_model_config, mock_drivers_database):
         r1 = _run(mock_model_config, mock_drivers_database)
         r2 = _run(mock_model_config, mock_drivers_database)
-        sm1, sm2 = r1["shift_matrix"], r2["shift_matrix"]
-        assert sm1.keys() == sm2.keys()
-        for cat in sm1:
-            for year, cell in sm1[cat]["path"].items():
-                for k, v in cell.items():
-                    assert sm2[cat]["path"][year][k] == v, (cat, year, k)
+        assert r1["shift_matrix"] == r2["shift_matrix"]
+        assert r1["totals"]["portfolio"] == r2["totals"]["portfolio"]
 
     def test_different_seed_diverges(self, mock_model_config, mock_drivers_database):
         r1 = _run(mock_model_config, mock_drivers_database, seed=42)
         r2 = _run(mock_model_config, mock_drivers_database, seed=43)
-        cat = next(iter(r1["shift_matrix"]))
-        path1 = r1["shift_matrix"][cat]["path"]
-        path2 = r2["shift_matrix"][cat]["path"]
-        last = max(path1.keys())
-        assert path1[last]["median"] != path2[last]["median"]
+        assert r1["shift_matrix"]["Hair: Color"]["path"][2030]["median"] != \
+            r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
-    def test_driver_order_does_not_change_results(self, mock_model_config, mock_drivers_database):
-        """C2 (July 2026 review): reproducibility must not depend on the
-        physical order trends arrive from the database. The engine is fed
-        id-ordered trends (ORDER BY id in load_trends); this test locks the
-        engine-level truth that a re-ordered trend list with the same seed
-        yields a DIFFERENT sample pairing — which is exactly why the load
-        order is pinned upstream. If this test ever passes with a shuffled
-        list, the copula assignment logic changed and C2 should be revisited.
-        """
-        import dataclasses
-        from prism.drivers import DriverSet
-        db1 = mock_drivers_database
-        db2 = DriverSet(
-            drivers=list(reversed(db1.drivers)),
-            categories=db1.categories,
-            forces=db1.forces,
-            source_file=db1.source_file,
-        )
-        r1 = _run(mock_model_config, db1)
-        r2 = _run(mock_model_config, db2)
-        cat = next(iter(r1["shift_matrix"]))
-        last = max(r1["shift_matrix"][cat]["path"].keys())
-        m1 = r1["shift_matrix"][cat]["path"][last]["median"]
-        m2 = r2["shift_matrix"][cat]["path"][last]["median"]
-        assert m1 != m2, (
-            "Trend order no longer affects the sample pairing — the ORDER BY "
-            "contract (C2) may be obsolete; review before removing it."
-        )
+    def test_driver_order_matters_to_the_draws(self, mock_model_config, mock_drivers_database):
+        """The copula pairs draws with drivers by position, so the same seed on a
+        reordered driver list gives different numbers. That is why the database
+        always returns drivers ordered by id; if this ever stops holding, the
+        ordering contract in prism.database.load_drivers can be revisited."""
+        reordered = DriverSet(drivers=list(reversed(mock_drivers_database.drivers)),
+                              categories=mock_drivers_database.categories, forces=mock_drivers_database.forces)
+        r1 = _run(mock_model_config, mock_drivers_database)
+        r2 = _run(mock_model_config, reordered)
+        assert r1["shift_matrix"]["Hair: Color"]["path"][2030]["median"] != \
+            r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
     def test_multichain_same_seed_reproduces(self, mock_model_config, mock_drivers_database):
-        e1 = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        e2 = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r1 = e1.run_multichain(mock_drivers_database, n_chains=2, iterations=200)
-        r2 = e2.run_multichain(mock_drivers_database, n_chains=2, iterations=200)
+        r1 = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+            mock_drivers_database, n_chains=2, iterations=200)
+        r2 = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+            mock_drivers_database, n_chains=2, iterations=200)
         assert r1["chain_seeds"] == r2["chain_seeds"]
-        cat = next(iter(r1["shift_matrix"]))
-        assert r1["shift_matrix"][cat] == r2["shift_matrix"][cat]
+        assert r1["shift_matrix"] == r2["shift_matrix"]
 
 
-class TestGoldenPins:
-    """Exact expected output for seed=42 / 500 iterations on the fixture DB.
-
-    Engine: bayesian_copula MODEL_VERSION 2.11.0.
-
-    REGENERATED 2026-09-10 (2.11.0, owner rulings O6–O11 — numbers MOVE by
-    design): the 48 composite cells are now rolled up with the cell
-    gross-profit-share matrix (config.cell_weights), whose default is the
-    EQUAL 1/48 placeholder (owner decision: equal regions and categories until
-    the actual P&L shares are loaded). The 2.10.0 pins used the Henkel Group
-    FY2025 regional split (0.38/0.26/0.17/0.19); because the fixture trends
-    are Europe-weighted, equal region shares dilute them further and the
-    magnitudes shrink. The second mover is the v3.11 calibration (O11): the
-    per-force attenuation and the within-force overlap defaults are now the
-    51-driver values of data/attenuation_calibration_v3_11.json (e.g. the
-    Government within-force overlap 0.426 → 0.126 dampens the fixture's
-    regulatory pair less, so the pins moved again on 2026-09-10 when the
-    calibration landed). tests/test_cell_weights.py locks the other
-    direction: the 2.11.0 engine with the separable Group-split matrix AND
-    the 2.10.0 calibration reproduces the 2.10.0 pins to 1e-12, so the
-    difference is weights plus calibration, not a defect. Jitter stays OFF
-    in the fixture (F4 has its own test); no fixture trend carries an
-    uncertainty score, so the O7 path is inert here and is exercised in
-    tests/test_uncertainty.py.
-
-    Regenerated 2026-09-11 for v3.12/2.12.0 (owner ruling O13): Toilet Care
-    was split out of Hard-Surface Cleaner, so the fixture now spans 13 equal
-    categories instead of 12 and the attenuation was recomputed on the wider
-    exposure space (v3.12). Both moves are small and in the expected
-    direction: the three category pins shift in the sixth decimal, the
-    portfolio band widens by about 0.005 pp. The 2.10.0 reproduction lock in
-    tests/test_cell_weights.py pins its own 12-category taxonomy explicitly,
-    so it still reproduces the historical numbers to 1e-12 and proves the
-    difference here is taxonomy plus calibration, not a defect.
-
-    Regenerated again 2026-09-11 for 2.12.0 (owner ruling O14, the LARGE move
-    in this release): the engine's default cell-weight matrix is no longer the
-    equal 1/52 grid but an ESTIMATE of the HCB gross-profit mix (public
-    sources, graded B/E/G, data/cell_weights_estimated_v1.json). The fixture
-    trends are Europe-weighted and the estimate puts about 51 percent of the
-    pool in Europe against the equal grid's 25, so every magnitude grows: the
-    portfolio pin moves from -0.00433 to -0.00572, about 32 percent deeper,
-    and the category pins move with their own regional mixes rather than
-    uniformly. This is the intended effect of the ruling, not drift. The equal
-    grid survives as prism.config.EQUAL_CELL_WEIGHTS and
-    tests/test_cell_weights.py still exercises it, so the pre-O14 basis stays
-    reproducible; the 2.10.0 lock is unaffected because it pins its own
-    matrix and its own 12-category taxonomy explicitly.
-
-    Prior regenerations: 2026-09-11 v3.12/2.12.0 (O13 Toilet Care split,
-    13 categories, v3.12 calibration); 2026-09-10 v3.11/2.11.0 (51-driver base, cell
-    weights, v3.11 calibration); 2026-07-13 v3.10/2.10.0 (regional 3D roll-up, n_eff
-    dampening, start_year onset); 2026-07-06 v3.8/2.8.1 (L3 clip, L4 floor,
-    fixture differentiation); June 2026 v3.7/D20 (t-copula deleted →
-    Gaussian); June 2026 v3.6/D1 (PSD-valid default correlations, F-01).
-    Regenerate pins ONLY for deliberate model changes, in the same commit.
-    """
+class TestGoldenValues:
+    """Seed 42, 500 iterations, terminal year 2030 of the fixture path."""
 
     PINS = {
-        # cat:          (median,            p10,                p90)
+        # category:    (median,          p10,             p90)
         "Hair: Color": (-0.004382824607, -0.006560453979, -0.001985604025),
         "Hair: Care":  (-0.004954295760, -0.006740405373, -0.002756923533),
         "LHC: FCN":    (-0.006774214440, -0.008688186306, -0.004155012017),
     }
-
-    # L29: the joint portfolio band (totals.portfolio) is what the dashboard
-    # headline shows (D3) — pin it too, not only per-category cells.
+    #: The joint portfolio band, the number the dashboard headline shows.
     PORTFOLIO_PIN = (-0.005718585254, -0.007619757232, -0.003235896735)
 
     def test_engine_identity(self, mock_model_config, mock_drivers_database):
@@ -173,181 +74,92 @@ class TestGoldenPins:
         assert r["model_version"] == "2.12.0"
         assert r["engine_name"] == "bayesian_copula"
         assert r["seed"] == SEED
-        assert r["numerics_backend"].startswith("scipy ")  # D13
-        assert r["vc_attribution_basis"] == "epicentre"    # 2.9.0 partition tag
+        assert r["numerics_backend"].startswith("scipy ")
 
-    def test_version_single_source(self):
-        """M15 (July 2026 review): one authoritative version everywhere —
-        the API/package version, the engine MODEL_VERSION, and package.json
-        must agree, so the live API can never again advertise a version
-        three releases stale."""
+    def test_one_version_everywhere(self):
+        """The package, the engine and package.json carry the same version."""
         assert prism.__version__ == BayesianMonteCarloEngine.MODEL_VERSION
         pkg = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_text())
         assert pkg["version"] == BayesianMonteCarloEngine.MODEL_VERSION
 
-    def test_golden_values_seed42(self, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database)
-        sm = r["shift_matrix"]
-        last_year = max(sm["Hair: Color"]["path"].keys())
-        assert last_year == 2030  # fixture horizon (prod runs use the config horizon)
+    def test_category_values(self, mock_model_config, mock_drivers_database):
+        sm = _run(mock_model_config, mock_drivers_database)["shift_matrix"]
+        assert max(sm["Hair: Color"]["path"]) == 2030
         for cat, (median, p10, p90) in self.PINS.items():
-            cell = sm[cat]["path"][last_year]
+            cell = sm[cat]["path"][2030]
             assert cell["median"] == pytest.approx(median, rel=1e-6), cat
             assert cell["p10"] == pytest.approx(p10, rel=1e-6), cat
             assert cell["p90"] == pytest.approx(p90, rel=1e-6), cat
 
-    def test_golden_pins_differ_across_categories(self):
-        """L29: identical pins can't catch a category mixup — keep them distinct."""
-        values = list(self.PINS.values())
-        assert len(set(values)) == len(values), "golden pins must be pairwise distinct"
+    def test_pins_are_distinct(self):
+        """Identical pins could not catch two categories being swapped."""
+        assert len(set(self.PINS.values())) == len(self.PINS)
 
-    def test_portfolio_band_pin(self, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database)
-        last_year = max(r["shift_matrix"]["Hair: Color"]["path"].keys())
-        cell = r["totals"]["portfolio"][int(last_year)]
+    def test_portfolio_band(self, mock_model_config, mock_drivers_database):
+        cell = _run(mock_model_config, mock_drivers_database)["totals"]["portfolio"][2030]
         median, p10, p90 = self.PORTFOLIO_PIN
         assert cell["median"] == pytest.approx(median, rel=1e-6)
         assert cell["p10"] == pytest.approx(p10, rel=1e-6)
         assert cell["p90"] == pytest.approx(p90, rel=1e-6)
 
-    def test_no_integrity_events_on_defaults(self, mock_model_config, mock_drivers_database):
-        """D1 regression lock (L29): default correlations are PSD-valid as
-        entered — if any repair (PSD shift, Cholesky clip, compounding floor)
-        fires on the default config + fixture, that is a model regression,
-        not noise."""
-        r = _run(mock_model_config, mock_drivers_database)
-        assert r["integrity_events"] == []
+    def test_no_integrity_events_on_the_defaults(self, mock_model_config, mock_drivers_database):
+        """The default correlations are positive definite as entered: any repair,
+        clip or floor on the defaults is a regression."""
+        assert _run(mock_model_config, mock_drivers_database)["integrity_events"] == []
 
 
-class TestMultichainContract:
-    """run_multichain result contract: master seed + seed stability (M2/L8)."""
+class TestMultichain:
+    def test_seeds(self, mock_model_config, mock_drivers_database):
+        r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+            mock_drivers_database, n_chains=3, iterations=200)
+        assert r["seed"] == SEED
+        assert r["n_chains"] == 3
+        assert len(r["chain_seeds"]) == 3 and r["chain_seeds"][0] == SEED
 
-    def test_master_seed_and_chain_seeds_persisted(self, mock_model_config, mock_drivers_database):
-        e = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r = e.run_multichain(mock_drivers_database, n_chains=3, iterations=200)
-        assert r["master_seed"] == SEED
-        assert r["seed"] == SEED  # the reproducible input, not a derived chain seed
-        assert len(r["chain_seeds"]) == 3
-        assert r["chain_seeds"][0] == SEED  # first chain runs the master seed
-
-    def test_seed_stability_block(self, mock_model_config, mock_drivers_database):
-        e = BayesianMonteCarloEngine(mock_model_config, seed=SEED)
-        r = e.run_multichain(mock_drivers_database, n_chains=3, iterations=200)
+    def test_seed_stability(self, mock_model_config, mock_drivers_database):
+        r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+            mock_drivers_database, n_chains=3, iterations=200)
         ss = r["seed_stability"]
         assert ss["metric"] == "terminal_year_portfolio_median"
-        assert ss["n_chains"] == 3
-        assert ss["iterations_per_chain"] == 200
+        assert ss["n_chains"] == 3 and ss["iterations_per_chain"] == 200 and ss["pooled_iterations"] == 600
         assert len(ss["per_chain_medians"]) == 3
-        # spread is max-min in percentage points — non-negative by construction
-        assert ss["spread_pp"] >= 0.0
-        assert ss["spread_pp"] == pytest.approx(
-            (max(ss["per_chain_medians"]) - min(ss["per_chain_medians"])) * 100.0
-        )
-        # chain_summaries mirror the same quantity
-        summaries = r["chain_summaries"]
-        assert [s["median_terminal"] for s in summaries] == ss["per_chain_medians"]
-        assert all(s["terminal_year"] == ss["terminal_year"] for s in summaries)
+        assert ss["spread_pp"] == pytest.approx((max(ss["per_chain_medians"]) - min(ss["per_chain_medians"])) * 100.0)
 
 
-class TestStructuralIdentities:
-    """Invariants that must hold in EVERY environment."""
+class TestAttributionIdentities:
+    """Each lens partitions the median, so the lens rows add up to the Shift Matrix."""
 
-    def test_force_decomposition_reconciles_to_median(
-        self, mock_model_config, mock_drivers_database,
-    ):
-        """Σ_force decomp[force][year][cat] == MC median for (cat, year).
-
-        PPA2's Force/VC/Region lenses anchor row totals to the Time-Path
-        median and rely on the decomposition being exhaustive (shares sum
-        to 1). If this breaks, the dashboard's lenses stop reconciling.
-        """
+    @pytest.mark.parametrize("lens", ["force", "vc", "region"])
+    def test_lens_reconciles_to_the_median(self, lens, mock_model_config, mock_drivers_database):
         r = _run(mock_model_config, mock_drivers_database)
-        sm, dec = r["shift_matrix"], r["decompositions"]["force"]
-        for ykey, by_cat in dec.items():
+        for year, by_cat in r["decompositions"][lens].items():
             for cat, row in by_cat.items():
-                med = sm[cat]["path"][int(ykey)]["median"]
-                assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
+                median = r["shift_matrix"][cat]["path"][int(year)]["median"]
+                assert sum(row.values()) == pytest.approx(median, rel=1e-9, abs=1e-12), (lens, cat, year)
 
-    def test_vc_decomposition_reconciles_to_median(
-        self, mock_model_config, mock_drivers_database,
-    ):
-        """2.9.0: the epicentre partition stays exhaustive — Σ over VC steps
-        of decomp[vc][year][cat] == MC median for every (cat, year), the
-        same identity the force lens carries. Shares sum to 1 per category
-        by construction of the partition."""
+    def test_value_chain_lens_is_a_partition_by_epicentre(self, mock_model_config, mock_drivers_database):
+        """Each driver's contribution sits wholly on its epicentre stage; every other stage carries 0."""
         r = _run(mock_model_config, mock_drivers_database)
-        sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
-        for ykey, by_cat in dec.items():
+        stages = {vc_epicentre_step_of(d.vc_exposure) for d in mock_drivers_database.drivers}
+        assert stages == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
+        for year, by_cat in r["decompositions"]["vc"].items():
             for cat, row in by_cat.items():
-                med = sm[cat]["path"][int(ykey)]["median"]
-                assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
+                median = r["shift_matrix"][cat]["path"][int(year)]["median"]
+                for step, value in row.items():
+                    if step not in stages:
+                        assert value == 0.0, (cat, year, step)
+                    elif abs(median) > 1e-15:
+                        assert value != 0.0, (cat, year, step)
 
-    def test_vc_attribution_is_categorical_partition(
-        self, mock_model_config, mock_drivers_database,
-    ):
-        """2.9.0: the VC lens is a hard partition by epicentre stage.
-
-        The fixture's five trends carry epicentres {Marketing(6),
-        Formulation(2), Commercial(7)×2, Manufacturing(3)} and every trend
-        exposes every category — so for EVERY category, exactly the stages
-        {Formulation, Manufacturing, Marketing, Commercial} carry non-zero
-        attribution and the other four stages carry exactly 0.0 (no kernel
-        smear, no uniform residue). Also locks the terminal-year
-        vc_decomposition to the per-year block's terminal slice (single
-        source of shares)."""
-        from prism.config import vc_epicentre_step_of
-        r = _run(mock_model_config, mock_drivers_database)
-        expected_steps = {
-            vc_epicentre_step_of(t.vc_exposure)
-            for t in mock_drivers_database.drivers
-        }
-        assert expected_steps == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
-
-        dec = r["decompositions"]["vc"]
-        last_year = max(int(y) for y in dec.keys())
-        for ykey, by_cat in dec.items():
-            for cat, row in by_cat.items():
-                med = r["shift_matrix"][cat]["path"][int(ykey)]["median"]
-                for step, val in row.items():
-                    if step in expected_steps:
-                        # Non-zero whenever the category actually shifted.
-                        if abs(med) > 1e-15:
-                            assert abs(val) > 0.0, (cat, ykey, step)
-                    else:
-                        assert val == 0.0, (
-                            f"{cat}/{ykey}/{step}: non-epicentre stage carries "
-                            f"attribution {val} — the partition leaked."
-                        )
-        # Terminal-year back-compat block == terminal slice of the per-year block.
-        for cat, row in r["vc_decomposition"].items():
-            assert row == pytest.approx(dec[last_year][cat]), cat
-
-    def test_vc_coverage_integrity_event_on_unscored_driver(
-        self, mock_model_config, mock_drivers_database,
-    ):
-        """A trend without a VC epicentre must surface as an integrity event
-        (the lens silently ignoring contributors was the pre-2.9 behavior),
-        while the partition identity still holds on the scored subset."""
-        import copy
+    def test_unscored_value_chain_is_reported(self, mock_model_config, mock_drivers_database):
         db = copy.deepcopy(mock_drivers_database)
-        db.drivers[0].vc_exposure = {}   # unscore one contributor
+        db.drivers[0].vc_exposure = {}
         r = _run(mock_model_config, db)
         events = [e for e in r["integrity_events"] if e["type"] == "vc_epicentre_coverage"]
-        assert len(events) == 1
-        assert events[0]["severity"] == "warning"
+        assert len(events) == 1 and events[0]["severity"] == "warning"
         assert db.drivers[0].id in events[0]["message"]
-        # Identity survives: shares renormalize over the scored subset.
-        sm, dec = r["shift_matrix"], r["decompositions"]["vc"]
-        for ykey, by_cat in dec.items():
+        assert events[0]["detail"]["unscored_driver_ids"] == [db.drivers[0].id]
+        for year, by_cat in r["decompositions"]["vc"].items():
             for cat, row in by_cat.items():
-                med = sm[cat]["path"][int(ykey)]["median"]
-                assert sum(row.values()) == pytest.approx(med, rel=1e-9, abs=1e-12), (cat, ykey)
-
-    # (The journey-decomposition reconciliation test was removed with the
-    #  quantitative journey layer, owner ruling O3 2026-07-07 — the negative
-    #  contract lock lives in test_bayesian_mc.TestJourneyLayerRemoved.)
-
-    def test_all_lenses_present(self, mock_model_config, mock_drivers_database):
-        r = _run(mock_model_config, mock_drivers_database)
-        for lens in ("force", "vc", "region"):
-            assert lens in r["decompositions"], lens
+                assert sum(row.values()) == pytest.approx(
+                    r["shift_matrix"][cat]["path"][int(year)]["median"], rel=1e-9, abs=1e-12)

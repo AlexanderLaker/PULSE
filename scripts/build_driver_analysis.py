@@ -1,81 +1,80 @@
 #!/usr/bin/env python3
-"""
-Build the per-driver model attribution record and render the PRISM Analysis
-texts of the Drivers page from it (owner instruction of 2026-09-17).
+"""Build the per-driver attribution record and render the PRISM Analysis texts from it.
 
-    python3 scripts/build_driver_analysis.py                 # attribution record + rendered texts
-    python3 scripts/build_driver_analysis.py --reference     # also rerun the 3 x 50k reference MC
-    python3 scripts/build_driver_analysis.py --check         # CI: committed record + texts == this code
-    python3 scripts/build_driver_analysis.py --cell-weights FILE   # the finance file, as run_50k_prod.py
-    python3 scripts/build_driver_analysis.py --workbook FILE        # record the persisted run from its QA workbook
+    python3 scripts/build_driver_analysis.py                  record, parity fixture and texts
+    python3 scripts/build_driver_analysis.py --reference      also re-run the 3 x 50,000 reference run
+    python3 scripts/build_driver_analysis.py --check          CI: the committed files match this code
+    python3 scripts/build_driver_analysis.py --cell-weights FILE   the finance file, as for run_production.py
+    python3 scripts/build_driver_analysis.py --workbook FILE        record which production run is reproduced
 
 Files
-  data/trend_base_2026-09/driver_attribution_v1.json   the numbers (GENERATED, never hand-edited)
-  data/trend_base_2026-09/driver_analysis_v1.json      the authored readings: one template per driver
-                                                       (hand-written) and its rendered text (GENERATED)
-  prism/seed_drivers.py                                 analysis = the rendered text
-                                                       (scripts/generate_seed_from_core_set.py)
+  data/drivers/driver_attribution.json   the figures (generated)
+  data/drivers/driver_analysis.json      one hand-written template per driver and the text
+                                         rendered from it (generated)
+  tests/frontend/fixtures/driverAttribution.fixture.json
+                                         parity fixture for lib/driverAttribution.ts, the
+                                         port of the decomposition the category drill-down uses
 
 What the record is
   The engine's own arithmetic, evaluated at the score means instead of at
-  Monte Carlo draws, and taken apart driver by driver. For every driver j,
-  cell (category c, region r) and path year y the additive term of the
+  Monte Carlo draws, and taken apart driver by driver. For driver j, cell
+  (category c, region r) and path year y the additive term of the
   compounding factor is
 
       a[j, c, r, y] = force_weight[f] x attenuation[f] x dampening[f, c, r]
-                      x E[p_j] x gp1_j x sign_j x E[materialisation_j(y)] x
-                      category_exposure[j, c] / 5 x regional_exposure[j, r] / 5
+                      x E[p_j] x gp1_j x sign_j x E[materialisation_j(y)]
+                      x category_exposure[j, c] / 5 x regional_exposure[j, r] / 5
 
-  with E[p_j] = probability / 6 (the Beta-prior mean, F5) and the
-  materialisation averaged over the driver's own peak-year jitter grid (O7).
-  This is exactly the quantity the engine sums per force inside
-  `_compute_all_paths_vectorized`; the force sums compound multiplicatively,
-  so the cell shift at the means is prod_f (1 + sum_j a) - 1, cross-terms
-  included. Those cross-terms (a few per cent of the cell shift) are spread
-  across the drivers of the cell in proportion to their additive terms, so
-  the drivers of a cell sum exactly to the cell shift at the means. Roll-up
-  as the engine does it (O6): portfolio = sum over cells of the gross-profit
-  share times the cell shift; category = share-weighted mean of the
-  category's row.
+  with E[p_j] = probability / 6 (the Beta-prior mean) and the
+  materialisation averaged over the driver's peak-year jitter grid. This is
+  the quantity the engine sums per force in `_compute_all_paths_vectorized`.
+  The force sums compound multiplicatively, so the cell shift at the means
+  is prod_f (1 + sum_j a) - 1, cross-terms included; the cross-terms (a few
+  percent of the cell shift) are spread over the drivers of the cell in
+  proportion to their additive terms, so the drivers of a cell add up to the
+  cell shift exactly. The roll-up is the engine's: portfolio = sum over
+  cells of the gross-profit share times the cell shift, category = the
+  share-weighted mean of the category's row.
 
-  What the sum at the means is: the run's terminal-year MEAN, to a few
-  hundredths of a percent (the only residual is the covariance between the
-  force factors, which the engine's Monte Carlo averages and this evaluation
-  at the means does not; on the 2.12.0 base the sum is -5.546 points against
-  a run mean of -5.545). The dashboard's headline is the MEDIAN, and the
-  portfolio distribution is skewed, so the median sits 0.03 points below the
-  mean. Every contribution is therefore scaled by one factor, the ratio of
-  the reference run's terminal-year median to the sum at the means (1.006 on
-  the 2.12.0 base), so that the 51 contributions add up to the headline the
-  reader sees. The factor is the mean-to-median skew of the portfolio
-  distribution, not an approximation error; it is recorded, and so is the
-  reference run.
+  The sum at the means is the run's terminal-year mean to a few hundredths
+  of a percent; the residual is the covariance between the force factors,
+  which the Monte Carlo averages and an evaluation at the means does not.
+  The dashboard's headline is the median, and the portfolio distribution is
+  skewed, so every contribution is scaled by one factor, the reference run's
+  terminal-year median over the sum at the means, and the contributions add
+  up to the headline the reader sees. The factor is the skew of the
+  distribution, not an approximation error; the record keeps it and the
+  reference run it comes from.
 
-  Because each driver's term is linear in its probability draw, the mean of
-  the Monte Carlo term equals the term at the mean: this is an exact
+  Each driver's term is linear in its probability draw, so the mean of the
+  Monte Carlo term equals the term at the mean: this is an exact
   expected-value decomposition of the additive part, not a fitted
-  attribution. It is labelled attribution everywhere it is shown (D6).
+  attribution, and it is labelled attribution wherever it is shown.
 
-  Per driver the record also carries: where the contribution lands (cells,
-  categories, regions), when it lands (the share of the terminal-year
+  Per driver the record also carries where the contribution lands (cells,
+  categories, regions); when it lands (the share of the terminal-year
   contribution present in each path year, which is the materialisation
-  ratio because the additive term factorises), the driver's own P10 to P90
+  ratio because the additive term factorises); the driver's own P10 to P90
   range at the horizon and its share of the portfolio band (200,000 draws of
-  the engine's own copula and jitter samplers; Euler allocation over the
-  additive sum, see `band_analysis`), the structural pass-through it faces,
-  the overlap correction in its cells and the same-force drivers it shares
-  them with, and its reach: the share of the gross-profit mix its exposures
-  cover, sum over cells of cell share x category exposure / 5 x regional
-  exposure / 5 (a driver scored 5 everywhere reaches 100 percent; one scored
-  1 everywhere reaches 4 percent), and, over all 52 cells, the cell where the
-  driver is the largest share of the cell's own shift.
+  the engine's own copula and jitter samplers, Euler allocation over the
+  additive sum, see `band_analysis`); the pass-through it faces, the overlap
+  correction in its cells and the same-force drivers it shares them with;
+  its reach, the share of the gross-profit mix its exposures cover (sum over
+  cells of cell share x category exposure / 5 x regional exposure / 5); and,
+  over all 52 cells, the cell where it is the largest share of the cell's
+  own shift.
 
 Why a generated record: the texts quote these figures, and a quoted figure
 must never drift from the model. `--check` recomputes the record from the
-committed seed and configuration and re-renders every text; CI fails when
-a score, an exposure, the calibration or the cell weights change without
-the analysis being regenerated (the same discipline as
-scripts/build_estimated_cell_weights.py --check).
+driver base and the configuration, re-renders every text and fails when a
+score, an exposure, the overlap correction or the cell weights changed
+without the analysis being regenerated. It also checks that the reference
+run was made on the current inputs (their digest) and that it reproduces
+the production run recorded with --workbook.
+
+After a re-scoring or a new finance file: run scripts/run_production.py,
+then this script with --reference --workbook FILE, review the re-rendered
+texts, run scripts/generate_seed.py and scripts/sync_analysis.py.
 """
 from __future__ import annotations
 
@@ -89,8 +88,8 @@ import sys
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, REPO)
 
-# The record is a function of the seed and the configuration, never of a
-# database: blank the URLs before pulse.env_loader can read .env.
+# The record is a function of the driver base and the configuration, never of
+# a database: blank the URLs before prism.env_loader can read .env.
 os.environ["DATABASE_URL"] = ""
 os.environ["POSTGRES_URL"] = ""
 
@@ -99,6 +98,7 @@ import numpy as np  # noqa: E402
 from prism.config import ModelConfig, FORCES, REGIONS  # noqa: E402
 from prism.drivers import DriverSet  # noqa: E402
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
+from scripts.driver_analysis_render import render_all  # noqa: E402
 
 DATA_DIR = os.path.join(REPO, "data", "drivers")
 ATTRIBUTION_PATH = os.path.join(DATA_DIR, "driver_attribution.json")
@@ -118,13 +118,12 @@ TOP_CELLS = 6
 TOP_PARTNERS = 3
 
 
-
 # ── drivers ─────────────────────────────────────────────────────────────
 
 def load_drivers() -> list:
-    """The committed seed, in the order the CLI loads it (ORDER BY id, C2)."""
-    from prism.seed_drivers import DRIVERS
-    return sorted(DRIVERS, key=lambda t: t.id)
+    """The drivers of the base, ordered by id as the production run loads them."""
+    from scripts.generate_seed import base_drivers
+    return base_drivers()
 
 
 def code_of(driver) -> str:
@@ -135,9 +134,8 @@ def code_of(driver) -> str:
 
 
 def load_cell_weights_file(path: str) -> tuple:
-    """Same file format as run_50k_prod.py --cell-weights (shares or absolute
-    figures, normalised to shares before the engine is built)."""
-    from scripts.run_50k_prod import load_cell_weights_file as _load  # type: ignore
+    """(shares, source) from a finance file, read exactly as run_production.py reads it."""
+    from scripts.run_production import load_cell_weights_file as _load
     from pathlib import Path
     return _load(Path(path))
 
@@ -158,11 +156,11 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     att = np.array([eng._effective_attenuation[f] for f in forces])
     fidx = np.array([forces.index(t.force) for t in drivers])
 
-    # F1: composite cell exposure, exactly as the engine builds it.
+    # Composite cell exposure, exactly as the engine builds it.
     region_w = np.zeros((n, nr))
     regionless = []
     for j, t in enumerate(drivers):
-        reg = getattr(t, "regional_exposure", None) or {}
+        reg = t.regional_exposure or {}
         vals = np.array([min(float(reg.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
         if vals.sum() <= 0:
             vals = np.ones(nr)
@@ -178,12 +176,12 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
             for r in range(nr):
                 E[j, c * nr + r] = ce * region_w[j, r]
 
-    # F2: magnitude-weighted within-force dampening, exactly as the engine.
+    # Magnitude-weighted within-force dampening, exactly as the engine.
     abs_score = np.array([abs(float(t.normalized_score)) for t in drivers])
     contrib = abs_score[:, None] * E
     damp = np.ones((nf, ncell))
     n_eff_all = np.zeros((nf, ncell))
-    wf_overlap = getattr(config, "within_force_overlap", {})
+    wf_overlap = config.within_force_overlap
     for f, force in enumerate(forces):
         mask = fidx == f
         if not mask.any():
@@ -200,7 +198,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
         d = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
         damp[f, :] = np.clip(d, 0.1, 1.0)
 
-    # F4/F11/O7: the schedule averaged over each driver's peak-jitter grid.
+    # The schedule averaged over each driver's peak-jitter grid.
     sched, offsets, off_probs = eng._peak_schedule_table(drivers)     # (n, n_off, ny)
     e_mat = np.einsum("jk,jky->jy", off_probs, sched)                # (n, ny)
     s_mean = np.array([float(t.normalized_score) for t in drivers])   # E[p] x gp1 x sign
@@ -213,7 +211,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     for f in range(nf):
         F[f] = A[fidx == f].sum(axis=0)
     # the engine floors every force factor at 0 (a factor cannot take a cell
-    # below -100 percent, L4); inert at the means on any realistic base
+    # below -100 percent); inert at the means on any realistic base
     cell_shift = np.prod(np.maximum(1.0 + F, 0.0), axis=0) - 1.0     # (ncell, ny)
     additive = F.sum(axis=0)
     spread = np.where(np.abs(additive) > 1e-15,
@@ -269,7 +267,7 @@ def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) 
     w_cell = W.reshape(-1)
     n = len(drivers)
     K = np.zeros(n)
-    for j, t in enumerate(drivers):
+    for j in range(n):
         f = fidx[j]
         term_const = fw[f] * att[f] * damp[f, :] * E[j, :]            # per cell, before score x materialisation
         a_raw = term_const * dec["s_mean"][j] * dec["e_mat"][j, y_last]
@@ -305,36 +303,35 @@ def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) 
 
 def inputs_hash(config: ModelConfig, drivers: list) -> str:
     """A digest of everything the reference run depends on: the scoring
-    state of every driver (the D19 fingerprint plus the onset year), the
-    force layers, the cell weights, the path and the engine version. The
+    state of every driver (its input-drift fingerprint plus the onset year),
+    the force layers, the cell weights, the path and the engine version. The
     reference run is stamped with it, and a record whose inputs no longer
-    match its reference run is refused, so that a re-scored seed cannot be
+    match its reference run is refused, so that a re-scored base cannot be
     reconciled to a median it does not produce."""
     import hashlib
-    from prism.audit.input_drift import driver_fingerprint
+    from prism.input_drift import driver_fingerprint
     fp = driver_fingerprint(drivers)
     for t in drivers:
-        fp[str(t.id)]["sy"] = int(getattr(t, "start_year", 0) or 0)
+        fp[str(t.id)]["sy"] = int(t.start_year or 0)
     payload = {
-        "trends": fp,
+        "drivers": fp,
         "force_weights": {f: round(float(config.force_weights[f]), 6) for f in FORCES},
         "per_force_attenuation": {f: round(float(config.per_force_attenuation[f]), 6) for f in FORCES},
         "within_force_overlap": {f: round(float(config.within_force_overlap.get(f, 0.0)), 6) for f in FORCES},
         "force_correlation_matrix": {a: {b: round(float(v), 6) for b, v in row.items()}
-                                     for a, row in (getattr(config, "force_correlation_matrix", None) or {}).items()},
-        "within_force_rho": round(float(getattr(config, "within_force_rho", 0.0) or 0.0), 6),
+                                     for a, row in config.force_correlation_matrix.items()},
+        "within_force_rho": round(float(config.within_force_rho), 6),
         "cell_weights": {c: {r: round(float(v), 8) for r, v in row.items()} for c, row in config.cell_weights.items()},
         "base_year": int(config.base_year), "path_years": list(config.path_years),
-        "peak_year_jitter": int(getattr(config, "peak_year_jitter", 0) or 0),
-        "model_version": getattr(BayesianMonteCarloEngine, "MODEL_VERSION", ""),
+        "peak_year_jitter": int(config.peak_year_jitter),
+        "model_version": BayesianMonteCarloEngine.MODEL_VERSION,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
     """The production recipe: run_multichain(3 x 50k, master seed 42)."""
-    db = DriverSet(drivers=list(drivers), categories=list(config.category_names),
-                       forces=list(FORCES), source_file="seed_drivers")
+    db = DriverSet(drivers=list(drivers), categories=list(config.category_names), forces=list(FORCES))
     eng = BayesianMonteCarloEngine(config, seed=42)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
     tot = res["totals"]["portfolio"]
@@ -348,7 +345,7 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
         "seed": 42, "chains": chains, "iterations": iterations,
         "pooled_iterations": chains * iterations,
         "numerics_backend": NUMERICS_BACKEND,
-        "model_version": res.get("model_version") or getattr(BayesianMonteCarloEngine, "MODEL_VERSION", ""),
+        "model_version": res["model_version"],
         "portfolio_terminal": {k: round(float(term[k]), 6) for k in ("p10", "p25", "median", "p75", "p90", "mean")},
         "categories_terminal": cats,
         "inputs_hash": inputs_hash(config, drivers),
@@ -357,19 +354,20 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
 
 
 def read_workbook(path: str) -> dict:
-    """The persisted production run as its QA workbook records it (written by
-    run_50k_prod.py): run id, generation time, pooled iterations, model
-    version and the 13 terminal-year category quantiles. Kept in the record
-    so that `--check` proves the reference run reproduces the run the
-    dashboard shows, and so that a reader of the record knows which run."""
+    """The production run as its QA workbook records it (prism/workbook.py).
+
+    Run id, generation time, pooled iterations, model version and the 13
+    terminal-year category quantiles. The record keeps them, so that `--check`
+    proves the reference run reproduces the run the dashboard serves, and a
+    reader of the record knows which run that is.
+    """
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     meta = {}
     for row in wb["Metadata"].iter_rows(values_only=True):
         if row and row[0] is not None and len(row) > 1:
             meta[str(row[0]).strip()] = row[1]
-    ws = wb["Shift Matrix"]
-    rows = list(ws.iter_rows(values_only=True))
+    rows = list(wb["Shift Matrix"].iter_rows(values_only=True))
     header, sub = rows[0], rows[1]
     start = next(i for i, v in enumerate(header) if str(v) == str(TERMINAL_YEAR))
     assert tuple(str(x) for x in sub[start:start + 5]) == ("p10", "p25", "median", "p75", "p90"), sub[start:start + 5]
@@ -379,10 +377,10 @@ def read_workbook(path: str) -> dict:
             p10, _, med, _, p90 = r[start:start + 5]
             cats[str(r[0])] = {"p10": round(float(p10), 6), "median": round(float(med), 6), "p90": round(float(p90), 6)}
     return {
-        "id": int(meta.get("simulation_run_id")) if meta.get("simulation_run_id") is not None else None,
+        "id": int(meta["Run id"]) if meta.get("Run id") is not None else None,
         "generated": str(meta.get("Generated") or ""),
-        "model_version": str(meta.get("model_version") or ""),
-        "pooled_iterations": int(meta.get("Iterations")) if meta.get("Iterations") is not None else None,
+        "model_version": str(meta.get("Model version") or ""),
+        "pooled_iterations": int(meta["Iterations"]) if meta.get("Iterations") is not None else None,
         "workbook": os.path.basename(path),
         "categories_terminal": cats,
     }
@@ -438,7 +436,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
     force_hw = {f: float(term[(dec["fidx"] == fi) & (term < 0)].sum()) for fi, f in enumerate(forces)}
     force_tw = {f: float(term[(dec["fidx"] == fi) & (term > 0)].sum()) for fi, f in enumerate(forces)}
     force_rank = {}
-    for fi, f in enumerate(forces):
+    for fi in range(len(forces)):
         ids = [int(j) for j in np.argsort(-np.abs(term)) if dec["fidx"][j] == fi]
         force_rank.update({j: i + 1 for i, j in enumerate(ids)})
     cat_tot = cat_pp[:, :, y_last].sum(axis=0)                # (nc,) category shift at the means, scaled
@@ -539,16 +537,16 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             "Expected-value decomposition of the engine's compounding arithmetic at the score "
             "means (Beta mean = probability/6, materialisation averaged over each driver's peak "
             "jitter), cross-terms spread in proportion to the additive terms, rolled up with the "
-            "cell gross-profit shares (O6). The sum reproduces the reference run's terminal-year "
+            "cell gross-profit shares. The sum reproduces the reference run's terminal-year "
             "mean; every contribution is then scaled by one factor, the run's median over that "
             "mean (the skew of the portfolio distribution), so the contributions add up to the "
-            "median headline the dashboard shows. Attribution, not simulation (D6)."
+            "median headline the dashboard shows. Attribution, not simulation."
         ),
         "basis": {
             "drivers": len(drivers),
-            "model_version": reference.get("model_version"),
-            "cell_weights_source": str(getattr(config, "cell_weights_source", "")),
-            "attenuation_source": str(getattr(config, "attenuation_source", "")),
+            "model_version": reference["model_version"],
+            "cell_weights_source": config.cell_weights_source,
+            "attenuation_source": config.attenuation_source,
             "force_weights": {f: r4(config.force_weights[f]) for f in forces},
             "per_force_attenuation": {f: r4(config.per_force_attenuation[f]) for f in forces},
             "within_force_overlap": {f: r4(config.within_force_overlap.get(f, 0.0)) for f in forces},
@@ -609,7 +607,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
             "per_force_attenuation": {f: float(config.per_force_attenuation[f]) for f in FORCES},
             "within_force_overlap": {f: float(config.within_force_overlap.get(f, 0.0)) for f in FORCES},
             "base_year": int(config.base_year), "path_years": list(years),
-            "peak_year_jitter": int(getattr(config, "peak_year_jitter", 0) or 0),
+            "peak_year_jitter": int(config.peak_year_jitter),
         },
         "cellWeights": {cat: {r: float(W[c, ri]) for ri, r in enumerate(REGIONS)} for c, cat in enumerate(cats)},
     }
@@ -626,12 +624,6 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
                           for c, cat in enumerate(cats)},
     }
     return {"generated_by": "scripts/build_driver_analysis.py", "inputs": inputs, "expected": expected}
-
-
-# ── rendering ──────────────────────────────────────────────────────────
-# The renderer lives in scripts/driver_analysis_render.py (no engine import)
-# so the seed generator and the tests use the same functions.
-from scripts.driver_analysis_render import render_all  # noqa: E402
 
 
 # ── main ───────────────────────────────────────────────────────────────
@@ -657,7 +649,7 @@ def _strip_volatile(rec: dict) -> dict:
 
 # Tolerances for comparing a committed artefact with its recomputation. The
 # arithmetic is deterministic, but libm and BLAS differ by an ulp or so between
-# platforms (the owner's arm64 machine, CI's x86_64), and a value that sits on
+# platforms (an arm64 laptop, CI's x86_64), and a value that sits on
 # a rounding boundary (a triangular average of rational curve values can land
 # exactly on a 5 in the fifth decimal) then rounds differently. Every field of
 # the record is rounded to four decimals or finer, so one unit in the fourth
@@ -688,10 +680,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reference", action="store_true", help="rerun the reference MC (3 x 50k, seed 42)")
     ap.add_argument("--chains", type=int, default=3)
     ap.add_argument("--iterations", type=int, default=50_000)
-    ap.add_argument("--cell-weights", default=None, help="finance cell-weight file, as run_50k_prod.py")
+    ap.add_argument("--cell-weights", default=None, help="finance cell-weight file, as for run_production.py")
     ap.add_argument("--workbook", default=None,
-                    help="the QA workbook of the persisted production run (run_50k_prod.py output); "
-                         "records which run the reference reproduces")
+                    help="the QA workbook of the production run the reference should reproduce")
     args = ap.parse_args(argv)
 
     drivers = load_drivers()
@@ -709,15 +700,10 @@ def main(argv: list[str] | None = None) -> int:
               f"[{reference['portfolio_terminal']['p10']*100:+.3f}, {reference['portfolio_terminal']['p90']*100:+.3f}]")
     else:
         reference = committed["reference_run"]
-        recorded = reference.get("inputs_hash")
-        if not recorded and not args.check:
-            print("note: the committed reference run carries no inputs hash; stamping it with the current seed "
-                  "and configuration (a reference run made before the hash existed)")
-            reference = dict(reference, inputs_hash=current_hash)
-        if recorded and recorded != current_hash and not args.check:
-            print("REFUSING: the seed's scoring state or the configuration changed since the committed reference "
+        if reference.get("inputs_hash") != current_hash and not args.check:
+            print("REFUSING: the drivers' scoring state or the configuration changed since the committed reference "
                   "run, so its median is not the current model's. Re-run with --reference --workbook FILE after "
-                  "the production run (the same --cell-weights FILE if one was used).")
+                  "the production run (with the same --cell-weights FILE if one was used).")
             return 1
 
     persisted = read_workbook(args.workbook) if args.workbook else (committed or {}).get("persisted_run")
@@ -733,19 +719,15 @@ def main(argv: list[str] | None = None) -> int:
         elif not records_match(_strip_volatile(committed), _strip_volatile(record), RECORD_ATOL):
             problems.append(f"{os.path.relpath(ATTRIBUTION_PATH, REPO)} differs from the recomputed record "
                             f"(regenerate: python3 scripts/build_driver_analysis.py)")
-        if committed is not None:
-            recorded = committed.get("reference_run", {}).get("inputs_hash")
-            if not recorded:
-                problems.append("the committed reference run carries no inputs hash (regenerate)")
-            elif recorded != current_hash:
-                problems.append("the seed's scoring state or the configuration changed since the committed reference "
-                                "run (its inputs hash differs): re-run with --reference --workbook FILE")
+        if committed is not None and committed["reference_run"].get("inputs_hash") != current_hash:
+            problems.append("the drivers' scoring state or the configuration changed since the committed reference "
+                            "run (its inputs digest differs): re-run with --reference --workbook FILE")
         if persisted:
             for line in reference_reproduces(reference, persisted):
-                problems.append(f"the reference run does not reproduce persisted run {persisted.get('id')}: {line}")
+                problems.append(f"the reference run does not reproduce production run {persisted.get('id')}: {line}")
         for code, entry in analysis.get("drivers", {}).items():
-            tid = next((i for i, d in record["drivers"].items() if d["code"] == code), None)
-            if tid and entry.get("text") != texts.get(tid):
+            driver_id = next((i for i, d in record["drivers"].items() if d["code"] == code), None)
+            if driver_id and entry.get("text") != texts.get(driver_id):
                 problems.append(f"{code}: rendered text differs from the committed one (regenerate)")
         if not os.path.exists(FIXTURE_PATH):
             problems.append(f"{os.path.relpath(FIXTURE_PATH, REPO)} is missing")
@@ -756,16 +738,16 @@ def main(argv: list[str] | None = None) -> int:
             for p in problems:
                 print("  -", p)
             return 1
-        print("driver analysis check OK: record and texts match the seed and the configuration.")
+        print("driver analysis check OK: record, fixture and texts match the driver base and the configuration.")
         return 0
 
     if persisted:
         mismatch = reference_reproduces(reference, persisted)
         if mismatch:
-            print(f"WARNING: the reference run does not reproduce persisted run {persisted.get('id')} "
-                  f"({len(mismatch)} quantile(s) differ, first: {mismatch[0]}). Either the seed or the "
+            print(f"WARNING: the reference run does not reproduce production run {persisted.get('id')} "
+                  f"({len(mismatch)} quantile(s) differ, first: {mismatch[0]}). Either the drivers or the "
                   f"configuration changed since that run, or the workbook is not this run's: record the "
-                  f"new production run with --workbook, or run run_50k_prod.py first.")
+                  f"new production run with --workbook, or run run_production.py first.")
         else:
             print(f"reference run reproduces persisted run {persisted.get('id')} ({persisted.get('generated')}) "
                   f"at every terminal-year category quantile")
@@ -777,8 +759,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
     if texts:
         for code, entry in analysis["drivers"].items():
-            tid = next(i for i, d in record["drivers"].items() if d["code"] == code)
-            entry["text"] = texts[tid]
+            driver_id = next(i for i, d in record["drivers"].items() if d["code"] == code)
+            entry["text"] = texts[driver_id]
         _dump_json(ANALYSIS_PATH, analysis)
         print(f"wrote {os.path.relpath(ANALYSIS_PATH, REPO)} ({len(texts)} rendered texts)")
     return 0

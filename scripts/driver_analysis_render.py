@@ -1,19 +1,18 @@
-"""
-Render the PRISM Analysis readings from their templates and the attribution
-record. Pure functions, no engine import, so the seed generator, the build
+"""Render the PRISM Analysis readings from their templates and the attribution record.
+
+Pure functions without an engine import, so the seed generator, the build
 script and the tests share one renderer.
 
-A template is prose with named placeholders in braces. Every figure in a
-reading comes from a placeholder; the rendered text is what
-`prism/seed_drivers.py` carries as `analysis` and what the
-Drivers page shows. The vocabulary is documented in
-docs/DRIVER_ANALYSIS_CONCEPT.md and enumerated by `render_fields`.
+A template is prose with named placeholders in braces; every figure in a
+reading comes from a placeholder, and ``render_fields`` lists them all. The
+rendered text is what prism/seed_drivers.py carries as ``analysis`` and what
+the Drivers page shows. docs/DRIVER_ANALYSIS.md sets out the rules the
+readings follow.
 
-Paragraph convention (the Drivers page renders it): paragraphs are separated
-by a blank line; a paragraph that starts with one of the fixed labels followed
-by a colon ("Weight in the answer:", "Where it lands:", "When it lands:",
-"What the band hinges on:") gets the label set as a small heading; the
-renderer appends the basis line ("Figures: ...") itself from the record.
+Paragraphs are separated by a blank line. A paragraph that opens with one of
+the fixed labels and a colon ("Weight in the answer:", "Where it lands:",
+"When it lands:", "What the band hinges on:") is shown with the label as a
+small heading; the renderer appends the basis line ("Figures: ...") itself.
 """
 from __future__ import annotations
 
@@ -55,11 +54,6 @@ def fmt_total(x: float) -> str:
     return f"{abs(float(x)):.1f}"
 
 
-def fmt_pp2(x: float) -> str:
-    """Magnitude in points with two decimals (cells are small)."""
-    return f"{abs(float(x)):.2f}"
-
-
 def ordinal(n) -> str:
     if not n:
         return ""
@@ -81,18 +75,13 @@ def cell_label(cat: str, region: str) -> str:
 def basis_line(rec: dict) -> str:
     """One sentence naming what the figures reconcile to, in terms a reader can
     check against the dashboard headline."""
-    ref = rec.get("reference_run", {})
-    version = rec.get("basis", {}).get("model_version") or ref.get("model_version") or ""
-    source = str(rec.get("basis", {}).get("cell_weights_source", ""))
-    basis = ("estimated HCB gross-profit mix" if source.upper().startswith("ESTIMATE")
-             else "finance cell weights" if source else "the configured cell weights")
-    median = float(ref.get("portfolio_terminal", {}).get("median", 0.0)) * 100
-    chains = ref.get("chains", "")
-    iters = ref.get("iterations", "")
-    recipe = f"{chains} x {iters:,} iterations, seed {ref.get('seed', '')}" if chains and iters else "reference run"
-    return (f"{BASIS_LABEL}: model attribution on the {version} base, {basis}, reconciled to a "
-            f"2035 portfolio median of {median:+.1f} percent ({recipe}). Read as exposure if "
-            f"nobody acts, not as a forecast.")
+    ref = rec["reference_run"]
+    source = str(rec["basis"]["cell_weights_source"])
+    weights = "the estimated HCB gross-profit mix" if source.upper().startswith("ESTIMATE") else "the finance cell weights"
+    median = float(ref["portfolio_terminal"]["median"]) * 100
+    recipe = f"{ref['chains']} x {ref['iterations']:,} iterations, seed {ref['seed']}"
+    return (f"{BASIS_LABEL}: model attribution on {weights}, reconciled to a 2035 portfolio median of "
+            f"{median:+.1f} percent ({recipe}). Read as exposure if nobody acts, not as a forecast.")
 
 
 def render_fields(rec: dict, drv: dict) -> dict:
@@ -142,8 +131,8 @@ def render_fields(rec: dict, drv: dict) -> dict:
         "mat2035": pct(t["expected_materialisation"]["2035"]),
         "p10": fmt_pp(band["p10_pp"]),
         "p90": fmt_pp(band["p90_pp"]),
-        "lo": fmt_pp2(min(abs(band["p10_pp"]), abs(band["p90_pp"]))),
-        "hi": fmt_pp2(max(abs(band["p10_pp"]), abs(band["p90_pp"]))),
+        "lo": fmt_pp(min(abs(band["p10_pp"]), abs(band["p90_pp"]))),
+        "hi": fmt_pp(max(abs(band["p10_pp"]), abs(band["p90_pp"]))),
         "band_share": pct(band["band_share"]),
         "pass_through": pct(st["pass_through"], 1),
         "reach": pct(st["reach"]),
@@ -181,7 +170,7 @@ def render_fields(rec: dict, drv: dict) -> dict:
         f["pool_hair"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("Hair")))
     for i, c in enumerate(cells[:TOP_CELLS], start=1):
         f[f"cell{i}"] = cell_label(c["category"], c["region"])
-        f[f"cell{i}_pp"] = fmt_pp2(c["pp"])
+        f[f"cell{i}_pp"] = fmt_pp(c["pp"])
         f[f"cell{i}_share"] = pct(c["share_of_driver"])
         f[f"cell{i}_pool"] = pct(c["cell_share_of_pool"], 1)
         f[f"cell{i}_of_cell"] = pct(c["share_of_cell"])
@@ -203,7 +192,7 @@ def render_fields(rec: dict, drv: dict) -> dict:
     if m:
         f["max_cell"] = cell_label(m["category"], m["region"])
         f["max_cell_share"] = pct(m["share_of_cell"])
-        f["max_cell_pp"] = fmt_pp2(m["pp"])
+        f["max_cell_pp"] = fmt_pp(m["pp"])
     cats_sorted = sorted(drv["category_pp"].items(), key=lambda kv: -abs(kv[1]))
     for i, (cat, v) in enumerate(cats_sorted[:4], start=1):
         f[f"cat{i}"] = CATEGORY_SHORT.get(cat, cat)
@@ -242,15 +231,16 @@ def render_text(rec: dict, drv: dict, template: str) -> str:
 
 
 def render_all(rec: dict, analysis: dict) -> dict:
-    """{trend id: rendered text} for every driver of the record. Raises when a
+    """{driver id: rendered text} for every driver of the record. Raises when a
     driver has no template or a template names a driver the record lacks."""
-    by_code = {d["code"]: (tid, d) for tid, d in rec["drivers"].items()}
+    by_code = {d["code"]: (driver_id, d) for driver_id, d in rec["drivers"].items()}
     templates = analysis.get("drivers", {})
     missing = [c for c in by_code if c not in templates]
     unknown = [c for c in templates if c not in by_code]
     if missing or unknown:
         raise ValueError(f"analysis templates: missing {missing}, unknown {unknown}")
-    return {tid: render_text(rec, drv, templates[code]["template"]) for code, (tid, drv) in by_code.items()}
+    return {driver_id: render_text(rec, drv, templates[code]["template"])
+            for code, (driver_id, drv) in by_code.items()}
 
 
 def split_paragraphs(text: str) -> list:

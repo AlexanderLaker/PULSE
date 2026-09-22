@@ -1,16 +1,7 @@
-# PRISM API — Vercel serverless runtime dependencies
-# Total must stay under 250MB unzipped.
-#
-# scipy (~150MB) is intentionally ABSENT — this runtime never computes.
-# The deployed service is read-only over persisted runs (F2/D13); the
-# scipy-only engine runs OFFLINE (scripts/run_50k_prod.py). No numpy
-# fallback exists anywhere (D13) — do not add scipy or a fallback here.
-# pandas (~60MB) absent — not needed at runtime (persisted/seed data only).
-#
-# M11 (July 2026 review): aiohttp, feedparser and requests removed — they
-# had ZERO importers in the deployed code path (leftovers of the deleted
-# scanner). Do not re-add dependencies without an actual import.
+# The Vercel Python function (api/index.py) serves the API from the persisted
+# data and never simulates, so it needs neither numpy nor scipy
+# (tests/test_api.py runs the API with both blocked). Keep this list to what
+# the API imports: the function bundle has a size limit.
 fastapi>=0.110,<1
 pydantic>=2.6,<3
-numpy>=1.26,<3
 psycopg2-binary>=2.9,<3

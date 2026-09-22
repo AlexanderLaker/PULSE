@@ -1,62 +1,43 @@
+# Dependencies, caches and build output
 node_modules/
-__pycache__/
-*.pyc
-.env
-*.db
-.venv/
-dist/
-dist-*/
-*.xlsx
-*.egg-info/
-.DS_Store
 .next/
 .vercel/
+dist/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
 .hypothesis/
-tsconfig.tsbuildinfo
-# Office app lock files
-.~lock.*#
-~$*
 
-# Vercel env upload helper — never commit
-.env.vercel-upload*
+# Secrets: only the template is tracked
+.env
+.env.*
+!.env.example
+/.clerk/
 
-# Deploy token for Cowork / sandbox auto-push — never commit
-.env.deploy
-
-# Post-deploy placeholder from prior token-upload flow — safe to delete locally
-DEPLOY_TOKEN_HIER_EINFUEGEN.txt
-
-# Sandbox / IDE local prefs — not part of the product
-.claude/settings.local.json
-
-# Python backup files from one-off migration scripts
-*.py.bak.*
-
-# SQLite write-ahead / journal side-files
+# Local SQLite databases and their side files
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
-_RETIRED_2026-06/
 
-# Handover-Cleanup 2026-06-05
+# Outputs that can hold confidential figures or personal data: production run
+# workbooks, and the archives written by migrations and maintenance scripts
+runs/
+*.xlsx
+archive/
+
+# Handover package (scripts/package_handover.sh)
+PRISM_HANDOVER_*.zip
+
+# Local working folders and files (prefixed with an underscore), editors, OS
+/_*
+.claude/settings.local.json
 .claude/worktrees/
-pulse_server.log
+.DS_Store
+.~lock.*#
+~$*
 *.log
-*.tsbuildinfo
-
-# Nicht-App-Dateien (Decks, Reports, Audits) — nur lokal/OneDrive
-_ARCHIVE/
-_BACKUP_pre_v3.7_2026-06-10.tar.gz
-
-# clerk configuration (can include secrets)
-/.clerk/
-
-# Handover quarantine 2026-06-11 — never commit, never ship
-_NOT_FOR_HANDOVER/
-
-# DX handover deliverable (build artifact, not source)
-PRISM_HANDOVER_DX_*.zip
-PRISM_HANDOVER_READINESS_*.md
-
-# One-off migration archives (may contain legacy auth rows) — local/OneDrive only
-data/archive/
+*.bak

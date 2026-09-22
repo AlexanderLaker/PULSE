@@ -1,6 +1,6 @@
 {
- "version": "estimated_v1_september2026",
- "source": "ESTIMATE, not Henkel P&L: HCB gross-profit share per category x region, built 2026-09-11 from public reporting and category knowledge (owner ruling O14). Every input is graded B / E / G; the grades and the whole derivation are on the Config sheet, the record is data/cell_weights_estimated_v1.json. The finance figures override this via run_50k_prod.py --cell-weights FILE.",
+ "version": "estimate-2026-09",
+ "source": "ESTIMATE, not Henkel P&L: HCB gross-profit share per category x region, built from public reporting and category knowledge. Every input is graded B / E / G; the derivation is in Settings under Model configuration and in data/calibration/cell_weights_estimate.json. A finance file passed to run_production.py --cell-weights replaces it.",
  "basis": "gp1_share",
  "is_estimate": true,
  "grade_legend": {
@@ -44,7 +44,7 @@
     "block": "LHC",
     "share_of_block": 0.04,
     "grade": "E",
-    "note": "toilet care (O13): WC-Frisch, Bref WC Duo-Aktiv and Power-Aktiv. Roughly a third of the old HSC block: rim blocks are a large, high-turnover franchise in Europe and the growth markets"
+    "note": "toilet care: WC-Frisch, Bref WC Duo-Aktiv and Power-Aktiv; rim blocks are a large, high-turnover franchise in Europe and the growth markets"
    },
    "LHC: FCA": {
     "block": "LHC",

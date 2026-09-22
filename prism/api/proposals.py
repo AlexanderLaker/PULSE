@@ -1,26 +1,16 @@
-"""Multi-expert trend score proposals — aggregation + response shaping.
+"""Expert score proposals: aggregation and response shapes.
 
-Pure-Python (no FastAPI / no DB imports) so it is unit-testable and reused by
-both the proposals endpoints (prism/api/routers/trends.py) and the cheap
-`proposal_summary` block attached to each serialized trend.
+Plain Python with no web or database imports, so it is easy to test. A
+proposal is one expert's partial view of a driver's scoreable fields:
+probability (1-5), gp1_pct_affected (0-1), peak_year, diffusion_curve,
+uncertainty (0-5) and the category, regional and value-chain exposure maps.
 
-A "proposal" is one user's PARTIAL opinion on the 8 scoreable fields of a
-trend:
-
-    probability (int 1..5), gp1_pct_affected (float 0..1), peak_year (int),
-    diffusion_curve (str), uncertainty (int 0..5, 2.11.0 O7),
-    category_exposure (map), regional_exposure (map), vc_exposure (map)
-
-Aggregation rules (from the frontend contract):
-  - probability / gp1_pct_affected      → arithmetic mean of non-null values,
-                                          rounded to 2 dp, with a count.
-  - peak_year / uncertainty             → median (number) of non-null values
-                                          (uncertainty rounded to an integer
-                                          score, half up).
-  - diffusion_curve                     → mode (most frequent) + full vote
-                                          distribution.
-  - exposure maps                       → PER CELL across users: {avg, count}.
-  - A field's aggregate is omitted (None) when nobody scored it.
+Aggregation across experts:
+  - probability, gp1_pct_affected: mean of the scored values (2 decimals) and a count
+  - peak_year: median; uncertainty: median rounded half up to a whole score
+  - diffusion_curve: the most frequent value and the full vote distribution
+  - exposure maps: per cell, the mean and the count
+  - a field nobody scored aggregates to None
 """
 from __future__ import annotations
 
@@ -104,8 +94,7 @@ def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dic
 
 
 def _uncertainty_agg(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """2.11.0 (O7): median of the non-null uncertainty scores, rounded half
-    up to an integer 0..5 (the engine consumes integer scores), with a count."""
+    """Median of the scored uncertainties, rounded half up to a whole score 0-5."""
     vals = _non_null([r.get("uncertainty") for r in rows])
     if not vals:
         return None
@@ -151,13 +140,11 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 
 def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The named "who scored what" breakdown (headline scalar fields, the
-    expert's free-text comment, and the expert's vc_exposure profile).
+    """Who scored what: the headline fields, the comment and the value-chain profile.
 
-    vc_exposure is carried per scorer (July 2026) because the value-chain
-    dimension is endorsed as a CATEGORICAL epicentre stage: the review UI
-    counts one vote per expert (derived from their profile's peak stage)
-    and must never present a per-cell average as a position.
+    The value chain is endorsed as one epicentre stage, so the review panel
+    counts one stage vote per expert from each profile rather than averaging
+    cells into a position nobody took.
     """
     out = []
     for r in rows:
@@ -181,10 +168,10 @@ def build_proposals_response(
     rows: List[Dict[str, Any]],
     user_id: Optional[str],
 ) -> Dict[str, Any]:
-    """Full GET/PUT /trends/{id}/proposals response body.
+    """Body of GET and PUT /api/v1/drivers/{id}/proposals.
 
-    `rows` is every proposal row for the trend (decoded dicts). `user_id`
-    selects the caller's own row for the `my` block.
+    ``rows`` are all proposals for the driver; ``user_id`` picks the caller's
+    own for the ``my`` block.
     """
     my_row = None
     if user_id is not None:
@@ -204,13 +191,11 @@ def build_proposal_summary(
     rows: List[Dict[str, Any]],
     user_id: Optional[str],
 ) -> Dict[str, Any]:
-    """Compact per-trend summary for the trend list / detail handlers.
+    """Compact per-driver summary attached to GET /api/v1/drivers.
 
-    Shape:
-        {count, probability|null, gp1_pct_affected|null, peak_year|null,
-         diffusion_curve|null, my|null}
-    where the headline aggregates carry {avg/median/mode, count} and `my`
-    is the caller's own partial proposal (or null).
+    {count, probability, gp1_pct_affected, peak_year, diffusion_curve,
+    uncertainty, my}: headline aggregates with their counts (or None) and the
+    caller's own proposal (or None).
     """
     prob = _mean2([r.get("probability") for r in rows])
     gp1 = _mean2([r.get("gp1_pct_affected") for r in rows])

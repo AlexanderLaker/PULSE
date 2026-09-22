@@ -1,18 +1,10 @@
-"""C3: Property-based tests for quantitative invariants.
+"""Property-based checks (hypothesis) on the full driver base.
 
-These tests use `hypothesis` to generate random but valid inputs and
-assert that model outputs respect invariants the engine is contractually
-supposed to preserve — regardless of the specific input values:
-
-1. All percentile outputs obey p10 ≤ p25 ≤ median ≤ p75 ≤ p90.
-2. Shift matrix contains only finite numbers (no NaN/inf leaks).
-3. Doubling iterations never changes the median by more than a
-   convergence-tolerance band (Monte Carlo stability).
-4. Two runs with the same seed produce identical output (seed integrity).
-5. ModelConfig.copy_with never mutates the original.
-6. |headline| is monotone in attenuation magnitude (per-force attenuation
-   scaled uniformly up/down — see test_attenuation_monotonic_in_headline).
+Whatever the seed: percentiles are ordered, every output is finite, a seed
+reproduces its run, ModelConfig.copy_with never mutates the original, and a
+uniformly stronger attenuation never shrinks the headline.
 """
+import dataclasses
 import math
 
 import numpy as np
@@ -82,7 +74,6 @@ def test_seed_reproducibility(db, seed):
 @given(att=st.floats(min_value=0.1, max_value=0.9, allow_nan=False),
        iters=st.integers(min_value=100, max_value=50_000))
 def test_copy_with_is_pure(att, iters):
-    """v3.2: validate copy_with on per_force_attenuation (no scalar)."""
     from prism.config import FORCES
     base = ModelConfig()
     original_pfa = dict(base.per_force_attenuation)
@@ -95,15 +86,14 @@ def test_copy_with_is_pure(att, iters):
     assert base.per_force_attenuation == original_pfa
     assert base.iterations == original_iters
     # Frozen: cannot mutate
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         base.per_force_attenuation = {f: 0.1 for f in FORCES}  # type: ignore[misc]
 
 
 # ── Invariant 5: attenuation monotonicity of |headline| ─────────────
-# v3.2: scalar attenuation removed. We now scale every per-force value
-# uniformly by a factor and verify |headline| is monotone in that factor
-# (under fixed seed + iterations). All trends share the same directional
-# aggregate sign, so larger attenuation amplifies the magnitude.
+# Every per-force attenuation is scaled by one factor; under a fixed seed the
+# magnitude of the headline must not fall as the factor rises (the base is
+# net contraction, so a larger pass-through amplifies it).
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
 def test_attenuation_monotonic_in_headline(db, seed):
@@ -124,10 +114,10 @@ def test_attenuation_monotonic_in_headline(db, seed):
         ]
         return float(np.mean(meds))
 
-    h_low = _headline(0.70)   # 30 % flex down from calibrated baseline
+    h_low = _headline(0.70)   # 30 percent below the default
     h_base = _headline(1.00)
-    h_high = _headline(1.30)  # 30 % flex up
-    # Monotonic in |.| — allow small noise tolerance
+    h_high = _headline(1.30)  # 30 percent above
+    # monotone in magnitude, with a small tolerance for sampling noise
     assert abs(h_low) <= abs(h_base) + 0.005, (
         f"|headline| not monotone low vs base: {h_low} {h_base}"
     )

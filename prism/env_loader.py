@@ -1,42 +1,25 @@
-"""Load the repo-root .env into the process environment (import side effect).
+"""Load the repository's .env file into the process environment.
 
-The engine and the ops scripts read configuration from ``os.environ``
-(``DATABASE_URL`` / ``POSTGRES_URL``, ``PRISM_DB_PATH``, ``PRISM_JWT_SECRET``);
-importing this module makes the repo-root ``.env`` available to them:
+Import this module for its side effect in command-line entry points:
 
-    import prism.env_loader  # noqa: F401  (import-for-side-effect)
+    import prism.env_loader  # noqa: F401
 
-M17 (July 2026 review): ``override=False`` — real shell environment variables
-WIN over .env values (the python-dotenv default). The previous
-``override=True`` silently ignored e.g. a staging ``DATABASE_URL`` exported on
-the command line in favour of the .env prod value, so operators could not
-redirect a run without editing the file.
-
-July 2026 rewrite: the former 270-line EnvConfig class in this module
-configured only deleted features (AI providers, news/patent/social scanners,
-Power BI service principals) and defaulted the SQLite path to the legacy
-``data/pulse.db``. Nothing imported it. Deleted, not maintained.
+Variables already set in the shell take precedence over the file
+(``override=False``), so a single run can be pointed at another database with
+``DATABASE_URL=... python scripts/run_production.py``.
 """
 import logging
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover — dev environments install python-dotenv
-    raise ImportError(
-        "python-dotenv is required. Install with: pip install -r requirements-dev.txt"
-    )
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
 
 if ENV_FILE.exists():
-    load_dotenv(ENV_FILE, override=False)  # M17: shell wins over .env
+    load_dotenv(ENV_FILE, override=False)
     logger.info("Loaded environment from %s (shell variables take precedence)", ENV_FILE)
 else:
-    logger.warning(
-        ".env not found at %s — relying on the process environment. "
-        "Copy .env.example to .env for local development.", ENV_FILE
-    )
+    logger.info(".env not found at %s; using the process environment only", ENV_FILE)

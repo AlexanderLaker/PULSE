@@ -1,0 +1,253 @@
+{
+ "about": "Driver descriptions this migration brings up to date. A stored description is replaced by the text below only while it is one of the previously shipped texts (their SHA-256); a description an admin has edited is left alone and reported.",
+ "descriptions": {
+  "competitive_r15": {
+   "previous_sha256": [
+    "a8487ce843635734cdd4a67c138bd03e84a41dcd14eae46e48eb3cd6547948de"
+   ],
+   "text": "The scale leaders out-spend HCB on innovation and media every year of the horizon: L'Oréal, Unilever and P&G in hair and laundry, Reckitt (Finish, Vanish) in auto-dish and additives, Church & Dwight (OxiClean, Arm & Hammer) in US additives and value laundry. L'Oréal grew hair care double-digit in Consumer Products and Dermatological Beauty in H1 2026 with premium hair the key driver of Professional Products, on R&I of EUR 1.38bn in 2025 (3.1% of sales) and advertising at 32.6% of sales in H1 2026, with K-Scan in 10,000 salons, an India tech hub and the NVIDIA computational-chemistry partnership (March 2026, initially photoprotection and skin tone). Unilever's hair care grew high single digits in H1 2026 on brand investment of 16.1% of turnover with Dove Fibre Repair, Scalp + Hair Therapy and K18. P&G's Ariel 'The Big One' pods contributed over 40% of UK fabric-care category growth in FY2025 (company-stated), although P&G's FY2026 was its weakest since 2019 (organic +1%, Fabric & Home Care flat) and Henkel gained about 50 bps of European fabric-care share. The 2025-26 acquisition wave (Kering Beauté, Medik8, Color Wow, Innovist, Dr. Squatch, Grüns) shows the same capital advantage."
+  },
+  "competitive_r17": {
+   "previous_sha256": [
+    "7076a5b9459728116d96c69e9971c672ce423dd8a7baeea708fc630eddd6c147"
+   ],
+   "text": "Reckitt completed the sale of Essential Home (Air Wick, Calgon, Cillit Bang, Woolite, Mortein in North America, Europe and Latin America; about GBP 2.0bn of 2024 revenue, -7% like-for-like in Q1 2025) to Advent on 31 December 2025, retaining 30%; the business now trades as Vestacy and agreed in August 2026 to move laundry production to McBride, which will take over two Vestacy factories in 2027, while Advent says it will 'drive operational excellence and unlock the brands' full potential', so the window is narrower than it first appeared. Finish stayed with Reckitt, so the auto-dish flank is not weakened. Other windows: P&G guides 30-50 bps of FY2027 growth given up to brand, form and go-to-market exits; Beiersdorf's NIVEA fell 6.8% organically in H1 2026 with an 18-month turnaround; Coty calls FY2027 a transition year. Overlaps for HCB: Woolite vs Perwoll, Cillit Bang vs Bref and WC Frisch, Mortein vs insect control, NIVEA vs Fa and Dial."
+  },
+  "competitive_r18": {
+   "previous_sha256": [
+    "f62f2ab536b7b0a7550145b0394d7849f2d206347c4fa965ffc365e6d6e01e42"
+   ],
+   "text": "After Olaplex, professional and prestige hair is roughly 15% of HCB sales pro forma and Henkel is global number two with about 12% share against L'Oréal's 27% and Wella's about 10% (Kline). L'Oréal PPD grew +12.6% like-for-like in H1 2026 'significantly outperforming the professional market' and already makes 39% of its sales outside salons; Kline records e-commerce gaining 15.6 points of hair-care sales over 2019-24 while salon back bar and take-home lost 7.5 and 8.5 points; Kao's Europe sales fell 3.6% like-for-like in H1 2026 with Goldwell hit by the European downturn; Wella filed for a NYSE IPO in August 2026 (about USD 2.9bn revenue). Olaplex's own 10-K names decreased salon demand and unauthorised diversion as principal risks."
+  },
+  "consumer_r01": {
+   "previous_sha256": [
+    "d669b9a603793d072ed1cf8d3fc5ed8f7bcb37a282fcf89bd4bbe25492eaf8b4"
+   ],
+   "text": "Private label reached a record 50% unit share and 42% value share (EUR 324bn) across Europe's six largest grocery markets (Circana, April 2026; Germany 52% units, 44% value); 34% of branded units are sold on promotion against 14% for private label. Momentum slowed in 2025 as national brands won shoppers back (Circana), but the 2026 energy-shock inflation can re-accelerate it. In HCB's core, German laundry private label is about 20% of value and cleaners about 30% (YouGov panel, MAT Mar 2026); hair private label is low. Private label now contributes significantly more to premium-tier growth in Western Europe than branded players (NIQ, June 2026: +514 against -170), through tiers such as Lidl Deluxe, dm Balea and Tesco Finest, which removes the quality rationale that protected mid-tier brand pricing."
+  },
+  "consumer_r03": {
+   "previous_sha256": [
+    "db0bb251fe2d2b1c353b36b6a042416ec6f85ce3d1c2355ef09414b647439901"
+   ],
+   "text": "Premium hair keeps outgrowing mass: US prestige hair +11% in dollars and +8% in units in H1 2026 against mass +7% with units falling (Circana); L'Oréal Professional Products grew +7.5% like-for-like in 2025 (+15% in its premium hair segment, Kérastase double-digit) and +12.6% like-for-like in H1 2026; Unilever's K18 posted 'very strong double-digit growth'. Henkel management puts past hair-market growth at about 4.5% a year and expects premium hair to compound at about 5%; HCB Hair grew +4.2% organic in H1 2026 with strong consumer and very strong professional growth. With Olaplex (about EUR 370m of annual sales, closed 7 July 2026) HCB is now global number two in professional hair, so premiumisation is both a direct tailwind and an integration exposure (Olaplex has declined since its 2022 peak, Kline). Bond-building and biomimetic-peptide science (K18, Olaplex, Elvive Collagen Lifter, Dove Fibre Repair) is the reason-to-believe; clinical evidence at cosmetic concentrations is still thin."
+  },
+  "consumer_r05": {
+   "previous_sha256": [
+    "df455f35d693ca5c2efb8c27a0dc4b8be2d2fe8646d24774bbf1f70ca607d07a"
+   ],
+   "text": "22.0% of the EU population was 65 or older on 1 January 2025 (+2.9 pp in ten years) and the share keeps rising to mid-century; 34% of Germans over 65 live alone. For HCB the evidenced mechanisms are two: grey-coverage and grey-blending colour demand (Hair Colorants and Hair Styling made the strongest contributions to HCB consumer hair growth in H1 2026) and gentle, scalp and thinning care for ageing hair. The offset is real: the over-55s showed the largest increase in dupe buying between 2024 and 2026 (Circana), US salon colour was flat in 2024 (Kline) and L'Oréal calls the professional colour market 'more challenging'. Colourants are HCB's largest hair profit line, so the net effect is a modest expansion."
+  },
+  "consumer_r07": {
+   "previous_sha256": [
+    "89637ab60ef3b0762105d0bd8f155ebd88b0a7ab5a34d364d3d1eafac58627db"
+   ],
+   "text": "US prestige scalp care grew 19% in H1 2025 and logged a third consecutive year of double-digit growth in 2025 (Circana); scalp-focused products and serums drove prestige hair in H1 2026. The segment is still small (3.4% of US salon retail, Kline) but every major now has a scalp flagship: Dove Scalp + Hair Therapy (US 2024, UK April 2026), Head & Shoulders and Vichy Dercos, and HCB launched Gliss Scalp Balance in February 2026 (five SKUs, EUR 5.99-8.99). The microbiome story is the ingredient layer under this driver, with a thin clinical base (three randomised trials indexed)."
+  },
+  "consumer_r10": {
+   "previous_sha256": [
+    "d0aa36d32d00b6b69623e068814848b403f70445fda01280f41e6f1fc75ba976"
+   ],
+   "text": "Thinning has become a medical-adjacent category: JAAD cohorts (2025, 2026) document GLP-1-associated hair loss; Unilever is marketing Nutrafol 'as a complement to a GLP-1 regimen' to lift new-customer conversion; L'Oréal's Vichy Dercos and Redken Acidic Grow Full are growth drivers; Hims & Hers reached USD 2.35bn revenue in 2025 with hair loss one of its founding specialties (no hair split disclosed). The Rx and supplement tiers sit with telehealth and Nutrafol, which caps HCB's addressable slice to cosmetic thickening (Schwarzkopf, Gliss, BC Scalp Genesis). Men's scalp, thinning and grey-blending routines are the evidenced male-grooming slice for HCB (Men Perfect, Syoss Men); the broader men's market growth sits in skincare, fragrance and DTC, where HCB is absent."
+  },
+  "consumer_r16": {
+   "previous_sha256": [
+    "cdbcff9431c84e27f2a348265406c721da787cd15f84db9c23334afcb674ad80"
+   ],
+   "text": "Domestic brands held 57.4% of China's RMB 1.1tn cosmetics market in 2025, the fifth consecutive year of gains (CAFFCI); 65% of sales are online and domestic brands are Douyin-native while foreign brands remain weighted to Tmall; several foreign brands withdrew or downsized in 2024-25. The mechanism is channel and price, not nationalism. HCB's China hair exposure is substantial (Vidal Sassoon Greater China acquired 2024, Schwarzkopf, Syoss, Shiseido Professional; a China hair-care and colorants plant expansion is in the 2026 capex list), yet Henkel's Asia-Pacific region grew 'very strong' organically in H1 2026, driven by Hair and P&G regained share in China after 15 quarters. The share shift is two-thirds done; what remains is a tail."
+  },
+  "consumer_r18": {
+   "previous_sha256": [
+    "8c6b52dcdc18e444b1b0101ec5da55e82a0de4384ebfc48243982745360bfff7"
+   ],
+   "text": "Hispanic Americans numbered 70.1m on 1 July 2025 (about 21% of the population) and delivered 76% of US population growth, but growth halved to +1.35m as net international migration fell 54% to 1.3m (Census Vintage 2025). Hispanic households over-index on hair care (index 138) and laundry care (126) (NIQ) and spend 41% more on laundry supplies (BLS), which is why HCB's US portfolio is exposed both ways. In 2025 Hispanic per-household spending growth slowed to 0.8% with unacculturated households -4.8% (Numerator); a 1% tax on cash and money-order remittances took effect in January 2026 and ICE removals exceeded 356,000 in FY2026 to July. Not Your Mother's (Curl Talk) partly closes the curl gap; HCB still has no Hispanic-targeted platform."
+  },
+  "consumer_r24": {
+   "previous_sha256": [
+    "89882ee481f133a0ac10c248466fe077b4aca4a069ada4503155780c6fc1238d"
+   ],
+   "text": "Curl care was the only US salon-retail segment that did not decline in 2024 (Kline); textured-hair consumers spend about 78% more on hair products (Syensqo, via BeautyMatter 2026); P&G (Mielle), Unilever (SheaMoisture), L'Oréal (Mizani, Garnier Curl Method 2025) have occupied the space. The category has no independent sizing. HCB now owns Not Your Mother's Curl Talk (26 SKUs, mass curl, North America) but has no type-4/coily or Africa-relevant range."
+  },
+  "consumer_r25": {
+   "previous_sha256": [
+    "3186d91a8c23f28357231125742cea6ea7a52f309dbc590517adda4648430801"
+   ],
+   "text": "EU total fertility fell to 1.34 in 2024 (lowest in the series), Japan at a new record low and Korea 0.80 in 2025 (Korea rising for a second year), US births -1% in 2025. The EU population peaks at 453m in 2029 (EUROPOP2025) and is only 1.5% lower by 2050; East Asia shrinks faster but is a small HCB exposure. EU average household size has been flat at 2.3 since 2014 (Germany 2.0 since 2009) and household counts still rise to 2035 (Germany 42.7m in 2025 to 43.2m, Destatis), so there is no household-count volume loss inside the horizon. Atomisation therefore raises loads per capita; the genuine headwinds are fewer children (fewer kid-related loads, lower soil) and post-2029 population decline, which compound mainly beyond the horizon."
+  },
+  "consumer_r27": {
+   "previous_sha256": [
+    "ebfdc222fa99a00487abfabdcdc8b3bf850907403890b14dc4c31c9619bd39e4"
+   ],
+   "text": "Germany has dishwashers in 77.3% of households (Destatis LWR 2024) and the US in 72.7% (EIA RECS 2020), while China is at about 3% (All View Cloud estimate cited by CHEAA) with volume growth of only about 2% a year and Euromonitor describes Brazil, India and Mexico as low-penetration or flat. For HCB the catch-up that matters is where Somat and Pril sit: Southern and Eastern Europe, Türkiye and MEA; Henkel reported very strong dishwashing growth in Q3 2025 and double-digit hand-dish growth in H1 2026. In India, China and Brazil HCB has no meaningful ADW franchise and Finish (Reckitt, now a refocused 'Powerbrand') absorbs most of the migration."
+  },
+  "consumer_r28": {
+   "previous_sha256": [
+    "f44d30666c8d89558b5e4230b1d0d76063586ad5a48863bc4ed42d887d6d2ca6"
+   ],
+   "text": "Scent boosters and laundry perfumes have graduated from novelty to a structural premium segment: the only public series sizes the global booster market at EUR 1.9bn in 2023 heading to EUR 3bn by 2028 (Euromonitor, cited by Unilever), with fragrance boosters growing more than 21% outside the US in the year to Q1 2024 (GMI, cited by Unilever); Circana's 2025 Pacesetters include a Downy scent booster and Downy Unstopables Unlimited is a 2026 Rising Star. Henkel's Fabric Care grew double-digit in Q3 2025 and 'significantly' in Q1 and Q2 2026 while Fabric Cleaning declined, and Silan launched its first liquid laundry perfume in Austria in September 2025 (EUR 4.99). P&G's Lenor/Downy Unstopables franchise leads. Risk inside the pool: the EU microplastics restriction bans non-degradable fragrance encapsulates from 17 October 2029 (Henkel already markets Silan perfumes as microplastic-free)."
+  },
+  "consumer_r34": {
+   "previous_sha256": [
+    "e2046b5bfe85779c5c75a86b1116812b36168e2d3ef64ca4aad3ffc2ad0b3cd6"
+   ],
+   "text": "US net international migration fell from 2.7m (2024) to 1.3m (2025) with 0.3m projected for 2026; household formation by recent immigrants is projected to drop from 640,000 (2024) to about 143,000 by 2027, pulling total household growth down to the Joint Center's low series of 690,000 a year (Harvard JCHS, August 2026). Young-adult headship fell to 32.7% in 2024. Household counts drive volume in HCB's North American laundry (all, Persil, Snuggle), dish and Dial body care."
+  },
+  "consumer_r35": {
+   "previous_sha256": [
+    "fc140ce28a4e0772706ef745fe9ee4acd3cc16acfa611348143ba38d8826d0e8",
+    "d2d51667fe09cea372c98e73917201068a0a468008732f175a8b89a2f8eafb7c"
+   ],
+   "text": "US mass hair grew +7% in dollars in H1 2026 with units down, while prestige hair grew +11% with units +8% and prestige body care +16% (Circana); mass hair was 'among the softer performers' in 2025 with growth from value combo packs. Kline records e-commerce gaining 15.6 points of hair-care sales over 2019-24 while salon back bar and take-home both lost share. HCB's hair is still majority mass in Europe (Schwarzkopf consumer, Syoss, Gliss, Taft) where private label and discounters compound the unit erosion, and European body care (Fa) declined in H1 2026. C-03 models the premium upside; this line carries the mass-shelf loss, as PRISM's one-sided driver grammar requires."
+  },
+  "consumer_r36": {
+   "previous_sha256": [
+    "e415cb3a93543aa2d658b38b58f6c9263bc1df659a5db440d95fae083b24e05d"
+   ],
+   "text": "IMEA grew +12.1% organically in 2025 and +14.9% in H1 2026, yet nominal sales fell 6.7% and were flat, and IMEA adjusted EBIT went from EUR 213m (2024) to EUR 200m (2025) and EUR 111m in H1 2026 at a 10.4% margin against 18.9% in Europe (Henkel AR 2025, H1 2026 report). Türkiye is consolidated under IAS 29 with a EUR 39m monetary loss in 2025; the lira lost 20.6% on average in 2025 and a further 9.8% by September 2026; Turkish inflation is 31.8% and Egyptian 14.9% (July 2026). Consumer Brands' H1 2026 nominal sales carried a -4.1 point FX effect, and Henkel guides a low-single-digit negative translation effect for 2026. Without this haircut the model converts organic growth-market percentages one-for-one into euro gross profit, which overstates the euro effect by roughly half on the evidence of the last six quarters."
+  },
+  "consumer_r37": {
+   "previous_sha256": [
+    "062209427fd30795c8a967f64a7f51ef56dab86250ffe65a502436241d94cee7"
+   ],
+   "text": "IMEA delivered organic growth of +12.1% (2025), +12.8% (Q1 2026) and +17.4% (Q2 2026) with both Laundry & Home Care and Hair contributing; Consumer Brands in Asia-Pacific grew very strongly in H1 2026, driven by Hair (Vidal Sassoon Greater China, a China hair plant expansion in the 2026 capex list). India's beauty and personal care market is USD 23bn growing about 12% a year to USD 40bn by 2030 (Redseer) but HCB's Indian footprint is hair-only and sub-scale until the Pril and Fa licences to Jyothy Labs ended on 31 May 2026; washing-machine penetration is about 20%. Southeast Asia's digital economy passed USD 300bn of GMV with video commerce at 25% of e-commerce (e-Conomy SEA 2025), but HCB there is professional-hair led. Latin America is Mexico-anchored for HCB; Mexico's record FDI is dominated by reinvested earnings rather than new plants and USMCA was not renewed at the July 2026 review, so no nearshoring volume enters this driver. In Sub-Saharan Africa NIQ sizes the five largest measured markets at about USD 74bn, with Nigeria's 54% growth being 5% volume. AfCFTA's phase-down for sensitive goods only began on 1 January 2026 and actual trade has so far run through the Guided Trade Initiative: a watch item. Middle East watch item: Gulf consumption has been affected since the war began (L'Oréal), with Saudi Arabia resilient; Indonesia's halal mandate for cosmetics bites 17 October 2026."
+  },
+  "customer_r01": {
+   "previous_sha256": [
+    "1914d6dd7a0f195795c5112a88ee6c6bb2068ebc457b9a6b3f314f5e61180e8b"
+   ],
+   "text": "Discounters hold 46.6% of German food-retail revenue (EHI, 2024 data) and remain Europe's fastest-growing physical channel outside Germany: Lidl grew 6.1% to EUR 140bn in FY2025, Aldi Nord grew 7.4% group-wide to about EUR 31bn (5.1% in Germany), Lidl GB reached a record 8.4% UK share in April 2026, and IGD sees discount growing 4.8% a year to 2030. In Germany itself the gain plateaued in 2025 (Edeka, Rewe and Lidl grew 2.7-3.6%; Aldi Süd +1.2%). Aldi US is adding 180+ stores in 2026 toward 3,200 by 2028 and claims one in three US households. Variety discounters (Action, Tedi, Woolworth) took 23% more non-food spend in two years (GfK) and set the visible price floor for branded hair and detergent packs. The pool mechanism is trade-margin dilution and price-ladder compression, not delisting."
+  },
+  "customer_r03": {
+   "previous_sha256": [
+    "7f01e7e8a6bba11031baee01a0ebab5cf0fc635bb24fa812af2327838d14f50d"
+   ],
+   "text": "Edeka and Rewe alone hold 46.8% of German grocery and the trade press calls the power relations between the big four 'cemented' (NIQ Trade Dimensions data, 2025); buying alliances are re-forming rather than fading (Concordis: Carrefour and Coopérative U negotiating with multinational suppliers from 2026; Eurelec with E.Leclerc, Rewe and Ahold Delhaize sourcing jointly since 2025, Ahold Delhaize citing 'price differences between European countries that cannot be objectively explained'); consolidation continues (Carrefour exits Italy and Romania, 165 Auchan supermarkets rebannered to Intermarché from October 2026, Aldi US converting Southeastern Grocers). The EU Single Market Strategy (May 2025) commits to tackle territorial supply constraints, the legal lever alliances need to buy cross-border; until a proposal is tabled it stays a watch item inside this line."
+  },
+  "customer_r07": {
+   "previous_sha256": [
+    "02f3a22026f0a8023fb332c416bc9ca14caa1f1ff54f6c9a712292a1ecff907c"
+   ],
+   "text": "L'Oréal Professional Products grew +7.5% like-for-like in 2025 (first time above EUR 5bn, a record 27% share of the professional market, Kérastase double-digit) and +12.6% like-for-like in H1 2026, with 39% of the division's sales already outside salons. Henkel Hair grew +4.2% organically in H1 2026 with strong consumer and very strong professional growth, and now owns Olaplex, the archetype of salon-to-retail crossover. Ceteris paribus the crossover raises category value but is led by competitors, so this line carries the price-ladder mechanism and X-18 carries the professional-channel contraction side."
+  },
+  "customer_r12": {
+   "previous_sha256": [
+    "5b89eddbc9972c8f7f4286d4944c2ff7ea1475b8475d1cd065c477231735ab95"
+   ],
+   "text": "Drugstores posted the strongest 2025 sales growth of any stationary German food retailer (+6.6%, NIQ) while the big four grocers grew 2.7-3.6%; nearly 70% of the food packages that grocers lost through store switching were bought in drugstores, and food is now 17.8% of drugstore sales. Private label across German grocery and drugstores reached almost EUR 80bn in 2025 (+EUR 2.7bn). dm and Rossmann are HCB's core German customers for hair, body and increasingly laundry and home care; their own labels sit directly against Schwarzkopf, Syoss, Fa, Persil and Somat, and both run loyalty and app platforms (Payback at dm) that are becoming media inventory. The shift was bigger and faster than discount in 2025."
+  },
+  "customer_r13": {
+   "previous_sha256": [
+    "437b9374e29672f8fa17ebd0c54d988069d0beb52e811bed3cd9e46e52605696"
+   ],
+   "text": "US retail media reached USD 60.3bn in 2025 and USD 71.1bn in 2026 (+17.8%), with Amazon 79.7% and Walmart 8.0% taking 89% of the increment (eMarketer); Amazon's advertising revenue was USD 68.6bn in 2025 and USD 19.8bn in Q2 2026 (+26%), Walmart Connect +43%. Europe is growing faster: IAB Europe projects EUR 28.8bn by 2028, almost four times the pace of total digital advertising. NIQ shows much of it is not incremental (a campaign reporting 14:1 ROAS measured 0.4:1 under MMM). Loyalty-data pricing (Kroger 84.51°, Tesco Media, Payback at dm and Edeka, Lidl Plus) lands in the same budget line."
+  },
+  "environmental_r01": {
+   "previous_sha256": [
+    "f201e3a91ddeb1b7c23a612728c83ede58c438f46d4a6ab98b02a737ee1e684e"
+   ],
+   "text": "The material squeeze is in lauric oils, the feedstock for the C12-C14 alcohols, SLES, betaines and glucosides in shampoos, body washes and dish liquids: palm kernel oil averaged USD 990/t in 2023 and USD 2,093/t in 2025, peaked at USD 2,258/t in September 2025 and was still USD 2,166/t in July 2026 (World Bank Pink Sheet); coconut oil averaged USD 2,480/t in 2025 with a monthly peak of USD 2,727/t; crude palm oil itself moved only from USD 886/t (2023) to USD 1,104/t (July 2026). Indonesia's B50 biodiesel mandate is live from 1 July 2026 (75-80% distributed by end-August, full coverage targeted 1 October), and its 2026 biodiesel allocation was left almost flat (S&P Global), so the full B50 feedstock pull (APROBI estimates 17-18 Mt of CPO a year) bites in 2027. EU buyers pay an EUDR compliance premium of USD 350-400/t on crude palm kernel oil (Fastmarkets). Henkel guides direct-material prices up in the high single digits for 2026."
+  },
+  "environmental_r03": {
+   "previous_sha256": [
+    "832f271865d1c1b559040e23d9d04841c6d4607e65940a269dae323a36cd0950"
+   ],
+   "text": "CBAM's definitive regime started 1 January 2026 (authorised declarants above 50 tonnes a year; scope cement, steel, aluminium, fertilisers, electricity, hydrogen); the Commission's December 2025 proposal (COM(2025) 989) extends it from 1 January 2028 to steel- and aluminium-intensive downstream products (the Annex I list), not to surfactants or formulated products; the Council agreed its position on 12 June 2026. ETS2 for buildings and road-transport fuels becomes fully operational in 2028; EUAs traded around EUR 80/t in July 2026 and the CBAM certificate price was EUR 75/t for Q2 2026. CSRD Scope 3 disclosure is a reporting duty, not a cost mechanism."
+  },
+  "environmental_r07": {
+   "previous_sha256": [
+    "9e4bb1a590d879aa9d6556a9619bec35f465095ab7f27736ac058945851e0500"
+   ],
+   "text": "IEA: EU electricity prices for energy-intensive industries in 2025 were 'on average roughly double the prices in the United States' and more than 50% above China and India; European gas averaged USD 11.96/mmbtu in 2025 against USD 3.53 in the US (3.4x) and USD 18.06 against USD 2.89 in July 2026 (6.2x) after the Hormuz closure (World Bank). The gap widened in 2026 rather than narrowing. The consequence is upstream: 37 Mt or about 9% of European chemical capacity closed in 2022-25 at six times the pre-2022 rate (Cefic), thinning European sources of surfactant intermediates and packaging resins and raising import dependence; Kearney's 2026 index shows US manufacturing imports at a four-year high despite tariffs, so 'nearshoring' is not visible in the data. Climate adaptation is a watch item: Munich Re puts European nat-cat losses in 2025 at USD 11bn against a USD 35bn ten-year average."
+  },
+  "government_r02": {
+   "previous_sha256": [
+    "1789f06f260d74301c229996adf1d7005bc3beddef9f5c63d93d1a36c3d15601"
+   ],
+   "text": "The deadlines are: rinse-off cosmetics 17 October 2027; detergents, waxes, polishes and air care 17 October 2028; leave-on cosmetics and encapsulated fragrances 17 October 2029. The risk of PVA capsule film being classified as a microplastic is contradicted by the legal text: polymers with solubility above 2 g/L are excluded, and the US EPA denied a petition for mandatory PVA safety testing in April 2023. The real exposures are solid opacifiers and other polymer microparticles in LHC liquids (2028) and fragrance encapsulates (2029), which land on the scent-premium pool (C-28); Henkel states it has replaced synthetic encapsulates in Europe and is still seeking a fully biodegradable opacifier."
+  },
+  "government_r03": {
+   "previous_sha256": [
+    "ed7ec6adc5ac34ece09bb1774a2d6bff180a868f698e9158f53663dd09ef2c5e"
+   ],
+   "text": "A rolling gradient with hard gates: Omnibus VII (Regulation (EU) 2025/877, applicable 1 September 2025), Omnibus VIII (2026/78, in force 2 February 2026), the 56 additional fragrance allergens (2023/1545: no placing on the market of non-compliant products after 31 July 2026, no making available after 31 July 2028), PFHxA in cosmetics from 10 October 2026 (2024/2462), cyclosiloxanes D4/D5/D6 in leave-on products from 6 June 2027 (2024/1328), and France's national PFAS ban since 1 January 2026. The universal REACH PFAS restriction is later and smaller than its headline suggests: RAC and SEAC opinions in 2026, Commission decision not before Q3 2027, application 2029 or later; the FDA found intentionally added PFAS in only 0.41% of registered cosmetic product listings, so PFAS is a component of this driver rather than a driver of its own. Council and Parliament both struck the Chemicals Omnibus VI exemption for oral and inhalation CMRs from their positions, so 'no relief' is the working assumption pending the final text."
+  },
+  "government_r04": {
+   "previous_sha256": [
+    "5adebf6124e567ae1480042d16cc65a4035f819a9248d1b365ea7e1a07a4b48d"
+   ],
+   "text": "PPWR (Regulation (EU) 2025/40) applies from 12 August 2026, but the cost-bearing gates come later: harmonised labels from 12 August 2028, recycled-content minima of 35% (65% by 2040) for HCB's non-contact-sensitive plastics, recyclability grades, a 50% empty-space cap and the Annex V bans (single-use plastic grouped packaging, hotel toiletry minis) from 1 January 2030, with EPR fees modulated by grade about 18 months after the 2028 design-for-recycling acts. The PFAS limit in packaging is food-contact only. UK pEPR has invoiced large producers since October 2025 (plastic GBP 423/t for 2025/26, modulated by recyclability from 2026/27); US state EPR is live (Oregon July 2025, Colorado 2026, California SB 54 regulations approved May 2026, Minnesota, Maryland, Maine, Washington to follow). Henkel's European laundry bottles are already at 65% PCR. Recyclate prices are weak in 2026, so the 2030 risk is availability after recycler closures, not today's price."
+  },
+  "government_r06": {
+   "previous_sha256": [
+    "47e7650e26095f998be1589cf6a3f5055fe40ad8233ec8463e256a5a9c2466bb"
+   ],
+   "text": "EUDR applies from 30 December 2026 for large and medium operators (30 June 2027 for micro and small) after Regulation (EU) 2025/2650, which also relieves downstream operators: they collect and keep suppliers' due-diligence reference numbers rather than filing statements. Palm oil, palm kernel oil, glycerol, fatty acids and fatty alcohols stay in scope; surfactants (HS 3402) and finished detergents and shampoos do not, so the obligation bites on HCB's oleochemical suppliers, not on HCB's formulations. CSDDD after Omnibus I (Directive (EU) 2026/470) applies only above 5,000 employees and EUR 1.5bn turnover from 26 July 2029, with civil liability and mandatory transition plans removed; CSRD is a reporting duty. The Kunming-Montreal framework and TNFD are not company mandates. The palm price effect (EUDR premium of USD 350-400/t on CPKO) is counted in E-01."
+  },
+  "government_r08": {
+   "previous_sha256": [
+    "a1196159278ae619e82d8e842efb00c50fa15afe65637a81dd8df6b5a9fd3c18"
+   ],
+   "text": "The Supreme Court struck down the IEEPA tariffs on 20 February 2026 (6-3) and refunds accelerated from May 2026; the replacement regime is a Section 122 surcharge of 10% (24 February to 24 July 2026) followed by Section 301 'forced labour' tariffs of 10% or 12.5% on 60 trading partners announced on 24 July 2026, with Section 232 sectoral tariffs (steel, aluminium, copper 50%) untouched; the Tax Foundation puts the 2026 average effective rate at 6.6%, the highest since 1969. Consumer-goods companies report 2026 tailwinds: P&G booked a 40 bps net tariff benefit to gross margin in its June 2026 quarter, Church & Dwight expects about USD 15m of refunds in H2 2026, and Henkel calls direct effects 'manageable' under 'In the Region for the Region'. The EU adopted the regulation eliminating its duties on most US industrial goods on 25 June 2026 (applicable from July 2026, with snap-back clauses) while USTR opened a Section 301 investigation into German pharmaceutical pricing (June 2026), so re-escalation risk persists."
+  },
+  "government_r13": {
+   "previous_sha256": [
+    "94f7f417949e4de68b399ae92b7261f16ee7ee2840292b80d6610bb27045e22e"
+   ],
+   "text": "MoCRA's registration, listing, adverse-event and safety-substantiation duties are live (more than 16,000 facilities and over a million product listings registered by mid-2026), but the federal layer has turned deregulatory: GMP exists only as draft guidance, no fragrance-allergen rule has been proposed, the talc testing rule was withdrawn in November 2025 and FDA's December 2025 PFAS report proposes no ban. The state layer is the real cost: Washington's Toxic-Free Cosmetics Act bans PFAS, phthalates, formaldehyde and m- and o-phenylenediamine from 2025 and 25 formaldehyde releasers from 2027 (hair colour and preservation), California AB 2771, Colorado and Minnesota (2025), Vermont (2026), Oregon SB 546 (2027)."
+  },
+  "government_r15": {
+   "previous_sha256": [
+    "daa466f29b28fd3476da5779d5abd400fd3366118596dcf1b34fc6e9b8ed8ce3",
+    "fafb0fba0642e46e4de65b29c282b4ed5a88835eb83d77062b878ce0fcb583f9"
+   ],
+   "text": "P.L. 119-21 expanded SNAP work requirements (USDA ended all existing waivers on 2 November 2025) and shifts up to 15% of benefit costs to states, tiered by payment error rate, from 1 October 2027. Participation fell to 37.4m in March 2026, about 4.7m below the FY2025 average and above CBO's estimate (CBPP); Circana expects EBT funding about USD 10bn lower in 2026 than 2025, measures SNAP-household CPG spend down USD 4.6bn in Q1 2026 and calls it 'the new baseline'; US grocery units are down about 2% year on year and half of SNAP shoppers say they plan to buy lower-priced brands (FRAC/FMI survey). HCB's North American home care is value-weighted (all, Purex, Dial) after the 2025 retailer-brands exit, so it over-indexes to this shock."
+  },
+  "government_r16": {
+   "previous_sha256": [
+    "b774c19135c2cc976c603d1860356d1e67271beeb92ab1058638647ae301e40b"
+   ],
+   "text": "Regulation (EU) 2026/405 of 11 February 2026 (OJ 2 March 2026, in force 22 March 2026) applies from 23 September 2029: a digital product passport and unique identifier for every detergent and end-user surfactant placed on the EU market, individual allergen labelling, a legal pathway for microorganism-based cleaners, and Article 4(3): 'By 23 March 2032, films or polymers within films shall comply with the biodegradability requirements set out in Part B of Annex I', with the Commission to set those criteria by delegated act (Annex I Part B is still empty). The CLP revision (2024/2865) forces a relabelling wave from 1 July 2026 and 1 January 2027 with grandfathering to 2028-29."
+  },
+  "government_r17": {
+   "previous_sha256": [
+    "0d845bf3d25308b4afb038963c846531b09c2c5f26ad1fb56ce5a52d53c2aa2a"
+   ],
+   "text": "Directive (EU) 2024/3019 makes producers of medicinal products and cosmetics cover at least 80% of the investment and operating cost of quaternary (micropollutant) treatment plus monitoring, through national EPR schemes to be in place by 31 December 2028; quaternary treatment is mandatory for plants above 150,000 population equivalent by 2033 (20%), 2039 (60%) and 2045 (all). Exemptions apply below 1 tonne of substances a year or for substances that are rapidly biodegradable in wastewater or generate no micropollutants. The cost base runs into billions of euros a year across the two sectors; fee levels are unknown until national schemes set them. The General Court declared the pharmaceutical and cosmetics industries' direct challenges inadmissible on 18 February 2026, leaving national-court referrals (Ireland) as the remaining legal route."
+  },
+  "technology_r01": {
+   "previous_sha256": [
+    "87bf93d29f9a1ad5b3780fd5734f0ba00b9ee49f3213da94789a278df6338a2b"
+   ],
+   "text": "Adoption is real: Unilever reports its beauty claims-generation process 75% faster and is building a USD 270m AI innovation centre; L'Oréal runs an IBM formulation model trained on 1.8m formulas and announced an OpenAI collaboration; Deloitte finds 80% of surveyed manufacturers planning to put 20% or more of improvement budgets into smart manufacturing; Unilever's digital twins deliver 10% capacity and 20-30% waste gains at site level; WPP's creative revenue fell 4.9% like-for-like in H1 2026 on lower client spending. But the majors reinvest the savings (L'Oréal A&P 32.2% of sales in 2025 and 32.6% in H1 2026; Unilever brand investment stable at 16.1%), private label suppliers get the same tools, and no company has disclosed a realised margin effect. The HCB-specific value is reformulation speed against the 2026-2032 regulatory gates and colour-shade matching in salons (K-Scan-type diagnostics, company-stated +23% salon sales)."
+  },
+  "technology_r02": {
+   "previous_sha256": [
+    "66672d416fce6dcb5a0a23de69d1b591de8a714a3c9fd387ffe4fcbc4096f3d9"
+   ],
+   "text": "Enzymes are the one bio-based platform at scale: Novonesis Household Care grew 8% organically in H1 2026 (12% in Q2) on market penetration and innovation, and the group raised its 2026 guidance to 7-8%. Biosurfactants (Evonik rhamnolipids, Holiferm) remain niche with no supplier claiming cost parity with SLES or LAS; Unilever's August 2026 charter with Galaxy Surfactants speaks of 'exploring' bio-based alternatives. Fermentation funding fell 44% to USD 357m in 2025 with high-profile closures (GFI); Amyris went through Chapter 11 in 2023 and Zymergen was liquidated in 2024, so market-size and cost-parity projections for biosurfactants rest on a thin base. Substitution away from lauric oils is a management response and must not offset E-01 inside the model."
+  },
+  "technology_r03": {
+   "previous_sha256": [
+    "a4b654158996b4b30be8c8d6a8cdac149c97ac56907b6a23e8e788789c0ede73"
+   ],
+   "text": "Compaction is happening across the majors: Henkel North America raised dose concentration by an average 16% across all, Persil and Snuggle liquids with nearly 5% less plastic (shipping from March 2025); P&G announced Tide evo fibre tiles in February 2026 and put them in stores across the US from April 2026, priced well above mainstream liquids per load, with an internal projection of up to USD 500m in annual sales. DTC sheets remain sub-scale and Consumer Reports (March 2026) says 'sheets test so poorly in our labs that we don't recommend them', so sheets are not a price-floor threat; the HCB risk is North American capture of the premium dry format. Retail refill stations stay sub-scale and PPWR sets no reuse or refill target for detergent packaging. Water stress (25 countries under extreme stress, WRI) supports concentrates and solids but no regulator anywhere proposes water-content limits on products; Southern European and IMEA plant water risk is the only near-term cost channel."
+  },
+  "technology_r08": {
+   "previous_sha256": [
+    "d8c8ef27bff801226c99a4d1fc6071bc6295378b8bcc8d065f8459e16c97f5e8"
+   ],
+   "text": "Auto-dosing (Miele TwinDos, Bosch i-DOS, Samsung AI Auto Dispenser, LG ezDispense) and platform replenishment (Amazon Dash Replenishment, used by Whirlpool, Haier, Samsung, LG and GE Appliances, covers washers and dishwashers; Alexa for Shopping's Scheduled Actions automate routine purchases, and Alexa+ is in early access in Germany, the UK, France, Italy, Spain and Austria as of July 2026) are the external drivers. Henkel's own Persil Smartwash is a management response and, as of September 2026, a limited Amazon launch (starter set EUR 49.99, app installs in the hundreds; the CTO put retail two to three years out in January 2025), so it cannot carry an Expansion driver. Under ceteris paribus the direction for HCB is mild contraction; no public penetration data exists for auto-dosing appliances."
+  },
+  "technology_r11": {
+   "previous_sha256": [
+    "31ee055048136edf6ef86a340d135e30ae12abec40117220fb7c350bfc93c7a4"
+   ],
+   "text": "Morgan Stanley sizes AI-assistant-driven US e-commerce at USD 190-385bn by 2030 (10-20% of online retail, groceries and CPG leading) and McKinsey at USD 3-5tn globally. The 2026 reality is mixed: OpenAI scaled Instant Checkout back in March 2026 because retailers would not cede checkout (in-chat conversion ran three times lower than click-out) and pushed checkout back to retailer apps; Amazon's Rufus reached 300m customers in 2025 and was folded into Alexa for Shopping with Buy for Me, Scheduled Actions and Auto Buying (May 2026); Google announced Universal Cart with checkout at Walmart, Target, Sephora and Ulta; Visa and Mastercard run agentic protocols without disclosed volumes. AI-referred retail traffic is growing several hundred per cent a year (Adobe) and ChatGPT shopping referrals more than doubled in a year, yet AI is under 1% of retailer traffic (Bain, May 2026). Retailer-owned agents entrench Amazon and Walmart; agents reward highly rated leaders, so the exposure is sharpest for mid-tier brands in low-consideration replenishment."
+  },
+  "technology_r13": {
+   "previous_sha256": [
+    "fa360402646520b8b0015c5c1e66dbefe3e2df039236fa13d9e0ba0c436dca02"
+   ],
+   "text": "Adobe's series shows AI-referred traffic to US retail sites +693% in the 2025 holiday season, +393% in Q1 2026 and +138% in May 2026, now converting 42-54% better than non-AI traffic; about a third of product pages are not machine-readable. McKinsey finds 38% of consumers in the UK, France and Germany use AI tools to research products and Bain that ChatGPT shopping referrals more than doubled in a year in the US, UK, France and Germany while remaining under 1% of total traffic. This is the discovery layer; T-11 is the transaction layer."
+  }
+ }
+}

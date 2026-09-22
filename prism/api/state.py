@@ -1,112 +1,82 @@
-"""Shared application state — extracted from prism/api/app.py (June 2026 split, review F4).
-Behavior-identical move; see app.py for assembly.
-"""
-import asyncio
-import logging
+"""What one API process keeps in memory: the drivers and the latest run.
 
-from prism.config import ModelConfig, CATEGORIES, FORCES
-from prism.drivers import Driver, DriverSet
+Both are loaded on first use and refreshed when the database changes: the
+driver set when database.drivers_stamp() moves (it changes with every saved
+driver row), the run when a newer run id appears. A production run, a content
+sync or an edit made through another server instance therefore reaches every
+instance on its next request, without a restart.
+
+The model configuration is the code's default ModelConfig: production runs
+use exactly that (plus the cell weights they record), so it is what the
+dashboard shows and what the category drill-down computes with.
+"""
+import logging
+import threading
+from typing import Optional
+
+from prism.config import CATEGORIES, FORCES, ModelConfig
+from prism.drivers import DriverSet
 
 logger = logging.getLogger(__name__)
 
-_state = {
-    "db": None,
-    "config": None,
-    "mc_result": None,
-    "audit": None,
-}
-_state_lock = asyncio.Lock()  # Protect concurrent mutations
+_lock = threading.RLock()
+_config = ModelConfig()
+_cache: dict = {"db_ready": False, "drivers": None, "drivers_stamp": None, "run": None}
 
 
-def _load_driver_set() -> DriverSet:
-    """Load trends from the Postgres/SQLite database into a TrendDatabase object.
+def model_config() -> ModelConfig:
+    return _config
 
-    Only auto-seeds if the database is completely empty (first run).
-    Use POST /api/v1/drivers/sync to explicitly add missing trends.
+
+def ensure_schema() -> None:
+    """Create the tables on a new database (once per process)."""
+    if not _cache["db_ready"]:
+        from prism.database import init_db
+        init_db()
+        _cache["db_ready"] = True
+
+
+def driver_set() -> DriverSet:
+    """The current drivers, reloaded if the database has changed.
+
+    An empty drivers table is seeded from prism.seed_drivers, so a new
+    database starts with the reviewed driver base.
     """
-    from prism.database import load_drivers, save_drivers
-    db_drivers = load_drivers()
-
-    if not db_drivers:
-        logger.info("Database empty — seeding with Intelligence Report trends...")
-        try:
+    from prism.database import drivers_stamp, load_drivers, save_drivers
+    with _lock:
+        ensure_schema()
+        stamp = drivers_stamp()
+        if stamp[0] == 0:
             from prism.seed_drivers import get_seed_drivers
-            seed_drivers = get_seed_drivers()
-            save_drivers(seed_drivers)
-            db_drivers = load_drivers()
-            logger.info(f"Seeded {len(db_drivers)} trends from Intelligence Report")
-        except Exception as e:
-            logger.error(f"Auto-seed failed: {e}")
-
-    logger.info(f"Loaded {len(db_drivers)} trends from database")
-    return DriverSet(
-        drivers=db_drivers,
-        categories=CATEGORIES,
-        forces=FORCES,
-        source_file="database",
-    )
+            logger.warning("The drivers table is empty; seeding it with the reviewed driver base")
+            save_drivers(get_seed_drivers())
+            stamp = drivers_stamp()
+        if _cache["drivers"] is None or _cache["drivers_stamp"] != stamp:
+            _cache["drivers"] = DriverSet(drivers=load_drivers(), categories=list(CATEGORIES), forces=list(FORCES))
+            _cache["drivers_stamp"] = stamp
+        return _cache["drivers"]
 
 
-def _backfill_diffusion_fields(db) -> None:
-    """
-    One-time migration: assign logical peak_year and diffusion_curve to
-    existing trends that still have the default (0 / 's_curve').
-
-    Heuristics by force type:
-      Government  → front_loaded, peak 2028 (regulation kicks in fast)
-      Technology  → back_loaded, peak 2030 (slow adoption then scale)
-      Consumer    → s_curve, peak 2029 (classic diffusion of preferences)
-      Customer    → linear, peak 2030 (gradual channel evolution)
-      Environmental → s_curve, peak 2030 (awareness tipping point)
-      Competitive → front_loaded, peak 2029 (competitors react within 1-2 years)
-
-    Trends with keywords like "ban", "phase-out", "regulation" get step_function.
-    Already-set trends (peak_year != 0) are left untouched.
-    """
-    changed = []
-    step_keywords = ["ban", "phase-out", "phase out", "prohibition", "deadline", "effective date", "mandatory"]
-    force_defaults = {
-        "Government":    ("front_loaded", 2028),
-        "Technology":    ("back_loaded",  2030),
-        "Consumer":      ("s_curve",      2029),
-        "Customer":      ("linear",       2030),
-        "Environmental": ("s_curve",      2030),
-        "Competitive":   ("front_loaded", 2029),
-    }
-    for driver in db.drivers:
-        if getattr(driver, 'peak_year', 0) not in (0, None):
-            continue  # already set by user
-        curve, peak = force_defaults.get(driver.force, ("s_curve", 2030))
-        # Override: step_function for hard regulatory deadlines
-        desc_lower = (driver.description or "").lower() + (driver.name or "").lower()
-        if any(kw in desc_lower for kw in step_keywords):
-            curve = "step_function"
-            peak = 2028
-        # Override: high-probability trends peak sooner
-        if driver.probability >= 5 and peak > 2028:
-            peak = peak - 1
-        driver.peak_year = peak
-        driver.diffusion_curve = curve
-        changed.append(driver)
-
-    if changed:
-        try:
-            from prism.database import save_drivers
-            save_drivers(changed)
-            logger.info(f"Backfilled peak_year/diffusion_curve for {len(changed)} trends")
-        except Exception as e:
-            logger.warning(f"Failed to backfill diffusion fields: {e}")
+def latest_run() -> Optional[dict]:
+    """The newest persisted run ({id, run_date, iterations, results}), or None."""
+    from prism.database import latest_run_summary, load_latest_run
+    with _lock:
+        ensure_schema()
+        summary = latest_run_summary()
+        if summary is None:
+            _cache["run"] = None
+        elif _cache["run"] is None or _cache["run"]["id"] != summary["id"]:
+            _cache["run"] = load_latest_run()
+        return _cache["run"]
 
 
-def get_state_snapshot() -> dict:
-    """Read-only snapshot accessor for routers (analytics, etc.).
+def reset_drivers() -> None:
+    """Drop the cached drivers so the next request reloads them."""
+    with _lock:
+        _cache.update(drivers=None, drivers_stamp=None)
 
-    Replaces the former circular `from prism.api.app import _state`
-    pattern — import from prism.api.state instead.
-    """
-    return {
-        "db": _state.get("db"),
-        "config": _state.get("config"),
-        "dag": _state.get("dag"),
-        "mc_result": _state.get("mc_result"),
-    }
+
+def reset() -> None:
+    """Forget everything cached (used by tests and after a failed request)."""
+    with _lock:
+        _cache.update(db_ready=False, drivers=None, drivers_stamp=None, run=None)

@@ -1,407 +1,233 @@
 #!/usr/bin/env python3
-"""Run the canonical production Monte Carlo against prod Neon and persist results.
+"""Run the production simulation and persist it as the run the dashboard serves.
 
-Usage (from the operator machine, repo root):
-    python3 scripts/run_50k_prod.py                 # canonical: 3 × 50k vs Neon
-    python3 scripts/run_50k_prod.py --iterations 5000 --allow-sqlite   # local dry run
-    python3 scripts/run_50k_prod.py --cell-weights data/cell_weights.local.json
-        # 2.11.0 (O6): roll the 52 category × region cells up with the actual
-        # HCB gross-profit share per cell instead of the estimated default.
-        # FILE is JSON: {"source": "<provenance label>", "basis": "gp1_share" |
-        # "gp1_absolute", "cells": {category: {region: value}}}. Absolute
-        # figures are normalised to shares BEFORE the engine is constructed and
-        # are never persisted (design philosophy #5); keep the file outside git.
+    python3 scripts/run_production.py                              3 x 50,000 iterations against the database in .env
+    python3 scripts/run_production.py --cell-weights FILE          the same, on the finance cell weights
+    python3 scripts/run_production.py --iterations 2000 --allow-sqlite   a quick local test run
 
-Requirements:
-    - .env contains POSTGRES_URL or DATABASE_URL pointing at Neon prod
-    - Python 3.10+ with requirements-dev.txt installed (numpy, scipy,
-      psycopg2-binary, openpyxl, python-dotenv)
+The database comes from POSTGRES_URL or DATABASE_URL (the repository's .env
+is loaded; shell variables win). Without one the script refuses to run
+unless --allow-sqlite is passed, which uses the local SQLite file instead.
 
-What it does:
-    1. Loads the driver base from prod Neon via prism.database.load_trends
-    2. Runs BayesianMonteCarloEngine.run_multichain (3 × 50k, master seed 42)
-    3. Computes the input-drift integrity event vs the previous run (D19)
-    4. Persists the results bundle as a NEW simulation_runs row
-    5. Writes a QA Excel to the repo root
+Steps: load the drivers, check that the copula correlations are positive
+definite on this driver mix, run three independently seeded chains (master
+seed 42) and pool them, compare the drivers' scoring state with the previous
+run's (the input-drift integrity event), persist the results bundle as a new
+simulation run and write the QA workbook to runs/.
 
-Exit codes (H2, July 2026 review — cron/operators must see failures):
-    0  success (run persisted; Excel best-effort)
-    1  no database URL configured
-    2  no drivers loaded
-    3  simulation succeeded but PERSIST FAILED — the dashboard will still
-       show the previous run; nothing was written
-    4  wrong database mode (Postgres URL set but SQLite fallback active —
-       usually a missing psycopg2; H1) and --allow-sqlite not passed
-    5  correlation matrix not positive semi-definite on the LOADED driver mix
-       (F6 pre-flight spectral gate) and --allow-nonpsd not passed — the
-       engine would silently repair it at runtime, making configured ≠
-       effective correlations. Lower the cross-force correlations or override.
-    6  --cell-weights file missing, unreadable or failing validation (2.11.0)
+--cell-weights FILE is a JSON object, kept outside the repository:
+    {"source": "<label shown with the run>",
+     "basis": "gp1_share" | "gp1_absolute",
+     "cells": {"<category>": {"<region>": value, ...}, ...}}
+with every category and region of prism.config. Shares must add up to 1
+(within 0.01); absolute figures are divided by their total here, so neither
+the engine nor the database ever sees an amount.
+
+Exit codes
+    0  the run is persisted (the QA workbook is best effort)
+    1  no usable database: none configured (and no --allow-sqlite), unreachable,
+       or still on the previous schema (run migrations/0001_driver_schema first)
+    2  the database holds no drivers
+    3  the simulation ran but persisting it failed; the dashboard keeps the previous run
+    4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
+    5  the --cell-weights file is missing or invalid
 """
-
 from __future__ import annotations
 
 import argparse
-import os
-import sys
+import json
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-# Importing env_loader loads the .env file at module scope — no call needed.
-import prism.env_loader  # noqa: F401  (import-for-side-effect)
+import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
+from prism.config import CATEGORIES, FORCES, REGIONS, ModelConfig  # noqa: E402
+from prism.config_validation import correlation_lambda_min, validate_model_config  # noqa: E402
+from prism.database import (POSTGRES_URL, USE_POSTGRES, LegacySchemaError, init_db, load_drivers,  # noqa: E402
+                            load_latest_run, save_simulation_run)
+from prism.drivers import DriverSet  # noqa: E402
+from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
+from prism.simulation.bayesian_mc import BayesianMonteCarloEngine  # noqa: E402
+from prism.workbook import write_workbook  # noqa: E402
 
-from prism.config import ModelConfig, CATEGORIES, FORCES
-from prism.database import USE_POSTGRES, load_drivers, save_simulation_run
-from prism.drivers import DriverSet
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
-from prism.workbook import ShiftMatrixWriter
+log = logging.getLogger("run_production")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger("run_50k_prod")
-
-#: Trend-base size the operator expects (the 51-driver base of the September
-#: 2026 review, release 2.11.0; 99 before). A different count is not fatal
-#: (the drift event reports adds/removes) but is warned loudly: a 2.11.0 run
-#: on a database that still holds the 99-trend base has not had
-#: scripts/replace_trend_base.py applied.
-EXPECTED_DRIVER_COUNT = 51
+MASTER_SEED = 42
+RUNS_DIR = REPO / "runs"
 
 
-def load_cell_weights_file(path: "Path") -> tuple:
-    """Read a 2.11.0 cell-weights file and return (shares, source_label).
-
-    Format: {"source": str, "basis": "gp1_share" | "gp1_absolute",
-             "cells": {category: {region: value}}}. Values must be
-    non-negative and complete (13 categories × 4 regions). "gp1_absolute"
-    figures (any currency unit) are normalised to shares here so the engine
-    and the persisted run only ever see shares — the total is not retained.
-    Raises ValueError with a readable message on any defect.
-    """
-    import json as _json
-    from prism.config import CATEGORIES as _CATS, REGIONS as _REGS
-    raw = _json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or "cells" not in raw:
-        raise ValueError("cell-weights file must be a JSON object with a 'cells' key")
+def load_cell_weights_file(path: Path) -> tuple:
+    """(shares, source label) from a finance cell-weights file; ValueError on any defect."""
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not isinstance(raw.get("cells"), dict):
+        raise ValueError("the file must be a JSON object with a 'cells' object")
     basis = str(raw.get("basis", "gp1_share")).strip().lower()
     if basis not in ("gp1_share", "gp1_absolute"):
-        raise ValueError(f"basis must be 'gp1_share' or 'gp1_absolute', got {basis!r}")
+        raise ValueError(f"basis must be 'gp1_share' or 'gp1_absolute', not {basis!r}")
     cells = raw["cells"]
-    if not isinstance(cells, dict):
-        raise ValueError("'cells' must map every category to {region: value}")
-    missing = [c for c in _CATS if c not in cells]
-    unknown = [c for c in cells if c not in _CATS]
+    missing, unknown = [c for c in CATEGORIES if c not in cells], [c for c in cells if c not in CATEGORIES]
     if missing or unknown:
         raise ValueError(f"cells: missing categories {missing}; unknown categories {unknown}")
-    total = 0.0
-    shares = {}
-    for cat in _CATS:
+    values = {}
+    for cat in CATEGORIES:
         row = cells[cat]
         if not isinstance(row, dict):
             raise ValueError(f"cells['{cat}'] must map every region to a value")
-        rmiss = [r for r in _REGS if r not in row]
-        runk = [r for r in row if r not in _REGS]
-        if rmiss or runk:
-            raise ValueError(f"cells['{cat}']: missing regions {rmiss}; unknown regions {runk}")
-        shares[cat] = {}
-        for region in _REGS:
+        missing, unknown = [r for r in REGIONS if r not in row], [r for r in row if r not in REGIONS]
+        if missing or unknown:
+            raise ValueError(f"cells['{cat}']: missing regions {missing}; unknown regions {unknown}")
+        for region in REGIONS:
             v = row[region]
             if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0:
-                raise ValueError(f"cells['{cat}']['{region}'] must be a non-negative number, got {v!r}")
-            shares[cat][region] = float(v)
-            total += float(v)
+                raise ValueError(f"cells['{cat}']['{region}'] must be a non-negative number, not {v!r}")
+        values[cat] = {r: float(row[r]) for r in REGIONS}
+    total = sum(v for row in values.values() for v in row.values())
     if total <= 0:
-        raise ValueError("cells must contain at least one positive value")
+        raise ValueError("the cells must contain at least one positive value")
     if basis == "gp1_share" and abs(total - 1.0) > 0.01:
-        raise ValueError(f"basis 'gp1_share' requires the 52 cells to sum to 1.0 (±0.01), got {total:.4f}")
-    shares = {c: {r: v / total for r, v in row.items()} for c, row in shares.items()}
+        raise ValueError(f"basis 'gp1_share' needs the {len(CATEGORIES) * len(REGIONS)} cells to add up to 1 "
+                         f"(within 0.01), not {total:.4f}")
+    shares = {c: {r: v / total for r, v in row.items()} for c, row in values.items()}
     source = str(raw.get("source") or f"cell-weights file {Path(path).name}")
     if basis == "gp1_absolute":
-        source = f"{source} (absolute gross profit normalised to shares at run time; amounts not persisted)"
+        source += " (absolute gross profit divided by its total at run time; no amount is stored)"
     return shares, source
+
+
+def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerprint: dict) -> dict:
+    """The persisted form of a run: what GET /api/v1/simulation serves (prism/api/runs.py)."""
+    return {
+        "shift_matrix": result["shift_matrix"],
+        "regional_shift_matrix": result["regional_shift_matrix"],
+        "decompositions": result["decompositions"],
+        "totals": result["totals"],
+        "cell_weights_used": result["cell_weights_used"],
+        "category_weights_used": result["category_weights_used"],
+        "region_weights_used": result["region_weights_used"],
+        "cell_weights_source": result["cell_weights_source"],
+        "mc_standard_error": result["mc_standard_error"],
+        "integrity_events": result["integrity_events"],
+        "seed_stability": result["seed_stability"],
+        "meta": {
+            "seed": result["seed"],
+            "chain_seeds": result["chain_seeds"],
+            "chains": result["n_chains"],
+            "model_version": result["model_version"],
+            "engine_name": result["engine_name"],
+            "numerics_backend": result["numerics_backend"],
+            "driver_count": driver_count,
+            "attenuation_source": config.attenuation_source,
+            "persisted_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            # The next run compares its drivers with this fingerprint.
+            "driver_fingerprint": fingerprint,
+        },
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--iterations", type=int, default=50_000,
-                        help="MC iterations per chain (default 50000)")
-    parser.add_argument("--chains", type=int, default=3,
-                        help="independent chains (default 3)")
+    parser.add_argument("--iterations", type=int, default=50_000, help="iterations per chain (default 50000)")
+    parser.add_argument("--chains", type=int, default=3, help="independent chains (default 3)")
+    parser.add_argument("--cell-weights", metavar="FILE", default=None,
+                        help="finance cell weights (see above); without it the run uses the estimated HCB mix")
     parser.add_argument("--allow-sqlite", action="store_true",
-                        help="permit running against the local SQLite fallback "
-                             "(testing only — NEVER for a production run)")
+                        help="run against the local SQLite file when no database is configured (tests only)")
     parser.add_argument("--allow-nonpsd", action="store_true",
-                        help="override the F6 pre-flight spectral gate and run "
-                             "even if the correlation matrix is not PSD on the "
-                             "loaded driver mix (the engine will repair it at "
-                             "runtime — configured ≠ effective correlations)")
-    parser.add_argument("--cell-weights", type=str, default=None, metavar="FILE",
-                        help="JSON file with the HCB gross-profit share (or absolute "
-                             "gross profit, normalised here) per category x region "
-                             "cell (2.11.0, O6; 13 x 4 since O13). Without this the run uses the "
-                             "ESTIMATED HCB mix of O14 (public sources, graded, not P&L); "
-                             "the equal 1/52 grid is prism.config.EQUAL_CELL_WEIGHTS.")
+                        help="run even if the correlation matrix is not positive definite on this driver mix; "
+                             "the engine then repairs it and records an integrity event")
     args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
 
-    db_url = os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL")
-    if not db_url and not args.allow_sqlite:
-        log.error("No POSTGRES_URL / DATABASE_URL in environment — aborting.")
-        log.error("Put POSTGRES_URL=postgres://… in .env and retry.")
+    if not USE_POSTGRES and not args.allow_sqlite:
+        log.error("No POSTGRES_URL or DATABASE_URL is set; put the database URL in .env "
+                  "(or pass --allow-sqlite for a local test run).")
         return 1
+    where = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else "the local SQLite file (test run)"
+    log.info("PRISM production run, engine %s, %d x %s iterations, database: %s",
+             BayesianMonteCarloEngine.MODEL_VERSION, args.chains, f"{args.iterations:,}", where)
 
-    # H1 (July 2026 review): a missing psycopg2 used to fall back to a local
-    # SQLite file SILENTLY — the run said "saved" and exited 0, but nothing
-    # reached Neon. Refuse to run in the wrong database mode.
-    if db_url and not USE_POSTGRES and not args.allow_sqlite:
-        log.error("A Postgres URL is configured but the SQLite fallback is "
-                  "active (psycopg2 missing or connection refused at import).")
-        log.error("Install psycopg2-binary (requirements-dev.txt) and retry, "
-                  "or pass --allow-sqlite for a LOCAL TEST run.")
-        return 4
-    if db_url and "neon.tech" not in db_url:
-        log.warning("DB URL does not look like Neon — double-check this is prod.")
-
-    banner = (f"PRISM — production Monte Carlo · engine "
-              f"{BayesianMonteCarloEngine.MODEL_VERSION} "
-              f"({args.chains} × {args.iterations:,} iterations)")
-    log.info("=" * 60)
-    log.info(banner)
-    log.info("=" * 60)
-    if args.allow_sqlite and not USE_POSTGRES:
-        log.warning("SQLite mode (--allow-sqlite): this is a TEST run, "
-                    "results will not reach production.")
-
-    # ── 1) Load trends ───────────────────────────────────────────────
-    log.info("[1/5] Loading drivers (%s)…", "Neon prod" if USE_POSTGRES else "SQLite")
-    drivers = load_drivers()
+    try:
+        init_db()
+        drivers = load_drivers()
+    except LegacySchemaError as e:
+        log.error("%s", e)
+        return 1
+    except Exception as e:  # noqa: BLE001 (reported with exit code 1)
+        log.error("Cannot read the database: %s", e)
+        return 1
     if not drivers:
-        log.error("No drivers returned from DB — aborting.")
+        log.error("The database holds no drivers.")
         return 2
-    driver_db = DriverSet(
-        drivers=drivers,
-        categories=CATEGORIES,
-        forces=FORCES,
-        source_file="neon_prod" if USE_POSTGRES else "sqlite_local",
-    )
-    log.info(
-        "      %d drivers, %d categories, %d forces",
-        len(driver_db.drivers), len(driver_db.categories), len(driver_db.forces),
-    )
-    if len(driver_db.drivers) != EXPECTED_DRIVER_COUNT:
-        log.warning("Expected %d drivers, found %d — the input-drift event "
-                    "will report the delta.", EXPECTED_DRIVER_COUNT, len(driver_db.drivers))
+    from prism.seed_drivers import DRIVERS as SEED
+    if len(drivers) != len(SEED):
+        log.warning("The database holds %d drivers, the driver base %d; the input-drift event will show the "
+                    "difference.", len(drivers), len(SEED))
+    driver_set = DriverSet(drivers=drivers, categories=list(CATEGORIES), forces=list(FORCES))
 
-    # ── 2) Configure ─────────────────────────────────────────────────
     config = ModelConfig().copy_with(iterations=args.iterations)
     if args.cell_weights:
         try:
             shares, source = load_cell_weights_file(Path(args.cell_weights))
             config = config.copy_with(cell_weights=shares, cell_weights_source=source)
-            from prism.config_validation import validate_model_config
-            validate_model_config(config.__dict__)
-        except Exception as exc:  # readable failure, exit 6
-            log.error("--cell-weights rejected: %s", exc)
-            return 6
-    log.info(
-        "[2/5] Config: %d iterations × %d chains = %d samples per category",
-        config.iterations, args.chains, config.iterations * args.chains,
-    )
-    log.info("      Horizon: %s – %s", config.path_years[0], config.path_years[-1])
-    # 2.11.0 (O6): the cell gross-profit shares that roll the 52 cells up.
-    log.info("      Cell weights: %s", config.cell_weights_source)
-    from prism.config import REGIONS as _REGIONS
-    log.info("      Region shares (column sums): %s",
-             ", ".join(f"{r} {config.region_weights[r]*100:.1f}%" for r in _REGIONS))
-    log.info("      Category shares (row sums): %s",
-             ", ".join(f"{c} {config.category_weights[c]*100:.1f}%" for c in CATEGORIES))
+            validate_model_config(config)
+        except (OSError, ValueError) as e:
+            log.error("--cell-weights rejected: %s", e)
+            return 5
+    log.info("Cell weights: %s", config.cell_weights_source)
+    log.info("  regions: %s", ", ".join(f"{r} {config.region_weights[r] * 100:.1f}%" for r in REGIONS))
 
-    # ── 2b) F6 pre-flight spectral gate ──────────────────────────────
-    # Correlation PSD validity is population-dependent: the defaults are valid
-    # on the 99-trend base but adding trends to one force can flip the minimum
-    # eigenvalue negative. The PUT /config spectral gate does NOT re-run on
-    # trend add/delete, so a run could ship with a matrix the engine silently
-    # repairs at runtime (rescaling ALL correlations → configured ≠ effective).
-    # For a production run, refuse rather than repair.
-    from prism.config_validation import correlation_lambda_min
-    lam_min = correlation_lambda_min(
-        config.force_correlation_matrix, config.within_force_rho,
-        [t.force for t in driver_db.drivers],
-    )
-    log.info("[2b/5] Correlation pre-flight: min eigenvalue on the loaded "
-             "%d-driver mix = %+.4f", len(driver_db.drivers), lam_min)
+    lam_min = correlation_lambda_min(config.force_correlation_matrix, config.within_force_rho,
+                                     [d.force for d in drivers])
+    log.info("Copula correlations on these %d drivers: minimum eigenvalue %+.4f", len(drivers), lam_min)
     if lam_min < 0 and not args.allow_nonpsd:
-        log.error("Correlation matrix is NOT positive semi-definite on the "
-                  "loaded driver mix (min eigenvalue %+.4f). The engine would "
-                  "repair it at runtime, making configured ≠ effective "
-                  "correlations (audit F-01/F6).", lam_min)
-        log.error("Lower the cross-force correlations in Config, or pass "
-                  "--allow-nonpsd to run with runtime repair anyway.")
-        return 5
-    if lam_min < 0:
-        log.warning("Running with a non-PSD correlation matrix (--allow-nonpsd) "
-                    "— the engine will repair it and emit an integrity event.")
+        log.error("The correlation matrix is not positive definite on this driver mix. The engine would "
+                  "have to repair it, so the correlations it uses would differ from the configured ones. "
+                  "Lower the cross-force correlations in prism/config.py, or pass --allow-nonpsd.")
+        return 4
 
-    # ── 3) Run multichain MC ─────────────────────────────────────────
-    log.info("[3/5] Running Bayesian Monte Carlo (2–6 minutes at 3 × 50k)…")
-    t0 = datetime.now()
-    mc = BayesianMonteCarloEngine(config, seed=42)
-    result = mc.run_multichain(driver_db, n_chains=args.chains,
-                               iterations=config.iterations)
-    elapsed = (datetime.now() - t0).total_seconds()
-    log.info("      Done in %.1fs", elapsed)
+    log.info("Simulating (a few minutes at 3 x 50,000)...")
+    started = datetime.now()
+    result = BayesianMonteCarloEngine(config, seed=MASTER_SEED).run_multichain(
+        driver_set, n_chains=args.chains, iterations=config.iterations)
+    log.info("  done in %.0f s; seed stability %.4f pp across %d chains",
+             (datetime.now() - started).total_seconds(), result["seed_stability"]["spread_pp"], args.chains)
 
-    # F7 (2.10.0): the vacuous R̂/ESS convergence log is replaced by the
-    # honest Monte-Carlo standard error of the published quantiles.
-    mc_se = result.get("mc_standard_error") or {}
-    if mc_se:
-        worst = max((v.get("median_se_pp", 0.0) for v in mc_se.values()), default=0.0)
-        log.info("      MC standard error (terminal-year median): worst-category "
-                 "%.4f pp across %d categories (pooled %s iterations)",
-                 worst, len(mc_se),
-                 (result.get("seed_stability") or {}).get("pooled_iterations", "?"))
-    stability = result.get("seed_stability") or {}
-    if stability:
-        log.info("      Seed stability: terminal-year portfolio median spread "
-                 "%.4f pp across %d chains", stability.get("spread_pp", 0.0),
-                 stability.get("n_chains", args.chains))
-
-    # ── 4) Input-drift integrity event (D19) ─────────────────────────
-    # Diff this run's trend scoring state against the previous accepted
-    # run's persisted fingerprint; the event lands in integrity_events and
-    # is persisted with the run so the dashboard surfaces it.
-    from prism.audit.input_drift import (
-        driver_fingerprint, compute_input_drift_event, previous_fingerprint_from_runs,
-    )
-    current_fp = driver_fingerprint(driver_db.drivers)
+    fingerprint = driver_fingerprint(drivers)
     try:
-        from prism.database import load_simulation_runs
-        prev_fp, prev_id, prev_date = previous_fingerprint_from_runs(load_simulation_runs(limit=1))
-        drift_event = compute_input_drift_event(current_fp, prev_fp, prev_id, prev_date)
-        if drift_event:
-            result.setdefault("integrity_events", []).append(drift_event)
-            log.info("      %s", drift_event["message"])
-        elif prev_id is not None:
-            log.info("      Input drift: previous run #%s has no fingerprint (pre-D19) — baseline starts now.", prev_id)
-    except Exception as e:
-        log.warning("Input-drift check skipped: %s", e)
+        previous = previous_fingerprint(load_latest_run())
+        drift = compute_input_drift_event(fingerprint, *previous)
+        if drift:
+            result["integrity_events"].append(drift)
+            log.info("  %s", drift["message"])
+    except Exception as e:  # noqa: BLE001 (the run is still valid without the comparison)
+        log.warning("Input-drift comparison skipped: %s", e)
 
-    # ── 5) Persist ───────────────────────────────────────────────────
-    # Save the full results bundle (shift_matrix + decompositions + totals +
-    # vc decomposition + integrity + seed stability) in the shape
-    # the FastAPI /api/v1/simulation endpoint rehydrates.
-    log.info("[5/5] Persisting to %s…", "Neon PROD" if USE_POSTGRES else "SQLite (test)")
-    persist_failed = False
     run_id = None
     try:
-        results_bundle = {
-            "shift_matrix": result.get("shift_matrix"),
-            # F1 (2.10.0): the 3D category × region shift matrix + the region
-            # GP1-share weights actually applied in the category/portfolio roll-up.
-            "regional_shift_matrix": result.get("regional_shift_matrix"),
-            "region_weights_used": result.get("region_weights_used"),
-            "cell_weights_used": result.get("cell_weights_used"),
-            "category_weights_used": result.get("category_weights_used"),
-            "cell_weights_source": result.get("cell_weights_source"),
-            "decompositions": result.get("decompositions"),
-            "totals": result.get("totals"),
-            "vc_decomposition": result.get("vc_decomposition"),
-            # F7 (2.10.0): per-quantile Monte-Carlo standard error (replaces the
-            # vacuous i.i.d. split-R̂/ESS block).
-            "mc_standard_error": result.get("mc_standard_error"),
-            # D19: integrity events (incl. input drift) + seed stability
-            # persist with the run so the read-only dashboard can show them.
-            "integrity_events": result.get("integrity_events", []),
-            "seed_stability": result.get("seed_stability"),
-            # F2: every persisted run carries its engine fidelity. D13: the
-            # engine itself is scipy-only (it refuses to import without
-            # scipy), so reaching this line implies exact numerics; the
-            # numerics_backend records the exact versions for the audit trail.
-            "meta": {
-                "engine_fidelity": "scipy",
-                "numerics_backend": result.get("numerics_backend"),
-                # L8: master seed (reproduces the run) + derived chain seeds.
-                "seed": result.get("master_seed", result.get("seed")),
-                "chain_seeds": result.get("chain_seeds"),
-                "chains": args.chains,
-                "model_version": result.get("model_version"),
-                "engine_name": result.get("engine_name"),
-                # 2.9.0: VC lens basis — "epicentre" (categorical partition).
-                # Pre-2.9 runs carry no tag; the dashboard labels those
-                # "profile-weighted (pre-2.9 run)".
-                "vc_attribution_basis": result.get("vc_attribution_basis"),
-                # 2.10.0 (F1): region GP1-share weights applied in the roll-up.
-                "region_weights_used": result.get("region_weights_used"),
-                "cell_weights_used": result.get("cell_weights_used"),
-                "category_weights_used": result.get("category_weights_used"),
-                "cell_weights_source": result.get("cell_weights_source"),
-                # 2.11.0 (O10/O11): the base and the calibration the run used,
-                # so the About footer can say so without guessing from dates.
-                "driver_count": len(driver_db.drivers),
-                "attenuation_source": config.attenuation_source,
-                "persisted_at_utc": datetime.now(timezone.utc).isoformat(),
-                # D19: fingerprint of THIS run's inputs — next run diffs itself
-                # against it.
-                "driver_fingerprint": current_fp,
-            },
-        }
-        run_id = save_simulation_run(
-            iterations=config.iterations,
-            model_type="bayesian_copula_multichain",
-            results=results_bundle,
-            # F9 (2.10.0): force_attribution deleted; F7: MC standard error
-            # travels in the results bundle, not the convergence column.
-            force_attribution=None,
-            convergence_diagnostics=None,
-        )
-        log.info("      Saved simulation_run id=%s", run_id)
-    except Exception as e:
-        # H2: record the failure but continue to the Excel export so the
-        # operator still gets the QA artifact — then exit non-zero below.
+        run_id = save_simulation_run(config.iterations, results_bundle(result, config, len(drivers), fingerprint))
+        log.info("Persisted as simulation run %s", run_id)
+    except Exception as e:  # noqa: BLE001 (reported with exit code 3 after the workbook)
         log.error("PERSIST FAILED: %s", e)
-        persist_failed = True
 
-    # Excel export for QA (best-effort; failure is warned, not fatal)
-    out_path = REPO / f"shift_matrix_50k_{datetime.now():%Y%m%d_%H%M}.xlsx"
+    RUNS_DIR.mkdir(exist_ok=True)
+    workbook = RUNS_DIR / f"prism_run_{run_id or 'unsaved'}_{datetime.now():%Y%m%d_%H%M}.xlsx"
     try:
-        writer = ShiftMatrixWriter(config)
-        writer.write(
-            str(out_path),
-            result,
-            allocation=None,
-            metadata={
-                "model_version": result.get("model_version"),
-                "engine_name": result.get("engine_name"),
-                "iterations": config.iterations,
-                "simulation_run_id": run_id,
-            },
-        )
-        log.info("      Excel: %s", out_path)
-    except Exception as e:
-        log.warning("Excel export skipped: %s", e)
+        write_workbook(str(workbook), result, config, run_id=run_id, driver_count=len(drivers))
+        log.info("QA workbook: %s", workbook)
+    except Exception as e:  # noqa: BLE001 (the workbook is a by-product)
+        log.warning("QA workbook not written: %s", e)
 
-    # Headline — the same number the dashboard headline shows: the joint
-    # portfolio (category-weighted) median at the terminal year (D3), not a
-    # plain across-category average (L13, July 2026 review).
-    last_year = int(config.path_years[-1])
-    portfolio = (result.get("totals") or {}).get("portfolio") or {}
-    cell = portfolio.get(last_year) or portfolio.get(str(last_year)) or {}
-    if cell:
-        log.info("")
-        log.info("═" * 60)
-        log.info("  Portfolio %d median shift: %+.1f%%  (P10 %+.1f%% · P90 %+.1f%%)",
-                 last_year, cell["median"] * 100, cell["p10"] * 100, cell["p90"] * 100)
-        log.info("═" * 60)
-
-    if persist_failed:
-        log.error("Run NOT persisted — fix the database issue and re-run. "
-                  "(The dashboard still serves the previous run.)")
+    year = config.path_years[-1]
+    headline = result["totals"]["portfolio"][year]
+    log.info("Portfolio %d median shift %+.1f%% (P10 %+.1f%%, P90 %+.1f%%)",
+             year, headline["median"] * 100, headline["p10"] * 100, headline["p90"] * 100)
+    if run_id is None:
+        log.error("The run was NOT persisted; the dashboard still serves the previous run.")
         return 3
     return 0
 

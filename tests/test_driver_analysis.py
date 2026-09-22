@@ -1,22 +1,18 @@
-"""
-The PRISM Analysis of the Drivers page (owner instruction 2026-09-17;
-docs/DRIVER_ANALYSIS_CONCEPT.md).
+"""The PRISM Analysis of the Drivers page (docs/DRIVER_ANALYSIS.md).
 
   (a) the decomposition in scripts/build_driver_analysis.py is the engine's
-      own arithmetic: with the copula draws pinned to the Beta means and the
-      peak jitter off, the engine's cell shifts equal the decomposition's cell
-      shifts to floating-point precision; the drivers of every cell add up
-      to the cell shift; the jitter expectation matches the engine's
-      schedule table;
+      own arithmetic: with the draws pinned to the Beta means and the peak
+      jitter off, the engine's cell shifts equal the decomposition's to
+      floating-point precision; the drivers of every cell add up to the cell
+      shift; the jitter expectation is the engine's schedule table averaged;
   (b) the committed record, the parity fixture and the rendered texts are
-      what the code produces from the committed seed and configuration, and
-      the seed carries the rendered texts (nothing can drift);
+      what the code produces from the driver base and the configuration, and
+      the seed carries the rendered texts;
   (c) every reading follows the rules: the four labelled paragraphs and the
-      basis line, every figure a placeholder, no restated score, no review
-      reference, no management response, no dash or filler, the vocabulary;
-  (d) scripts/apply_driver_analysis.py moves a database onto the readings:
-      dry run, apply, idempotence, compare-and-swap, the Postgres guard, a
-      stale file, a read-back that fails.
+      basis line, every model figure a placeholder, no restated score, no
+      history of the base, no management response, no dash or filler, the
+      driver vocabulary.
+Writing the texts into a database is scripts/sync_analysis.py (test_operations.py).
 """
 from __future__ import annotations
 
@@ -24,7 +20,6 @@ import copy
 import importlib.util
 import json
 import re
-import sqlite3
 from pathlib import Path
 
 import numpy as np
@@ -38,7 +33,6 @@ from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "drivers"
 ANALYSIS = DATA / "driver_analysis.json"
-BASE_DIR = DATA
 ATTRIBUTION = DATA / "driver_attribution.json"
 FIXTURE = REPO / "tests" / "frontend" / "fixtures" / "driverAttribution.fixture.json"
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
@@ -132,7 +126,7 @@ FORBIDDEN = [
     (re.compile(r"\buncertainty [0-5]\b", re.I), "a restated uncertainty score"),
     (re.compile(r"\bexposure(?: score)? [0-5]\b", re.I), "a restated exposure score"),
     (re.compile(r"\bGP1 (?:share )?(?:of )?0\.\d+"), "a restated GP1 share"),
-    # the owner's own examples of a restated score in words ("a small GP1
+    # examples of a score restated in words ("a small GP1
     # share", "a likely probability"), and the scoring vocabulary itself
     (re.compile(r"\bGP1 share\b|\bprobabilit(?:y|ies)\b|\buncertainty score\b|\bconfidence\b|"
                 r"\bbalanced (?:case|rather)\b|\blikely (?:probability|case)\b|\bscored\b|\bscores\b|"
@@ -142,7 +136,7 @@ FORBIDDEN = [
     (re.compile(r"September 2026 review|the (?:2026 )?review\b|old base|earlier base|previous base|prior base|"
                 r"was corrected|was deleted|were wrong|was wrong|report mill|could not be verified|unverified|"
                 r"unsourced|watch list|merged into|folded into|\brenamed\b|\bretired\b", re.I),
-     "a reference to the review"),
+     "a reference to the history of the base"),
     (re.compile(r"\b(?:Henkel|HCB) (?:should|must|needs to|has to|ought to|could|would need to|can offset)\b|"
                 r"\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure", re.I),
      "a management response"),
@@ -221,7 +215,7 @@ class TestCommittedArtefacts:
     def test_rendered_texts_and_seed_agree(self, render, record, analysis):
         rendered = render.render_all(record, analysis)
         by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
-        seed = {t.id: t for t in seed_drivers.get_seed_drivers()}
+        seed = {t.id: t for t in seed_drivers.DRIVERS}
         assert set(analysis["drivers"]) == set(by_code)
         for code, entry in analysis["drivers"].items():
             tid = by_code[code]
@@ -270,7 +264,7 @@ class TestCommittedArtefacts:
         """The peak year is a score the page shows and a re-score moves it; a
         template names it only through {peak_year}. The lock reads the
         timing paragraph for "to / at / until <the driver's peak year>"."""
-        seed = {t.id: t for t in seed_drivers.get_seed_drivers()}
+        seed = {t.id: t for t in seed_drivers.DRIVERS}
         by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
         offenders = []
         for code, entry in analysis["drivers"].items():
@@ -302,7 +296,7 @@ class TestCommittedArtefacts:
         monkeypatch.setattr(build, "ATTRIBUTION_PATH", str(p))
         assert build.main(["--check"]) == 1
         out = capsys.readouterr().out
-        assert "inputs hash differs" in out
+        assert "inputs digest differs" in out
         # a build without --reference refuses instead of reconciling to the old median
         assert build.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
@@ -310,14 +304,14 @@ class TestCommittedArtefacts:
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record
         carries that run's id and its 13 terminal-year category quantiles
-        from the QA workbook run_50k_prod.py wrote, and the reference run
-        must reproduce them exactly (same seed, chains, iterations, seed
-        module and configuration)."""
+        from the QA workbook run_production.py wrote, and the reference run
+        must reproduce them exactly (same seed, chains, iterations, drivers
+        and configuration)."""
         persisted = record["persisted_run"]
         assert persisted and persisted["id"] and persisted["model_version"] == record["basis"]["model_version"]
         assert len(persisted["categories_terminal"]) == 13
         assert build.reference_reproduces(record["reference_run"], persisted) == []
-        # the published headline (DEPLOY.md, CLAUDE.md) is the reference run's, to the displayed decimals
+        # the headline quoted in docs/MODEL.md is the reference run's, to the displayed decimals
         term = record["reference_run"]["portfolio_terminal"]
         assert (round(term["median"] * 100, 2), round(term["p10"] * 100, 2), round(term["p90"] * 100, 2)) == (-5.58, -6.16, -4.89)
 

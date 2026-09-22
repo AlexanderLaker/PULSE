@@ -1,147 +1,94 @@
-"""Data models for PRISM — Trend and TrendDatabase."""
+"""The Profit Pool Driver and the set of drivers a simulation runs on."""
 
+import copy
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Optional
+
+#: The scores experts can propose; a driver's baseline records the same fields.
+SCORE_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
+                "category_exposure", "regional_exposure", "vc_exposure")
+
+#: Every editable field that feeds the model: the scores plus the direction.
+#: An admin edit to any of them sets ``scores_edited``.
+MODEL_FIELDS = ("direction",) + SCORE_FIELDS
 
 
 @dataclass
 class Driver:
-    """A single strategic trend with scoring metadata."""
-    id: str                                    # e.g. "consumer_01"
-    force: str                                 # e.g. "Consumer"
-    sub_category: str = ""                     # e.g. "Trends"
+    """One external driver of the HCB profit pool, with its scores.
+
+    ``probability_prior`` and ``normalized_score`` are derived from the scores
+    and cannot be passed in; call ``recompute()`` after changing a score.
+    """
+    id: str                           # e.g. "consumer_r01"; the display code is "C-01"
+    force: str                        # one of config.FORCES
     name: str = ""
     description: str = ""
-    direction: str = "Expansion"               # "Expansion" | "Contraction"
-    probability: int = 3                       # 1-5
-    start_year: int = 2028
-    normalized_score: float = 0.0
-    analysis: str = ""
-    category_exposure: dict = field(default_factory=dict)  # {cat: 0-5}
-    vc_exposure: dict = field(default_factory=dict)        # {vc_step: 0-5}
+    direction: str = "Expansion"      # "Expansion" | "Contraction"
+    probability: int = 3              # 1-5; the Beta prior's mean is probability / 6
+    start_year: int = 2028            # onset: no effect up to this year
+    analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
+    category_exposure: dict = field(default_factory=dict)  # {category: 0-5}
+    vc_exposure: dict = field(default_factory=dict)        # {value-chain step: 0-5}
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}
-    data_source: str = ""
-    source_type: str = ""
-    confidence: str = "Medium"
-    last_updated: datetime = field(default_factory=datetime.now)
-    ai_suggested: bool = False
-    user_override: bool = False
-    # (The delphi-era fields scorer_count / score_variance / debiasing_applied
-    #  were removed 2026-07-07, owner ruling O1 — the Delphi capability itself
-    #  was deleted in June 2026 (D10); scripts/migrate_drop_delphi.py drops
-    #  the matching legacy columns from existing databases.)
-    # % of GP1 affected — what fraction of the category profit pool is
-    # realistically exposed to this trend at full materialization.
-    # AI-preset, expert-adjustable. Range 0.0 to 1.0 (e.g. 0.15 = 15%).
-    # This replaces the implicit assumption that every trend can affect
-    # 100% of the pool. A high-materialization trend with gp1_pct_affected=0.15
-    # means: "this trend can fully materialize, but even at full force
-    # it only touches 15% of the category's GP1."
-    # Must be determined by AI analysis — no default value.
+    data_source: str = ""             # one-line summary of the evidence
+    sources: list = field(default_factory=list)           # [{title, url, tier, note}]
+    confidence: str = "Medium"        # how well the present state is evidenced (display only)
+    # Share of the category's gross profit the driver can move at full
+    # materialisation, in (0, 1]. There is no default: a driver without it
+    # cannot be simulated.
     gp1_pct_affected: Optional[float] = None
-    # Materialization timing — when does the full impact arrive?
-    # peak_year: the year by which 100% of the trend's impact has materialized.
-    # 0 = use default (2030). Must be >= base_year and <= 2035.
+    # Year by which the full effect has materialised; 0 means "not scored",
+    # in which case the force's default schedule applies.
     peak_year: int = 0
-    # Diffusion curve — the temporal shape of how the impact builds up.
-    # MECE taxonomy:
-    #   "s_curve"       — slow start, rapid middle, plateau (classic adoption)
-    #   "linear"        — steady equal increments each year
-    #   "front_loaded"  — most impact happens early, then flattens
-    #   "back_loaded"   — slow start, accelerates toward the end
-    #   "step_function" — minimal impact then sudden jump at peak_year
-    diffusion_curve: str = "s_curve"
-    # (alpha, beta) for the Beta prior. F11 (2.10.0): renamed from the
-    # misleading ``probability_posterior`` — there is NO Bayesian update from
-    # data anywhere in the engine (T7), so "posterior" implied a learning step
-    # that never happens. This is a structured-judgment PRIOR set from the 1–5
-    # score. A read-only ``probability_posterior`` property is kept as a
-    # deprecated alias for one release so no external reader breaks.
-    probability_prior: Optional[tuple] = None
-    # AI baseline snapshot (June 2026 multi-expert proposals layer).
-    # An immutable dict of the originally-seeded scoreable fields
-    # {probability, gp1_pct_affected, peak_year, diffusion_curve,
-    #  category_exposure, regional_exposure, vc_exposure} captured at seed
-    # time and persisted in the trends.ai_suggestion column. Survives admin
-    # edits/endorsements so the "AI suggestion" reference never drifts.
-    # None for legacy trends until scripts/backfill_ai_suggestion.py runs.
-    ai_suggestion: Optional[dict] = None
-    # Uncertainty score (2.11.0, owner ruling O7): ONE score per trend on a
-    # 0–5 scale — the dispersion around the modelled size and timing of the
-    # effect, given its direction (scale documented in pulse/config.py next
-    # to UNCERTAINTY_KAPPA). It sets the Beta-prior concentration (the mean
-    # stays p/6) and the per-trend peak-year jitter width. None = not scored:
-    # the trend then behaves exactly as in 2.10.0 (κ = 6, global jitter).
-    uncertainty: Optional[int] = None
+    diffusion_curve: str = "s_curve"  # one of config.VALID_DIFFUSION_CURVES
+    uncertainty: Optional[int] = None  # 0-5, see config.UNCERTAINTY_KAPPA; None = not scored
+    # The scores the driver was seeded with (see scores()): the reference the
+    # Drivers page compares expert proposals and later edits against.
+    baseline: Optional[dict] = None
+    scores_edited: bool = False       # an admin has changed a MODEL_FIELDS value since seeding
+    probability_prior: tuple = field(init=False, default=(3, 3))
+    normalized_score: float = field(init=False, default=0.0)
 
     def __post_init__(self):
-        from prism.config import beta_prior_for  # top-level module, no scipy
-        direction_sign = 1 if self.direction == "Expansion" else -1
+        self.recompute()
+
+    def recompute(self) -> None:
+        """Refresh the Beta prior and the expected signed score from the scores.
+
+        normalized_score = E[p] x gp1_pct_affected x direction, the
+        deterministic counterpart of what the engine samples per iteration.
+        """
+        from prism.config import beta_prior_for
         if self.uncertainty is not None:
             self.uncertainty = max(0, min(5, int(self.uncertainty)))
-        # Structured-judgment Beta PRIOR centered on the expert/AI 1–5 score —
-        # always recompute from the current probability (and, since 2.11.0,
-        # the uncertainty score) so re-scoring updates it (F11: renamed prior;
-        # NOT updated from data — see field comment). Without an uncertainty
-        # score this is (p, 6 − p), the 2.10.0 prior, exactly.
-        # The raw score goes in: the unscored branch of beta_prior_for is the
-        # 2.10.0 formula verbatim, (max(p, 1), max(6 − p, 1)).
         self.probability_prior = beta_prior_for(self.probability, self.uncertainty)
-        # normalized_score aligned with MC engine formula:
-        #   MC samples: prob_01 × gp1_pct_affected × direction
-        #   Deterministic: E[prob_01] × gp1_pct_affected × direction
-        # where E[prob_01] = alpha / (alpha + beta) from the Beta prior.
-        # Economic magnitude is captured by gp1_pct_affected (high-materialization
-        # trends get higher gp1_pct assignments).
-        a_p, b_p = self.probability_prior
-        prob_mean = a_p / (a_p + b_p)  # Expected probability of materialization
+        a, b = self.probability_prior
         gp1 = self.gp1_pct_affected if self.gp1_pct_affected is not None else 0.0
-        self.normalized_score = prob_mean * gp1 * direction_sign
+        self.normalized_score = a / (a + b) * gp1 * self.direction_sign
+
+    def scores(self) -> dict:
+        """A copy of the driver's SCORE_FIELDS."""
+        return {name: copy.deepcopy(getattr(self, name)) for name in SCORE_FIELDS}
 
     @property
     def direction_sign(self) -> int:
         return 1 if self.direction == "Expansion" else -1
 
-    @property
-    def probability_posterior(self):
-        """Deprecated alias for ``probability_prior`` (F11, 2.10.0).
-
-        Kept read-only for one release so any external reader still resolves;
-        the engine and API now use ``probability_prior``. There is no Bayesian
-        posterior in PRISM — the name was a misnomer (T7)."""
-        return self.probability_prior
-
-    @probability_posterior.setter
-    def probability_posterior(self, value):
-        # Tolerate old code/paths that still assign the former field name.
-        self.probability_prior = value
-
-
-
 
 @dataclass
 class DriverSet:
-    """Container for all ingested trends and metadata."""
-    drivers: list = field(default_factory=list)       # List[Trend]
-    categories: list = field(default_factory=list)    # Category names
-    forces: list = field(default_factory=list)        # Force names
-    source_file: str = ""
-    ingestion_date: datetime = field(default_factory=datetime.now)
-    financial_data_detected: bool = False
+    """The drivers a simulation runs on, with the taxonomy they are scored in."""
+    drivers: list = field(default_factory=list)       # [Driver]
+    categories: list = field(default_factory=list)
+    forces: list = field(default_factory=list)
 
     @property
     def driver_count(self) -> int:
         return len(self.drivers)
 
-    def get_drivers_by_force(self, force: str) -> list:
-        return [t for t in self.drivers if t.force == force]
-
-    def get_drivers_by_category(self, category: str) -> list:
-        return [t for t in self.drivers if t.category_exposure.get(category, 0) > 0]
-
     def get_driver_by_id(self, driver_id: str) -> Optional[Driver]:
-        for t in self.drivers:
-            if t.id == driver_id:
-                return t
+        for d in self.drivers:
+            if d.id == driver_id:
+                return d
         return None

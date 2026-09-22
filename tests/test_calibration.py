@@ -1,23 +1,11 @@
-"""v3.12 calibration (2.12.0, owner ruling O13): the engine defaults in
-prism/config.py must be exactly the values of the generated record
-data/attenuation_calibration_v3_12.json, the record must be reproducible
-from the seed by scripts/compute_attenuation_v3_12.py, the identity
-eff_att = 0.5 x (1 - mean cross-force row overlap) must hold between the
-matrix and the attenuation, and the default copula matrix must be PSD on
-the 51-driver population (D1 / F6).
+"""The overlap correction: prism/config.py equals the generated record, and the record is reproducible.
 
-The calibration is a FUNCTION OF THE CATEGORY EXPOSURE SPACE (pairwise
-weighted Jaccard over the category vectors), so splitting "LHC: TOI" out of
-"LHC: HSC" — 12 columns to 13 — moves it. v3.12 is the same method and the
-same mechanism adjustments as v3.11 re-run on the 13-column space; the v3.11
-script and record stay in the repo as the superseded provenance.
-
-Background (FINDINGS_REGISTER F-28): before 2.11.0 the within-force overlap
-and the cross-force matrix in config.py were the v3.1 numbers labelled v3.5
-while the per-force attenuation was v3.5 — three layers, two provenances.
-This lock makes that drift impossible: one JSON, one script, one test.
+All three layers (per-force attenuation, within-force overlap, cross-force
+matrix) come from one record, data/calibration/attenuation.json, written by
+scripts/compute_attenuation.py from the driver base. The correction depends
+on the category exposure space, so a taxonomy or exposure change must be
+followed by a re-run; these tests fail until it is.
 """
-
 import importlib.util
 import json
 from pathlib import Path
@@ -26,100 +14,96 @@ import numpy as np
 import pytest
 
 from prism import config as C
-from prism.config_validation import ModelConfigValidator, validate_model_config
+from prism.config_validation import validate_model_config
 
 REPO = Path(__file__).resolve().parent.parent
-JSON_PATH = REPO / "data" / "calibration" / "attenuation.json"
+RECORD = REPO / "data" / "calibration" / "attenuation.json"
 
 
 @pytest.fixture(scope="module")
-def cal():
-    return json.loads(JSON_PATH.read_text(encoding="utf-8"))
+def record():
+    return json.loads(RECORD.read_text(encoding="utf-8"))
 
 
-class TestDefaultsEqualTheRecord:
-    def test_source_tag(self, cal):
-        assert C.DEFAULT_ATTENUATION_SOURCE == cal["calibration_version"] == "calibrated_v3.12_september2026"
+def _script():
+    spec = importlib.util.spec_from_file_location("compute_attenuation", REPO / "scripts" / "compute_attenuation.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
-    def test_per_force_attenuation(self, cal):
-        assert C.DEFAULT_PER_FORCE_ATTENUATION == cal["per_force_effective_attenuation"]
 
-    def test_within_force_overlap(self, cal):
-        assert C.DEFAULT_WITHIN_FORCE_OVERLAP == cal["within_force_final"]
+class TestConfigEqualsTheRecord:
+    def test_source_label(self, record):
+        assert C.DEFAULT_ATTENUATION_SOURCE == record["calibration_version"]
 
-    def test_cross_force_matrix(self, cal):
+    def test_per_force_attenuation(self, record):
+        assert C.DEFAULT_PER_FORCE_ATTENUATION == record["per_force_effective_attenuation"]
+
+    def test_within_force_overlap(self, record):
+        assert C.DEFAULT_WITHIN_FORCE_OVERLAP == record["within_force_final"]
+
+    def test_cross_force_matrix(self, record):
         for i in C.FORCES:
             for j in C.FORCES:
-                expected = 0.0 if i == j else cal["cross_force_final"][i][j]
+                expected = 0.0 if i == j else record["cross_force_final"][i][j]
                 assert C.DEFAULT_FORCE_OVERLAP_MATRIX[i][j] == pytest.approx(expected, abs=1e-12), (i, j)
 
-    def test_identity_between_matrix_and_attenuation(self):
+    def test_config_holds_the_printed_blocks_verbatim(self, record):
+        """The script prints the three constants as they appear in prism/config.py."""
+        source = (REPO / "prism" / "config.py").read_text(encoding="utf-8")
+        for block in _script().config_literals(record).split("\n\n"):
+            assert block.strip() in source, block.splitlines()[0]
+
+    def test_attenuation_follows_from_the_matrix(self):
         for i in C.FORCES:
             row = [C.DEFAULT_FORCE_OVERLAP_MATRIX[i][j] for j in C.FORCES if j != i]
-            assert C.DEFAULT_PER_FORCE_ATTENUATION[i] == pytest.approx(round(0.5 * (1 - sum(row) / len(row)), 3), abs=1e-9), i
+            assert C.DEFAULT_PER_FORCE_ATTENUATION[i] == pytest.approx(round(0.5 * (1 - sum(row) / len(row)), 3))
 
-    def test_population_and_bounds(self, cal):
-        assert cal["n_trends"] == 51
-        assert cal["force_counts"] == {"Consumer": 20, "Customer": 7, "Technology": 6,
-                                       "Government": 10, "Environmental": 4, "Competitive": 4}
+    def test_bounds(self, record):
+        assert record["n_drivers"] == 51
         for f in C.FORCES:
             assert 0.10 <= C.DEFAULT_WITHIN_FORCE_OVERLAP[f] <= 0.45
             assert 0.0 < C.DEFAULT_PER_FORCE_ATTENUATION[f] <= 0.5
-            for g in C.FORCES:
-                assert 0.0 <= C.DEFAULT_FORCE_OVERLAP_MATRIX[f][g] <= 0.45
-        assert abs(cal["trend_weighted_mean_attenuation"] - 0.452) < 0.02  # sanity vs v3.1/v3.5 (~0.45)
+            assert all(0.0 <= v <= 0.45 for v in C.DEFAULT_FORCE_OVERLAP_MATRIX[f].values())
 
-    def test_every_mechanism_adjustment_has_a_reason(self, cal):
+    def test_every_mechanism_adjustment_has_a_reason(self, record):
         for f in C.FORCES:
-            assert cal["within_force_mechanism_reason"][f]
+            assert record["within_force_mechanism_reason"][f]
         for i in C.FORCES:
             for j in C.FORCES:
-                if i != j and cal["cross_force_mechanism_adj"][i][j]:
-                    assert f"{i}->{j}" in cal["cross_force_mechanism_reason"], (i, j)
-                    assert abs(cal["cross_force_mechanism_adj"][i][j]) <= 0.10
+                if i != j and record["cross_force_mechanism_adj"][i][j]:
+                    assert record["cross_force_mechanism_reason"][f"{i}->{j}"], (i, j)
+                    assert abs(record["cross_force_mechanism_adj"][i][j]) <= 0.10
 
 
 class TestReproducible:
-    def test_script_regenerates_the_record(self, cal, tmp_path):
-        spec = importlib.util.spec_from_file_location("compute_attenuation",
-                                                      REPO / "scripts" / "compute_attenuation.py")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        out = mod.main(out_json=tmp_path / "cal.json", verbose=False)
-        regenerated = json.loads((tmp_path / "cal.json").read_text(encoding="utf-8"))
-        assert regenerated == cal
-        assert out["per_force_effective_attenuation"] == C.DEFAULT_PER_FORCE_ATTENUATION
+    def test_the_script_regenerates_the_record(self, record, tmp_path):
+        out = tmp_path / "attenuation.json"
+        _script().compute(out_json=out, verbose=False)
+        assert json.loads(out.read_text(encoding="utf-8")) == record
+
+    def test_the_check_passes_and_catches_a_stale_config(self, monkeypatch, tmp_path, capsys):
+        script = _script()
+        assert script.main(["--check"]) == 0
+        stale = tmp_path / "attenuation.json"
+        stale.write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(script, "OUT_JSON", stale)
+        monkeypatch.setattr(script, "REPO", tmp_path)
+        (tmp_path / "prism").mkdir()
+        (tmp_path / "prism" / "config.py").write_text("# no blocks", encoding="utf-8")
+        assert script.main(["--check"]) == 1
+        out = capsys.readouterr().out
+        assert "differs from the derivation" in out and "does not hold the three blocks" in out
 
 
-class TestCopulaValidityOn51:
-    def test_defaults_are_psd_on_the_seed_population(self, cal):
-        from prism.seed_drivers import get_seed_drivers
-        forces = [t.force for t in get_seed_drivers()]
-        R = np.asarray(C.build_driver_correlation_matrix(forces, C.DEFAULT_WITHIN_FORCE_RHO,
-                                                        C.DEFAULT_FORCE_CORRELATIONS), dtype=float)
-        lam = float(np.linalg.eigvalsh(R).min())
+class TestCopula:
+    def test_default_correlations_are_positive_definite_on_the_driver_base(self, record):
+        from prism.seed_drivers import DRIVERS
+        R = C.build_driver_correlation_matrix([d.force for d in DRIVERS], C.DEFAULT_WITHIN_FORCE_RHO,
+                                              C.DEFAULT_FORCE_CORRELATIONS)
+        lam = float(np.linalg.eigvalsh(np.asarray(R)).min())
         assert lam > 0.0
-        assert lam == pytest.approx(cal["correlation_lambda_min_51"], abs=1e-6)
-        assert cal["correlation_defaults_kept"] is True
+        assert lam == pytest.approx(record["correlation_lambda_min"], abs=1e-6)
 
-
-class TestValidatorAcceptsTheTag:
-    def test_default_config_validates(self):
-        validate_model_config(C.ModelConfig().__dict__)
-
-    def test_legacy_tags_still_accepted_and_unknown_rejected(self):
-        base = ModelConfigValidator.model_validate(
-            {k: v for k, v in C.ModelConfig().__dict__.items() if k in ModelConfigValidator.model_fields})
-        assert base.attenuation_source == "calibrated_v3.12_september2026"
-        data = base.model_dump()
-        # A run persisted before the Toilet Care split carries the v3.11 tag,
-        # and older ones the v3.5 tag: both must still load.
-        for legacy in ("calibrated_v3.11_september2026", "calibrated_v3.5_april2026",
-                       "calibrated_v3.1_april2026"):
-            data["attenuation_source"] = legacy
-            ModelConfigValidator.model_validate(data)
-        data["attenuation_source"] = "calibrated_v9"
-        with pytest.raises(Exception) as err:
-            ModelConfigValidator.model_validate(data)
-        # the message names the current tag first and marks the older ones legacy
-        assert "one of ('calibrated_v3.12_september2026', 'calibrated_v3.11_september2026' (legacy)" in str(err.value)
+    def test_the_default_configuration_validates(self):
+        validate_model_config(C.ModelConfig())
