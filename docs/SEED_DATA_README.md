@@ -7,7 +7,7 @@
 `pulse/seed_trends.py` holds the driver base (the Profit Pool Drivers; the code keeps the name `Trend`, owner ruling O15) as Python `Trend` rows plus a `SOURCE_URLS` table (graded sources per driver). It is **generated**, never hand-edited:
 
 ```
-data/trend_base_2026-09/core_set_51_v5.json   the reviewed core set (descriptions, direction,
+data/trend_base_2026-09/core_set_51_v6.json   the reviewed core set (descriptions, direction,
                                               probability, GP1 share, onset, peak, curve,
                                               confidence, category / regional / value-chain
                                               exposures, uncertainty score, graded sources,
@@ -18,10 +18,24 @@ data/trend_base_2026-09/core_set_51_v5.json   the reviewed core set (description
                                               with a written reason. v5 = v4 with four texts
                                               reworded to the Driver vocabulary (owner ruling
                                               O15, 2026-09-16: C-03, C-27, C-35, G-15); v4
-                                              stays in the folder as the O13 record.
+                                              stays in the folder as the O13 record. v6 = v5
+                                              with the review's own notes ("the old base
+                                              assumed ...") taken out of 40 descriptions and
+                                              nothing else changed (owner instruction O16,
+                                              2026-09-17); the review record stays in each
+                                              driver's `change` field; v5 stays as the O15
+                                              record.
 data/trend_base_2026-09/verdicts_99_v1.json   the disposition of every code of the previous
                                               99-trend base (KEEP / MERGE INTO / SUBSTITUTE /
                                               DELETE / NEW) with the review's reason
+data/trend_base_2026-09/driver_analysis_v1.json      the PRISM Analysis reading per driver
+data/trend_base_2026-09/driver_attribution_v1.json   (owner instruction O16, 2026-09-17): 51
+                                              templates and the attribution record their
+                                              figures are filled from, written by
+                                              scripts/build_driver_analysis.py; the generator
+                                              re-renders each text from the record and writes
+                                              it into `strategic_implication`, refusing a
+                                              stale file (docs/DRIVER_ANALYSIS_CONCEPT.md)
         │
         ▼  python3 scripts/generate_seed_from_core_set.py
 pulse/seed_trends.py        51 Trend rows + SOURCE_URLS + the E1 credibility gate + CLI
@@ -58,8 +72,9 @@ data/trendCodeMap.ts        51 live display codes + 65 retired codes with merged
 |-----------|------|
 | Fresh local SQLite (empty) | `python -m pulse --serve` and `pulse/api/state.py` seed automatically from `get_report_trends()` |
 | Existing database on the 99-trend base (local SQLite, then Neon) | `python3 scripts/replace_trend_base.py` — archive-first (trends, exposures, sources, proposals to `data/archive/`), deletes the retired ids, writes the 51, restores the expert proposals of the kept ids, verifies, writes an audit-log entry. `--dry-run` reports only; `--postgres` is required to touch Neon. Run once per database by the owner. |
-| Later edits to the reviewed JSON | change the JSON, re-run the generator, commit the regenerated files, then `POST /api/v1/trends/full-reseed` (admin) or the replacement script |
+| Later edits to the reviewed JSON | change the JSON (a re-score goes into `core_set_51_v6.json`), re-run `build_driver_analysis.py --reference --workbook FILE` after the next production run, re-run the generator, commit the regenerated files, then `POST /api/v1/trends/full-reseed` (admin) or the replacement script, and `apply_driver_analysis.py` for the texts |
 | The O15 text edits (Driver vocabulary, 2026-09-16) | `python3 scripts/apply_driver_vocabulary.py`: archive-first; one compare-and-swap transaction replaces the 58 listed phrases in the Consumer Journey server copy and one phrase in each of the four driver texts, and changes nothing else, so admin edits and expert proposals survive. Not a reseed: a reseed would reset every admin edit to the seed. `--dry-run` reports only; `--postgres` is required to touch Neon. |
+| The O16 PRISM Analysis readings and v6 descriptions (2026-09-17) | `python3 scripts/apply_driver_analysis.py`: archive-first; verifies the committed readings against the record and the seed against v6 first; one compare-and-swap transaction writes the rendered reading into `strategic_implication` for the 51 drivers and moves a description that still reads as v5 onto v6 (a reworded one is reported, not forced), and changes nothing else (no score, exposure, source, provenance flag or expert proposal), so the next run reports no input drift. Refuses a database missing a driver of the base (exit 8) or whose scoring inputs differ from the seed's (exit 9; carry the re-score into v6 and regenerate, or `--allow-drift`). Run after the vocabulary script; `--dry-run` reports only; `--postgres` is required to touch Neon; redeploy after the Neon run. Regenerate the readings first (`build_driver_analysis.py --reference --workbook FILE`) whenever a score, the calibration, the cell weights or the production run changed. |
 
 `POST /api/v1/seed` and `POST /api/v1/trends/sync` upsert the seed without deleting orphans; they are not the way to move a database from the 99 base to the 51 base.
 

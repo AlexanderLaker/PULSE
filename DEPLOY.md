@@ -32,11 +32,13 @@ Pushing to `main` auto-triggers a Vercel build (~2 min). Monitor at https://verc
 There is **no `next build` in CI** — the build runs only on Vercel (where the
 Clerk/Neon env vars are present). CI runs the `npm run verify` gates instead
 (typecheck + lint + vitest + pytest); see `.github/workflows/ci.yml`. The
-pytest job also runs the two generated-artifact gates —
-`scripts/generate_seed_from_core_set.py --check` (seed + code map) and
+engine job also runs the three generated-artifact gates as explicit steps —
+`scripts/generate_seed_from_core_set.py --check` (seed + code map),
 `scripts/build_estimated_cell_weights.py --check` (the O14 cell-weight record
-and `lib/cellWeightProvenance.ts`) — so no generated file can drift from its
-generator.
+and `lib/cellWeightProvenance.ts`) and `scripts/build_driver_analysis.py
+--check` (the O16 attribution record, the rendered PRISM Analysis texts, the
+parity fixture and the reproduction of the recorded production run) — so no
+generated file can drift from its generator.
 
 ### Pushing from your Mac
 
@@ -312,6 +314,88 @@ by hand (an admin may have reworded it). Integrity events are stored with each
 run, so the persisted run keeps the wording it was saved with in the About
 footer ("N trend score(s) changed") until the next `run_50k_prod.py` writes a
 new run.
+
+**The PRISM Analysis readings and the cleaned descriptions (owner instruction
+of 2026-09-17, O16), no engine version bump.** The Drivers page's "PRISM
+Analysis" is a reading of the model's own attribution for each driver
+(`docs/DRIVER_ANALYSIS_CONCEPT.md`). Its figures come from
+`data/trend_base_2026-09/driver_attribution_v1.json`, the readings from
+`driver_analysis_v1.json`, and the seed carries the rendered text; under the
+same instruction the base file is `core_set_51_v6.json`, whose 40 edited
+descriptions no longer carry the review's own notes. The database copy of a
+driver takes precedence over the seed, so both reach a page only through the
+script below.
+
+```bash
+# The local SQLite copy first (blank the URLs if .env names Neon); the
+# vocabulary script above must already have run on that database:
+DATABASE_URL= POSTGRES_URL= python3 scripts/apply_driver_analysis.py --dry-run
+DATABASE_URL= POSTGRES_URL= python3 scripts/apply_driver_analysis.py
+# Neon, right before the production deploy, after apply_driver_vocabulary.py:
+python3 scripts/apply_driver_analysis.py --dry-run
+python3 scripts/apply_driver_analysis.py --postgres
+# Redeploy right after the Neon run (see below), then Neon again after that
+# deploy: expect "to change: 0; already current: 51; not in this database: 0"
+# and "to move onto v6: 0; ... still on the pre-O15 wording: 0"
+python3 scripts/apply_driver_analysis.py --dry-run
+# The report: how many readings will change and how many are already current;
+# how many descriptions still read as v5 (moved), as v6 (done), as the pre-O15
+# wording (run apply_driver_vocabulary.py first) or as something else (an admin
+# reworded it: reported, never forced); any driver of the base
+# the database does not have (the run stops, exit 8: the readings describe the
+# 51-driver base); and any driver whose scoring inputs differ from the seed's
+# (the run stops, exit 9: a reading is written on the seed's scores; a database
+# ahead of the seed gets the re-score carried into core_set_51_v6.json and the
+# readings regenerated first, one behind the seed, every driver differing in
+# category exposure because O13's Toilet Care column never reached it, is
+# brought onto the seed first with POST /api/v1/trends/sync or
+# replace_trend_base.py --force; --allow-drift writes anyway with the drift
+# listed). The script first
+# verifies that every committed text is the rendering of its template on the
+# committed record, whose reference run is stamped with a digest of the seed's
+# scoring state and the configuration, and that the seed carries the v6
+# descriptions (exit 7 if not: regenerate), archives the current texts and descriptions
+# (data/archive/driver_analysis_<mode>_<stamp>.json), then writes in ONE
+# transaction with compare-and-swap on the text it read and the audit entry
+# (`driver_analysis_applied`). Only `strategic_implication` and `description`
+# move: no score, exposure, source, provenance flag or expert proposal, so the
+# next run reports no input drift. Idempotent.
+# Exit codes: 0 done or nothing to change · 2 cannot read, or no database file ·
+#             3 archive failed · 4 Postgres without --postgres, or --postgres on
+#             a connection that is not Postgres · 5 problems after the write, or
+#             the commit did not confirm (run --dry-run; re-running is safe) ·
+#             6 write failed, lock timeout or a text changed meanwhile (rolled
+#             back; re-run) · 7 the committed readings or descriptions are stale ·
+#             8 a driver of the base is not in this database · 9 scoring drift
+#             against the seed (a dry run returns 8 and 9 too)
+```
+
+Redeploy right after the Neon run, and ask admins to reload any open Drivers
+page before they edit. The old texts come back through two vectors. The API's
+per-instance driver cache (`pulse/api/state.py`): a warm instance keeps serving
+the old reading and the old description, and an admin edit on such an instance
+writes every column of the cached driver back through `save_trends`, the old
+texts included, until the instance is replaced. And the browser: the Drivers
+editor sends the description it loaded with the page on every save (never the
+reading), so a page opened before the script ran writes the old description
+back even against a fresh instance. The second dry run after the deploy shows
+anything written back up to then; if it reports anything to change or to move,
+run the script with `--postgres` once more.
+
+When the inputs of the readings change (a re-scored driver, a recalibration, a
+finance cell-weight file, a new production run), the readings are regenerated
+before the seed: `run_50k_prod.py` as today, then
+`python3 scripts/build_driver_analysis.py --reference --workbook <the run's QA
+workbook>` (with the same `--cell-weights FILE` if one was used; it reruns the
+3 × 50k reference, which takes about as long as the production run, and records
+which persisted run the reference reproduces), review the re-rendered texts
+and the comparative claims in them (`docs/DRIVER_ANALYSIS_CONCEPT.md` §8),
+`python3 scripts/generate_seed_from_core_set.py`, then this script on each
+database. `python3 scripts/build_driver_analysis.py --check` is the CI gate
+that the committed record, the rendered texts and the parity fixture are what
+the code produces and that the reference run still reproduces the recorded
+production run; `generate_seed_from_core_set.py --check` holds the seed to the
+texts and the v6 descriptions.
 
 ## Smoke test after deploy
 

@@ -339,11 +339,24 @@ class TestRepositoryContent:
         by_id = {t.id: t for t in drivers}
         for tid, col, old, new in vocab.DRIVER_EDITS:
             text = getattr(by_id[tid], col)
+            if col == "strategic_implication":
+                # Since 2026-09-17 the column carries the PRISM Analysis reading
+                # (scripts/build_driver_analysis.py), not the reviewed notes the
+                # O15 edit reworded; the old phrase must still be gone.
+                assert old not in text and text.startswith("Weight in the answer:"), (tid, col)
+                continue
+            if tid == "government_r15":
+                # O16 (2026-09-17) took the review's own notes out of the
+                # descriptions; G-15's O15 sentence was one of them, so neither
+                # wording is in the seed any more (core_set_51_v6.json).
+                assert old not in text and new not in text and "old base" not in text, (tid, col)
+                continue
             assert new in text and old not in text, (tid, col)
         left = [(t.id, f) for t in drivers for f in ("name", "description", "strategic_implication")
                 if WORD.search(getattr(t, f) or "")]
         assert left == []
-        assert "core_set_51_v5.json" in (REPO / "pulse" / "seed_trends.py").read_text(encoding="utf-8")
+        # the seed is generated from v6 since O16 (v5 plus description edits only; the O15 texts are unchanged)
+        assert "core_set_51_v6.json" in (REPO / "pulse" / "seed_trends.py").read_text(encoding="utf-8")
 
 
 # ── (b) generated text handed to people ─────────────────────────────────────
@@ -518,6 +531,20 @@ class TestRuntimeText:
 
 REAL_WORLD = "Brazil shows a pronounced premiumisation trend in colour."
 
+#: The strategic_implication of consumer_r27 as the O15 vocabulary pass left
+#: it (the reviewed scoring notes), before scripts/apply_driver_analysis.py
+#: replaced the column with the PRISM Analysis reading on 2026-09-17.
+PRE_ANALYSIS_R27_TEXT = (
+    "Mechanism: Volume (ADW occasions grow with the installed base); geographic mix. Probability 4 of 5: "
+    "appliance penetration rises steadily where incomes rise; the pace is the question. Exposure: ADW 5; "
+    "hand dish 1 (the driver is modelled as expansion, so the cannibalised category cannot carry a negative "
+    "score; the volume loss stays small). Europe 5 (Southern and Eastern Europe are the epicentre for Somat), "
+    "High Growth 3 (Türkiye, MEA), Asia 1 (China at 3 per cent penetration, no HCB ADW), North America 0 "
+    "(saturated at 73 per cent and no HCB ADW). Timing: Onset 2025 (the catch-up has been visible since 2024; "
+    "the engine floor), linear to 2034: appliance replacement cycles are slow and steady. Uncertainty 3 of 5: "
+    "penetration growth of one to two points a year could be twice or half that, and there is no dated trigger."
+)
+
 
 def _journey_blob(vocab, drop: str | None = None) -> dict:
     olds = [o for o, _ in vocab.JOURNEY_EDITS if o != drop]
@@ -548,6 +575,16 @@ def db(monkeypatch, tmp_path, vocab, sqlite_db):
     dbm.init_db()
     # deep copies: get_report_trends() hands out the module's own Trend objects
     seed = {t.id: copy.deepcopy(t) for t in seed_trends.get_report_trends()}
+    # The seed's strategic_implication is the PRISM Analysis reading since
+    # 2026-09-17; a database moved by O15 alone still carries the reviewed
+    # notes, which is the state this fixture reproduces for consumer_r27.
+    seed["consumer_r27"].strategic_implication = PRE_ANALYSIS_R27_TEXT
+    # Likewise the seed's descriptions are v6 since O16 (the review's notes
+    # taken out); a database moved by O15 alone carries the v5 descriptions,
+    # and G-15's O15 sentence is one of the notes v6 removed, so the fixture
+    # starts G-15 from its v4 wording (the pre-O15 state the script expects).
+    v4 = {d["code"]: d["desc"] for d in json.loads((BASE / "core_set_51_v4.json").read_text(encoding="utf-8"))}
+    seed["government_r15"].description = v4["G-15"]
     rows = []
     for tid in ("consumer_r03", "consumer_r27", "consumer_r35", "government_r15", "consumer_r01"):
         t = seed[tid]
@@ -669,6 +706,21 @@ class TestContentScript:
         assert "nothing to change: this database already carries the Driver vocabulary" in capsys.readouterr().out
         assert _journey_rows(db) == 2
 
+    def test_a_driver_that_already_carries_the_prism_analysis_counts_as_done(self, db, vocab, capsys):
+        # scripts/apply_driver_analysis.py rewrote the column: neither the old
+        # nor the new O15 phrase is there, and that is not something to look at.
+        reading = seed_trends.get_report_trends()
+        r27 = next(t for t in reading if t.id == "consumer_r27")
+        with db.get_db_connection() as conn:
+            conn.cursor().execute("UPDATE trends SET strategic_implication = ? WHERE id = 'consumer_r27'",
+                                  (r27.strategic_implication,))
+            conn.commit()
+        db.save_journey_content(_journey_blob(vocab), updated_by="seed")
+        assert vocab.main(dry_run=True, allow_postgres=False) == 0
+        out = capsys.readouterr().out
+        assert "driver consumer_r27.strategic_implication: done" in out
+        assert "need a look by hand" not in out
+
     def test_a_reworded_phrase_is_reported_not_forced(self, db, vocab, capsys):
         dropped = "The neuro-scent trend left the model"
         db.save_journey_content(_journey_blob(vocab, drop=dropped), updated_by="admin")
@@ -688,6 +740,22 @@ class TestContentScript:
         out = capsys.readouterr().out
         assert "driver government_r15.description: no-such-driver" in out
         assert "nothing written" in out and "this database already carries the Driver vocabulary" not in out
+
+    def test_a_description_already_on_the_current_base_text_counts_as_done(self, db, vocab, capsys):
+        """O16 took G-15's O15 sentence out of the description altogether, so a
+        database already moved by scripts/apply_driver_analysis.py carries
+        neither the old nor the new phrase; the script must report done, not
+        missing, and write nothing to that driver."""
+        current = {t.id: t.description for t in seed_trends.get_report_trends()}
+        with db.get_db_connection() as conn:
+            conn.cursor().execute("UPDATE trends SET description = ? WHERE id = 'government_r15'", (current["government_r15"],))
+            conn.commit()
+        assert vocab.main(dry_run=True, allow_postgres=False, archive_dir="data/archive") == 0
+        out = capsys.readouterr().out
+        assert "driver government_r15.description: done" in out
+        assert "driver government_r15.description: missing" not in out
+        assert vocab.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0
+        assert {t.id: t for t in db.load_trends()}["government_r15"].description == current["government_r15"]
 
     def test_database_without_a_server_copy_updates_the_drivers_only(self, db, vocab, capsys):
         assert vocab.main(dry_run=False, allow_postgres=False, archive_dir="data/archive") == 0

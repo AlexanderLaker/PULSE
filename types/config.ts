@@ -106,6 +106,10 @@ export interface ModelConfig {
    *  anywhere. Six values (one per force) sourced from
    *  data/Attenuation_Calibration.xlsx (Cross-Force_Matrix sheet). */
   per_force_attenuation?: Record<ForceName, number>;
+  /** The within-force overlap correction per force (D8; served read-only by
+   *  GET /config, edited on the Config sheet). Consumed by the per-driver
+   *  attribution of the category drill-down (lib/driverAttribution.ts). */
+  within_force_overlap?: Record<ForceName, number>;
   attenuation_source?: 'calibrated_v3.12_september2026' | 'calibrated_v3.11_september2026' | 'calibrated_v3.5_april2026' | 'calibrated_v3.1_april2026' | 'admin_override';
   // neutral_threshold deleted (July 2026): engine-inert, removed end-to-end.
   base_year?: number;

@@ -29,7 +29,10 @@ where they mean a modelled driver:
      JOURNEY_EDITS_FROM_2026_09_16 maps that table's wording to the same
      corrected phrases;
   2. four driver texts from the September review (DRIVER_EDITS: C-03, C-27,
-     C-35, G-15).
+     C-35, G-15). The C-27 entry is on strategic_implication, the column that
+     scripts/apply_driver_analysis.py (owner instruction 2026-09-17) rewrites
+     wholesale with the PRISM Analysis reading; run this script FIRST, and a
+     driver that already carries a reading counts as done here.
 
 What it does, in order, and nothing else:
   1. Refuses to run against Postgres without --postgres (the same near-miss
@@ -379,6 +382,18 @@ def _read_state() -> tuple[int | None, dict | None, dict]:
     return journey_id, journey, texts
 
 
+def _current_seed_text(tid: str, col: str) -> str | None:
+    """The generated seed's current text for a driver column (None if unknown)."""
+    try:
+        from pulse.seed_trends import get_report_trends
+    except Exception:  # pragma: no cover - the seed module is always importable in the repo
+        return None
+    for t in get_report_trends():
+        if t.id == tid:
+            return getattr(t, col, None)
+    return None
+
+
 def plan(journey: dict | None, drivers: dict) -> dict:
     """Pure: what a run would change. Status per item: 'apply' (the old phrase,
     or its 2026-09-16 wording, found), 'done' (only the new phrase found),
@@ -399,6 +414,15 @@ def plan(journey: dict | None, drivers: dict) -> dict:
         elif old in text:
             status = "apply"
         elif new in text:
+            status = "done"
+        elif col == "strategic_implication" and text.startswith("Weight in the answer:"):
+            # The column already carries the PRISM Analysis reading written by
+            # scripts/apply_driver_analysis.py, which supersedes this edit.
+            status = "done"
+        elif text == _current_seed_text(tid, col):
+            # The column already carries the current base text (O16 took the
+            # review's notes out of the descriptions, G-15's O15 sentence among
+            # them), which supersedes this edit.
             status = "done"
         else:
             status = "missing"

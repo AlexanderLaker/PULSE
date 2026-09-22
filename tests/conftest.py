@@ -12,6 +12,14 @@ import os
 if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
     os.environ["DATABASE_URL"] = ""
     os.environ["POSTGRES_URL"] = ""
+    # The SQLite fallback would otherwise be the developer's own data/prism.db:
+    # tests that save drivers, runs and audit rows would land in it (and the
+    # O16 apply script's scoring-drift gate would then see test edits there).
+    # Every test file gets a fresh throwaway database instead, unless the
+    # caller set PRISM_DB_PATH on purpose.
+    if not os.environ.get("PRISM_DB_PATH"):
+        import tempfile
+        os.environ["PRISM_DB_PATH"] = os.path.join(tempfile.mkdtemp(prefix="prism-tests-"), "prism.db")
 
 import pytest  # noqa: E402
 import numpy as np  # noqa: E402

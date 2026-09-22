@@ -56,6 +56,7 @@ import {
 } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { cellMarginals } from '@/lib/cellWeights';
+import { canAttribute, computeDriverAttribution } from '@/lib/driverAttribution';
 import ShiftValue from '@/components/dashboard/ShiftValue';
 import {
   getYearPercentiles, weightedAvg,
@@ -1317,19 +1318,59 @@ const ProfitPoolAnalysis2: FC<{
     };
   }, [matrixData, impactFilter, impactFractions, catWeightsForTotals, view]);
 
-    // ── Category Detail Panel data ─────────────────────────────────
+  // ── Per-driver attribution at the score means (2026-09-17) ───────
+  // The same decomposition the PRISM Analysis readings on the Drivers page
+  // are written on (scripts/build_driver_analysis.py; lib/driverAttribution.ts
+  // is its parity-pinned port), so the drill-down's ranking and a reading's
+  // stated weight agree. Needs the three force layers from GET /config and
+  // the cell gross-profit shares the run used; otherwise null and the panel
+  // falls back to the exposure proxy below.
+  const exactAttribution = useMemo(() => {
+    const cellWeights = simulation?.cell_weights_used as Record<string, Record<string, number>> | undefined;
+    if (!canAttribute(config) || !cellWeights || !trends?.length) return null;
+    try {
+      return computeDriverAttribution({
+        trends: trends.map((t) => ({
+          id: t.id, force: t.force,
+          normalized_score: (t as { gp1_shift?: number }).gp1_shift ?? t.normalized_score ?? 0,
+          category_exposure: (t.category_exposure ?? {}) as Record<string, number>,
+          regional_exposure: (t as { regional_exposure?: Record<string, number> }).regional_exposure,
+          uncertainty: t.uncertainty ?? null,
+          peak_year: (t as { peak_year?: number }).peak_year ?? null,
+          diffusion_curve: (t as { diffusion_curve?: string }).diffusion_curve ?? null,
+          start_year: (t as { start_year?: number }).start_year ?? null,
+        })),
+        categories: CATEGORIES.map((c) => c.name),
+        config: {
+          force_weights: config.force_weights,
+          per_force_attenuation: config.per_force_attenuation,
+          within_force_overlap: config.within_force_overlap as Record<string, number>,
+          base_year: config.base_year,
+          path_years: (config.path_years as number[] | undefined) ?? YEARS,
+        },
+        cellWeights,
+      });
+    } catch {
+      return null;
+    }
+  }, [simulation?.cell_weights_used, config, trends]);
+
+  // ── Category Detail Panel data ─────────────────────────────────
   // Rebuilds only when the underlying simulation / trends / selected year
   // changes. Category keys follow the display-name convention
   // ("Hair: Color") to match `simulation.shifts` and the row.id used in the
   // matrix. For the force decomposition we snapshot at `selectedYear`
   // (Time Path view defaults to the horizon end so the user sees peak
-  // exposure). Contributing trends are filtered by the trend's category
-  // exposure map and sorted by score magnitude inside the panel itself.
+  // exposure). Contributing drivers are filtered by the driver's category
+  // exposure map and sorted by contribution inside the panel itself.
   const panelData = useMemo(() => {
     const cats = CATEGORIES.map((c) => ({ id: c.name, name: c.name, group: c.group }));
     const shifts_path: { [cat: string]: Record<string, { median?: number; p10?: number; p90?: number }> } = {};
     const force_decomposition: { [cat: string]: Record<ForceName, number> } = {};
     const contributing_trends: { [cat: string]: Trend[] } = {};
+    // Drivers the port took at full materialisation (no peak year or curve),
+    // named in the drill-down footer so the basis is never overstated.
+    const approximate_drivers: { [cat: string]: string[] } = {};
     // F1 (2.10.0): per-category regional shift at the selected year — the 3D
     // drill-down. region → {median, p10, p90}.
     const regional_shift: { [cat: string]: Record<string, { median?: number; p10?: number; p90?: number }> } = {};
@@ -1386,23 +1427,38 @@ const ProfitPoolAnalysis2: FC<{
         force_decomposition[c.id] = rec;
       }
 
-      // ------ Contributing trends -- Bain-grade scaled attribution ------
-      // Raw per-trend contribution = gp1_shift × (exposure/5). We rescale
-      // so the sum matches the MC terminal median shift for this category,
-      // making each trend's contribution readable as 'pp of final shift'.
-      // attribution_share = |scaled| / sum(|scaled|) across contributing
-      // trends -- the denominator a Bain partner wants to see.
+      // ------ Contributing drivers -- attribution at the score means ------
+      // Since the PRISM Analysis rework (owner instruction 2026-09-17) the
+      // per-driver contribution is the engine's own arithmetic evaluated at
+      // the score means (lib/driverAttribution.ts, parity-pinned to the
+      // Python decomposition the readings are written on): force weight x
+      // attenuation x overlap correction x expected materialisation x
+      // category AND regional exposure, rolled up with the run's cell
+      // gross-profit shares. The drivers of a category are then rescaled so
+      // they add up to the category's MC terminal median (the published
+      // number), and attribution_share = |scaled| / sum(|scaled|).
+      // Fallback, only when the config layers or the run's cell weights are
+      // not available: the pre-2026-09-17 proxy, gp1_shift x category
+      // exposure / 5, labelled as such through `attribution_basis`.
       const cid = CATEGORIES.find((x) => x.name === c.id)?.id ?? c.id;
 
-      // Prefilter: trends that actually touch this category.
+      // Prefilter: drivers that actually touch this category.
       const filtered = (trends ?? []).filter((t) => {
         const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
         const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
         return exp > 0;
       });
 
-      // Raw directional contribution per trend.
+      // Raw directional contribution per driver. One basis per category: the
+      // exact decomposition for every driver when it is available, the proxy
+      // for every driver otherwise, never a mix of the two in one ranking.
+      const horizonYear = YEARS[YEARS.length - 1];
+      const useExact = exactAttribution != null;
       const rawContribs = filtered.map((t) => {
+        if (useExact) {
+          const exact = exactAttribution.byDriver[t.id]?.category?.[c.id]?.[horizonYear];
+          return typeof exact === 'number' && isFinite(exact) ? exact : 0;
+        }
         const exposureRaw = (t.category_exposure ?? {}) as Record<string, number>;
         const exp = exposureRaw[c.id] ?? exposureRaw[cid] ?? 0;
         const gp1Shift = (t as { gp1_shift?: number; normalized_score?: number }).gp1_shift
@@ -1410,6 +1466,10 @@ const ProfitPoolAnalysis2: FC<{
           ?? 0;
         return gp1Shift * (Math.max(0, Math.min(5, exp)) / 5);
       });
+      if (useExact) {
+        const approx = filtered.filter((t) => exactAttribution.byDriver[t.id]?.approximate).map((t) => t.id);
+        if (approx.length) approximate_drivers[c.id] = approx;
+      }
       const rawTotal = rawContribs.reduce((a, b) => a + b, 0);
 
       // MC terminal shift for this category (horizon end).
@@ -1454,8 +1514,10 @@ const ProfitPoolAnalysis2: FC<{
       // up, not the portfolio-wide column sums.
       cell_weights: simulation?.cell_weights_used ?? undefined,
       categories: cats,
-    };
-  }, [simulation, trends, selectedYear]);
+      attribution_basis: exactAttribution ? 'score_means' : 'exposure_proxy',
+      approximate_drivers,
+    } as const;
+  }, [simulation, trends, selectedYear, exactAttribution]);
 
   const meta = VIEW_META[view];
 

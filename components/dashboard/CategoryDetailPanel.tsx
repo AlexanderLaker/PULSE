@@ -60,7 +60,9 @@ interface Trend {
   exposure_level?: number;
   /** Scaled contribution to the MC terminal shift (percentage points, signed). */
   contribution?: number;
-  /** Pre-scaling contribution = gp1_shift x (exposure/5), for auditing. */
+  /** Pre-scaling contribution, for auditing: the driver's terminal-year
+   *  contribution to the category at the score means (lib/driverAttribution.ts),
+   *  or gp1_shift x (exposure/5) on the exposure-proxy fallback. */
   raw_contribution?: number;
   /** Absolute share of the category's explained movement (0..1). */
   attribution_share?: number;
@@ -81,6 +83,15 @@ interface CategoryDetailPanelData {
    *  normalised, is the weight set that produced ITS number. */
   cell_weights?: Record<string, Record<string, number>>;
   categories?: Array<{ id: string; name: string; group?: string }>;
+  /** How the contributing drivers were attributed (2026-09-17): 'score_means'
+   *  is the engine's arithmetic at the score means (lib/driverAttribution.ts,
+   *  the basis of the PRISM Analysis readings); 'exposure_proxy' is the older
+   *  gp1_shift x exposure / 5 proxy, used only when the config layers or the
+   *  run's cell weights are unavailable. */
+  attribution_basis?: 'score_means' | 'exposure_proxy';
+  /** Drivers taken at full materialisation because they carry no peak year
+   *  or diffusion curve (the port's `approximate` flag), by category. */
+  approximate_drivers?: { [categoryId: string]: string[] };
 }
 
 interface CategoryDetailPanelProps {
@@ -495,9 +506,12 @@ const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }
 //   "This trend — in one glance — how big is it, which way, and does it matter?"
 //
 // Hero metric is attribution_share (|scaled| / Σ|scaled|, sums to 100% across
-// the category's contributing trends). This is what turns a wall of 0.0% noise
+// the category's contributing drivers). This is what turns a wall of 0.0% noise
 // into a decision-ready ranking. Secondary metric is the signed contribution in
 // percentage points of MC terminal shift — same units as the matrix cell.
+// Since 2026-09-17 the contribution is the engine's arithmetic at the score
+// means (lib/driverAttribution.ts, rescaled to the row's median), the same
+// basis as the PRISM Analysis on the Drivers page; see `attribution_basis`.
 interface TrendCardProps {
   trend: Trend;
   index: number;
@@ -1292,6 +1306,14 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             />
             Shifts are cumulative vs 2025 from the Bayesian MC engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
+            {data?.attribution_basis === 'exposure_proxy'
+              ? ' Contributing drivers: exposure proxy (Shift \u00d7 category exposure), because the configuration layers or the run\u2019s cell weights were not available; the Drivers page reads are attributed at the score means.'
+              : data?.attribution_basis === 'score_means'
+                ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight \u00d7 attenuation \u00d7 overlap correction \u00d7 expected materialisation \u00d7 category and regional exposure, rolled up with the run\u2019s cell weights), rescaled here to the row\u2019s terminal-year median where the readings are reconciled to the portfolio median, so shares agree and points can differ by the row\u2019s own factor.'
+                : ''}
+            {data?.attribution_basis === 'score_means' && (data?.approximate_drivers?.[categoryId]?.length ?? 0) > 0
+              ? ` ${data.approximate_drivers?.[categoryId]?.length} driver(s) without a peak year or curve are taken at full materialisation.`
+              : ''}
           </footer>
         </div>
       </motion.aside>

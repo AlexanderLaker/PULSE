@@ -441,6 +441,68 @@ const SectionInfoTip: FC<{ text: string }> = ({ text }) => (
   </span>
 );
 
+// ─── PRISM Analysis — the per-driver reading (owner instruction 2026-09-17) ─
+// The reading is authored on the model's own attribution (docs/
+// DRIVER_ANALYSIS_CONCEPT.md): four labelled paragraphs and a basis line,
+// rendered from data/trend_base_2026-09/driver_analysis_v1.json into the
+// seed and the database. Paragraphs are separated by a blank line; a
+// paragraph that opens with one of the fixed labels gets the label set as a
+// small heading, the basis line ("Figures: ...") is set small and muted, and
+// anything else renders as plain prose, so an older single-paragraph text
+// still displays.
+const ANALYSIS_LABELS = ['Weight in the answer', 'Where it lands', 'When it lands', 'What the band hinges on'];
+const ANALYSIS_BASIS_LABEL = 'Figures';
+const ANALYSIS_PROVENANCE =
+  'Attribution at the score means, reconciled to the persisted run’s headline; a reading authored on those figures. Read as exposure if nobody acts, not as a forecast.';
+
+export function splitAnalysis(text: string | undefined | null): { label: string | null; body: string }[] {
+  const labels = [...ANALYSIS_LABELS, ANALYSIS_BASIS_LABEL];
+  return (text ?? '')
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const label = labels.find((l) => p.startsWith(`${l}:`));
+      return label ? { label, body: p.slice(label.length + 1).trim() } : { label: null, body: p };
+    });
+}
+
+const PrismAnalysisReading: FC<{ text?: string | null }> = ({ text }) => {
+  const paragraphs = splitAnalysis(text);
+  if (paragraphs.length === 0) {
+    return (
+      <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>
+        No PRISM Analysis available for this driver.
+      </span>
+    );
+  }
+  return (
+    <div data-testid="prism-analysis" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {paragraphs.map(({ label, body }, i) => (
+        label === ANALYSIS_BASIS_LABEL ? (
+          <p key={i} style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: S.mutedText, fontWeight: 500 }}>
+            <span style={{ fontWeight: 700 }}>{ANALYSIS_BASIS_LABEL}:</span> {body}
+          </p>
+        ) : (
+          <div key={i}>
+            {label && (
+              <div style={{
+                fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: S.primary, marginBottom: 4,
+              }}>
+                {label}
+              </div>
+            )}
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: S.onSurface, fontWeight: 450 }}>
+              {body}
+            </p>
+          </div>
+        )
+      ))}
+    </div>
+  );
+};
+
 // ─── Section Card — boxed card for each sub-section in the expanded panel ─
 interface SectionCardProps {
   title: string;
@@ -1183,10 +1245,10 @@ const ExpertInputPanel: FC<{ trend: Trend; onMyChange?: (trendId: string, my: Tr
             </p>
           </SectionCard>
 
-          <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
-            <blockquote style={{ margin: 0, padding: '12px 16px', borderRadius: 10, borderLeft: `3px solid ${S.primary}`, backgroundColor: S.surfaceLow, fontSize: 14, lineHeight: 1.55, color: S.onSurface, fontWeight: 500 }}>
-              {trend.strategic_implication || <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>No strategic implication documented.</span>}
-            </blockquote>
+          <SectionCard title="PRISM Analysis" icon={BarChart3} accent={S.primary} footnote={ANALYSIS_PROVENANCE}>
+            <div style={{ padding: '12px 16px', borderRadius: 10, borderLeft: `3px solid ${S.primary}`, backgroundColor: S.surfaceLow }}>
+              <PrismAnalysisReading text={trend.strategic_implication} />
+            </div>
           </SectionCard>
 
           <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the AI suggestion.">
@@ -2750,31 +2812,25 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ trend, isAdmin = false, updateT
             )}
           </SectionCard>
 
-          {/* PRISM Analysis is ALWAYS read-only — never editable by the admin */}
-          <SectionCard title="PRISM Analysis" icon={Sparkles} accent={S.primary}>
-            <blockquote style={{
-              margin: 0,
+          {/* PRISM Analysis is ALWAYS read-only — never editable by the admin.
+              The reading is regenerated from the attribution record
+              (scripts/build_driver_analysis.py) and moved into the database
+              by scripts/apply_driver_analysis.py, never typed here. */}
+          <SectionCard title="PRISM Analysis" icon={BarChart3} accent={S.primary} footnote={ANALYSIS_PROVENANCE}>
+            <div style={{
               padding: '12px 16px',
               borderRadius: 10,
               borderLeft: `3px solid ${S.primary}`,
               backgroundColor: S.surfaceLow,
-              fontSize: 14, lineHeight: 1.55,
-              color: S.onSurface,
-              fontStyle: 'normal',
-              fontWeight: 500,
             }}>
-              {trend.strategic_implication || (
-                <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>
-                  No strategic implication documented.
-                </span>
-              )}
-            </blockquote>
+              <PrismAnalysisReading text={trend.strategic_implication} />
+            </div>
             {isEditing && (
               <div style={{
                 marginTop: 8, fontSize: 11, letterSpacing: '0.06em',
                 textTransform: 'uppercase', color: S.mutedText, fontWeight: 700,
               }}>
-                PRISM Analysis is generated by the engine and is not editable.
+                The figures of the PRISM Analysis are regenerated from the model and the reading is authored on them; it is not editable here.
               </div>
             )}
           </SectionCard>

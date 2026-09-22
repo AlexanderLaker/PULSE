@@ -1,0 +1,337 @@
+/**
+ * driverAttribution.ts — per-driver attribution of the shift, the engine's
+ * own arithmetic evaluated at the score means (owner instruction 2026-09-17;
+ * docs/DRIVER_ANALYSIS_CONCEPT.md section 2).
+ *
+ * This is a port of the decomposition in scripts/build_driver_analysis.py,
+ * which the PRISM Analysis readings on the Drivers page are written on, so
+ * that the category drill-down ranks the contributing drivers with the same
+ * numbers a reading states. Both sides are pinned to one fixture
+ * (tests/frontend/fixtures/driverAttribution.fixture.json, written by the
+ * Python script; tests/frontend/driverAttribution.test.ts) and must never
+ * drift apart.
+ *
+ * Per driver j, composite cell (category c, region r) and path year y the
+ * additive term of the compounding factor is
+ *
+ *   a[j,c,r,y] = forceWeight[f] * attenuation[f] * dampening[f,c,r]
+ *              * normalizedScore[j] * E[materialisation_j(y)]
+ *              * categoryExposure[j,c]/5 * regionalExposure[j,r]/5
+ *
+ * with normalizedScore = Beta-prior mean (probability/6) x GP1 share x
+ * direction (the value the API serves) and the materialisation averaged over
+ * the driver's own peak-year jitter grid (O7). The force sums compound
+ * multiplicatively per cell; the second-order cross-terms are spread over
+ * the drivers of the cell in proportion to their additive terms so the
+ * drivers of a cell add up to the cell shift at the means. Roll-up as the
+ * engine does it (O6): category = share-weighted mean of the category's row
+ * of cell weights, portfolio = sum over cells of share x cell shift.
+ *
+ * Read as attribution (D6), never as a second simulation: the Monte Carlo
+ * medians of the persisted run stay the published numbers, and the panel
+ * scales the drivers of a category to that median.
+ */
+
+export const FORCES = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'] as const;
+export const REGIONS = ['Europe', 'North America', 'Asia', 'High Growth'] as const;
+export const PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+export const BASE_YEAR = 2025;
+/** pulse.config.UNCERTAINTY_PEAK_JITTER (O7): peak-year jitter width by uncertainty score. */
+export const UNCERTAINTY_PEAK_JITTER: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 };
+/** pulse.config.DEFAULT_PEAK_YEAR_JITTER: the width of an unscored driver (2.10.0 behaviour). */
+export const DEFAULT_PEAK_YEAR_JITTER = 1;
+
+export interface AttributionTrend {
+  id: string;
+  force: string;
+  /** Beta-prior mean x GP1 share x direction sign (the API's normalized_score). */
+  normalized_score: number;
+  category_exposure: Record<string, number>;
+  regional_exposure?: Record<string, number>;
+  uncertainty?: number | null;
+  peak_year?: number | null;
+  diffusion_curve?: string | null;
+  start_year?: number | null;
+}
+
+export interface AttributionConfig {
+  force_weights: Record<string, number>;
+  per_force_attenuation: Record<string, number>;
+  within_force_overlap: Record<string, number>;
+  base_year?: number;
+  path_years?: number[];
+  peak_year_jitter?: number;
+}
+
+export interface AttributionInputs {
+  trends: AttributionTrend[];
+  categories: string[];
+  config: AttributionConfig;
+  /** cellWeights[category][region]: the gross-profit share matrix the run used (any scale). */
+  cellWeights: Record<string, Record<string, number>>;
+}
+
+export interface DriverAttribution {
+  /** Contribution to the portfolio shift by year (fraction, signed). */
+  portfolio: Record<number, number>;
+  /** Contribution to each category's shift by year (fraction, signed). */
+  category: Record<string, Record<number, number>>;
+  /** True when the driver had no peak year or curve and full materialisation was assumed. */
+  approximate: boolean;
+}
+
+export interface AttributionResult {
+  years: number[];
+  byDriver: Record<string, DriverAttribution>;
+  /** The cell shifts at the means, rolled up: category and portfolio by year. */
+  categoryShift: Record<string, Record<number, number>>;
+  portfolioShift: Record<number, number>;
+}
+
+/**
+ * Python's round(x, 4) on the schedule values. Python rounds the exact
+ * binary value of x * 1e4 and breaks a true tie half to even; the two agree
+ * on every value a diffusion curve can produce here (the only exact tie, the
+ * step curve at t = 7/8, evaluates below the tie in both), which the parity
+ * fixture replays.
+ */
+function roundHalfEven4(x: number): number {
+  const scaled = x * 1e4;
+  const floor = Math.floor(scaled);
+  const diff = scaled - floor;
+  let r: number;
+  if (diff > 0.5) r = floor + 1;
+  else if (diff < 0.5) r = floor;
+  else r = floor % 2 === 0 ? floor : floor + 1;
+  return r / 1e4;
+}
+
+/**
+ * pulse.config.compute_materialization_schedule, ported line by line.
+ * Returns year -> fraction in [0, 1].
+ */
+export function computeMaterializationSchedule(
+  peakYear: number, diffusionCurve: string, years: number[], baseYear: number, startYear?: number | null,
+): Record<number, number> {
+  const onset = startYear == null ? baseYear : Math.max(baseYear, Math.trunc(startYear));
+  const last = years[years.length - 1];
+  const py = peakYear && peakYear > onset ? peakYear : (last > onset ? last : onset + 1);
+  const schedule: Record<number, number> = {};
+  for (const year of years) {
+    if (year >= py) { schedule[year] = 1.0; continue; }
+    if (year <= onset) { schedule[year] = 0.0; continue; }
+    const span = Math.max(py - onset, 1);
+    const t = Math.max(0.0, Math.min(1.0, (year - onset) / span));
+    let frac: number;
+    if (diffusionCurve === 'linear') frac = t;
+    else if (diffusionCurve === 'front_loaded') frac = Math.sqrt(t);
+    else if (diffusionCurve === 'back_loaded') frac = t * t;
+    else if (diffusionCurve === 'step_function') frac = t < 0.8 ? 0.05 : 0.05 + ((t - 0.8) / 0.2) * 0.95;
+    else {
+      frac = 1.0 / (1.0 + Math.exp(-12 * (t - 0.5)));
+      const f0 = 1.0 / (1.0 + Math.exp(-12 * (0 - 0.5)));
+      const f1 = 1.0 / (1.0 + Math.exp(-12 * (1 - 0.5)));
+      frac = (frac - f0) / (f1 - f0);
+    }
+    schedule[year] = roundHalfEven4(Math.max(0.0, Math.min(1.0, frac)));
+  }
+  return schedule;
+}
+
+/** pulse.config.peak_jitter_for: the driver's own width, else the global one. */
+export function peakJitterFor(uncertainty: number | null | undefined, globalJitter: number): number {
+  const g = Math.trunc(globalJitter || 0);
+  if (g <= 0) return 0;
+  if (uncertainty == null) return g;
+  const u = Math.max(0, Math.min(5, Math.trunc(uncertainty)));
+  return UNCERTAINTY_PEAK_JITTER[u];
+}
+
+/**
+ * The expected materialisation of one driver per path year: its schedule
+ * averaged over the symmetric triangular peak-jitter grid, with the jittered
+ * peak clamped at onset + 1 exactly as `_peak_schedule_table` does.
+ */
+export function expectedMaterialisation(
+  t: AttributionTrend, years: number[], baseYear: number, globalJitter: number,
+): { byYear: number[]; approximate: boolean } {
+  const jt = peakJitterFor(t.uncertainty, globalJitter);
+  const offsets: number[] = [];
+  for (let o = -jt; o <= jt; o++) offsets.push(o);
+  const weights = offsets.map((o) => (jt <= 0 ? 1 : Math.max(0, jt + 1 - Math.abs(o))));
+  const wsum = weights.reduce((a, b) => a + b, 0);
+  const sy = t.start_year == null ? null : Math.trunc(t.start_year);
+  const onset = sy == null ? baseYear : Math.max(baseYear, sy);
+  const basePk = t.peak_year ?? 0;
+  const dc = t.diffusion_curve ?? '';
+  const byYear = years.map(() => 0);
+  let approximate = false;
+  offsets.forEach((off, k) => {
+    const w = weights[k] / wsum;
+    if (w === 0) return;
+    let sched: Record<number, number>;
+    if (basePk > 0 && dc) {
+      const pk = Math.max(basePk + off, onset + 1);
+      sched = computeMaterializationSchedule(pk, dc, years, baseYear, sy);
+    } else {
+      // The engine falls back to its force-level schedule table for such a
+      // driver; the panel assumes full materialisation after the onset and
+      // flags the driver as approximate.
+      approximate = true;
+      sched = {};
+      years.forEach((yr) => { sched[yr] = yr > onset ? 1.0 : 0.0; });
+    }
+    years.forEach((yr, i) => { byYear[i] += w * (sched[yr] ?? 1.0); });
+  });
+  return { byYear, approximate };
+}
+
+/** An exposure score as the engine reads it: min(x, 5) / 5, a missing or
+ *  non-numeric score as 0 (the engine does not floor a negative score either;
+ *  scores are validated to 0..5 before they reach it). */
+function clamp5(v: number | undefined): number {
+  const x = Number(v ?? 0);
+  if (!isFinite(x)) return 0;
+  return Math.min(x, 5) / 5;
+}
+
+/**
+ * The decomposition. Every driver's additive term is exact at the means; the
+ * cross-terms of the multiplicative compounding are spread proportionally.
+ */
+export function computeDriverAttribution(inputs: AttributionInputs): AttributionResult {
+  const { trends, categories, config, cellWeights } = inputs;
+  const years = config.path_years?.length ? config.path_years.map(Number) : PATH_YEARS;
+  const baseYear = config.base_year ?? BASE_YEAR;
+  const globalJitter = config.peak_year_jitter ?? DEFAULT_PEAK_YEAR_JITTER;
+  const forces = [...FORCES] as string[];
+  const regions = [...REGIONS] as string[];
+  const nCat = categories.length, nReg = regions.length, nCell = nCat * nReg, nYear = years.length;
+  const n = trends.length;
+
+  const fw = forces.map((f) => config.force_weights?.[f] ?? 1 / forces.length);
+  const att = forces.map((f) => config.per_force_attenuation?.[f] ?? 0);
+  const fidx = trends.map((t) => Math.max(0, forces.indexOf(t.force)));
+
+  // F1: composite cell exposure (a region-less driver counts as globally present, as the engine does).
+  const E: number[][] = trends.map((t) => {
+    const reg = t.regional_exposure ?? {};
+    let rv = regions.map((r) => clamp5(reg[r]));
+    if (rv.reduce((a, b) => a + b, 0) <= 0) rv = regions.map(() => 1);
+    const row = new Array<number>(nCell).fill(0);
+    categories.forEach((cat, c) => {
+      const ce = clamp5(t.category_exposure?.[cat]);
+      if (ce <= 0) return;
+      for (let r = 0; r < nReg; r++) row[c * nReg + r] = ce * rv[r];
+    });
+    return row;
+  });
+
+  // F2: magnitude-weighted within-force dampening per (force, cell).
+  const absScore = trends.map((t) => Math.abs(Number(t.normalized_score ?? 0)));
+  const damp: number[][] = forces.map(() => new Array<number>(nCell).fill(1));
+  forces.forEach((force, f) => {
+    const ov = config.within_force_overlap?.[force] ?? 0;
+    if (ov <= 0) return;
+    for (let cell = 0; cell < nCell; cell++) {
+      let s1 = 0, s2 = 0;
+      trends.forEach((_, j) => {
+        if (fidx[j] !== f) return;
+        const m = absScore[j] * E[j][cell];
+        s1 += m; s2 += m * m;
+      });
+      const nEff = s2 > 0 ? (s1 * s1) / s2 : 0;
+      const d = nEff > 1 ? 1 - ov * (nEff - 1) / Math.max(nEff, 1) : 1;
+      damp[f][cell] = Math.min(1, Math.max(0.1, d));
+    }
+  });
+
+  // F4/F11/O7: expected materialisation per driver and year.
+  const mats = trends.map((t) => expectedMaterialisation(t, years, baseYear, globalJitter));
+
+  // Additive terms, force sums, compounding and the proportional spread.
+  const score = trends.map((t) => Number(t.normalized_score ?? 0));
+  const A: number[][][] = trends.map((_, j) => {
+    const f = fidx[j];
+    const k = fw[f] * att[f] * score[j];
+    return Array.from({ length: nCell }, (__, cell) =>
+      years.map((___, y) => k * damp[f][cell] * E[j][cell] * mats[j].byYear[y]));
+  });
+  const cellShift: number[][] = Array.from({ length: nCell }, () => new Array<number>(nYear).fill(0));
+  const spread: number[][] = Array.from({ length: nCell }, () => new Array<number>(nYear).fill(1));
+  for (let cell = 0; cell < nCell; cell++) {
+    for (let y = 0; y < nYear; y++) {
+      const forceSum = new Array<number>(forces.length).fill(0);
+      for (let j = 0; j < n; j++) forceSum[fidx[j]] += A[j][cell][y];
+      let prod = 1, additive = 0;
+      forceSum.forEach((s) => { prod *= Math.max(0, 1 + s); additive += s; });
+      cellShift[cell][y] = prod - 1;
+      spread[cell][y] = Math.abs(additive) > 1e-15 ? cellShift[cell][y] / additive : 1;
+    }
+  }
+
+  // O6 roll-up weights.
+  const W = new Array<number>(nCell).fill(0);
+  categories.forEach((cat, c) => regions.forEach((r, ri) => {
+    W[c * nReg + ri] = Math.max(0, Number(cellWeights?.[cat]?.[r] ?? 0));
+  }));
+  const wTotal = W.reduce((a, b) => a + b, 0);
+  const w = wTotal > 0 ? W.map((v) => v / wTotal) : W.map(() => 1 / nCell);
+  const wn = new Array<number>(nCell).fill(0);
+  categories.forEach((_, c) => {
+    let rowSum = 0;
+    for (let r = 0; r < nReg; r++) rowSum += w[c * nReg + r];
+    for (let r = 0; r < nReg; r++) wn[c * nReg + r] = rowSum > 0 ? w[c * nReg + r] / rowSum : 1 / nReg;
+  });
+
+  const byDriver: Record<string, DriverAttribution> = {};
+  trends.forEach((t, j) => {
+    const portfolio: Record<number, number> = {};
+    const category: Record<string, Record<number, number>> = {};
+    years.forEach((yr, y) => {
+      let p = 0;
+      for (let cell = 0; cell < nCell; cell++) p += A[j][cell][y] * spread[cell][y] * w[cell];
+      portfolio[yr] = p;
+    });
+    categories.forEach((cat, c) => {
+      const row: Record<number, number> = {};
+      years.forEach((yr, y) => {
+        let v = 0;
+        for (let r = 0; r < nReg; r++) {
+          const cell = c * nReg + r;
+          v += A[j][cell][y] * spread[cell][y] * wn[cell];
+        }
+        row[yr] = v;
+      });
+      category[cat] = row;
+    });
+    byDriver[t.id] = { portfolio, category, approximate: mats[j].approximate };
+  });
+
+  const categoryShift: Record<string, Record<number, number>> = {};
+  const portfolioShift: Record<number, number> = {};
+  years.forEach((yr, y) => {
+    let p = 0;
+    for (let cell = 0; cell < nCell; cell++) p += cellShift[cell][y] * w[cell];
+    portfolioShift[yr] = p;
+  });
+  categories.forEach((cat, c) => {
+    const row: Record<number, number> = {};
+    years.forEach((yr, y) => {
+      let v = 0;
+      for (let r = 0; r < nReg; r++) v += cellShift[c * nReg + r][y] * wn[c * nReg + r];
+      row[yr] = v;
+    });
+    categoryShift[cat] = row;
+  });
+
+  return { years, byDriver, categoryShift, portfolioShift };
+}
+
+/** True when the config carries every layer the decomposition needs. */
+export function canAttribute(config: Partial<AttributionConfig> | null | undefined): config is AttributionConfig {
+  if (!config) return false;
+  const has = (rec: Record<string, number> | undefined) =>
+    !!rec && FORCES.every((f) => typeof rec[f] === 'number' && isFinite(rec[f]));
+  return has(config.force_weights) && has(config.per_force_attenuation) && has(config.within_force_overlap);
+}

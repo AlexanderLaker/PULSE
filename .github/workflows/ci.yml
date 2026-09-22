@@ -45,3 +45,9 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest tests/ -q
+      # The generated artefacts must be what the generators produce (the
+      # pytest suite covers each of these too; the explicit steps make a
+      # stale committed file readable in the job log by name).
+      - run: python scripts/generate_seed_from_core_set.py --check
+      - run: python scripts/build_estimated_cell_weights.py --check
+      - run: python scripts/build_driver_analysis.py --check

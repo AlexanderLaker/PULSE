@@ -52,7 +52,7 @@ Everything below is the live product unless the last column says otherwise.
 | `lib/` | Server helpers (`roles.ts`, `db.ts`, `prismJwt.ts`) plus the lint-enforced single sources for shift math (`shiftMatrix.ts`) and display (`format.ts`). | **Yes — auth + DB** |
 | `types/` | Shared TypeScript types, including the simulation result contract. | Useful |
 | `data/` | Static front-end content (`consumerJourney.ts`, `trendCodeMap.ts`), the attenuation calibration JSON/XLSX, and `prism.db` — a **local SQLite fallback only**, never production. | Read the note |
-| `scripts/` | `run_50k_prod.py` (the canonical production run), two one-shot DB migrations, `promote_admin.py`, the shift-matrix lint guard, and `package_handover.sh`. `scripts/archive/` holds spent migrations. | **Yes — the job** |
+| `scripts/` | `run_50k_prod.py` (the canonical production run), the generators with their `--check` gates (`generate_seed_from_core_set.py`, `build_estimated_cell_weights.py`, `build_driver_analysis.py`), the archive-first content scripts (`replace_trend_base.py`, `apply_driver_vocabulary.py`, `apply_driver_analysis.py`), two one-shot DB migrations, `promote_admin.py`, the shift-matrix lint guard, and `package_handover.sh`. `scripts/archive/` holds spent migrations. | **Yes — the job** |
 | `tests/` | 7 pytest modules + `conftest.py` (engine, API, ops, golden pins) and 10 vitest specs under `tests/frontend/`. | **Yes — your safety net** |
 | `docs/` | Engineering docs plus `docs/governance/` — the decision log and findings register. Code comments cite these by finding ID. | Yes, see §5 |
 | `.github/workflows/ci.yml` | Two CI jobs: frontend (typecheck + lint + vitest) and engine (pytest **with** scipy). | **Yes — CI** |

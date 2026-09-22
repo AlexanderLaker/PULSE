@@ -3,17 +3,30 @@
 Generate the trend base of release 2.11.0 from the reviewed core set.
 
 Inputs (both in the repository so the base is reproducible):
-  data/trend_base_2026-09/core_set_51_v5.json   the 51 reviewed drivers
+  data/trend_base_2026-09/core_set_51_v6.json   the 51 reviewed drivers
                                                 (senior-partner review,
                                                 2/3 September 2026, v3;
                                                 v4 added the TOI column,
                                                 O13; v5 rewords four
                                                 texts to the Driver
-                                                vocabulary, O15)
+                                                vocabulary, O15; v6 takes
+                                                the review's own notes out
+                                                of 34 descriptions, O16)
   data/trend_base_2026-09/verdicts_99_v1.json   the disposition of every
                                                 code of the 99-trend base
                                                 (KEEP / MERGE INTO /
                                                 SUBSTITUTE / DELETE / NEW)
+  data/trend_base_2026-09/driver_analysis_v1.json
+                                                the PRISM Analysis of every
+                                                driver (owner instruction of
+                                                2026-09-17): an authored
+                                                template per driver and the
+                                                text rendered from it on the
+                                                attribution record
+                                                driver_attribution_v1.json by
+                                                scripts/build_driver_analysis.py;
+                                                the rendered text becomes
+                                                strategic_implication
 
 Outputs (committed, never hand-edited):
   pulse/seed_trends.py      the seed module (Trend rows + SOURCE_URLS +
@@ -60,8 +73,10 @@ sys.path.insert(0, str(ROOT))
 
 from pulse.config import CATEGORIES, REGIONS, VC_STEPS, vc_epicentre_step_of  # noqa: E402
 
-CORE_SET = ROOT / "data" / "trend_base_2026-09" / "core_set_51_v5.json"
+CORE_SET = ROOT / "data" / "trend_base_2026-09" / "core_set_51_v6.json"
 VERDICTS = ROOT / "data" / "trend_base_2026-09" / "verdicts_99_v1.json"
+ANALYSIS = ROOT / "data" / "trend_base_2026-09" / "driver_analysis_v1.json"
+ATTRIBUTION = ROOT / "data" / "trend_base_2026-09" / "driver_attribution_v1.json"
 SEED_OUT = ROOT / "pulse" / "seed_trends.py"
 CODEMAP_OUT = ROOT / "data" / "trendCodeMap.ts"
 
@@ -93,13 +108,6 @@ def q(s) -> str:
     return json.dumps("" if s is None else str(s), ensure_ascii=False)
 
 
-def sentence(s: str) -> str:
-    s = (s or "").strip()
-    if s and s[-1] not in ".!?":
-        s += "."
-    return s
-
-
 def first_sentence(text: str, cap: int = 220) -> str:
     text = (text or "").strip()
     m = re.search(r"(?<=[.!?])\s+(?=[A-Z0-9])", text)
@@ -128,25 +136,32 @@ def canonical_vc_profile(epicentre: str) -> dict:
     return out
 
 
-def score_note(prefix: str, note: str) -> str:
-    """'5: the shift is observed ...' -> 'Probability 5 of 5: the shift ...'."""
-    m = re.match(r"^\s*(\d)\s*[:\-–]\s*(.*)$", note or "", re.S)
-    if m:
-        return sentence(f"{prefix} {m.group(1)} of 5: {m.group(2).strip()}")
-    return sentence(f"{prefix}: {note.strip()}") if note else ""
+def load_analysis() -> dict:
+    """The PRISM Analysis texts keyed by display code, verified against the
+    attribution record they were rendered on (the same renderer, no engine):
+    a template edited without regenerating, or a record regenerated without
+    re-rendering, stops the generator here rather than shipping a stale text."""
+    from scripts.driver_analysis_render import render_all
+    analysis = json.loads(ANALYSIS.read_text(encoding="utf-8"))
+    record = json.loads(ATTRIBUTION.read_text(encoding="utf-8"))
+    rendered = render_all(record, analysis)          # {trend id: text}
+    id_of = {d["code"]: tid for tid, d in record["drivers"].items()}
+    texts = {}
+    for code, entry in analysis["drivers"].items():
+        expected = rendered[id_of[code]]
+        if entry.get("text") != expected:
+            raise SystemExit(
+                f"{ANALYSIS.relative_to(ROOT)}: the text of {code} is not the rendering of its "
+                f"template on {ATTRIBUTION.relative_to(ROOT)}; run scripts/build_driver_analysis.py")
+        texts[code] = expected
+    return texts
 
 
-def implication_text(r: dict) -> str:
-    n = r.get("param_notes") or {}
-    parts = [
-        sentence(f"Mechanism: {r['mech']}"),
-        score_note("Probability", n.get("prob_note", "")),
-        sentence(f"Exposure: {n.get('exp_note', '')}") if n.get("exp_note") else "",
-        sentence(f"Timing: {n.get('time_note', '')}") if n.get("time_note") else "",
-        score_note("Uncertainty", n.get("unc_note", "")),
-        sentence(f"What changed in the September 2026 review: {r['change']}") if r.get("change") else "",
-    ]
-    return " ".join(p for p in parts if p)
+def analysis_text(r: dict, texts: dict) -> str:
+    try:
+        return texts[r["code"]]
+    except KeyError:
+        raise SystemExit(f"{ANALYSIS.relative_to(ROOT)}: no PRISM Analysis for driver {r['code']}") from None
 
 
 def data_source_text(r: dict) -> str:
@@ -335,7 +350,7 @@ if __name__ == "__main__":
 '''
 
 
-def render_seed(recs: list[dict], verdicts: dict) -> str:
+def render_seed(recs: list[dict], verdicts: dict, texts: dict) -> str:
     by_force = collections.Counter(r["force"] for r in recs)
     by_dir = collections.Counter(r["direction"] for r in recs)
     kept = sum(1 for r in recs if verdicts.get(r["review_code"], {}).get("verdict") == "KEEP")
@@ -350,7 +365,7 @@ def render_seed(recs: list[dict], verdicts: dict) -> str:
     a("PRISM seed data: 51 drivers (release 2.11.0 trend base, September 2026).")
     a("")
     a("GENERATED by scripts/generate_seed_from_core_set.py from")
-    a("data/trend_base_2026-09/core_set_51_v5.json (the reviewed core set of the")
+    a("data/trend_base_2026-09/core_set_51_v6.json (the reviewed core set of the")
     a("senior-partner trend-base review, 2/3 September 2026, v3) and")
     a("data/trend_base_2026-09/verdicts_99_v1.json (the disposition of every code")
     a("of the 99-trend base). Do not hand-edit: change the JSON, re-run the")
@@ -453,7 +468,7 @@ def render_seed(recs: list[dict], verdicts: dict) -> str:
         a(f"        direction={q(r['direction'])}, probability={int(r['prob'])}, start_year={int(r['start'])},")
         a(f"        gp1_pct_affected={float(r['gp1'])!r}, peak_year={int(r['peak'])}, diffusion_curve={q(r['curve'])},")
         a(f"        uncertainty={int(r['uncertainty']['score'])},")
-        a(f"        strategic_implication={q(implication_text(r))},")
+        a(f"        strategic_implication={q(analysis_text(r, texts))},")
         a("        category_exposure=cat(" + ", ".join(str(int(c[k])) for k in CATEGORIES) + "),")
         a(f"        vc_exposure=vc(" + ", ".join(str(int(v[k])) for k in VC_STEPS) + f"),  # epicentre {r['vc_epicentre']}")
         a("        regional_exposure=reg(" + ", ".join(str(int(g[k])) for k in REGIONS) + "),")
@@ -632,7 +647,8 @@ def generate() -> tuple[str, str, list[dict], dict]:
     order = {f: i for i, f in enumerate(FORCE_ORDER)}
     recs.sort(key=lambda r: (order[r["force"]], r["id"]))
     retired = build_retired(recs, verdicts)
-    return render_seed(recs, verdicts), render_codemap(recs, retired), recs, retired
+    texts = load_analysis()
+    return render_seed(recs, verdicts, texts), render_codemap(recs, retired), recs, retired
 
 
 def main() -> int:

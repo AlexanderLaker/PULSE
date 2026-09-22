@@ -11,10 +11,19 @@ including the Postgres-style ON DELETE CASCADE on expert proposals.
 carries THIRTEEN category-exposure rows. The drivers themselves (population,
 codes, probabilities, regional exposures) are unchanged by the split.
 
-Owner ruling O15 (2026-09-16): the generator reads core_set_51_v5.json, which
-is v4 with four texts reworded to the Driver vocabulary (C-03, C-27, C-35,
-G-15). tests/test_driver_vocabulary.py locks that v5 differs from v4 in exactly
+Owner ruling O15 (2026-09-16): core_set_51_v5.json is v4 with four texts
+reworded to the Driver vocabulary (C-03, C-27, C-35, G-15).
+tests/test_driver_vocabulary.py locks that v5 differs from v4 in exactly
 those four fields.
+
+Owner instruction O16 (2026-09-17): the generator reads core_set_51_v6.json,
+which is v5 with the review's own notes ("the old base assumed ...", "could
+not be verified", ...) taken out of 40 descriptions: the Description card a
+reader sees on the Drivers page describes the driver as it stands, like the
+PRISM Analysis beneath it. The review record stays in the `change` field,
+which nothing renders. `test_v6_is_v5_with_the_review_notes_out_of_the_descriptions`
+locks that v6 differs from v5 in the `desc` field only and that no
+description refers to the review.
 """
 
 import importlib.util
@@ -32,7 +41,7 @@ from pulse import seed_trends
 
 REPO = Path(__file__).resolve().parent.parent
 CODEMAP = REPO / "data" / "trendCodeMap.ts"
-CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v5.json"
+CORE_SET = REPO / "data" / "trend_base_2026-09" / "core_set_51_v6.json"
 LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G",
           "Environmental": "E", "Competitive": "X"}
 SLUG = {"Consumer": "consumer", "Customer": "customer", "Technology": "technology",
@@ -105,6 +114,33 @@ class TestSeedIntegrity:
             assert len(review["category_exposure"]) == 13, t.id  # the v4 column
             assert t.category_exposure == review["category_exposure"]
             assert t.regional_exposure == review["regional_exposure"]
+
+    def test_v6_is_v5_with_the_review_notes_out_of_the_descriptions(self):
+        """O16: the Description card describes the driver as it stands. v6
+        differs from v5 in the `desc` field only (40 drivers), no description
+        refers to the review or to the earlier base, and the review's own
+        record survives untouched in the `change` field."""
+        v5 = {d["code"]: d for d in json.loads((CORE_SET.parent / "core_set_51_v5.json").read_text(encoding="utf-8"))}
+        v6 = {d["code"]: d for d in json.loads(CORE_SET.read_text(encoding="utf-8"))}
+        assert v5.keys() == v6.keys()
+        changed = []
+        for code, d in v6.items():
+            for field in d:
+                if d[field] != v5[code][field]:
+                    assert field == "desc", (code, field)
+                    changed.append(code)
+        assert len(changed) == 40, sorted(changed)
+        review = re.compile(r"old base|previous base|earlier base|the old [A-Z]-\d\d|old '|report mill|could not be "
+                            r"(?:verified|found)|was wrong|were wrong|is wrong|the review\b|September 2026 review|unsourced|"
+                            r"unsupported|unverified|unconfirmed|is dropped|verified deadlines|mislabelled|wrong sign|"
+                            r"deleted\)|\bstale\b|no (?:tier-1 )?source|is not supported|had no source|genuinely missing|"
+                            r"\d+%, not \d+%|standalone \d\.\d+ GP1|correct sign|often-quoted|was Grand View", re.I)
+        offenders = [(code, m.group(0)) for code, d in v6.items() for m in review.finditer(d["desc"])]
+        assert offenders == []
+        assert all(v6[code]["change"] == v5[code]["change"] for code in v6)
+        # the seed carries v6's descriptions, and no description a reader sees refers to the review
+        for t in seed_trends.get_report_trends():
+            assert not review.search(t.description), t.id
 
     def test_committed_outputs_match_the_generator(self):
         r = subprocess.run([sys.executable, str(REPO / "scripts" / "generate_seed_from_core_set.py"), "--check"],
