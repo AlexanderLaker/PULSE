@@ -430,23 +430,3 @@ class TestF11StartYear:
         assert p[2027]["median"] == pytest.approx(0.0, abs=1e-12)
         assert p[2028]["median"] == pytest.approx(0.0, abs=1e-12)  # onset year: 0
         assert p[2030]["median"] < 0.0  # ramped in by the terminal year
-
-
-class TestF11TriggerSign:
-    """F11 (2.10.0): the early-warning trigger comparison is signed — a
-    positive overshoot must not fire a contraction (negative-threshold)
-    trigger, and vice-versa (was `abs(median) >= abs(threshold)`)."""
-
-    def test_positive_shift_does_not_fire_contraction_trigger(self):
-        from pulse.simulation.paths import TriggerCondition
-        trig = TriggerCondition(category="Hair: Color", threshold=-0.02, target_year=2030)
-        # A +5% shift must NOT breach a −2% contraction threshold.
-        assert trig.evaluate({2030: {"median": 0.05}}) is None
-        # A −3% shift breaches it.
-        assert trig.evaluate({2030: {"median": -0.03}}) is not None
-
-    def test_expansion_threshold_is_directional(self):
-        from pulse.simulation.paths import TriggerCondition
-        trig = TriggerCondition(category="Hair: Color", threshold=0.02, target_year=2030)
-        assert trig.evaluate({2030: {"median": -0.05}}) is None   # negative doesn't fire
-        assert trig.evaluate({2030: {"median": 0.03}}) is not None

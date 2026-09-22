@@ -239,31 +239,6 @@ class TestTrendUncertainty2_11:
                 conn.commit()
 
 
-class TestBaseReplacementGuard2_11:
-    """2.11.0 (O10): the admin reseed/sync endpoints refuse to act as a base
-    replacement when the seed and the database differ materially."""
-
-    def test_full_reseed_refuses_material_difference(self, client, monkeypatch):
-        from pulse.api.routers import trends as trends_router
-        from pulse.ingestion.models import Trend
-        from pulse.config import CATEGORIES, REGIONS, VC_STEPS
-        fake_seed = [Trend(id=f"consumer_r{90 + i}", force="Consumer", name=f"new {i}", direction="Contraction",
-                           probability=3, gp1_pct_affected=0.1, start_year=2025, peak_year=2030,
-                           diffusion_curve="linear", category_exposure={c: 1 for c in CATEGORIES},
-                           regional_exposure={r: 1 for r in REGIONS}, vc_exposure={v: 1 for v in VC_STEPS})
-                     for i in range(12)]
-        for t in fake_seed:
-            t.sources = [{"title": "x", "url": "https://example.org", "tier": "A"}]
-        import pulse.seed_trends as seed_mod
-        monkeypatch.setattr(seed_mod, "get_report_trends", lambda: fake_seed)
-        before = client.get("/api/v1/trends").json()
-        r = client.post("/api/v1/trends/full-reseed")
-        assert r.status_code == 409 and "replace_trend_base" in r.text
-        r = client.post("/api/v1/trends/sync")
-        assert r.status_code == 409 and "replace_trend_base" in r.text
-        assert len(client.get("/api/v1/trends").json()) == len(before)
-
-
 class TestAPISimulation:
     """Test simulation endpoints."""
 

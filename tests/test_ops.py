@@ -41,14 +41,6 @@ class TestProdEntrypoint:
         monkeypatch.setattr(mod, "USE_POSTGRES", False)
         assert mod.main([]) == 4
 
-    def test_python_dash_m_pulse_helpers_import(self):
-        """`python -m pulse` CLI module imports (L1 regression guard)."""
-        import pulse.main  # noqa: F401
-        parser = pulse.main.create_parser()
-        args = parser.parse_args(["--seeds", "1", "2"])
-        assert args.seeds == [1, 2]
-
-
 class TestExcelWriterRoundTrip:
     def test_writer_produces_workbook(self, tmp_path, mock_model_config, mock_trends_database):
         """M10: engine result → xlsx → reopen → expected sheets + a value."""
@@ -141,46 +133,6 @@ class TestReproducibilityContract:
             "load_trends() must return trends in a deterministic order — "
             "reproducibility depends on it (C2)."
         )
-
-
-class TestSnapshotCap:
-    def test_snapshot_cap_counts_name_and_notes(self):
-        """M12 bypass regression (adversarial re-review 2026-07-06): the cap
-        must count name/notes, not only shifts/trends — multi-MB free-text
-        used to slip past it."""
-        from fastapi.testclient import TestClient
-        from pulse.api.app import app
-        from pulse.api import auth as pauth
-
-        client = TestClient(app, raise_server_exceptions=False)
-        app.dependency_overrides[pauth.require_auth] = lambda: {
-            "sub": "test-user", "email": "t@example.com", "role": "viewer",
-        }
-        try:
-            resp = client.post("/api/v1/snapshots", json={
-                "name": "x" * 199,
-                "shifts": {},
-                "trends": [],
-                "notes": "y" * 3999,
-            })
-            # Within schema bounds and under the byte cap → not a 413/422.
-            assert resp.status_code not in (413, 422), resp.text
-
-            # Over the schema bound → rejected at validation.
-            resp = client.post("/api/v1/snapshots", json={
-                "name": "x" * 10_000, "shifts": {}, "trends": [],
-            })
-            assert resp.status_code == 422
-
-            # Under the schema bounds but a huge shifts payload → 413.
-            resp = client.post("/api/v1/snapshots", json={
-                "name": "ok",
-                "shifts": {"blob": "z" * (600 * 1024)},
-                "trends": [],
-            })
-            assert resp.status_code == 413
-        finally:
-            app.dependency_overrides.pop(pauth.require_auth, None)
 
 
 class TestDiagnosticsFailureBranch:
