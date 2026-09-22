@@ -1,80 +1,48 @@
 /**
- * Sign-up page — clean editorial surface, gated by a shared access code.
+ * Sign-up: the same surface as the sign-in page (wordmark, one plain card,
+ * Clerk's frames flattened), with an access-code gate in front of Clerk's
+ * <SignUp />.
  *
- * Mirrors app/sign-in/[[...sign-in]]/page.tsx exactly so the two
- * auth surfaces feel identical. PRISM wordmark above the card,
- * single flat white card below, Clerk's inner frame + stripes
- * neutralised.
+ * Clerk has no shared invite code for self-service sign-up, so the page asks
+ * for the code the early-access cohort received (NEXT_PUBLIC_SIGNUP_CODE,
+ * 'HCB2026' by default) before it shows the form. It is a soft gate: the
+ * code sits in the client bundle, which is enough for an internal MVP. A
+ * stronger gate would check the code in a server route that issues a signed,
+ * short-lived cookie.
  *
- * ─── Access-code gate ──────────────────────────────────────────────
- * Clerk does not natively support a shared "invite code" for self
- * service sign-up. We add a thin gate in front of <SignUp>: the user
- * must enter the code we've shared with the early-access cohort
- * (default 'HCB2026', overridable via NEXT_PUBLIC_SIGNUP_CODE) before
- * the Clerk form appears.
- *
- * Note this is a soft gate — anyone who reads the bundled JS could
- * still find the literal code. For internal MVP gating that's fine;
- * if we need stronger guarantees we can move the check to a server
- * route that issues a signed, short-lived cookie.
- *
- * Role assignment happens server-side via the Clerk webhook
- * (app/api/webhooks/clerk/route.ts) — first user in user_roles becomes
- * admin, everyone else viewer.
+ * The Clerk webhook (app/api/webhooks/clerk/route.ts) assigns the role: the
+ * first user becomes admin, everyone after that viewer.
  */
 'use client';
 
 import Link from 'next/link';
-import { useState, useSyncExternalStore, FormEvent } from 'react';
+import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
-// ─── Editorial design tokens ──────────────────────────────────────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  surfaceContainer:   '#e5eeff',
-  primary:            '#005db5',
-  primaryDim:         '#0052a0',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-  outlineVariant:     '#81b5f6',
-  cardBorder:         'rgba(0, 52, 94, 0.10)',
-  danger:             '#b3261e',
-};
+/** The access-code gate's error red. */
+const DANGER = '#b3261e';
 
-const HEADLINE_FONT =
-  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT =
-  "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-
-// Build-time injected — NEXT_PUBLIC_* envs are baked into the client
-// bundle. Default to 'HCB2026' for the current cohort.
+// NEXT_PUBLIC_* variables are baked into the client bundle at build time.
 const REQUIRED_CODE =
   (process.env.NEXT_PUBLIC_SIGNUP_CODE || 'HCB2026').trim();
 
 const UNLOCK_KEY = 'prism.signupCodeOk.v1';
 
-/** SSR-safe read of the unlock flag. The server (and the hydration pass)
- *  always report "locked", so the gate is what renders until the browser
- *  snapshot takes over — the job the old `hydrated` state flag did.
- *  Storage failures (privacy mode) read as locked, keeping the gate up. */
+/** Whether this browser session has passed the gate. Unreadable storage
+ *  (private mode) reads as locked, so the gate stays up. */
 function unlockedInStorage(): boolean {
-  if (typeof window === 'undefined') return false;
   try { return window.sessionStorage.getItem(UNLOCK_KEY) === '1'; } catch { return false; }
 }
 
-/** The flag only changes through the gate's own onUnlock, which re-renders
- *  via `codeAccepted` — there is no external event to subscribe to. */
+/** Only the gate's own onUnlock writes the flag, and it re-renders through
+ *  `codeAccepted`: nothing to subscribe to. */
 const subscribeToUnlockFlag = () => () => {};
 
 export default function SignUpPage() {
-  // Gate state — start locked; unlock once the code is verified in this
-  // render tree (`codeAccepted`) or once the browser snapshot reports a
-  // prior unlock. The stored flag is read through useSyncExternalStore so
-  // the read is legal during render and SSR-safe: server and hydration both
-  // see "locked", exactly as the old hydrated/effect pair produced.
+  // Unlocked once the code is accepted here or an earlier unlock is stored.
+  // The stored flag is read with useSyncExternalStore; its server snapshot
+  // says "locked", so the gate is what the server and hydration render.
   const [codeAccepted, setCodeAccepted] = useState(false);
   const storedUnlock = useSyncExternalStore(
     subscribeToUnlockFlag,
@@ -86,12 +54,10 @@ export default function SignUpPage() {
   return (
     <>
       {/*
-        Strip every frame, shadow, border and background Clerk would
-        otherwise draw around its own form — we render the card chrome
-        ourselves. Also kills the orange diagonal-stripe "Development
-        mode" watermark that Clerk paints on the footer when using
-        pk_test_* keys, and any stray masks / clip-paths that could
-        reintroduce the lens bug.
+        The page draws the card, so Clerk's frames, shadows, borders and
+        backgrounds go. The block also hides the striped "Development mode"
+        watermark Clerk paints with pk_test_* keys and removes any mask or
+        clip-path that could bring the lens artefact back.
       */}
       <style>{`
         /* 1. Flatten all Clerk container layers */
@@ -120,8 +86,8 @@ export default function SignUpPage() {
           display: none !important;
         }
 
-        /* 3. Belt-and-suspenders: nuke any mask/clip-path that could
-              reintroduce the circular "lens" artefact. */
+        /* 3. No mask, clip-path or filter anywhere inside Clerk's root:
+              any of them can paint the circular "lens" artefact. */
         .cl-rootBox,
         .cl-rootBox *,
         .cl-cardBox,
@@ -157,7 +123,7 @@ export default function SignUpPage() {
           fontFamily: BODY_FONT,
         }}
       >
-        {/* ─── PRISM wordmark — matches dashboard top-nav brand ───── */}
+        {/* The PRISM wordmark in the top nav's brand treatment. */}
         <div className="mb-10">
           <div
             className="text-2xl font-extrabold tracking-tighter uppercase"
@@ -167,7 +133,7 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        {/* ─── Sign-up surface — single clean card, no nested panels */}
+        {/* One card, no nested panels */}
         <div
           className="w-full max-w-md rounded-3xl"
           style={{
@@ -189,7 +155,6 @@ export default function SignUpPage() {
             />
           ) : (
             <>
-              {/* Compact header */}
               <div className="text-center mb-8">
                 <div
                   className="text-[10px] font-bold uppercase tracking-[0.22em]"
@@ -205,7 +170,7 @@ export default function SignUpPage() {
                 </div>
               </div>
 
-              {/* Clerk form — frame/shadow/stripes all suppressed above */}
+              {/* Clerk's form without its own card, header or logo */}
               <div className="flex justify-center">
                 <SignUp
                   appearance={{
@@ -226,7 +191,6 @@ export default function SignUpPage() {
           )}
         </div>
 
-        {/* Footer label */}
         <div
           className="mt-10 text-[10px] font-semibold uppercase tracking-[0.22em]"
           style={{ color: S.onSurfaceVariant }}
@@ -238,21 +202,16 @@ export default function SignUpPage() {
   );
 }
 
-// ─── Access code gate ──────────────────────────────────────────────
+// ─── Access-code gate ──────────────────────────────────────────────
 const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    // Case-insensitive, whitespace-tolerant comparison.
-    const ok =
-      code.trim().toLowerCase() === REQUIRED_CODE.toLowerCase();
-    if (!ok) {
+    // Case-insensitive, ignoring surrounding whitespace.
+    if (code.trim().toLowerCase() !== REQUIRED_CODE.toLowerCase()) {
       setError('That code is not valid. Please double-check and try again.');
-      setSubmitting(false);
       return;
     }
     setError(null);
@@ -308,19 +267,19 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
         className="w-full px-4 py-3 rounded-xl text-base outline-none transition-all"
         style={{
           backgroundColor: S.surfaceLow,
-          border: `1px solid ${error ? S.danger : S.cardBorder}`,
+          border: `1px solid ${error ? DANGER : S.cardBorder}`,
           color: S.onSurface,
           fontFamily: BODY_FONT,
           letterSpacing: '0.04em',
         }}
         onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? S.danger : S.outlineVariant;
+          e.currentTarget.style.borderColor = error ? DANGER : S.outlineVariant;
           e.currentTarget.style.boxShadow = `0 0 0 3px ${
             error ? 'rgba(179, 38, 30, 0.12)' : 'rgba(0, 93, 181, 0.12)'
           }`;
         }}
         onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? S.danger : S.cardBorder;
+          e.currentTarget.style.borderColor = error ? DANGER : S.cardBorder;
           e.currentTarget.style.boxShadow = 'none';
         }}
       />
@@ -330,7 +289,7 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
           id="prism-access-code-error"
           role="alert"
           className="mt-2 text-xs leading-relaxed"
-          style={{ color: S.danger }}
+          style={{ color: DANGER }}
         >
           {error}
         </div>
@@ -338,7 +297,7 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
 
       <button
         type="submit"
-        disabled={!code.trim() || submitting}
+        disabled={!code.trim()}
         className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-bold tracking-tight transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           backgroundColor: S.primary,

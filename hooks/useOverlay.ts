@@ -1,20 +1,18 @@
 'use client';
 
 /**
- * useOverlay — the ONE overlay behavior contract (R-03, design review
- * 2026-07-01). Every PRISM overlay (drill-down, settings, welcome, journey
- * panel, explorer drawer/notice) gets identical mechanics:
+ * useOverlay: the behaviour every overlay shares (drill-down, settings,
+ * welcome dialog, journey panel, explorer drawer and notice).
  *
- *   1. Escape closes.
- *   2. Body scroll is locked while open (no page scrolling behind).
- *   3. Focus moves into the dialog on open (container fallback).
- *   4. Tab / Shift+Tab are trapped inside the dialog.
- *   5. Focus RETURNS to the triggering element on close.
+ *   1. Escape closes it.
+ *   2. The page behind it does not scroll.
+ *   3. Focus moves into it on open (to the container if nothing is focusable).
+ *   4. Tab and Shift+Tab stay inside it.
+ *   5. Focus returns to the element that opened it.
  *
- * Usage:
  *   const ref = useRef<HTMLElement | null>(null);
  *   useOverlay(open, onClose, ref);
- *   <aside ref={ref} role="dialog" aria-modal="true">…</aside>
+ *   <aside ref={ref} role="dialog" aria-modal="true">...</aside>
  */
 
 import { useEffect, useRef, type RefObject } from 'react';
@@ -28,7 +26,7 @@ export default function useOverlay(
   containerRef: RefObject<HTMLElement | null>,
 ) {
   // Keep the latest onClose without re-binding listeners every render
-  // (assigned in an effect — refs must not be written during render).
+  // (assigned in an effect: refs must not be written during render).
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -40,8 +38,8 @@ export default function useOverlay(
     // (5) Remember the trigger to restore focus on close.
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
-    // (2) Body scroll lock — width-stable (avoid layout shift from the
-    // disappearing scrollbar).
+    // (2) Lock the page scroll without a layout shift from the
+    // disappearing scrollbar.
     const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
     const prevOverflow = document.body.style.overflow;
     const prevPaddingRight = document.body.style.paddingRight;

@@ -1,100 +1,93 @@
 /**
- * SettingsModal — Editorial-style settings drawer for PRISM.
+ * Settings, opened from the gear in the top nav: a rail of sections on the
+ * left, the chosen section on the right.
  *
- * Replaces the legacy export-only SettingsPanel. Opened from the gear icon
- * in the top nav. Six sections organized in a left-rail / content layout:
+ *   Account (everyone): profile, password and active sessions. Identity lives
+ *     in Clerk, so these sections talk to Clerk directly.
+ *   Model (everyone): the model configuration, read-only. The parameters are
+ *     the code's (the store's config); the cell weights are the ones the
+ *     served run used.
+ *   Administration (admins): user management, through the dashboard's
+ *     /api/users routes.
  *
- *   Account (everyone):
- *     • Profile      — email, display name, role badge
- *     • Password     — change password via Clerk
- *     • Sessions     — active sessions + sign out everywhere
- *     • Session Info — JWT refresh status, current token lifetime
- *
- *   Admin only:
- *     • Config Sheet — model configuration variables (admin-editable)
- *     • User Management — list users, edit roles
- *
- * Design language mirrors Trends2 / ConsumerJourney2 / ProfitPoolAnalysis2
- * ("Digital Curator" editorial style — Maritime blue tonal palette, Manrope
- * headlines, pill-shaped chips, rounded section cards). See Trends2.tsx for
- * the reference tokens.
- *
- * Auth model:
- *   Identity / password / sessions live in Clerk (`useUser`, `useClerk`,
- *   `useSessionList`). Authorization (admin vs viewer) is read from our own
- *   /api/me endpoint (which reads user_roles in Neon Postgres).
+ * The page resolves the role once and passes it in as `isAdmin`.
  */
 
 'use client';
 
-import React, {
-  FC, useCallback, useEffect, useMemo, useRef, useState,
+import {
+  useEffect, useRef, useState,
+  type CSSProperties, type FC, type FormEvent, type ReactNode,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, User, KeyRound, Monitor, SlidersHorizontal, Users as UsersIcon,
-  ShieldCheck, Check, AlertCircle, LogOut,
-  Sparkles,
+  ShieldCheck, Check, AlertCircle, Info, LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import {
-  useUser, useClerk, useSessionList, useSession,
-} from '@clerk/nextjs';
+import { useUser, useClerk, useSession } from '@clerk/nextjs';
+import * as api from '@/api/client';
+import type { ManagedUser } from '@/api/client';
+import usePrism from '@/hooks/usePrism';
+import useOverlay from '@/hooks/useOverlay';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import { cellMarginals, equalCellWeights, estimatedCellWeights } from '@/lib/cellWeights';
+import { CATEGORIES, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, fmtDate, fmtDateTime, fmtPct } from '@/lib/format';
+import { cellMarginals } from '@/lib/cellWeights';
 import {
   BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_VERSION, GRADE_LEGEND,
-  MARGIN_INDEX, MARGIN_INDEX_NOTE, REGION_MIX, REGION_MIX_NOTE,
+  MARGIN_INDEX, MARGIN_INDEX_NOTE, REGION_MIX, REGION_MIX_NOTE, type Grade,
 } from '@/lib/cellWeightProvenance';
-import type { Grade } from '@/lib/cellWeightProvenance';
-import { fmtDate, fmtDateTime } from '@/lib/format';
-import useOverlay from '@/hooks/useOverlay';
+import type { ForceName, ModelConfig, Role, SimulationResult } from '@/types';
 
-// ─── Section nav definition ─────────────────────────────────────────
-type SectionId =
-  | 'profile'
-  | 'password'
-  | 'sessions'
-  | 'config'
-  | 'users';
+// ─── Sections ───────────────────────────────────────────────────────
+
+type SectionId = 'profile' | 'password' | 'sessions' | 'model' | 'users';
+type GroupId = 'account' | 'model' | 'admin';
 
 interface SectionDef {
   id: SectionId;
   label: string;
+  subtitle: string;
   icon: LucideIcon;
-  adminOnly?: boolean;
-  group: 'account' | 'admin';
+  group: GroupId;
 }
 
 const SECTIONS: SectionDef[] = [
-  { id: 'profile',       label: 'Profile',          icon: User,             group: 'account' },
-  { id: 'password',      label: 'Password',         icon: KeyRound,         group: 'account' },
-  { id: 'sessions',      label: 'Active sessions',  icon: Monitor,          group: 'account' },
-  { id: 'config',        label: 'Config sheet',     icon: SlidersHorizontal, group: 'admin' },
-  { id: 'users',         label: 'User management',  icon: UsersIcon,        group: 'admin', adminOnly: true },
+  { id: 'profile',  label: 'Profile',             subtitle: 'Your identity and display name',                icon: User,              group: 'account' },
+  { id: 'password', label: 'Password',            subtitle: 'Rotate your credentials',                       icon: KeyRound,          group: 'account' },
+  { id: 'sessions', label: 'Active sessions',     subtitle: 'Devices and browsers with an active session',   icon: Monitor,           group: 'account' },
+  { id: 'model',    label: 'Model configuration', subtitle: "The model's parameters and the served run's cell weights", icon: SlidersHorizontal, group: 'model' },
+  { id: 'users',    label: 'User management',     subtitle: 'Team access and roles',                         icon: UsersIcon,         group: 'admin' },
 ];
 
-// ─── SectionCard — reused from Trends2 pattern ──────────────────────
-interface SectionCardProps {
+const GROUPS: Array<{ id: GroupId; label: string; adminOnly?: boolean }> = [
+  { id: 'account', label: 'Account' },
+  { id: 'model', label: 'Model' },
+  { id: 'admin', label: 'Administration', adminOnly: true },
+];
+
+// ─── Building blocks ────────────────────────────────────────────────
+
+type Status = { kind: 'success' | 'error' | 'info'; message: string };
+
+/** The message of a failed call, or a fallback line. */
+const errorText = (err: unknown, fallback: string): string =>
+  err instanceof Error && err.message ? err.message : fallback;
+
+const SectionCard: FC<{
   title: string;
   icon: LucideIcon;
   accent?: string;
-  description?: string;
-  children: React.ReactNode;
-  footnote?: React.ReactNode;
-}
-const SectionCard: FC<SectionCardProps> = ({
-  title, icon: Icon, accent, description, children, footnote,
-}) => (
+  description?: ReactNode;
+  children: ReactNode;
+}> = ({ title, icon: Icon, accent, description, children }) => (
   <div style={{
     backgroundColor: S.surface,
     border: `1px solid ${S.cardBorder}`,
     borderRadius: 14,
     padding: '18px 20px 20px',
   }}>
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
       <span style={{
         width: 30, height: 30, borderRadius: 9,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -113,37 +106,26 @@ const SectionCard: FC<SectionCardProps> = ({
       </div>
     </div>
     {description && (
-      <div style={{
-        marginBottom: 14, fontSize: 12.5, lineHeight: 1.55, color: S.mutedText,
-      }}>
+      <div style={{ marginBottom: 14, fontSize: 12.5, lineHeight: 1.55, color: S.mutedText }}>
         {description}
       </div>
     )}
     {children}
-    {footnote && (
-      <div style={{
-        marginTop: 12, fontSize: 11, lineHeight: 1.55, color: S.mutedText,
-      }}>
-        {footnote}
-      </div>
-    )}
   </div>
 );
 
-// ─── Role pill ─────────────────────────────────────────────────────
-const RolePill: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) => {
+const Muted: FC<{ children: ReactNode }> = ({ children }) => (
+  <div style={{ color: S.mutedText, fontSize: 13 }}>{children}</div>
+);
+
+const RolePill: FC<{ role: Role }> = ({ role }) => {
   const isAdmin = role === 'admin';
-  const isUnknown = role === 'unknown';
   return (
     <span
       className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase"
       style={{
-        backgroundColor: isUnknown
-          ? S.surfaceHigh
-          : (isAdmin ? S.primaryContainer : S.secondaryContainer),
-        color: isUnknown
-          ? S.mutedText
-          : (isAdmin ? S.onPrimaryContainer : S.onSecondaryContainer),
+        backgroundColor: isAdmin ? S.primaryContainer : S.secondaryContainer,
+        color: isAdmin ? S.onPrimaryContainer : S.onSecondaryContainer,
       }}
     >
       {isAdmin && <ShieldCheck size={11} strokeWidth={2.5} />}
@@ -152,29 +134,31 @@ const RolePill: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) => {
   );
 };
 
-// ─── Field row (label + input) — editorial styling ─────────────────
-interface FieldProps {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}
-const Field: FC<FieldProps> = ({ label, hint, children }) => (
+const LABEL_STYLE: CSSProperties = {
+  fontFamily: HEADLINE_FONT,
+  fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+  textTransform: 'uppercase', color: S.onSurfaceVariant,
+};
+
+/** A form control with its label; the <label> wraps the control. */
+const Field: FC<{ label: string; hint?: string; children: ReactNode }> = ({ label, hint, children }) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-    <span style={{
-      fontFamily: HEADLINE_FONT,
-      fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-      textTransform: 'uppercase', color: S.onSurfaceVariant,
-    }}>
-      {label}
-    </span>
+    <span style={LABEL_STYLE}>{label}</span>
     {children}
-    {hint && (
-      <span style={{ fontSize: 11, color: S.mutedText }}>{hint}</span>
-    )}
+    {hint && <span style={{ fontSize: 11, color: S.mutedText }}>{hint}</span>}
   </label>
 );
 
-const INPUT_STYLE: React.CSSProperties = {
+/** A labelled value, table or note that is not a form control. */
+const SubBlock: FC<{ label: string; hint?: string; children: ReactNode }> = ({ label, hint, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <span style={LABEL_STYLE}>{label}</span>
+    {children}
+    {hint && <span style={{ fontSize: 11, lineHeight: 1.55, color: S.mutedText }}>{hint}</span>}
+  </div>
+);
+
+const INPUT_STYLE: CSSProperties = {
   fontFamily: BODY_FONT,
   fontSize: 13.5,
   color: S.onSurface,
@@ -182,138 +166,45 @@ const INPUT_STYLE: React.CSSProperties = {
   border: `1px solid ${S.cardBorder}`,
   borderRadius: 10,
   padding: '9px 12px',
-  // R-14: no `outline: 'none'` here — the global input:focus ring and the
-  // :focus-visible outline (globals.css) provide the visible focus
-  // indicator, which the inline override used to suppress (fully so on
-  // <select>, which the input:focus ring doesn't cover).
+  // No outline override: the focus indicator comes from globals.css (the
+  // input:focus ring, and :focus-visible for every control, <select> included).
   transition: 'border-color 0.15s, background-color 0.15s',
 };
 
-const READONLY_STYLE: React.CSSProperties = {
+/** A value shown in a field's frame, not editable. */
+const VALUE_STYLE: CSSProperties = {
   ...INPUT_STYLE,
   backgroundColor: S.surfaceContainer,
   color: S.mutedText,
-  cursor: 'not-allowed',
 };
 
-// ─── Locale-proof numeric field (R-11, design review 2026-07-01) ────
-// CAUSE of the "0,001 / 0,3 / 0,05 next to 10000" finding: these fields
-// were `<input type="number">`, whose DISPLAYED value is formatted by the
-// browser in the OS/browser locale — a German locale renders the JSON
-// number 0.001 as "0,001" while integers get no separator at all. The
-// stored config values were always plain JSON numbers. Typing a comma in
-// a point-locale browser (or clearing the field) also made
-// `e.target.value` return "" → parseFloat → NaN entered the draft and
-// serialized to `null` in the PUT /api/config payload.
-//
-// Convention now: canonical decimal-POINT display ("0.001", "0.3");
-// editable integers stay plain ("10000") so they parse back; comma AND
-// point are accepted on entry; only finite numbers are committed to the
-// draft, so the PUT body always carries valid JSON numbers.
-const parseDecimal = (raw: string): number =>
-  parseFloat(raw.trim().replace(/\s+/g, '').replace(',', '.'));
-/** Integers: strip grouping separators — "10,000" / "10.000" / "10 000" → 10000. */
-const parseInteger = (raw: string): number =>
-  parseInt(raw.replace(/[.,\s]/g, ''), 10);
+const READONLY_INPUT_STYLE: CSSProperties = { ...VALUE_STYLE, cursor: 'not-allowed' };
 
-/** Trim float noise for display: 0.08333333333333333 → "0.083333". */
-const fmtShortNumber = (v: number): string => String(parseFloat(v.toFixed(6)));
-
-interface NumberFieldProps {
-  value: number;
-  onCommit: (v: number) => void;
-  integer?: boolean;
-  readOnly?: boolean;
-  inputStyle: React.CSSProperties;
-  /** Display formatter (default String). Parsing/committing stays exact. */
-  format?: (v: number) => string;
-}
-const NumberField: FC<NumberFieldProps> = ({
-  value, onCommit, integer, readOnly, inputStyle, format,
-}) => {
-  const fmt = format ?? String;
-  const [text, setText] = useState(() => fmt(value));
-  const parse = integer ? parseInteger : parseDecimal;
-  // Resync when the draft changes elsewhere (load / discard) without
-  // clobbering in-progress typing that already parses to `value`. Adjusted
-  // during render — the documented React pattern — with `syncedValue`
-  // holding the last value we resynced against, so the comparison runs once
-  // per incoming change instead of on every commit.
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setText((t) => (parse(t) === value || fmt(parse(t)) === fmt(value) ? t : fmt(value)));
-  }
-  return (
-    <input
-      type="text"
-      inputMode={integer ? 'numeric' : 'decimal'}
-      value={text}
-      onChange={(e) => {
-        const raw = e.target.value;
-        setText(raw);
-        const parsed = parse(raw);
-        if (Number.isFinite(parsed)) onCommit(parsed);
-      }}
-      onBlur={() => setText(fmt(value))}
-      disabled={readOnly}
-      readOnly={readOnly}
-      style={inputStyle}
-    />
-  );
-};
-
-const PRIMARY_BUTTON: React.CSSProperties = {
+const BUTTON: CSSProperties = {
   fontFamily: HEADLINE_FONT,
   fontSize: 12.5,
   fontWeight: 700,
   letterSpacing: '0.02em',
-  color: '#ffffff',
-  backgroundColor: S.primary,
   border: 'none',
   borderRadius: 999,
   padding: '9px 18px',
   cursor: 'pointer',
   transition: 'background-color 0.15s, opacity 0.15s',
 };
+const PRIMARY_BUTTON: CSSProperties = { ...BUTTON, color: '#ffffff', backgroundColor: S.primary };
+const DESTRUCTIVE_BUTTON: CSSProperties = { ...BUTTON, color: S.error, backgroundColor: S.errorContainer };
 
-const SECONDARY_BUTTON: React.CSSProperties = {
-  fontFamily: HEADLINE_FONT,
-  fontSize: 12.5,
-  fontWeight: 700,
-  letterSpacing: '0.02em',
-  color: S.primary,
-  backgroundColor: S.surfaceLow,
-  border: 'none',
-  borderRadius: 999,
-  padding: '9px 18px',
-  cursor: 'pointer',
-  transition: 'background-color 0.15s, opacity 0.15s',
-};
-
-const DESTRUCTIVE_BUTTON: React.CSSProperties = {
-  ...SECONDARY_BUTTON,
-  color: S.error,
-  backgroundColor: S.errorContainer,
-};
-
-// ─── Toast (inline status banner) ──────────────────────────────────
-interface StatusBannerProps {
-  kind: 'success' | 'error' | 'info';
-  children: React.ReactNode;
-}
-const StatusBanner: FC<StatusBannerProps> = ({ kind, children }) => {
-  const palette = kind === 'success'
+const StatusBanner: FC<{ kind: Status['kind']; children: ReactNode }> = ({ kind, children }) => {
+  const { bg, fg, Icon } = kind === 'success'
     ? { bg: S.successContainer, fg: S.success, Icon: Check }
     : kind === 'error'
       ? { bg: S.errorContainer, fg: S.onErrorContainer, Icon: AlertCircle }
-      : { bg: S.surfaceLow, fg: S.primary, Icon: Sparkles };
-  const Icon = palette.Icon;
+      : { bg: S.surfaceLow, fg: S.primary, Icon: Info };
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 14px', borderRadius: 10,
-      backgroundColor: palette.bg, color: palette.fg,
+      backgroundColor: bg, color: fg,
       fontSize: 12.5, fontWeight: 500,
     }}>
       <Icon size={14} strokeWidth={2.25} />
@@ -323,19 +214,19 @@ const StatusBanner: FC<StatusBannerProps> = ({ kind, children }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: Profile
+// Account: profile
 // ═══════════════════════════════════════════════════════════════════
-const ProfileSection: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) => {
+
+const ProfileSection: FC<{ role: Role }> = ({ role }) => {
   const { user, isLoaded } = useUser();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
 
-  // Hydrate the form from the Clerk user as soon as it resolves, and again
-  // whenever Clerk hands us a different user object (e.g. after a save).
-  // Adjusted during render against the last user we synced from, so the
-  // fields are already filled in the pass that first renders them.
+  // The form follows the Clerk user: it is filled in the render that first
+  // sees the user, and again whenever Clerk hands over a new user object
+  // (after a save, for instance).
   const [syncedUser, setSyncedUser] = useState<typeof user>(undefined);
   if (user && syncedUser !== user) {
     setSyncedUser(user);
@@ -343,89 +234,78 @@ const ProfileSection: FC<{ role: 'admin' | 'viewer' | 'unknown' }> = ({ role }) 
     setLastName(user.lastName ?? '');
   }
 
-  const handleSave = useCallback(async () => {
-    if (!user) return;
+  if (!isLoaded || !user) {
+    return <SectionCard title="Profile" icon={User}><Muted>Loading…</Muted></SectionCard>;
+  }
+
+  const save = async () => {
     setSaving(true);
     setStatus(null);
     try {
       await user.update({ firstName, lastName });
       setStatus({ kind: 'success', message: 'Profile updated.' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update profile.';
-      setStatus({ kind: 'error', message });
+      setStatus({ kind: 'error', message: errorText(err, 'Failed to update profile.') });
     } finally {
       setSaving(false);
     }
-  }, [user, firstName, lastName]);
-
-  if (!isLoaded || !user) {
-    return <SectionCard title="Profile" icon={User}><div style={{ color: S.mutedText, fontSize: 13 }}>Loading…</div></SectionCard>;
-  }
-
-  const email = user.primaryEmailAddress?.emailAddress ?? '—';
-  // R-12: locale-stable "26 Jun 2026" (was browser-locale toLocaleDateString).
-  const createdAt = fmtDate(user.createdAt);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionCard
-        title="Identity"
-        icon={User}
-        description="Your identity is managed by Clerk. Email changes are handled through a verification flow."
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="Email">
-            <input type="email" value={email} readOnly style={READONLY_STYLE} />
+    <SectionCard
+      title="Identity"
+      icon={User}
+      description="Your identity is managed by Clerk. You can change your name here, not your email address."
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Email">
+          <input type="email" value={user.primaryEmailAddress?.emailAddress ?? NO_VALUE} readOnly style={READONLY_INPUT_STYLE} />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="First name">
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="e.g. Alex"
+              style={INPUT_STYLE}
+            />
           </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="First name">
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="e.g. Alex"
-                style={INPUT_STYLE}
-              />
-            </Field>
-            <Field label="Last name">
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="e.g. Laker"
-                style={INPUT_STYLE}
-              />
-            </Field>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Role">
-              <div style={{ padding: '9px 12px' }}>
-                <RolePill role={role} />
-              </div>
-            </Field>
-            <Field label="Member since">
-              <input type="text" value={createdAt} readOnly style={READONLY_STYLE} />
-            </Field>
-          </div>
-          {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ ...PRIMARY_BUTTON, opacity: saving ? 0.6 : 1 }}
-            >
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
+          <Field label="Last name">
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="e.g. Laker"
+              style={INPUT_STYLE}
+            />
+          </Field>
         </div>
-      </SectionCard>
-    </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <SubBlock label="Role">
+            <div style={{ padding: '9px 12px' }}>
+              <RolePill role={role} />
+            </div>
+          </SubBlock>
+          <Field label="Member since">
+            <input type="text" value={fmtDate(user.createdAt)} readOnly style={READONLY_INPUT_STYLE} />
+          </Field>
+        </div>
+        {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={save} disabled={saving} style={{ ...PRIMARY_BUTTON, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </SectionCard>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: Password
+// Account: password
 // ═══════════════════════════════════════════════════════════════════
+
 const PasswordSection: FC = () => {
   const { user, isLoaded } = useUser();
   const [current, setCurrent] = useState('');
@@ -433,11 +313,14 @@ const PasswordSection: FC = () => {
   const [confirm, setConfirm] = useState('');
   const [signOutOthers, setSignOutOthers] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  if (!isLoaded || !user) {
+    return <SectionCard title="Password" icon={KeyRound}><Muted>Loading…</Muted></SectionCard>;
+  }
+
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user) return;
     setStatus(null);
     if (next.length < 8) {
       setStatus({ kind: 'error', message: 'New password must be at least 8 characters.' });
@@ -457,165 +340,134 @@ const PasswordSection: FC = () => {
       setCurrent(''); setNext(''); setConfirm('');
       setStatus({ kind: 'success', message: 'Password updated successfully.' });
     } catch (err) {
-      // Clerk error objects expose `errors[0].longMessage` for friendlier copy.
-      // Fall back through message → generic text so we never show `[object Object]`.
-      const anyErr = err as { errors?: Array<{ longMessage?: string; message?: string }>; message?: string };
-      const msg = anyErr?.errors?.[0]?.longMessage
-        ?? anyErr?.errors?.[0]?.message
-        ?? anyErr?.message
-        ?? 'Failed to update password.';
-      setStatus({ kind: 'error', message: msg });
+      // Clerk puts its readable explanation in errors[0].longMessage.
+      const clerk = err as { errors?: Array<{ longMessage?: string; message?: string }> };
+      const message = clerk.errors?.[0]?.longMessage ?? clerk.errors?.[0]?.message;
+      setStatus({ kind: 'error', message: message ?? errorText(err, 'Failed to update password.') });
     } finally {
       setSaving(false);
     }
-  }, [user, current, next, confirm, signOutOthers]);
-
-  const handleRequestReset = useCallback(async () => {
-    if (!user) return;
-    const email = user.primaryEmailAddress?.emailAddress;
-    if (!email) {
-      setStatus({ kind: 'error', message: 'No email on file for reset.' });
-      return;
-    }
-    setStatus({ kind: 'success', message: `Check ${email} for reset instructions via Clerk.` });
-    // Full reset flow lives on the /sign-in page — link to it.
-    window.open('/sign-in?reset=true', '_blank', 'noopener,noreferrer');
-  }, [user]);
-
-  if (!isLoaded || !user) {
-    return <SectionCard title="Password" icon={KeyRound}><div style={{ color: S.mutedText, fontSize: 13 }}>Loading…</div></SectionCard>;
-  }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionCard
-        title="Change password"
-        icon={KeyRound}
-        description="Use a strong, unique password. Minimum 8 characters. If you've forgotten your current password, use the reset link below."
-      >
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="Current password">
-            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} style={INPUT_STYLE} required />
+    <SectionCard
+      title="Change password"
+      icon={KeyRound}
+      description={'Use a strong, unique password of at least 8 characters. Forgotten your current password? Sign out and choose "Forgot password?" on the sign-in page.'}
+    >
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Current password">
+          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} style={INPUT_STYLE} required />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="New password" hint="At least 8 characters.">
+            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} style={INPUT_STYLE} required minLength={8} />
           </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="New password" hint="At least 8 characters.">
-              <input type="password" value={next} onChange={(e) => setNext(e.target.value)} style={INPUT_STYLE} required minLength={8} />
-            </Field>
-            <Field label="Confirm new password">
-              <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} style={INPUT_STYLE} required minLength={8} />
-            </Field>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: S.onSurface, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={signOutOthers}
-              onChange={(e) => setSignOutOthers(e.target.checked)}
-              style={{ accentColor: S.primary }}
-            />
-            Sign out of all other sessions after changing password
-          </label>
-          {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-            <button type="button" onClick={handleRequestReset} style={SECONDARY_BUTTON}>
-              Request password reset
-            </button>
-            <button type="submit" disabled={saving} style={{ ...PRIMARY_BUTTON, opacity: saving ? 0.6 : 1 }}>
-              {saving ? 'Updating…' : 'Update password'}
-            </button>
-          </div>
-        </form>
-      </SectionCard>
-    </div>
+          <Field label="Confirm new password">
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} style={INPUT_STYLE} required minLength={8} />
+          </Field>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: S.onSurface, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={signOutOthers}
+            onChange={(e) => setSignOutOthers(e.target.checked)}
+            style={{ accentColor: S.primary }}
+          />
+          Sign out of all other sessions after changing password
+        </label>
+        {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="submit" disabled={saving} style={{ ...PRIMARY_BUTTON, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+      </form>
+    </SectionCard>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: Active Sessions
+// Account: active sessions
 // ═══════════════════════════════════════════════════════════════════
+
+type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
+/** One of the user's active sessions, on any device, with its latest activity. */
+type DeviceSession = Awaited<ReturnType<ClerkUser['getSessions']>>[number];
+
 const SessionsSection: FC = () => {
-  const { sessions, isLoaded } = useSessionList();
+  const { user } = useUser();
   const { session: currentSession } = useSession();
   const { signOut } = useClerk();
+  const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [signingOutAll, setSigningOutAll] = useState(false);
-  const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
 
-  const handleRevoke = useCallback(async (sessionId: string) => {
-    setRevokingId(sessionId);
+  // user.getSessions() lists the user's sessions on every device; the
+  // browser's own session list would show this browser only.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    user.getSessions().then(
+      (list) => { if (!cancelled) setSessions(list); },
+      (err: unknown) => {
+        if (cancelled) return;
+        setSessions([]);
+        setStatus({ kind: 'error', message: errorText(err, 'Failed to load sessions.') });
+      },
+    );
+    return () => { cancelled = true; };
+  }, [user]);
+
+  if (!sessions) {
+    return <SectionCard title="Active sessions" icon={Monitor}><Muted>Loading…</Muted></SectionCard>;
+  }
+
+  const others = sessions.filter((s) => s.id !== currentSession?.id);
+
+  const revoke = async (session: DeviceSession) => {
+    setRevokingId(session.id);
     setStatus(null);
     try {
-      // Clerk v6: revoke a specific session by passing its ID to signOut().
-      // This ends just that session (e.g. another device), leaving the
-      // current session untouched. The top-level useClerk().signOut({ sessionId })
-      // is the supported way to do this from the frontend SDK.
-      await signOut({ sessionId });
+      await session.revoke();
+      setSessions((list) => list && list.filter((s) => s.id !== session.id));
       setStatus({ kind: 'success', message: 'Session revoked.' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke session.';
-      setStatus({ kind: 'error', message });
+      setStatus({ kind: 'error', message: errorText(err, 'Failed to revoke session.') });
     } finally {
       setRevokingId(null);
     }
-  }, [signOut]);
+  };
 
-  const handleSignOutEverywhere = useCallback(async () => {
+  // Every other device first, then this browser, which lands on /sign-in.
+  const signOutEverywhere = async () => {
     setSigningOutAll(true);
     setStatus(null);
     try {
-      // Clerk's top-level signOut() revokes the current session and redirects
-      // to /sign-in. To sign out of every device (including this one) we
-      // simply call signOut without a sessionId — Clerk handles the rest.
+      await Promise.all(others.map((s) => s.revoke()));
       await signOut({ redirectUrl: '/sign-in' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to sign out.';
-      setStatus({ kind: 'error', message });
+      setStatus({ kind: 'error', message: errorText(err, 'Failed to sign out.') });
       setSigningOutAll(false);
     }
-  }, [signOut]);
+  };
 
-  if (!isLoaded) {
-    return <SectionCard title="Active sessions" icon={Monitor}><div style={{ color: S.mutedText, fontSize: 13 }}>Loading…</div></SectionCard>;
-  }
-
-  const sorted = [...(sessions ?? [])].sort((a, b) => {
-    const aT = a.lastActiveAt ? new Date(a.lastActiveAt).getTime() : 0;
-    const bT = b.lastActiveAt ? new Date(b.lastActiveAt).getTime() : 0;
-    return bT - aT;
-  });
+  const sorted = [...sessions].sort((a, b) => b.lastActiveAt.getTime() - a.lastActiveAt.getTime());
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <SectionCard
         title={`Active sessions (${sorted.length})`}
         icon={Monitor}
-        description="Each device or browser that has signed in appears here. Revoke any you don't recognize."
+        description="Each device or browser where you are signed in appears here. Revoke any you don't recognize."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {sorted.length === 0 && (
-            <div style={{ color: S.mutedText, fontSize: 13 }}>No active sessions.</div>
-          )}
+          {sorted.length === 0 && <Muted>No active sessions.</Muted>}
           {sorted.map((s) => {
             const isCurrent = currentSession?.id === s.id;
-            // R-12: locale-stable "26 Jun 2026, 08:38".
-            const lastActive = s.lastActiveAt ? fmtDateTime(s.lastActiveAt) : 'unknown';
-            // Clerk v6 dropped `latestActivity` from the public SessionResource
-            // type, but the data is still hydrated at runtime when the session
-            // has been fetched via useSessionList(). We read it through a
-            // narrow cast so TypeScript doesn't block the build while still
-            // letting us display useful device / location metadata when the
-            // backend provided it.
-            const activity = (s as unknown as {
-              latestActivity?: {
-                deviceType?: string;
-                browserName?: string;
-                city?: string;
-                country?: string;
-              };
-            }).latestActivity;
-            const device = activity?.deviceType ?? 'Device';
-            const browser = activity?.browserName ?? '';
-            const location = [activity?.city, activity?.country]
-              .filter(Boolean).join(', ') || 'Location unknown';
+            const activity = s.latestActivity;
+            const location = [activity?.city, activity?.country].filter(Boolean).join(', ') || 'Location unknown';
             return (
               <div
                 key={s.id}
@@ -639,7 +491,7 @@ const SessionsSection: FC = () => {
                     fontSize: 13, fontWeight: 600, color: S.onSurface,
                     display: 'flex', alignItems: 'center', gap: 8,
                   }}>
-                    <span>{device} · {browser || 'Browser'}</span>
+                    <span>{activity?.deviceType || 'Device'} · {activity?.browserName || 'Browser'}</span>
                     {isCurrent && (
                       <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
                         style={{ backgroundColor: S.primary, color: '#fff' }}>
@@ -648,12 +500,12 @@ const SessionsSection: FC = () => {
                     )}
                   </div>
                   <div style={{ fontSize: 11, color: S.mutedText, marginTop: 2 }}>
-                    {location} · Last active {lastActive}
+                    {location} · Last active {fmtDateTime(s.lastActiveAt)}
                   </div>
                 </div>
                 {!isCurrent && (
                   <button
-                    onClick={() => handleRevoke(s.id)}
+                    onClick={() => revoke(s)}
                     disabled={revokingId === s.id}
                     style={{ ...DESTRUCTIVE_BUTTON, opacity: revokingId === s.id ? 0.6 : 1, padding: '6px 14px', fontSize: 11.5 }}
                   >
@@ -673,10 +525,10 @@ const SessionsSection: FC = () => {
         title="Sign out everywhere"
         icon={LogOut}
         accent={S.error}
-        description="End every session — including this one — on every device. You'll need to sign in again."
+        description="End every session on every device, this one included. You'll need to sign in again."
       >
         <button
-          onClick={handleSignOutEverywhere}
+          onClick={signOutEverywhere}
           disabled={signingOutAll}
           style={{ ...DESTRUCTIVE_BUTTON, opacity: signingOutAll ? 0.6 : 1 }}
         >
@@ -688,116 +540,47 @@ const SessionsSection: FC = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: Config Sheet (admin-editable)
+// Model configuration (read-only)
 // ═══════════════════════════════════════════════════════════════════
-// GET /api/config contract — mirrors pulse/api/routers/config.py get_config.
-// Config-sheet review (July 2026): the sheet previously rendered fields the
-// API never returned (region, neutral_threshold, base_year, residual_cross_rho)
-// — those inputs showed hardcoded frontend defaults instead of server state,
-// and PUT silently dropped them (pydantic ignores unknown keys), so they were
-// dead dials. The payload below mirrors the real contract; engine-consumed
-// values that are not admin dials render read-only.
-interface ModelConfigPayload {
-  per_force_attenuation?: Record<string, number>;
-  within_force_overlap?: Record<string, number>;
-  attenuation_source?: string;
-  force_weights?: Record<string, number>;
-  // vc_weights deleted (2.9.0, July 2026): the VC lens is an epicentre
-  // partition — GET /config no longer returns a per-step weight group.
-  // 2.11.0 (O6): the 13 × 4 matrix of HCB gross-profit SHARES per
-  // category × region cell is the ONLY aggregation dial for the roll-up;
-  // region_weights / category_weights are its marginals, returned read-only
-  // by GET /config (PUT rejects them).
-  cell_weights?: Record<string, Record<string, number>>;
-  cell_weights_source?: string;
-  /** Served by GET: the label "Reset to estimate" writes. Since O14 the
-   *  backend default IS the estimate, so this is the estimate's provenance. */
-  cell_weights_source_default?: string;
-  /** Served by GET: the label "Reset to equal" writes — the equal 1/52
-   *  grid's own provenance. Absent on a pre-O14 service (see resetCellsEqual). */
-  cell_weights_source_equal?: string;
-  derived_weights?: string[];
-  region_weights?: Record<string, number>;
-  category_weights?: Record<string, number>;
-  force_correlation_matrix?: Record<string, Record<string, number>>;
-  force_overlap_matrix?: Record<string, Record<string, number>>;
-  path_years?: number[];
-  base_year?: number; // read-only context (engine-consumed, not admin-editable)
-  iterations?: number;
-  within_force_rho?: number;
-  // t_copula_df removed (D20, June 2026): the engine runs a Gaussian copula.
-}
 
-// Keys this sheet may PUT (subset of the backend ConfigUpdate model).
-// The correlation/overlap matrices and attenuation stay read-only in the UI
-// (D8: changed only via a correction release / the admin API and its gates).
-const EDITABLE_KEYS = [
-  'iterations', 'within_force_rho',
-  'force_weights', 'cell_weights', 'cell_weights_source',
-] as const;
-type EditableKey = typeof EDITABLE_KEYS[number];
-type WeightGroupKey = 'force_weights';
-
-// Canonical display order — mirrors pulse/config.py taxonomies. Rendering is
-// robust to drift: missing keys are skipped, unknown keys are appended.
-const FORCE_ORDER = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'];
-const REGION_ORDER = ['Europe', 'North America', 'Asia', 'High Growth'];
-// (VC_ORDER deleted with the value-chain weight grid, 2.9.0 — the VC lens
-//  is an epicentre partition; there are no per-step weights to edit.)
-const CATEGORY_ORDER = [
-  'Hair: Color', 'Hair: Care', 'Hair: Styling', 'Hair: Body',
-  'LHC: FCN', 'LHC: FCA', 'LHC: FFI', 'LHC: LAD',
-  'LHC: HDW', 'LHC: ADW', 'LHC: HSC', 'LHC: TOI', 'LHC: IC',
-];
-const FORCE_ABBR: Record<string, string> = {
+const FORCE_ABBR: Record<ForceName, string> = {
   Consumer: 'Cons.', Customer: 'Cust.', Technology: 'Tech.',
   Government: 'Gov.', Environmental: 'Env.', Competitive: 'Comp.',
 };
+const CATEGORY_NAMES = CATEGORIES.map((c) => c.name);
 
-const orderedKeys = (obj: Record<string, unknown>, order: string[]): string[] => [
-  ...order.filter((k) => k in obj),
-  ...Object.keys(obj).filter((k) => !order.includes(k)),
-];
+/** A number to fixed digits; the missing-value mark when there is none. */
+const fixed = (v: number | undefined, digits: number): string =>
+  typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : NO_VALUE;
 
-// ── Non-form sub-block (label + content + hint). Unlike Field this is NOT
-//    a <label> — tables and read-only text are not form controls. ─────
-const SubBlock: FC<{ label: string; hint?: string; children: React.ReactNode }> = ({ label, hint, children }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-    <span style={{
-      fontFamily: HEADLINE_FONT,
-      fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
-      textTransform: 'uppercase', color: S.onSurfaceVariant,
-    }}>
-      {label}
-    </span>
-    {children}
-    {hint && (
-      <span style={{ fontSize: 11, lineHeight: 1.55, color: S.mutedText }}>{hint}</span>
-    )}
-  </div>
-);
+/** A share in percent with two decimals: several cells hold less than 0.1 %. */
+const pct2 = (share: number): string => (share * 100).toFixed(2);
 
-// ── Read-only force tables (attenuation row-pair + 6×6 matrices) ────
-const CELL_TH: React.CSSProperties = {
+const CELL_TH: CSSProperties = {
   fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 800,
   letterSpacing: '0.06em', textTransform: 'uppercase',
   color: S.onSurfaceVariant, backgroundColor: S.surfaceContainer,
   padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap',
 };
-const CELL_LABEL: React.CSSProperties = {
+const CELL_LABEL: CSSProperties = {
   ...CELL_TH,
   textAlign: 'left', backgroundColor: S.surfaceLow,
   position: 'sticky', left: 0, zIndex: 1,
 };
-const CELL_NUM: React.CSSProperties = {
+const ROW_LABEL: CSSProperties = {
+  ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}`,
+  textTransform: 'none', letterSpacing: 0, fontSize: 11.5,
+};
+const CELL_NUM: CSSProperties = {
   fontFamily: MONO_FONT, fontSize: 12, color: S.onSurface,
   padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap',
   fontVariantNumeric: 'tabular-nums',
   borderTop: `1px solid ${S.cardBorder}`,
 };
+const CELL_SUM: CSSProperties = { ...CELL_NUM, fontWeight: 700, color: S.onSurfaceVariant };
 
-/** Horizontal-scroll wrapper so wide tables are never clipped. */
-const TableScroller: FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+/** Scrolls a wide table sideways instead of clipping it. */
+const TableScroller: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
   <div
     role="region"
     aria-label={label}
@@ -813,164 +596,149 @@ const TableScroller: FC<{ label: string; children: React.ReactNode }> = ({ label
   </div>
 );
 
-/** Read-only 6×6 force matrix, read row → column. */
-const ForceMatrixTable: FC<{
-  matrix: Record<string, Record<string, number>>;
-  digits: number;
-  diagonal: 'dash' | 'value';
+/** Per-force values: one row per parameter, one column per force. */
+const ForceRowsTable: FC<{
   label: string;
-}> = ({ matrix, digits, diagonal, label }) => {
-  const forces = orderedKeys(matrix, FORCE_ORDER);
-  return (
-    <TableScroller label={label}>
-      <thead>
-        <tr>
-          <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer, textTransform: 'none', letterSpacing: 0 }}>
-            row \ col
-          </th>
-          {forces.map((f) => (
-            <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f] ?? f}</th>
+  rows: Array<{ name: string; values: Record<ForceName, number> }>;
+}> = ({ label, rows }) => (
+  <TableScroller label={label}>
+    <thead>
+      <tr>
+        <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer }} aria-label="Parameter" />
+        {FORCES.map((f) => <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f]}</th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map(({ name, values }) => (
+        <tr key={name}>
+          <th scope="row" style={ROW_LABEL}>{name}</th>
+          {FORCES.map((f) => <td key={f} style={CELL_NUM}>{fixed(values[f], 3)}</td>)}
+        </tr>
+      ))}
+    </tbody>
+  </TableScroller>
+);
+
+/** A 6 x 6 force matrix, read row by column. */
+const ForceMatrixTable: FC<{
+  matrix: Record<ForceName, Record<ForceName, number>>;
+  digits: number;
+  /** The overlap matrix has no diagonal of its own: the within-force overlap covers it. */
+  hideDiagonal?: boolean;
+  label: string;
+}> = ({ matrix, digits, hideDiagonal = false, label }) => (
+  <TableScroller label={label}>
+    <thead>
+      <tr>
+        <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer, textTransform: 'none', letterSpacing: 0 }}>
+          row \ col
+        </th>
+        {FORCES.map((f) => <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f]}</th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {FORCES.map((row) => (
+        <tr key={row}>
+          <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{row}</th>
+          {FORCES.map((col) => (
+            <td key={col} style={{ ...CELL_NUM, color: row === col ? S.mutedText : S.onSurface }}>
+              {row === col && hideDiagonal ? NO_VALUE : fixed(matrix[row]?.[col], digits)}
+            </td>
           ))}
         </tr>
-      </thead>
-      <tbody>
-        {forces.map((row) => (
-          <tr key={row}>
-            <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{row}</th>
-            {forces.map((col) => {
-              const isDiag = row === col;
-              const v = matrix[row]?.[col];
-              return (
-                <td key={col} style={{ ...CELL_NUM, color: isDiag ? S.mutedText : S.onSurface }}>
-                  {isDiag && diagonal === 'dash' ? '—' : typeof v === 'number' ? v.toFixed(digits) : '—'}
-                </td>
-              );
-            })}
-          </tr>
-        ))}
-      </tbody>
-    </TableScroller>
-  );
+      ))}
+    </tbody>
+  </TableScroller>
+);
+
+const PARAM_GRID: CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12,
 };
 
-/** Per-force attenuation + within-force overlap as one six-column table
-    (replaces the two cramped half-width box grids that clipped). */
-const AttenuationTable: FC<{
-  attenuation?: Record<string, number>;
-  overlap?: Record<string, number>;
-}> = ({ attenuation, overlap }) => {
-  const forces = orderedKeys({ ...(attenuation ?? {}), ...(overlap ?? {}) }, FORCE_ORDER);
-  if (forces.length === 0) {
-    return <div style={READONLY_STYLE}>not returned by engine</div>;
-  }
-  const renderRow = (name: string, values?: Record<string, number>) => (
-    <tr>
-      <th scope="row" style={{
-        ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}`,
-        textTransform: 'none', letterSpacing: 0, fontSize: 11.5,
-      }}>
-        {name}
-      </th>
-      {forces.map((f) => {
-        const v = values?.[f];
-        return (
-          <td key={f} style={CELL_NUM}>
-            {typeof v === 'number' ? v.toFixed(3) : '—'}
-          </td>
-        );
-      })}
-    </tr>
-  );
+/** The code's parameters, from GET /api/v1/config. */
+const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
+  const years = config.path_years;
+  const horizon = years.length
+    ? `${years[0]}–${years[years.length - 1]} · ${years.length} years`
+    : NO_VALUE;
+  const jitter = config.peak_year_jitter;
   return (
-    <TableScroller label="Per-force attenuation and within-force overlap">
-      <thead>
-        <tr>
-          <th style={{ ...CELL_LABEL, backgroundColor: S.surfaceContainer }} aria-label="Parameter" />
-          {forces.map((f) => (
-            <th key={f} style={CELL_TH} title={f}>{FORCE_ABBR[f] ?? f}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {renderRow('Attenuation', attenuation)}
-        {renderRow('Within-force overlap', overlap)}
-      </tbody>
-    </TableScroller>
+    <>
+      <SectionCard
+        title="Simulation parameters"
+        icon={SlidersHorizontal}
+        description="The engine's defaults, as the code sets them."
+      >
+        <div style={PARAM_GRID}>
+          <SubBlock label="Default iterations" hint="Per chain. The production run uses 3 chains of 50,000.">
+            <div style={VALUE_STYLE}>{config.iterations.toLocaleString('en-US')}</div>
+          </SubBlock>
+          <SubBlock label="Path horizon" hint="Relative-shift paths over these years.">
+            <div style={VALUE_STYLE}>{horizon}</div>
+          </SubBlock>
+          <SubBlock label="Base year" hint="Materialisation anchor.">
+            <div style={VALUE_STYLE}>{config.base_year}</div>
+          </SubBlock>
+          <SubBlock
+            label="Peak-year jitter"
+            hint={jitter > 0
+              ? `Each iteration moves every driver's peak year by up to the width its uncertainty score sets, 0 to 4 years (±${jitter} for a driver without a score).`
+              : 'Every driver peaks in its scored year in every iteration.'}
+          >
+            <div style={VALUE_STYLE}>{jitter > 0 ? 'On' : 'Off'}</div>
+          </SubBlock>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Copula dependence (Gaussian)"
+        icon={SlidersHorizontal}
+        description="How driver correlations flow through the Monte Carlo. The correlations are latent-scale: they set the co-movement of the underlying Gaussian variables, not of the delivered Beta scores, so the realised score-to-score correlation is a little lower (about 0.28 for a latent 0.30). They lie between 0 and 1, so negative dependence cannot be expressed. The production run refuses a setting that is not positive definite on the loaded drivers rather than repairing it silently."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={PARAM_GRID}>
+            <SubBlock label="Within-force ρ" hint="Correlation between two drivers of the same force.">
+              <div style={VALUE_STYLE}>{fixed(config.within_force_rho, 2)}</div>
+            </SubBlock>
+          </div>
+          <SubBlock
+            label="Force correlation matrix"
+            hint="Correlation between drivers of two forces; positive definite as entered on the current drivers. A force pair the matrix does not name takes 0.05."
+          >
+            <ForceMatrixTable matrix={config.force_correlation_matrix} digits={2} label="Force correlation matrix" />
+          </SubBlock>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Attenuation & overlap"
+        icon={SlidersHorizontal}
+        description={`The engine dampens each force's combined driver effect with a per-force attenuation, 0.5 × (1 − mean between-force overlap of that force's row), and dampens the drivers within a force by their within-force overlap, for the mechanisms they share. Source: ${config.attenuation_source}, a structured-judgment overlap correction built on the drivers' category exposures.`}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ForceRowsTable
+            label="Per-force attenuation and within-force overlap"
+            rows={[
+              { name: 'Attenuation', values: config.per_force_attenuation },
+              { name: 'Within-force overlap', values: config.within_force_overlap },
+            ]}
+          />
+          <SubBlock
+            label="Between-force overlap matrix"
+            hint="Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is covered by a broad one more than the other way round), bounded 0–0.45. The within-force overlap above covers the diagonal."
+          >
+            <ForceMatrixTable matrix={config.force_overlap_matrix} digits={3} hideDiagonal label="Between-force overlap matrix" />
+          </SubBlock>
+        </div>
+      </SectionCard>
+    </>
   );
 };
 
-// ── Editable weight grid with a live sum badge ──────────────────────
-const WeightGrid: FC<{
-  title: string;
-  weights: Record<string, number>;
-  order: string[];
-  onCommit: (key: string, v: number) => void;
-  readOnly: boolean;
-}> = ({ title, weights, order, onCommit, readOnly }) => {
-  const keys = orderedKeys(weights, order);
-  const sum = keys.reduce((a, k) => a + (Number.isFinite(weights[k]) ? weights[k] : 0), 0);
-  const ok = Math.abs(sum - 1) <= 0.01; // PUT /api/v1/config tolerance
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
-          fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
-          letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant,
-        }}>
-          {title}
-        </span>
-        <span
-          style={{
-            fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 999,
-            backgroundColor: ok ? S.successContainer : S.errorContainer,
-            color: ok ? S.success : S.onErrorContainer,
-          }}
-          title={ok
-            ? 'Sums to 1.0 within the ±0.01 backend tolerance.'
-            : 'Must sum to 1.0 (±0.01) — the backend rejects this save.'}
-        >
-          Σ {sum.toFixed(3)}{ok ? '' : ' · must equal 1.0'}
-        </span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
-        {keys.map((k) => (
-          <Field key={k} label={k}>
-            <NumberField
-              value={weights[k]}
-              onCommit={(v) => onCommit(k, v)}
-              readOnly={readOnly}
-              inputStyle={readOnly ? READONLY_STYLE : INPUT_STYLE}
-              format={fmtShortNumber}
-            />
-          </Field>
-        ))}
-      </div>
-    </div>
-  );
-};
+// ── How the estimated mix is built ──────────────────────────────────
+// Every number comes from the generated record (lib/cellWeightProvenance.ts);
+// none is repeated here.
 
-// ── 2.11.0 (O6): editable 13 × 4 cell-weight grid ───────────────────
-// Each cell is the share of the HCB gross-profit pool that sits in that
-// category × region (entered in %, stored as a share that sums to 1). The
-// row and column sums are the derived category and region weights the engine
-// reports as category_weights_used / region_weights_used — read-only here.
-const CELL_INPUT: React.CSSProperties = {
-  ...INPUT_STYLE, width: 76, padding: '5px 7px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5,
-};
-const CELL_INPUT_RO: React.CSSProperties = { ...CELL_INPUT, ...READONLY_STYLE, width: 76 };
-const fmtPct2 = (v: number): string => (Number.isFinite(v) ? v.toFixed(2) : '');
-// The two reset bases share one shape; the estimate is the primary of the
-// pair (it is the engine default since O14), marked with the container tint
-// rather than a new button style.
-const CELL_RESET_BUTTON: React.CSSProperties = { ...SECONDARY_BUTTON, padding: '4px 12px', fontSize: 11 };
-const CELL_RESET_PRIMARY: React.CSSProperties = { ...CELL_RESET_BUTTON, backgroundColor: S.primaryContainer };
-
-// ── 2.12.0 (O14): how the 52 default shares were built ──────────────
-// The engine default is an ESTIMATE of the HCB gross-profit mix, not Henkel
-// P&L, so the derivation and the grade of every input belong on the sheet
-// instead of inside a provenance string. Every number below is read from the
-// generated record (lib/cellWeightProvenance.ts) — none is repeated here.
 const GRADE_COLOR: Record<Grade, { bg: string; fg: string }> = {
   B: { bg: S.successContainer, fg: S.success },
   E: { bg: S.amberContainer, fg: S.onAmberContainer },
@@ -991,61 +759,55 @@ const GradeChip: FC<{ grade: Grade }> = ({ grade }) => (
   </span>
 );
 
-const PROV_TEXT: React.CSSProperties = { fontSize: 11.5, lineHeight: 1.6, color: S.mutedText };
-const PROV_HEAD: React.CSSProperties = {
+const PROV_TEXT: CSSProperties = { fontSize: 11.5, lineHeight: 1.6, color: S.mutedText };
+const PROV_HEAD: CSSProperties = {
   fontFamily: HEADLINE_FONT, fontSize: 10.5, fontWeight: 800,
   letterSpacing: '0.06em', textTransform: 'uppercase', color: S.onSurfaceVariant,
 };
-const PROV_TH_LEFT: React.CSSProperties = { ...CELL_TH, textAlign: 'left' };
-const PROV_TH_MID: React.CSSProperties = { ...CELL_TH, textAlign: 'center' };
-const PROV_GROUP_ROW: React.CSSProperties = {
+const PROV_TH_LEFT: CSSProperties = { ...CELL_TH, textAlign: 'left' };
+const PROV_TH_MID: CSSProperties = { ...CELL_TH, textAlign: 'center' };
+const PROV_GROUP_ROW: CSSProperties = {
   ...CELL_TH, textAlign: 'left', textTransform: 'none', letterSpacing: '0.03em',
   fontSize: 11, borderTop: `1px solid ${S.cardBorder}`,
 };
-const PROV_NUM: React.CSSProperties = {
+const PROV_NUM: CSSProperties = {
   fontFamily: MONO_FONT, fontSize: 11.5, color: S.onSurface,
   padding: '5px 10px', textAlign: 'right', whiteSpace: 'nowrap',
   fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${S.cardBorder}`,
 };
-const PROV_ROW_LABEL: React.CSSProperties = {
+const PROV_ROW_LABEL: CSSProperties = {
   fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, color: S.onSurface,
   padding: '5px 10px', textAlign: 'left', whiteSpace: 'nowrap',
   borderTop: `1px solid ${S.cardBorder}`,
 };
-const PROV_GRADE_CELL: React.CSSProperties = {
+const PROV_GRADE_CELL: CSSProperties = {
   padding: '5px 10px', textAlign: 'center', borderTop: `1px solid ${S.cardBorder}`,
 };
-const PROV_NOTE_CELL: React.CSSProperties = {
+const PROV_NOTE_CELL: CSSProperties = {
   fontSize: 10.5, lineHeight: 1.5, color: S.mutedText,
   padding: '5px 10px', textAlign: 'left', minWidth: 210,
   borderTop: `1px solid ${S.cardBorder}`,
 };
 
-const pct1 = (v: number): string => `${(v * 100).toFixed(1)}%`;
-
-// Derived once from the generated record: block order, the categories in
-// each block, the region columns and the marginal summary line.
-const PROV_BLOCK_SHARES: Record<string, number> = BLOCK_SPLIT.shares;
-const PROV_CATEGORIES = orderedKeys(CATEGORY_MIX, CATEGORY_ORDER);
-const PROV_BLOCKS = [
-  ...Object.keys(PROV_BLOCK_SHARES),
-  ...Array.from(new Set(PROV_CATEGORIES.map((c) => CATEGORY_MIX[c].block))).filter((b) => !(b in PROV_BLOCK_SHARES)),
+/** `obj`'s keys in the given order first, then any others. */
+const orderedKeys = (obj: Record<string, unknown>, order: string[]): string[] => [
+  ...order.filter((k) => k in obj),
+  ...Object.keys(obj).filter((k) => !order.includes(k)),
 ];
-const PROV_REGION_CATEGORIES = orderedKeys(REGION_MIX, CATEGORY_ORDER);
-const PROV_REGIONS = (() => {
-  const seen = Array.from(new Set(PROV_REGION_CATEGORIES.flatMap((c) => Object.keys(REGION_MIX[c].mix))));
-  return [...REGION_ORDER.filter((r) => seen.includes(r)), ...seen.filter((r) => !REGION_ORDER.includes(r))];
-})();
+
+const BLOCK_SHARES: Record<string, number> = BLOCK_SPLIT.shares;
+const PROV_CATEGORIES = orderedKeys(CATEGORY_MIX, CATEGORY_NAMES);
+const PROV_REGION_CATEGORIES = orderedKeys(REGION_MIX, CATEGORY_NAMES);
+const PROV_REGIONS = Object.keys(ESTIMATE_MARGINALS.region);
 const PROV_CELL_COUNT = PROV_CATEGORIES.length * PROV_REGIONS.length;
 const PROV_REGION_LINE = Object.entries(ESTIMATE_MARGINALS.region)
-  .map(([r, w]) => `${r} ${pct1(w)}`).join(' · ');
+  .map(([r, w]) => `${r} ${fmtPct(w)}`).join(' · ');
 const PROV_TOP_CATEGORIES = Object.entries(ESTIMATE_MARGINALS.category)
   .sort((a, b) => b[1] - a[1]).slice(0, 3)
-  .map(([c, w]) => `${c} ${pct1(w)}`).join(' · ');
+  .map(([c, w]) => `${c} ${fmtPct(w)}`).join(' · ');
 
-/** The graded derivation behind the default matrix. Read-only for everyone,
- *  admin or viewer: it explains the engine default, it never edits it. */
-const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimate }) => (
+/** The graded derivation of the estimated mix. */
+const CellWeightProvenance: FC = () => (
   <details style={{
     border: `1px solid ${S.cardBorder}`, borderRadius: 10,
     backgroundColor: S.surfaceLow, padding: '10px 12px',
@@ -1058,19 +820,10 @@ const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimat
       {Object.keys(MARGIN_INDEX).length} margin indices, {PROV_REGION_CATEGORIES.length} regional mixes, each graded
     </summary>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
-      {!matchesEstimate && (
-        <div style={{
-          fontSize: 11.5, lineHeight: 1.55, padding: '8px 10px', borderRadius: 8,
-          backgroundColor: S.amberContainer, color: S.onAmberContainer,
-        }}>
-          The grid above has been changed away from the estimate. What follows derives the
-          <strong> default </strong> mix, not the shares now in the grid.
-        </div>
-      )}
       <div style={PROV_TEXT}>
         These {PROV_CELL_COUNT} shares are an <strong>estimate</strong> of the HCB gross-profit mix, built from
-        public reporting and category knowledge. They are not Henkel P&amp;L: the finance figures replace them on
-        the production CLI (<code>run_50k_prod.py --cell-weights FILE</code>). Each cell is the category's share
+        public reporting and category knowledge. They are not Henkel P&amp;L: a finance file passed
+        to <code>scripts/run_production.py --cell-weights</code> replaces them. Each cell is the category's share
         of its block, times the block's share of HCB, times a GP1 margin index, times that category's own
         regional mix, normalised to 1.
       </div>
@@ -1089,16 +842,14 @@ const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimat
         <TableScroller label="Block split: each block's share of HCB gross profit">
           <thead>
             <tr>
-              {Object.keys(PROV_BLOCK_SHARES).map((b) => <th key={b} style={CELL_TH}>{b}</th>)}
+              {Object.keys(BLOCK_SHARES).map((b) => <th key={b} style={CELL_TH}>{b}</th>)}
               <th style={PROV_TH_MID}>Grade</th>
               <th style={PROV_TH_LEFT}>Basis</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              {Object.entries(PROV_BLOCK_SHARES).map(([b, w]) => (
-                <td key={b} style={PROV_NUM}>{pct1(w)}</td>
-              ))}
+              {Object.entries(BLOCK_SHARES).map(([b, w]) => <td key={b} style={PROV_NUM}>{fmtPct(w)}</td>)}
               <td style={PROV_GRADE_CELL}><GradeChip grade={BLOCK_SPLIT.grade} /></td>
               <td style={PROV_NOTE_CELL}>{BLOCK_SPLIT.note}</td>
             </tr>
@@ -1124,23 +875,23 @@ const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimat
               <th style={PROV_TH_LEFT}>Basis</th>
             </tr>
           </thead>
-          {PROV_BLOCKS.map((b) => (
+          {Object.keys(BLOCK_SHARES).map((b) => (
             <tbody key={b}>
               <tr>
                 <td colSpan={6} style={PROV_GROUP_ROW}>
-                  {b} · {pct1(PROV_BLOCK_SHARES[b] ?? 0)} of HCB gross profit
+                  {b} · {fmtPct(BLOCK_SHARES[b])} of HCB gross profit
                 </td>
               </tr>
               {PROV_CATEGORIES.filter((c) => CATEGORY_MIX[c].block === b).map((c) => {
                 const mix = CATEGORY_MIX[c];
-                const mi = MARGIN_INDEX[c];
+                const margin = MARGIN_INDEX[c];
                 return (
                   <tr key={c}>
                     <td style={PROV_ROW_LABEL}>{c}</td>
-                    <td style={PROV_NUM}>{pct1(mix.shareOfBlock)}</td>
+                    <td style={PROV_NUM}>{fmtPct(mix.shareOfBlock)}</td>
                     <td style={PROV_GRADE_CELL}><GradeChip grade={mix.grade} /></td>
-                    <td style={PROV_NUM}>{mi ? mi.index.toFixed(2) : ''}</td>
-                    <td style={PROV_GRADE_CELL}>{mi ? <GradeChip grade={mi.grade} /> : null}</td>
+                    <td style={PROV_NUM}>{margin ? margin.index.toFixed(2) : ''}</td>
+                    <td style={PROV_GRADE_CELL}>{margin ? <GradeChip grade={margin.grade} /> : null}</td>
                     <td style={PROV_NOTE_CELL}>{mix.note}</td>
                   </tr>
                 );
@@ -1168,7 +919,7 @@ const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimat
               return (
                 <tr key={c}>
                   <td style={PROV_ROW_LABEL}>{c}</td>
-                  {PROV_REGIONS.map((r) => <td key={r} style={PROV_NUM}>{pct1(rm.mix[r] ?? 0)}</td>)}
+                  {PROV_REGIONS.map((r) => <td key={r} style={PROV_NUM}>{fmtPct(rm.mix[r] ?? 0)}</td>)}
                   <td style={PROV_GRADE_CELL}><GradeChip grade={rm.grade} /></td>
                   <td style={PROV_NOTE_CELL}>{rm.note}</td>
                 </tr>
@@ -1190,691 +941,308 @@ const CellWeightProvenance: FC<{ matchesEstimate: boolean }> = ({ matchesEstimat
   </details>
 );
 
-const CellWeightGrid: FC<{
-  cells: Record<string, Record<string, number>>;
-  onCommit: (category: string, region: string, share: number) => void;
-  onResetEstimate: () => void;
-  onResetEqual: () => void;
-  readOnly: boolean;
-}> = ({ cells, onCommit, onResetEstimate, onResetEqual, readOnly }) => {
-  const m = cellMarginals(cells, CATEGORY_ORDER, REGION_ORDER);
-  const { categories: cats, regions, total, ok, equal, matchesEstimate, cellCount: nCells } = m;
-  // Three bases, one quiet badge: the O14 estimate (the engine default), the
-  // neutral 1/n grid, or shares that are neither (loaded from finance, or
-  // hand-edited on this sheet).
-  const basis = matchesEstimate
-    ? { label: 'estimated HCB mix (O14)', title: `The engine default since owner ruling O14: the estimated HCB gross-profit mix, version ${ESTIMATE_VERSION}.` }
-    : equal
-      ? { label: `equal placeholder (1/${nCells} each)`, title: 'The neutral basis: every cell carries the same share, which weights every region equally.' }
-      : { label: 'custom (edited)', title: 'Neither the estimated HCB mix nor the equal grid: these shares were loaded or edited.' };
-  const share = (c: string, r: string) => {
-    const v = cells[c]?.[r];
-    return Number.isFinite(v) ? Number(v) : 0;
-  };
-  const rowSum = (c: string) => m.rowSums[c] ?? 0;
-  const colSum = (r: string) => m.colSums[r] ?? 0;
+const BasisBadge: FC<{ estimate: boolean }> = ({ estimate }) => (
+  <span
+    title={estimate
+      ? `The estimated HCB gross-profit mix, version ${ESTIMATE_VERSION}`
+      : 'The shares from the finance file the production run was given'}
+    style={{
+      fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
+      padding: '2px 8px', borderRadius: 999,
+      backgroundColor: estimate ? S.amberContainer : S.successContainer,
+      color: estimate ? S.onAmberContainer : S.success,
+    }}
+  >
+    {estimate ? 'Estimated HCB mix' : 'Finance figures'}
+  </span>
+);
+
+/** The served run's cell weights with their marginals and where they come from. */
+const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
+  const m = cellMarginals(run.cell_weights_used, CATEGORY_NAMES, run.decompositions.dimensions.regions);
+  const estimate = m.matchesEstimate;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{
-          fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
-          letterSpacing: '0.08em', textTransform: 'uppercase', color: S.onSurfaceVariant,
-        }}>
-          Cell weights — share of HCB gross profit per category × region (%)
+        <span style={{ ...LABEL_STYLE, fontWeight: 800, letterSpacing: '0.08em' }}>
+          Cell weights of run #{run.run_meta.run_id}: share of HCB gross profit per category × region (%)
         </span>
-        <span
-          style={{
-            fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 999,
-            backgroundColor: ok ? S.successContainer : S.errorContainer,
-            color: ok ? S.success : S.onErrorContainer,
-          }}
-          title={ok
-            ? 'The 52 shares sum to 100% within the ±1 pt backend tolerance.'
-            : 'The 52 shares must sum to 100% (±1 pt) — the backend rejects this save.'}
-        >
-          Σ {(total * 100).toFixed(2)}%{ok ? '' : ' · must equal 100%'}
-        </span>
-        <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: S.mutedText }} title={basis.title}>
-          {basis.label}
-        </span>
-        {!readOnly && (
-          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-            <button
-              type="button"
-              onClick={onResetEstimate}
-              disabled={matchesEstimate}
-              style={{ ...CELL_RESET_PRIMARY, opacity: matchesEstimate ? 0.5 : 1 }}
-              title="Restore the estimated HCB gross-profit mix, the engine default since O14"
-            >
-              Reset to estimate
-            </button>
-            <button
-              type="button"
-              onClick={onResetEqual}
-              disabled={equal}
-              style={{ ...CELL_RESET_BUTTON, opacity: equal ? 0.5 : 1 }}
-              title={`Set every cell to 1/${nCells}, the neutral basis, which is itself an assumption: it weights every region equally`}
-            >
-              Reset to equal
-            </button>
-          </div>
-        )}
+        <BasisBadge estimate={estimate} />
       </div>
+      {!estimate && (
+        <div style={{ fontSize: 11.5, lineHeight: 1.55, color: S.onSurfaceVariant }}>
+          Source: {run.cell_weights_source}
+        </div>
+      )}
       <TableScroller label="Cell weights: share of HCB gross profit per category and region">
-          <thead>
-            <tr>
-              <th style={{ ...CELL_LABEL, textAlign: 'left' }}>Category</th>
-              {regions.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
-              <th style={CELL_TH} title="Row sum = the category's share of the pool (derived, read-only)">Σ category</th>
+        <thead>
+          <tr>
+            <th style={CELL_LABEL}>Category</th>
+            {m.regions.map((r) => <th key={r} style={CELL_TH}>{r}</th>)}
+            <th style={CELL_TH} title="Row sum: the category's share of the pool">Σ category</th>
+          </tr>
+        </thead>
+        <tbody>
+          {m.categories.map((c) => (
+            <tr key={c}>
+              <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }}>{c}</th>
+              {m.regions.map((r) => <td key={r} style={CELL_NUM}>{pct2(run.cell_weights_used[c]?.[r] ?? 0)}</td>)}
+              <td style={CELL_SUM}>{pct2(m.rowSums[c])}%</td>
             </tr>
-          </thead>
-          <tbody>
-            {cats.map((c) => (
-              <tr key={c}>
-                <td style={{ ...CELL_LABEL, textAlign: 'left' }}>{c}</td>
-                {regions.map((r) => (
-                  <td key={r} style={{ padding: '3px 4px', textAlign: 'right' }}>
-                    <NumberField
-                      value={share(c, r) * 100}
-                      onCommit={(v) => onCommit(c, r, v / 100)}
-                      readOnly={readOnly}
-                      inputStyle={readOnly ? CELL_INPUT_RO : CELL_INPUT}
-                      format={fmtPct2}
-                    />
-                  </td>
-                ))}
-                <td style={{ padding: '3px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 700, color: S.onSurfaceVariant }}>
-                  {(rowSum(c) * 100).toFixed(2)}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td style={{ ...CELL_LABEL, textAlign: 'left' }} title="Column sum = the region's share of the pool (derived, read-only)">Σ region</td>
-              {regions.map((r) => (
-                <td key={r} style={{ padding: '6px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 700, color: S.onSurfaceVariant }}>
-                  {(colSum(r) * 100).toFixed(2)}%
-                </td>
-              ))}
-              <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: MONO_FONT, fontSize: 11.5, fontWeight: 800, color: ok ? S.success : S.onErrorContainer }}>
-                {(total * 100).toFixed(2)}%
-              </td>
-            </tr>
-          </tfoot>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" style={{ ...CELL_LABEL, borderTop: `1px solid ${S.cardBorder}` }} title="Column sum: the region's share of the pool">
+              Σ region
+            </th>
+            {m.regions.map((r) => <td key={r} style={CELL_SUM}>{pct2(m.colSums[r])}%</td>)}
+            <td style={{ ...CELL_SUM, fontWeight: 800 }}>{pct2(m.total)}%</td>
+          </tr>
+        </tfoot>
       </TableScroller>
-      <CellWeightProvenance matchesEstimate={matchesEstimate} />
+      <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55 }}>
+        {estimate ? (
+          <>
+            <strong>An estimate from public reporting, not Henkel P&amp;L.</strong> A finance file passed
+            to <code>scripts/run_production.py --cell-weights</code> replaces it.
+          </>
+        ) : (
+          <>These shares come from the finance file the production run was given (<code>scripts/run_production.py --cell-weights</code>).</>
+        )}{' '}
+        Only shares enter PRISM, never euro figures. A cell with share 0 contributes nothing to the roll-up
+        however exposed its drivers are: HCB's presence in a region enters here, not through the exposures.
+      </div>
+      {estimate && <CellWeightProvenance />}
     </div>
   );
 };
 
-const ConfigSection: FC<{ isAdmin: boolean }> = ({ isAdmin }) => {
-  const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<ModelConfigPayload | null>(null);
-  const [draft, setDraft] = useState<ModelConfigPayload | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ kind: 'success' | 'error' | 'info'; message: string } | null>(null);
-
-  // The fetch. Every state write happens in a promise continuation, so the
-  // mount effect below can start it without setting state synchronously.
-  const fetchConfig = useCallback(
-    () =>
-      fetch('/api/config', { credentials: 'include' })
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`Load failed (${res.status})`);
-          const data = (await res.json()) as ModelConfigPayload;
-          setConfig(data);
-          setDraft(data);
-        })
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : 'Failed to load config.';
-          setStatus({ kind: 'error', message: `${message}. Defaults are shown — save is disabled.` });
-          setConfig(null);
-          setDraft(null);
-        })
-        .finally(() => {
-          setLoading(false);
-        }),
-    [],
-  );
-
-  // "Reload from backend": re-enter the loading state, then fetch.
-  const load = useCallback(() => {
-    setLoading(true);
-    setStatus(null);
-    return fetchConfig();
-  }, [fetchConfig]);
-
-  // Initial load. The section already mounts in exactly the state `load`
-  // would set here (loading, no status), so it goes straight to the fetch.
-  useEffect(() => { void fetchConfig(); }, [fetchConfig]);
-
-  // Diff-only save: only keys the admin actually changed enter the PUT body.
-  // The previous full-draft PUT audit-logged EVERY field as "changed" on
-  // every save and leaned on pydantic silently dropping unknown keys.
-  const dirtyKeys = useMemo<EditableKey[]>(() => {
-    if (!config || !draft) return [];
-    return EDITABLE_KEYS.filter(
-      (k) => JSON.stringify(config[k]) !== JSON.stringify(draft[k]),
-    );
-  }, [config, draft]);
-  const isDirty = dirtyKeys.length > 0;
-
-  const handleSave = useCallback(async () => {
-    if (!draft || dirtyKeys.length === 0) return;
-    setSaving(true);
-    setStatus(null);
-    try {
-      const body = Object.fromEntries(dirtyKeys.map((k) => [k, draft[k]]));
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({ error: res.statusText }));
-        const msg = typeof payload.error === 'string' ? payload.error : `Save failed (${res.status})`;
-        throw new Error(msg);
-      }
-      setConfig(draft);
-      setStatus({
-        kind: 'success',
-        message: `Saved and audit-logged (${dirtyKeys.join(', ')}). The persisted run is now marked stale — dashboard numbers change only after the next production CLI run.`,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save configuration.';
-      setStatus({ kind: 'error', message });
-    } finally {
-      setSaving(false);
-    }
-  }, [draft, dirtyKeys]);
-
-  const handleReset = useCallback(() => {
-    setDraft(config);
-    setStatus({ kind: 'info', message: 'Reverted to last loaded values.' });
-  }, [config]);
-
-  // Everyone can see the Config sheet — only admins can change it. Non-admins
-  // get the same form but with every input disabled and the Save row hidden.
-  // We thread a single `readOnly` flag through so the UI stays consistent
-  // and the backend PUT gate (requireAdmin in /api/config) is the real
-  // enforcement boundary — the UI just mirrors it.
-  const readOnly = !isAdmin;
-
-  const patch = (p: Partial<ModelConfigPayload>) => {
-    if (readOnly) return;
-    setDraft((d) => (d ? { ...d, ...p } : d));
-  };
-
-  const patchWeight = (group: WeightGroupKey) => (key: string, v: number) => {
-    if (readOnly) return;
-    setDraft((d) => (d ? { ...d, [group]: { ...(d[group] ?? {}), [key]: v } } : d));
-  };
-
-  // 2.11.0 (O6): one cell of the 13 × 4 share matrix; the marginals shown
-  // next to the grid are recomputed from the draft on every render.
-  const patchCell = (category: string, region: string, share: number) => {
-    if (readOnly) return;
-    setDraft((d) => {
-      if (!d) return d;
-      const cells = { ...(d.cell_weights ?? {}) };
-      cells[category] = { ...(cells[category] ?? {}), [region]: share };
-      return { ...d, cell_weights: cells };
-    });
-  };
-  // 2.12.0 (O14): back to the engine default, the estimated HCB gross-profit
-  // mix. Same shape as the equal reset below, over the estimate's own keys.
-  const resetCellsEstimate = () => {
-    if (readOnly) return;
-    setDraft((d) => {
-      if (!d?.cell_weights) return d;
-      const cells = estimatedCellWeights();
-      if (!Object.keys(cells).length) return d;
-      return {
-        ...d,
-        cell_weights: cells,
-        // The backend's own default wording (served by GET) so an untouched
-        // default never registers as a source change.
-        cell_weights_source: d.cell_weights_source_default ?? d.cell_weights_source,
-      };
-    });
-  };
-  const resetCellsEqual = () => {
-    if (readOnly) return;
-    setDraft((d) => {
-      if (!d?.cell_weights) return d;
-      const { categories, regions, cellCount } = cellMarginals(d.cell_weights, CATEGORY_ORDER, REGION_ORDER);
-      if (!cellCount) return d;
-      return {
-        ...d,
-        cell_weights: equalCellWeights(categories, regions),
-        // The equal grid's OWN wording (served by GET) so an untouched
-        // placeholder never registers as a source change. Since O14 the
-        // *default* label is the estimate's, so falling back to it here would
-        // stamp the estimate's provenance onto an equal grid; on a service
-        // that does not serve the equal label we leave the existing text
-        // alone instead — a stale label beats a wrong one.
-        cell_weights_source: d.cell_weights_source_equal ?? d.cell_weights_source,
-      };
-    });
-  };
-
-  const ro = readOnly;
-
-  const horizon = draft?.path_years?.length
-    ? `${draft.path_years[0]}–${draft.path_years[draft.path_years.length - 1]} · ${draft.path_years.length} years`
-    : '—';
-
+const ModelSection: FC = () => {
+  const { config, simulation, loading } = usePrism();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {readOnly && (
-        <StatusBanner kind="info">
-          You have <b>viewer</b> access — values below are read-only. Ask an administrator to make changes.
-        </StatusBanner>
-      )}
+      <StatusBanner kind="info">
+        Read-only: a parameter change is a code change followed by a production run.
+      </StatusBanner>
 
-      {loading || !draft ? (
+      {config ? <ParameterCards config={config} /> : (
         <SectionCard title="Simulation parameters" icon={SlidersHorizontal}>
-          <div style={{ color: S.mutedText, fontSize: 13 }}>
-            {loading ? 'Loading configuration…' : 'No configuration available.'}
-          </div>
+          <Muted>{loading ? 'Loading the configuration…' : 'No model configuration is available yet.'}</Muted>
         </SectionCard>
-      ) : (
-        <>
-          <SectionCard
-            title="Simulation parameters"
-            icon={SlidersHorizontal}
-            description="Admin changes are audit-logged and mark the persisted run stale — dashboard numbers change only after the next production CLI run. Existing runs are immutable."
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-              <Field label="MC iterations" hint="Admin bounds 1,000–100,000 · default 10,000. Production runs execute offline at 50,000 × 3 chains.">
-                <NumberField
-                  integer
-                  value={draft.iterations ?? 10000}
-                  onCommit={(v) => patch({ iterations: v })}
-                  readOnly={ro}
-                  inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-                />
-              </Field>
-              <SubBlock label="Path horizon (read-only)" hint="Relative-shift paths over the 10-year horizon.">
-                <div style={READONLY_STYLE}>{horizon}</div>
-              </SubBlock>
-              <SubBlock label="Base year (read-only)" hint="Materialization anchor. Changed only via a correction release.">
-                <div style={READONLY_STYLE}>{draft.base_year ?? '—'}</div>
-              </SubBlock>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Copula dependence — Gaussian"
-            icon={SlidersHorizontal}
-            description="How driver correlations flow through the Monte Carlo. The t-copula tail dial was removed June 2026 (D20) after testing inert (<2% band effect). Correlation settings implying a non-PSD driver-population matrix are rejected at save time (spectral gate, D1) rather than silently repaired. F8 (2.10.0): these correlations are LATENT-SCALE — they parameterise the co-movement of the underlying Gaussian variables, not the delivered Beta scores; the realised score-to-score correlation is a touch lower (≈0.28 for a latent 0.30). The [0,1] restriction means negative dependence is not expressible (a documented limitation)."
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
-                <Field label="Within-force ρ" hint="Correlation between drivers of the same force. Bounds 0–0.9 · default 0.30.">
-                  <NumberField
-                    value={draft.within_force_rho ?? 0.3}
-                    onCommit={(v) => patch({ within_force_rho: v })}
-                    readOnly={ro}
-                    inputStyle={ro ? READONLY_STYLE : INPUT_STYLE}
-                  />
-                </Field>
-              </div>
-              {draft.force_correlation_matrix && (
-                <SubBlock
-                  label="Force correlation matrix (read-only)"
-                  hint="Cross-force correlations, PSD-valid as entered (v3.6 recalibration, D1). Pairs not covered by a driver's force row fall back to residual ρ = 0.05. Editable via the admin API only — symmetry, unit diagonal and the spectral gate are enforced there."
-                >
-                  <ForceMatrixTable
-                    matrix={draft.force_correlation_matrix}
-                    digits={2}
-                    diagonal="value"
-                    label="Force correlation matrix"
-                  />
-                </SubBlock>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Attenuation & overlap"
-            icon={SlidersHorizontal}
-            description={`Read-only. The engine dampens each force's combined driver effect with a per-force attenuation — derived as 0.5 × (1 − mean between-force overlap of that force's row) — plus within-force overlap dampening for mechanism redundancy. Source: structured-judgment overlap correction (v3.12, Sep-2026, 51-driver base)${draft.attenuation_source === 'admin_override' ? ' — admin override active' : ''}. Changed only via a correction release.`}
-          >
-            {/* F-27/D8 (June 2026): the legacy scalar attenuation field was a
-                silent no-op — the engine consumes six per-force values.
-                D17 (owner decision): the source is labeled "structured-
-                judgment overlap correction", not "calibrated" — the values
-                rest on a weighted-Jaccard exposure proxy plus documented
-                judgment adjustments, not on measured outcomes (F-19). */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <AttenuationTable
-                attenuation={draft.per_force_attenuation}
-                overlap={draft.within_force_overlap}
-              />
-              {draft.force_overlap_matrix && (
-                <SubBlock
-                  label="Between-force overlap matrix (read-only)"
-                  hint="Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is 'covered' by a broad one more than vice versa), bounded 0–0.45. The diagonal is handled by the within-force overlap above."
-                >
-                  <ForceMatrixTable
-                    matrix={draft.force_overlap_matrix}
-                    digits={3}
-                    diagonal="dash"
-                    label="Between-force overlap matrix"
-                  />
-                </SubBlock>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Aggregation weights"
-            icon={SlidersHorizontal}
-            description="Weights the engine consumes for portfolio aggregation and the lenses. Force weights must sum to 1.0 and the 52 cell shares to 100% — the backend rejects saves outside ±0.01; inside that tolerance the engine applies the cell shares normalised to their total (the run reports the shares actually applied as cell_weights_used). Since 2.11.0 (owner ruling O6) the roll-up from the 52 category × region cells to the category and portfolio numbers uses ONE 13 × 4 matrix of gross-profit shares: category shift = share-weighted mean of its row, portfolio = Σ share × cell. The former region and category dials are its row and column sums and are derived, not edited. The value-chain lens carries no weights: it is a categorical epicentre partition (2.9.0)."
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {draft.force_weights ? (
-                <WeightGrid
-                  title="Force weights"
-                  weights={draft.force_weights}
-                  order={FORCE_ORDER}
-                  onCommit={patchWeight('force_weights')}
-                  readOnly={ro}
-                />
-              ) : (
-                <div style={{ color: S.mutedText, fontSize: 12.5 }}>
-                  No force weights returned by the backend — defaults are used (equal weight per force).
-                </div>
-              )}
-              {draft.cell_weights ? (
-                <>
-                  <CellWeightGrid
-                    cells={draft.cell_weights}
-                    onCommit={patchCell}
-                    onResetEstimate={resetCellsEstimate}
-                    onResetEqual={resetCellsEqual}
-                    readOnly={ro}
-                  />
-                  <Field label="Cell weights source" hint="Provenance label stored with the weights and shown in the About-this-model footer of every run (max 400 characters).">
-                    <input
-                      type="text"
-                      value={draft.cell_weights_source ?? ''}
-                      onChange={(e) => patch({ cell_weights_source: e.target.value.slice(0, 400) })}
-                      disabled={ro}
-                      readOnly={ro}
-                      style={ro ? READONLY_STYLE : INPUT_STYLE}
-                    />
-                  </Field>
-                  <div style={{ fontSize: 11.5, color: S.mutedText, lineHeight: 1.55, marginTop: -8 }}>
-                    <strong>Assumption:</strong> the default is the estimated HCB gross-profit mix
-                    (owner ruling O14, September 2026), derived cell by cell above. The equal 1/52 grid
-                    is still one click away, but it is an assumption of its own rather than a neutral
-                    choice: it weights every region equally. The production CLI still takes the real
-                    shares from a file kept outside the repository
-                    (<code>run_50k_prod.py --cell-weights FILE</code>); euro figures never enter PRISM,
-                    only shares. A cell with share 0 contributes nothing to the roll-up however large
-                    its mechanism score (presence in a region enters here, not through the exposures).
-                  </div>
-                </>
-              ) : (
-                <div style={{ color: S.mutedText, fontSize: 12.5 }}>
-                  No cell weights returned by the backend (pre-2.11 service): the engine default applies, the
-                  estimated HCB gross-profit mix of owner ruling O14.
-                </div>
-              )}
-            </div>
-          </SectionCard>
-        </>
       )}
 
-      {status && <StatusBanner kind={status.kind}>{status.message}</StatusBanner>}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-        <button onClick={load} style={SECONDARY_BUTTON} disabled={loading}>
-          Reload from backend
-        </button>
-        {!readOnly && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={handleReset} disabled={!isDirty || saving} style={{ ...SECONDARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
-              Discard changes
-            </button>
-            <button onClick={handleSave} disabled={!isDirty || saving} style={{ ...PRIMARY_BUTTON, opacity: (!isDirty || saving) ? 0.5 : 1 }}>
-              {saving ? 'Saving…' : isDirty ? `Save configuration (${dirtyKeys.length})` : 'Save configuration'}
-            </button>
-          </div>
-        )}
-      </div>
+      <SectionCard
+        title="Aggregation weights"
+        icon={SlidersHorizontal}
+        description="Force weights scale each force's contribution before the forces compound. A run rolls its category × region cells up with one matrix of gross-profit shares: a category's shift is the share-weighted mean of its row, the portfolio's the share-weighted sum of all cells. Row sums are the category shares, column sums the region shares. The value-chain lens carries no weights: it assigns each driver wholly to its epicentre stage."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {config && (
+            <SubBlock label="Force weights">
+              <ForceRowsTable label="Force weights" rows={[{ name: 'Weight', values: config.force_weights }]} />
+            </SubBlock>
+          )}
+          {simulation ? <RunCellWeights run={simulation} /> : (
+            <Muted>{loading ? 'Loading the run…' : 'There is no run yet, so there are no cell weights to show.'}</Muted>
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Section: User Management (admin only)
+// Administration: user management
 // ═══════════════════════════════════════════════════════════════════
-interface ManagedUser {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: 'admin' | 'viewer';
-  lastSignInAt: string | null;
-  createdAt: string | null;
-}
 
-const UsersSection: FC<{ isAdmin: boolean; currentUserId: string | null }> = ({ isAdmin, currentUserId }) => {
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+const USER_GRID = '2fr 1.2fr 0.8fr 1fr 0.8fr';
+
+const UsersSection: FC<{ currentUserId: string | null }> = ({ currentUserId }) => {
+  const [users, setUsers] = useState<ManagedUser[] | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
 
-  // The directory read. Every state write happens in a promise continuation,
-  // so the effect below can start it without setting state synchronously.
-  // The section mounts in the loading state this used to set on entry.
-  const load = useCallback(
-    () =>
-      fetch('/api/users', { credentials: 'include' })
-        .then(async (res) => {
-          if (!res.ok) throw new Error(`Load failed (${res.status})`);
-          const data = (await res.json()) as { users: ManagedUser[] };
-          setUsers(data.users);
-        })
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : 'Failed to load users.';
-          setStatus({ kind: 'error', message });
-          setUsers([]);
-        })
-        .finally(() => {
-          setLoading(false);
-        }),
-    [],
-  );
+  useEffect(() => {
+    let cancelled = false;
+    api.getUsers().then(
+      (res) => { if (!cancelled) setUsers(res.users); },
+      (err: unknown) => {
+        if (cancelled) return;
+        setUsers([]);
+        setStatus({ kind: 'error', message: errorText(err, 'Failed to load users.') });
+      },
+    );
+    return () => { cancelled = true; };
+  }, []);
 
-  // Non-admins render the "restricted" card below and never read `loading`,
-  // so there is nothing to fetch and nothing to clear for them.
-  useEffect(() => { if (isAdmin) void load(); }, [isAdmin, load]);
-
-  const handleRoleChange = useCallback(async (userId: string, role: 'admin' | 'viewer') => {
+  const changeRole = async (userId: string, role: Role) => {
     setUpdatingId(userId);
     setStatus(null);
     try {
-      const res = await fetch(`/api/users/${userId}/role`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ role }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(payload.error ?? `Update failed (${res.status})`);
-      }
-      setUsers((list) => list.map((u) => (u.id === userId ? { ...u, role } : u)));
+      const saved = await api.setUserRole(userId, role);
+      setUsers((list) => list && list.map((u) => (u.id === userId ? { ...u, role: saved.role } : u)));
       setStatus({ kind: 'success', message: 'Role updated.' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update role.';
-      setStatus({ kind: 'error', message });
+      setStatus({ kind: 'error', message: errorText(err, 'Failed to update role.') });
     } finally {
       setUpdatingId(null);
     }
-  }, []);
-
-  if (!isAdmin) {
-    return (
-      <SectionCard
-        title="User management"
-        icon={UsersIcon}
-        description="User management is restricted to administrators."
-      >
-        <StatusBanner kind="info">
-          You don't have permission to view this section.
-        </StatusBanner>
-      </SectionCard>
-    );
-  }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionCard
-        title={`All users${users.length ? ` (${users.length})` : ''}`}
-        icon={UsersIcon}
-        description="Promote teammates to admin or demote to viewer. Admins can edit model configuration and manage other users. Viewers have read-only access."
-      >
-        {loading ? (
-          <div style={{ color: S.mutedText, fontSize: 13 }}>Loading users…</div>
-        ) : users.length === 0 ? (
-          <div style={{ color: S.mutedText, fontSize: 13 }}>No users returned from the directory.</div>
-        ) : (
+    <SectionCard
+      title={`All users${users?.length ? ` (${users.length})` : ''}`}
+      icon={UsersIcon}
+      description="Promote teammates to admin or demote them to viewer. Admins edit drivers and Consumer Journey content and manage users; viewers have read-only access."
+    >
+      {users === null ? (
+        <Muted>Loading users…</Muted>
+      ) : users.length === 0 ? (
+        <Muted>No users returned from the directory.</Muted>
+      ) : (
+        <div style={{
+          border: `1px solid ${S.cardBorder}`, borderRadius: 12, overflow: 'hidden',
+          backgroundColor: S.surface,
+        }}>
           <div style={{
-            border: `1px solid ${S.cardBorder}`, borderRadius: 12, overflow: 'hidden',
-            backgroundColor: S.surface,
+            display: 'grid',
+            gridTemplateColumns: USER_GRID,
+            padding: '10px 14px',
+            backgroundColor: S.surfaceContainer,
+            fontFamily: HEADLINE_FONT,
+            fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: S.onSurfaceVariant,
           }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 1.2fr 0.8fr 1fr 0.8fr',
-              padding: '10px 14px',
-              backgroundColor: S.surfaceContainer,
-              fontFamily: HEADLINE_FONT,
-              fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
-              textTransform: 'uppercase', color: S.onSurfaceVariant,
-            }}>
-              <span>User</span>
-              <span>Name</span>
-              <span>Role</span>
-              <span>Last active</span>
-              <span style={{ textAlign: 'right' }}>Actions</span>
-            </div>
-            {users.map((u) => {
-              const isSelf = currentUserId === u.id;
-              const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ') || '—';
-              // R-12: locale-stable "26 Jun 2026".
-              const lastSignIn = fmtDate(u.lastSignInAt);
-              return (
-                <div
-                  key={u.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2fr 1.2fr 0.8fr 1fr 0.8fr',
-                    padding: '12px 14px',
-                    borderTop: `1px solid ${S.cardBorder}`,
-                    alignItems: 'center',
-                    fontSize: 12.5, color: S.onSurface,
-                  }}
-                >
-                  <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {u.email}
-                    {isSelf && (
-                      <span className="ml-2 text-[11px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
-                        style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer }}>
-                        You
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ color: S.mutedText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</span>
-                  <span><RolePill role={u.role} /></span>
-                  <span style={{ color: S.mutedText }}>{lastSignIn}</span>
-                  <span style={{ textAlign: 'right' }}>
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value as 'admin' | 'viewer')}
-                      disabled={updatingId === u.id || isSelf}
-                      title={isSelf ? "You can't change your own role." : 'Change role'}
-                      style={{
-                        ...INPUT_STYLE,
-                        padding: '5px 10px',
-                        fontSize: 12,
-                        opacity: (updatingId === u.id || isSelf) ? 0.55 : 1,
-                        cursor: isSelf ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <option value="viewer">Viewer</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </span>
-                </div>
-              );
-            })}
+            <span>User</span>
+            <span>Name</span>
+            <span>Role</span>
+            <span>Last sign-in</span>
+            <span style={{ textAlign: 'right' }}>Actions</span>
           </div>
-        )}
-        {status && (
-          <div style={{ marginTop: 12 }}><StatusBanner kind={status.kind}>{status.message}</StatusBanner></div>
-        )}
-      </SectionCard>
-    </div>
+          {users.map((u) => {
+            const isSelf = currentUserId === u.id;
+            const locked = updatingId === u.id || isSelf;
+            return (
+              <div
+                key={u.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: USER_GRID,
+                  padding: '12px 14px',
+                  borderTop: `1px solid ${S.cardBorder}`,
+                  alignItems: 'center',
+                  fontSize: 12.5, color: S.onSurface,
+                }}
+              >
+                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {u.email}
+                  {isSelf && (
+                    <span className="ml-2 text-[11px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer }}>
+                      You
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: S.mutedText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[u.firstName, u.lastName].filter(Boolean).join(' ') || NO_VALUE}
+                </span>
+                <span><RolePill role={u.role} /></span>
+                <span style={{ color: S.mutedText }}>{fmtDate(u.lastSignInAt)}</span>
+                <span style={{ textAlign: 'right' }}>
+                  <select
+                    value={u.role}
+                    onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                    disabled={locked}
+                    aria-label={`Role of ${u.email}`}
+                    title={isSelf ? "You can't change your own role." : 'Change role'}
+                    style={{
+                      ...INPUT_STYLE,
+                      padding: '5px 10px',
+                      fontSize: 12,
+                      opacity: locked ? 0.55 : 1,
+                      cursor: isSelf ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {status && (
+        <div style={{ marginTop: 12 }}><StatusBanner kind={status.kind}>{status.message}</StatusBanner></div>
+      )}
+    </SectionCard>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// Main Modal
+// The dialog
 // ═══════════════════════════════════════════════════════════════════
+
+const RAIL_HEADING: CSSProperties = {
+  padding: '4px 10px 6px',
+  fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
+  letterSpacing: '0.12em', textTransform: 'uppercase',
+  color: S.onSurfaceVariant,
+  display: 'flex', alignItems: 'center', gap: 6,
+};
+
+const RailButton: FC<{ section: SectionDef; active: boolean; onSelect: () => void }> = ({ section, active, onSelect }) => {
+  const Icon = section.icon;
+  return (
+    <button
+      onClick={onSelect}
+      aria-current={active ? 'page' : undefined}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 12px', borderRadius: 10,
+        backgroundColor: active ? S.primaryContainer : 'transparent',
+        color: active ? S.onPrimaryContainer : S.onSurface,
+        border: 'none', cursor: 'pointer',
+        textAlign: 'left',
+        fontFamily: BODY_FONT,
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        transition: 'background-color 0.15s',
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = S.surfaceLow; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
+    >
+      <Icon size={15} strokeWidth={2.25} />
+      {section.label}
+    </button>
+  );
+};
+
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  isAdmin: boolean;
 }
 
-const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
+const SettingsModal: FC<SettingsModalProps> = ({ open, onClose, isAdmin }) => {
   const { user, isLoaded } = useUser();
-  const [activeSection, setActiveSection] = useState<SectionId>('profile');
-  const [role, setRole] = useState<'admin' | 'viewer' | 'unknown'>('unknown');
-  const [roleLoaded, setRoleLoaded] = useState(false);
-
-  // Fetch current user's role from our Postgres (source of truth for
-  // authorization in PRISM — Clerk only handles identity).
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/me', { credentials: 'include' });
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { role: 'admin' | 'viewer' };
-        if (!cancelled) { setRole(data.role); setRoleLoaded(true); }
-      } catch {
-        if (!cancelled) { setRole('viewer'); setRoleLoaded(true); }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
-
-  // R-03 (design review 2026-07-01): shared overlay contract — Escape,
-  // body scroll lock, focus trap, initial focus and focus return all come
-  // from useOverlay (replaces the local Escape-only listener).
+  const [chosen, setChosen] = useState<SectionId>('profile');
   const modalRef = useRef<HTMLDivElement | null>(null);
   useOverlay(open, onClose, modalRef);
 
-  const isAdmin = role === 'admin';
-  const visibleSections = SECTIONS.filter((s) => !s.adminOnly || isAdmin);
+  const role: Role = isAdmin ? 'admin' : 'viewer';
+  const groups = GROUPS.filter((g) => !g.adminOnly || isAdmin);
+  const visible = SECTIONS.filter((s) => groups.some((g) => g.id === s.group));
+  // A chosen section the role now hides gives way to the first visible one.
+  const active = visible.find((s) => s.id === chosen) ?? visible[0];
 
   const renderSection = () => {
-    switch (activeSection) {
-      case 'profile':      return <ProfileSection role={role} />;
-      case 'password':     return <PasswordSection />;
-      case 'sessions':     return <SessionsSection />;
-      case 'config':       return <ConfigSection isAdmin={isAdmin} />;
-      case 'users':        return <UsersSection isAdmin={isAdmin} currentUserId={user?.id ?? null} />;
-      default:             return null;
+    switch (active.id) {
+      case 'profile':  return <ProfileSection role={role} />;
+      case 'password': return <PasswordSection />;
+      case 'sessions': return <SessionsSection />;
+      case 'model':    return <ModelSection />;
+      case 'users':    return <UsersSection currentUserId={user?.id ?? null} />;
     }
   };
 
@@ -1882,7 +1250,6 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1895,7 +1262,6 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
               backdropFilter: 'blur(4px)',
             }}
           />
-          {/* Modal */}
           <motion.div
             ref={modalRef}
             initial={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -1916,17 +1282,13 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
               overflow: 'hidden',
               display: 'grid',
               gridTemplateColumns: '260px 1fr',
-              // Scroll fix (July 2026): without an explicit row constraint the
-              // single implicit grid row sizes to max-content, so content
-              // taller than the fixed-inset modal grew past its bounds and the
-              // outer overflow:hidden clipped it — <main>'s overflow:auto
-              // never engaged and the sheet could not scroll. minmax(0, 1fr)
-              // pins the row to the modal height so the panes scroll instead.
+              // The explicit row size keeps both panes inside the dialog: an
+              // implicit row would grow with its content, the dialog would clip
+              // it and <main> would never scroll.
               gridTemplateRows: 'minmax(0, 1fr)',
               fontFamily: BODY_FONT,
             }}
           >
-            {/* Left rail */}
             <aside style={{
               backgroundColor: S.surface,
               borderRight: `1px solid ${S.cardBorder}`,
@@ -1943,91 +1305,28 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                 Settings
               </div>
 
-              <div style={{
-                padding: '4px 10px 6px',
-                fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
-                letterSpacing: '0.12em', textTransform: 'uppercase',
-                color: S.onSurfaceVariant,
-              }}>
-                Account
-              </div>
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 16 }}>
-                {visibleSections.filter((s) => s.group === 'account').map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '9px 12px', borderRadius: 10,
-                        backgroundColor: isActive ? S.primaryContainer : 'transparent',
-                        color: isActive ? S.onPrimaryContainer : S.onSurface,
-                        border: 'none', cursor: 'pointer',
-                        textAlign: 'left',
-                        fontFamily: BODY_FONT,
-                        fontSize: 13, fontWeight: isActive ? 600 : 500,
-                        transition: 'background-color 0.15s',
-                      }}
-                      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = S.surfaceLow; }}
-                      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                    >
-                      <Icon size={15} strokeWidth={2.25} />
-                      {section.label}
-                    </button>
-                  );
-                })}
-              </nav>
-
-              {isAdmin && (
-                <>
-                  <div style={{
-                    padding: '4px 10px 6px',
-                    fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 800,
-                    letterSpacing: '0.12em', textTransform: 'uppercase',
-                    color: S.onSurfaceVariant,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    <ShieldCheck size={11} /> Administration
+              {groups.map((group) => (
+                <div key={group.id} style={{ marginBottom: 16 }}>
+                  <div style={RAIL_HEADING}>
+                    {group.adminOnly && <ShieldCheck size={11} />}
+                    {group.label}
                   </div>
                   <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {visibleSections.filter((s) => s.group === 'admin').map((section) => {
-                      const Icon = section.icon;
-                      const isActive = activeSection === section.id;
-                      return (
-                        <button
-                          key={section.id}
-                          onClick={() => setActiveSection(section.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '9px 12px', borderRadius: 10,
-                            backgroundColor: isActive ? S.primaryContainer : 'transparent',
-                            color: isActive ? S.onPrimaryContainer : S.onSurface,
-                            border: 'none', cursor: 'pointer',
-                            textAlign: 'left',
-                            fontFamily: BODY_FONT,
-                            fontSize: 13, fontWeight: isActive ? 600 : 500,
-                            transition: 'background-color 0.15s',
-                          }}
-                          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = S.surfaceLow; }}
-                          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <Icon size={15} strokeWidth={2.25} />
-                          {section.label}
-                        </button>
-                      );
-                    })}
+                    {visible.filter((s) => s.group === group.id).map((section) => (
+                      <RailButton
+                        key={section.id}
+                        section={section}
+                        active={section.id === active.id}
+                        onSelect={() => setChosen(section.id)}
+                      />
+                    ))}
                   </nav>
-                </>
-              )}
+                </div>
+              ))}
 
               <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: `1px solid ${S.cardBorder}` }}>
                 {isLoaded && user && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 10px',
-                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px' }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: 16,
                       backgroundColor: S.primaryContainer,
@@ -2044,16 +1343,13 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                       }}>
                         {user.primaryEmailAddress?.emailAddress ?? 'Signed in'}
                       </div>
-                      <div style={{ fontSize: 11, color: S.mutedText }}>
-                        {roleLoaded ? role : 'Loading role…'}
-                      </div>
+                      <div style={{ fontSize: 11, color: S.mutedText }}>{role}</div>
                     </div>
                   </div>
                 )}
               </div>
             </aside>
 
-            {/* Content area */}
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
               <header style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -2066,15 +1362,9 @@ const SettingsModal: FC<SettingsModalProps> = ({ open, onClose }) => {
                     fontSize: 18, fontWeight: 800, color: S.onBg,
                     letterSpacing: '-0.01em',
                   }}>
-                    {SECTIONS.find((s) => s.id === activeSection)?.label ?? 'Settings'}
+                    {active.label}
                   </div>
-                  <div style={{ fontSize: 12, color: S.mutedText, marginTop: 2 }}>
-                    {activeSection === 'profile' && 'Your identity and display name'}
-                    {activeSection === 'password' && 'Rotate your credentials'}
-                    {activeSection === 'sessions' && 'Devices and browsers with an active session'}
-                    {activeSection === 'config' && 'PRISM simulation parameters'}
-                    {activeSection === 'users' && 'Team access and roles'}
-                  </div>
+                  <div style={{ fontSize: 12, color: S.mutedText, marginTop: 2 }}>{active.subtitle}</div>
                 </div>
                 <button
                   onClick={onClose}

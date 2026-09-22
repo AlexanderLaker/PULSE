@@ -1,45 +1,38 @@
 /**
- * HomeGate — "Profit Pool Model", the entry view of PRISM.
+ * The entry view: "Profit Pool Model" over four doors, one per production
+ * tab in tab order, telling the system's story once across the top: the
+ * input, the lens, the output, the market. The gate only points the way: no
+ * figures, no run metadata, no footer.
  *
- * The gate is a pure wayfinding surface (owner design review, July 2026):
- * one headline, four equal doors in product-tab order, the system's story
- * told once across the top — THE INPUT → THE LENS → THE OUTPUT → THE MARKET
- * — and nothing else. No numbers, no run metadata, no footer.
+ * What the artwork shows:
+ *   - Drivers: a dot cluster per force, sized by the number of drivers in
+ *     that force, so the door shows the shape of the evidence base.
+ *   - Profit Pool Shift Analysis: the 13 categories' median shifts in the
+ *     terminal year, tinted with the matrix's own heat ramp (heatFill), and
+ *     below them the portfolio's P10–P90 band with its median. Until a run
+ *     loads the cells keep the neutral tint.
+ *   - Consumer Journey: an abstract pictogram. The journey overlay is
+ *     qualitative, so the art must not suggest a per-stage decomposition.
+ *   - Profit Pool Explorer: a static mekko in that page's chart grammar (bar
+ *     width = revenue share, height = GP1 proxy, arrows = pool development).
+ *     It is not wired to lib/profitPoolData, which stays out of the initial
+ *     bundle.
  *
- * Honest-display notes (what is live and what is deliberately not):
- *   • Drivers door  — LIVE: constellation dot count per force is derived
- *     from the driver store (∝ drivers-per-force), so the door shows the
- *     shape of the current evidence base. Geometry only, no numbers.
- *   • Shift door    — LIVE: the 13 heat cells are the 13 categories'
- *     MC-median shifts at the terminal year from the persisted run,
- *     tinted through lib/format's heatFill (the matrix's own ramp, F1/U3);
- *     the band below is the joint portfolio P10–median–P90 (D3). Until
- *     the run loads, cells render in the neutral base tint — never fake.
- *   • Journey door  — STATIC by design: the journey overlay is qualitative
- *     (owner ruling O3 deleted the quantitative stage layer); the artwork
- *     is an abstract pictogram and must not imply a per-stage decomposition
- *     exists in the model.
- *   • Explorer door — STATIC mekko pictogram mirroring that page's chart
- *     grammar (bar width = revenue share, height = GP1 proxy, arrows =
- *     pool development). lib/profitPoolData stays out of the initial
- *     bundle (F10), so the art is not wired to it.
- *
- * Interaction: click / Enter opens the pane via the dashboard's keep-alive
- * tab opener; keys 1–4 jump straight into a room while the gate is the
- * active pane. Entrance animation respects prefers-reduced-motion.
+ * A click or Enter opens the tab; keys 1–4 do the same while the gate is the
+ * visible pane. The entrance animation respects prefers-reduced-motion.
  */
 
 'use client';
 
-import React, { FC, ReactNode, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type FC, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import usePrism from '@/hooks/usePrism';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import { CATEGORIES, YEARS, heatFill, heatScaleFor } from '@/lib/format';
+import { CATEGORIES, FORCE_COLORS, YEARS, heatFill, heatScaleFor } from '@/lib/format';
+import { getYearPercentiles } from '@/lib/shiftMatrix';
 import type { ForceName } from '@/types';
-import type { PercentileDistribution, ShiftPath } from '@/types/simulation';
 
-/** Tabs the gate can open — mirrors the dashboard's production tab ids. */
+/** The tabs the gate opens: the dashboard's production tab ids. */
 export type GateRoom =
   | 'drivers'
   | 'consumer-journey'
@@ -47,15 +40,15 @@ export type GateRoom =
   | 'profit-pool-explorer';
 
 interface HomeGateProps {
-  /** True while the gate is the visible pane — gates the 1–4 key listener
-   *  (panes stay mounted when hidden, keep-alive architecture). */
+  /** True while the gate is the visible pane. Hidden panes stay mounted, so
+   *  the keys 1–4 listen only then. */
   active: boolean;
   onNavigate: (room: GateRoom) => void;
 }
 
-// ─── Local design tokens (gate-only washes; base colours from theme) ──
-// Colour is used as light: a white→tint gradient per door plus one soft
-// radial glow. Values are gate-specific by design — not shared tokens.
+// ─── Door washes (gate-only; base colours come from the theme) ─────
+// Colour is used as light: a white-to-tint gradient per door plus one soft
+// radial glow.
 const WASH = {
   drivers:   { bg: 'linear-gradient(180deg,#ffffff 0%,#f2f7ff 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,93,181,.07), transparent 70%)' },
   journey:  { bg: 'linear-gradient(180deg,#ffffff 0%,#f5f3fe 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(107,79,196,.07), transparent 70%)' },
@@ -65,9 +58,9 @@ const WASH = {
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// ─── Trends constellation layout ──────────────────────────────────
-// Hand-tuned cluster positions per force (up to 8 dot slots each); the
-// NUMBER of dots rendered per cluster is live: max(3, round(count / 4)).
+// ─── Drivers constellation ─────────────────────────────────────────
+// Hand-tuned dot positions per force cluster (up to 8 slots each); a cluster
+// draws max(3, round(drivers in the force / 4)) of them.
 const CLUSTER_ORDER: ForceName[] = [
   'Consumer', 'Technology', 'Government', 'Competitive', 'Environmental', 'Customer',
 ];
@@ -79,41 +72,14 @@ const CLUSTER_SPOTS: Array<Array<[number, number, number]>> = [
   [[170, 150, 6.5], [196, 176, 4.5], [152, 184, 4]],
   [[242, 152, 6.5], [262, 182, 4.5], [224, 168, 4]],
 ];
-const FORCE_COLOR: Record<ForceName, string> = {
-  Consumer: '#005db5', Customer: '#6b4fc4', Technology: '#0e8aa8',
-  Government: '#b07d2b', Environmental: '#2f8f4e', Competitive: '#b0504a',
-};
-/** v3.5 base composition — placeholder dot counts until the store loads. */
-// 2.11.0 (O10): the 51-driver base of the September 2026 review.
-const FALLBACK_FORCE_COUNTS: Record<ForceName, number> = {
+/** The seeded driver base per force: the dot counts until the drivers load. */
+const SEED_FORCE_COUNTS: Record<ForceName, number> = {
   Consumer: 20, Government: 10, Customer: 7, Technology: 6, Competitive: 4, Environmental: 4,
 };
 
-// ─── Shift-matrix helpers (mirrors ProfitPoolAnalysis2's tolerant read) ──
-function extractMedian(v: PercentileDistribution | number | undefined): number | null {
-  if (v == null) return null;
-  if (typeof v === 'number') return v;
-  return v.median ?? null;
-}
-function medianAt(
-  shifts: Record<string, ShiftPath> | undefined,
-  catName: string,
-  catId: string,
-  year: number,
-): number | null {
-  if (!shifts) return null;
-  const path = shifts[catName] ?? shifts[catId];
-  if (!path) return null;
-  const v = (path as Record<string | number, unknown>)[year]
-         ?? (path as Record<string | number, unknown>)[String(year)];
-  return extractMedian(v as PercentileDistribution | number | undefined);
-}
-
 const TERMINAL_YEAR = YEARS[YEARS.length - 1];
-// 13 cells = the 13 categories, canonical CATEGORIES order, 4-column grid.
-// 2.12.0 (owner ruling O13): the LHC: TOI split made it 13, so the block runs
-// to a fourth row and the portfolio band below it drops by one row pitch —
-// everything still inside the shared 300 × 230 viewBox.
+// One cell per category in CATEGORIES order, four to a row; the portfolio
+// band sits under the fourth row, inside the shared 300 x 230 viewBox.
 const CELL_X = [10, 72, 134, 196];
 const CELL_Y = [14, 60, 106, 152];
 // Band geometry (SVG x-range shared by rail and fill), under the cell block.
@@ -131,7 +97,7 @@ const DriversArt: FC<{ countsByForce: Record<ForceName, number> }> = ({ countsBy
     {CLUSTER_ORDER.map((force, i) => {
       const dots = Math.max(3, Math.round((countsByForce[force] ?? 0) / 4));
       const spots = CLUSTER_SPOTS[i].slice(0, dots);
-      const c = FORCE_COLOR[force];
+      const c = FORCE_COLORS[force];
       return (
         <g key={force}>
           <circle cx={CLUSTER_SPOTS[i][0][0]} cy={CLUSTER_SPOTS[i][0][1]} r={15} fill={c} opacity={0.10} />
@@ -158,7 +124,7 @@ const DriversArt: FC<{ countsByForce: Record<ForceName, number> }> = ({ countsBy
   </svg>
 );
 
-/** Static, abstract by design — the journey layer is qualitative (O3). */
+/** Static and abstract: the journey overlay is qualitative. */
 const JourneyArt: FC = () => {
   const nodes: Array<[number, number]> = [[16, 120], [72, 92], [132, 106], [192, 146], [250, 130]];
   const bars: Array<{ h: number; up: boolean }> = [
@@ -200,7 +166,7 @@ const JourneyArt: FC = () => {
   );
 };
 
-/** LIVE: 13 category medians at the terminal year + joint portfolio band. */
+/** The categories' terminal-year medians and, below them, the portfolio band. */
 const ShiftArt: FC<{
   cells: Array<number | null>;
   highlightIdx: number | null;
@@ -244,7 +210,7 @@ const ShiftArt: FC<{
   );
 };
 
-/** Static mekko pictogram — the Explorer page's chart grammar (F10: not wired). */
+/** A static mekko in the Explorer page's chart grammar. */
 const ExplorerArt: FC = () => {
   const bars = [
     { share: 0.29, gp1: 0.75, up: true,  fill: 'rgba(15,155,142,.18)', stroke: '#0f9b8e' },
@@ -353,7 +319,7 @@ const Door: FC<{
       <p className="pr-[52px] text-sm font-medium" style={{ color: S.mutedText }}>{caption}</p>
     </div>
 
-    {/* keyboard hint — revealed on hover / keyboard focus */}
+    {/* keyboard hint, shown on hover and keyboard focus */}
     <span
       aria-hidden="true"
       className="absolute right-[22px] top-6 flex h-[22px] w-[22px] items-center justify-center rounded-[7px]
@@ -364,7 +330,7 @@ const Door: FC<{
       {keyHint}
     </span>
 
-    {/* the go affordance — rotates → to ↗ on hover */}
+    {/* the go arrow turns from → to ↗ on hover */}
     <span
       aria-hidden="true"
       className="absolute bottom-[22px] right-[22px] flex h-[38px] w-[38px] items-center justify-center
@@ -395,21 +361,17 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
   const { drivers, simulation } = usePrism();
   const reduced = useReducedMotion() ?? false;
 
-  // Live: trends per force (falls back to the 2.11.0 base until loaded).
+  // Drivers per force, and in all; the seeded base until the drivers load.
   const countsByForce = useMemo<Record<ForceName, number>>(() => {
-    if (!drivers.length) return FALLBACK_FORCE_COUNTS;
-    const counts = { ...FALLBACK_FORCE_COUNTS };
-    (Object.keys(counts) as ForceName[]).forEach((f) => { counts[f] = 0; });
-    drivers.forEach((t) => { counts[t.force] = (counts[t.force] ?? 0) + 1; });
+    if (!drivers.length) return SEED_FORCE_COUNTS;
+    const counts = Object.fromEntries(CLUSTER_ORDER.map((f) => [f, 0])) as Record<ForceName, number>;
+    for (const d of drivers) counts[d.force] += 1;
     return counts;
   }, [drivers]);
+  const driverCount = drivers.length || Object.values(SEED_FORCE_COUNTS).reduce((a, b) => a + b, 0);
 
-  // Live driver count (the 2.11.0 base until the trends have loaded).
-  const driverCount = drivers.length || Object.values(FALLBACK_FORCE_COUNTS).reduce((a, b) => a + b, 0);
-
-  // Live: category medians at the terminal year, canonical CATEGORIES order.
   const matrixCells = useMemo<Array<number | null>>(
-    () => CATEGORIES.map((c) => medianAt(simulation?.shifts, c.name, c.id, TERMINAL_YEAR)),
+    () => CATEGORIES.map((c) => getYearPercentiles(simulation?.shifts, c.name, TERMINAL_YEAR)?.median ?? null),
     [simulation],
   );
   const highlightIdx = useMemo<number | null>(() => {
@@ -421,15 +383,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
     return idx;
   }, [matrixCells]);
 
-  // Live: joint portfolio band (D3) at the terminal year, when present.
-  const band = useMemo(() => {
-    const p = simulation?.totals?.portfolio;
-    const entry = p?.[String(TERMINAL_YEAR)] ?? p?.[TERMINAL_YEAR as unknown as string];
-    if (!entry || entry.p10 == null || entry.p90 == null || entry.median == null) return null;
-    return { p10: entry.p10, median: entry.median, p90: entry.p90 };
-  }, [simulation]);
+  const band = simulation?.totals.portfolio[String(TERMINAL_YEAR)] ?? null;
 
-  // Keys 1–4 open a room — only while the gate is the visible pane.
+  // Keys 1–4 open a tab while the gate is the visible pane.
   useEffect(() => {
     if (!active) return undefined;
     const onKey = (e: KeyboardEvent) => {
@@ -449,7 +405,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
       style={{
         minHeight: 'calc(100vh - 64px)',
         fontFamily: BODY_FONT,
-        // Token bridge for Tailwind hover states (values stay in lib/theme).
+        // Theme values for the Tailwind hover states below.
         ['--gate-primary' as string]: S.primary,
         ['--gate-ink2' as string]: S.onSurfaceVariant,
         ['--gate-hairline' as string]: S.cardBorder,
@@ -471,9 +427,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
 
       <section className="relative grid min-h-[460px] flex-1 auto-rows-[minmax(300px,1fr)] grid-cols-1 gap-[18px] sm:grid-cols-2 xl:auto-rows-auto xl:grid-cols-4">
         <Door
-          eyebrow="The input" title="Drivers" caption={`${driverCount} drivers — the evidence.`}
+          eyebrow="The input" title="Drivers" caption={`${driverCount} drivers: the evidence.`}
           keyHint="1" wash={WASH.drivers} delay={0.08} reduced={reduced}
-          ariaLabel={`Drivers — the input. ${driverCount} drivers, the evidence. Shortcut key 1.`}
+          ariaLabel={`Drivers, the input. ${driverCount} drivers: the evidence. Shortcut key 1.`}
           onOpen={() => onNavigate('drivers')}
         >
           <DriversArt countsByForce={countsByForce} />
@@ -482,16 +438,16 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
         <Door
           eyebrow="The lens" title="Consumer Journey" caption="Pool impact, stage by stage."
           keyHint="2" wash={WASH.journey} delay={0.16} reduced={reduced}
-          ariaLabel="Consumer Journey — the lens. Pool impact, stage by stage. Shortcut key 2."
+          ariaLabel="Consumer Journey, the lens. Pool impact, stage by stage. Shortcut key 2."
           onOpen={() => onNavigate('consumer-journey')}
         >
           <JourneyArt />
         </Door>
 
         <Door
-          eyebrow="The output" title="Profit Pool Shift Analysis" caption="Every category's shift to 2035."
+          eyebrow="The output" title="Profit Pool Shift Analysis" caption={`Every category's shift to ${TERMINAL_YEAR}.`}
           keyHint="3" wash={WASH.shift} delay={0.24} reduced={reduced}
-          ariaLabel="Profit Pool Shift Analysis — the output. Every category's shift to 2035. Shortcut key 3."
+          ariaLabel={`Profit Pool Shift Analysis, the output. Every category's shift to ${TERMINAL_YEAR}. Shortcut key 3.`}
           onOpen={() => onNavigate('shift-analysis')}
         >
           <ShiftArt cells={matrixCells} highlightIdx={highlightIdx} band={band} />
@@ -500,7 +456,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
         <Door
           eyebrow="The market" title="Profit Pool Explorer" caption="The pools, sized and sourced."
           beta keyHint="4" wash={WASH.explorer} delay={0.32} reduced={reduced}
-          ariaLabel="Profit Pool Explorer, beta — the market. The pools, sized and sourced. Shortcut key 4."
+          ariaLabel="Profit Pool Explorer (Beta), the market. The pools, sized and sourced. Shortcut key 4."
           onOpen={() => onNavigate('profit-pool-explorer')}
         >
           <ExplorerArt />

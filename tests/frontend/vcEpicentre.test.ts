@@ -1,41 +1,22 @@
-// @vitest-environment jsdom
 /**
- * VC epicentre invariants (July 2026 redesign): the stage ↔ profile mapping
- * behind the epicentre slider must round-trip for every stage, and reading an
- * arbitrary profile must pick the max-scoring stage — ties resolve toward the
- * exposure-weighted centroid. Positions are CATEGORICAL: Review & Endorse
- * counts votes per stage and must never present an average as a position
- * (a Supply Chain vote and two Commercial votes must not become "Marketing").
+ * The value-chain epicentre (lib/valueChain.ts): TypeScript twin of
+ * tests/test_vc_epicentre.py. The engine and the dashboard must agree on a
+ * driver's stage, so both suites pin the same table; change them together.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { VC_STEPS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 
-vi.mock('@/hooks/usePrism', () => ({
-  __esModule: true,
-  default: () => ({}),
-  PrismProvider: ({ children }: { children: unknown }) => children,
-}));
-vi.mock('@/api/client', () => ({
-  getDriverProposals: vi.fn(),
-  saveMyProposal: vi.fn(),
-  updateDriver: vi.fn(),
-}));
-
-import { epicentreOf, canonicalVcProfile } from '@/components/dashboard/Drivers';
-
-const STEPS = [
-  'Raw Materials', 'Formulation', 'Manufacturing', 'Packaging',
-  'Supply Chain', 'Marketing', 'Commercial', 'Consumer',
-];
+const stage = (name: string) => VC_STEPS.indexOf(name as (typeof VC_STEPS)[number]) + 1;
 
 describe('canonicalVcProfile', () => {
-  it('writes 5 at the epicentre with a 3/1 falloff, 0 elsewhere', () => {
+  it('writes 5 at the epicentre with a 3 / 1 falloff and 0 elsewhere', () => {
     expect(canonicalVcProfile(6)).toEqual({
       'Raw Materials': 0, Formulation: 0, Manufacturing: 0, Packaging: 1,
       'Supply Chain': 3, Marketing: 5, Commercial: 3, Consumer: 1,
     });
   });
 
-  it('clips the falloff at both chain ends', () => {
+  it('clips the falloff at both ends of the chain', () => {
     expect(canonicalVcProfile(1)).toEqual({
       'Raw Materials': 5, Formulation: 3, Manufacturing: 1, Packaging: 0,
       'Supply Chain': 0, Marketing: 0, Commercial: 0, Consumer: 0,
@@ -47,33 +28,33 @@ describe('canonicalVcProfile', () => {
   });
 });
 
-describe('epicentreOf', () => {
-  it('round-trips the canonical profile for every stage (incl. clipped ends)', () => {
-    for (let stage = 1; stage <= 8; stage++) {
-      expect(epicentreOf(canonicalVcProfile(stage))).toBe(stage);
-    }
+describe('epicentreOf (the parity table of tests/test_vc_epicentre.py)', () => {
+  it('round-trips the canonical profile of every stage', () => {
+    for (let s = 1; s <= 8; s++) expect(epicentreOf(canonicalVcProfile(s))).toBe(s);
   });
 
-  it('returns null for unscored / all-zero profiles', () => {
+  it('is null for an unscored or all-zero profile', () => {
     expect(epicentreOf(undefined)).toBeNull();
     expect(epicentreOf({})).toBeNull();
     expect(epicentreOf({ Marketing: 0, Consumer: 0 })).toBeNull();
   });
 
-  it('picks the max-scoring stage of an arbitrary (legacy) profile', () => {
+  it('picks the highest-scoring stage of any profile', () => {
     expect(epicentreOf({
-      Manufacturing: 1, Packaging: 1, 'Supply Chain': 2,
-      Marketing: 4, Commercial: 5, Consumer: 4,
-    })).toBe(STEPS.indexOf('Commercial') + 1);
+      Manufacturing: 1, Packaging: 1, 'Supply Chain': 2, Marketing: 4, Commercial: 5, Consumer: 4,
+    })).toBe(stage('Commercial'));
   });
 
-  it('resolves max ties toward the exposure-weighted centroid', () => {
-    // Max 3 at Raw Materials and Consumer; the Commercial weight pulls the
-    // centroid downstream → Consumer wins the tie.
+  it('resolves a tie toward the exposure-weighted centroid', () => {
+    // Raw Materials and Consumer tie at 3; the Commercial weight pulls the centroid downstream.
     expect(epicentreOf({ 'Raw Materials': 3, Commercial: 2, Consumer: 3 })).toBe(8);
   });
 
-  it('reads snake_case fallback keys from old payloads', () => {
-    expect(epicentreOf({ supply_chain: 5, manufacturing: 2 })).toBe(5);
+  it('resolves a flat profile to the earlier central stage', () => {
+    expect(epicentreOf(Object.fromEntries(VC_STEPS.map((s) => [s, 2])))).toBe(4);
+  });
+
+  it('ignores keys outside the eight stages', () => {
+    expect(epicentreOf({ supply_chain: 5, Manufacturing: 2 })).toBe(stage('Manufacturing'));
   });
 });

@@ -1,109 +1,89 @@
 /**
- * ConsumerJourney2.tsx — Consumer Journey layer (rebuilt 2026-06-10).
+ * The Consumer Journey: a qualitative overlay that maps the Profit Pool
+ * Drivers to the moments of the Laundry and Hair consumer journeys.
  *
- * WHAT THIS IS (post-audit, PRISM_Consumer_Journey_Audit_2026-06-10.md):
- * a QUALITATIVE strategist overlay that maps trends to consumer moments.
- * It is authored content — it does NOT feed the Shift Matrix. Per the audit
- * (§3, §5 fixes #1-#7/#9, §7) this rebuild is honest about what it is:
+ * Every tile is authored content with visible provenance (revision month and
+ * evidence grade). Its dialog shows the drivers behind the moment, resolved to
+ * the live drivers and linked to the Drivers page, the net effect, the
+ * Strategist Read (authored, not simulated) and the stage context. Nothing
+ * here feeds or reads the Shift Matrix.
  *
- *   • This component holds ZERO hard-coded journey content. All tiles, stage
- *     definitions and stage contexts come from data/consumerJourney.ts (the
- *     bundled seed) or, when an admin has saved edits, from GET /api/journey.
- *     It is pure view + interaction logic over those modules.
- *   • Every analysis is labelled "Strategist Read — authored, not simulated"
- *     (fix #1, C4) — never "PRISM Analysis". Provenance + evidence-grade chips
- *     ride every tile and are never stripped.
- *   • Trend-code chips resolve through data/trendCodeMap.ts to the LIVE trend
- *     in usePrism().trends, with working "View in Drivers →" drill-through
- *     (fix #3, B1/B3). Retired codes render muted, with no live-driver styling.
- *   • (O3, owner ruling 2026-07-07: the quantitative journey layer —
- *     journey_exposure scores + engine journey_decomposition — was deleted.
- *     This overlay is deliberately QUALITATIVE: tiles, Strategist Reads and
- *     live-trend evidence only; nothing here feeds or reads the Shift Matrix.)
- *   • The "Laundry" tab is labelled honestly — it is laundry-only; a caption
- *     notes the Home Care journey is pending (fix #9 / A2).
+ * The tiles come from data/consumerJourney.ts until an admin saves an edit;
+ * from then on the newest saved version replaces them. The stage contexts
+ * always come from the module.
  *
- * The contrast that matters: this view sits one tab away from genuinely
- * computed outputs. It must read as restrained, sourced, and clearly authored
- * — never as if its prose were model output.
+ * This view sits one tab away from computed output, so it has to read as
+ * authored judgment, never as model output.
  */
 
 'use client';
 
-import React, {
-  useState, useEffect, useMemo, useCallback, useRef, FC,
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+  type CSSProperties, type FC, type ReactNode,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ExternalLink, ArrowRight, X, Edit3, Check,
-  Info, PenLine, Sparkles, CircleCheck,
-  Plus, Trash2, Save, ChevronLeft, ChevronRight,
+  Info, PenLine, CircleCheck, Plus, Trash2, Save, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import useOverlay from '@/hooks/useOverlay';
+import { ApiError, getJourneyContent, saveJourneyContent } from '@/api/client';
 import {
-  LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX, JOURNEY_CONTENT_VERSION,
-  type JourneyKey, type JourneyStageDef, type JourneyTile, type TileType,
+  LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX,
+  type JourneyContent, type JourneyKey, type JourneyStageDef, type JourneyTile, type TileType,
   type PoolImpactGrade, type ProvenanceGrade,
 } from '@/data/consumerJourney';
-import {
-  DRIVER_CODE_MAP, RETIRED_CODES, driverIdForCode, liveCodeFor,
-} from '@/data/driverCodeMap';
-import type { Driver } from '@/types/drivers';
+import { DRIVER_CODE_MAP, type DriverCodeInfo } from '@/data/driverCodeMap';
+import type { Driver, ForceName } from '@/types';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { FORCE_COLORS, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
 import Chip, { type ChipKind } from '@/components/dashboard/Chip';
 
-/** Force colors — L11 (July 2026 review): the local bright palette rendered a
- *  SECOND force→colour scheme one tab away from the maritime one used by the
- *  Drivers table and the drill-down. Force chips now read from the single
- *  palette in lib/format.ts (FORCE_COLORS) — one force, one colour, every tab. */
-const forceColor = (force?: string): string =>
-  (force ? (FORCE_COLORS as Record<string, string>)[force] ?? S.primary : S.primary);
+/** Force chips use the one force palette of lib/format, so a force has the same colour on every tab. */
+const forceColor = (force: string): string => FORCE_COLORS[force as ForceName] ?? S.primary;
 
-// ── Tile type chip palette ──────────────────────────────────────────────
 const TYPE_STYLES: Record<TileType, { label: string; bg: string; fg: string }> = {
   product: { label: 'Product', bg: '#d6e3ff', fg: '#00519e' },
   tech: { label: 'Tech', bg: '#dce9ff', fg: '#0052a0' },
   service: { label: 'Service', bg: '#e5eeff', fg: '#26619d' },
 };
 
-// ── Evidence grade → shared Chip variant (R-18: text chips, no icon
-//    stickers). The journey's grade wording (verified / estimate /
-//    hypothesis) is preserved via label overrides; 'hypothesis' has no
-//    dedicated Chip kind and renders neutral — the label carries the meaning.
+/** Evidence grade as a shared Chip. 'hypothesis' has no Chip kind of its own and renders neutral; its label carries the meaning. */
 const GRADE_CHIP: Record<ProvenanceGrade, { kind: ChipKind; label: string }> = {
   verified: { kind: 'reported', label: 'Verified' },
   estimate: { kind: 'estimate', label: 'Estimate' },
   hypothesis: { kind: 'neutral', label: 'Hypothesis' },
 };
 
+/** The month an edit stamps on a tile, YYYY-MM. */
 const CURRENT_YYYYMM = (() => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 })();
 
 // ════════════════════════════════════════════════════════════════════════
-// Types — local view state
+// Types
 // ════════════════════════════════════════════════════════════════════════
 interface ConsumerJourneyProps {
-  onNavigateProfitPoolShiftModel?: () => void;
-  onNavigateDrivers?: () => void;
-  /** Receives a driver NAME, used as a Drivers-tab search query. */
+  /** Opens the Drivers page searched for this driver name. */
   onNavigateToDriver?: (query: string) => void;
+  /** Shows the editing controls; the save route checks the role again. */
   isAdmin?: boolean;
 }
 
-type Direction = 'benefiting' | 'negativelyImpacted';
+/** The side of a stage a tile sits on: tailwind (benefiting) or headwind (negativelyImpacted). */
+type Side = 'benefiting' | 'negativelyImpacted';
 
 interface SelectedTile {
   tile: JourneyTile;
   stageId: string;
   stageLabel: string;
-  direction: Direction;
+  side: Side;
 }
 
-/** Editable subset of a tile (admin editor). */
+/** The fields the admin editor changes. */
 interface TileEdits {
   name: string;
   intensity: 1 | 2 | 3;
@@ -112,33 +92,23 @@ interface TileEdits {
   analysis: string;
 }
 
-/** The full content blob shape persisted via PUT /api/journey. */
-interface JourneyContent {
-  lhc: JourneyStageDef[];
-  hair: JourneyStageDef[];
-}
-
 type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden';
+
+/** A cited driver: its code-map entry and, once the drivers have loaded, the live row. */
+interface CitedDriver {
+  code: string;
+  info: DriverCodeInfo;
+  live: Driver | undefined;
+}
 
 // ════════════════════════════════════════════════════════════════════════
 // Pure helpers
 // ════════════════════════════════════════════════════════════════════════
 
-/** Deep-clone the seed so admin edits never mutate the imported module. */
-function cloneStages(stages: JourneyStageDef[]): JourneyStageDef[] {
-  return stages.map(s => ({
-    ...s,
-    benefiting: s.benefiting.map(t => ({ ...t, driverCodes: [...t.driverCodes], provenance: { ...t.provenance } })),
-    negativelyImpacted: s.negativelyImpacted.map(t => ({ ...t, driverCodes: [...t.driverCodes], provenance: { ...t.provenance } })),
-  }));
-}
-
-/** Minimal markdown renderer for tile analyses: **bold** spans + \n\n
- *  paragraph breaks. No new dependency — a deliberately small parser. */
+/** Renders a Strategist Read: **bold** spans and blank-line paragraph breaks. */
 const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
-  // The seed stores escaped "\\n\\n"; normalise both real and escaped breaks.
-  const normalised = text.replace(/\\n/g, '\n');
-  const paragraphs = normalised.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  // The content stores its breaks escaped ("\\n\\n"); real breaks work too.
+  const paragraphs = text.replace(/\\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
   return (
     <>
       {paragraphs.map((para, i) => (
@@ -160,57 +130,47 @@ const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
   );
 };
 
-/** Display name with a trailing parenthetical stripped (declutter, 2026-06-27).
- *  Display-only — the seed/content name is never mutated, so this is reversible
- *  and loses nothing (the full string still lives in the content store). */
+/** A tile's name without a trailing parenthetical; the full name stays in the content and in the tooltip. */
 const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
 
-/** Intensity → surface tint depth — the declutter replacement for the dots
- *  (2026-06-27): a stronger tile reads more saturated so the pressure pattern
- *  stays legible at a squint, with no extra chip. `up` picks the hue. */
-// L10 (July 2026 review): both tint helpers build their rgba() from the
-// semantic rgb channels exported by lib/format — never re-hardcoded here.
-const intensityTint = (up: boolean, intensity: 1 | 2 | 3): string => {
-  const a = 0.03 + 0.05 * intensity; // 0.08 / 0.13 / 0.18
-  return up ? `rgba(${EXPANSION_RGB},${a})` : `rgba(${CONTRACTION_RGB},${a})`;
+/** Pool-impact grade to tile tint: High is notably dark, Low much lighter; `up` picks green (tailwind) or red (headwind). */
+const gradeTint = (up: boolean, grade?: PoolImpactGrade): string => {
+  const a = grade === 'High' ? 0.36 : grade === 'Med' ? 0.17 : 0.06;
+  return `rgba(${up ? EXPANSION_RGB : CONTRACTION_RGB},${a})`;
 };
 
-/** Pool-impact grade → tile tint depth. Pronounced spread: High is notably
- *  dark, Low much lighter. `up` picks the hue (green tailwind / red headwind). */
-const gradeTint = (up: boolean, grade?: 'Low' | 'Med' | 'High'): string => {
-  const a = grade === 'High' ? 0.36 : grade === 'Med' ? 0.17 : 0.06;
-  return up ? `rgba(${EXPANSION_RGB},${a})` : `rgba(${CONTRACTION_RGB},${a})`;
-};
-/** Pool-impact grade → left accent-bar opacity (High solid, Low faint). */
-const gradeBarOpacity = (grade?: 'Low' | 'Med' | 'High'): number =>
+/** Pool-impact grade to the opacity of the tile's accent bar (High solid, Low faint). */
+const gradeBarOpacity = (grade?: PoolImpactGrade): number =>
   grade === 'High' ? 1 : grade === 'Med' ? 0.6 : 0.3;
 
-/** R-09b — display-only impact sort. Pool-impact grade DESC (the grade that
- *  drives the tile tint: darkest first), then intensity DESC (the previous
- *  ordering), stable beyond that (source order preserved). Sorts a COPY at
- *  render time — the content blob and the admin save payload keep their
- *  original order. */
+/**
+ * Display order on a stage side: pool-impact grade first (the tint, darkest on
+ * top), then intensity; ties keep the content order. Sorts a copy, so the
+ * saved content keeps its own order.
+ */
 const GRADE_RANK: Record<PoolImpactGrade, number> = { High: 3, Med: 2, Low: 1 };
 const impactRank = (t: JourneyTile): number => (t.poolImpact ? GRADE_RANK[t.poolImpact.grade] : 0);
 const sortTilesForDisplay = (tiles: JourneyTile[]): JourneyTile[] =>
   [...tiles].sort((a, b) => (impactRank(b) - impactRank(a)) || (b.intensity - a.intensity));
 
-// (M8, owner decision 2026-07-06: the "Strength" bar was removed. It was
-//  built on Impact × Probability, but the model retired the 1–5 impact input
-//  over a year ago (replaced by gp1_pct_affected) — the backend never sends
-//  it, so the bar had never rendered once. Evidence cards keep the live
-//  Stage-exposure bar; the driver's real inputs are one click away via
-//  "View in Drivers".)
-
-/** A long Laundry stage spans two grid columns and lays its tiles out in two
- *  readable sub-columns, so very long stages (e.g. Add Products) don't stretch
- *  the whole rail downward (owner request 2026-06-29). Laundry only — the Hair
- *  journey stays single-column (owner decision 2026-06-29). Counts are the full
- *  (unfiltered) tile counts so a stage's width doesn't jump when the type filter
- *  changes. */
+/**
+ * A Laundry stage with more than ten tiles on a side spans two grid columns,
+ * so its tiles wrap less and the rail stays short; Hair stages stay one column
+ * wide. The count ignores the type filter, so a stage keeps its width when the
+ * filter changes.
+ */
 const WIDE_STAGE_TILE_THRESHOLD = 10;
 const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
   (journeyKey === 'lhc' && Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
+
+/** The drivers a tile cites, each once; a code outside the code map is not a driver. */
+const citedDrivers = (tile: JourneyTile, driversById: Map<string, Driver>): CitedDriver[] =>
+  Array.from(new Set(tile.driverCodes))
+    .filter(code => Object.hasOwn(DRIVER_CODE_MAP, code))
+    .map(code => {
+      const info = DRIVER_CODE_MAP[code];
+      return { code, info, live: driversById.get(info.driverId) };
+    });
 
 // ════════════════════════════════════════════════════════════════════════
 // Small presentational atoms
@@ -249,19 +209,18 @@ const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => void }> 
   );
 };
 
-/** R-09a — stage-header rollup: a split bar + counts line so the board
- *  answers "which stage matters most" at a glance. Weights are the tiles'
- *  authored intensity grades (1–3); counts respect the active type filter so
- *  they match the tiles rendered below. Qualitative overlay arithmetic —
- *  NOT engine output (the title attribute says so).
- *  (Detail-panel provenance / evidence chips render via the shared <Chip>,
- *  R-18 — provenance is still never stripped, fix #1.) */
+/**
+ * Stage header rollup, so the board shows which stage matters most at a
+ * glance: a split bar weighted by the tiles' authored intensity (1–3) and the
+ * tile count per side. Both follow the type filter, so they match the tiles
+ * below. Qualitative arithmetic, not engine output; the tooltip says so.
+ */
 const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: JourneyTile[] }> = ({ benefiting, negativelyImpacted }) => {
   const tw = benefiting.reduce((n, t) => n + t.intensity, 0);
   const hw = negativelyImpacted.reduce((n, t) => n + t.intensity, 0);
   const total = tw + hw;
   return (
-    <div title="Tile count weighted by authored grades — qualitative overlay, not simulated">
+    <div title="Tile count weighted by authored grades: qualitative overlay, not simulated">
       <div style={{ display: 'flex', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: S.surfaceHigh }} aria-hidden="true">
         {tw > 0 && <span style={{ display: 'block', width: `${(tw / total) * 100}%`, backgroundColor: S.expansion, opacity: 0.55 }} />}
         {hw > 0 && <span style={{ display: 'block', width: `${(hw / total) * 100}%`, backgroundColor: S.contraction, opacity: 0.55 }} />}
@@ -276,7 +235,7 @@ const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: JourneyTi
 };
 
 /** Section header card used in the detail panel. */
-const SectionCard: FC<{ title: React.ReactNode; accent: string; children: React.ReactNode; subtitle?: React.ReactNode }> = ({ title, accent, children, subtitle }) => (
+const SectionCard: FC<{ title: ReactNode; accent: string; children: ReactNode; subtitle?: ReactNode }> = ({ title, accent, children, subtitle }) => (
   <div className="rounded-2xl p-4" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
     <h3
       className="text-[11px] font-extrabold uppercase tracking-[0.14em] pl-2.5"
@@ -296,17 +255,16 @@ const SectionCard: FC<{ title: React.ReactNode; accent: string; children: React.
 // ════════════════════════════════════════════════════════════════════════
 // Tile pill (in the stage rail)
 // ════════════════════════════════════════════════════════════════════════
+
+/** A tile in the rail: the pool-impact grade sets its tint depth and the opacity of its accent bar. */
 const TilePill: FC<{
   tile: JourneyTile;
-  direction: Direction;
+  side: Side;
   selected: boolean;
   onClick: () => void;
-}> = ({ tile, direction, selected, onClick }) => {
-  const isExp = direction === 'benefiting';
+}> = ({ tile, side, selected, onClick }) => {
+  const isExp = side === 'benefiting';
   const accent = isExp ? S.expansion : S.error;
-  const isAi = tile.provenance.author === 'ai';
-  // Declutter (2026-06-27): no dots, no type chip, name parenthetical stripped.
-  // Intensity is carried by surface tint depth + a left accent bar instead.
   return (
     <button
       onClick={onClick}
@@ -327,118 +285,38 @@ const TilePill: FC<{
         }}
       />
       <span
-        // Full name always visible (no clamp); tight line-height so wrapped
-        // lines sit close together instead of stretching the tile.
+        // The name is never clamped; the tight line height keeps wrapped lines close together.
         style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.1, fontFamily: HEADLINE_FONT }}
         title={tile.name}
       >
         {displayTileName(tile.name)}
       </span>
-      {isAi && (
-        <div style={{ marginTop: 3 }}>
-          <span
-            className="inline-flex items-center gap-1 rounded-full font-bold"
-            style={{ fontSize: 9, padding: '0px 6px', backgroundColor: S.amberContainer, color: S.onAmberContainer, fontFamily: HEADLINE_FONT }}
-          >
-            <Sparkles size={8} strokeWidth={2.5} /> AI · pending review
-          </span>
-        </div>
-      )}
     </button>
   );
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Trend-force card (in the detail panel) — resolves a code to the LIVE trend
-// and reads it as a directional force: tailwind/headwind, and how hard it
-// hits THIS stage. The connect to the Drivers page (B1/B3 preserved).
+// Driver card (in the detail panel)
 // ════════════════════════════════════════════════════════════════════════
+
+/**
+ * A driver behind the moment: the live driver once the drivers have loaded
+ * (the code map's name and first sentence until then), read as a tailwind or
+ * headwind by its own direction, with a link to the Drivers page.
+ */
 const DriverForceCard: FC<{
-  code: string;
-  /** Every cited code of the tile that resolved to this card's driver (a
-   *  tile citing K-08 and T-06 renders ONE K-13 card that names both). */
-  citedCodes?: string[];
-  driversById: Map<string, Driver>;
+  driver: CitedDriver;
   driversLoaded: boolean;
   onNavigateToDriver?: (query: string) => void;
-}> = ({ code: citedCode, citedCodes, driversById, driversLoaded, onNavigateToDriver }) => {
-  // Retired codes (fix B3, extended 2.11.0): a code the September 2026
-  // review MERGED into a live driver resolves to that driver's card (the
-  // tile's evidence stays usable, honestly labelled "cited as T-06"); a
-  // deleted code keeps a muted card with NO live-driver styling and the
-  // review's one-line reason, plus a pointer when a fact of it lives on
-  // inside a live driver.
-  const retired = RETIRED_CODES[citedCode];
-  const code = retired?.mergedInto?.[0] && DRIVER_CODE_MAP[retired.mergedInto[0]]
-    ? retired.mergedInto[0]
-    : citedCode;
-  if (retired && code === citedCode) {
-    const residue = retired.residueIn?.filter(c => DRIVER_CODE_MAP[c]) ?? [];
-    return (
-      <div
-        className="rounded-xl p-3"
-        style={{ backgroundColor: S.surfaceLow, border: `1px dashed ${S.cardBorder}`, opacity: 0.85 }}
-        title={`${retired.name} (retired ${retired.retiredIn})`}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span
-            className="inline-flex items-center rounded-full font-bold"
-            style={{ fontSize: 10, padding: '1px 7px', backgroundColor: S.surfaceContainer, color: S.mutedText, textDecoration: 'line-through', fontFamily: HEADLINE_FONT }}
-          >
-            {citedCode}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT }}>retired driver · {retired.name}</span>
-        </div>
-        <p style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '6px 0 0', fontStyle: 'italic' }}>
-          {retired.note} — kept for reference; not a live driver.
-        </p>
-        {residue.length > 0 && (
-          <p style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '4px 0 0' }}>
-            A note from it lives on inside{' '}
-            {residue.map((c, i) => (
-              <span key={c}>
-                {i > 0 ? ', ' : ''}
-                <button
-                  type="button"
-                  onClick={() => onNavigateToDriver?.(DRIVER_CODE_MAP[c].name)}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: onNavigateToDriver ? 'pointer' : 'default', color: S.primary, fontWeight: 700, fontFamily: HEADLINE_FONT, fontSize: 11 }}
-                >
-                  {c}
-                </button>
-              </span>
-            ))}
-            .
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  const info = DRIVER_CODE_MAP[code];
-  if (!info) {
-    return (
-      <div className="rounded-xl p-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
-        <span style={{ fontSize: 11, color: S.mutedText, fontFamily: HEADLINE_FONT }}>{code} — unmapped code</span>
-      </div>
-    );
-  }
-
-  const driverId = driverIdForCode(code);
-  const live = driverId ? driversById.get(driverId) : undefined;
+}> = ({ driver: { code, info, live }, driversLoaded, onNavigateToDriver }) => {
   const c = forceColor(info.force);
-
   const name = live?.name ?? info.name;
-  const direction = live?.direction ?? info.direction;
-  const isExp = direction === 'Expansion';
-  // fallbackDescription only when trends haven't loaded (fix #3 wording).
+  const isExp = (live?.direction ?? info.direction) === 'Expansion';
   const description = live?.description ?? (driversLoaded ? '' : info.fallbackDescription);
-  // (O3 2026-07-07: the per-stage exposure score — and its bar — went with
-  //  the deleted quantitative journey layer.)
-  const sourceCount = live?.sources?.length;
+  const sourceCount = live?.sources.length ?? 0;
 
   return (
     <div className="rounded-xl p-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
-      {/* identity row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span
           className="inline-flex items-center rounded-full font-bold"
@@ -454,23 +332,6 @@ const DriverForceCard: FC<{
           {info.force}
         </span>
       </div>
-      {(() => {
-        const merged = (citedCodes ?? [citedCode]).filter(c => c !== code && RETIRED_CODES[c]);
-        if (merged.length === 0) return null;
-        return (
-          <p
-            style={{ fontSize: 10.5, color: S.mutedText, lineHeight: 1.45, margin: '6px 0 0', fontStyle: 'italic' }}
-            title={merged.map(c => `${c}: ${RETIRED_CODES[c]!.note}`).join('\n')}
-          >
-            Cited as {merged.map((c, i) => (
-              <span key={c}>{i > 0 ? ', ' : ''}<span style={{ textDecoration: 'line-through' }}>{c}</span> ({RETIRED_CODES[c]!.name})</span>
-            ))}; carried inside {code} since the September 2026 review.
-          </p>
-        );
-      })()}
-      {/* force row: direction + stage exposure (M8 2026-07-06: the dead
-          "Strength" bar — Impact × Probability on a retired input — was
-          removed; it had never rendered) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
         <span
           className="inline-flex items-center gap-1 rounded-full font-bold"
@@ -480,7 +341,7 @@ const DriverForceCard: FC<{
             color: isExp ? S.onExpansionContainer : S.onErrorContainer,
             fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
           }}
-          title={isExp ? 'Expansion driver — a tailwind for this moment' : 'Contraction driver — a headwind for this moment'}
+          title={isExp ? 'Expansion driver: a tailwind for this moment' : 'Contraction driver: a headwind for this moment'}
         >
           {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
           {isExp ? 'Tailwind' : 'Headwind'}
@@ -496,7 +357,7 @@ const DriverForceCard: FC<{
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
         <button
-          onClick={() => onNavigateToDriver?.(live?.name ?? info.name)}
+          onClick={() => onNavigateToDriver?.(name)}
           className="inline-flex items-center gap-1.5"
           style={{
             fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',
@@ -508,7 +369,7 @@ const DriverForceCard: FC<{
           <ExternalLink size={11} strokeWidth={2.5} />
           View in Drivers
         </button>
-        {typeof sourceCount === 'number' && sourceCount > 0 && (
+        {sourceCount > 0 && (
           <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
             {sourceCount} source{sourceCount === 1 ? '' : 's'}
           </span>
@@ -519,11 +380,10 @@ const DriverForceCard: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Stage context block (always visible) — from LHC_CTX / HAIR_CTX (by label).
+// Stage context (always visible), looked up by stage label
 // ════════════════════════════════════════════════════════════════════════
 const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({ stageLabel, journeyKey }) => {
-  const ctxMap = journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX;
-  const ctx = ctxMap[stageLabel];
+  const ctx = (journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX)[stageLabel];
   if (!ctx) return null;
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Henkel brands', value: ctx.henkelBrands },
@@ -532,9 +392,9 @@ const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({
   ];
   return (
     <SectionCard
-      title={`Stage context — ${stageLabel}`}
+      title={`Stage context: ${stageLabel}`}
       accent={S.primary}
-      subtitle="Authored stage context — same provenance rules as the tile reads"
+      subtitle="Authored stage context, same provenance rules as the tile reads"
     >
       <div className="flex flex-col gap-2.5">
         {rows.map(r => (
@@ -551,10 +411,9 @@ const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Why-chain (B, 2026-06-27) — the de-blackbox ladder: driving trends (link to
-// Trends) → net effect. Makes the
-// reasoning behind the authored classification visible, without ever claiming
-// the classification is simulated. Trends + attribution are real; the read is judgment.
+// Why-chain: the drivers behind a moment, then the net effect. It shows the
+// reasoning behind the authored classification without claiming that the
+// classification is simulated: the drivers are real, the read is judgment.
 // ════════════════════════════════════════════════════════════════════════
 const StepDot: FC<{ n: number }> = ({ n }) => (
   <span style={{
@@ -566,42 +425,31 @@ const StepDot: FC<{ n: number }> = ({ n }) => (
 
 const WhyChain: FC<{
   tile: JourneyTile;
-  stageId: string;
-  journeyKey: JourneyKey;
-  direction: Direction;
+  side: Side;
   driversById: Map<string, Driver>;
   driversLoaded: boolean;
   onNavigateToDriver?: (query: string) => void;
-}> = ({ tile, stageId, journeyKey, direction, driversById, driversLoaded, onNavigateToDriver }) => {
-  const isExp = direction === 'benefiting';
+}> = ({ tile, side, driversById, driversLoaded, onNavigateToDriver }) => {
+  const isExp = side === 'benefiting';
   const accent = isExp ? S.expansion : S.error;
 
-  // Net effect from the live trends' OWN directions (independent of the tile map).
-  // 2.11.0: a cited code that the September 2026 review merged into a live
-  // driver resolves to that driver; each live driver counts once per tile
-  // (a tile citing K-08 and T-06 now counts K-13 once); deleted codes drop out.
-  const resolved = Array.from(new Set(
-    tile.driverCodes.map(code => liveCodeFor(code)).filter((c): c is string => !!c),
-  ))
-    .map(code => {
-      const info = DRIVER_CODE_MAP[code];
-      const id = driverIdForCode(code);
-      const live = id ? driversById.get(id) : undefined;
-      return { dir: live?.direction ?? info?.direction, force: live?.force ?? info?.force };
-    })
-    .filter(r => r.dir);
-  const up = resolved.filter(r => r.dir === 'Expansion').length;
-  const down = resolved.filter(r => r.dir === 'Contraction').length;
+  // The net effect counts each cited driver by its own direction, independent of the tile's side.
+  const drivers = citedDrivers(tile, driversById);
+  const up = drivers.filter(d => (d.live?.direction ?? d.info.direction) === 'Expansion').length;
+  const down = drivers.length - up;
   const forceCounts: Record<string, number> = {};
-  resolved.forEach(r => { if (r.force) forceCounts[r.force] = (forceCounts[r.force] ?? 0) + 1; });
+  drivers.forEach(d => {
+    const force = d.live?.force ?? d.info.force;
+    forceCounts[force] = (forceCounts[force] ?? 0) + 1;
+  });
   const dominant = Object.entries(forceCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-  const stepWrap: React.CSSProperties = { position: 'relative', paddingLeft: 38, paddingBottom: 18 };
-  const connector: React.CSSProperties = {
+  const stepWrap: CSSProperties = { position: 'relative', paddingLeft: 38, paddingBottom: 18 };
+  const connector: CSSProperties = {
     position: 'absolute', left: 11.5, top: 24, bottom: 0, width: 1.5,
     background: `linear-gradient(${S.outline}, rgba(71,125,187,0.2))`,
   };
-  const stepLabel: React.CSSProperties = {
+  const stepLabel: CSSProperties = {
     fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
     color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
   };
@@ -613,12 +461,12 @@ const WhyChain: FC<{
       </h3>
 
       <div style={{ marginTop: 14 }}>
-        {/* 1 — the drivers behind this moment (each card links to the Drivers page) */}
+        {/* 1: the drivers behind this moment, each linked to the Drivers page */}
         <div style={stepWrap}>
           <StepDot n={1} /><span style={connector} />
           <div style={stepLabel}>Drivers behind this moment</div>
           <div style={{ marginTop: 8 }}>
-            {tile.driverCodes.length === 0 ? (
+            {drivers.length === 0 ? (
               <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
                 {tile.driverNote.startsWith('No modelled driver')
                   ? `${tile.driverNote}. The Strategist Read below stands as authored judgment; nothing here feeds the Shift Matrix.`
@@ -626,31 +474,17 @@ const WhyChain: FC<{
               </p>
             ) : (
               <div className="flex flex-col gap-2">
-                {/* 2.11.0: one card per LIVE driver — citations that the review
-                    merged into the same driver share a card; deleted codes keep
-                    their own muted card. */}
-                {(() => {
-                  const groups: Array<{ key: string; code: string; cited: string[] }> = [];
-                  for (const c of tile.driverCodes) {
-                    const live = liveCodeFor(c);
-                    const key = live ?? `retired:${c}`;
-                    const g = groups.find(x => x.key === key);
-                    if (g) g.cited.push(c);
-                    else groups.push({ key, code: live ?? c, cited: [c] });
-                  }
-                  return groups.map(g => (
-                    <DriverForceCard
-                      key={g.key} code={g.cited[0]!} citedCodes={g.cited}
-                      driversById={driversById} driversLoaded={driversLoaded} onNavigateToDriver={onNavigateToDriver}
-                    />
-                  ));
-                })()}
+                {drivers.map(d => (
+                  <DriverForceCard
+                    key={d.code} driver={d} driversLoaded={driversLoaded} onNavigateToDriver={onNavigateToDriver}
+                  />
+                ))}
               </div>
             )}
           </div>
         </div>
 
-        {/* 2 — net effect */}
+        {/* 2: net effect */}
         <div style={{ ...stepWrap, paddingBottom: 0 }}>
           <StepDot n={2} />
           <div style={stepLabel}>Net effect</div>
@@ -670,7 +504,7 @@ const WhyChain: FC<{
             {tile.poolImpact && (
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                  Profit-pool impact (re-graded September 2026 on the 51-driver base)
+                  Profit-pool impact
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full" style={{ fontSize: 11, fontWeight: 800, padding: '1px 10px', color: '#fff', backgroundColor: accent, fontFamily: HEADLINE_FONT }}>
                   {isExp ? '▲' : '▼'} {tile.poolImpact.grade}
@@ -685,8 +519,10 @@ const WhyChain: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Admin tile editor (compact, inline in the detail panel) — fix #6.
+// Admin tile editor, inline in the detail panel
 // ════════════════════════════════════════════════════════════════════════
+const INTENSITY_LABELS: Record<1 | 2 | 3, string> = { 1: 'Mild', 2: 'Moderate', 3: 'Strong' };
+
 const TileEditor: FC<{
   initial: JourneyTile;
   onSave: (edits: TileEdits) => void;
@@ -702,11 +538,11 @@ const TileEditor: FC<{
   });
 
   const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: 10, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
     marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT,
   };
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     width: '100%', padding: '8px 10px', borderRadius: 8, backgroundColor: '#fff',
     border: `1px solid ${S.cardBorder}`, color: S.onSurface, fontSize: 12, fontFamily: BODY_FONT,
   };
@@ -732,7 +568,7 @@ const TileEditor: FC<{
                 border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
               }}
             >
-              {n} — {n === 1 ? 'Mild' : n === 2 ? 'Moderate' : 'Strong'}
+              {n} · {INTENSITY_LABELS[n]}
             </button>
           ))}
         </div>
@@ -832,86 +668,57 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
 }) => {
   const { drivers } = usePrism();
 
-  // ── Content: seed → replaced by server blob on mount (fix #6) ──
-  const [content, setContent] = useState<JourneyContent>(() => ({
-    lhc: cloneStages(LHC_JOURNEY),
-    hair: cloneStages(HAIR_JOURNEY),
-  }));
-  const [contentSource, setContentSource] = useState<'seed' | 'server'>('seed');
-
+  // The bundled content, replaced by the newest saved version once it arrives.
+  const [content, setContent] = useState<JourneyContent>({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/journey', { credentials: 'include' });
-        if (!res.ok) return; // 404/401/etc → keep seed silently
-        const data: unknown = await res.json();
-        if (cancelled || !data || typeof data !== 'object') return;
-        const blob = data as Partial<JourneyContent>;
-        if (Array.isArray(blob.lhc) && Array.isArray(blob.hair)) {
-          setContent({ lhc: cloneStages(blob.lhc), hair: cloneStages(blob.hair) });
-          setContentSource('server');
-        }
-      } catch {
-        /* keep seed silently */
-      }
-    })();
+    getJourneyContent()
+      .then((stored) => {
+        if (stored && !cancelled) setContent({ lhc: stored.lhc, hair: stored.hair });
+      })
+      .catch(() => { /* the bundled content stays */ });
     return () => { cancelled = true; };
   }, []);
 
-  // ── View state ──
   const [tab, setTab] = useState<JourneyKey>('lhc');
-  const [typeFilter, setTypeFilter] = useState<Set<TileType>>(new Set(['product', 'tech', 'service']));
+  const [typeFilter, setTypeFilter] = useState<Set<TileType>>(() => new Set(['product', 'tech', 'service']));
   const [selected, setSelected] = useState<SelectedTile | null>(null);
   const [editing, setEditing] = useState(false);
-  const [editMode, setEditMode] = useState(false); // R-15 — editing chrome is opt-in (admin only)
+  // The editing controls stay hidden until an admin turns them on.
+  const [editMode, setEditMode] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  const stages = tab === 'lhc' ? content.lhc : content.hair;
+  const stages = content[tab];
 
-  // ── Live trend index for evidence cards ──
   const driversLoaded = drivers.length > 0;
-  const driversById = useMemo(() => {
-    const m = new Map<string, Driver>();
-    for (const t of drivers) m.set(t.id, t);
-    return m;
-  }, [drivers]);
+  const driversById = useMemo(() => new Map(drivers.map(d => [d.id, d])), [drivers]);
 
-  // ── Counters ──
-  const totals = useMemo(() => {
-    let benefiting = 0, declining = 0, ai = 0;
-    for (const s of stages) {
-      benefiting += s.benefiting.length;
-      declining += s.negativelyImpacted.length;
-      ai += s.benefiting.filter(t => t.provenance.author === 'ai').length;
-      ai += s.negativelyImpacted.filter(t => t.provenance.author === 'ai').length;
-    }
-    return { benefiting, declining, ai };
-  }, [stages]);
+  const totals = useMemo(() => ({
+    benefiting: stages.reduce((n, s) => n + s.benefiting.length, 0),
+    declining: stages.reduce((n, s) => n + s.negativelyImpacted.length, 0),
+  }), [stages]);
 
-  // ── Selection helpers ──
-  const openTile = useCallback((tile: JourneyTile, stageId: string, stageLabel: string, direction: Direction) => {
-    setSelected({ tile, stageId, stageLabel, direction });
+  const openTile = useCallback((tile: JourneyTile, stageId: string, stageLabel: string, side: Side) => {
+    setSelected({ tile, stageId, stageLabel, side });
     setEditing(false);
   }, []);
   const closePanel = useCallback(() => { setSelected(null); setEditing(false); }, []);
 
-  // R-03 — shared overlay contract on the tile detail dialog: Escape close,
-  // focus trap, focus return to the trigger tile, body scroll lock.
+  // The tile dialog shares the overlay behaviour: Escape closes it, focus stays
+  // inside and returns to the tile, and the page behind does not scroll.
   const panelRef = useRef<HTMLDivElement | null>(null);
   useOverlay(!!selected, closePanel, panelRef);
 
-  // ── Flattened, visible tile order for prev/next navigation in the dialog ──
-  //   Stage-major (benefiting then declining within a stage), filtered + sorted
-  //   exactly as the rail renders, so ◀ ▶ steps through neighbours you can see.
+  // The visible tiles in rail order (stage by stage, tailwind before headwind,
+  // filtered and sorted as rendered), so ◀ ▶ step through neighbours you can see.
   const flatTiles = useMemo<SelectedTile[]>(() => {
     const out: SelectedTile[] = [];
     for (const s of stages) {
-      const ben = sortTilesForDisplay(s.benefiting.filter(t => typeFilter.has(t.type)));
-      const neg = sortTilesForDisplay(s.negativelyImpacted.filter(t => typeFilter.has(t.type)));
-      ben.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'benefiting' }));
-      neg.forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, direction: 'negativelyImpacted' }));
+      for (const side of ['benefiting', 'negativelyImpacted'] as const) {
+        sortTilesForDisplay(s[side].filter(t => typeFilter.has(t.type)))
+          .forEach(t => out.push({ tile: t, stageId: s.id, stageLabel: s.label, side }));
+      }
     }
     return out;
   }, [stages, typeFilter]);
@@ -927,8 +734,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     setEditing(false);
   }, [selectedIndex, flatTiles]);
 
-  // ── Keyboard: ←/→ step to neighbour tiles (only while open). Escape,
-  //    focus trap and scroll lock come from the shared useOverlay (R-03). ──
+  // ← and → step to the neighbouring tiles while the dialog is open.
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
@@ -939,115 +745,70 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, stepSelection]);
 
-  // ── Admin mutations (local state first; persisted on "Save to server") ──
-  const mutateTile = useCallback((
-    journeyKey: JourneyKey,
-    stageId: string,
-    direction: Direction,
-    tileId: string,
-    updater: (tiles: JourneyTile[]) => JourneyTile[],
-  ) => {
-    setContent(prev => {
-      const next: JourneyContent = { lhc: cloneStages(prev.lhc), hair: cloneStages(prev.hair) };
-      const arr = journeyKey === 'lhc' ? next.lhc : next.hair;
-      const stage = arr.find(s => s.id === stageId);
-      if (stage) {
-        if (direction === 'benefiting') stage.benefiting = updater(stage.benefiting);
-        else stage.negativelyImpacted = updater(stage.negativelyImpacted);
-      }
-      return next;
-    });
+  // ── Admin edits: local until "Save to server" ──
+  const mutateTiles = useCallback((stageId: string, side: Side, update: (tiles: JourneyTile[]) => JourneyTile[]) => {
+    setContent(prev => ({
+      ...prev,
+      [tab]: prev[tab].map(s => (s.id === stageId ? { ...s, [side]: update(s[side]) } : s)),
+    }));
     setSaveState('idle');
     setSaveMsg(null);
-    // touch tileId to satisfy the linter on closures that only filter by id
-    void tileId;
-  }, []);
+  }, [tab]);
 
   const applyEdits = useCallback((sel: SelectedTile, edits: TileEdits) => {
-    const updatedTile: JourneyTile = {
+    const updated: JourneyTile = {
       ...sel.tile,
       name: edits.name.trim() || sel.tile.name,
       intensity: edits.intensity,
       driverNote: edits.driverNote,
       driverCodes: edits.driverCodes,
       analysis: edits.analysis.trim() ? edits.analysis : sel.tile.analysis,
-      provenance: { ...sel.tile.provenance, date: CURRENT_YYYYMM }, // bump date (fix #6)
+      provenance: { ...sel.tile.provenance, date: CURRENT_YYYYMM },   // an edit re-dates the tile
     };
-    mutateTile(tab, sel.stageId, sel.direction, sel.tile.id, tiles =>
-      tiles.map(t => (t.id === sel.tile.id ? updatedTile : t)));
-    setSelected({ ...sel, tile: updatedTile });
+    mutateTiles(sel.stageId, sel.side, tiles => tiles.map(t => (t.id === sel.tile.id ? updated : t)));
+    setSelected({ ...sel, tile: updated });
     setEditing(false);
-  }, [mutateTile, tab]);
-
-  // ── Approve an AI-suggested tile (promote AI suggestion to strategist) ──
-  //   The reviewer accepts the mapping: the tile loses its "pending review"
-  //   treatment and becomes a regular strategist-authored read. Grade is
-  //   left as-is (review ≠ new hard evidence); the date is stamped now.
-  //   Persisted with the rest of the blob via "Save to server".
-  const approveAiTile = useCallback((sel: SelectedTile) => {
-    const updatedTile: JourneyTile = {
-      ...sel.tile,
-      provenance: { ...sel.tile.provenance, author: 'strategist', date: CURRENT_YYYYMM },
-    };
-    mutateTile(tab, sel.stageId, sel.direction, sel.tile.id, tiles =>
-      tiles.map(t => (t.id === sel.tile.id ? updatedTile : t)));
-    setSelected({ ...sel, tile: updatedTile });
-    setEditing(false);
-  }, [mutateTile, tab]);
+  }, [mutateTiles]);
 
   const removeTile = useCallback((sel: SelectedTile) => {
-    mutateTile(tab, sel.stageId, sel.direction, sel.tile.id, tiles =>
-      tiles.filter(t => t.id !== sel.tile.id));
+    mutateTiles(sel.stageId, sel.side, tiles => tiles.filter(t => t.id !== sel.tile.id));
     closePanel();
-  }, [mutateTile, tab, closePanel]);
+  }, [mutateTiles, closePanel]);
 
-  const addTile = useCallback((stageId: string, direction: Direction) => {
+  const addTile = useCallback((stageId: string, side: Side) => {
     const slug = Math.random().toString(36).slice(2, 8);
-    const newTile: JourneyTile = {
-      id: `${tab}.${stageId}.${direction === 'benefiting' ? 'exp' : 'con'}.new-${slug}`,
+    const tile: JourneyTile = {
+      id: `${tab}.${stageId}.${side === 'benefiting' ? 'exp' : 'con'}.new-${slug}`,
       name: 'New tile',
       type: 'product',
       driverCodes: [],
       driverNote: '',
       intensity: 2,
-      // admin-authored ⇒ strategist (NOT ai), current month, estimate grade (fix #6)
       provenance: { author: 'strategist', date: CURRENT_YYYYMM, grade: 'estimate' },
       analysis: '',
     };
-    mutateTile(tab, stageId, direction, newTile.id, tiles => [...tiles, newTile]);
+    mutateTiles(stageId, side, tiles => [...tiles, tile]);
     const stageLabel = stages.find(s => s.id === stageId)?.label ?? stageId;
-    setSelected({ tile: newTile, stageId, stageLabel, direction });
+    setSelected({ tile, stageId, stageLabel, side });
     setEditing(true);
-  }, [mutateTile, tab, stages]);
+  }, [mutateTiles, tab, stages]);
 
-  // ── Persist the FULL {lhc, hair} blob (fix #6) ──
+  /** Saves the whole tile map for every user; the route answers 403 unless the caller is an admin. */
   const saveToServer = useCallback(async () => {
     setSaveState('saving');
     setSaveMsg(null);
     try {
-      const res = await fetch('/api/journey', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lhc: content.lhc, hair: content.hair }),
-      });
-      if (res.status === 403) {
-        setSaveState('forbidden');
-        setSaveMsg('Admin required — your account cannot save journey content.');
-        return;
-      }
-      if (!res.ok) {
-        const text = await res.text().catch(() => res.statusText);
-        setSaveState('error');
-        setSaveMsg(`Save failed (${res.status}). ${text.slice(0, 160)}`);
-        return;
-      }
+      await saveJourneyContent(content);
       setSaveState('saved');
-      setContentSource('server');
-      setSaveMsg(null);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        setSaveState('forbidden');
+        setSaveMsg('Admin required: your account cannot save journey content.');
+        return;
+      }
+      const status = e instanceof ApiError && e.status > 0 ? ` (${e.status})` : '';
       setSaveState('error');
-      setSaveMsg(`Save failed. ${(e as Error).message}`);
+      setSaveMsg(`Save failed${status}. ${(e as Error).message.slice(0, 160)}`);
     }
   }, [content]);
 
@@ -1058,7 +819,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     <div className="min-h-screen" style={{ backgroundColor: S.bg, color: S.onBg, fontFamily: BODY_FONT }}>
       <main className="max-w-[1440px] mx-auto px-8 py-10">
 
-        {/* ─── Header (insight-rail accent) ─── */}
+        {/* ─── Header ─── */}
         <header className="mb-5 flex items-start justify-between gap-8 flex-wrap">
           <div className="pl-5" style={{ borderLeft: `4px solid ${S.primary}` }}>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] mb-2" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
@@ -1074,21 +835,20 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </div>
         </header>
 
-        {/* ─── Scope banner (fix #1) — exact sentiment, always visible ─── */}
+        {/* ─── Scope banner, always visible ─── */}
         <div className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
           <Info size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant, flexShrink: 0, marginTop: 2 }} />
           <p className="text-[12.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, margin: 0 }}>
-            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping drivers to consumer moments — authored content does not feed the Shift Matrix.</strong>
+            <strong style={{ fontFamily: HEADLINE_FONT }}>Qualitative overlay mapping drivers to consumer moments. Authored content does not feed the Shift Matrix.</strong>
           </p>
         </div>
 
-        {/* ─── Tabs + filters ─── */}
+        {/* ─── Tabs and filters ─── */}
         <section className="mb-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <FilterChip label="Laundry" active={tab === 'lhc'} onClick={() => { setTab('lhc'); closePanel(); }} />
             <FilterChip label="Hair" active={tab === 'hair'} onClick={() => { setTab('hair'); closePanel(); }} />
             {isAdmin && (
-              /* R-15 — editing chrome is opt-in; viewers never see this. */
               <button
                 onClick={() => { if (editMode) setEditing(false); setEditMode(v => !v); }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200"
@@ -1099,7 +859,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 }}
                 aria-pressed={editMode}
                 title={editMode
-                  ? 'Editing is on — click to hide the add / edit / save controls'
+                  ? 'Editing is on: click to hide the add / edit / save controls'
                   : 'Show the editing controls (add tiles, edit tiles, save to server)'}
               >
                 <Edit3 size={11} strokeWidth={2.5} /> Edit board
@@ -1107,7 +867,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             )}
             {tab === 'lhc' && (
               <span className="text-[11px]" style={{ color: S.mutedText, fontStyle: 'italic', fontFamily: BODY_FONT }}>
-                Laundry only — the Home Care (dish / surface / WC) journey is pending.
+                Laundry only: the Home Care (dish / surface / WC) journey is not built yet.
               </span>
             )}
           </div>
@@ -1119,11 +879,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.error, fontFamily: HEADLINE_FONT }}>
                 <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.declining}
               </span>
-              {totals.ai > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.onAmberContainer, fontFamily: HEADLINE_FONT }}>
-                  <Sparkles size={12} strokeWidth={2.5} /> {totals.ai} AI · pending review
-                </span>
-              )}
             </div>
             <div className="h-5 w-px" style={{ backgroundColor: S.cardBorder }} aria-hidden="true" />
             <div className="flex gap-1.5">
@@ -1143,7 +898,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </div>
         </section>
 
-        {/* ─── Stage rail (horizontal scroll) ─── */}
+        {/* ─── Stage rail ─── */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1155,18 +910,16 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             <div
               className="grid"
               style={{
-                // All stages fit on screen, no horizontal scroll (2026-06-14):
-                // minmax(0,1fr) lets the columns shrink to share the available
-                // width equally. Long stages span two units (2026-06-29) and
-                // lay their tiles in two sub-columns, so the total unit count is
-                // stages + however many are "wide". Each group (headers /
-                // benefiting / declining) sums to the same unit count, so the
-                // three rows stay column-aligned.
+                // Every stage fits the width: minmax(0, 1fr) lets the columns
+                // shrink equally. A wide stage takes two units, so the unit
+                // count is the number of stages plus the wide ones; the header,
+                // tailwind and headwind rows each add up to that count, which
+                // keeps the three rows aligned.
                 gridTemplateColumns: `repeat(${stages.reduce((n, s) => n + stageSpan(s, tab), 0)}, minmax(0, 1fr))`,
                 width: '100%', gap: 0,
               }}
             >
-              {/* Stage headers — with the R-09a tailwind/headwind rollup */}
+              {/* Stage headers with the tailwind / headwind rollup */}
               {stages.map((stage, i) => (
                 <div
                   key={stage.id + '_h'}
@@ -1175,10 +928,9 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                     padding: '10px 9px 9px', backgroundColor: S.surfaceLow,
                     borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                     borderBottom: `1px solid ${S.cardBorder}`,
-                    // Flex column so the rollup bar can be pinned to the bottom of
-                    // the cell (grid stretches all header cells to equal height),
-                    // keeping every stage's bar horizontally aligned regardless of
-                    // whether the title wraps to one line or two.
+                    // A flex column pins the rollup to the bottom of the cell
+                    // (the grid gives every header the same height), so the
+                    // bars line up whether a title takes one line or two.
                     display: 'flex', flexDirection: 'column',
                   }}
                 >
@@ -1188,8 +940,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   <div style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, marginTop: 3, lineHeight: 1.25, fontFamily: HEADLINE_FONT, letterSpacing: '-0.01em' }}>
                     {stage.label}
                   </div>
-                  {/* marginTop:auto pushes the rollup to the bottom edge; paddingTop
-                      guarantees a gap from the title even in the tallest (2-line) cell. */}
+                  {/* marginTop auto pushes the rollup to the bottom edge; the padding keeps it clear of a two-line title. */}
                   <div style={{ marginTop: 'auto', paddingTop: 7 }}>
                     <StageRollup
                       benefiting={stage.benefiting.filter(t => typeFilter.has(t.type))}
@@ -1199,25 +950,15 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 </div>
               ))}
 
-              {/* Benefiting row */}
+              {/* Tailwind row */}
               {stages.map((stage, i) => {
                 const tiles = sortTilesForDisplay(stage.benefiting.filter(t => typeFilter.has(t.type)));
-                const wide = stageSpan(stage, tab) === 2;
-                const tileEls = tiles.map(tile => (
-                  <TilePill
-                    key={tile.id}
-                    tile={tile}
-                    direction="benefiting"
-                    selected={selected?.tile.id === tile.id}
-                    onClick={() => openTile(tile, stage.id, stage.label, 'benefiting')}
-                  />
-                ));
                 return (
                   <div
                     key={stage.id + '_b'}
                     style={{
-                      gridColumn: wide ? 'span 2' : undefined,
-                      backgroundColor: 'rgba(45,125,63,0.04)', padding: '7px 6px',
+                      gridColumn: stageSpan(stage, tab) === 2 ? 'span 2' : undefined,
+                      backgroundColor: `rgba(${EXPANSION_RGB},0.04)`, padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       borderBottom: `1px solid ${S.cardBorder}`, minHeight: 56,
                     }}
@@ -1237,30 +978,27 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         </button>
                       )}
                     </div>
-                    {tileEls}
+                    {tiles.map(tile => (
+                      <TilePill
+                        key={tile.id}
+                        tile={tile}
+                        side="benefiting"
+                        selected={selected?.tile.id === tile.id}
+                        onClick={() => openTile(tile, stage.id, stage.label, 'benefiting')}
+                      />
+                    ))}
                   </div>
                 );
               })}
 
-              {/* Declining row */}
+              {/* Headwind row */}
               {stages.map((stage, i) => {
                 const tiles = sortTilesForDisplay(stage.negativelyImpacted.filter(t => typeFilter.has(t.type)));
-                const wide = stageSpan(stage, tab) === 2;
-                const tileEls = tiles.map(tile => (
-                  <TilePill
-                    key={tile.id}
-                    tile={tile}
-                    direction="negativelyImpacted"
-                    selected={selected?.tile.id === tile.id}
-                    onClick={() => openTile(tile, stage.id, stage.label, 'negativelyImpacted')}
-                  />
-                ));
                 return (
                   <div
                     key={stage.id + '_n'}
                     style={{
-                      gridColumn: wide ? 'span 2' : undefined,
-                      // L10 (July 2026 review): semantic rgb channels from lib/format.
+                      gridColumn: stageSpan(stage, tab) === 2 ? 'span 2' : undefined,
                       backgroundColor: `rgba(${CONTRACTION_RGB},0.04)`, padding: '7px 6px',
                       borderRight: i < stages.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
                       minHeight: 56,
@@ -1281,7 +1019,15 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         </button>
                       )}
                     </div>
-                    {tileEls}
+                    {tiles.map(tile => (
+                      <TilePill
+                        key={tile.id}
+                        tile={tile}
+                        side="negativelyImpacted"
+                        selected={selected?.tile.id === tile.id}
+                        onClick={() => openTile(tile, stage.id, stage.label, 'negativelyImpacted')}
+                      />
+                    ))}
                   </div>
                 );
               })}
@@ -1298,13 +1044,13 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </div>
         </motion.div>
 
-        {/* ─── Admin save bar (fix #6; shown only in edit mode — R-15) ─── */}
+        {/* ─── Admin save bar, shown in edit mode ─── */}
         {isAdmin && editMode && (
           <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
             <div className="flex items-center gap-2">
               <Edit3 size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />
               <span className="text-[12px]" style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
-                Editing on — tile edits update this view. <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> — saves the journey content for all users.
+                Editing on: tile edits update this view. <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> saves the journey content for all users.
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -1337,7 +1083,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       </main>
 
       {/* ════════════════════════════════════════════════════════════════
-          Detail dialog (full-screen) — Why-chain + Strategist Read + context
+          Detail dialog: Why-chain, Strategist Read and stage context
       ════════════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {selected && (
@@ -1363,7 +1109,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 role="dialog"
                 aria-modal="true"
                 tabIndex={-1}
-                aria-label={`${displayTileName(selected.tile.name)} — detail`}
+                aria-label={`${displayTileName(selected.tile.name)}: detail`}
                 onClick={e => e.stopPropagation()}
                 style={{
                   width: 'min(1120px, 100%)', margin: 'auto', maxHeight: '92vh',
@@ -1378,7 +1124,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   journeyKey={tab}
                   driversById={driversById}
                   driversLoaded={driversLoaded}
-                  isAdmin={isAdmin && editMode}
+                  canEdit={isAdmin && editMode}
                   editing={editing}
                   position={selectedIndex >= 0 ? { index: selectedIndex, total: flatTiles.length } : null}
                   onPrev={() => stepSelection(-1)}
@@ -1388,7 +1134,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   onCancelEdit={() => setEditing(false)}
                   onApplyEdits={edits => applyEdits(selected, edits)}
                   onRemove={() => removeTile(selected)}
-                  onApprove={() => approveAiTile(selected)}
                   onNavigateToDriver={onNavigateToDriver}
                 />
               </div>
@@ -1401,14 +1146,14 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Detail panel body (split out to keep the main render legible)
+// Detail panel body
 // ════════════════════════════════════════════════════════════════════════
 const PanelBody: FC<{
   selected: SelectedTile;
   journeyKey: JourneyKey;
   driversById: Map<string, Driver>;
   driversLoaded: boolean;
-  isAdmin: boolean;
+  canEdit: boolean;
   editing: boolean;
   position: { index: number; total: number } | null;
   onPrev: () => void;
@@ -1418,28 +1163,26 @@ const PanelBody: FC<{
   onCancelEdit: () => void;
   onApplyEdits: (edits: TileEdits) => void;
   onRemove: () => void;
-  onApprove: () => void;
   onNavigateToDriver?: (query: string) => void;
 }> = ({
   selected, journeyKey, driversById, driversLoaded,
-  isAdmin, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onApprove, onNavigateToDriver,
+  canEdit, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onNavigateToDriver,
 }) => {
-  const { tile, stageId, stageLabel, direction } = selected;
-  const isExp = direction === 'benefiting';
+  const { tile, stageLabel, side } = selected;
+  const isExp = side === 'benefiting';
   const ts = TYPE_STYLES[tile.type];
-  const isAi = tile.provenance.author === 'ai';
   const canPrev = !!position && position.index > 0;
   const canNext = !!position && position.index < position.total - 1;
 
-  const iconBtn: React.CSSProperties = {
+  const iconBtn: CSSProperties = {
     width: 34, height: 34, borderRadius: 999, border: 'none', backgroundColor: S.surfaceLow,
     color: S.onSurfaceVariant, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
   };
-  const iconBtnOff: React.CSSProperties = { ...iconBtn, opacity: 0.4, cursor: 'default' };
+  const iconBtnOff: CSSProperties = { ...iconBtn, opacity: 0.4, cursor: 'default' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, width: '100%', fontFamily: BODY_FONT }}>
-      {/* ── Sticky top bar — breadcrumb · neighbour nav · close ── */}
+      {/* ── Sticky top bar: breadcrumb, neighbour navigation, close ── */}
       <div style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 18px', backgroundColor: 'rgba(248,249,255,0.92)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${S.cardBorder}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12, color: S.onSurfaceVariant, minWidth: 0 }}>
           <span style={{ whiteSpace: 'nowrap' }}>{journeyKey === 'lhc' ? 'Laundry' : 'Hair'}</span>
@@ -1454,7 +1197,6 @@ const PanelBody: FC<{
         </div>
       </div>
 
-      {/* ── Scroll body ── */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* Hero */}
         <div style={{ padding: '22px 26px 18px', borderBottom: `1px solid ${S.cardBorder}` }}>
@@ -1472,68 +1214,27 @@ const PanelBody: FC<{
             <p style={{ fontSize: 14.5, color: S.onSurfaceVariant, lineHeight: 1.55, margin: '9px 0 0', maxWidth: '52rem' }}>{tile.driverNote}</p>
           )}
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 13 }}>
-            {/* R-18 — evidence + provenance via the shared Chip (text variants, no icon stickers) */}
             <Chip
               kind={GRADE_CHIP[tile.provenance.grade].kind}
               label={GRADE_CHIP[tile.provenance.grade].label}
               title={`Evidence grade: ${tile.provenance.grade}`}
             />
             <Chip
-              kind={isAi ? 'ai' : 'authored'}
-              label={`${isAi ? 'AI suggestion' : 'Strategist-authored'} · ${tile.provenance.date}`}
-              title={isAi
-                ? `AI-suggested mapping (${tile.provenance.date}) — pending strategist review`
-                : `Strategist-authored (${tile.provenance.date})`}
+              kind="authored"
+              label={`Strategist-authored · ${tile.provenance.date}`}
+              title={`Strategist-authored (${tile.provenance.date})`}
             />
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>{ts.label}</span>
             <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Intensity {tile.intensity}/3</span>
           </div>
-
-          {isAi && (
-            <div className="rounded-xl" style={{ marginTop: 14, backgroundColor: S.amberContainer, padding: '11px 14px' }}>
-              <div className="flex items-start gap-2">
-                <Sparkles size={13} strokeWidth={2.5} style={{ color: S.onAmberContainer, flexShrink: 0, marginTop: 1 }} />
-                <p style={{ fontSize: 11.5, color: S.onAmberContainer, lineHeight: 1.5, margin: 0 }}>
-                  AI-suggested mapping ({tile.provenance.date}) — <strong style={{ fontFamily: HEADLINE_FONT }}>pending strategist review</strong>. Treat as a hypothesis until verified.
-                </p>
-              </div>
-              {isAdmin && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={onApprove}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
-                      style={{ backgroundColor: S.expansion, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-                      title="Approve — promote this AI suggestion to a regular strategist-reviewed read"
-                    >
-                      <Check size={13} strokeWidth={2.5} /> Approve
-                    </button>
-                    <button
-                      onClick={onRemove}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-[12.5px] font-bold"
-                      style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-                      title="Discard — remove this AI suggestion from the journey"
-                    >
-                      <Trash2 size={13} strokeWidth={2.5} /> Discard
-                    </button>
-                  </div>
-                  <p style={{ fontSize: 10, color: S.onAmberContainer, margin: '6px 0 0', fontStyle: 'italic' }}>
-                    Approve clears the review flag and makes it a regular read; Discard removes it. Either way, <strong style={{ fontFamily: HEADLINE_FONT }}>Save to server</strong> to persist.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Two columns: Why-chain (left) · Strategist Read + Stage context (right) */}
+        {/* Two columns: Why-chain on the left, Strategist Read and stage context on the right */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5" style={{ padding: '20px 26px 30px' }}>
           <div>
             <WhyChain
               tile={tile}
-              stageId={stageId}
-              journeyKey={journeyKey}
-              direction={direction}
+              side={side}
               driversById={driversById}
               driversLoaded={driversLoaded}
               onNavigateToDriver={onNavigateToDriver}
@@ -1544,7 +1245,7 @@ const PanelBody: FC<{
             <SectionCard
               title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={12} strokeWidth={2.5} /> Strategist Read</span>}
               accent={S.primaryDim}
-              subtitle="Authored analysis — not simulated"
+              subtitle="Authored analysis, not simulated"
             >
               <div style={{ padding: '12px 14px', borderRadius: 10, backgroundColor: S.surfaceLow }}>
                 {tile.analysis
@@ -1555,7 +1256,7 @@ const PanelBody: FC<{
 
             <StageContextBlock stageLabel={stageLabel} journeyKey={journeyKey} />
 
-            {isAdmin && !editing && (
+            {canEdit && !editing && (
               <button
                 onClick={onEdit}
                 className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-full text-sm font-bold uppercase tracking-[0.08em]"
@@ -1564,7 +1265,7 @@ const PanelBody: FC<{
                 <Edit3 size={13} strokeWidth={2.5} /> Edit tile
               </button>
             )}
-            {isAdmin && editing && (
+            {canEdit && editing && (
               <SectionCard title="Edit tile" accent={S.primary}>
                 <TileEditor
                   initial={tile}

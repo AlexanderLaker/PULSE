@@ -1,93 +1,152 @@
 // @vitest-environment jsdom
 /**
- * Consumer Journey rework suite (2026-06-27) — interaction tests for the
- * declutter (parenthetical stripping) and the full-screen Why-chain dialog.
- * Renders against a canned store; verifies the de-blackbox ladder actually
- * mounts and connects to the live trend.
+ * The Consumer Journey page: the rail, the tile dialog with its Why-chain and
+ * the link to the Drivers page, the stored content that replaces the bundled
+ * tiles, and the admin save.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
+import type { PrismStore } from '@/hooks/usePrism';
+import type { JourneyContent, JourneyTile } from '@/data/consumerJourney';
+import { ApiError } from '@/api/client';
+import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
+import { makeDriver, makeStore } from './fixtures/prism';
 
-const STORE = vi.hoisted(() => ({ store: {} as Record<string, unknown> }));
-
-vi.mock('@/hooks/usePrism', () => ({
-  __esModule: true,
-  default: () => STORE.store,
-  PrismProvider: ({ children }: { children: unknown }) => children,
+const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
+const API = vi.hoisted(() => ({
+  getJourneyContent: vi.fn(),
+  saveJourneyContent: vi.fn(),
 }));
-vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(), updateDriver: vi.fn() }));
+
+vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
+vi.mock('@/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/client')>()),
+  getJourneyContent: API.getJourneyContent,
+  saveJourneyContent: API.saveJourneyContent,
+}));
 
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
 
-// T-01 → technology_r01 (the first Sorting / benefiting tile links it).
-// (M8, 2026-07-06: the phantom impact/score fields were removed from the
-//  fixture together with the never-rendered Strength bar they fed.
-//  O3, 2026-07-07: journey_exposure / journey_decomposition removed with
-//  the quantitative journey layer — the overlay is qualitative-only.)
-const t01 = {
+// The first Sorting tailwind tile cites T-01 (technology_r01).
+const TILE = 'AI stain/fabric recognition apps';
+const T01 = makeDriver({
   id: 'technology_r01',
-  name: 'AI-Driven Formulation and Speed-to-Market',
   force: 'Technology',
+  name: 'AI and automation productivity (live row)',
   direction: 'Expansion',
-  probability: 4.5,
   description: 'AI reads the garment and prescribes the SKU.',
-  sources: [{ title: 's', url: 'https://example.com', data: 'd' }],
-};
+});
 
-STORE.store = {
-  drivers: [t01],
-  simulation: {},
-  loading: false,
-  error: null,
-};
+beforeEach(() => {
+  STORE.current = makeStore({ drivers: [T01] });
+  API.getJourneyContent.mockReset().mockResolvedValue(null);
+  API.saveJourneyContent.mockReset().mockResolvedValue({ status: 'saved', tiles: 300 });
+});
 
 afterEach(() => cleanup());
 
-describe('ConsumerJourney2 — declutter + full-screen Why-chain', () => {
+function openTile(name = TILE) {
+  fireEvent.click(screen.getByText(name));
+  return within(screen.getByRole('dialog'));
+}
+
+describe('ConsumerJourney: rail and tile dialog', () => {
   it('strips trailing parentheticals from tile names in the rail', () => {
     const { container } = render(<ConsumerJourney />);
-    // a known parenthetical tile renders its stripped name…
     expect(container.textContent).toContain('Garment care advisory service');
-    // …and the parenthetical itself is gone from the rail
     expect(container.textContent).not.toContain('(digital)');
     expect(container.textContent).not.toContain('(auto-dose)');
   });
 
-  it('opens a full-screen dialog with the Why-chain and the Drivers connect', () => {
-    render(<ConsumerJourney onNavigateToDriver={() => {}} />);
+  it('states its scope and that the Home Care journey is not built yet', () => {
+    render(<ConsumerJourney />);
+    expect(screen.getByText(/Authored content does not feed the Shift Matrix\./)).toBeTruthy();
+    expect(screen.getByText(/the Home Care \(dish \/ surface \/ WC\) journey is not built yet/)).toBeTruthy();
+  });
 
-    fireEvent.click(screen.getByText('AI stain/fabric recognition apps'));
+  it('opens a dialog with the Why-chain, the provenance and the live driver', () => {
+    render(<ConsumerJourney />);
+    const dialog = openTile();
 
-    const dialog = screen.getByRole('dialog');
-    const u = within(dialog);
+    expect(dialog.getByText('Why this moment is expanding')).toBeTruthy();
+    expect(dialog.getByText('Drivers behind this moment')).toBeTruthy();
+    expect(dialog.getByText('Net effect')).toBeTruthy();
+    expect(dialog.getByText('AI and automation productivity (live row)')).toBeTruthy();
+    expect(dialog.getByText('AI reads the garment and prescribes the SKU.')).toBeTruthy();
+    expect(dialog.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
 
-    // two-step ladder: drivers -> net effect (O15 vocabulary, 2026-09-16)
-    expect(u.getByText(/Why this moment is (expanding|under pressure)/)).toBeTruthy();
-    expect(u.getByText('Drivers behind this moment')).toBeTruthy();
-    expect(u.getByText('Net effect')).toBeTruthy();
+    expect(dialog.getByText('Strategist-authored · 2026-09')).toBeTruthy();
+    expect(dialog.getByText('Estimate')).toBeTruthy();
+    expect(dialog.getByText('Authored analysis, not simulated')).toBeTruthy();
+  });
 
-    // driver-force card resolved against the LIVE driver
-    expect(u.getAllByText(/Tailwind/).length).toBeGreaterThan(0);
-    // M8 (2026-07-06): the "Strength" bar is GONE (retired impact input).
-    // O3 (2026-07-07): "Stage exposure" is GONE too — the quantitative
-    // journey layer was deleted. Lock both in.
-    expect(u.queryByText('Strength')).toBeNull();
-    expect(u.queryByText('Stage exposure')).toBeNull();
-    expect(u.getAllByText('View in Drivers').length).toBeGreaterThan(0);
+  it('links a driver card to the Drivers page with the live driver name', () => {
+    const onNavigateToDriver = vi.fn();
+    render(<ConsumerJourney onNavigateToDriver={onNavigateToDriver} />);
+    fireEvent.click(openTile().getByText('View in Drivers'));
+    expect(onNavigateToDriver).toHaveBeenCalledWith('AI and automation productivity (live row)');
+  });
 
-    // refinement 2026-06-29: "This moment" + "Computed attribution" steps and
-    // the honesty footer were removed; lock that in.
-    expect(u.queryByText('This moment')).toBeNull();
-    expect(u.queryByText(/Computed attribution/)).toBeNull();
-    expect(dialog.textContent).not.toContain('judgment, not simulated');
+  it('shows the code map entry until the drivers arrive', () => {
+    STORE.current = makeStore({ drivers: [] });
+    render(<ConsumerJourney />);
+    const dialog = openTile();
+    expect(dialog.getByText(DRIVER_CODE_MAP['T-01'].name)).toBeTruthy();
+    expect(dialog.getByText(/\(offline fallback\)/)).toBeTruthy();
   });
 
   it('closes on Escape', async () => {
     render(<ConsumerJourney />);
-    fireEvent.click(screen.getByText('AI stain/fabric recognition apps'));
-    expect(screen.queryByRole('dialog')).not.toBeNull();
+    openTile();
     fireEvent.keyDown(window, { key: 'Escape' });
-    // exit is deferred by the AnimatePresence transition; wait for unmount
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+});
+
+describe('ConsumerJourney: stored content and the admin save', () => {
+  it('replaces the bundled tiles with the stored content', async () => {
+    const tile: JourneyTile = {
+      id: 'lhc.sorting.exp.stored',
+      name: 'Stored tile',
+      type: 'tech',
+      driverCodes: ['T-01'],
+      driverNote: 'T-01 AI and automation productivity',
+      intensity: 2,
+      provenance: { author: 'strategist', date: '2026-10', grade: 'verified' },
+      analysis: null,
+    };
+    const stored: JourneyContent = {
+      lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [tile], negativelyImpacted: [] }],
+      hair: [],
+    };
+    API.getJourneyContent.mockResolvedValue(stored);
+    render(<ConsumerJourney />);
+    expect(await screen.findByText('Stored tile')).toBeTruthy();
+    expect(screen.queryByText(TILE)).toBeNull();
+  });
+
+  it('keeps the editing controls from a viewer', () => {
+    render(<ConsumerJourney />);
+    expect(screen.queryByRole('button', { name: 'Edit board' })).toBeNull();
+  });
+
+  it('saves the whole tile map for an admin', async () => {
+    render(<ConsumerJourney isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    expect(await screen.findByText('Saved')).toBeTruthy();
+    expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
+    const sent = API.saveJourneyContent.mock.calls[0]![0] as JourneyContent;
+    expect(Object.keys(sent).sort()).toEqual(['hair', 'lhc']);
+    expect(sent.lhc.length).toBeGreaterThan(0);
+    expect(sent.hair.length).toBeGreaterThan(0);
+  });
+
+  it('says so when the save route refuses the account', async () => {
+    API.saveJourneyContent.mockRejectedValue(new ApiError(403, 'Admin role required'));
+    render(<ConsumerJourney isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    expect(await screen.findByText('Admin required: your account cannot save journey content.')).toBeTruthy();
   });
 });

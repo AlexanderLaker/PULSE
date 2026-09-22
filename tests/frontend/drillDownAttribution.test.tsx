@@ -1,37 +1,32 @@
 // @vitest-environment jsdom
 /**
  * The category drill-down ranks its contributing drivers with the same
- * decomposition the PRISM Analysis readings are written on (owner instruction
- * 2026-09-17, F-30). Rendered end to end from the parity fixture the Python
- * build writes: the Shift Analysis page mounts on a store whose drivers,
- * configuration layers and cell weights are the fixture's inputs and whose
- * category medians are the fixture's category shifts, the fabric-clean row
- * is opened, and the drill-down must
+ * decomposition the PRISM Analysis readings are written on. Rendered end to
+ * end from the parity fixture the Python build writes: the Shift Analysis
+ * page mounts on a store whose drivers, configuration and cell weights are
+ * the fixture's inputs and whose category medians are the fixture's category
+ * shifts; the fabric-clean row is opened, and the drill-down must
  *
  *   1. name the score-means basis in its footer (never the exposure proxy),
- *   2. rank the drivers as the fixture does (X-15 first, then C-01, C-06),
- *   3. fall back to the labelled exposure proxy, with the old ranking, when
- *      the configuration layers are not served.
+ *   2. rank the drivers as the fixture does (X-15, C-01, C-06 first),
+ *   3. fall back to the labelled exposure proxy, ranked by Shift x exposure,
+ *      when the configuration did not load.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Driver, ForceName, ShiftPath } from '@/types';
+import type { PrismStore } from '@/hooks/usePrism';
+import { distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
 
-const STORE = vi.hoisted(() => ({ store: {} as Record<string, unknown> }));
+const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 
-vi.mock('@/hooks/usePrism', () => ({
-  __esModule: true,
-  default: () => STORE.store,
-  PrismProvider: ({ children }: { children: unknown }) => children,
-}));
-vi.mock('@/api/client', () => ({
-  getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  updateDriver: vi.fn(),
-}));
+vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.store }));
+vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(async () => null) }));
 
-// The drill-down's fan chart renders in a Recharts ResponsiveContainer, which
-// needs a ResizeObserver; jsdom has none, and the chart is not under test.
+// The fan chart renders in a Recharts ResponsiveContainer, which needs a
+// ResizeObserver; jsdom has none, and the chart is not under test.
 class ResizeObserverStub {
   observe() {}
   unobserve() {}
@@ -41,58 +36,55 @@ class ResizeObserverStub {
 
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 
-const REPO = path.resolve(__dirname, '..', '..');
-const FIXTURE = JSON.parse(fs.readFileSync(
-  path.join(REPO, 'tests', 'frontend', 'fixtures', 'driverAttribution.fixture.json'), 'utf8'));
-const YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+type FixtureDriver = Pick<Driver,
+  'id' | 'normalized_score' | 'category_exposure' | 'regional_exposure'
+  | 'uncertainty' | 'peak_year' | 'diffusion_curve' | 'start_year'> & { force: string };
+
+const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'driverAttribution.fixture.json'), 'utf8')) as {
+  inputs: {
+    drivers: FixtureDriver[];
+    config: { force_weights: Record<ForceName, number>; per_force_attenuation: Record<ForceName, number>;
+      within_force_overlap: Record<ForceName, number>; base_year: number; path_years: number[]; peak_year_jitter: number };
+    cellWeights: Record<string, Record<string, number>>;
+  };
+  expected: {
+    byDriver: Record<string, { category: Record<string, Record<string, number>> }>;
+    categoryShift: Record<string, Record<string, number>>;
+  };
+};
 const FCN = 'LHC: FCN';
 
-type FixtureDriver = {
-  id: string; force: string; normalized_score: number;
-  category_exposure: Record<string, number>; regional_exposure: Record<string, number>;
-  uncertainty: number | null; peak_year: number | null; diffusion_curve: string | null; start_year: number | null;
-};
-
-const NAMES: Record<string, string> = {
-  competitive_r15: 'Scale-leader innovation and A&P escalation',
-  consumer_r01: 'Private label structural penetration',
-  consumer_r06: 'Cost-of-living squeeze, round two',
-  consumer_r36: 'Growth-market currency depreciation',
-};
-
-function buildStore(withConfigLayers: boolean) {
-  const drivers = (FIXTURE.inputs.drivers as FixtureDriver[]).map((t) => ({
-    ...t,
-    name: NAMES[t.id] ?? `Driver ${t.id}`,
-    direction: t.normalized_score < 0 ? 'Contraction' : 'Expansion',
-    probability: 4, confidence: 'Medium', description: 'd',
-    gp1_shift: t.normalized_score, vc_exposure: {}, source_type: 'seed', data_source: 's',
-    analysis: 'Weight in the answer: x.',
+/** The fixture's drivers, each named by its id so a card's name is the driver's id. */
+function fixtureDrivers(): Driver[] {
+  return FIXTURE.inputs.drivers.map((d) => makeDriver({
+    ...d,
+    force: d.force as ForceName,
+    name: d.id,
+    direction: d.normalized_score < 0 ? 'Contraction' : 'Expansion',
   }));
-  const shifts: Record<string, Record<number, unknown>> = {};
-  for (const cat of FIXTURE.inputs.categories as string[]) {
-    shifts[cat] = {};
-    for (const y of YEARS) {
-      const m = FIXTURE.expected.categoryShift[cat][String(y)] as number;
-      shifts[cat][y] = { median: m, p10: m * 1.1, p25: m * 1.05, p75: m * 0.95, p90: m * 0.9 };
-    }
-  }
+}
+
+function buildStore(configLoaded: boolean): PrismStore {
+  const shifts: Record<string, ShiftPath> = Object.fromEntries(
+    Object.entries(FIXTURE.expected.categoryShift).map(([cat, byYear]) => [
+      cat, Object.fromEntries(Object.entries(byYear).map(([year, median]) => [year, distribution(median)])),
+    ]),
+  );
   const cfg = FIXTURE.inputs.config;
-  return {
-    health: { status: 'ok', version: 'test', has_simulation: true },
-    drivers,
-    simulation: {
-      shifts,
-      cell_weights_used: FIXTURE.inputs.cellWeights,
-      run_meta: { run_id: 99, iterations: 50000, model_type: 'bayesian_copula', model_version: '2.12.0' },
-    },
-    config: withConfigLayers
-      ? { force_weights: cfg.force_weights, per_force_attenuation: cfg.per_force_attenuation,
-          within_force_overlap: cfg.within_force_overlap, base_year: cfg.base_year, path_years: cfg.path_years }
-      : { iterations: 500 },
-    loading: false, error: null, backendAvailable: true, connectionState: 'connected',
-    updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
-  };
+  return makeStore({
+    drivers: fixtureDrivers(),
+    simulation: makeSimulation({ shifts, cell_weights_used: FIXTURE.inputs.cellWeights }),
+    config: configLoaded
+      ? makeConfig({
+          force_weights: cfg.force_weights,
+          per_force_attenuation: cfg.per_force_attenuation,
+          within_force_overlap: cfg.within_force_overlap,
+          base_year: cfg.base_year,
+          path_years: cfg.path_years,
+          peak_year_jitter: cfg.peak_year_jitter,
+        })
+      : null,
+  });
 }
 
 function openFabricClean(container: HTMLElement): HTMLElement {
@@ -102,13 +94,11 @@ function openFabricClean(container: HTMLElement): HTMLElement {
   return aside;
 }
 
-function driverOrder(aside: HTMLElement): string[] {
-  const text = aside.textContent ?? '';
-  return Object.values(NAMES)
-    .map((n) => ({ n, i: text.indexOf(n) }))
-    .filter((x) => x.i >= 0)
-    .sort((a, b) => a.i - b.i)
-    .map((x) => x.n);
+/** The driver cards in rank order, by driver id. */
+function cardOrder(aside: HTMLElement): string[] {
+  return within(aside)
+    .getAllByRole('button', { name: /on the Drivers page$/ })
+    .map((card) => /^Open "(.+)" on the Drivers page$/.exec(card.getAttribute('aria-label') ?? '')?.[1] ?? '');
 }
 
 afterEach(() => cleanup());
@@ -116,30 +106,38 @@ afterEach(() => cleanup());
 describe('category drill-down: contributing drivers at the score means', () => {
   it('names the score-means basis and ranks the fabric-clean drivers as the fixture does', () => {
     STORE.store = buildStore(true);
-    const { container } = render(<ShiftAnalysis />);
+    const openDriver = vi.fn();
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={openDriver} />);
     const aside = openFabricClean(container);
+
     expect(aside.textContent).toContain('the same decomposition as the PRISM Analysis');
     expect(aside.textContent).not.toContain('exposure proxy');
-    // the fixture's own order in fabric clean at 2035
-    const exact = FIXTURE.expected.byDriver as Record<string, { category: Record<string, Record<string, number>> }>;
-    const fixtureOrder = Object.keys(exact)
-      .filter((id) => id in NAMES)
-      .sort((a, b) => exact[a].category[FCN]['2035'] - exact[b].category[FCN]['2035'])
-      .map((id) => NAMES[id]);
-    expect(fixtureOrder[0]).toBe(NAMES.competitive_r15);
-    expect(driverOrder(aside)).toEqual(fixtureOrder);
-    // the growth-market driver (F-30) sits below the three large European headwinds
-    expect(driverOrder(aside).indexOf(NAMES.consumer_r36)).toBe(3);
     expect(within(aside).getByText(/Contributing Drivers/)).toBeTruthy();
+
+    const expected = FIXTURE.inputs.drivers
+      .filter((d) => (d.category_exposure[FCN] ?? 0) > 0)
+      .map((d) => d.id)
+      .sort((a, b) => Math.abs(FIXTURE.expected.byDriver[b].category[FCN]['2035'])
+        - Math.abs(FIXTURE.expected.byDriver[a].category[FCN]['2035']));
+    const order = cardOrder(aside);
+    expect(order.slice(0, 3)).toEqual(['competitive_r15', 'consumer_r01', 'consumer_r06']);
+    expect(order).toEqual(expected);
+    // The growth-market currency driver sits well below the large European headwinds.
+    expect(order.indexOf('consumer_r36')).toBeGreaterThan(10);
+
+    fireEvent.click(within(aside).getAllByRole('button', { name: /on the Drivers page$/ })[0]);
+    expect(openDriver).toHaveBeenCalledWith('competitive_r15');
   });
 
-  it('falls back to the labelled exposure proxy when the configuration layers are not served', () => {
+  it('falls back to the labelled exposure proxy when the configuration did not load', () => {
     STORE.store = buildStore(false);
-    const { container } = render(<ShiftAnalysis />);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
     const aside = openFabricClean(container);
+
     expect(aside.textContent).toContain('Contributing drivers: exposure proxy');
     expect(aside.textContent).not.toContain('the same decomposition as the PRISM Analysis');
-    // the proxy ranks by Shift x exposure: private label (the largest Shift value) first
-    expect(driverOrder(aside)[0]).toBe(NAMES.consumer_r01);
+    // The proxy ranks by Shift x exposure / 5: private label (the largest) first.
+    const order = cardOrder(aside);
+    expect(order.slice(0, 3)).toEqual(['consumer_r01', 'competitive_r15', 'customer_r13']);
   });
 });

@@ -1,13 +1,9 @@
 /**
- * LoadingSkeleton — shimmer placeholder shown while Clerk hydrates.
- *
- * June 2026: rewritten to sketch the ACTUAL shell (top nav + editorial
- * header + headline tiles + matrix card) in the maritime palette. The
- * previous version mimicked the decommissioned v1 dashboard (KPI band /
- * timeline / waterfall) in the old Apple palette.
+ * Shimmer placeholders. FullPageSkeleton sketches the dashboard shell (top
+ * nav, page header, headline tiles, matrix card) while Clerk starts up and
+ * while the Explorer tab loads.
  */
 
-import React from 'react';
 import { S } from '@/lib/theme';
 
 const shimmer = `linear-gradient(90deg, ${S.surfaceLow} 0%, ${S.surfaceHigh} 50%, ${S.surfaceLow} 100%)`;
@@ -21,7 +17,6 @@ function SkeletonBase({
   );
 }
 
-/** Full-page skeleton mirroring the live shell: nav, header, matrix card. */
 export function FullPageSkeleton() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: S.bg }}>
@@ -43,7 +38,7 @@ export function FullPageSkeleton() {
         </div>
       </div>
 
-      {/* Editorial header + headline tiles + matrix card */}
+      {/* Page header, headline tiles, matrix card */}
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '40px 32px' }}>
         <div style={{ borderLeft: `4px solid ${S.primaryContainer}`, paddingLeft: 20, marginBottom: 32 }}>
           <SkeletonBase width={220} height={11} />
@@ -70,5 +65,3 @@ export function FullPageSkeleton() {
     </div>
   );
 }
-
-export default SkeletonBase;

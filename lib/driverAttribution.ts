@@ -1,15 +1,15 @@
 /**
- * driverAttribution.ts — per-driver attribution of the shift, the engine's
- * own arithmetic evaluated at the score means (owner instruction 2026-09-17;
- * docs/DRIVER_ANALYSIS_CONCEPT.md section 2).
+ * Per-driver attribution of the shift: the engine's own arithmetic evaluated
+ * at the score means and taken apart driver by driver.
  *
- * This is a port of the decomposition in scripts/build_driver_analysis.py,
- * which the PRISM Analysis readings on the Drivers page are written on, so
- * that the category drill-down ranks the contributing drivers with the same
- * numbers a reading states. Both sides are pinned to one fixture
- * (tests/frontend/fixtures/driverAttribution.fixture.json, written by the
- * Python script; tests/frontend/driverAttribution.test.ts) and must never
- * drift apart.
+ * This is the TypeScript port of the decomposition in
+ * scripts/build_driver_analysis.py (docs/DRIVER_ANALYSIS.md), which the PRISM
+ * Analysis readings on the Drivers page are written on. The category
+ * drill-down ranks its contributing drivers with it, so a driver's rank there
+ * and its reading state the same numbers. The Python script writes a parity
+ * fixture (tests/frontend/fixtures/driverAttribution.fixture.json) that
+ * tests/frontend/driverAttribution.test.ts replays, so the two cannot drift
+ * apart.
  *
  * Per driver j, composite cell (category c, region r) and path year y the
  * additive term of the compounding factor is
@@ -20,30 +20,32 @@
  *
  * with normalizedScore = Beta-prior mean (probability/6) x GP1 share x
  * direction (the value the API serves) and the materialisation averaged over
- * the driver's own peak-year jitter grid (O7). The force sums compound
+ * the driver's own peak-year jitter grid. The force sums compound
  * multiplicatively per cell; the second-order cross-terms are spread over
- * the drivers of the cell in proportion to their additive terms so the
- * drivers of a cell add up to the cell shift at the means. Roll-up as the
- * engine does it (O6): category = share-weighted mean of the category's row
- * of cell weights, portfolio = sum over cells of share x cell shift.
+ * the drivers of the cell in proportion to their additive terms, so the
+ * drivers of a cell add up to the cell shift at the means. The roll-up is the
+ * engine's: a category is the share-weighted mean of its row of the run's
+ * cell weights, the portfolio the share-weighted sum over all cells.
  *
- * Read as attribution (D6), never as a second simulation: the Monte Carlo
- * medians of the persisted run stay the published numbers, and the panel
- * scales the drivers of a category to that median.
+ * Read the result as attribution, never as a second simulation: the Monte
+ * Carlo medians of the persisted run stay the published numbers, and the
+ * drill-down scales the drivers of a category to that median.
  */
+import { FORCES, REGIONS, YEARS } from '@/lib/format';
+import type { ForceName } from '@/types';
 
-export const FORCES = ['Consumer', 'Customer', 'Technology', 'Government', 'Environmental', 'Competitive'] as const;
-export const REGIONS = ['Europe', 'North America', 'Asia', 'High Growth'] as const;
-export const PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+/** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
 export const BASE_YEAR = 2025;
-/** pulse.config.UNCERTAINTY_PEAK_JITTER (O7): peak-year jitter width by uncertainty score. */
-export const UNCERTAINTY_PEAK_JITTER: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 };
-/** pulse.config.DEFAULT_PEAK_YEAR_JITTER: the width of an unscored driver (2.10.0 behaviour). */
-export const DEFAULT_PEAK_YEAR_JITTER = 1;
+
+/** prism/config.py UNCERTAINTY_PEAK_JITTER: a scored driver's peak-year jitter width in years. */
+const UNCERTAINTY_PEAK_JITTER: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 };
+
+/** prism/config.py DEFAULT_PEAK_YEAR_JITTER: the engine-wide width when the configuration names none. */
+const DEFAULT_PEAK_YEAR_JITTER = 1;
 
 export interface AttributionDriver {
   id: string;
-  force: string;
+  force: ForceName;
   /** Beta-prior mean x GP1 share x direction sign (the API's normalized_score). */
   normalized_score: number;
   category_exposure: Record<string, number>;
@@ -76,7 +78,7 @@ export interface DriverAttribution {
   portfolio: Record<number, number>;
   /** Contribution to each category's shift by year (fraction, signed). */
   category: Record<string, Record<number, number>>;
-  /** True when the driver had no peak year or curve and full materialisation was assumed. */
+  /** True when the driver has no peak year or curve and full materialisation is assumed. */
   approximate: boolean;
 }
 
@@ -107,8 +109,8 @@ function roundHalfEven4(x: number): number {
 }
 
 /**
- * pulse.config.compute_materialization_schedule, ported line by line.
- * Returns year -> fraction in [0, 1].
+ * The port of prism/config.py compute_materialization_schedule: the share of
+ * a driver's full effect present in each path year, year -> fraction in [0, 1].
  */
 export function computeMaterializationSchedule(
   peakYear: number, diffusionCurve: string, years: number[], baseYear: number, startYear?: number | null,
@@ -138,7 +140,7 @@ export function computeMaterializationSchedule(
   return schedule;
 }
 
-/** pulse.config.peak_jitter_for: the driver's own width, else the global one. */
+/** The port of prism/config.py peak_jitter_for: the driver's own width, else the global one; 0 switches jitter off. */
 export function peakJitterFor(uncertainty: number | null | undefined, globalJitter: number): number {
   const g = Math.trunc(globalJitter || 0);
   if (g <= 0) return 0;
@@ -150,7 +152,7 @@ export function peakJitterFor(uncertainty: number | null | undefined, globalJitt
 /**
  * The expected materialisation of one driver per path year: its schedule
  * averaged over the symmetric triangular peak-jitter grid, with the jittered
- * peak clamped at onset + 1 exactly as `_peak_schedule_table` does.
+ * peak clamped at onset + 1 exactly as the engine's _peak_schedule_table does.
  */
 export function expectedMaterialisation(
   t: AttributionDriver, years: number[], baseYear: number, globalJitter: number,
@@ -174,9 +176,8 @@ export function expectedMaterialisation(
       const pk = Math.max(basePk + off, onset + 1);
       sched = computeMaterializationSchedule(pk, dc, years, baseYear, sy);
     } else {
-      // The engine falls back to its force-level schedule table for such a
-      // driver; the panel assumes full materialisation after the onset and
-      // flags the driver as approximate.
+      // The engine gives such a driver its force's default schedule; here it
+      // is taken at full materialisation after the onset and flagged.
       approximate = true;
       sched = {};
       years.forEach((yr) => { sched[yr] = yr > onset ? 1.0 : 0.0; });
@@ -201,23 +202,22 @@ function clamp5(v: number | undefined): number {
  */
 export function computeDriverAttribution(inputs: AttributionInputs): AttributionResult {
   const { drivers, categories, config, cellWeights } = inputs;
-  const years = config.path_years?.length ? config.path_years.map(Number) : PATH_YEARS;
+  const years = config.path_years?.length ? config.path_years.map(Number) : YEARS;
   const baseYear = config.base_year ?? BASE_YEAR;
   const globalJitter = config.peak_year_jitter ?? DEFAULT_PEAK_YEAR_JITTER;
-  const forces = [...FORCES] as string[];
-  const regions = [...REGIONS] as string[];
-  const nCat = categories.length, nReg = regions.length, nCell = nCat * nReg, nYear = years.length;
+  const nCat = categories.length, nReg = REGIONS.length, nCell = nCat * nReg, nYear = years.length;
   const n = drivers.length;
 
-  const fw = forces.map((f) => config.force_weights?.[f] ?? 1 / forces.length);
-  const att = forces.map((f) => config.per_force_attenuation?.[f] ?? 0);
-  const fidx = drivers.map((t) => Math.max(0, forces.indexOf(t.force)));
+  const fw = FORCES.map((f) => config.force_weights?.[f] ?? 1 / FORCES.length);
+  const att = FORCES.map((f) => config.per_force_attenuation?.[f] ?? 0);
+  const fidx = drivers.map((t) => Math.max(0, FORCES.indexOf(t.force)));
 
-  // F1: composite cell exposure (a region-less driver counts as globally present, as the engine does).
+  // Composite cell exposure; a driver without regional scores counts as
+  // present in every region, as in the engine.
   const E: number[][] = drivers.map((t) => {
     const reg = t.regional_exposure ?? {};
-    let rv = regions.map((r) => clamp5(reg[r]));
-    if (rv.reduce((a, b) => a + b, 0) <= 0) rv = regions.map(() => 1);
+    let rv = REGIONS.map((r) => clamp5(reg[r]));
+    if (rv.reduce((a, b) => a + b, 0) <= 0) rv = REGIONS.map(() => 1);
     const row = new Array<number>(nCell).fill(0);
     categories.forEach((cat, c) => {
       const ce = clamp5(t.category_exposure?.[cat]);
@@ -227,10 +227,11 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     return row;
   });
 
-  // F2: magnitude-weighted within-force dampening per (force, cell).
+  // Within-force dampening per (force, cell), from the magnitude-weighted
+  // effective number of drivers (the participation ratio).
   const absScore = drivers.map((t) => Math.abs(Number(t.normalized_score ?? 0)));
-  const damp: number[][] = forces.map(() => new Array<number>(nCell).fill(1));
-  forces.forEach((force, f) => {
+  const damp: number[][] = FORCES.map(() => new Array<number>(nCell).fill(1));
+  FORCES.forEach((force, f) => {
     const ov = config.within_force_overlap?.[force] ?? 0;
     if (ov <= 0) return;
     for (let cell = 0; cell < nCell; cell++) {
@@ -246,7 +247,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     }
   });
 
-  // F4/F11/O7: expected materialisation per driver and year.
+  // Expected materialisation per driver and year (onset, curve, peak jitter).
   const mats = drivers.map((t) => expectedMaterialisation(t, years, baseYear, globalJitter));
 
   // Additive terms, force sums, compounding and the proportional spread.
@@ -261,7 +262,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   const spread: number[][] = Array.from({ length: nCell }, () => new Array<number>(nYear).fill(1));
   for (let cell = 0; cell < nCell; cell++) {
     for (let y = 0; y < nYear; y++) {
-      const forceSum = new Array<number>(forces.length).fill(0);
+      const forceSum = new Array<number>(FORCES.length).fill(0);
       for (let j = 0; j < n; j++) forceSum[fidx[j]] += A[j][cell][y];
       let prod = 1, additive = 0;
       forceSum.forEach((s) => { prod *= Math.max(0, 1 + s); additive += s; });
@@ -270,9 +271,9 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     }
   }
 
-  // O6 roll-up weights.
+  // Roll-up weights: w over all cells (portfolio), wn within each category's row.
   const W = new Array<number>(nCell).fill(0);
-  categories.forEach((cat, c) => regions.forEach((r, ri) => {
+  categories.forEach((cat, c) => REGIONS.forEach((r, ri) => {
     W[c * nReg + ri] = Math.max(0, Number(cellWeights?.[cat]?.[r] ?? 0));
   }));
   const wTotal = W.reduce((a, b) => a + b, 0);
@@ -326,12 +327,4 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   });
 
   return { years, byDriver, categoryShift, portfolioShift };
-}
-
-/** True when the config carries every layer the decomposition needs. */
-export function canAttribute(config: Partial<AttributionConfig> | null | undefined): config is AttributionConfig {
-  if (!config) return false;
-  const has = (rec: Record<string, number> | undefined) =>
-    !!rec && FORCES.every((f) => typeof rec[f] === 'number' && isFinite(rec[f]));
-  return has(config.force_weights) && has(config.per_force_attenuation) && has(config.within_force_overlap);
 }

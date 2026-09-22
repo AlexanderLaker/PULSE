@@ -1,13 +1,14 @@
-/** @type {import('next').NextConfig} */
-//
-// In production (Vercel) the `/api/v1/*` paths are rewritten to the
-// Python serverless handler by `vercel.json`. In local development
-// `npm run dev` runs Next.js on :3000 but the FastAPI engine runs
-// separately on :8000, so we need a matching rewrite in Next.js so
-// the dashboard's `fetch('/api/v1/...')` calls resolve. The target
-// is configurable via PRISM_BACKEND_URL (default http://127.0.0.1:8000).
-const BACKEND_URL =
-  process.env.PRISM_BACKEND_URL || 'http://127.0.0.1:8000';
+/**
+ * Next.js configuration.
+ *
+ * On Vercel, vercel.json sends /api/v1/* to the Python function. In local
+ * development the API runs as its own server (uvicorn, port 8000), so the
+ * same path is rewritten to it here; PRISM_BACKEND_URL points elsewhere if
+ * needed. A production build leaves the rewrite to vercel.json.
+ *
+ * @type {import('next').NextConfig}
+ */
+const BACKEND_URL = process.env.PRISM_BACKEND_URL || 'http://127.0.0.1:8000';
 
 const nextConfig = {
   reactStrictMode: true,
@@ -15,15 +16,8 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    // Only proxy in dev — on Vercel `vercel.json` takes precedence.
-    if (process.env.NODE_ENV === 'production' && !process.env.FORCE_DEV_PROXY) {
-      return [];
-    }
-    // (L23, July 2026 review: the legacy '/api/py/*' alias rewrite was
-    //  removed here and in vercel.json — zero callers in the tree.)
-    return [
-      { source: '/api/v1/:path*', destination: `${BACKEND_URL}/api/v1/:path*` },
-    ];
+    if (process.env.NODE_ENV === 'production') return [];
+    return [{ source: '/api/v1/:path*', destination: `${BACKEND_URL}/api/v1/:path*` }];
   },
 };
 

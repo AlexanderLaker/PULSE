@@ -5,6 +5,6 @@
     ".next",
     "next-env.d.ts",
     "prism",
-    "_NOT_FOR_HANDOVER"
+    "_*"
   ]
 }

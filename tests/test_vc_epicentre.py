@@ -2,8 +2,8 @@
 
 The engine reads the value chain as one epicentre stage per driver, derived
 from the stored eight-step profile by prism.config.vc_epicentre_of. The
-dashboard's epicentreOf (components/dashboard/Drivers.tsx) must behave
-identically, so both suites pin the same fixture table; change them together.
+dashboard's epicentreOf (lib/valueChain.ts) must behave identically, so both
+suites pin the same fixture table; change them together.
 """
 from prism.config import VC_STEPS, vc_epicentre_of, vc_epicentre_step_of
 from prism.drivers import Driver
@@ -11,7 +11,7 @@ from prism.input_drift import compute_input_drift_event, driver_fingerprint
 
 
 def _canonical(stage: int) -> dict:
-    """The 5/3/1 profile the editor writes (canonicalVcProfile in Drivers.tsx)."""
+    """The 5/3/1 profile the editor writes (canonicalVcProfile in lib/valueChain.ts)."""
     falloff = [5, 3, 1]
     return {
         s: (falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0)
@@ -70,6 +70,9 @@ class TestEpicentreOf:
         # A flat profile ties at all eight stages; its centroid is 4.5 and the
         # earlier of the two equally near stages wins: stage 4, Packaging.
         assert vc_epicentre_of({s: 2 for s in VC_STEPS}) == 4
+
+    def test_keys_outside_the_eight_stages_are_ignored(self):
+        assert vc_epicentre_of({"supply_chain": 5, "Manufacturing": 2}) == VC_STEPS.index("Manufacturing") + 1
 
     def test_step_name_helper(self):
         assert vc_epicentre_step_of(_canonical(6)) == "Marketing"

@@ -38,6 +38,6 @@
   "exclude": [
     "node_modules",
     "prism",
-    "_NOT_FOR_HANDOVER"
+    "_*"
   ]
 }

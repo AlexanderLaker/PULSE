@@ -1,58 +1,68 @@
 /**
- * PRISM — Simulation & Shift Matrix types.
- * Maps to the core Shift Matrix output contract (CLAUDE.md §2).
+ * The persisted run as GET /api/v1/simulation serves it (prism/api/runs.py).
+ *
+ * `SimulationPayload` is the JSON as it arrives; api/client.ts lifts each
+ * category's percentile path into `shifts`, which is the `SimulationResult`
+ * every view reads. Keys are strings: "2035", "Hair: Color", "Europe".
  */
 
-import type {
-  CategoryId, ForceName, ScenarioId, ModelType, ProjectionYear,
-  YearRecord, CategoryRecord,
-} from './index';
-
-/** Percentile distribution for a single year. */
+/** The distribution of a shift in one year. */
 export interface PercentileDistribution {
+  p10: number;
+  p25: number;
   median: number;
-  p10?: number;
-  p25?: number;
-  p75?: number;
-  p90?: number;
+  p75: number;
+  p90: number;
+  mean: number;
+  std: number;
 }
 
-/** Shift path for a single category across all projection years. */
-export type ShiftPath = Record<number, PercentileDistribution | number>;
+/** A shift path: year -> distribution. */
+export type ShiftPath = Record<string, PercentileDistribution>;
 
-/** Full shifts object: category → year → percentile data. */
-export type ShiftMatrix = Record<string, ShiftPath>;
-
-/** Velocity data: year-over-year rate of change. */
-export type VelocityPath = YearRecord<number>;
-
-/** Early-warning trigger definition. */
-export interface ShiftTrigger {
-  condition: string;
-  alert: string;
-  year?: number;
-  threshold?: number;
+/** Distribution of each iteration's change from the previous year. */
+export interface VelocityBand {
+  median: number;
+  p10: number;
+  p90: number;
 }
 
-/** Trigger status from the API. */
-export interface TriggerStatus {
-  id: number;
-  category: string;
-  condition_type: string;
-  threshold: number;
-  target_year: number;
-  action_text: string;
-  status: 'active' | 'fired' | 'dismissed';
-  fired_date?: string;
+/** One category's (or one category and region's) simulated shift. */
+export interface CellShift {
+  path: ShiftPath;
+  /** year -> change from the previous year; starts at the second path year. */
+  velocity: Record<string, VelocityBand>;
 }
 
-// (F9, 2.10.0: ForceAttribution / force_attribution deleted — the dormant,
-//  numerically-unstable direct_effects block that no consumer read. The
-//  shipped Force lens is decompositions.force.)
+/** year -> category -> lens dimension (force, value-chain stage, region) -> part of the median shift. */
+export type Decomposition = Record<string, Record<string, Record<string, number>>>;
 
-/** F7 (2.10.0): per-quantile Monte-Carlo standard error at the terminal year,
- *  per category (in percentage points). Replaces the vacuous i.i.d. split-R̂/
- *  ESS "convergence" block. Measures sampling noise only — ≈0.001 pp at 50k. */
+/** The three attribution lenses. Each splits the same median shift, so every lens adds up to it. */
+export interface Decompositions {
+  force: Decomposition;
+  vc: Decomposition;
+  region: Decomposition;
+  dimensions: {
+    forces: string[];
+    vc_steps: string[];
+    regions: string[];
+    categories: string[];
+    years: number[];
+  };
+}
+
+export interface Totals {
+  /** category -> year -> median shift (the row totals of every lens). */
+  category_path: Record<string, Record<string, number>>;
+  /** year -> dimension -> sum over the categories (column totals per lens). */
+  by_force: Record<string, Record<string, number>>;
+  by_vc: Record<string, Record<string, number>>;
+  by_region: Record<string, Record<string, number>>;
+  /** The portfolio band: the joint percentiles of the gross-profit-weighted portfolio shift. */
+  portfolio: ShiftPath;
+}
+
+/** Bootstrap standard error of the terminal-year percentiles, in percentage points. */
 export interface McStandardError {
   median_se_pp: number;
   p10_se_pp: number;
@@ -62,173 +72,66 @@ export interface McStandardError {
   method: string;
 }
 
-/** F1 (2.10.0): the 3D regional shift — per category, per region, a percentile
- *  path (+ velocity), the same cell shape as ShiftMatrix entries. */
-export type RegionalShiftMatrix = Record<string, Record<string, {
-  path: ShiftPath;
-  velocity?: Record<string, { median: number; p10?: number; p90?: number }>;
-}>>;
-
-/**
- * Per-year Decomposition Matrix — backend-computed (bayesian_mc v2.5+).
- *
- * The backend produces three lenses (Force, Value Chain, Region) that each
- * decompose the SAME MC-median category shift for every (category, year).
- * By construction the row total (sum across the lens dimension) equals
- * the MC median per category per year — so row totals are identical across
- * all three lenses, and column totals aggregate across categories to the
- * same per-year grand total.
- *
- *   sum over force   of force[y][cat][f]  === mc_median[cat][y]
- *   sum over vc_step of vc[y][cat][s]     === mc_median[cat][y]
- *   sum over region  of region[y][cat][r] === mc_median[cat][y]
- */
-export interface DecompositionMatrix {
-  force:  Record<string, Record<string, Record<string, number>>>;   // year → cat → force → shift
-  vc:     Record<string, Record<string, Record<string, number>>>;   // year → cat → vc_step → shift
-  region: Record<string, Record<string, Record<string, number>>>;   // year → cat → region → shift
-  dimensions?: {
-    forces: string[];
-    vc_steps: string[];
-    regions: string[];
-    categories: string[];
-    years: number[];
-  };
-}
-
-/** Per-year totals block — row totals, column totals, grand totals. */
-export interface TotalsMatrix {
-  /** Row totals: per-category MC median at each year (identical across the 3 lenses by construction). */
-  category_path: Record<string, Record<string, number>>;         // cat → year → total
-  /** Column totals under the Force lens: aggregated across categories. */
-  by_force:      Record<string, Record<string, number>>;         // year → force → total
-  by_vc:         Record<string, Record<string, number>>;         // year → vc_step → total
-  by_region:     Record<string, Record<string, number>>;         // year → region → total
-  // (F10, 2.10.0: `grand` deleted — a raw SUM of the 13 category medians,
-  //  ≈13× the headline, unused, and "sum of medians ≠ median of sum". Use
-  //  `portfolio` below, the real per-iteration portfolio quantity.)
-  /**
-   * Joint portfolio percentiles (D3 / audit F-16, June 2026): true joint
-   * band of the category-weighted portfolio shift, computed per iteration
-   * from the raw MC samples — NOT an average of per-category bands. The
-   * headline band reads this when present (2.8.0+ runs).
-   */
-  portfolio?:    Record<string, PercentileDistribution & { mean?: number; std?: number }>;
-}
-
-// (JourneyDecomposition removed 2026-07-07, owner ruling O3 — the
-//  quantitative journey layer was deleted.)
-
-/** Integrity event emitted by the engine or the run orchestrator (D19). */
+/** Something the engine repaired, assumed or measured, recorded with the run (input drift among them). */
 export interface IntegrityEvent {
-  type: string;            // e.g. 'input_drift', 'correlation_pd_repair'
-  severity: 'info' | 'warning' | 'error' | string;
+  type: string;
+  severity: 'info' | 'warning' | 'error';
   message: string;
-  detail?: Record<string, unknown>;
+  detail?: Record<string, unknown> | null;
 }
 
-/**
- * Cross-seed stability of the terminal-year portfolio median (M2, 2.8.1 —
- * owner re-ruling 2026-07-06 of the June T18 removal). Measures MC sampling
- * noise at the configured iteration count ONLY — it cannot detect model
- * error; at 50k × 3 chains a spread of ≈0 pp is the expected result.
- * Replaces the misleading R̂ badge (D3).
- */
+/** Spread of the terminal-year portfolio median across the independently seeded chains. */
 export interface SeedStability {
-  metric: 'terminal_year_portfolio_median' | string;
+  metric: string;
   terminal_year: number;
   per_chain_medians: number[];
-  /** max − min across chains, in percentage points. */
+  /** Largest minus smallest chain median, in percentage points: Monte Carlo noise only. */
   spread_pp: number;
   n_chains: number;
   iterations_per_chain: number;
+  pooled_iterations: number;
 }
 
-/** Per-run audit metadata attached to every persisted simulation.
- *
- * Populated by the `run_50k_prod.py` script (v3.2+) and rehydrated by
- * the FastAPI /api/v1/simulation endpoint. Surfaced in the dashboard's
- * "Showing run #N · date · scenario" ribbon so users can tell which
- * persisted run they're looking at.
- */
+/** Which run this is and how it was computed. */
 export interface RunMeta {
-  run_id: number | null;
-  run_date: string | null;
-  iterations: number | null;
-  model_type: string | null;
-  scenario?: string | null;
-  notes?: string | null;
-  seed?: number | null;
-  /** L8 (2.8.1): derived per-chain seeds; `seed` is the reproducible master. */
-  chain_seeds?: number[] | null;
-  chains?: number | null;
-  git_sha?: string | null;
-  model_version?: string | null;
-  engine_name?: string | null;
-  /** D13: 'scipy' — only the exact-numerics engine may produce runs. */
-  engine_fidelity?: string | null;
-  /** D13: exact library versions, e.g. 'scipy 1.15.3 · numpy 2.2.6'. */
-  numerics_backend?: string | null;
-  /** 2.9.0: how the run's VC lens was computed. 'epicentre' = categorical
-   *  partition (each trend assigned wholly to its value-chain epicentre
-   *  stage). Null/absent on pre-2.9 runs, which used profile×weight shares
-   *  — the About-footer labels those "profile-weighted (pre-2.9 run)". */
-  vc_attribution_basis?: string | null;
-  /** 2.10.0 (F1): the region GP1-share weights applied in the roll-up
-   *  (since 2.11.0 the column sums of cell_weights_used). */
-  region_weights_used?: Record<string, number> | null;
-  /** 2.11.0 (O6): the 13 × 4 gross-profit-share matrix the run rolled up
-   *  with, its row sums, and the provenance label. Absent on pre-2.11 runs. */
-  cell_weights_used?: Record<string, Record<string, number>> | null;
-  category_weights_used?: Record<string, number> | null;
-  cell_weights_source?: string | null;
-  /** 2.11.0 (O10/O11): number of drivers the run loaded and the calibration
-   *  tag of its config (e.g. 'calibrated_v3.12_september2026'). */
-  driver_count?: number | null;
-  attenuation_source?: string | null;
-  converged_categories?: number | null;
-  total_categories?: number | null;
-  persisted_at_utc?: string | null;
+  run_id: number;
+  run_date: string;
+  /** Iterations per chain. */
+  iterations: number;
+  seed: number;
+  chain_seeds: number[];
+  chains: number;
+  model_version: string;
+  engine_name: string;
+  numerics_backend: string;
+  driver_count: number;
+  attenuation_source: string;
+  persisted_at_utc: string;
 }
 
-/** Full simulation result from POST /simulate. */
-export interface SimulationResult {
-  shifts: ShiftMatrix;
-  /** F1 (2.10.0): the 3D category × region shift + the region GP1-share weights
-   *  actually applied in the category/portfolio roll-up. */
-  regional_shift_matrix?: RegionalShiftMatrix;
-  region_weights_used?: Record<string, number>;
-  /** 2.11.0 (O6): the cell gross-profit-share matrix the run used, its row
-   *  sums (the category weights the footer totals must use) and the label. */
-  cell_weights_used?: Record<string, Record<string, number>>;
-  category_weights_used?: Record<string, number>;
-  cell_weights_source?: string;
-  /** Per-year Force/VC/Region decompositions — source of truth for the Shift-Matrix lenses. */
-  decompositions?: DecompositionMatrix;
-  /** Per-year row/column totals + the joint portfolio band. */
-  totals?: TotalsMatrix;
-  /** F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS convergence). */
-  mc_standard_error?: Record<string, McStandardError>;
-  scenario?: ScenarioId;
-  generated?: string;
-  model_version?: string;
-  /** Audit metadata about the persisted run — drives the dashboard ribbon. */
-  run_meta?: RunMeta | null;
-  /** D19: integrity events (input drift, runtime repairs) persisted with the run. */
-  integrity_events?: IntegrityEvent[];
-  /** M2 (2.8.1): cross-seed stability block; null/absent on older runs. */
-  seed_stability?: SeedStability | null;
+/** GET /api/v1/simulation as it arrives. */
+export interface SimulationPayload {
+  shift_matrix: Record<string, CellShift>;
+  /** category -> region -> shift of that cell. */
+  regional_shift_matrix: Record<string, Record<string, CellShift>>;
+  decompositions: Decompositions;
+  totals: Totals;
+  /** category -> region -> gross-profit share the run rolled up with (sums to 1). */
+  cell_weights_used: Record<string, Record<string, number>>;
+  /** Row sums of cell_weights_used: each category's share. */
+  category_weights_used: Record<string, number>;
+  /** Column sums of cell_weights_used: each region's share. */
+  region_weights_used: Record<string, number>;
+  /** Where the cell weights come from (the estimate's label, or the finance file's). */
+  cell_weights_source: string;
+  /** category -> standard error of its terminal-year percentiles. */
+  mc_standard_error: Record<string, McStandardError>;
+  integrity_events: IntegrityEvent[];
+  seed_stability: SeedStability;
+  run_meta: RunMeta;
 }
 
-// (SimulationParams removed with runSimulation, L25/July 2026 review —
-//  the deployed service never simulates; runs come from the offline CLI.)
-
-/** Scenario definition. */
-export interface Scenario {
-  id: ScenarioId;
-  name: string;
-  description: string;
-  shocks?: Record<ForceName, number>;
-  force_overrides?: Record<ForceName, number>;
+/** The run as the views read it: `shifts[category]` is that category's path. */
+export interface SimulationResult extends Omit<SimulationPayload, 'shift_matrix'> {
+  shifts: Record<string, ShiftPath>;
 }
-

@@ -1,22 +1,10 @@
 /**
- * PATCH /api/users/[userId]/role — admin-only role change.
+ * PATCH /api/users/{userId}/role: an admin changes a user's role.
  *
- * Body: { role: 'admin' | 'viewer' }.
- *
- * Safeguards:
- *   - Caller must be admin (requireAdmin).
- *   - Admins cannot demote themselves — this prevents a lone admin from
- *     accidentally locking everyone out. To demote yourself, another
- *     admin must do it.
- *   - Role must be a valid enum value; anything else → 400.
- *
- * Side effects:
- *   - Writes to `user_roles` via `setRole` in lib/roles.ts.
- *   - Appends an audit_log row so the change is traceable.
- *
- * The target must already exist in `user_roles` (otherwise the webhook
- * hasn't fired). If they don't, we upsert a viewer row first so the
- * UPDATE has something to hit.
+ * Body { role: 'admin' | 'viewer' }. An admin cannot demote themselves, so
+ * the last admin can never lock everyone out; another admin has to do it. A
+ * user the webhook has not added yet gets a viewer row first. The change is
+ * written to the audit log. Response: { role }.
  */
 import { NextResponse } from 'next/server';
 import {
@@ -57,10 +45,8 @@ export async function PATCH(req: Request, { params }: Params) {
       );
     }
 
-    // Ensure the row exists. If the webhook hasn't fired yet, create a
-    // minimal row so the subsequent UPDATE lands. We pass the admin's
-    // email as a placeholder — the webhook (or a later /api/me call)
-    // will correct it.
+    // A user the webhook has not reached yet gets a viewer row first, with a
+    // placeholder email the next user.updated event replaces.
     const existing = await getRole(targetUserId);
     const sql = getSQL();
     if (existing === null) {
@@ -73,8 +59,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
     await setRole(targetUserId, nextRole);
 
-    // Audit entry — best effort. A failure here shouldn't roll back the
-    // role change, but we log it so ops notice.
+    // Best effort: the role change stands even if the audit entry fails.
     try {
       await sql`
         INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id)

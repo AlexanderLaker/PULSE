@@ -1,5 +1,5 @@
 /**
- * Parity lock for lib/driverAttribution.ts (owner instruction 2026-09-17).
+ * Parity lock for lib/driverAttribution.ts.
  *
  * The PRISM Analysis readings on the Drivers page are written on the Python
  * decomposition in scripts/build_driver_analysis.py; the category drill-down
@@ -15,8 +15,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   computeDriverAttribution, computeMaterializationSchedule, expectedMaterialisation,
-  peakJitterFor, canAttribute, PATH_YEARS, BASE_YEAR,
+  peakJitterFor, BASE_YEAR,
 } from '@/lib/driverAttribution';
+import { YEARS } from '@/lib/format';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'driverAttribution.fixture.json');
 
@@ -96,32 +97,32 @@ describe('lib/driverAttribution parity with scripts/build_driver_analysis.py', (
   });
 });
 
-describe('materialisation schedule and jitter (ports of pulse.config)', () => {
+describe('materialisation schedule and jitter (ports of prism/config.py)', () => {
   it('matches the engine\'s curve values on the fixture drivers', () => {
     // s-curve 2025 -> 2030 (onset 2025): the engine rounds to 4 decimals.
-    const s = computeMaterializationSchedule(2030, 's_curve', PATH_YEARS, BASE_YEAR, 2025);
+    const s = computeMaterializationSchedule(2030, 's_curve', YEARS, BASE_YEAR, 2025);
     expect(s[2026]).toBe(0.0242);
     expect(s[2027]).toBe(0.2301);
     expect(s[2028]).toBe(0.7699);
     expect(s[2029]).toBe(0.9758);
     expect(s[2030]).toBe(1);
     expect(s[2035]).toBe(1);
-    const lin = computeMaterializationSchedule(2029, 'linear', PATH_YEARS, BASE_YEAR, 2025);
+    const lin = computeMaterializationSchedule(2029, 'linear', YEARS, BASE_YEAR, 2025);
     expect(lin[2027]).toBe(0.5);
-    const fl = computeMaterializationSchedule(2027, 'front_loaded', PATH_YEARS, BASE_YEAR, 2025);
+    const fl = computeMaterializationSchedule(2027, 'front_loaded', YEARS, BASE_YEAR, 2025);
     expect(fl[2026]).toBe(0.7071);
-    const step = computeMaterializationSchedule(2030, 'step_function', PATH_YEARS, BASE_YEAR, 2025);
+    const step = computeMaterializationSchedule(2030, 'step_function', YEARS, BASE_YEAR, 2025);
     expect(step[2028]).toBe(0.05);
   });
 
   it('gates the onset by start_year and saturates a jittered peak at onset + 1', () => {
-    const late = computeMaterializationSchedule(2035, 'linear', PATH_YEARS, BASE_YEAR, 2028);
+    const late = computeMaterializationSchedule(2035, 'linear', YEARS, BASE_YEAR, 2028);
     expect(late[2028]).toBe(0);
     expect(late[2029]).toBe(0.1429);
     expect(late[2034]).toBe(0.8571);
     const m = expectedMaterialisation(
       { id: 'x', force: 'Consumer', normalized_score: 0.1, category_exposure: {}, uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 },
-      PATH_YEARS, BASE_YEAR, 1,
+      YEARS, BASE_YEAR, 1,
     );
     // width 4: offsets -4..+4 all clamp at onset + 1 = 2026 or later; 2026 is
     // fully materialised only for the clamped draws, so the expectation lies
@@ -150,12 +151,5 @@ describe('materialisation schedule and jitter (ports of pulse.config)', () => {
     });
     expect(r.byDriver.a.approximate).toBe(true);
     expect(r.byDriver.a.portfolio[2035]).toBeCloseTo(-0.1 / 6 * 0.5, 12);
-  });
-
-  it('canAttribute requires the three force layers', () => {
-    expect(canAttribute(null)).toBe(false);
-    expect(canAttribute({ force_weights: { Consumer: 1 } } as never)).toBe(false);
-    const fx = load();
-    expect(canAttribute(fx.inputs.config)).toBe(true);
   });
 });

@@ -1,31 +1,18 @@
 /**
- * Neon Postgres client.
- *
- * Single source of truth for the SQL client used by Clerk-adjacent code
- * (roles, audit log, etc.). The old custom-auth user CRUD lives in git
- * history — do not resurrect it.
+ * PRISM's database for the dashboard's own tables (user_roles) and the audit
+ * entries it writes. The same Neon database the API uses, through Neon's
+ * serverless driver.
  */
 import { neon } from '@neondatabase/serverless';
 
-function getDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL environment variable is not set. ' +
-        'Provision a Neon database via the Vercel dashboard (Storage → Create Database → Neon) ' +
-        'and connect it to the project — this will inject DATABASE_URL automatically.'
-    );
-  }
-  return url;
-}
-
 /**
- * Get a tagged-template SQL client.
- *
- * Lazy so module load never fails — only calling `getSQL()` at request time
- * can throw on missing DATABASE_URL. This matters during Next.js's
- * "Collect page data" build step which imports modules without env vars.
+ * A tagged-template SQL client. Created per call, so importing this module
+ * never fails without DATABASE_URL (the build imports it with no environment).
  */
 export function getSQL() {
-  return neon(getDatabaseUrl());
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL is not set: connect the Neon database to the Vercel project, or set it in .env.');
+  }
+  return neon(url);
 }

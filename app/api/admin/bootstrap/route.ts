@@ -1,31 +1,22 @@
 /**
- * POST /api/admin/bootstrap — one-shot admin promotion.
+ * POST /api/admin/bootstrap: make a signed-up user admin with a shared secret.
  *
- * This route solves the chicken-and-egg problem of "I need to be admin to
- * promote myself, but nobody is admin yet." It accepts an email, looks up
- * the matching `user_roles` row, and sets `role = 'admin'`.
+ * This is how the first admin is set up when nobody can promote anyone yet.
+ * The route is not behind the Clerk session; the header x-bootstrap-secret
+ * must equal ADMIN_BOOTSTRAP_SECRET instead.
  *
- * Security model: this endpoint is NOT gated by Clerk auth — the sandbox
- * can't reach Neon directly to run a migration, so we need something
- * Alex (or another trusted operator) can hit from anywhere that can
- * reach the Vercel deployment. Instead, authorization comes from a
- * shared secret (`ADMIN_BOOTSTRAP_SECRET`) set as a Vercel env var.
+ *   - secret unset: the route answers 404, as if it did not exist
+ *   - wrong or missing header: 403
+ *   - no user_roles row for the email (the user has not signed in yet): 404
  *
- *   - If the secret env var is unset → endpoint is disabled (404-style).
- *   - If the secret env var is set but the header doesn't match → 403.
- *   - If the target email has no row in `user_roles` → 404.
- *
- * Intended workflow:
- *   1. Set `ADMIN_BOOTSTRAP_SECRET=<random>` in the Vercel project env.
- *   2. Redeploy (happens automatically after `git push`).
- *   3. curl with `x-bootstrap-secret: <random>` and `{ "email": "..." }`.
- *   4. UNSET the env var once promotion is confirmed.
- *
- * Every promotion writes an `audit_log` row so the action is traceable
- * even after the secret is rotated away.
+ * Set the secret in the Vercel project, call the route with
+ * { "email": "..." }, then remove the secret again. scripts/promote_admin.py
+ * does the same with direct database access. Every promotion is written to
+ * the audit log.
  */
 import { NextResponse } from 'next/server';
 import { getSQL } from '@/lib/db';
+import { ensureUserRolesTable } from '@/lib/roles';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +28,7 @@ interface BootstrapBody {
 export async function POST(req: Request) {
   const expected = process.env.ADMIN_BOOTSTRAP_SECRET;
   if (!expected) {
-    // Disabled in this environment — refuse to acknowledge existence.
+    // Disabled here: do not reveal that the route exists.
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -56,24 +47,11 @@ export async function POST(req: Request) {
   }
   const email = rawEmail.toLowerCase();
 
+  await ensureUserRolesTable();
   const sql = getSQL();
 
-  // Ensure the table exists (idempotent) — matches lib/roles.ts.
-  await sql`
-    CREATE TABLE IF NOT EXISTS user_roles (
-      clerk_user_id TEXT PRIMARY KEY,
-      email         TEXT NOT NULL,
-      role          TEXT NOT NULL DEFAULT 'viewer'
-                    CHECK (role IN ('admin', 'viewer')),
-      created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  // Look up the existing row. We don't create one here — if the email
-  // isn't in user_roles yet, the Clerk webhook hasn't fired, which means
-  // the user hasn't signed up. Better to surface that as 404 than to
-  // insert a ghost row with no clerk_user_id.
+  // No row is created here: without one the user has not signed up yet, and
+  // a row without a Clerk user id would be a ghost.
   const rows = (await sql`
     SELECT clerk_user_id, role
       FROM user_roles
@@ -106,7 +84,7 @@ export async function POST(req: Request) {
      WHERE clerk_user_id = ${clerkUserId}
   `;
 
-  // Audit entry — best effort. The promotion still succeeds if this fails.
+  // Best effort: the promotion stands even if the audit entry fails.
   try {
     await sql`
       INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id)

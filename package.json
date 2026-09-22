@@ -9,11 +9,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . && bash scripts/check_single_source.sh",
+    "lint": "eslint . --max-warnings 0 && bash scripts/check_single_source.sh",
     "typecheck": "tsc -p tsconfig.check.json --noEmit",
     "test": "vitest run",
-    "test:py": "python3 -m pytest tests/ -q",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run test:py"
+    "test:py": "python3 -m pytest -q",
+    "lint:py": "ruff check .",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run lint:py && npm run test:py"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",

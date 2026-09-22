@@ -42,10 +42,10 @@ def vc_epicentre_of(vc_exposure: Optional[dict]) -> Optional[int]:
     the highest-scoring stage; ties resolve towards the exposure-weighted
     centroid, and an exact tie in distance goes to the earlier stage.
 
-    ``epicentreOf`` in components/dashboard/Drivers.tsx implements the same
-    rule. tests/test_vc_epicentre.py and tests/frontend/vcEpicentre.test.ts
-    pin both to one fixture table, so the engine and the interface always
-    agree on a driver's stage.
+    ``epicentreOf`` in lib/valueChain.ts implements the same rule.
+    tests/test_vc_epicentre.py and tests/frontend/vcEpicentre.test.ts pin both
+    to one fixture table, so the engine and the interface always agree on a
+    driver's stage.
     """
     if not vc_exposure:
         return None

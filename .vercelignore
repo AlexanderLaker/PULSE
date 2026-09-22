@@ -1,29 +1,16 @@
-node_modules
+# What a Vercel deployment leaves out. The Next.js build needs app/,
+# components/, hooks/, lib/, types/, api/client.ts and data/*.ts; the Python
+# function needs api/index.py, api/requirements.txt and prism/.
 .venv
 __pycache__
 *.pyc
-tests/
-data/*.db
-data/prism.db
-.git
-*.xlsx
 *.db
-api/public/
-_RETIRED_2026-06
-# Next 16: proxy.ts replaced middleware.ts — keep stale stub out of builds
-middleware.ts
-
-# v3.7 deploy hygiene: backup tarball + decks stay out of uploads
-_BACKUP*
-*.pptx
-*.jpg
-
-# Non-live files consolidated into the gitignored _NOT_FOR_HANDOVER/ (never committed, never deployed)
-_NOT_FOR_HANDOVER/
-
-# 2.11.0 deploy hygiene (2026-09-10): archives, review inputs and the
-# governance docs never travel with a CLI upload deploy
-Claude outputs/
-data/archive/
-data/trend_base_2026-09/
+*.xlsx
+runs/
+tests/
 docs/
+migrations/
+scripts/
+data/drivers/
+data/calibration/
+_*

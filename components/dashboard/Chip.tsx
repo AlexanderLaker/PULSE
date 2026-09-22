@@ -1,47 +1,43 @@
 'use client';
 
 /**
- * Chip — the ONE chip language for recurring semantics (R-18, design review
- * 2026-07-01). Direction, evidence grade and provenance were previously
- * styled three different ways across Drivers / drill-down / Journey /
- * Explorer (slate ↗ pills vs green ▲ chips vs emoji stickers). One
- * component, text + colour (never colour or emoji alone), glyph arrows
- * only for direction (matches ShiftValue).
+ * Chip: one look for the labels that recur across the dashboard: a driver's
+ * direction, an evidence grade, the provenance of a score or a text. A chip
+ * always carries text, so its meaning never rests on colour alone; only the
+ * direction chips add a glyph, the same arrows ShiftValue uses.
  */
 
 import React from 'react';
 import { S, BODY_FONT } from '@/lib/theme';
 
+export type ChipKind =
+  | 'expansion' | 'contraction'   // a driver's direction
+  | 'reported' | 'estimate'       // an evidence grade
+  | 'edited' | 'authored'         // provenance
+  | 'neutral';                    // no meaning of its own: the label carries it
+
 type ChipSpec = { label: string; bg: string; ink: string; glyph?: string };
 
-const SPECS: Record<string, ChipSpec> = {
-  /* direction */
-  expansion:   { label: 'Expansion',   bg: S.expansionDim,     ink: S.expansionInk,  glyph: '▲' },
-  contraction: { label: 'Contraction', bg: S.contractionDim,   ink: S.contractionInk, glyph: '▼' },
-  /* evidence grade (Explorer source ladder wording) */
-  reported:  { label: 'Reported',  bg: S.greenSoft,        ink: S.expansionInk },
-  derived:   { label: 'Derived',   bg: S.blueSoft,         ink: S.primaryDim },
-  estimate:  { label: 'Estimate',  bg: S.amberSoft,        ink: S.amber },
-  /* provenance (D7 semantics unchanged — styling unified) */
-  ai:        { label: 'AI suggestion',      bg: S.surfaceContainer, ink: S.onSurfaceVariant },
-  reviewed:  { label: 'Expert-reviewed',    bg: S.greenSoft,        ink: S.expansionInk },
-  authored:  { label: 'Strategist-authored', bg: S.surfaceContainer, ink: S.onSurfaceVariant },
-  /* neutral */
-  neutral:   { label: '',          bg: S.surfaceContainer, ink: S.onSurfaceVariant },
+const SPECS: Record<ChipKind, ChipSpec> = {
+  expansion:   { label: 'Expansion',   bg: S.expansionDim,   ink: S.expansionInk,   glyph: '▲' },
+  contraction: { label: 'Contraction', bg: S.contractionDim, ink: S.contractionInk, glyph: '▼' },
+  reported:    { label: 'Reported',    bg: S.greenSoft,      ink: S.expansionInk },
+  estimate:    { label: 'Estimate',    bg: S.amberSoft,      ink: S.amber },
+  edited:      { label: 'Edited',      bg: S.greenSoft,      ink: S.expansionInk },
+  authored:    { label: 'Strategist-authored', bg: S.surfaceContainer, ink: S.onSurfaceVariant },
+  neutral:     { label: '',            bg: S.surfaceContainer, ink: S.onSurfaceVariant },
 };
-
-export type ChipKind = keyof typeof SPECS;
 
 const Chip: React.FC<{
   kind: ChipKind;
-  /** Override the default label (e.g. "Estimate · RSP"). */
+  /** Replaces the kind's own label (e.g. "Estimate · RSP"). */
   label?: string;
   title?: string;
-  /** Compact = 1px 6px padding for dense rows. */
+  /** Tighter padding for dense rows. */
   compact?: boolean;
   style?: React.CSSProperties;
 }> = ({ kind, label, title, compact, style }) => {
-  const spec = SPECS[kind] ?? SPECS.neutral!;
+  const spec = SPECS[kind];
   return (
     <span
       title={title}

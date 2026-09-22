@@ -1,35 +1,41 @@
 // @vitest-environment jsdom
 /**
- * The PRISM Analysis card on the Drivers page (owner instruction 2026-09-17).
+ * The Drivers page: the PRISM Analysis card, and around it the Edited chip
+ * and the admin save.
  *
- *   1. `splitAnalysis` turns a reading into its labelled paragraphs and the
- *      basis line, and leaves an older single-paragraph text readable.
- *   2. Rendered on the Drivers page, an expanded driver shows the four
- *      labels as headings, the basis line, the provenance footnote, and no
- *      restated score, review reference or management response.
- *   3. The committed readings (data/trend_base_2026-09/driver_analysis_v1.json)
- *      follow the same structure for all 51 drivers.
+ *   1. `splitAnalysis` turns a reading into its four labelled paragraphs and
+ *      the basis line, and keeps a text without labels as plain prose.
+ *   2. An expanded driver shows the labels as headings, the basis line and
+ *      the footnote; in the admin editor the reading stays read-only text.
+ *   3. The committed readings (data/drivers/driver_analysis.json) have that
+ *      structure for all 51 drivers and none of the forbidden content.
+ *   4. An unedited driver carries no provenance chip; an edited one carries
+ *      the Edited chip, whose tooltip lists each changed input with its
+ *      baseline value.
+ *   5. The admin save sends only the fields that changed, never the PRISM
+ *      Analysis, and shows the error when the store rejects the write.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Driver } from '@/types';
+import type { PrismStore } from '@/hooks/usePrism';
+import { makeDriver, makeStore } from './fixtures/prism';
 
-const STORE = vi.hoisted(() => ({ store: {} as Record<string, unknown> }));
+const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 
-vi.mock('@/hooks/usePrism', () => ({
-  __esModule: true,
-  default: () => STORE.store,
-  PrismProvider: ({ children }: { children: unknown }) => children,
-}));
+vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
 vi.mock('@/api/client', () => ({
-  getDiagnostics: vi.fn(async () => ({ db_reachable: true, simulation_run_count: 1 })),
-  getDriverProposals: vi.fn(async () => null),
-  saveMyProposal: vi.fn(async () => null),
-  updateDriver: vi.fn(),
+  getDriverProposals: vi.fn(async () => { throw new Error('not used in these tests'); }),
+  saveMyProposal: vi.fn(async () => { throw new Error('not used in these tests'); }),
 }));
 
 import Drivers, { splitAnalysis } from '@/components/dashboard/Drivers';
+
+// framer-motion restores the scroll position after it measures the expanded
+// panel's height; jsdom has no window.scrollTo, and scrolling is not under test.
+window.scrollTo = (() => {}) as typeof window.scrollTo;
 
 const REPO = path.resolve(__dirname, '..', '..');
 const ANALYSIS = JSON.parse(fs.readFileSync(
@@ -37,61 +43,78 @@ const ANALYSIS = JSON.parse(fs.readFileSync(
 const RECORD = JSON.parse(fs.readFileSync(
   path.join(REPO, 'data', 'drivers', 'driver_attribution.json'), 'utf8'));
 const LABELS = ['Weight in the answer', 'Where it lands', 'When it lands', 'What the band hinges on'];
-// the headline the basis line names, from the record (never a typed number)
+// The headline the basis line names, read from the record (never a typed number).
 const HEADLINE = (RECORD.reference_run.portfolio_terminal.median * 100).toFixed(1);
 const BASIS_PIN = `reconciled to a 2035 portfolio median of ${HEADLINE} percent`;
+const FOOTNOTE = 'Attribution at the score means, reconciled to the portfolio median in the basis line; a reading authored on those figures.';
 
-const reading = ANALYSIS.drivers['C-01'].text as string;
-
-const driver = {
-  id: 'consumer_r01', name: 'Private label structural penetration', force: 'Consumer',
-  direction: 'Contraction', probability: 5, confidence: 'High', gp1_pct_affected: 0.22,
-  description: 'Retailer brands keep gaining share.', normalized_score: -0.183, gp1_shift: -0.183,
-  analysis: reading,
-  category_exposure: { 'Hair: Color': 2 }, regional_exposure: { Europe: 5 }, vc_exposure: {},
-  source_type: 'seed', data_source: 's', peak_year: 2030, diffusion_curve: 'front_loaded', uncertainty: 2,
-};
-
-STORE.store = {
-  health: { status: 'ok', version: 'test', has_simulation: true },
-  drivers: [driver],
-  simulation: null,
-  config: {},
-  loading: false, error: null, backendAvailable: true, connectionState: 'connected',
-  updateDriver: vi.fn(), reload: vi.fn(), reconnect: vi.fn(),
-};
+const READING = ANALYSIS.drivers['C-01'].text as string;
+const ROW_NAME = /Private label structural penetration/;
 
 afterEach(() => cleanup());
 
+/** Renders the page on one driver and expands its row. */
+function openDriver(overrides: Partial<Driver> = {}, options: { isAdmin?: boolean; store?: Partial<PrismStore> } = {}) {
+  const driver = makeDriver({ analysis: READING, ...overrides });
+  STORE.current = makeStore({ drivers: [driver], ...options.store });
+  const view = render(<Drivers isAdmin={options.isAdmin ?? false} />);
+  fireEvent.click(screen.getByRole('button', { name: ROW_NAME }));
+  return { ...view, driver, store: STORE.current };
+}
+
+/** The text a person can read plus the tooltips. */
+function readableText(root: HTMLElement): string {
+  const titles = Array.from(root.querySelectorAll('[title], [aria-label]'))
+    .flatMap((el) => [el.getAttribute('title') ?? '', el.getAttribute('aria-label') ?? '']);
+  return [root.textContent ?? '', ...titles].join('\n');
+}
+
 describe('splitAnalysis', () => {
   it('splits a reading into the four labelled paragraphs and the basis line', () => {
-    const parts = splitAnalysis(reading);
+    const parts = splitAnalysis(READING);
     expect(parts.map((p) => p.label)).toEqual([...LABELS, 'Figures']);
     expect(parts[0].body.startsWith('Private label carries')).toBe(true);
-    expect(parts[4].body).toMatch(/^model attribution on the 2\.12\.0 base/);
+    expect(parts[4].body).toMatch(/^model attribution on the estimated HCB gross-profit mix/);
+    expect(parts[4].body).toContain(BASIS_PIN);
   });
 
-  it('keeps an unlabelled text as one plain paragraph and an empty text as nothing', () => {
+  it('keeps a text without labels as one plain paragraph and a blank text as nothing', () => {
     expect(splitAnalysis('Mechanism: price/mix. Probability 5 of 5.')).toEqual([
       { label: null, body: 'Mechanism: price/mix. Probability 5 of 5.' },
     ]);
     expect(splitAnalysis('')).toEqual([]);
-    expect(splitAnalysis(undefined)).toEqual([]);
+    expect(splitAnalysis('\n\n  \n')).toEqual([]);
   });
 });
 
 describe('Drivers page: the PRISM Analysis card', () => {
-  it('shows the labelled reading, the basis line and the provenance footnote once expanded', () => {
-    const { container } = render(<Drivers />);
-    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+  it('shows the labelled reading in order, the basis line and the footnote once expanded', () => {
+    const { container } = openDriver();
     const card = container.querySelector('[data-testid="prism-analysis"]') as HTMLElement;
     expect(card).toBeTruthy();
-    for (const label of LABELS) expect(card.textContent).toContain(label);
-    expect(card.textContent).toContain('Figures');
-    expect(card.textContent).toContain(BASIS_PIN);
-    expect(container.textContent).toContain('Attribution at the score means, reconciled to the persisted run');
-    expect(container.textContent).not.toContain('generated by the engine');
-    expect(container.textContent).not.toContain('No strategic implication documented');
+    const text = card.textContent ?? '';
+    const positions = LABELS.map((label) => text.indexOf(label));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(text).toContain('Figures:');
+    expect(text).toContain(BASIS_PIN);
+    expect(container.textContent).toContain(FOOTNOTE);
+  });
+
+  it('stays read-only text in the admin editor', () => {
+    const { container } = openDriver({}, { isAdmin: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const card = container.querySelector('[data-testid="prism-analysis"]') as HTMLElement;
+    expect(card.textContent).toContain(LABELS[0]);
+    expect(card.querySelector('textarea, input')).toBeNull();
+    expect(container.querySelectorAll('textarea')).toHaveLength(1);   // the description
+    expect(container.textContent).toContain('The figures of the PRISM Analysis come from the model and the reading is authored on them; it cannot be edited here.');
+  });
+
+  it('says so when a driver has no reading', () => {
+    const { container } = openDriver({ analysis: '' });
+    expect(container.querySelector('[data-testid="prism-analysis"]')).toBeNull();
+    expect(container.textContent).toContain('No PRISM Analysis available for this driver.');
   });
 });
 
@@ -109,22 +132,111 @@ describe('the committed readings', () => {
     }
   });
 
-  it('never restate a score, refer to the review, prescribe a response or use an em-dash', () => {
-    // The Python suite (tests/test_driver_analysis.py, FORBIDDEN) is the
-    // authoritative lock; this mirrors its patterns so a frontend-only run
-    // still fails on the same content.
+  it('never restate a score, refer to the history of the base, prescribe a response or use a dash', () => {
+    // tests/test_driver_analysis.py (FORBIDDEN) is the authoritative lock;
+    // these are its patterns, so a frontend-only run fails on the same content.
     const FORBIDDEN: RegExp[] = [
       /\b[0-5] of 5\b/, /\bprobability [0-5]\b/i, /\buncertainty [0-5]\b/i, /\bexposure(?: score)? [0-5]\b/i,
       /\bGP1 (?:share )?(?:of )?0\.\d+/,
-      /\bGP1 share\b|\bprobabilit(?:y|ies)\b|\buncertainty score\b|\bconfidence\b|\bbalanced (?:case|rather)\b|\blikely (?:probability|case)\b|\bscored\b|\bscores\b|\balmost certain\b|\bvery unlikely\b|\bchance of\b|\bthe odds\b/i,
+      /\bGP1 share\b|\bprobabilit(?:y|ies)\b|\buncertainty score\b|\bconfidence\b|\bbalanced (?:case|rather)\b|\blikely (?:probability|case)\b|\bscored\b|\bscores\b|\balmost certain\b|\bvery unlikely\b|\b(?:one|two) in (?:three|four|five|six) chance\b|\bchance of\b|\bthe odds\b/i,
       /September 2026 review|the (?:2026 )?review\b|old base|earlier base|previous base|prior base|was corrected|was deleted|were wrong|was wrong|report mill|could not be verified|unverified|unsourced|watch list|merged into|folded into|\brenamed\b|\bretired\b/i,
       /\b(?:Henkel|HCB) (?:should|must|needs to|has to|ought to|could|would need to|can offset)\b|\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure/i,
-      /[—–]/, /\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b/i,
+      /[\u2014\u2013]/, /\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b/i,
       /\btrends?\b/i, /\{\w+\}/,
     ];
     for (const code of codes) {
       const text = ANALYSIS.drivers[code].text as string;
       for (const pattern of FORBIDDEN) expect(text, `${code}: ${pattern}`).not.toMatch(pattern);
     }
+  });
+});
+
+describe('Drivers page: the Edited chip', () => {
+  const edited = (root: HTMLElement) => Array.from(root.querySelectorAll('[title^="Edited by an admin"]'));
+
+  it('is absent on a driver no admin has changed, and nothing mentions an AI suggestion', () => {
+    const { container } = openDriver();
+    expect(edited(container)).toEqual([]);
+    expect(readableText(container)).not.toMatch(/\bAI\b/);
+  });
+
+  it('lists each changed input with its baseline value on an edited driver', () => {
+    const base = makeDriver();
+    const { container } = openDriver({
+      probability: 4,
+      peak_year: 2031,
+      category_exposure: { ...base.category_exposure, 'LHC: FCN': 5 },
+      scores_edited: true,
+    });
+    const chips = edited(container);
+    expect(chips).toHaveLength(2);   // the row's last column and the panel's meta row
+    expect(chips[0].textContent).toBe('Edited');
+    expect(chips[0].getAttribute('title')!.split('\n')).toEqual([
+      'Edited by an admin. Changed from the baseline:',
+      'Probability: 4 / 5 (baseline 5 / 5)',
+      'Peak year: 2031 (baseline 2030)',
+      'Category exposure: FCN 5 (baseline 3)',
+    ]);
+    expect(screen.getByTitle('Baseline 5 / 5 · edited to 4 / 5')).toBeTruthy();
+  });
+
+  it('says when an edited driver has no baseline to compare with', () => {
+    const { container } = openDriver({ scores_edited: true, baseline: null });
+    expect(edited(container)[0].getAttribute('title'))
+      .toBe('Edited by an admin. This driver has no baseline to compare with.');
+  });
+});
+
+describe('Drivers page: the admin editor', () => {
+  it('is for admins only, like the Review & Endorse mode', () => {
+    openDriver();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Review & Endorse/ })).toBeNull();
+    expect(screen.getByText(/Read-only · admin-maintained/)).toBeTruthy();
+    cleanup();
+
+    openDriver({}, { isAdmin: true });
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /Review & Endorse/ })).toBeTruthy();
+  });
+
+  it('saves only the fields that changed, never the PRISM Analysis', async () => {
+    const { driver, store } = openDriver({}, { isAdmin: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(driver.description), {
+      target: { value: 'Private label keeps gaining share across European grocery.' },
+    });
+    fireEvent.change(screen.getByDisplayValue('Apr 2026'), { target: { value: 'May 2026' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(store.updateDriver).toHaveBeenCalledTimes(1));
+    expect(store.updateDriver).toHaveBeenCalledWith('consumer_r01', {
+      description: 'Private label keeps gaining share across European grocery.',
+      sources: [{
+        title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', note: 'May 2026',
+      }],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy());
+  });
+
+  it('closes without a request when nothing changed', async () => {
+    const { store } = openDriver({}, { isAdmin: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy());
+    expect(store.updateDriver).not.toHaveBeenCalled();
+  });
+
+  it('keeps the editor open with the error when the store rejects the save', async () => {
+    const updateDriver = vi.fn<PrismStore['updateDriver']>(async () => { throw new Error('Driver consumer_r01 not found'); });
+    openDriver({}, { isAdmin: true, store: { updateDriver } });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const probability = screen.getByRole('radiogroup', { name: /^Probability/ });
+    fireEvent.click(within(probability).getByRole('radio', { name: '3 of 5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('Driver consumer_r01 not found')).toBeTruthy());
+    expect(updateDriver).toHaveBeenCalledWith('consumer_r01', { probability: 3 });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
   });
 });

@@ -1,17 +1,9 @@
 /**
- * GET /api/me — the current caller's authorization context.
+ * GET /api/me: the signed-in user and their role, { clerkUserId, email, role }.
  *
- * This is the single endpoint the SettingsModal hits on open to decide
- * whether to render the admin-only sections (Config Sheet, User
- * Management). Clerk hooks already give us identity on the client; we
- * deliberately do NOT trust a client-side role claim — authorization
- * always comes from Postgres `user_roles`.
- *
- * Response: { clerkUserId, email, role }.
- *
- * Returns 401 if not signed in (middleware will usually intercept first,
- * but we handle it defensively so a direct fetch without cookies still
- * gets a JSON error instead of an HTML redirect page).
+ * The dashboard asks once and shows admin controls from the answer. The role
+ * always comes from user_roles, never from anything the browser holds, and
+ * every write is checked again on the server. 401 without a session.
  */
 import { NextResponse } from 'next/server';
 import { requireAuth, UnauthorizedError } from '@/lib/roles';

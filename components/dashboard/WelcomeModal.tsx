@@ -1,26 +1,16 @@
 /**
- * WelcomeModal — Two-step welcome / orientation popup shown on every login.
+ * The welcome dialog: two steps of orientation, shown once per sign-in
+ * (app/dashboard/page.tsx keeps the per-session flag).
  *
- * Step 1: MVP disclaimer + feedback channel (Alexander Laker).
- * Step 2: Brief explainer of the three production views, in header order:
- *           Drivers (input) -> Consumer Journey -> Profit Pool Shift Analysis.
- *           The Profit Pool Explorer (Beta) tab is not introduced here —
- *           it lives to the right of the top nav.
- *
- * Design language mirrors SettingsModal / Trends2 / ProfitPoolAnalysis2
- * (Maritime blue editorial tokens, Manrope headlines, pill-shaped CTAs).
- *
- * Visibility model:
- *   Shown on every fresh login. We key sessionStorage by the active Clerk
- *   session ID — once the user dismisses it, the same session won't show it
- *   again (so a tab refresh inside an active session is silent), but a new
- *   sign-in produces a new session ID and the modal re-appears.
+ *   Step 1: the early-access note and who to send feedback to.
+ *   Step 2: the three production views in header order: Drivers (the input),
+ *           Consumer Journey, Profit Pool Shift Analysis. The Profit Pool
+ *           Explorer (Beta) is left out; it sits at the right of the top nav.
  */
 
 'use client';
 
-import React, { FC, useRef, useState } from 'react';
-import useOverlay from '@/hooks/useOverlay';
+import { useRef, useState, type CSSProperties, type FC, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -31,6 +21,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import useOverlay from '@/hooks/useOverlay';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 interface WelcomeModalProps {
@@ -41,18 +32,15 @@ interface WelcomeModalProps {
 const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Reset to step 1 every time the modal opens. Adjusted during render
-  // (the documented React pattern) rather than in an effect: `wasOpen`
-  // holds the previous `open` so the reset happens in the same pass that
-  // opens the modal, with no extra commit.
+  // Every opening starts at step 1. The step resets during the render in
+  // which `open` turns true (React's pattern for state that follows a prop),
+  // so opening costs no extra commit.
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
     if (open) setStep(1);
   }
 
-  // R-03: shared overlay contract — Escape, focus trap, focus return,
-  // body scroll lock (replaces the local Escape-only listener).
   const modalRef = useRef<HTMLDivElement | null>(null);
   useOverlay(open, onClose, modalRef);
 
@@ -60,7 +48,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -76,11 +63,9 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
             }}
           />
 
-          {/* Centering wrapper — flex-centers the modal both vertically and
-              horizontally. We deliberately do NOT center via
-              `transform: translate(-50%, -50%)` on the motion card itself,
-              because Framer Motion's `animate` transform (scale/y) overwrites
-              the inline transform and pushes the card off-center. */}
+          {/* A flex wrapper centres the card. translate(-50%, -50%) on the
+              card itself would not hold: Framer Motion's animated transform
+              (scale, y) replaces it. */}
           <div
             style={{
               position: 'fixed',
@@ -93,7 +78,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               pointerEvents: 'none',
             }}
           >
-            {/* Modal card */}
             <motion.div
               ref={modalRef}
               initial={{ opacity: 0, scale: 0.97, y: 12 }}
@@ -118,7 +102,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 pointerEvents: 'auto',
               }}
             >
-            {/* Close button */}
             <button
               onClick={onClose}
               aria-label="Close"
@@ -138,7 +121,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               <X size={18} />
             </button>
 
-            {/* Step indicator dots */}
             <div
               style={{
                 position: 'absolute',
@@ -171,7 +153,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               />
             </div>
 
-            {/* Body — switch by step */}
             <div
               style={{
                 padding: '56px 40px 28px',
@@ -182,7 +163,6 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               {step === 1 ? <Step1Welcome /> : <Step2Views />}
             </div>
 
-            {/* Footer with primary CTA */}
             <div
               style={{
                 padding: '20px 40px 28px',
@@ -247,7 +227,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                     <ChevronRight size={16} />
                   </>
                 ) : (
-                  <>Got it — let&rsquo;s go</>
+                  <>Got it, let&rsquo;s go</>
                 )}
               </button>
             </div>
@@ -259,7 +239,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
   );
 };
 
-// ─── Step 1: MVP welcome / disclaimer ───────────────────────────────
+// ─── Step 1: early access ───────────────────────────────────────────
 const Step1Welcome: FC = () => (
   <div>
     <div
@@ -305,7 +285,7 @@ const Step1Welcome: FC = () => (
         color: S.onSurface,
       }}
     >
-      You&rsquo;re one of our early access users — thanks for being here.
+      You&rsquo;re one of our early access users. Thanks for being here.
     </p>
 
     <p
@@ -323,7 +303,7 @@ const Step1Welcome: FC = () => (
       tool, not on the specific insights or details you&rsquo;ll see in the views.
       Note that the{' '}
       <strong style={{ color: S.onBg }}>underlying data may still change</strong>{' '}
-      as the project progresses and sources are reviewed.
+      as the project progresses and sources are checked.
     </p>
 
     <p
@@ -341,7 +321,7 @@ const Step1Welcome: FC = () => (
   </div>
 );
 
-// ─── Step 2: The 4 views ────────────────────────────────────────────
+// ─── Step 2: the three views ────────────────────────────────────────
 const Step2Views: FC = () => (
   <div>
     <h2
@@ -371,7 +351,6 @@ const Step2Views: FC = () => (
       The other two views are built on it.
     </p>
 
-    {/* INPUT */}
     <SectionLabel>Input</SectionLabel>
     <ViewCard
       number="1"
@@ -380,7 +359,6 @@ const Step2Views: FC = () => (
       body="Lists each Profit Pool Driver with its scores: probability, share of GP1 affected, timing, and exposure by category and region."
     />
 
-    {/* OUTPUTS */}
     <SectionLabel style={{ marginTop: 18 }}>Outputs</SectionLabel>
     <ViewCard
       number="2"
@@ -393,13 +371,13 @@ const Step2Views: FC = () => (
       icon={TrendingUp}
       title="Profit Pool Shift Analysis"
       body="Visualizes where value is migrating, sliced by time path, force, region, and value chain step."
-      note="Values reflect the isolated driver impact on HCB's current business — excluding price moves, innovations, or competitor actions."
+      note="Values reflect the isolated driver impact on HCB's current business, excluding price moves, innovations or competitor actions."
     />
   </div>
 );
 
-// ─── Small building blocks for Step 2 ───────────────────────────────
-const SectionLabel: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+// ─── Building blocks of step 2 ──────────────────────────────────────
+const SectionLabel: FC<{ children: ReactNode; style?: CSSProperties }> = ({
   children,
   style,
 }) => (

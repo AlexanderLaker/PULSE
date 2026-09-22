@@ -1,219 +1,151 @@
 /**
- * PRISM — Trend data types.
- * Maps to pulse/ingestion/models.py Trend dataclass.
+ * Drivers as GET /api/v1/drivers returns them, the admin edit and the expert
+ * proposals (prism/api/routers/drivers.py, prism/api/proposals.py).
  */
+import type { Confidence, Direction, ForceName } from './index';
 
-import type {
-  ForceName, Direction, Confidence, CategoryId, ValueChainStep,
-} from './index';
-
-/** Source tier — editorial credibility rating assigned to a single evidence
- *  source. Mirrors the backend classification (S=official regulator → E=social). */
+/** Credibility tier of a source, from S (official statistics, regulators) to E (social media). */
 export type SourceTier = 'S' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C' | 'D' | 'E';
 
-/** A single external evidence source for a trend. */
+/** One piece of evidence behind a driver. `note` usually holds the publication date. */
 export interface DriverSource {
   title: string;
   url: string;
-  data: string;
-  /** Credibility tier — optional so legacy sources without a rating still render. */
-  tier?: SourceTier;
+  tier: SourceTier | '';
+  note: string;
 }
 
-/** Bayesian posterior parameters (Beta distribution). */
-export interface BetaPosterior {
-  alpha: number;
-  beta: number;
+/** Scores 0 to 5 keyed by category, region or value-chain stage. */
+export type ExposureMap = Record<string, number>;
+
+/** The inputs the model reads from a driver. */
+export interface DriverScores {
+  /** Likelihood 1 to 5; the Beta prior's mean is probability / 6. */
+  probability: number;
+  /** Share of the exposed gross profit affected at full materialisation, 0 to 1. */
+  gp1_pct_affected: number;
+  /** Year by which the effect is fully present. */
+  peak_year: number;
+  diffusion_curve: string;
+  /** Spread around the modelled size and timing, 0 to 5; null when not scored. */
+  uncertainty: number | null;
+  category_exposure: ExposureMap;
+  regional_exposure: ExposureMap;
+  vc_exposure: ExposureMap;
 }
 
-/** Category exposure mapping (category → 0-5 score). */
-export type CategoryExposure = Partial<Record<CategoryId, number>>;
-
-/** Value chain exposure mapping (step → 0-5 score). */
-export type VCExposure = Partial<Record<ValueChainStep, number>>;
-
-/** Regional exposure mapping (region → 0-5 score). Keys are backend
- *  display names ("Europe", "North America", "Asia", "High Growth"). */
-export type RegionalExposure = Partial<Record<string, number>>;
-
-// (JourneyExposure removed 2026-07-07, owner ruling O3 — the quantitative
-//  journey layer was deleted; the journey UI is qualitative-only.)
-
-/** Full trend object as returned by the API. */
-export interface Driver {
+/** One row of GET /api/v1/drivers. */
+export interface Driver extends DriverScores {
   id: string;
   force: ForceName;
-  sub_category?: string;
   name: string;
   description: string;
   direction: Direction;
-  // (M8, July 2026 review: the phantom `impact`, `score` and
-  //  `weighted_score` fields were removed — the backend never sent them;
-  //  the model retired the 1–5 impact input in favour of gp1_pct_affected.)
-  probability: number;   // 1-5
-  start_year?: number;
-  normalized_score?: number;
-  /** Backend alias of normalized_score (probability-mean × gp1 × direction). */
-  gp1_shift?: number;
-  /** % of GP1 realistically exposed at full materialization (0.0-1.0). */
-  gp1_pct_affected?: number;
-  /** Year by which 100% of impact has materialized (0 = default). */
-  peak_year?: number;
-  /** MECE diffusion curve shape — see pulse/config.py (diffusion curves). */
-  diffusion_curve?: string;
-  /** 2.11.0 (owner ruling O7): ONE uncertainty score per trend, 0–5 — the
-   *  dispersion around the modelled size and timing of the effect. Sets the
-   *  Beta-prior concentration (24/16/10/6/4/3, mean unchanged) and the
-   *  per-trend peak-year jitter (0/1/1/2/3/4 years). null = not scored: the
-   *  trend then behaves exactly as in 2.10.0 (concentration 6, global jitter). */
-  uncertainty?: number | null;
-  analysis?: string;
-  category_exposure?: CategoryExposure;
-  vc_exposure?: VCExposure;
-  regional_exposure?: RegionalExposure;
-  data_source?: string;
-  source_type?: string;
-  confidence?: Confidence;
-  last_updated?: string;
-  ai_suggested?: boolean;
-  user_override?: boolean;
-  /** Snapshot of the originally AI-suggested scores (captured at seed time).
-   *  Lets the UI show the AI suggestion on hover and flag an endorsed trend
-   *  whose truth now deviates from the AI baseline. Absent on legacy rows. */
-  ai_suggestion?: DriverScoreSnapshot;
-  /** Lightweight per-trend rollup of expert proposals, returned inline with the
-   *  trend list so a collapsed row can show scorer counts and the caller's own
-   *  score without a per-row round-trip. Full detail (named scorers, per-cell
-   *  aggregates) comes from GET /trends/{id}/proposals. */
-  proposal_summary?: ProposalSummary;
-  sources?: DriverSource[];
-
-  // (Delphi-era metadata fields removed 2026-07-07, owner ruling O1 —
-  //  the capability itself was deleted June 2026, D10.)
-
-  // Bayesian posterior (probability only — the impact posterior went with
-  // the retired impact input, M8)
-  probability_posterior?: BetaPosterior;
+  /** Year the effect starts to materialise. */
+  start_year: number;
+  confidence: Confidence;
+  /** Beta mean x GP1 share x direction sign: the driver's signed weight before exposures. */
+  normalized_score: number;
+  /** The generated PRISM Analysis text; read-only everywhere. */
+  analysis: string;
+  /** One-line evidence summary. */
+  data_source: string;
+  sources: DriverSource[];
+  /** The scores the driver was seeded with; null for a driver added without them. */
+  baseline: DriverScores | null;
+  /** True once an admin has changed a model input. */
+  scores_edited: boolean;
+  proposal_summary: ProposalSummary;
 }
 
-/** Subset of Trend fields that can be updated via PUT /trends/{id}. */
+/** Body of an admin edit (PUT /api/drivers/{id}); only the fields sent change. */
 export interface DriverUpdate {
-  probability?: number;
-  /** 2.11.0 (O7): uncertainty score 0–5. Absent = unchanged; an EXPLICIT
-   *  null clears the score (back to the 2.10.0 behaviour). The editor does
-   *  not offer clearing; the API does. */
-  uncertainty?: number | null;
-  direction?: Direction;
+  name?: string;
   description?: string;
-  analysis?: string;
-  confidence?: Confidence;
-  category_exposure?: CategoryExposure;
-  vc_exposure?: VCExposure;
-  regional_exposure?: RegionalExposure;
+  direction?: Direction;
+  probability?: number;
   gp1_pct_affected?: number;
   peak_year?: number;
   diffusion_curve?: string;
-  sources?: DriverSource[];
-  name?: string;
-}
-
-/** Force contribution to a category shift. */
-export interface ForceContribution {
-  force: ForceName;
-  value: number;
-  normalized: number;
-}
-
-// ─── Multi-expert scoring (proposals layer) ─────────────────────────
-// Non-admin experts propose scores for the seven scoreable fields; the
-// AI-suggested value remains the "truth" that feeds the model until an admin
-// endorses. The model only ever consumes the trend's own columns — proposals
-// are a parallel, named, advisory store.
-
-/** A snapshot of the seven scoreable fields. Used for the AI baseline and as
- *  the shape of a single expert's proposal. */
-export interface DriverScoreSnapshot {
-  probability?: number;        // 1-5
-  gp1_pct_affected?: number;   // 0.0-1.0
-  peak_year?: number;
-  diffusion_curve?: string;
-  /** 2.11.0 (O7): uncertainty score 0–5 (null/absent = not scored). */
+  /** null clears the score. */
   uncertainty?: number | null;
-  category_exposure?: CategoryExposure;
-  regional_exposure?: RegionalExposure;
-  vc_exposure?: VCExposure;
+  confidence?: Confidence;
+  category_exposure?: ExposureMap;
+  regional_exposure?: ExposureMap;
+  vc_exposure?: ExposureMap;
+  sources?: DriverSource[];
 }
 
-/** The subset of fields a non-admin expert may propose (PUT
- *  /trends/{id}/proposals). The seven scoreable fields plus an optional
- *  free-text comment (not part of the AI snapshot). */
-export interface DriverProposalPatch extends DriverScoreSnapshot {
-  /** Free-text expert note attached to the proposal. */
-  comment?: string;
+// ── Expert proposals ────────────────────────────────────────────────────────
+// Any signed-in expert may propose scores for a driver. A proposal never
+// changes the driver; an admin endorses it by editing the driver.
+
+/** The caller's own proposal: any subset of the scores, plus a comment. */
+export interface DriverProposal {
+  probability?: number | null;
+  gp1_pct_affected?: number | null;
+  peak_year?: number | null;
+  diffusion_curve?: string | null;
+  uncertainty?: number | null;
+  category_exposure?: ExposureMap | null;
+  regional_exposure?: ExposureMap | null;
+  vc_exposure?: ExposureMap | null;
+  comment?: string | null;
 }
 
-/** Aggregate of expert proposals for one field. */
+/** Aggregate of one field across experts. */
 export interface ProposalAgg {
-  /** Mean — probability, GP1%, per-cell exposures. */
+  /** Mean: probability, GP1 share, exposure cells. */
   avg?: number;
-  /** Median — peak year. */
+  /** Median: peak year, uncertainty. */
   median?: number;
-  /** Mode — diffusion curve (categorical). */
+  /** Most frequent value: diffusion curve. */
   mode?: string;
-  /** Vote distribution — diffusion curve. */
+  /** Votes per value: diffusion curve. */
   distribution?: Record<string, number>;
-  /** How many experts scored this field. */
+  /** Number of experts who scored the field. */
   count: number;
 }
 
-/** One expert's headline proposal, for the "who scored what" breakdown. */
+/** One expert's proposal in the "who scored what" list. */
 export interface ProposalScorer {
   user_id: string;
   name: string;
   role: string;
-  probability?: number;
-  gp1_pct_affected?: number;
-  peak_year?: number;
-  diffusion_curve?: string;
-  /** 2.11.0 (O7): this expert's uncertainty score. */
-  uncertainty?: number | null;
-  /** This expert's VC profile — carried so Review & Endorse can count value-chain
-   *  epicentre VOTES per stage (categorical; never averaged). July 2026. */
-  vc_exposure?: VCExposure;
-  /** Free-text note this expert left with their proposal. */
-  comment?: string;
+  probability: number | null;
+  gp1_pct_affected: number | null;
+  peak_year: number | null;
+  diffusion_curve: string | null;
+  uncertainty: number | null;
+  /** Read for the expert's value-chain epicentre vote. */
+  vc_exposure: ExposureMap | null;
+  comment: string | null;
 }
 
-/** Per-cell aggregate map (category / region / value-chain exposure). */
-export type ProposalCellAgg = Record<string, ProposalAgg>;
-
-/** Full proposals payload for a single trend (GET /trends/{id}/proposals). */
+/** Body of GET and PUT /api/v1/drivers/{id}/proposals. */
 export interface DriverProposalsResponse {
   driver_id: string;
-  /** The calling user's own current proposal (null if they haven't scored). */
-  my: DriverProposalPatch | null;
+  my: DriverProposal | null;
   aggregate: {
-    probability?: ProposalAgg | null;
-    gp1_pct_affected?: ProposalAgg | null;
-    peak_year?: ProposalAgg | null;
-    diffusion_curve?: ProposalAgg | null;
-    /** 2.11.0 (O7): median of the experts' uncertainty scores. */
-    uncertainty?: ProposalAgg | null;
-    category_exposure?: ProposalCellAgg;
-    regional_exposure?: ProposalCellAgg;
-    vc_exposure?: ProposalCellAgg;
+    probability: ProposalAgg | null;
+    gp1_pct_affected: ProposalAgg | null;
+    peak_year: ProposalAgg | null;
+    diffusion_curve: ProposalAgg | null;
+    uncertainty: ProposalAgg | null;
+    category_exposure: Record<string, ProposalAgg>;
+    regional_exposure: Record<string, ProposalAgg>;
+    vc_exposure: Record<string, ProposalAgg>;
   };
   scorers: ProposalScorer[];
 }
 
-/** Lightweight rollup returned inline with each trend in the list. */
+/** The per-driver summary that comes with the driver list. */
 export interface ProposalSummary {
   count: number;
-  probability?: ProposalAgg | null;
-  gp1_pct_affected?: ProposalAgg | null;
-  peak_year?: ProposalAgg | null;
-  diffusion_curve?: ProposalAgg | null;
-  /** 2.11.0 (O7). */
-  uncertainty?: ProposalAgg | null;
-  my?: DriverProposalPatch | null;
+  probability: ProposalAgg | null;
+  gp1_pct_affected: ProposalAgg | null;
+  peak_year: ProposalAgg | null;
+  diffusion_curve: ProposalAgg | null;
+  uncertainty: ProposalAgg | null;
+  my: DriverProposal | null;
 }

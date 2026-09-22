@@ -1,8 +1,8 @@
 /**
- * F3: /api/prism-cookie must mint a VIEWER-ONLY engine token into an
- * httpOnly, SameSite=Lax cookie scoped to /api/v1 — and refuse anonymous
- * callers. The viewer-only claim is the CSRF backstop: the cookie can
- * never satisfy require_admin on the engine.
+ * /api/prism-cookie: the cookie the API reads need. It carries a viewer token
+ * for every user, admins included, in an httpOnly SameSite=Lax cookie scoped
+ * to /api/v1, so a request riding on it can never authorise a write. Callers
+ * without a session get no cookie.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

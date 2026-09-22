@@ -1,28 +1,14 @@
 /**
- * Clerk webhook receiver.
+ * POST /api/webhooks/clerk: Clerk's user events, mirrored into user_roles.
  *
- * Clerk POSTs here whenever a user-lifecycle event happens
- * (user.created, user.updated, user.deleted). We mirror the event
- * into PRISM's `user_roles` table so authorization logic — which
- * runs in our own Postgres, not Clerk — stays in sync.
+ * Clerk calls this route when a user is created, updated or deleted, and the
+ * role table in PRISM's database follows (lib/roles.ts): the first user ever
+ * becomes admin, everyone after that viewer.
  *
- * Security model
- * --------------
- * Svix signs every webhook with a shared secret (CLERK_WEBHOOK_SIGNING_SECRET).
- * Without verification, anyone on the internet could forge "user.created"
- * requests and auto-promote themselves to admin. We verify the signature
- * before parsing the body — failures return 400 and log nothing sensitive.
- *
- * Route is declared public in middleware.ts (`/api/webhooks/(.*)`) because
- * it authenticates via svix, not via a Clerk session cookie.
- *
- * First-user-admin rule
- * ---------------------
- * `upsertUserRole` in lib/roles.ts counts existing rows; if zero, the new
- * user is admin. This gives Alex admin without needing manual SQL after
- * the first sign-up. The race window (two people signing up in the same
- * second) is effectively nil for an internal tool, and the worst case is
- * two admins — trivial to fix.
+ * Every request is verified against CLERK_WEBHOOK_SIGNING_SECRET (Svix)
+ * before the body is read; without the check anyone could forge a
+ * user.created event. The route is public in proxy.ts because it
+ * authenticates by signature, not by session.
  */
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
@@ -30,21 +16,15 @@ import { Webhook } from 'svix';
 import type { WebhookEvent } from '@clerk/nextjs/server';
 import { deleteUserRole, upsertUserRole } from '@/lib/roles';
 
-// Pin to the Node runtime — svix needs Node's `crypto` for HMAC verification
-// and the Neon driver used by upsertUserRole expects a Node environment.
-// Edge runtime would fail on both counts.
+// Svix verifies with Node's crypto, and the Neon driver expects Node too.
 export const runtime = 'nodejs';
-
-// Webhooks must never be statically optimized or cached; every invocation
-// is a unique signed request from Clerk.
+// Every call is a unique signed request: never cache or pre-render it.
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const secret = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
   if (!secret) {
-    // Fail closed: if the deployer forgot to set the secret, we must
-    // not accept unverified events — otherwise the endpoint becomes a
-    // backdoor into user_roles.
+    // Fail closed: an unverified event must never reach user_roles.
     console.error('[clerk-webhook] CLERK_WEBHOOK_SIGNING_SECRET not set');
     return NextResponse.json(
       { error: 'Webhook not configured' },
@@ -52,8 +32,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Svix requires all three headers to verify. Missing any → tampered
-  // or misrouted request; reject with 400.
+  // Svix needs all three headers; a request without them is tampered or misrouted.
   const headerList = await headers();
   const svixId = headerList.get('svix-id');
   const svixTimestamp = headerList.get('svix-timestamp');
@@ -66,9 +45,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Read the raw body as text — svix verifies against the exact bytes
-  // Clerk signed. Parsing to JSON first would re-serialize and break
-  // the signature check.
+  // Verify the exact bytes Clerk signed: parsing first would re-serialise them.
   const payload = await req.text();
 
   let event: WebhookEvent;
@@ -87,14 +64,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // At this point the payload is authentic. Dispatch on event type.
   try {
     switch (event.type) {
       case 'user.created':
       case 'user.updated': {
         const { id, email_addresses, primary_email_address_id } = event.data;
-        // Pick the primary email if marked, otherwise fall back to
-        // the first address. Clerk guarantees at least one.
+        // The primary address, else the first one.
         const primary =
           email_addresses.find((e) => e.id === primary_email_address_id) ??
           email_addresses[0];
@@ -118,14 +93,11 @@ export async function POST(req: Request) {
       }
 
       default:
-        // Clerk sends other events (session.created, email.created, …)
-        // that we don't care about. Ack them so Clerk doesn't retry.
+        // Other events are acknowledged so Clerk does not retry them.
         break;
     }
   } catch (err) {
-    // Persistence failed (DB down, migration missing, etc). Return 500
-    // so Clerk will retry with exponential backoff — this is the right
-    // behavior for transient errors.
+    // A failed write answers 500, so Clerk retries with backoff.
     console.error('[clerk-webhook] handler error:', err);
     return NextResponse.json(
       { error: 'Handler failed' },

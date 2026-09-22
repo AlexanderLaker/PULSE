@@ -1,47 +1,24 @@
 /**
- * Sign-in page — clean editorial surface, zero decorative overlays.
+ * Sign-in: the PRISM wordmark over one plain card that holds Clerk's
+ * <SignIn />. Clerk runs the whole flow; the ClerkProvider appearance in
+ * app/layout.tsx styles its controls.
  *
- * Rebuilt from scratch (April 2026) to:
- *   1. Eliminate any stray circular / lens / shimmer effect from
- *      Clerk's default skeleton + dev-mode UI by aggressively
- *      stripping masks, clip-paths, backdrop-filters and pseudo-elements
- *      from inside the Clerk root.
- *   2. Hoist the PRISM wordmark to the top of the page in the exact
- *      typographic treatment used by the dashboard's upper-left brand
- *      (Manrope 800, tracking tighter, uppercase, maritime navy).
- *
- * Design tokens are identical to Trends 2 / Profit Pool Analysis 2.
- * Clerk's `<SignIn />` still handles the auth flow end-to-end; the
- * ClerkProvider in app/layout.tsx controls the inner control styling.
+ * The style block flattens Clerk's own frames and strips masks, clip-paths,
+ * filters and pseudo-elements inside its root, any of which can paint a
+ * circular "lens" artefact over the form, and it hides the development-mode
+ * watermark.
  */
 import { SignIn } from '@clerk/nextjs';
-
-// ─── Editorial design tokens ──────────────────────────────────────
-const S = {
-  bg:                 '#f8f9ff',
-  surface:            '#ffffff',
-  surfaceLow:         '#eff4ff',
-  primary:            '#005db5',
-  onBg:               '#00345e',
-  onSurface:          '#00345e',
-  onSurfaceVariant:   '#26619d',
-};
-
-const HEADLINE_FONT =
-  "'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
-const BODY_FONT =
-  "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 export default function SignInPage() {
   return (
     <>
       {/*
-        Strip every frame, shadow, border and background Clerk would
-        otherwise draw around its own form — we render the card chrome
-        ourselves. Also kills the orange diagonal-stripe "Development
-        mode" watermark that Clerk paints on the footer when using
-        pk_test_* keys, and any stray masks / clip-paths that could
-        reintroduce the lens bug.
+        The page draws the card, so Clerk's frames, shadows, borders and
+        backgrounds go. The block also hides the striped "Development mode"
+        watermark Clerk paints with pk_test_* keys and removes any mask or
+        clip-path that could bring the lens artefact back.
       */}
       <style>{`
         /* 1. Flatten all Clerk container layers */
@@ -70,8 +47,8 @@ export default function SignInPage() {
           display: none !important;
         }
 
-        /* 3. Belt-and-suspenders: nuke any mask/clip-path that could
-              reintroduce the circular "lens" artefact. */
+        /* 3. No mask, clip-path or filter anywhere inside Clerk's root:
+              any of them can paint the circular "lens" artefact. */
         .cl-rootBox,
         .cl-rootBox *,
         .cl-cardBox,
@@ -107,10 +84,7 @@ export default function SignInPage() {
           fontFamily: BODY_FONT,
         }}
       >
-        {/* ─── PRISM wordmark ─────────────────────────────────────
-            Exact match for the dashboard top-nav brand treatment:
-            Manrope 800, text-2xl, tracking-tighter, uppercase, onBg.
-        */}
+        {/* The PRISM wordmark in the top nav's brand treatment. */}
         <div className="mb-10">
           <div
             className="text-2xl font-extrabold tracking-tighter uppercase"
@@ -120,7 +94,7 @@ export default function SignInPage() {
           </div>
         </div>
 
-        {/* ─── Sign-in surface — single clean card, no nested panels */}
+        {/* One card, no nested panels */}
         <div
           className="w-full max-w-md rounded-3xl"
           style={{
@@ -129,7 +103,6 @@ export default function SignInPage() {
             padding: '40px 32px 32px',
           }}
         >
-          {/* Compact header */}
           <div className="text-center mb-8">
             <div
               className="text-[10px] font-bold uppercase tracking-[0.22em]"
@@ -145,7 +118,7 @@ export default function SignInPage() {
             </div>
           </div>
 
-          {/* Clerk form — no inner card, no header, stripped to essentials */}
+          {/* Clerk's form without its own card, header or logo */}
           <div className="flex justify-center">
             <SignIn
               appearance={{
@@ -164,7 +137,6 @@ export default function SignInPage() {
           </div>
         </div>
 
-        {/* Footer label */}
         <div
           className="mt-10 text-[10px] font-semibold uppercase tracking-[0.22em]"
           style={{ color: S.onSurfaceVariant }}

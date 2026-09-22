@@ -2,13 +2,14 @@
  * Consumer Journey content: the tiles of each journey stage and the stage contexts.
  *
  * This module is the content the page ships with. Once an admin saves an edit,
- * the page reads the newest stored version from GET /api/journey instead (the
- * tiles only; the stage contexts always come from here).
+ * the page reads the newest stored version from the API instead
+ * (GET /api/v1/journey; the tiles only, the stage contexts always come from
+ * here).
  *
- * Every tile carries its provenance: the author ('strategist', or 'ai' for a
- * suggestion awaiting approval), the month of its last revision and an
- * evidence grade: 'verified' (sourced hard data), 'estimate' (a Fermi or
- * consulting estimate) or 'hypothesis' (needs validation).
+ * Every tile carries its provenance: the author (every tile is
+ * strategist-authored), the month of its last revision and an evidence grade:
+ * 'verified' (sourced hard data), 'estimate' (a Fermi or consulting estimate)
+ * or 'hypothesis' (needs validation).
  *
  * A tile cites the modelled drivers behind it by display code in driverCodes
  * (data/driverCodeMap.ts); driverNote is the short rationale shown with them.
@@ -17,13 +18,15 @@
  * simulation.
  */
 
+/** 'lhc' is the Laundry journey (the Home Care journey is not built yet), 'hair' the Hair journey. */
 export type JourneyKey = 'lhc' | 'hair';
 export type TileType = 'product' | 'tech' | 'service';
 export type ProvenanceGrade = 'verified' | 'estimate' | 'hypothesis';
 
 export interface TileProvenance {
-  author: 'strategist' | 'ai';
-  date: string; // YYYY-MM
+  author: 'strategist';
+  /** Month of the last revision, YYYY-MM. */
+  date: string;
   grade: ProvenanceGrade;
 }
 
@@ -57,6 +60,7 @@ export interface JourneyTile {
   analysis: string | null;
 }
 
+/** One stage of a journey: the tiles that gain (tailwind) and the tiles under pressure (headwind). */
 export interface JourneyStageDef {
   id: string;
   label: string;
@@ -64,6 +68,13 @@ export interface JourneyStageDef {
   negativelyImpacted: JourneyTile[];
 }
 
+/** The tile map an admin edits and the API stores as one version. */
+export interface JourneyContent {
+  lhc: JourneyStageDef[];
+  hair: JourneyStageDef[];
+}
+
+/** A stage's authored context, keyed by stage label in LHC_CTX and HAIR_CTX. */
 export interface StageContext {
   henkelBrands: string;
   competitors: string;

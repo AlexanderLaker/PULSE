@@ -1,35 +1,27 @@
 /**
- * Profit Pool Explorer — Bain-classic pool views over verified public data
- * (Beta; visible to all signed-in users — not admin-gated).
+ * The Profit Pool Explorer (Beta, open to every signed-in user): Bain-style
+ * profit pool views over public data, one chart per view.
  *
- * v2 (2026-06-11):
- *   • ARROWS = POOL DEVELOPMENT. The indicator above each bar encodes the
- *     growth of the profit pool AREA (revenue × GP1), derived in
- *     `lib/profitPoolData.ts` as (1+revenueCAGR)×(1+marginCAGR)−1 — not
- *     revenue CAGR alone, and not GP1 level.
- *   • CLICK DRILL-DOWN. Clicking a bar opens an assessment panel that
- *     decomposes the pool trajectory into its two factors — revenue CAGR
- *     (verified) and GP1 margin development (graded estimate) — plus € pool
- *     sizes today → 2030, and clickable sources.
- *   • HIERARCHICAL NAVIGATION. Group toggle (Laundry | Hair) with view
- *     sub-pills (Value Chain | Sub-Segments | Core + Adjacent).
- *   • CLICKABLE, GRADED SOURCES. Every figure links to a page where the
- *     cited number is visible (verified 2026-06-11); evidence grades use
- *     the Consumer-Journey grammar: ✅ reported · ⚡ derived · ⚠️ estimate.
- *   • The former year selector (2027/2030/2032/2035) was removed — it
- *     altered no data. The horizon is stated honestly: FY2025 → 2030.
+ *   Chart: bar width = revenue share, bar height = GP1 margin, bar area = the
+ *   profit pool; rows keep their authored order (value chain raw to retail,
+ *   categories by logic).
+ *   Arrows: the development of the pool area (revenue × GP1), derived in
+ *   lib/profitPoolData.ts as (1 + revenue CAGR) × (1 + margin CAGR) − 1;
+ *   not revenue growth alone, and not the GP1 level.
+ *   Drill-down: a bar opens a panel that splits the pool trajectory into its
+ *   two factors, the revenue CAGR and the GP1 margin drift (a graded
+ *   estimate), with € pools today and in 2030 and every source linked and
+ *   graded.
+ *   Navigation: Laundry | Hair, then Value Chain | Sub-Segments | Core + Adjacent.
  *
- * Chart grammar (Bain pool chart): X = revenue share · Y = GP1 margin ·
- * Area = profit pool · order locked as authored (chain / format logic).
+ * Every indicator runs over the same horizon, FY2025 → 2030.
  */
 
 'use client';
 
-import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import {
-  Info, Loader2, Sparkles, X,
-} from 'lucide-react';
+import { Info, Lightbulb, Loader2, X } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import useOverlay from '@/hooks/useOverlay';
 import {
@@ -55,16 +47,16 @@ import {
   type EvidenceGrade,
 } from '@/lib/profitPoolData';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { NO_VALUE } from '@/lib/format';
 
 const BAR_FILL = 'rgba(214, 227, 255, 0.85)';
 const BAR_FILL_ACTIVE = 'rgba(178, 205, 255, 0.95)';
 const BAR_STROKE = S.primaryDim;
 
-// R-19.2 (design review 2026-07-01): below ~34 CSS px of rendered bar width
-// (≈26 viewBox units at the ~1250px card width) the in-bar % text and the
-// top arrow glyphs are suppressed — they clip or collide on 1–2%-share
-// slivers. The bar itself, its aria-label and the hover tooltip keep
-// carrying the data.
+// Below ~34 CSS px of rendered bar width (≈26 viewBox units at the ~1250px
+// card width) the in-bar % text and the arrow glyphs above the bar are left
+// out: they would clip or collide on 1–2%-share slivers. The bar itself, its
+// aria-label and the hover tooltip still carry the data.
 const DECOR_MIN_W = 26;
 
 const arrowColorFor = (tone: CagrRating['tone']): string =>
@@ -110,18 +102,18 @@ const ArrowsHTML: FC<{ rating: CagrRating; size?: number }> = ({ rating, size = 
   </span>
 );
 
-// ─── Evidence grade chip — same grammar as the Consumer Journey ──
-const GRADE_META: Record<EvidenceGrade, { glyph: string; label: string; fg: string; bg: string }> = {
-  reported: { glyph: '✅', label: 'Reported', fg: S.expansion, bg: S.greenSoft },
-  derived:  { glyph: '⚡', label: 'Derived',  fg: S.primaryDim,  bg: S.blueSoft },
-  estimate: { glyph: '⚠️', label: 'Estimate', fg: S.amber,       bg: S.amberSoft },
+// ─── Evidence grade chip: the grade in words, coloured by grade ──
+const GRADE_META: Record<EvidenceGrade, { label: string; fg: string; bg: string }> = {
+  reported: { label: 'Reported', fg: S.expansion, bg: S.greenSoft },
+  derived:  { label: 'Derived',  fg: S.primaryDim,  bg: S.blueSoft },
+  estimate: { label: 'Estimate', fg: S.amber,       bg: S.amberSoft },
 };
 
 const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, compact }) => {
   const m = GRADE_META[grade];
   return (
     <span
-      title={`${m.label} — ${grade === 'reported'
+      title={`${m.label}: ${grade === 'reported'
         ? 'figure as published at the linked page'
         : grade === 'derived'
           ? 'arithmetic on published figures (basis stated)'
@@ -138,21 +130,23 @@ const GradeChip: FC<{ grade: EvidenceGrade; compact?: boolean }> = ({ grade, com
   );
 };
 
-// ─── Compact source chip — "Name (value)" hyperlink, coloured by grade ──
+// ─── Compact source chip: "Name (value)" hyperlink, coloured by grade ──
+// A source label reads "Source: figure" (lib/profitPoolData.ts); the chip
+// keeps a short source name and the first figure in the label.
 const SRC_VALUE_RE = /~?[€$£]?\s?\d[\d.,]*\s?(?:bn\b|m\b|%)/i;
 function sourceParts(src: SourceRef): { name: string; value: string } {
-  let name = src.label.split(' — ')[0]
+  const head = src.label.split(': ')[0];
+  const name = head
     .replace(/\s+FY?\d{2,4}.*$/i, '')                          // drop "FY2025 …" onward
     .replace(/\s*~?[€$£]?\d[\d.,]*\s?(?:bn\b|m\b|%).*$/i, '')  // drop a trailing figure
     .replace(/\s*\(.*$/, '')                                    // drop a trailing "( …"
     .replace(/\s*&\s*Company$/i, '')                            // "Kline & Company" → "Kline"
     .trim();
-  if (!name) name = src.label.split(' — ')[0];
   const m = src.label.match(SRC_VALUE_RE);
-  return { name, value: m ? m[0].replace(/\s+/g, '') : '' };
+  return { name: name || head, value: m ? m[0].replace(/\s+/g, '') : '' };
 }
 
-// Tag each source by what it provides — Revenue/size vs GP1 margin — from which list it came; dedupe by URL.
+// Each source tagged by the list it comes from (revenue/size or GP1 margin), deduplicated by URL.
 function taggedSources(
   revenue: SourceRef[], margin: SourceRef[],
 ): { src: SourceRef; kind: 'Revenue' | 'GP1' }[] {
@@ -170,9 +164,9 @@ const SourceChip: FC<{ src: SourceRef; kind: 'Revenue' | 'GP1' }> = ({ src, kind
       href={src.url}
       target="_blank"
       rel="noopener noreferrer"
-      // v3 (2026-07-02): the hover carries the FULL derivation recipe —
-      // triangulated Passport-category sizes must show viewers how they
-      // were derived (Passport internal values are licence-restricted).
+      // The hover carries the full derivation: a triangulated category size
+      // has to show how it was derived, because Passport's own values are
+      // licence-restricted.
       title={src.detail ? `${src.label}\n\nHow this was derived: ${src.detail}` : src.label}
       style={{
         fontSize: 11, fontWeight: 600, color: GRADE_META[src.grade].fg,
@@ -185,7 +179,7 @@ const SourceChip: FC<{ src: SourceRef; kind: 'Revenue' | 'GP1' }> = ({ src, kind
   );
 };
 
-// ─── Hover tooltip (slim — click carries the depth) ──────────────
+// ─── Hover tooltip (slim: the click carries the depth) ───────────
 const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: number }> = ({
   item, slide, x, y,
 }) => {
@@ -266,32 +260,31 @@ const DetailPanel: FC<{
   const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
   const panelRef = useRef<HTMLElement>(null);
 
-  // Per-figure derivation tooltips (owner request 2026-07-03): every number
-  // in the panel explains its own calculation + the source behind it on hover.
+  // Every figure in the panel explains its calculation and its source on hover.
   const revSrc = item.sources.revenue[0];
-  const revSrcNames = item.sources.revenue.map((s) => sourceParts(s).name).join(' · ');
-  const mgnSrcNames = item.sources.margin.map((s) => sourceParts(s).name).join(' · ');
+  const revSrcNames = item.sources.revenue.map((s) => sourceParts(s).name).join(' · ') || NO_VALUE;
+  const mgnSrcNames = item.sources.margin.map((s) => sourceParts(s).name).join(' · ') || NO_VALUE;
+  const revBasis = revSrc ? `${revSrc.label}${revSrc.detail ? `\nDerivation: ${revSrc.detail}` : ''}` : NO_VALUE;
   const gp1EndPct = gp1Terminal(item);
   const marginCagr = Math.pow(gp1EndPct / item.gp1Margin, 1 / POOL_HORIZON_YEARS) - 1;
   const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
   const tips = {
-    revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
+    revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revBasis}`,
     gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
-    revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(slide.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revSrc?.label ?? '—'}${revSrc?.detail ? `\nDerivation: ${revSrc.detail}` : ''}`,
-    revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nRationale: ${item.revenueDriver}\nSource: ${revSrcNames || '—'} (grade: ${item.sources.revenue[0]?.grade ?? 'estimate'}).`,
+    revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(slide.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revBasis}`,
+    revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nRationale: ${item.revenueDriver}\nSource: ${revSrcNames} (grade: ${revSrc?.grade ?? 'estimate'}).`,
     revEnd: `2030 revenue = today × (1 + CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(revEur)} × (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(revEnd)} (nominal).`,
-    gp1Today: `GP1/CM1 proxy ${pct(item.gp1Margin)} — PRISM structured estimate CALIBRATED against reported FY2025 gross margins (GP1 is not separately disclosed at this level, so it is never graded 'reported').\n\nCalibration anchors: ${mgnSrcNames || '—'}.`,
-    gp1Pa: `Margin drift ${gp1Rating.label} over ${POOL_HORIZON_LABEL} — structured judgment (⚠️).\n\nRationale: ${item.marginDriver}`,
+    gp1Today: `GP1/CM1 proxy ${pct(item.gp1Margin)}: a PRISM structured estimate CALIBRATED against reported FY2025 gross margins (GP1 is not separately disclosed at this level, so it is never graded 'reported').\n\nCalibration anchors: ${mgnSrcNames}.`,
+    gp1Pa: `Margin drift ${gp1Rating.label} over ${POOL_HORIZON_LABEL}: structured judgment, graded Estimate.\n\nRationale: ${item.marginDriver}`,
     gp1End: `2030 GP1 = today + drift:\n${pct(item.gp1Margin)} ${item.gp1DeltaBps >= 0 ? '+' : '−'} ${Math.abs(item.gp1DeltaBps)}bps = ${pct(gp1EndPct)}.`,
-    poolToday: `${fmtEurBn(gp1Now)} = revenue ${fmtEurBn(revEur)} × GP1 ${pct(item.gp1Margin)}.\n\nSources: size — ${revSrcNames || '—'}; margin calibration — ${mgnSrcNames || '—'}.`,
+    poolToday: `${fmtEurBn(gp1Now)} = revenue ${fmtEurBn(revEur)} × GP1 ${pct(item.gp1Margin)}.\n\nSources: size from ${revSrcNames}; margin calibration from ${mgnSrcNames}.`,
     poolPa: `Pool CAGR = (1 + revenue CAGR) × (1 + margin CAGR) − 1\n= (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))}) × (1 ${marginCagr >= 0 ? '+' : '−'} ${pct(Math.abs(marginCagr), 2)}) − 1 = ${poolRating.label} p.a.\n\nMargin CAGR is the ${item.gp1DeltaBps >= 0 ? '+' : ''}${item.gp1DeltaBps}bps drift spread over ${POOL_HORIZON_YEARS} years.`,
-    poolEnd: `2030 GP1 pool = today × (1 + pool CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(gp1Now)} × (1 ${pool >= 0 ? '+' : '−'} ${pct(Math.abs(pool))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(gp1End)} — equals 2030 revenue × 2030 GP1 (${fmtEurBn(revEnd)} × ${pct(gp1EndPct)}).`,
+    poolEnd: `2030 GP1 pool = today × (1 + pool CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(gp1Now)} × (1 ${pool >= 0 ? '+' : '−'} ${pct(Math.abs(pool))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(gp1End)}, which equals 2030 revenue × 2030 GP1 (${fmtEurBn(revEnd)} × ${pct(gp1EndPct)}).`,
   };
 
-  // R-03 (design review 2026-07-01): shared overlay contract — Escape,
-  // focus trap, initial focus, focus return and body scroll lock all come
-  // from useOverlay. The panel is only mounted while open, so `open` is
-  // simply `true` for its lifetime.
+  // The shared overlay behaviour (Escape, focus trap, initial focus, focus
+  // return, scroll lock). The panel is mounted only while open, so `open` is
+  // simply true for its lifetime.
   useOverlay(true, onClose, panelRef);
 
   return (
@@ -310,7 +303,7 @@ const DetailPanel: FC<{
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
-        aria-label={`${name} — profit pool assessment`}
+        aria-label={`${name}: profit pool assessment`}
         initial={reduceMotion ? { opacity: 0 } : { x: 440, opacity: 0.6 }}
         animate={reduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
         exit={reduceMotion ? { opacity: 0 } : { x: 440, opacity: 0.6 }}
@@ -352,13 +345,13 @@ const DetailPanel: FC<{
             </button>
           </div>
 
-          {/* Top key info — where this pool sits in the view */}
+          {/* Key figures: where this pool sits in the view */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
             <KeyInfo label="Revenue share" value={fmtShare(item.revenueShare)} sub="of view" tip={tips.revShare} />
             <KeyInfo label="GP1 pool share" value={fmtShare(gp1PoolShare)} sub="of view pool" tip={tips.gp1Share} />
           </div>
 
-          {/* Profit pool trajectory — one row per metric: today → rate → 2030 */}
+          {/* Profit pool trajectory, one row per metric: today → rate → 2030 */}
           <div style={{ marginBottom: 16 }}>
             <SectionLabel>Profit pool trajectory · {POOL_HORIZON_LABEL}</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: TRAJ_GRID, gap: 6, padding: '6px 4px 7px' }}>
@@ -403,11 +396,11 @@ const DetailPanel: FC<{
               endTip={tips.poolEnd}
             />
             <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.5, margin: '9px 4px 0' }}>
-              Pool = revenue × GP1 margin — the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it. Hover any figure for its calculation and source.
+              Pool = revenue × GP1 margin: the bottom row is the top two combined. Margin drift is a structured estimate; the pool rate inherits it. Hover any figure for its calculation and source.
             </div>
           </div>
 
-          {/* Sources — compact "Name (value)" hyperlinks; colour = grade */}
+          {/* Sources: compact "Name (value)" hyperlinks; colour = grade */}
           <div style={{ marginBottom: 4 }}>
             <SectionLabel>Sources</SectionLabel>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px', marginTop: 5, lineHeight: 1.5 }}>
@@ -422,14 +415,14 @@ const DetailPanel: FC<{
   );
 };
 
-const SectionLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
+const SectionLabel: FC<{ children: ReactNode }> = ({ children }) => (
   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 2 }}>
     {children}
   </div>
 );
 
-// Top key-info tile — the share of the view this pool holds.
-// `tip` (2026-07-03): hover explains how the figure is derived + its source.
+// A key figure: the share of the view this pool holds; `tip` explains on
+// hover how the figure is derived and where it comes from.
 const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string }> = ({ label, value, sub, tip }) => (
   <div
     title={tip}
@@ -444,9 +437,9 @@ const KeyInfo: FC<{ label: string; value: string; sub: string; tip?: string }> =
 
 const TRAJ_GRID = '1.4fr 1fr 1fr 1fr';
 
-// One trajectory row: metric · today · change (colour = direction) · 2030, with an optional driver + grade beneath.
-// Per-cell tips (owner request 2026-07-03): each figure carries its own
-// calculation + source on hover (dotted underline = hover affordance).
+// One trajectory row: metric · today · change (colour = direction) · 2030,
+// with an optional driver and grade beneath. Each figure carries its own
+// calculation and source on hover (the dotted underline marks it).
 const TrajRow: FC<{
   metric: string; today: string; change: string; changeTone: CagrRating['tone']; end: string;
   emphasis?: boolean; driver?: string; grade?: EvidenceGrade;
@@ -503,7 +496,7 @@ interface BarGeom {
   poolRating: CagrRating;
 }
 
-/** Pure geometry — outside the component so render never reassigns. */
+/** Pure geometry, outside the component so render never reassigns. */
 function computeBars(
   items: SlideItem[], ml: number, plotW: number, plotH: number, yMax: number,
 ): BarGeom[] {
@@ -528,11 +521,9 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const ordered = slide.items;
   const W = 960;
-  // R-19.3: H/MB grown together (plotH unchanged → identical bar geometry)
-  // and ML widened so the rotated −35° x-labels render in full: the longest
-  // ("Brand Owner CPG (Retail)", "Conditioners & Treatments") used to clip
-  // at the bottom edge and the first tier's ("Commodity Chemicals") at the
-  // left edge. Verified against the longest labels at ~1200px card width.
+  // The margins leave room for the rotated (−35°) x-labels: the longest
+  // ("Brand Owner CPG (Retail)", "Conditioners & Treatments") and the first
+  // tier's ("Commodity Chemicals") render in full at ~1200px card width.
   const H = 448;
   const ML = 96, MR = 20, MT = 32, MB = 132;
   const plotW = W - ML - MR;
@@ -553,7 +544,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', fontFamily: BODY_FONT }}
       role="group"
-      aria-label={`${slide.title} — pool chart; arrows show profit-pool development ${POOL_HORIZON_LABEL}`}
+      aria-label={`${slide.title}, pool chart; arrows show profit-pool development ${POOL_HORIZON_LABEL}`}
     >
       {yTicks.map(t => {
         const y = MT + plotH - (t / yMax) * plotH;
@@ -597,20 +588,20 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
         const cx = b.xPx0 + w / 2;
         const isSelected = selectedId === b.item.id;
         const isFocused = focusedId === b.item.id;
-        // Micro-pools keep their honest area but drop decoration — labels/
-        // arrows would collide; hover & click carry their identity. Axis
-        // name/% labels need ≥14 units; in-bar % and arrows need
-        // DECOR_MIN_W (R-19.2).
+        // Micro-pools keep their honest area but drop the decoration, which
+        // would collide; hover and click carry their identity. The axis name
+        // and % labels need ≥14 units, the in-bar % and the arrows need
+        // DECOR_MIN_W.
         const labeled = w >= 14;
         const decorated = w >= DECOR_MIN_W;
         const name = b.item.sublabel ? `${b.item.label} ${b.item.sublabel}` : b.item.label;
         return (
           <g
             key={b.item.id}
-            // R-14 (verified 2026-07-02): outline:'none' is allowed here
-            // because keyboard focus renders its own explicit indicator —
-            // the <rect> below switches to a 2px S.primary stroke (dashed
-            // when focused-but-not-selected) plus the active fill.
+            // outline: 'none' is safe here because keyboard focus draws its
+            // own indicator: the <rect> below switches to a 2px S.primary
+            // stroke (dashed when focused but not selected) plus the active
+            // fill.
             style={{ cursor: 'pointer', outline: 'none' }}
             role="button"
             tabIndex={0}
@@ -664,7 +655,7 @@ const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, on
                 {name}
               </text>
             )}
-            {/* Pool-development arrows — revenue × GP1, not revenue alone */}
+            {/* Pool-development arrows: revenue × GP1, not revenue alone */}
             {decorated && (
               <ArrowsSVG rating={b.poolRating} cx={cx} cy={y} ariaPrefix="Pool development" />
             )}
@@ -745,7 +736,7 @@ const KindPills: FC<{ kind: SlideKind; onSelect: (k: SlideKind) => void }> = ({ 
   </div>
 );
 
-// ─── Beta notice (R-19.4) — shown once, acknowledgment persisted ──
+// ─── Beta notice: shown once per browser, the acknowledgment stored ──
 const NOTICE_ACK_KEY = 'prism.explorerNoticeAck.v1';
 
 /** SSR-safe ack read. On the server we report "acked" so the dialog can
@@ -760,8 +751,8 @@ const ExplorerBetaNotice: FC<{ open: boolean; onAck: () => void; onClose: () => 
   open, onAck, onClose,
 }) => {
   const ref = useRef<HTMLDivElement | null>(null);
-  // R-03: shared overlay contract — Escape, focus trap, initial focus,
-  // focus return, body scroll lock.
+  // The shared overlay behaviour: Escape, focus trap, initial focus, focus
+  // return, scroll lock.
   useOverlay(open, onClose, ref);
   if (!open) return null;
   return (
@@ -826,17 +817,17 @@ const ProfitPoolExplorer: FC = () => {
   const [hover, setHover] = useState<{ item: SlideItem; x: number; y: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // R-19.4: the Beta notice auto-opens once per browser (the tab is
-  // keep-alive-mounted, so this runs on the first Explorer visit) and
-  // never again once acknowledged. "Got it" persists the ack; Escape or
-  // a backdrop click dismisses without persisting. The ack is read in the
-  // state initializer — this tab is `ssr: false` (page.tsx) and
+  // The Beta notice opens once per browser: on the first Explorer visit
+  // (the tab stays mounted once visited) and never again once acknowledged.
+  // "Got it" stores the acknowledgment; Escape or a backdrop click only
+  // dismisses. The acknowledgment is read in the state initializer: this tab
+  // renders on the client only (`ssr: false` in page.tsx) and
   // `noticeAcked()` is SSR-safe anyway, so there is nothing to hydrate
   // against and no effect is needed to reach the open state.
   const [noticeOpen, setNoticeOpen] = useState(() => !noticeAcked());
   const closeNotice = useCallback(() => setNoticeOpen(false), []);
   const ackNotice = useCallback(() => {
-    try { window.localStorage.setItem(NOTICE_ACK_KEY, '1'); } catch { /* storage unavailable — dismiss only */ }
+    try { window.localStorage.setItem(NOTICE_ACK_KEY, '1'); } catch { /* storage unavailable: dismiss only */ }
     setNoticeOpen(false);
   }, []);
 
@@ -861,8 +852,8 @@ const ProfitPoolExplorer: FC = () => {
     <div
       className="min-h-screen"
       style={{
-        // Shared maritime page shell — centered max-w-1440 with px-8 py-10,
-        // matching Profit Pool Exposure / Drivers / Consumer Journey.
+        // The page shell every dashboard tab shares: centred, max 1440px wide,
+        // 40px / 32px padding.
         maxWidth: 1440,
         margin: '0 auto',
         padding: '40px 32px',
@@ -878,11 +869,11 @@ const ProfitPoolExplorer: FC = () => {
             Beta · Profit Pool Explorer
           </div>
           <h1 className="font-extrabold tracking-tight" style={{ fontFamily: HEADLINE_FONT, fontSize: '2.4rem', lineHeight: 1.15, color: S.onBg, margin: 0 }}>
-            Industry Profit Pools — HCB Lens
+            Industry Profit Pools: HCB Lens
           </h1>
           <p style={{ color: S.mutedText, fontSize: 13, margin: '6px 0 0', maxWidth: 780 }}>
             Bain-classic pool views. Arrows show the development of the
-            <b> profit pool</b> (revenue × GP1 proxy, {POOL_HORIZON_LABEL}) — click any bar for the
+            <b> profit pool</b> (revenue × GP1 proxy, {POOL_HORIZON_LABEL}). Click any bar for the
             revenue / margin decomposition, € pool sizes and clickable sources.
             Y-axis = <b>GP1 proxy</b> (estimated). Market sizing: <b>Euromonitor</b> (consumer hair · laundry/home care),
             <b> Kline</b> (professional hair).
@@ -911,7 +902,7 @@ const ProfitPoolExplorer: FC = () => {
         <KindPills kind={kind} onSelect={(k) => { setKind(k); setSelectedId(null); }} />
       </div>
 
-      {/* Main card — shared maritime card: borderless, rounded-2xl, soft shadow */}
+      {/* Main card: borderless, rounded, soft shadow */}
       <div
         className="rounded-2xl"
         style={{
@@ -934,7 +925,7 @@ const ProfitPoolExplorer: FC = () => {
             </div>
           </div>
 
-          {/* GP1 pool trajectory badge — area-weighted, not revenue-weighted */}
+          {/* GP1 pool trajectory badge: area-weighted, not revenue-weighted */}
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: 14,
@@ -974,7 +965,7 @@ const ProfitPoolExplorer: FC = () => {
           />
         </div>
 
-        {/* Legend — pool ladder + evidence grades */}
+        {/* Legend: pool ladder and evidence grades */}
         <div
           style={{
             display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center',
@@ -999,7 +990,7 @@ const ProfitPoolExplorer: FC = () => {
           </div>
         </div>
 
-        {/* How-to-read key + honesty caveat on the development arrows */}
+        {/* How-to-read key and the caveat on the development arrows */}
         <div
           style={{
             marginTop: 12, padding: '10px 12px', borderRadius: 10,
@@ -1011,20 +1002,20 @@ const ProfitPoolExplorer: FC = () => {
           bar <b>width</b> = revenue share · bar <b>height</b> = GP1 proxy ·
           bar <b>area</b> = GP1 profit pool · <b>arrow</b> = pool development p.a.
           <span style={{ color: S.mutedText }}>
-            {' '}— a verified revenue CAGR combined with a <b>structured margin-drift estimate</b>{' '}
-            (the drift is judgment, graded ⚠️ in the drill-down; treat the arrow as directional, not a forecast).
-            Sub-1% pools render as slim slivers — hover or click a bar to inspect them.
+            {' '}The arrow combines a verified revenue CAGR with a <b>structured margin-drift estimate</b>{' '}
+            (the drift is judgment, graded Estimate in the drill-down; treat the arrow as directional, not a forecast).
+            Sub-1% pools render as slim slivers: hover or click a bar to inspect them.
             {slide.kind === 'ValueChain' && (
-              <> Value-chain tiers <b>overlap</b> (the same end-consumer euro is counted at brand-owner and again at retail), so total chain revenue exceeds the headline consumer pool — areas show where margin sits, not additive pools.</>
+              <> Value-chain tiers <b>overlap</b> (the same end-consumer euro is counted at brand-owner and again at retail), so total chain revenue exceeds the headline consumer pool; areas show where margin sits, not additive pools.</>
             )}
           </span>
         </div>
       </div>
 
-      {/* Insights + construction + sources */}
+      {/* Key insights and how the view is built */}
       <div style={{ marginTop: 18, padding: 20, background: S.surface, border: `1px solid ${S.cardBorder}`, borderRadius: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Sparkles size={16} color={S.primary} />
+          <Lightbulb size={16} color={S.primary} />
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.primary }}>
             Profit Pool Architecture · Key Insights
           </span>
@@ -1055,7 +1046,7 @@ const ProfitPoolExplorer: FC = () => {
 
       </div>
 
-      {/* About this view — methodology footnote (page bottom) */}
+      {/* About this view: the methodology footnote */}
       <div style={{ marginTop: 18, fontSize: 11, color: S.mutedText, lineHeight: 1.6, maxWidth: 980 }}>
         <b style={{ color: S.onSurfaceVariant }}>About this view.</b>{' '}
         The Y-axis is a <b>GP1 proxy</b>: GP1 / CM1 is not separately disclosed at tier level by any
@@ -1079,7 +1070,7 @@ const ProfitPoolExplorer: FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Beta notice — first-visit acknowledgment (R-19.4) */}
+      {/* Beta notice, shown on the first visit */}
       <ExplorerBetaNotice open={noticeOpen} onAck={ackNotice} onClose={closeNotice} />
     </div>
   );

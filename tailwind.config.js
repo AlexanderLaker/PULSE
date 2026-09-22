@@ -1,4 +1,10 @@
-/** @type {import('tailwindcss').Config} */
+/**
+ * Tailwind scans the dashboard for class names. The theme stays Tailwind's
+ * own: the design tokens live in lib/theme.ts and the fonts come from
+ * next/font (app/layout.tsx).
+ *
+ * @type {import('tailwindcss').Config}
+ */
 module.exports = {
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
@@ -6,11 +12,6 @@ module.exports = {
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    // R-23 (design review 2026-07-01): the legacy Apple-era extend block
-    // (brand/surface/content/status palettes incl. the wrong semantic
-    // expansion/contraction pair, apple shadows/radii/animations/fontSize
-    // scale) was deleted — zero generated classes were in use. Theme tokens
-    // live in lib/theme.ts; fonts ship via next/font in app/layout.tsx.
     extend: {},
   },
   plugins: [],

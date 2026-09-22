@@ -1,260 +1,147 @@
 /**
- * PRISM Profit Pool Shift Model — Typed API Client
- * Fully typed interface to the FastAPI backend.
- * Zero `any` types. Every request and response is typed.
+ * Every request the dashboard makes.
+ *
+ * Reads go straight to the PRISM API under /api/v1 and are authenticated by
+ * the httpOnly viewer cookie that /api/prism-cookie sets (see
+ * hooks/usePrism.ts). Admin writes go to the dashboard's own routes under
+ * /api, which check the signed-in user's role and forward the write with a
+ * short-lived admin token (lib/backend.ts): the viewer cookie can never
+ * authorise a write. User management and the role lookup are dashboard
+ * routes too (lib/roles.ts).
  */
-
 import type {
-  Driver, DriverUpdate,
-  DriverProposalPatch, DriverProposalsResponse,
-  SimulationResult,
-  HealthStatus, DiagnosticsResult, ModelConfig, AuditEntry, ForceSummary,
+  DiagnosticsResult, Driver, DriverProposal, DriverProposalsResponse, DriverUpdate,
+  HealthStatus, ModelConfig, Role, SimulationPayload, SimulationResult,
 } from '@/types';
+import type { JourneyContent } from '@/data/consumerJourney';
 
-// ── Base Request ─────────────────────────────────────────────────
-
-const BASE = '/api/v1';
-
-/** L25 (July 2026 review): no request may hang forever — a stalled proxy
- *  used to leave the dashboard in a permanent skeleton. 20s covers Neon
- *  cold starts with margin. */
+/** No request may hang: 20 s covers a serverless database waking up. */
 const REQUEST_TIMEOUT_MS = 20_000;
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
-      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      ...options,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText })) as { detail?: string };
-      throw new ApiError(res.status, err.detail ?? `API ${res.status}`);
-    }
-    return res.json() as Promise<T>;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new ApiError(0, 'Backend unavailable or network error');
-    }
-    if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new ApiError(0, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
-    }
-    throw error;
+/** One readable line from an error body ({detail} from the API, {error} from the dashboard routes). */
+function errorMessage(body: unknown, status: number): string {
+  const b = (body ?? {}) as { detail?: unknown; error?: unknown };
+  const detail = b.detail ?? b.error;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && typeof (detail as { error?: unknown }).error === 'string') {
+    return (detail as { error: string }).error;
   }
+  return detail != null ? JSON.stringify(detail) : `Request failed (${status})`;
 }
 
-/**
- * Like `request()`, but targets a Next.js admin-proxy route under `/api`
- * (NOT the `/api/v1` engine rewrite). Admin mutations must go through a
- * proxy that mints a role=admin Bearer token — the browser's direct
- * `pulse-token` cookie is viewer-only by design, so hitting `/api/v1`
- * straight would always 403 "Admin access required" (see
- * app/api/trends/[id]/route.ts). Sends credentials so Clerk can identify
- * the caller, and surfaces either `{ detail }` or `{ error }` bodies.
- */
-const ADMIN_BASE = '/api';
-
-async function adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function send<T>(url: string, init: RequestInit = {}): Promise<T> {
+  let res: Response;
   try {
-    const res = await fetch(`${ADMIN_BASE}${path}`, {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...options.headers },
-      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      ...options,
+    res = await fetch(url, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...init.headers },
+      signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { detail?: unknown; error?: unknown };
-      const raw = err.detail ?? err.error ?? `API ${res.status}`;
-      // Guard against non-string bodies (e.g. a FastAPI 422 detail array):
-      // stringify them so the UI never shows "[object Object]".
-      const msg = typeof raw === 'string' ? raw : JSON.stringify(raw);
-      throw new ApiError(res.status, msg);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') {
+      throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`);
     }
-    return res.json() as Promise<T>;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new ApiError(0, 'Backend unavailable or network error');
-    }
-    if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new ApiError(0, `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
-    }
-    throw error;
+    throw new ApiError(0, 'The PRISM service could not be reached');
   }
+  if (!res.ok) {
+    throw new ApiError(res.status, errorMessage(await res.json().catch(() => null), res.status));
+  }
+  return (await res.json()) as T;
 }
 
-// ── Health & Config ──────────────────────────────────────────────
+const put = (body: unknown): RequestInit => ({ method: 'PUT', body: JSON.stringify(body) });
 
-export const getHealth = (): Promise<HealthStatus> =>
-  request('/health');
+// ── Service status ──────────────────────────────────────────────────────────
 
-export const getConfig = (): Promise<ModelConfig> =>
-  request('/config');
+export const getHealth = (): Promise<HealthStatus> => send('/api/v1/health');
 
-/** GET /api/v1/diagnostics — backend's view of its own DB state.
- *  Drives the differentiated empty-state banner in ProfitPoolAnalysis2.tsx.
- *  Never throws — returns a default "unreachable" shape on network error so
- *  the UI can still say something useful. */
-export const getDiagnostics = async (): Promise<DiagnosticsResult> => {
-  try {
-    return await request<DiagnosticsResult>('/diagnostics');
-  } catch {
-    return {
-      db_mode: 'unknown',
-      db_host: null,
-      db_url_env: null,
-      db_reachable: false,
-      simulation_run_count: 0,
-      latest_run_id: null,
-      latest_run_date: null,
-      latest_iterations: null,
-      latest_has_shift_matrix: false,
-      latest_has_decompositions: false,
-      latest_has_totals: false,
-      latest_has_vc_decomposition: false,
-      error: 'diagnostics endpoint unreachable',
-      simulation_reason: 'db_error',
-      in_memory_simulation: false,
-      version: 'unknown',
-    };
-  }
-};
+/** What the service sees of its database; null when the service itself cannot be reached. */
+export const getDiagnostics = (): Promise<DiagnosticsResult | null> =>
+  send<DiagnosticsResult>('/api/v1/diagnostics').catch(() => null);
 
-// ── Trends ───────────────────────────────────────────────────────
+/** Sets the viewer cookie the /api/v1 reads need. Resolves whether or not it succeeded. */
+export const primeViewerCookie = (): Promise<void> =>
+  fetch('/api/prism-cookie').then(() => undefined, () => undefined);
 
-export const getDrivers = (force?: string): Promise<Driver[]> =>
-  request(`/drivers${force ? `?force=${encodeURIComponent(force)}` : ''}`);
+// ── Drivers ─────────────────────────────────────────────────────────────────
 
-export const getDriver = (id: string): Promise<Driver> =>
-  request(`/drivers/${id}`);
+export const getDrivers = (): Promise<Driver[]> => send('/api/v1/drivers');
 
-// Admin-only. Routes through the Next.js proxy /api/trends/{id} (which mints
-// a role=admin Bearer token), NOT the viewer-cookie /api/v1 path — otherwise
-// the backend's require_admin answers 403 even for real admins.
-export const updateDriver = (id: string, data: DriverUpdate): Promise<Driver> =>
-  adminRequest(`/drivers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export interface DriverUpdateResult {
+  status: 'updated' | 'unchanged';
+  driver_id: string;
+  /** The fields that changed; absent when nothing did. */
+  changed?: string[];
+}
 
-// ── Trend score proposals (multi-expert scoring) ─────────────────
-// Any authenticated user may read aggregates and write THEIR OWN proposal
-// (backend require_auth — the viewer cookie suffices, so these stay on the
-// direct /api/v1 path). Endorsement is a normal admin updateTrend() with the
-// chosen values, so it flows through the validated, audited PUT /trends/{id}
-// path — now via the /api/trends/{id} admin proxy.
+/** Admin edit, through the dashboard route that checks the role. */
+export const updateDriver = (id: string, update: DriverUpdate): Promise<DriverUpdateResult> =>
+  send(`/api/drivers/${encodeURIComponent(id)}`, put(update));
 
-/** GET /api/v1/trends/{id}/proposals — the caller's own proposal, the expert
- *  aggregate, and the named "who scored what" breakdown. */
+/** The caller's own proposal, the aggregate across experts and who scored what. */
 export const getDriverProposals = (id: string): Promise<DriverProposalsResponse> =>
-  request(`/drivers/${id}/proposals`);
+  send(`/api/v1/drivers/${encodeURIComponent(id)}/proposals`);
 
-/** PUT /api/v1/trends/{id}/proposals — upsert the caller's own proposal.
- *  Partial patch: only the provided fields are written. Returns the refreshed
- *  proposals payload. */
-export const saveMyProposal = (
-  id: string,
-  patch: DriverProposalPatch,
-): Promise<DriverProposalsResponse> =>
-  request(`/drivers/${id}/proposals`, {
-    method: 'PUT',
-    body: JSON.stringify(patch),
-  });
+/** Merge fields into the caller's own proposal; any signed-in user may propose. */
+export const saveMyProposal = (id: string, proposal: DriverProposal): Promise<DriverProposalsResponse> =>
+  send(`/api/v1/drivers/${encodeURIComponent(id)}/proposals`, put(proposal));
 
-// ── Simulation ───────────────────────────────────────────────────
+// ── The run and the configuration ───────────────────────────────────────────
 
-/**
- * Normalize the backend simulation payload to the shape the frontend expects.
- *
- * Backend response shape (FastAPI):
- *   {
- *     shift_matrix: { [cat]: { path: { [year]: {p10,p25,median,p75,p90,mean,std} }, velocity: {...} } },
- *     regional_shift_matrix: { [cat]: { [region]: { path: {...} } } },  // F1 (2.10.0)
- *     region_weights_used: { [region]: number },
- *     cell_weights_used: { [cat]: { [region]: share } },               // O6 (2.11.0)
- *     category_weights_used: { [cat]: share }, cell_weights_source,
- *     mc_standard_error: { [cat]: {median_se_pp,...} },                 // F7 (2.10.0)
- *     iterations, model_type, ...
- *   }
- *
- * Frontend type `SimulationResult` expects:
- *   {
- *     shifts: { [cat]: { [year]: PercentileDistribution } },    // flat, no `.path`
- *     regional_shift_matrix, region_weights_used, cell_weights_used,
- *     category_weights_used, cell_weights_source, mc_standard_error
- *   }
- *
- * This normalizer accepts either shape (idempotent).
- */
-// Exported so the normalization rules can be unit-tested (tests/frontend/normalizeSimulation.test.ts).
-export function normalizeSimulation(raw: unknown): SimulationResult {
-  const r = (raw ?? {}) as Record<string, unknown>;
-
-  // shifts: prefer `shifts` if already normalized, else unwrap `shift_matrix[cat].path`
-  let shifts = r.shifts as Record<string, unknown> | undefined;
-  if (!shifts && r.shift_matrix && typeof r.shift_matrix === 'object') {
-    const matrix = r.shift_matrix as Record<string, unknown>;
-    shifts = {};
-    for (const [cat, val] of Object.entries(matrix)) {
-      if (val && typeof val === 'object') {
-        const v = val as Record<string, unknown>;
-        // Unwrap `.path` if present; otherwise assume it's already a year-map
-        shifts[cat] = (v.path && typeof v.path === 'object') ? v.path : v;
-      }
-    }
-  }
-
-  return {
-    ...(r as Partial<SimulationResult>),
-    shifts: (shifts ?? {}) as SimulationResult['shifts'],
-    // F1 (2.10.0): the 3D regional shift + the region GP1-share weights used.
-    regional_shift_matrix: r.regional_shift_matrix as SimulationResult['regional_shift_matrix'],
-    region_weights_used: r.region_weights_used as SimulationResult['region_weights_used'],
-    // O6 (2.11.0): the cell gross-profit-share matrix, its row sums and label.
-    cell_weights_used: r.cell_weights_used as SimulationResult['cell_weights_used'],
-    category_weights_used: r.category_weights_used as SimulationResult['category_weights_used'],
-    cell_weights_source: r.cell_weights_source as SimulationResult['cell_weights_source'],
-    // F7 (2.10.0): per-quantile MC standard error (replaces R̂/ESS convergence;
-    // F9: force_attribution deleted — neither is carried through any more).
-    mc_standard_error: r.mc_standard_error as SimulationResult['mc_standard_error'],
-    // v3.1: pass through the per-year decompositions and totals blocks.
-    // Already JSON-serializable (backend stringified int year keys).
-    decompositions: r.decompositions as SimulationResult['decompositions'],
-    totals: r.totals as SimulationResult['totals'],
-    // M2 (2.8.1): cross-seed stability of the terminal-year portfolio
-    // median. Null/absent on pre-2.8.1 runs — the footer says "not recorded".
-    seed_stability: r.seed_stability as SimulationResult['seed_stability'],
-  } as SimulationResult;
+/** The served run with each category's percentile path lifted into `shifts`. */
+export function normalizeSimulation(payload: SimulationPayload): SimulationResult {
+  const { shift_matrix, ...rest } = payload;
+  const shifts = Object.fromEntries(Object.entries(shift_matrix).map(([cat, cell]) => [cat, cell.path]));
+  return { ...rest, shifts };
 }
 
 export const getSimulation = async (): Promise<SimulationResult> =>
-  normalizeSimulation(await request<unknown>('/simulation'));
+  normalizeSimulation(await send<SimulationPayload>('/api/v1/simulation'));
 
-// (runSimulation removed, L25/July 2026 review: it had no callers — F2: the
-//  deployed service never simulates; runs are produced by the offline CLI.)
+export const getConfig = (): Promise<ModelConfig> => send('/api/v1/config');
 
-// ── Forces ───────────────────────────────────────────────────────
+// ── Consumer Journey content ────────────────────────────────────────────────
 
-export const getForces = (): Promise<ForceSummary[] | { forces: string[] }> =>
-  request('/forces');
+/** The newest content an admin saved; null while the bundled content applies. */
+export const getJourneyContent = (): Promise<JourneyContent | null> =>
+  send<JourneyContent>('/api/v1/journey').catch((e: unknown) => {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  });
 
-// ── Audit ────────────────────────────────────────────────────────
+/** Admin save of the whole tile map, through the dashboard route that checks the role. */
+export const saveJourneyContent = (content: JourneyContent): Promise<{ status: 'saved'; tiles: number }> =>
+  send('/api/journey', put(content));
 
-export const getAuditLog = (limit = 50): Promise<AuditEntry[]> =>
-  request(`/audit/log?limit=${limit}`);
+// ── Identity and users (dashboard routes) ───────────────────────────────────
 
-// ── Analytics client removed (D14 + Sobol rider, June 2026) ─────
-// CVaR / Sobol / tipping-points / reverse-stress were deleted end-to-end:
-// they rendered nowhere in the live UI and their fetches were silently
-// swallowed. See audit/strategy-review/06, Part A addendum.
-// ── Delphi client removed (D10, June 2026) ──────────────────────
+export interface Me {
+  clerkUserId: string;
+  email: string;
+  role: Role;
+}
 
+export const getMe = (): Promise<Me> => send('/api/me');
+
+/** A user as the admin's user list shows it: Clerk's identity with PRISM's role. */
+export interface ManagedUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: Role;
+  lastSignInAt: string | null;
+  createdAt: string | null;
+}
+
+export const getUsers = (): Promise<{ users: ManagedUser[] }> => send('/api/users');
+
+export const setUserRole = (userId: string, role: Role): Promise<{ role: Role }> =>
+  send(`/api/users/${encodeURIComponent(userId)}/role`, { method: 'PATCH', body: JSON.stringify({ role }) });

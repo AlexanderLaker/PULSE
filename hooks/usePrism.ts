@@ -1,226 +1,158 @@
 /**
- * Central state hook for PRISM Profit Pool Shift Model.
+ * The dashboard's data: the drivers, the served run, the model configuration
+ * and the service's health, loaded once and shared by every view.
  *
- * June 2026 refactor:
- *   - Single shared instance: `PrismProvider` (mounted once in
- *     app/dashboard/page.tsx) runs the data lifecycle; every tab reads the
- *     same store via `usePrism()`. Previously each tab mounted its own copy
- *     of this hook, so every tab switch re-fetched the entire world and
- *     dropped all in-view state.
- *   - Pruned to what the live UI consumes. The analytics endpoints
- *     (CVaR / Sobol / tipping points — deleted from the backend entirely,
- *     D14 + Sobol rider June 2026), AI insights / triggers, scenario
- *     list, force summaries and the in-app `simulate()` belonged to the
- *     v1 dashboard, which no longer exists. Simulations are CLI-only
- *     (scripts/run_50k_prod.py); the UI renders the latest persisted run.
+ * Mount <PrismProvider> once (app/dashboard/page.tsx); every view reads the
+ * same store with usePrism(). The dashboard never simulates: it shows the
+ * newest run the production job persisted.
  *
- * Kept as a .ts file (no JSX) so the module specifier `@/hooks/usePrism`
- * is untouched; the provider is built with React.createElement.
+ * A load first asks /api/prism-cookie for the viewer cookie the /api/v1 reads
+ * need. Every load takes a new sequence number and only the newest may write
+ * state, so a slow earlier load can never overwrite a later one. While the
+ * service is unreachable the store checks its health every 30 s (every 60 s
+ * while connected) and reloads everything once it answers again.
+ *
+ * A .ts module without JSX: the provider is built with createElement.
  */
 'use client';
 
 import {
-  createContext, createElement, useContext, useState, useEffect,
-  useCallback, useRef, type ReactNode, type FC,
+  createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  type FC, type ReactNode,
 } from 'react';
 import * as api from '@/api/client';
-import type {
-  HealthStatus, Driver, SimulationResult, ModelConfig, DriverUpdate,
-} from '@/types';
+import type { Driver, DriverUpdate, HealthStatus, ModelConfig, SimulationResult } from '@/types';
 
-/** Return type for the usePrism hook. */
-export interface UsePrismReturn {
+export type ConnectionState = 'connected' | 'reconnecting' | 'offline';
+
+export interface PrismStore {
   health: HealthStatus | null;
   drivers: Driver[];
+  /** The served run; null when there is none (the views say why). */
   simulation: SimulationResult | null;
   config: ModelConfig | null;
+  /** True until the first load has finished. */
   loading: boolean;
   error: string | null;
+  connectionState: ConnectionState;
+  /** False while the service cannot be reached. */
   backendAvailable: boolean;
-  connectionState: 'connected' | 'reconnecting' | 'offline';
-  updateDriver: (driverId: string, updates: DriverUpdate) => Promise<void>;
+  /** Admin edit of a driver; rejects when the write fails, then refreshes the drivers. */
+  updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
+  /** Load everything again (the retry and reconnect buttons). */
   reload: () => Promise<void>;
-  reconnect: () => Promise<void>;
 }
 
-function usePrismStore(): UsePrismReturn {
+function usePrismStore(): PrismStore {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [backendAvailable, setBackendAvailable] = useState(true);
-  const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'offline'>('reconnecting');
+  const [connectionState, setConnectionState] = useState<ConnectionState>('reconnecting');
   const mounted = useRef(true);
-  const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // M7 (July 2026 review): request ordering. Every loadAll() takes a new
-  // epoch; only the newest epoch may write state, so a slow older load can
-  // never overwrite a newer one.
-  const loadEpochRef = useRef(0);
-  // Mirror of connectionState for use inside stable callbacks (avoids the
-  // stale-closure variant of the reconnect bug). Kept in sync via an effect
-  // — refs must not be written during render (react-hooks/refs).
-  const connectionStateRef = useRef<'connected' | 'reconnecting' | 'offline'>('reconnecting');
-  useEffect(() => { connectionStateRef.current = connectionState; }, [connectionState]);
+  const loadSequence = useRef(0);
+  // The health check reads the state through a ref, so its callback can stay stable.
+  const connectionRef = useRef<ConnectionState>('reconnecting');
+  useEffect(() => { connectionRef.current = connectionState; }, [connectionState]);
 
-  // -- Initial load with graceful degradation -------------------
-  // Written as a promise chain rather than async/await on purpose: every
-  // state write lives in a continuation, so the mount effect below can start
-  // the load without setting state synchronously during the effect. The two
-  // commit stages (core payload, then the stored run) and the `finally` are
-  // the same ones the async version had.
-  const loadAll = useCallback(() => {
-    // M7: claim a new epoch; stale loads may not write state.
-    const epoch = ++loadEpochRef.current;
-    const fresh = () => mounted.current && epoch === loadEpochRef.current;
-    // F3: prime the httpOnly engine cookie (pulse-token) so the
-    // authenticated /api/v1 reads succeed. Errors are non-fatal here —
-    // if priming failed, the reads below 401 and we surface offline.
-    return fetch('/api/prism-cookie', { credentials: 'include' })
-      .catch(() => undefined)
+  // A promise chain rather than async/await: every state write happens in a
+  // continuation, so the mount effect can start a load without setting state
+  // synchronously inside the effect.
+  const load = useCallback(() => {
+    const sequence = ++loadSequence.current;
+    const current = () => mounted.current && sequence === loadSequence.current;
+    return api.primeViewerCookie()
       .then(() => Promise.all([
-        api.getHealth().catch((err: Error) => { throw err; }),
+        api.getHealth(),
         api.getDrivers().catch((): Driver[] => []),
         api.getConfig().catch((): null => null),
       ]))
-      .then(([h, t, c]) => {
-        if (!fresh()) return null;
-
-        setBackendAvailable(true);
+      .then(([h, d, c]) => {
+        if (!current()) return null;
         setConnectionState('connected');
         setHealth(h);
-        setDrivers(Array.isArray(t) ? t : []);
+        setDrivers(d);
         setConfig(c);
-
-        // Load stored simulation if available
-        return h?.has_simulation
-          ? api.getSimulation().catch((): null => null)
-          : null;
+        return h.has_simulation ? api.getSimulation().catch((): null => null) : null;
       })
-      .then((sim) => {
-        // If no stored simulation, leave it null -- the dashboard explains why.
-        if (sim && fresh()) setSimulation(sim);
+      .then((run) => {
+        if (current()) setSimulation(run);
       })
       .catch((e: unknown) => {
-        if (fresh()) {
-          setBackendAvailable(false);
-          setConnectionState('offline');
-          setHealth({ status: 'offline', version: 'unknown' });
-          setError(`Backend unavailable. ${(e as Error).message}`);
-        }
+        if (!current()) return;
+        setConnectionState('offline');
+        setHealth(null);
+        setError(`The PRISM service is unavailable: ${(e as Error).message}`);
       })
       .finally(() => {
-        if (fresh()) setLoading(false);
+        if (current()) setLoading(false);
       });
   }, []);
 
-  // -- Reload entry point ----------------------------------------
-  // Re-enter the loading state, then run the same load. Every caller that
-  // reaches the store from the UI (retry button, explicit reconnect, the
-  // health check's offline -> connected recovery) goes through here; the
-  // mount effect calls `loadAll` directly because the store already starts
-  // in exactly this state, so the three writes below would be no-ops.
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
     setConnectionState('reconnecting');
-    return loadAll();
-  }, [loadAll]);
+    return load();
+  }, [load]);
 
-  // -- Health check with reconnect logic ------------------------
-  const performHealthCheck = useCallback(async () => {
+  const checkHealth = useCallback(async () => {
     try {
       await api.getHealth();
-      if (mounted.current) {
-        // M7: transitioning offline → connected must RELOAD data, not just
-        // flip the badge — the dashboard used to read "connected" over
-        // stale/empty data until a manual page refresh.
-        const wasDisconnected = connectionStateRef.current !== 'connected';
-        setBackendAvailable(true);
-        setConnectionState('connected');
-        setError(null);
-        if (wasDisconnected) void reload();
-      }
+      if (!mounted.current) return;
+      const wasDisconnected = connectionRef.current !== 'connected';
+      setConnectionState('connected');
+      setError(null);
+      if (wasDisconnected) void reload();   // the data may be stale or missing
     } catch {
-      if (mounted.current) {
-        setBackendAvailable(false);
-        setConnectionState('offline');
-      }
+      if (mounted.current) setConnectionState('offline');
     }
   }, [reload]);
 
-  // -- Schedule periodic health checks --------------------------
-  const scheduleHealthCheck = useCallback(() => {
-    if (healthCheckIntervalRef.current) {
-      clearInterval(healthCheckIntervalRef.current);
-    }
-    // 60 s when connected, 30 s while offline/reconnecting.
-    const intervalMs = connectionState === 'connected' ? 60000 : 30000;
-    healthCheckIntervalRef.current = setInterval(() => {
-      void performHealthCheck();
-    }, intervalMs);
-  }, [connectionState, performHealthCheck]);
-
   useEffect(() => {
-    scheduleHealthCheck();
-    return () => {
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-      }
-    };
-  }, [scheduleHealthCheck]);
+    const timer = setInterval(() => { void checkHealth(); }, connectionState === 'connected' ? 60_000 : 30_000);
+    return () => clearInterval(timer);
+  }, [connectionState, checkHealth]);
 
   useEffect(() => {
     mounted.current = true;
-    void loadAll();
+    void load();
     return () => { mounted.current = false; };
-  }, [loadAll]);
+  }, [load]);
 
-  // -- Update trend score ----------------------------------------
-  const updateDriver = useCallback(async (driverId: string, updates: DriverUpdate) => {
-    // M6 (July 2026 review): ALWAYS attempt the write and rethrow on
-    // failure. The old `if (!backendAvailable) return;` guard silently
-    // dropped saves whenever the (up to 60s stale) offline flag was up,
-    // while callers' success paths showed "✓ saved". Callers already have
-    // try/catch + error UI — they just never received the rejection.
+  const updateDriver = useCallback(async (driverId: string, update: DriverUpdate) => {
     try {
-      await api.updateDriver(driverId, updates);
+      await api.updateDriver(driverId, update);
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
       throw e;
     }
-    const t = await api.getDrivers().catch((): Driver[] => []);
-    if (mounted.current) setDrivers(t);
+    const fresh = await api.getDrivers().catch((): Driver[] | null => null);
+    if (fresh && mounted.current) setDrivers(fresh);
   }, []);
 
-  // -- Explicit reconnect function --------------------------------
-  // `reload` already flips the badge to "reconnecting" before it fetches.
-  const reconnect = useCallback(async () => {
-    await reload();
-  }, [reload]);
-
-  return {
-    health, drivers, simulation, config,
-    loading, error, backendAvailable, connectionState,
-    updateDriver, reload, reconnect,
-  };
+  // One object per state change, so a re-render of the page alone (a tab
+  // switch) does not re-render every view that reads the store.
+  return useMemo(() => ({
+    health, drivers, simulation, config, loading, error, connectionState,
+    backendAvailable: connectionState !== 'offline',
+    updateDriver, reload,
+  }), [health, drivers, simulation, config, loading, error, connectionState, updateDriver, reload]);
 }
 
-// --- Context plumbing -------------------------------------------
-const PrismContext = createContext<UsePrismReturn | null>(null);
+const PrismContext = createContext<PrismStore | null>(null);
 
-/** Mount once (dashboard page). All tabs share this single store. */
+/** Mount once (app/dashboard/page.tsx); every view shares this store. */
 export const PrismProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const value = usePrismStore();
-  return createElement(PrismContext.Provider, { value }, children);
+  const store = usePrismStore();
+  return createElement(PrismContext.Provider, { value: store }, children);
 };
 
-/** Read the shared PRISM store. Must be used inside <PrismProvider>. */
-export default function usePrism(): UsePrismReturn {
-  const ctx = useContext(PrismContext);
-  if (!ctx) {
-    throw new Error('usePrism must be used within <PrismProvider> (see app/dashboard/page.tsx)');
-  }
-  return ctx;
+/** The shared store. Must be used inside <PrismProvider>. */
+export default function usePrism(): PrismStore {
+  const store = useContext(PrismContext);
+  if (!store) throw new Error('usePrism must be used inside <PrismProvider> (app/dashboard/page.tsx)');
+  return store;
 }

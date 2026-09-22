@@ -1,21 +1,15 @@
 /**
- * GET /api/prism-cookie — primes the browser with a short-lived PRISM
- * engine token so the FastAPI read endpoints can require authentication
- * (review F3).
+ * GET /api/prism-cookie: give the browser the cookie the PRISM API reads need.
  *
- * Design:
- *   - Identity comes from the Clerk session (requireAuth) — anonymous
- *     callers get 401 and no cookie.
- *   - The minted JWT is ALWAYS role=viewer, even for admins. Reads are
- *     the only thing the cookie can authorize; admin mutations keep
- *     going through the Next.js proxy routes with a Bearer token, so a
- *     cross-site request riding the cookie can never reach an admin
- *     gate (CSRF defense in depth, on top of SameSite=Lax).
- *   - httpOnly + Secure + SameSite=Lax + Path=/api/v1: invisible to JS,
- *     never sent cross-site on non-navigation requests, never sent to
- *     anything but the engine API.
- *   - TTL 12h; usePrism re-primes on every dashboard load / reconnect,
- *     so expiry self-heals on the next visit.
+ *   - The user comes from the Clerk session; without one the answer is 401
+ *     and no cookie is set.
+ *   - The token in the cookie always says viewer, admins included. The cookie
+ *     authorises reads only; writes go through the dashboard routes with a
+ *     separate admin token (lib/backend.ts), so a cross-site request riding
+ *     on the cookie can never reach a write.
+ *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
+ *     cannot read it and it is sent to the API only.
+ *   - It lasts 12 hours; the dashboard asks for a fresh one whenever it loads.
  */
 import { NextResponse } from 'next/server';
 import { requireAuth, UnauthorizedError } from '@/lib/roles';
@@ -38,7 +32,7 @@ export async function GET() {
         { status: 503 },
       );
     }
-    // Viewer-only by design — see header comment.
+    // Viewer only, whatever the user's role (see above).
     const token = signPrismJwt(
       { sub: me.clerkUserId, email: me.email, role: 'viewer' },
       TTL_SECONDS,

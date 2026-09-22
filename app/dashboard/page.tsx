@@ -1,58 +1,30 @@
 'use client';
 
 /**
- * PRISM Dashboard Page
+ * The dashboard: the top navigation, the panes behind it and two dialogs
+ * (settings and the welcome dialog), all inside one PrismProvider, so the
+ * data loads once and every pane reads the same store.
  *
- * Main entry point for the Profit Pool Shift Model.
- * Handles authentication, error boundaries, and component composition.
+ * Only signed-in users get here: proxy.ts sends everyone else to /sign-in.
+ * Clerk (v6) supplies the identity; the role comes from /api/me, asked once
+ * here and handed to every view with admin controls as `isAdmin`. Every tab
+ * is open to every role.
  *
- * Auth model (Clerk):
- *   - The Clerk middleware (middleware.ts) already guarantees the user
- *     is signed in before this component renders. Unauthenticated
- *     visitors are redirected to /sign-in before hitting this route.
- *   - `useUser()` gives us reactive access to the current user for
- *     display (email, avatar) without any fetch.
- *   - `<SignOutButton>` / `useClerk().signOut()` handles logout —
- *     Clerk invalidates the session on the server and clears cookies.
- *
- * Authorization (role-aware UI, not tab gating):
- *   Identity comes from Clerk; *authorization* (admin vs viewer) is
- *   served by our own /api/me endpoint, which reads user_roles in Neon
- *   Postgres. We mirror the pattern used in SettingsModal.tsx. Role only
- *   toggles admin-only *controls* inside tabs (e.g. editors); every tab,
- *   including Profit Pool Explorer, is visible to all signed-in users.
- *
- * Tab navigation (constant across all pages):
- *   Drivers | Consumer Journey | Profit Pool Shift Analysis
- *   [+ Profit Pool Explorer — Beta, pinned right]
- *   Below md: a menu button opens the same tab list as a sheet.
- *
- * Entry view (July 2026): users land on the HomeGate — "Profit Pool
- * Model", four visual doors in tab order. It is a hidden tab (not in the
- * top nav); the PRISM wordmark returns to it from anywhere. Keys 1–4 on
- * the gate jump straight into a room.
- *
- * Data (single store): one <PrismProvider> wraps all tabs, so the data
- * layer loads once and is shared. Tabs are mounted on first visit and
- * then KEPT MOUNTED (hidden via display:none), so in-view state — lens,
- * year, filters, open drill-down, scroll — survives tab switches and no
- * refetch is triggered on switch.
+ * Users land on the entry gate, a pane outside the top nav that the PRISM
+ * wordmark returns to. A pane mounts on its first visit and then stays
+ * mounted, hidden while another shows, so its lens, year, filters, open
+ * drill-down and scroll survive a tab switch and nothing reloads. Below md
+ * the tabs sit behind a menu button.
  */
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
-import dynamic from 'next/dynamic';
+import * as api from '@/api/client';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers from '@/components/dashboard/Drivers';
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
-// The Profit Pool Explorer (Beta) tab is dynamically imported (review
-// F10): it pulls lib/profitPoolData, which does not belong in the
-// initial bundle of the three production tabs.
-const ProfitPoolExplorer = dynamic(
-  () => import('@/components/dashboard/ProfitPoolExplorer'),
-  { loading: () => <FullPageSkeleton />, ssr: false },
-);
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import HomeGate from '@/components/dashboard/HomeGate';
 import SettingsModal from '@/components/dashboard/SettingsModal';
@@ -60,188 +32,132 @@ import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
 import { S, HEADLINE_FONT } from '@/lib/theme';
+import type { Role } from '@/types';
+
+// The Explorer loads on its first visit: lib/profitPoolData does not belong
+// in the initial bundle.
+const ProfitPoolExplorer = dynamic(
+  () => import('@/components/dashboard/ProfitPoolExplorer'),
+  { loading: () => <FullPageSkeleton />, ssr: false },
+);
 
 type DashboardTab =
   | 'home'
-  | 'shift-analysis'
   | 'drivers'
   | 'consumer-journey'
+  | 'shift-analysis'
   | 'profit-pool-explorer';
 
 interface TabDef {
   id: DashboardTab;
   label: string;
-  adminOnly?: boolean;
-  /** Render in a muted gray to signal "(Beta)" status. */
+  /** Beta: muted grey, pinned to the right of the nav. */
   beta?: boolean;
-  /** Excluded from the top nav (kept for potential future use). */
+  /** Not in the nav: the entry gate, which the wordmark opens. */
   hidden?: boolean;
 }
 
 const TABS: TabDef[] = [
-  // Entry view — the gate. Not in the top nav; the PRISM wordmark opens it.
-  { id: 'home',                  label: 'Home', hidden: true },
-  // Production views — left side of the top nav, in maritime blue.
-  { id: 'drivers',              label: 'Drivers' },
-  { id: 'consumer-journey',    label: 'Consumer Journey' },
-  { id: 'shift-analysis',         label: 'Profit Pool Shift Analysis' },
-  // Beta views — pinned to the right side of the top nav, in muted gray.
-  { id: 'profit-pool-explorer',  label: 'Profit Pool Explorer (Beta)', beta: true },
+  { id: 'home', label: 'Home', hidden: true },
+  { id: 'drivers', label: 'Drivers' },
+  { id: 'consumer-journey', label: 'Consumer Journey' },
+  { id: 'shift-analysis', label: 'Profit Pool Shift Analysis' },
+  { id: 'profit-pool-explorer', label: 'Profit Pool Explorer (Beta)', beta: true },
 ];
+const MAIN_TABS = TABS.filter((t) => !t.hidden && !t.beta);
+const BETA_TABS = TABS.filter((t) => !t.hidden && t.beta);
 
-// Editorial top-nav tokens — aliases into the shared theme (R-23).
-const NAV = {
-  primary:          S.primary,
-  onBg:             S.onBg,
-  onSurfaceVariant: S.onSurfaceVariant,
-  surfaceLow:       S.surfaceLow,
-  surfaceHigh:      S.surfaceHigh,
-  outlineVariant:   S.outlineVariant,
-  // Muted gray scale for "(Beta)" tabs — readable but visually
-  // de-emphasized vs. the production tabs in maritime blue.
-  betaInactive:     S.neutral,
-  betaActive:       S.mutedText,
-};
+// Beta tabs read in muted grey, a step back from the production tabs' blue.
+const BETA_INACTIVE = S.neutral;
+const BETA_ACTIVE = S.mutedText;
 
-// ─── Welcome-modal session gate ────────────────────────────────────
+// The welcome dialog opens once per Clerk session: dismissing it stores the
+// session id in sessionStorage, so a refresh stays quiet and a new sign-in
+// (a new session id) shows it again.
 const welcomeSeenKey = (sessionId: string) => `prism.welcomeSeen.${sessionId}`;
 
-/** SSR-safe read of the per-session "welcome seen" flag. On the server we
- *  report "seen" so the modal can never try to auto-open outside the
- *  browser; storage failures (privacy mode) read as not-seen, so the modal
- *  still shows. Mirrors `noticeAcked()` in ProfitPoolExplorer.tsx. */
+/** Whether this session has seen the dialog. Unreadable storage (private
+ *  mode) reads as not seen, so the dialog still shows. */
 function welcomeSeen(sessionId: string): boolean {
-  if (typeof window === 'undefined') return true;
   try { return !!window.sessionStorage.getItem(welcomeSeenKey(sessionId)); } catch { return false; }
 }
 
-/** The gate only changes when the user dismisses the modal, which already
- *  re-renders through `greetedSession` — there is no external event to
- *  subscribe to, so this returns a no-op unsubscribe. */
-const subscribeToWelcomeGate = () => () => {};
+/** Only this page writes the flag, and dismissing re-renders anyway: nothing to subscribe to. */
+const subscribeToWelcomeFlag = () => () => {};
 
 export default function DashboardPage() {
-  // Clerk: `isLoaded` flips true once the session state has been hydrated.
-  // `isSignedIn` and `user` come straight from the active session — no
-  // fetch, no race condition against middleware.
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const { session } = useSession();
 
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('home');
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['home']);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  // ─── Journey → Drivers drill-through (v3.6 journey layer) ────────
-  // The Consumer Journey's evidence cards navigate to the Drivers tab
-  // with a search query (driver name) pre-applied via Trends2's
-  // initialSearch prop. (O15, 2026-09-16: the tab reads "Drivers"; the
-  // component and the `trends-2` id keep their code names.)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // The search the Drivers tab applies when another view opens it on a driver.
   const [driversSearch, setDriversSearch] = useState<string | null>(null);
 
-  // ─── Keep-alive tabs ─────────────────────────────────────────────
-  // A tab is mounted the first time it is visited and stays mounted
-  // afterwards (hidden with display:none). In-view state — lens, year,
-  // filters, open drill-down, scroll — survives tab switches.
-  const [visitedTabs, setVisitedTabs] = useState<DashboardTab[]>(['home']);
+  // Admin controls stay hidden until /api/me says otherwise, and after any failure.
+  const [role, setRole] = useState<Role>('viewer');
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    api.getMe().then(
+      (me) => { if (!cancelled) setRole(me.role); },
+      () => { if (!cancelled) setRole('viewer'); },
+    );
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+  const isAdmin = role === 'admin';
 
-  // Beta notice for the Explorer now lives INSIDE ProfitPoolExplorer.tsx
-  // (R-19.4: shown once per browser, ack persisted) — the page-level copy
-  // that re-opened on every tab switch was removed with it.
-
-  // ─── Welcome / MVP onboarding modal ─────────────────────────────────
-  // Shown on every fresh login (v3.6 owner-verified semantics). Keyed by
-  // the active Clerk session ID in sessionStorage — a tab refresh inside
-  // an active session stays silent, but a new sign-in produces a new
-  // session ID and the modal re-appears.
-  //
-  // The gate lives in sessionStorage — outside React — so it is read
-  // through useSyncExternalStore instead of being copied into state by an
-  // effect. The server snapshot reports "already greeted", so the modal can
-  // never auto-open during SSR/hydration; the browser snapshot takes over
-  // immediately afterwards, which is the timing the effect used to produce.
+  // The flag lives outside React, so it is read with useSyncExternalStore; the
+  // server snapshot says "seen", so the dialog never opens while hydrating.
   const sessionId = session?.id ?? null;
-  const greetedInStorage = useSyncExternalStore(
-    subscribeToWelcomeGate,
+  const seenInStorage = useSyncExternalStore(
+    subscribeToWelcomeFlag,
     () => (sessionId ? welcomeSeen(sessionId) : true),
     () => true,
   );
-  // Dismissal of the live modal. The sessionStorage write in
-  // `handleWelcomeClose` makes it durable across refreshes; this keeps the
-  // modal closed in place without waiting for a storage round-trip.
-  const [greetedSession, setGreetedSession] = useState<string | null>(null);
+  // Closes the dialog at once; the stored flag keeps it closed after a refresh.
+  const [dismissedSession, setDismissedSession] = useState<string | null>(null);
   const welcomeOpen =
-    !!isSignedIn && sessionId !== null && !greetedInStorage && greetedSession !== sessionId;
+    !!isSignedIn && sessionId !== null && !seenInStorage && dismissedSession !== sessionId;
 
-  const handleWelcomeClose = () => {
+  const closeWelcome = () => {
     if (!sessionId) return;
-    setGreetedSession(sessionId);
+    setDismissedSession(sessionId);
     try {
       window.sessionStorage.setItem(welcomeSeenKey(sessionId), '1');
     } catch {
-      /* noop */
+      // Private mode: the dialog shows again after a refresh.
     }
   };
 
-  // Central tab opener — marks the tab visited (keep-alive) and closes
-  // the mobile sheet. R-10: the window scroll position is shared across
-  // the keep-alive panes, so switching tabs used to strand you mid-page
-  // (e.g. landing in the middle of the Journey board) — scroll to top on
-  // every switch; all other per-tab state still survives.
+  // A session that ends while the page is open: a full navigation to
+  // /sign-in, so proxy.ts runs again.
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) window.location.href = '/sign-in';
+  }, [isLoaded, isSignedIn]);
+
+  // Opening a tab mounts it for good and closes the mobile menu. The panes
+  // share the window's scroll position, so every switch starts at the top.
   const openTab = (id: DashboardTab) => {
     setActiveTab(id);
     setVisitedTabs((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setMobileNavOpen(false);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
-  // Authorization — same pattern as SettingsModal.tsx. 'unknown' until fetched;
-  // we fall back to 'viewer' on error so admin-only UI stays hidden by default.
-  const [role, setRole] = useState<'admin' | 'viewer' | 'unknown'>('unknown');
-
-  useEffect(() => {
-    if (!isSignedIn) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/me', { credentials: 'include' });
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { role: 'admin' | 'viewer' };
-        if (!cancelled) setRole(data.role);
-      } catch {
-        if (!cancelled) setRole('viewer');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isSignedIn]);
-
-  // Middleware normally prevents an unauthenticated render, but we handle
-  // it defensively rather than rendering nothing. The full navigation to
-  // /sign-in (so the middleware re-evaluates) lives in an effect — it is a
-  // side effect on an external system, not something render may do.
-  useEffect(() => {
-    if (isLoaded && !isSignedIn && typeof window !== 'undefined') {
-      window.location.href = '/sign-in';
-    }
-  }, [isLoaded, isSignedIn]);
-
-  const isAdmin = role === 'admin';
-  // All tabs visible to all users; the `adminOnly` flag is no longer used.
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && !t.hidden);
-  // Split for layout: production tabs anchor to the brand on the left,
-  // Beta tabs are pinned to the right of the nav next to the Settings icon.
-  const mainTabs = visibleTabs.filter((t) => !t.beta);
-  const betaTabs = visibleTabs.filter((t) => t.beta);
+  const openDriver = (query: string) => {
+    setDriversSearch(query);
+    openTab('drivers');
+  };
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Redirect explicitly to /sign-in after Clerk clears the session.
-      // Without redirectUrl, Clerk would send the user to the app's
-      // configured after-sign-out URL (defaults to "/"), which our
-      // middleware would then bounce to /sign-in anyway — passing it
-      // here saves one hop.
+      // Straight to /sign-in: Clerk's default ("/") would only bounce there through proxy.ts.
       await signOut({ redirectUrl: '/sign-in' });
     } catch (error) {
       console.error('Logout failed:', error);
@@ -249,10 +165,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Show the loading skeleton while Clerk is initializing. Middleware
-  // has already guaranteed authentication before we render, so the
-  // `!isSignedIn` branch should only fire in edge cases (token expiry
-  // mid-session, for example).
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-white">
@@ -261,20 +173,15 @@ export default function DashboardPage() {
     );
   }
 
-  if (!isSignedIn) {
-    // The redirect itself is fired by the effect above; render nothing
-    // while the browser navigates.
-    return null;
-  }
+  // The effect above is already sending the browser to /sign-in.
+  if (!isSignedIn) return null;
 
   const userEmail = user.primaryEmailAddress?.emailAddress ?? 'Signed in';
 
-  // Renders one tab button. Beta tabs use a muted gray scale to clearly
-  // differentiate them from the production tabs (which use maritime blue).
   const renderTabButton = (tab: TabDef) => {
     const isActive = activeTab === tab.id;
-    const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
-    const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onSurfaceVariant;
+    const activeColor = tab.beta ? BETA_ACTIVE : S.primary;
+    const inactiveColor = tab.beta ? BETA_INACTIVE : S.onSurfaceVariant;
     return (
       <button
         key={tab.id}
@@ -296,11 +203,11 @@ export default function DashboardPage() {
     );
   };
 
-  // Mobile sheet row — full-width tap target (below md).
+  // A full-width row in the mobile menu.
   const renderMobileTabRow = (tab: TabDef) => {
     const isActive = activeTab === tab.id;
-    const activeColor   = tab.beta ? NAV.betaActive   : NAV.primary;
-    const inactiveColor = tab.beta ? NAV.betaInactive : NAV.onBg;
+    const activeColor = tab.beta ? BETA_ACTIVE : S.primary;
+    const inactiveColor = tab.beta ? BETA_INACTIVE : S.onBg;
     return (
       <button
         key={tab.id}
@@ -309,7 +216,7 @@ export default function DashboardPage() {
         style={{
           fontFamily: HEADLINE_FONT,
           color: isActive ? activeColor : inactiveColor,
-          backgroundColor: isActive ? NAV.surfaceLow : 'transparent',
+          backgroundColor: isActive ? S.surfaceLow : 'transparent',
         }}
       >
         {tab.label}
@@ -317,8 +224,8 @@ export default function DashboardPage() {
     );
   };
 
-  // Keep-alive wrapper: mounted once visited, hidden when inactive.
-  const tabPane = (id: DashboardTab, node: React.ReactNode) => (
+  // Mounted once visited, hidden while inactive.
+  const tabPane = (id: DashboardTab, node: ReactNode) => (
     <div style={{ display: activeTab === id ? undefined : 'none' }}>
       {visitedTabs.includes(id) && <ErrorBoundary>{node}</ErrorBoundary>}
     </div>
@@ -326,8 +233,7 @@ export default function DashboardPage() {
 
   return (
     <PrismProvider>
-    <div className="min-h-screen" style={{ backgroundColor: '#f8f9ff' }}>
-      {/* ─── Editorial Top Navigation (constant across all tabs) ─── */}
+    <div className="min-h-screen" style={{ backgroundColor: S.bg }}>
       <nav
         className="sticky top-0 z-50 backdrop-blur-xl"
         style={{
@@ -336,15 +242,13 @@ export default function DashboardPage() {
         }}
       >
         <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-4 md:gap-6">
-          {/* Brand + tabs */}
           <div className="flex items-center gap-4 md:gap-8 min-w-0">
-            {/* Mobile menu toggle — the only tab access below md. */}
             <button
               onClick={() => setMobileNavOpen((v) => !v)}
               aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
               aria-expanded={mobileNavOpen}
               className="md:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-black/5"
-              style={{ color: NAV.onBg }}
+              style={{ color: S.onBg }}
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -353,40 +257,35 @@ export default function DashboardPage() {
               onClick={() => openTab('home')}
               aria-label="PRISM home"
               className="text-2xl font-extrabold tracking-tighter uppercase transition-opacity hover:opacity-70"
-              style={{ fontFamily: HEADLINE_FONT, color: NAV.onBg }}
+              style={{ fontFamily: HEADLINE_FONT, color: S.onBg }}
             >
               PRISM
             </button>
 
             <div className="hidden md:flex items-center gap-6">
-              {mainTabs.map((tab) => renderTabButton(tab))}
+              {MAIN_TABS.map(renderTabButton)}
             </div>
           </div>
 
-          {/* Utilities */}
           <div className="flex items-center gap-3">
-            {/* Beta tabs — pinned to the far right, immediately before the
-                Settings icon. Hidden below md to mirror the main tab group. */}
-            {betaTabs.length > 0 && (
-              <div
-                className="hidden md:flex items-center gap-5 pr-3 mr-1 border-r"
-                style={{ borderColor: 'rgba(0, 52, 94, 0.10)' }}
-              >
-                {betaTabs.map((tab) => renderTabButton(tab))}
-              </div>
-            )}
+            <div
+              className="hidden md:flex items-center gap-5 pr-3 mr-1 border-r"
+              style={{ borderColor: S.cardBorder }}
+            >
+              {BETA_TABS.map(renderTabButton)}
+            </div>
             <button
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
               className="p-2 rounded-full transition-colors hover:bg-black/5"
-              style={{ color: NAV.onSurfaceVariant }}
+              style={{ color: S.onSurfaceVariant }}
             >
               <Settings size={18} />
             </button>
 
             <div
               className="hidden sm:flex flex-col items-end leading-tight"
-              style={{ color: NAV.onBg }}
+              style={{ color: S.onBg }}
             >
               <span className="text-xs font-semibold">{userEmail}</span>
             </div>
@@ -396,10 +295,7 @@ export default function DashboardPage() {
               disabled={isLoggingOut}
               aria-label="Logout"
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-50"
-              style={{
-                backgroundColor: NAV.surfaceLow,
-                color: NAV.primary,
-              }}
+              style={{ backgroundColor: S.surfaceLow, color: S.primary }}
             >
               <LogOut size={14} />
               <span className="hidden sm:inline">
@@ -409,72 +305,38 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Mobile nav sheet (below md) ─────────────────────────── */}
         {mobileNavOpen && (
           <div
             className="md:hidden border-t"
             style={{
-              backgroundColor: '#ffffff',
-              borderColor: 'rgba(0, 52, 94, 0.10)',
+              backgroundColor: S.surface,
+              borderColor: S.cardBorder,
               boxShadow: '0 24px 48px -12px rgba(0, 52, 94, 0.18)',
             }}
           >
-            {mainTabs.map((tab) => renderMobileTabRow(tab))}
-            {betaTabs.length > 0 && (
-              <>
-                <div
-                  className="px-6 pt-3 pb-1 text-[11px] font-bold uppercase tracking-[0.14em]"
-                  style={{ color: NAV.betaInactive, fontFamily: HEADLINE_FONT }}
-                >
-                  Beta
-                </div>
-                {betaTabs.map((tab) => renderMobileTabRow(tab))}
-              </>
-            )}
+            {MAIN_TABS.map(renderMobileTabRow)}
+            <div
+              className="px-6 pt-3 pb-1 text-[11px] font-bold uppercase tracking-[0.14em]"
+              style={{ color: BETA_INACTIVE, fontFamily: HEADLINE_FONT }}
+            >
+              Beta
+            </div>
+            {BETA_TABS.map(renderMobileTabRow)}
             <div className="h-2" />
           </div>
         )}
       </nav>
 
-      {/* ─── Main Content — keep-alive panes ──────────────────────
-          Every visited tab stays mounted; only the active one is
-          displayed. Switching back is instant and stateful. */}
       <div className="relative">
-        {tabPane('home', (
-          <HomeGate active={activeTab === 'home'} onNavigate={openTab} />
-        ))}
-        {tabPane('shift-analysis', (
-          <ShiftAnalysis
-            isAdmin={isAdmin}
-            onNavigateToDriver={(query: string) => {
-              setDriversSearch(query);
-              openTab('drivers');
-            }}
-          />
-        ))}
-        {tabPane('drivers', <Drivers initialSearch={driversSearch} />)}
-        {tabPane('consumer-journey', (
-          <ConsumerJourney
-            onNavigateProfitPoolShiftModel={() => openTab('shift-analysis')}
-            onNavigateDrivers={() => openTab('drivers')}
-            onNavigateToDriver={(query: string) => {
-              setDriversSearch(query);
-              openTab('drivers');
-            }}
-            isAdmin={isAdmin}
-          />
-        ))}
+        {tabPane('home', <HomeGate active={activeTab === 'home'} onNavigate={openTab} />)}
+        {tabPane('shift-analysis', <ShiftAnalysis isAdmin={isAdmin} onNavigateToDriver={openDriver} />)}
+        {tabPane('drivers', <Drivers initialSearch={driversSearch} isAdmin={isAdmin} />)}
+        {tabPane('consumer-journey', <ConsumerJourney onNavigateToDriver={openDriver} isAdmin={isAdmin} />)}
         {tabPane('profit-pool-explorer', <ProfitPoolExplorer />)}
       </div>
 
-      {/* ─── Settings Modal (gear icon in top nav) ─────────────────── */}
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      {/* ─── Welcome / MVP modal — shown on every fresh login ──────── */}
-      <WelcomeModal open={welcomeOpen} onClose={handleWelcomeClose} />
-
-      {/* Explorer Beta notice: rendered inside ProfitPoolExplorer.tsx
-          (R-19.4 — shown once per browser, acknowledgment persisted). */}
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} isAdmin={isAdmin} />
+      <WelcomeModal open={welcomeOpen} onClose={closeWelcome} />
     </div>
     </PrismProvider>
   );

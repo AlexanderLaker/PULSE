@@ -1,3 +1,5 @@
+// Vitest runs the dashboard tests in tests/frontend. The default environment
+// is node; a test that renders components opts into jsdom in its first line.
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
@@ -6,7 +8,7 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, '.') },
   },
   test: {
-    environment: 'node',          // default — UI tests opt into jsdom per-file
+    environment: 'node',
     include: ['tests/frontend/**/*.test.{ts,tsx}'],
   },
 });

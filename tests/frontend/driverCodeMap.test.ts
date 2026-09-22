@@ -1,102 +1,77 @@
 /**
- * trendCodeMap integrity (2.11.0, owner ruling O10): the journey layer's
- * code map must partition every code into LIVE (51 drivers) or RETIRED,
- * every retired pointer must land on a live code, every journey-tile
- * citation must resolve to one of the two, and liveCodeFor must follow a
- * merged code to its driver while never resurrecting a deleted one.
- * (The Python twin, tests/test_trend_base_2026_09.py, checks the map
- * against pulse/seed_trends.py.)
+ * The driver code map (data/driverCodeMap.ts, generated from
+ * data/drivers/driver_base.json): one code per driver of the base, each code
+ * built from its driver's force and id and agreeing with the driver's name,
+ * force and direction, and every code the Consumer Journey content cites or
+ * names is a live driver. tests/test_driver_base.py checks the same map
+ * against prism/seed_drivers.py.
  */
 import { describe, it, expect } from 'vitest';
-import {
-  DRIVER_CODE_MAP, RETIRED_CODES, driverIdForCode, codeForDriverId, liveCodeFor,
-} from '@/data/driverCodeMap';
-import { LHC_JOURNEY, HAIR_JOURNEY } from '@/data/consumerJourney';
+import { DRIVER_CODE_MAP, driverIdForCode, codeForDriverId } from '@/data/driverCodeMap';
+import { LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX } from '@/data/consumerJourney';
+import driverBase from '@/data/drivers/driver_base.json';
 
 const LETTER: Record<string, string> = {
   Consumer: 'C', Customer: 'K', Technology: 'T', Government: 'G', Environmental: 'E', Competitive: 'X',
 };
-const SLUG: Record<string, string> = {
-  Consumer: 'consumer', Customer: 'customer', Technology: 'technology',
-  Government: 'government', Environmental: 'environmental', Competitive: 'competitive',
-};
 
-describe('TREND_CODE_MAP (live codes)', () => {
-  it('holds the 51 drivers with codes derived from their ids', () => {
-    const codes = Object.keys(DRIVER_CODE_MAP);
-    expect(codes).toHaveLength(51);
-    for (const code of codes) {
-      const info = DRIVER_CODE_MAP[code];
+const CODES = Object.keys(DRIVER_CODE_MAP);
+const TILES = [...LHC_JOURNEY, ...HAIR_JOURNEY].flatMap((s) => [...s.benefiting, ...s.negativelyImpacted]);
+
+describe('DRIVER_CODE_MAP', () => {
+  it('holds one code per driver of the base', () => {
+    expect(driverBase.drivers).toHaveLength(51);
+    expect(CODES).toHaveLength(51);
+    expect(new Set(CODES)).toEqual(new Set(driverBase.drivers.map((d) => d.code)));
+    expect(new Set(CODES.map((c) => DRIVER_CODE_MAP[c].driverId)).size).toBe(51);
+  });
+
+  it('builds each code from the force letter and the number of the driver id', () => {
+    for (const code of CODES) {
+      const { driverId, force } = DRIVER_CODE_MAP[code];
       const [letter, num] = code.split('-');
-      expect(letter).toBe(LETTER[info.force]);
-      expect(info.driverId).toBe(`${SLUG[info.force]}_r${num}`);
-      expect(['Expansion', 'Contraction']).toContain(info.direction);
-      expect(info.name.length).toBeGreaterThan(0);
-      expect(driverIdForCode(code)).toBe(info.driverId);
-      expect(codeForDriverId(info.driverId)).toBe(code);
+      expect(letter).toBe(LETTER[force]);
+      expect(driverId).toBe(`${force.toLowerCase()}_r${num}`);
     }
-    const ids = new Set(codes.map((c) => DRIVER_CODE_MAP[c].driverId));
-    expect(ids.size).toBe(51);
   });
 
-  it('carries the two force moves under their new codes', () => {
-    expect(DRIVER_CODE_MAP['K-13'].driverId).toBe('customer_r13');
-    expect(DRIVER_CODE_MAP['C-37'].driverId).toBe('consumer_r37');
-    expect(DRIVER_CODE_MAP['T-06']).toBeUndefined();
-    expect(DRIVER_CODE_MAP['X-06']).toBeUndefined();
+  it("agrees with each driver's id, name, force, direction and description", () => {
+    for (const d of driverBase.drivers) {
+      const info = DRIVER_CODE_MAP[d.code];
+      expect(info.driverId).toBe(d.id);
+      expect(info.name).toBe(d.name);
+      expect(info.force).toBe(d.force);
+      expect(info.direction).toBe(d.direction);
+      expect(info.fallbackDescription.length).toBeGreaterThan(0);
+      expect(d.description.startsWith(info.fallbackDescription.replace(/…$/, ''))).toBe(true);
+    }
+  });
+
+  it('resolves codes and driver ids both ways, and nothing for an unknown one', () => {
+    for (const code of CODES) {
+      const id = DRIVER_CODE_MAP[code].driverId;
+      expect(driverIdForCode(code)).toBe(id);
+      expect(codeForDriverId(id)).toBe(code);
+    }
+    expect(driverIdForCode('Z-99')).toBeUndefined();
+    expect(codeForDriverId('consumer_r99')).toBeUndefined();
   });
 });
 
-describe('RETIRED_CODES', () => {
-  it('never overlaps the live map and every pointer lands on a live code', () => {
-    for (const [code, info] of Object.entries(RETIRED_CODES)) {
-      expect(DRIVER_CODE_MAP[code]).toBeUndefined();
-      expect(info.name.length).toBeGreaterThan(0);
-      expect(info.note.length).toBeGreaterThan(0);
-      expect(['v3.1', 'v3.3', 'v3.11']).toContain(info.retiredIn);
-      for (const t of [...(info.mergedInto ?? []), ...(info.residueIn ?? [])]) {
-        expect(DRIVER_CODE_MAP[t]).toBeDefined();
-      }
-      expect(!!(info.mergedInto && info.residueIn)).toBe(false);
-    }
-    expect(Object.keys(RETIRED_CODES)).toHaveLength(65);
+describe('Consumer Journey content', () => {
+  it('cites only live driver codes', () => {
+    const cited = new Set(TILES.flatMap((t) => t.driverCodes));
+    expect(cited.size).toBeGreaterThan(0);
+    expect([...cited].filter((c) => !DRIVER_CODE_MAP[c])).toEqual([]);
   });
 
-  it('records the September 2026 dispositions', () => {
-    expect(RETIRED_CODES['T-06'].mergedInto).toEqual(['K-13']);
-    expect(RETIRED_CODES['X-06'].mergedInto).toEqual(['C-37']);
-    expect([...(RETIRED_CODES['G-07'].mergedInto ?? [])].sort()).toEqual(['G-04', 'G-16']);
-    expect(RETIRED_CODES['X-01'].mergedInto).toEqual(['X-17']);
-    expect(RETIRED_CODES['X-10'].residueIn).toEqual(['C-01']);
-    expect(RETIRED_CODES['C-15'].mergedInto).toBeUndefined();
-    expect(RETIRED_CODES['C-12'].retiredIn).toBe('v3.1');
-  });
-});
-
-describe('liveCodeFor', () => {
-  it('returns live codes unchanged, follows merges, and drops deleted codes', () => {
-    expect(liveCodeFor('C-01')).toBe('C-01');
-    expect(liveCodeFor('K-08')).toBe('K-13');   // merged into retail media (K-13)
-    expect(liveCodeFor('T-06')).toBe('K-13');   // force move
-    expect(liveCodeFor('G-07')).toBe('G-16');   // first of two targets
-    expect(liveCodeFor('X-10')).toBeUndefined(); // deleted; a residue note is not a driver
-    expect(liveCodeFor('C-15')).toBeUndefined(); // deleted outright
-    expect(liveCodeFor('Z-99')).toBeUndefined(); // unknown
-  });
-});
-
-describe('journey tiles', () => {
-  it('cite only live or retired codes', () => {
-    const unknown = new Set<string>();
-    for (const journey of [LHC_JOURNEY, HAIR_JOURNEY]) {
-      for (const stage of journey) {
-        for (const tile of [...stage.benefiting, ...stage.negativelyImpacted]) {
-          for (const code of tile.driverCodes) {
-            if (!DRIVER_CODE_MAP[code] && !RETIRED_CODES[code]) unknown.add(code);
-          }
-        }
-      }
-    }
-    expect([...unknown]).toEqual([]);
+  it('names only live driver codes in its notes, reads and stage contexts', () => {
+    const texts = [
+      ...TILES.flatMap((t) => [t.name, t.driverNote, t.analysis ?? '']),
+      ...[LHC_CTX, HAIR_CTX].flatMap((ctx) => Object.values(ctx).flatMap((c) => [c.henkelBrands, c.competitors, c.opportunity])),
+    ];
+    const named = new Set(texts.flatMap((t) => t.match(/\b[CKTGEX]-\d\d\b/g) ?? []));
+    expect(named.size).toBeGreaterThan(0);
+    expect([...named].filter((c) => !DRIVER_CODE_MAP[c])).toEqual([]);
   });
 });

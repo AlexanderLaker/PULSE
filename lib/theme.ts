@@ -1,16 +1,11 @@
 /**
- * PRISM — Maritime Editorial theme.
- * SINGLE SOURCE OF TRUTH for colour tokens and font stacks (R-23, design
- * review 2026-07-01). The per-component `const S = {…}` copies and local
- * HEADLINE/BODY/MONO font constants were consolidated here — do not
- * re-declare tokens inside components.
+ * The dashboard's colour tokens and font stacks, defined once; components
+ * import them instead of declaring their own.
  *
- * Fonts (R-17): Manrope / Inter / JetBrains Mono are self-hosted via
- * `next/font` in app/layout.tsx and exposed as CSS variables; the stacks
- * below fall back to locally-installed copies, then system fonts.
- *
- * Shift semantics (expansion / contraction / heat ramp) live in
- * lib/format.ts — this file mirrors the same pair for surface tokens.
+ * Manrope, Inter and JetBrains Mono are self-hosted with next/font
+ * (app/layout.tsx) and exposed as CSS variables; the stacks fall back to
+ * installed copies, then to system fonts. The shift colours and the heat ramp
+ * live in lib/format.ts; S mirrors that pair for surfaces.
  */
 
 export const HEADLINE_FONT =
@@ -42,7 +37,7 @@ export const S = {
   tertiaryContainer:    '#dae2fd',
   onTertiaryContainer:  '#4a5167',
 
-  /* ─── Status (R-20: one soft error container everywhere) ─── */
+  /* ─── Status ─── */
   error:            '#9f403d',
   errorContainer:   '#fde2e1',
   onErrorContainer: '#752121',

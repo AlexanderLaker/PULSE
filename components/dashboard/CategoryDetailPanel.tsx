@@ -1,24 +1,18 @@
 /**
- * CategoryDetailPanel — Editorial Intelligence drill-down drawer.
+ * The drill-down of one category, opened from a Shift Matrix row or a KPI
+ * tile: its shift path with the P10–P90 band, the force attribution and the
+ * regional shifts at the selected year, and the drivers behind its
+ * terminal-year shift, ranked by their share of it.
  *
- * Redesign (April 2026) — palette, typography and card rhythm now match
- * `ProfitPoolAnalysis2.tsx` exactly, so clicking a category row and landing
- * in the drawer feels like the same surface, not a dark pop-out.
+ * The contributing drivers are attributed at the score means with
+ * lib/driverAttribution.ts, the decomposition the PRISM Analysis on the
+ * Drivers page is written on, so a driver's rank here and its reading agree.
+ * When the model configuration did not load, the ranking falls back to an
+ * exposure proxy; the footer names the basis in use.
  *
- * Design language:
- *   • Soft blue-on-white palette (S tokens, mirrored from ProfitPoolAnalysis2)
- *   • Manrope headline + Inter body, JetBrains Mono for numbers
- *   • White rounded-2xl surfaces on a light surfaceLow drawer background
- *   • Soft editorial shadows (0 4px 60px -15px rgba(0,52,94,0.08))
- *   • Green rgba(34,197,94) / Red rgba(239,68,68) for expansion / contraction
- *     — identical to matrix cell palette
- *   • Backdrop: soft navy overlay (rgba(0,52,94,0.22)) with backdrop blur,
- *     replacing the old black 50% backdrop that felt jarring on a light page
- *
- * Content (unchanged from v1):
- *   • Fan chart — p10/p90 band + median line across 2026–2035
- *   • Force decomposition — horizontal bars at the selected year
- *   • Contributing trends — list with force tag and direction
+ * The panel shares the Shift Analysis surface (S tokens, Manrope headlines,
+ * JetBrains Mono figures, white cards on the light page background), so the
+ * drill-down reads as the same page rather than a pop-out.
  */
 import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -30,98 +24,90 @@ import {
   Area, Line, ComposedChart, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FORCES, FORCE_COLORS, YEARS, fmtShift, fmtPct, categoryDisplay, groupDisplay } from '@/lib/format';
+import {
+  CATEGORIES, FLAT_EPS, FORCE_COLORS, NO_VALUE, YEARS,
+  fmtShift, fmtPct, categoryDisplay, groupDisplay,
+} from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
+import { computeDriverAttribution, type AttributionResult } from '@/lib/driverAttribution';
 import useOverlay from '@/hooks/useOverlay';
-import type { ForceName, ProjectionYear } from '@/types';
+import type { Driver, ForceName, ModelConfig, ShiftPath, SimulationResult } from '@/types';
 
-// ─── Types ────────────────────────────────────────────────────────────────
-
-interface PathDataPoint {
-  median?: number;
-  p10?: number;
-  p90?: number;
-}
-
-interface PathData {
-  [key: string]: PathDataPoint;
-}
-
-interface Driver {
-  id: string;
-  name: string;
-  force: ForceName;
-  direction: 'Expansion' | 'Contraction';
-  /** Engine scoring input carried through from the API trend (spread into
-   *  this payload by PPA2) — used as the ranking tiebreak. (M8, July 2026
-   *  review: replaced the phantom `score` field the backend never sent.) */
-  normalized_score?: number;
-  exposure_level?: number;
-  /** Scaled contribution to the MC terminal shift (percentage points, signed). */
-  contribution?: number;
-  /** Pre-scaling contribution, for auditing: the driver's terminal-year
-   *  contribution to the category at the score means (lib/driverAttribution.ts),
-   *  or gp1_shift x (exposure/5) on the exposure-proxy fallback. */
-  raw_contribution?: number;
-  /** Absolute share of the category's explained movement (0..1). */
-  attribution_share?: number;
-}
-
-interface CategoryDetailPanelData {
-  shifts_path?: { [categoryId: string]: PathData };
-  force_decomposition?: { [categoryId: string]: Record<ForceName, number> };
-  contributing_drivers?: { [categoryId: string]: Driver[] };
-  /** F1 (2.10.0): per-category regional shift at the selected year — the 3D
-   *  drill-down (region → {median, p10, p90}). */
-  regional_shift?: { [categoryId: string]: Record<string, PathDataPoint> };
-  /** Region GP1-share weights used in the roll-up (region → weight 0..1);
-   *  since 2.11.0 the column sums of the cell matrix (portfolio-wide). */
-  region_weights?: Record<string, number>;
-  /** 2.11.0 (O6): the cell gross-profit-share matrix the run rolled up with
-   *  (category → region → share of the whole pool). A category's row,
-   *  normalised, is the weight set that produced ITS number. */
-  cell_weights?: Record<string, Record<string, number>>;
-  categories?: Array<{ id: string; name: string; group?: string }>;
-  /** How the contributing drivers were attributed (2026-09-17): 'score_means'
-   *  is the engine's arithmetic at the score means (lib/driverAttribution.ts,
-   *  the basis of the PRISM Analysis readings); 'exposure_proxy' is the older
-   *  gp1_shift x exposure / 5 proxy, used only when the config layers or the
-   *  run's cell weights are unavailable. */
-  attribution_basis?: 'score_means' | 'exposure_proxy';
-  /** Drivers taken at full materialisation because they carry no peak year
-   *  or diffusion curve (the port's `approximate` flag), by category. */
-  approximate_drivers?: { [categoryId: string]: string[] };
-}
+const CATEGORY_NAMES = CATEGORIES.map((c) => c.name);
+const HORIZON_START = YEARS[0];
+const HORIZON_END = YEARS[YEARS.length - 1];
 
 interface CategoryDetailPanelProps {
-  data: CategoryDetailPanelData;
-  categoryId: string;
+  /** The category's API key, e.g. "LHC: FCN". */
+  category: string;
+  /** The year the force and regional sections show. */
+  year: number;
+  simulation: SimulationResult;
+  drivers: Driver[];
+  /** The model configuration; null when it did not load, which leaves the exposure proxy. */
+  config: ModelConfig | null;
   onClose: () => void;
-  /** Drill-through to the Drivers tab: receives the driver NAME (used as the
-      Drivers search query — same contract as the Consumer Journey evidence
-      cards). When provided, every contributing-driver row becomes a link. */
+  /** Opens the Drivers page searched for a driver's name; makes every driver card a link. */
   onOpenDriver?: (name: string) => void;
 }
 
-interface ChartDataPoint {
-  year: ProjectionYear;
-  median: number;
-  p10: number;
-  p90: number;
+// ─── Contributing drivers ──────────────────────────────────────────────────
+
+/** One driver's part in the category's terminal-year shift. */
+interface Contributor {
+  driver: Driver;
+  /** The driver's exposure score for the category: 0 to 5, and above 0 for every contributor. */
+  exposure: number;
+  /** Signed, in shift units; the category's contributors add up to its terminal-year median. */
+  contribution: number;
+  /** |contribution| over the category's total |contribution|. */
+  share: number;
 }
 
-// ─── Section — Editorial card wrapper with uppercase header ──────────
+/**
+ * The drivers that touch the category, largest part first. With an
+ * attribution a driver's part is its contribution at the score means;
+ * without one it is the exposure proxy, the driver's Shift (normalized_score)
+ * x category exposure / 5. One basis for every driver of the list, rescaled
+ * so the parts add up to the median the matrix shows.
+ */
+function rankContributors(
+  category: string, drivers: Driver[], attribution: AttributionResult | null, median: number,
+): Contributor[] {
+  const exposed = drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0);
+  const raw = exposed.map((d) => (attribution
+    ? attribution.byDriver[d.id].category[category][HORIZON_END]
+    : d.normalized_score * (Math.min(5, d.category_exposure[category]) / 5)));
+  const rawTotal = raw.reduce((a, b) => a + b, 0);
+  const scale = Math.abs(rawTotal) > 1e-9 && Math.abs(median) > 1e-9 ? median / rawTotal : 1;
+  const scaled = raw.map((v) => v * scale);
+  const totalAbs = scaled.reduce((a, b) => a + Math.abs(b), 0);
+  return exposed
+    .map((driver, i) => ({
+      driver,
+      exposure: driver.category_exposure[category],
+      contribution: scaled[i],
+      share: totalAbs > 1e-9 ? Math.abs(scaled[i]) / totalAbs : 0,
+    }))
+    .sort((a, b) => {
+      const gap = Math.abs(b.contribution) - Math.abs(a.contribution);
+      return Math.abs(gap) > 1e-9
+        ? gap
+        : Math.abs(b.driver.normalized_score) - Math.abs(a.driver.normalized_score);
+    });
+}
+
+// ─── Section: card with an uppercase header ────────────────────────────────
 
 interface SectionProps {
   title: string;
   icon?: LucideIcon;
   trailing?: React.ReactNode;
   children: React.ReactNode;
-  noPadding?: boolean;
 }
 
-const Section: React.FC<SectionProps> = ({ title, icon: Icon, trailing, children, noPadding }) => (
+const Section: React.FC<SectionProps> = ({ title, icon: Icon, trailing, children }) => (
   <section
     style={{
       backgroundColor: S.surface,
@@ -149,43 +135,24 @@ const Section: React.FC<SectionProps> = ({ title, icon: Icon, trailing, children
       <span>{title}</span>
       {trailing && <div style={{ marginLeft: 'auto' }}>{trailing}</div>}
     </header>
-    <div style={{ padding: noPadding ? 0 : '16px 18px' }}>{children}</div>
+    <div style={{ padding: '16px 18px' }}>{children}</div>
   </section>
 );
 
-// ─── MiniPathChart ────────────────────────────────────────────────────────
+// ─── MiniPathChart ─────────────────────────────────────────────────────────
 
-interface MiniPathChartProps {
-  pathData: PathData;
+interface ChartDataPoint {
+  year: number;
+  median: number;
+  p10: number;
+  p90: number;
 }
 
-const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
-  if (!pathData || Object.keys(pathData).length === 0) {
-    return (
-      <div
-        style={{
-          height: 280,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: S.mutedText,
-          fontSize: 12,
-          fontFamily: BODY_FONT,
-          backgroundColor: S.surfaceLow,
-          borderRadius: 10,
-        }}
-      >
-        No path data available
-      </div>
-    );
-  }
-
-  const chartData: ChartDataPoint[] = YEARS.map((year) => ({
-    year: year as ProjectionYear,
-    median: pathData[year]?.median ?? 0,
-    p10: pathData[year]?.p10 ?? pathData[year]?.median ?? 0,
-    p90: pathData[year]?.p90 ?? pathData[year]?.median ?? 0,
-  }));
+const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
+  const chartData: ChartDataPoint[] = YEARS.map((year) => {
+    const d = path[String(year)];
+    return { year, median: d.median, p10: d.p10, p90: d.p90 };
+  });
 
   const maxAbs = Math.max(
     ...chartData.map((d) => Math.max(Math.abs(d.p10), Math.abs(d.p90), Math.abs(d.median))),
@@ -193,10 +160,10 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
   );
   const yAxisDomain: [number, number] = [-maxAbs * 1.15, maxAbs * 1.15];
 
-  // U9 (June 2026): tint the band + median line by the terminal direction, so a
-  // contracting category reads red and an expanding one green — matching the
-  // matrix cell it was opened from, instead of a neutral blue for both.
-  const termMedian = chartData.length ? chartData[chartData.length - 1]!.median : 0;
+  // The band and the median line take the terminal direction's colour, so a
+  // contracting category reads red and an expanding one green, like the
+  // matrix cell the drill-down was opened from.
+  const termMedian = chartData[chartData.length - 1].median;
   const fanTint = termMedian < 0 ? S.contraction : termMedian > 0 ? S.expansion : S.primary;
 
   return (
@@ -296,7 +263,7 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
               );
             }}
           />
-          {/* Confidence band: p10 to p90 */}
+          {/* The P10–P90 band: P10 as an invisible base, the band stacked on it. */}
           <Area
             type="monotone"
             dataKey="p10"
@@ -314,7 +281,6 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
             fill="url(#confidenceBand)"
             isAnimationActive={false}
           />
-          {/* Median line */}
           <Line
             type="monotone"
             dataKey="median"
@@ -332,25 +298,11 @@ const MiniPathChart: React.FC<MiniPathChartProps> = ({ pathData }) => {
 
 // ─── ForceDecomposition ────────────────────────────────────────────────────
 
-interface ForceDecompositionProps {
-  decomposition: Record<ForceName, number>;
-}
-
-const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }) => {
-  if (!decomposition || Object.keys(decomposition).length === 0) {
-    return (
-      <div style={{ fontSize: 12, color: S.mutedText, fontFamily: BODY_FONT }}>
-        No decomposition data available
-      </div>
-    );
-  }
-
+/** The category's median at the selected year split by force, largest part first. */
+const ForceDecomposition: React.FC<{ decomposition: Record<string, number> }> = ({ decomposition }) => {
   const forces = Object.keys(decomposition)
-    .filter((f): f is ForceName => (decomposition[f as ForceName] ?? 0) !== 0)
-    .sort(
-      (a, b) =>
-        Math.abs(decomposition[b as ForceName]) - Math.abs(decomposition[a as ForceName]),
-    );
+    .filter((f) => decomposition[f] !== 0)
+    .sort((a, b) => Math.abs(decomposition[b]) - Math.abs(decomposition[a]));
 
   if (forces.length === 0) {
     return (
@@ -370,7 +322,6 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
         const isPositive = value > 0;
         const barColor = isPositive ? S.expansion : S.contraction;
         const valueInk = isPositive ? S.expansionInk : S.contractionInk;
-        const forceDef = FORCES[force];
 
         return (
           <div
@@ -382,7 +333,6 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
               columnGap: 10,
             }}
           >
-            {/* Force label */}
             <div
               style={{
                 display: 'inline-flex',
@@ -399,14 +349,13 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
                   width: 8,
                   height: 8,
                   borderRadius: 999,
-                  backgroundColor: FORCE_COLORS[force] ?? forceDef?.color ?? S.primary,
+                  backgroundColor: FORCE_COLORS[force as ForceName] ?? S.primary,
                   flexShrink: 0,
                 }}
               />
               {force}
             </div>
 
-            {/* Bar */}
             <div
               style={{
                 height: 8,
@@ -428,7 +377,6 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
               />
             </div>
 
-            {/* Value */}
             <span
               style={{
                 fontSize: 12,
@@ -447,20 +395,20 @@ const ForceDecomposition: React.FC<ForceDecompositionProps> = ({ decomposition }
   );
 };
 
-// ─── RegionalDecomposition — F1 (2.10.0) 3D drill-down ───────────────────
-// The category's shift resolved by region at the selected year. Unlike the
-// force/vc/region ATTRIBUTION lenses (which partition the category median),
-// these are the ACTUAL per-region relative shifts the engine computed; the
-// category number is their GP1-share-weighted roll-up (weights shown).
-interface RegionalRow { region: string; median: number; p10?: number; p90?: number; weight?: number; }
-const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }> = ({ rows, cellRow = false }) => {
-  if (!rows || rows.length === 0) {
-    return (
-      <div style={{ fontSize: 12, color: S.mutedText, fontFamily: BODY_FONT }}>
-        No regional detail for this run (pre-2.10 run — re-run the engine).
-      </div>
-    );
-  }
+// ─── RegionalDecomposition ─────────────────────────────────────────────────
+// The category's own shift in each region at the selected year. Unlike the
+// attribution lenses, which split the category median, these are the
+// regional shifts the engine computes; the category number is their roll-up
+// with the category's row of the cell weights (the percentages shown).
+
+interface RegionalRow {
+  region: string;
+  median: number;
+  /** The region's share of this category's gross profit; undefined when the row carries none. */
+  share: number | undefined;
+}
+
+const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows }) => {
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.median)), 1e-9);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -473,9 +421,9 @@ const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }
           <div key={r.region} style={{ display: 'grid', gridTemplateColumns: '132px 1fr 62px', alignItems: 'center', columnGap: 10 }}>
             <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontSize: 12, fontWeight: 600, color: S.onSurface, fontFamily: BODY_FONT }}>
               <span>{r.region}</span>
-              {r.weight != null && (
+              {r.share != null && (
                 <span style={{ fontSize: 10, color: S.mutedText, fontFamily: MONO_FONT }}>
-                  {(r.weight * 100).toFixed(0)}%
+                  {fmtPct(r.share, 0)}
                 </span>
               )}
             </div>
@@ -491,52 +439,44 @@ const RegionalDecomposition: React.FC<{ rows: RegionalRow[]; cellRow?: boolean }
         );
       })}
       <div style={{ fontSize: 10.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.5, marginTop: 2 }}>
-        {cellRow
-          ? <>% = the region&rsquo;s share of THIS category&rsquo;s gross profit (its row of the cell-weight matrix, Config sheet). The category shift above is the share-weighted average of these regional shifts.</>
-          : <>% = region&rsquo;s GP1 share used in the roll-up (portfolio-wide, pre-2.11 run). The category shift above is the share-weighted average of these regional shifts.</>}
+        % = the region&rsquo;s share of this category&rsquo;s gross profit (its row of the run&rsquo;s cell weights). The category shift above is the share-weighted average of these regional shifts.
       </div>
     </div>
   );
 };
 
-// ─── TrendCard — Bain-grade attribution row ──────────────────────────────
-//
-// Each card answers one question a Bain partner would ask in a matrix read-out:
-//
-//   "This trend — in one glance — how big is it, which way, and does it matter?"
-//
-// Hero metric is attribution_share (|scaled| / Σ|scaled|, sums to 100% across
-// the category's contributing drivers). This is what turns a wall of 0.0% noise
-// into a decision-ready ranking. Secondary metric is the signed contribution in
-// percentage points of MC terminal shift — same units as the matrix cell.
-// Since 2026-09-17 the contribution is the engine's arithmetic at the score
-// means (lib/driverAttribution.ts, rescaled to the row's median), the same
-// basis as the PRISM Analysis on the Drivers page; see `attribution_basis`.
+// ─── DriverCard ────────────────────────────────────────────────────────────
+// One ranked row: how big the driver's part is, which way it points and
+// whether it matters. The hero figure is its share of the category's
+// movement (the shares add up to 100% across the list), which turns a wall
+// of near-zero contributions into a ranking; beneath it the signed
+// contribution in the matrix's own units.
+
 interface DriverCardProps {
-  driver: Driver;
+  contributor: Contributor;
+  /** Position in the ranking, from 0. */
   index: number;
-  rank: number;
   /** When provided, the card is a link into the Drivers page. */
   onOpen?: () => void;
 }
 
-const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) => {
+const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOpen }) => {
+  const { driver, exposure, contribution, share } = contributor;
   const [hovered, setHovered] = useState(false);
-  const contribution = driver.contribution ?? 0;
-  const share = driver.attribution_share ?? 0;
+  const rank = index + 1;
   const isExpansion = contribution !== 0
     ? contribution > 0
     : driver.direction === 'Expansion';
   const dirColor = isExpansion ? S.expansion : S.contraction;
   const dirBg = isExpansion ? S.expansionDim : S.contractionDim;
   const dirInk = isExpansion ? S.expansionInk : S.contractionInk;
-  const forceColor = FORCE_COLORS[driver.force] ?? S.primary;
+  const forceColor = FORCE_COLORS[driver.force];
 
-  // Width of the inline share bar (cap at 100%, floor at 2% so non-zero trends
-  // are still visible even when they're tiny relative to the top driver).
+  // The share bar: capped at 100%, and at least 2% wide for any non-zero
+  // share, so a small driver stays visible next to the largest.
   const barWidth = share > 0 ? Math.max(2, Math.min(100, share * 100)) : 0;
-  const shareLabel = share > 0 ? fmtPct(share, share >= 0.1 ? 0 : 1) : '—';
-  const contribLabel = contribution !== 0 ? fmtShift(contribution, 1) : '—';
+  const shareLabel = share > 0 ? fmtPct(share, share >= 0.1 ? 0 : 1) : NO_VALUE;
+  const contribLabel = contribution !== 0 ? fmtShift(contribution, 1) : NO_VALUE;
 
   const interactive = !!onOpen;
 
@@ -568,7 +508,6 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
         transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
       }}
     >
-      {/* Rank */}
       <div
         style={{
           width: 28,
@@ -587,7 +526,6 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
         {rank}
       </div>
 
-      {/* Body */}
       <div style={{ minWidth: 0 }}>
         <div
           style={{
@@ -605,7 +543,7 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
           {driver.name}
         </div>
 
-        {/* Meta row: force tag + exposure chip + direction pill */}
+        {/* Force, exposure and direction */}
         <div
           style={{
             marginTop: 4,
@@ -622,25 +560,23 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
             <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: forceColor, display: 'inline-block', flexShrink: 0 }} />
             {driver.force}
           </span>
-          {driver.exposure_level != null && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-                padding: '1px 7px',
-                borderRadius: 999,
-                backgroundColor: S.surfaceLow,
-                color: S.onSurfaceVariant,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Exposure {driver.exposure_level}/5
-            </span>
-          )}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+              padding: '1px 7px',
+              borderRadius: 999,
+              backgroundColor: S.surfaceLow,
+              color: S.onSurfaceVariant,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Exposure {exposure}/5
+          </span>
           <span
             style={{
               display: 'inline-flex',
@@ -660,7 +596,6 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
           </span>
         </div>
 
-        {/* Share bar */}
         <div
           style={{
             marginTop: 8,
@@ -684,7 +619,7 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
         </div>
       </div>
 
-      {/* Hero metrics */}
+      {/* Share of movement, then the signed contribution */}
       <div
         style={{
           display: 'flex',
@@ -731,7 +666,6 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
         </div>
       </div>
 
-      {/* Link affordance — the card opens this driver on the Drivers page */}
       {interactive && (
         <ArrowUpRight
           size={15}
@@ -752,116 +686,75 @@ const DriverCard: React.FC<DriverCardProps> = ({ driver, index, rank, onOpen }) 
 // ─── CategoryDetailPanel ───────────────────────────────────────────────────
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
-  data, categoryId, onClose, onOpenDriver,
+  category, year, simulation, drivers, config, onClose, onOpenDriver,
 }) => {
-  const category = useMemo(() => {
-    if (!categoryId || !data) return null;
-    return (
-      data.categories?.find((c) => c.id === categoryId) ?? { id: categoryId, name: categoryId }
-    );
-  }, [categoryId, data]);
+  const group = CATEGORIES.find((c) => c.name === category)?.group;
+  const path = simulation.shifts[category];
 
-  // ─── Momentum hover tooltip state ────────────────────────────────
-  // Mirrors the Matrix cell-tooltip pattern in ProfitPoolAnalysis2: track
-  // the cursor anchor (top-center of the KPI tile) and render a fixed-
-  // positioned, navy/white tooltip with the same shadow + arrow language
-  // so the design is consistent across the dashboard.
+  // Anchor of the momentum explainer (the tile's bottom centre); it is
+  // fixed-positioned like the matrix cell tooltip.
   const [pathHover, setPathHover] = useState<{ x: number; y: number } | null>(null);
 
-  // R-03: one overlay contract — Escape closes, focus is trapped inside,
-  // body scroll locks, focus returns to the trigger on close.
+  // Escape closes, focus stays inside, the page behind does not scroll, and
+  // focus returns to the row or tile that opened the panel.
   const panelRef = useRef<HTMLElement | null>(null);
   useOverlay(true, onClose, panelRef);
 
-  const pathData: PathData = useMemo(() => {
-    if (!data?.shifts_path?.[categoryId]) return {};
-    return data.shifts_path[categoryId];
-  }, [data, categoryId]);
+  const forceDecomposition = simulation.decompositions.force[String(year)][category];
 
-  const forceDecomposition = useMemo<Record<ForceName, number>>(() => {
-    const empty: Record<ForceName, number> = {
-      Consumer: 0, Customer: 0, Technology: 0,
-      Government: 0, Environmental: 0, Competitive: 0,
-    };
-    if (!data?.force_decomposition?.[categoryId]) return empty;
-    return data.force_decomposition[categoryId] as Record<ForceName, number>;
-  }, [data, categoryId]);
-
-  // F1 (2.10.0): the 3D regional breakdown for this category at the selected
-  // year — a list of {region, median, p10, p90, weight} sorted by |median|.
-  const regionalShift = useMemo(() => {
-    const byRegion = data?.regional_shift?.[categoryId];
-    if (!byRegion) return [];
-    // 2.11.0 (O6): prefer THIS category's row of the cell matrix, normalised
-    // to the row sum — those are the weights that rolled its regions up.
-    // Pre-2.11 runs carry only the portfolio-wide region weights.
-    const weights: Record<string, number | undefined> =
-      rowShares(data?.cell_weights, categoryId) ?? (data?.region_weights ?? {});
-    return Object.entries(byRegion)
-      .map(([region, cell]) => ({
-        region,
-        median: cell?.median ?? 0,
-        p10: cell?.p10,
-        p90: cell?.p90,
-        weight: weights[region],
-      }))
+  const regionalShift = useMemo<RegionalRow[]>(() => {
+    const shares = rowShares(simulation.cell_weights_used, category);
+    return Object.entries(simulation.regional_shift_matrix[category])
+      .map(([region, cell]) => ({ region, median: cell.path[String(year)].median, share: shares?.[region] }))
       .sort((a, b) => Math.abs(b.median) - Math.abs(a.median));
-  }, [data, categoryId]);
-  const regionalWeightsAreCellRow = !!data?.cell_weights?.[categoryId];
+  }, [simulation, category, year]);
 
-  const driverList = useMemo<Driver[]>(() => {
-    if (!data?.contributing_drivers?.[categoryId]) return [];
-    // Rank by |scaled contribution| primarily; fall back to |normalized_score|
-    // when the scaled attribution field isn't populated (legacy data).
-    // (M8, July 2026 review: the old fallback read `score`, a field the
-    // backend never sends — the tiebreak was a permanent no-op.)
-    return [...data.contributing_drivers[categoryId]].sort((a, b) => {
-      const ca = Math.abs(a.contribution ?? 0);
-      const cb = Math.abs(b.contribution ?? 0);
-      if (Math.abs(ca - cb) > 1e-9) return cb - ca;
-      return Math.abs(b.normalized_score ?? 0) - Math.abs(a.normalized_score ?? 0);
-    });
-  }, [data, categoryId]);
+  const attribution = useMemo(() => (config
+    ? computeDriverAttribution({ drivers, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
+    : null), [drivers, config, simulation.cell_weights_used]);
 
-  // Aggregates for the Contributing Trends section header and narrative.
-  const totalAttribution = useMemo(() => {
-    return driverList.reduce((acc, t) => acc + Math.abs(t.contribution ?? 0), 0);
-  }, [driverList]);
-  const topShare = useMemo(() => {
-    const topN = Math.min(5, driverList.length);
-    if (totalAttribution <= 1e-9) return 0;
-    const sumTop = driverList.slice(0, topN).reduce(
-      (acc, t) => acc + Math.abs(t.contribution ?? 0),
-      0,
-    );
-    return sumTop / totalAttribution;
-  }, [driverList, totalAttribution]);
-  // Horizon endpoints — summary KPIs
-  const horizonEnd = YEARS[YEARS.length - 1];
-  const horizonStart = YEARS[0];
-  const shiftEnd = pathData[horizonEnd!]?.median ?? 0;
-  const shiftStart = pathData[horizonStart!]?.median ?? 0;
+  const shiftEnd = path[String(HORIZON_END)].median;
+  const shiftStart = path[String(HORIZON_START)].median;
   const velocity = shiftEnd - shiftStart;
 
-  // R-07: momentum is re-expressed verbally — "+1.2%" in green under a red
-  // headline read as good news when it means "still shrinking, more slowly".
-  // The message names the situation; the colour follows the MESSAGE:
-  // deepening = contraction ink, easing = calm navy, accelerating = expansion
-  // ink, slowing = amber. Value renders in percentage POINTS (a delta of a
-  // percentage, not a percentage).
-  const EPS = 0.0005;
+  const contributors = useMemo(
+    () => rankContributors(category, drivers, attribution, shiftEnd),
+    [category, drivers, attribution, shiftEnd],
+  );
+  const approximateCount = attribution
+    ? contributors.filter((c) => attribution.byDriver[c.driver.id].approximate).length
+    : 0;
+
+  // Share of the category's movement carried by its five largest drivers.
+  const topShare = useMemo(() => {
+    const total = contributors.reduce((acc, c) => acc + Math.abs(c.contribution), 0);
+    if (total <= 1e-9) return 0;
+    const top = contributors.slice(0, 5).reduce((acc, c) => acc + Math.abs(c.contribution), 0);
+    return top / total;
+  }, [contributors]);
+
+  // Momentum is said in words, because "+1.2 pt" in green under a red
+  // headline reads as good news when it means "still shrinking, more
+  // slowly". The colour follows the message: deepening in contraction ink,
+  // easing in calm navy, accelerating in expansion ink, slowing in amber. The
+  // value is in percentage points: a difference of two percentages.
   const momentum = useMemo(() => {
-    const pts = `${velocity >= EPS ? '+' : ''}${(velocity * 100).toFixed(1)} pt`;
-    if (shiftEnd < -EPS && velocity > EPS)
+    const pts = `${velocity >= FLAT_EPS ? '+' : ''}${(velocity * 100).toFixed(1)} pt`;
+    if (shiftEnd < -FLAT_EPS && velocity > FLAT_EPS)
       return { msg: 'Contraction easing', pts, color: S.onSurface };
-    if (shiftEnd < -EPS && velocity < -EPS)
+    if (shiftEnd < -FLAT_EPS && velocity < -FLAT_EPS)
       return { msg: 'Contraction deepening', pts, color: S.contractionInk };
-    if (shiftEnd > EPS && velocity > EPS)
+    if (shiftEnd > FLAT_EPS && velocity > FLAT_EPS)
       return { msg: 'Expansion accelerating', pts, color: S.expansionInk };
-    if (shiftEnd > EPS && velocity < -EPS)
+    if (shiftEnd > FLAT_EPS && velocity < -FLAT_EPS)
       return { msg: 'Expansion slowing', pts, color: S.amber };
     return { msg: 'Broadly flat', pts, color: S.onSurface };
   }, [shiftEnd, velocity]);
+
+  const showMomentumHelp = (e: React.SyntheticEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setPathHover({ x: r.left + r.width / 2, y: r.bottom });
+  };
 
   return (
     <motion.div
@@ -870,8 +763,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       exit={{ opacity: 0 }}
       onClick={onClose}
       style={{
-        // top = 64px keeps the global sticky nav (h-16) visible and
-        // interactive while the full-screen drill-down is open.
+        // top = 64px keeps the sticky top navigation (h-16) visible and
+        // usable while the drill-down is open.
         position: 'fixed',
         top: 64,
         right: 0,
@@ -888,8 +781,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         fontFamily: BODY_FONT,
       }}
     >
-      {/* Full-page modal — fills the viewport below the global nav.
-          The drill-down is a destination, not a side drawer. */}
+      {/* A full-page destination below the navigation, not a side drawer. */}
       <motion.aside
         ref={panelRef}
         initial={{ opacity: 0, scale: 0.985, y: 8 }}
@@ -899,12 +791,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`${category?.name ?? 'Category'} drill-down`}
+        aria-label={`${categoryDisplay(category)} drill-down`}
         tabIndex={-1}
         style={{
-          // The aside IS the scroll container; the header below is
-          // position:sticky so it stays pinned while the body scrolls.
-          // Fills the full viewport below the global sticky nav (h-16).
+          // The aside is the scroll container; the sticky header stays
+          // pinned while the body scrolls.
           position: 'relative',
           width: '100%',
           height: '100%',
@@ -919,7 +810,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           zIndex: 45,
         }}
       >
-        {/* ─── Header (sticky) ─────────────────────────────────────── */}
         <header
           style={{
             position: 'sticky',
@@ -949,7 +839,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                {groupDisplay(category?.group) || 'Shift Matrix'} · Drill-down
+                {groupDisplay(group)} · Drill-down
               </div>
               <h2
                 style={{
@@ -962,7 +852,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   lineHeight: 1.15,
                 }}
               >
-                {categoryDisplay(category?.name) || 'Category'}
+                {categoryDisplay(category)}
               </h2>
             </div>
             <span
@@ -1015,7 +905,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               gap: 10,
             }}
           >
-            {/* Shift at horizon end */}
             <div
               style={{
                 padding: '12px 14px',
@@ -1034,7 +923,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                {horizonEnd} Shift
+                {HORIZON_END} Shift
               </div>
               <div
                 style={{
@@ -1050,26 +939,18 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               </div>
             </div>
 
-            {/* Momentum (R-07): verbal message + message-driven colour;
-                explainer opens on hover, keyboard focus AND tap (R-04). */}
+            {/* Momentum: the explainer opens on hover, keyboard focus and tap. */}
             <div
-              onMouseEnter={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
-              }}
+              onMouseEnter={showMomentumHelp}
               onMouseLeave={() => setPathHover(null)}
-              onFocus={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
-              }}
+              onFocus={showMomentumHelp}
               onBlur={() => setPathHover(null)}
               onClick={(e) => {
                 if (pathHover) { setPathHover(null); return; }
-                const r = e.currentTarget.getBoundingClientRect();
-                setPathHover({ x: r.left + r.width / 2, y: r.bottom });
+                showMomentumHelp(e);
               }}
               tabIndex={0}
-              aria-label={`Momentum: ${momentum.msg}, ${momentum.pts} between ${horizonStart} and ${horizonEnd}`}
+              aria-label={`Momentum: ${momentum.msg}, ${momentum.pts} between ${HORIZON_START} and ${HORIZON_END}`}
               style={{
                 position: 'relative',
                 padding: '12px 14px',
@@ -1105,11 +986,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               </div>
               <div style={{ marginTop: 3, fontSize: 11, fontWeight: 600, color: momentum.color, fontFamily: BODY_FONT, lineHeight: 1.25 }}>
                 {momentum.msg}{' '}
-                <span style={{ color: S.mutedText, fontWeight: 400 }}>· {horizonStart} → {horizonEnd}</span>
+                <span style={{ color: S.mutedText, fontWeight: 400 }}>· {HORIZON_START} → {HORIZON_END}</span>
               </div>
             </div>
 
-            {/* Trend count */}
             <div
               style={{
                 padding: '12px 14px',
@@ -1140,17 +1020,14 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   lineHeight: 1,
                 }}
               >
-                {driverList.length}
+                {contributors.length}
               </div>
             </div>
           </div>
         </header>
 
-        {/* ─── Scrollable content ──────────────────────────────────
-            Full-page layout: two columns on large screens — simulation
-            evidence (fan chart + force decomposition) on the left, the
-            ranked contributing-trend drivers on the right. Stacks to a
-            single column below lg. */}
+        {/* Two columns on large screens: what the simulation says on the
+            left, the ranked drivers behind it on the right; one column below lg. */}
         <div
           className="grid gap-4 items-start lg:grid-cols-2"
           style={{
@@ -1158,137 +1035,127 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             backgroundColor: S.bg,
           }}
         >
-          {/* Left column — what the simulation says */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          {/* Fan chart */}
-          <Section
-            title={`Shift Path · ${horizonStart}–${horizonEnd}`}
-            icon={LineChart}
-            trailing={
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  backgroundColor: S.primaryContainer,
-                  color: S.onPrimaryContainer,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  textTransform: 'none',
-                  fontFamily: BODY_FONT,
-                }}
-              >
-                P10 – P90
-              </span>
-            }
-          >
-            <MiniPathChart pathData={pathData} />
-          </Section>
-
-          {/* Force decomposition */}
-          <Section title="Force Decomposition" icon={Zap}>
-            <ForceDecomposition decomposition={forceDecomposition} />
-          </Section>
-
-          {/* F1 (2.10.0): regional shift drill-down — the actual per-region
-              shifts (not attribution) at the selected year, with the GP1
-              weights that roll them up to the category number. */}
-          <Section title="Regional Shift" icon={Globe}>
-            <RegionalDecomposition rows={regionalShift} cellRow={regionalWeightsAreCellRow} />
-          </Section>
-          </div>
-
-          {/* Right column — the drivers behind the shift */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          {/* Contributing trends — ranked by scaled attribution share */}
-          {driverList.length > 0 && (
             <Section
-              title="Contributing Drivers"
-              icon={Layers}
+              title={`Shift Path · ${HORIZON_START}–${HORIZON_END}`}
+              icon={LineChart}
               trailing={
                 <span
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '3px 10px',
+                    borderRadius: 999,
+                    backgroundColor: S.primaryContainer,
+                    color: S.onPrimaryContainer,
                     fontSize: 11,
                     fontWeight: 700,
-                    color: S.onSurfaceVariant,
-                    letterSpacing: '0.06em',
-                    fontFamily: HEADLINE_FONT,
+                    letterSpacing: '0.04em',
+                    textTransform: 'none',
+                    fontFamily: BODY_FONT,
                   }}
                 >
-                  {driverList.length} TOTAL
-                  {topShare > 0 ? ' \u00B7 TOP-5 ' + fmtPct(topShare, 0) : ''}
+                  P10 – P90
                 </span>
               }
             >
-              {/* Concentration strip — share of movement captured by top 5 */}
-              {topShare > 0 && (
-                <div
-                  style={{
-                    marginBottom: 12,
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    backgroundColor: S.surfaceLow,
-                    border: `1px solid ${S.cardBorder}`,
-                  }}
-                >
-                  <div
+              <MiniPathChart path={path} />
+            </Section>
+
+            <Section title="Force Decomposition" icon={Zap}>
+              <ForceDecomposition decomposition={forceDecomposition} />
+            </Section>
+
+            <Section title="Regional Shift" icon={Globe}>
+              <RegionalDecomposition rows={regionalShift} />
+            </Section>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {contributors.length > 0 && (
+              <Section
+                title="Contributing Drivers"
+                icon={Layers}
+                trailing={
+                  <span
                     style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      justifyContent: 'space-between',
-                      marginBottom: 6,
                       fontSize: 11,
+                      fontWeight: 700,
                       color: S.onSurfaceVariant,
-                      fontFamily: BODY_FONT,
-                      letterSpacing: '0.02em',
+                      letterSpacing: '0.06em',
+                      fontFamily: HEADLINE_FONT,
                     }}
                   >
-                    <span style={{ fontWeight: 600 }}>Top 5 drivers</span>
-                    <span style={{ fontFamily: MONO_FONT, fontWeight: 700, color: S.onBg }}>
-                      {fmtPct(topShare, 0)} of movement
-                    </span>
-                  </div>
+                    {contributors.length} TOTAL
+                    {topShare > 0 ? ' · TOP-5 ' + fmtPct(topShare, 0) : ''}
+                  </span>
+                }
+              >
+                {/* Concentration: the share of movement the top five carry */}
+                {topShare > 0 && (
                   <div
                     style={{
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: S.surface,
-                      overflow: 'hidden',
+                      marginBottom: 12,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      backgroundColor: S.surfaceLow,
                       border: `1px solid ${S.cardBorder}`,
                     }}
                   >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, topShare * 100)}%` }}
-                      transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
+                    <div
                       style={{
-                        height: '100%',
-                        backgroundColor: S.primary,
-                        opacity: 0.82,
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        marginBottom: 6,
+                        fontSize: 11,
+                        color: S.onSurfaceVariant,
+                        fontFamily: BODY_FONT,
+                        letterSpacing: '0.02em',
                       }}
-                    />
+                    >
+                      <span style={{ fontWeight: 600 }}>Top 5 drivers</span>
+                      <span style={{ fontFamily: MONO_FONT, fontWeight: 700, color: S.onBg }}>
+                        {fmtPct(topShare, 0)} of movement
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: S.surface,
+                        overflow: 'hidden',
+                        border: `1px solid ${S.cardBorder}`,
+                      }}
+                    >
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, topShare * 100)}%` }}
+                        transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
+                        style={{
+                          height: '100%',
+                          backgroundColor: S.primary,
+                          opacity: 0.82,
+                        }}
+                      />
+                    </div>
                   </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {contributors.map((contributor, idx) => (
+                    <DriverCard
+                      key={contributor.driver.id}
+                      contributor={contributor}
+                      index={idx}
+                      onOpen={onOpenDriver ? () => onOpenDriver(contributor.driver.name) : undefined}
+                    />
+                  ))}
                 </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {driverList.map((driver, idx) => (
-                  <DriverCard
-                    key={driver.id}
-                    driver={driver}
-                    index={idx}
-                    rank={idx + 1}
-                    onOpen={onOpenDriver ? () => onOpenDriver(driver.name) : undefined}
-                  />
-                ))}
-              </div>
-            </Section>
-          )}
+              </Section>
+            )}
           </div>
 
-          {/* Footer methodology line — mirrors ProfitPoolAnalysis2 footer */}
           <footer
             className="lg:col-span-2"
             style={{
@@ -1306,22 +1173,18 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             />
             Shifts are cumulative vs 2025 from the Bayesian MC engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
-            {data?.attribution_basis === 'exposure_proxy'
-              ? ' Contributing drivers: exposure proxy (Shift \u00d7 category exposure), because the configuration layers or the run\u2019s cell weights were not available; the Drivers page reads are attributed at the score means.'
-              : data?.attribution_basis === 'score_means'
-                ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight \u00d7 attenuation \u00d7 overlap correction \u00d7 expected materialisation \u00d7 category and regional exposure, rolled up with the run\u2019s cell weights), rescaled here to the row\u2019s terminal-year median where the readings are reconciled to the portfolio median, so shares agree and points can differ by the row\u2019s own factor.'
-                : ''}
-            {data?.attribution_basis === 'score_means' && (data?.approximate_drivers?.[categoryId]?.length ?? 0) > 0
-              ? ` ${data.approximate_drivers?.[categoryId]?.length} driver(s) without a peak year or curve are taken at full materialisation.`
-              : ''}
+            {contributors.length > 0 && (attribution
+              ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median where the readings are reconciled to the portfolio median, so shares agree and points can differ by the row’s own factor.'
+              : ' Contributing drivers: exposure proxy (Shift × category exposure), because the model configuration did not load; the PRISM Analysis on the Drivers page is attributed at the score means.')}
+            {approximateCount > 0 && (approximateCount === 1
+              ? ' 1 driver without a peak year or curve is taken at full materialisation.'
+              : ` ${approximateCount} drivers without a peak year or curve are taken at full materialisation.`)}
           </footer>
         </div>
       </motion.aside>
 
-      {/* ── Momentum hover tooltip ───────────────────────────────
-          Visual language is identical to the Matrix cell tooltip in
-          ProfitPoolAnalysis2 — fixed position, navy fill, white text,
-          uppercase eyebrow, downward arrow. */}
+      {/* The momentum explainer, in the matrix cell tooltip's style: fixed
+          position, light card, uppercase eyebrow, pointer arrow. */}
       {pathHover && (
         <div
           className="fixed z-50 pointer-events-none rounded-xl shadow-2xl"
@@ -1353,17 +1216,16 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             Momentum · What this means
           </div>
           <div style={{ lineHeight: 1.5, opacity: 0.92 }}>
-            Velocity of the profit-pool shift across the horizon —
+            Velocity of the profit-pool shift across the horizon:
             <span style={{ fontFamily: MONO_FONT, fontWeight: 600, opacity: 0.95 }}>
               {' '}horizon-end − horizon-start{' '}
             </span>
             of the MC median path.
           </div>
           <div style={{ marginTop: 6, opacity: 0.65, fontSize: 11 }}>
-            Contraction easing / deepening · Expansion accelerating / slowing — the label names the direction of travel
+            Contraction easing / deepening · Expansion accelerating / slowing: the label names the direction of travel
           </div>
-          {/* Pointer arrow — points up because the bubble sits below the tile;
-              light fill + border on the two upward edges to match the body. */}
+          {/* Points up, because the card sits below the tile. */}
           <div
             style={{
               position: 'absolute',
