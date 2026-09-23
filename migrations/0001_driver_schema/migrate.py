@@ -120,6 +120,7 @@ from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FOR
                           VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN)
+from prism.database import describe_error  # noqa: E402
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
@@ -949,8 +950,13 @@ def main(argv: list | None = None) -> int:
 
     try:
         db = Database(args.sqlite)
-    except Exception as e:  # noqa: BLE001 (reported, not raised)
+    except FileNotFoundError as e:
         print(f"Cannot open the database: {e}")
+        return 1
+    except Exception as e:  # noqa: BLE001 (reported by its category, never by its raw text)
+        # A driver's message about a failed connection can quote part of the
+        # URL, password included.
+        print(f"Cannot open the database: {describe_error(e)}")
         return 1
     tables = db.tables()
     if "drivers" in tables:

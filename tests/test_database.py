@@ -102,11 +102,12 @@ class TestSchema:
                 db.init_db()
             except Exception as e:   # noqa: BLE001 (collected for the assertion)
                 errors.append(e)
-        threads = [threading.Thread(target=start) for _ in range(4)]
+        threads = [threading.Thread(target=start, daemon=True) for _ in range(4)]
         for t in threads:
             t.start()
         for t in threads:
             t.join(30)
+        assert not any(t.is_alive() for t in threads), "an instance never finished creating the schema"
         assert errors == []
         assert _count(db, "SELECT COUNT(*) FROM schema_migrations") == len(db.SCHEMA_MIGRATIONS)
 

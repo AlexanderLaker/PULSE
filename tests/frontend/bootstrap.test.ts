@@ -18,6 +18,9 @@ vi.mock('@/lib/roles', () => ({ ensureUserRolesTable: vi.fn(async () => undefine
 
 import { POST } from '@/app/api/admin/bootstrap/route';
 
+/** A made-up secret of forty characters. */
+const SECRET = 'x'.repeat(40);
+
 const call = (secret: string | null, body: unknown = { email: 'First.Admin@Example.com' }) =>
   POST(new Request('https://prism.test/api/admin/bootstrap', {
     method: 'POST',
@@ -28,7 +31,7 @@ const call = (secret: string | null, body: unknown = { email: 'First.Admin@Examp
 beforeEach(() => {
   db.rows = [];
   db.queries = [];
-  process.env.ADMIN_BOOTSTRAP_SECRET = 'a-long-shared-secret-of-forty-characters';
+  process.env.ADMIN_BOOTSTRAP_SECRET = SECRET;
 });
 afterEach(() => { delete process.env.ADMIN_BOOTSTRAP_SECRET; });
 
@@ -48,21 +51,21 @@ describe('/api/admin/bootstrap', () => {
   });
 
   it('refuses a missing or wrong secret, including one that only starts right', async () => {
-    for (const secret of [null, 'wrong', 'a-long-shared-secret-of-forty', 'a-long-shared-secret-of-forty-characters-and-more']) {
+    for (const secret of [null, 'wrong', SECRET.slice(0, 30), `${SECRET}-and-more`]) {
       expect((await call(secret)).status).toBe(403);
     }
     expect(db.queries).toEqual([]);
   });
 
   it('never creates a user the Clerk webhook has not added', async () => {
-    const res = await call('a-long-shared-secret-of-forty-characters');
+    const res = await call(SECRET);
     expect(res.status).toBe(404);
     expect(db.queries.some((q) => q.startsWith('INSERT INTO user_roles'))).toBe(false);
   });
 
   it('promotes an existing user and writes the audit log', async () => {
     db.rows = [{ clerk_user_id: 'user_7', role: 'viewer' }];
-    const res = await call('a-long-shared-secret-of-forty-characters');
+    const res = await call(SECRET);
     expect(res.status).toBe(200);
     expect(db.queries.some((q) => q.startsWith("UPDATE user_roles SET role = 'admin'"))).toBe(true);
     expect(db.queries.some((q) => q.startsWith('INSERT INTO audit_log'))).toBe(true);

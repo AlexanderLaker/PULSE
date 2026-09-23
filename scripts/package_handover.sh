@@ -30,13 +30,12 @@ echo "Packaging $(git rev-parse --abbrev-ref HEAD) at ${HEAD_SHA}"
 git archive HEAD | tar -x -C "$STAGE"
 
 fail=0
-# Any .env file but the example.
-for path in "$STAGE"/.env*; do
-  [ -e "$path" ] || continue
-  [ "$(basename "$path")" = ".env.example" ] && continue
-  echo "Forbidden path in the archive: $(basename "$path")" >&2
+# Any .env file but the example, anywhere in the tree (.gitignore keeps them
+# out at every depth).
+while IFS= read -r path; do
+  echo "Forbidden file in the archive: ${path#"$STAGE"/}" >&2
   fail=1
-done
+done < <(find "$STAGE" -name '.env*' ! -path "$STAGE/.env.example")
 # Local state: at the root, Clerk's folder and the local working folders (a
 # leading underscore); anywhere in the tree, the folders .gitignore keeps out
 # at every depth (run outputs and migration archives), database files and
@@ -55,11 +54,12 @@ while IFS= read -r path; do
   fail=1
 done < <(find "$STAGE" -type f \( -name '*.db' -o -name '*.db-*' -o -name '*.sqlite' -o -name '*.sqlite3' \
                                   -o -name '*.xlsx' \))
-# A Clerk secret key, or a connection string with a password. The test
-# database on localhost (CI and docs/OPERATIONS.md) is not a secret.
-# Each match is checked on its own, so a local URL cannot hide a real one on
-# the same line.
-SECRET_PATTERN="(sk_(live|test)_[A-Za-z0-9]{8,}|postgres(ql)?://[^ '\"]*:[^ '\"]*@[^ '\"/:?]*)"
+# A Clerk secret key or webhook secret, a value assigned to one of PRISM's
+# secrets (the token secret, the bootstrap secret), or a connection string
+# with a password. The test database on localhost (CI and docs/OPERATIONS.md)
+# is not a secret. Each match is checked on its own, so a local URL cannot hide
+# a real one on the same line.
+SECRET_PATTERN="(sk_(live|test)_[A-Za-z0-9]{8,}|whsec_[A-Za-z0-9+/=]{16,}|(PRISM_JWT_SECRET|ADMIN_BOOTSTRAP_SECRET|CLERK_SECRET_KEY|CLERK_WEBHOOK_SIGNING_SECRET)[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9_+/=-]{16,}|postgres(ql)?://[^ '\"]*:[^ '\"]*@[^ '\"/:?]*)"
 LOCAL_DATABASE="@(localhost|127\.0\.0\.1)$"
 hits="$(grep -rIonE "$SECRET_PATTERN" "$STAGE" | grep -vE "$LOCAL_DATABASE" || true)"
 if [ -n "$hits" ]; then

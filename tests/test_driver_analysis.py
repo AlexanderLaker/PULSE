@@ -361,6 +361,16 @@ class TestCommittedArtefacts:
         with pytest.raises(ValueError, match="written for the estimated gross-profit mix"):
             render.basis_line(other)
 
+    def test_a_malformed_record_fails_as_itself_and_a_typo_as_an_unknown_placeholder(self, render, record):
+        drv = next(iter(record["drivers"].values()))
+        with pytest.raises(KeyError, match="unknown placeholder 'no_such_field'"):
+            render.render_text(record, drv, "Weight in the answer: {no_such_field}.")
+        broken = copy.deepcopy(record)
+        del broken["totals"]["pool_region_shares"]
+        with pytest.raises(KeyError) as failure:
+            render.render_text(broken, broken["drivers"][next(iter(broken["drivers"]))], "Weight in the answer: {net}.")
+        assert failure.value.args == ("pool_region_shares",)
+
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record
         carries that run's id and its 13 terminal-year category quantiles,

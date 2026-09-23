@@ -16,6 +16,7 @@
   own spelling; tests/frontend/interfaceCopy.test.tsx holds the dashboard to
   the same list).
 - Scripts are entry points: no script or migration imports another script.
+- The tracked files pass the handover's scan for secret-shaped strings.
 - README.md's configuration table and .env.example name the same variables,
   and every variable the code reads is one of them.
 """
@@ -188,6 +189,11 @@ def test_the_spelling_check_spares_names_links_and_the_size_family():
                           "https://example.org/hair-color") == []
 
 
+#: Calls that load or run Python code by a name or a path chosen at run time.
+DYNAMIC_LOADERS = {"spec_from_file_location", "SourceFileLoader", "load_module", "import_module", "run_path",
+                   "run_module", "__import__", "exec", "execfile"}
+
+
 def test_no_script_imports_another():
     """Code that two scripts, or a script and the package, need lives in
     prism/; a script that imported another would run that one's module code
@@ -197,13 +203,14 @@ def test_no_script_imports_another():
     hits = []
     for path in entry_points:
         rel = path.relative_to(REPO).as_posix()
-        text = path.read_text(encoding="utf-8")
-        for node in ast.walk(ast.parse(text)):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             names = ([a.name for a in node.names] if isinstance(node, ast.Import)
                      else [node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
             hits += [f"{rel}: imports {n}" for n in names if n.split(".")[0] in scripts | {"scripts"}]
-        if re.search(r"\b(?:spec_from_file_location|run_path|import_module)\b", text):
-            hits.append(f"{rel}: loads a module by its name or path")
+            if isinstance(node, ast.Call):
+                called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+                if called in DYNAMIC_LOADERS:
+                    hits.append(f"{rel}:{node.lineno}: loads code with {called}()")
     assert len(entry_points) >= 7 and hits == []
 
 
@@ -232,3 +239,21 @@ def test_the_configuration_names_every_variable_the_code_reads():
     assert {"DATABASE_URL", "POSTGRES_URL", "PRISM_JWT_SECRET"} <= read
     assert read - documented - PLATFORM_VARIABLES == set(), "read by the code but not documented"
     assert documented - read - LIBRARY_VARIABLES == set(), "documented but read nowhere"
+
+
+def test_the_tree_passes_the_handover_secret_scan():
+    """scripts/package_handover.sh refuses a tree holding a secret-shaped
+    string; its own patterns find none in the tracked files, so no test value
+    blocks a handover."""
+    if shutil.which("git") is None or shutil.which("grep") is None or not (REPO / ".git").exists():
+        pytest.skip("not a git checkout")
+    script = (REPO / "scripts" / "package_handover.sh").read_text(encoding="utf-8")
+    pattern = re.search(r'^SECRET_PATTERN="(.*)"$', script, re.M).group(1).replace('\\"', '"')
+    local = re.search(r'^LOCAL_DATABASE="(.*)"$', script, re.M).group(1)
+    tracked = [p for p in subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, text=True,
+                                         check=True).stdout.split("\0") if p and (REPO / p).is_file()]
+    found = subprocess.run(["grep", "-IonE", pattern, "--", *tracked], cwd=REPO, capture_output=True, text=True)
+    assert found.returncode in (0, 1), found.stderr
+    hits = [line.rsplit(":", 1)[0] for line in found.stdout.splitlines() if not re.search(local, line)]
+    assert hits == []
+    assert re.search(pattern.replace("[[:space:]]", r"\s"), "PRISM_JWT_SECRET=" + "k" * 40)   # the scan is live

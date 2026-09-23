@@ -762,6 +762,13 @@ class TestMigration:
         assert "FAILED at the commit" in capsys.readouterr().out
         assert dump(previous) == before
 
+    def test_a_connection_that_fails_is_named_by_its_category_only(self, migration, monkeypatch, capsys):
+        """psycopg2's message about a malformed URL quotes part of it, password included."""
+        monkeypatch.setenv("POSTGRES_URL", "postgresql://owner:s3cr%zzet@localhost/prism")
+        assert migration.main(["--dry-run"]) == 1
+        out = capsys.readouterr().out
+        assert "Cannot open the database: the database URL is malformed" in out and "s3cr" not in out
+
     def test_what_is_refused(self, migration, tmp_path, capsys):
         assert migration.main(["--sqlite", str(tmp_path / "missing.db")]) == 1
         empty = tmp_path / "empty.db"

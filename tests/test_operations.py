@@ -298,6 +298,14 @@ def test_the_admin_script_requires_tls_unless_the_url_says_otherwise(monkeypatch
     assert calls == [{"sslmode": "require"}, {}]
 
 
+def test_the_admin_script_names_a_failed_connection_by_its_category_only(capsys):
+    """psycopg2's message about a malformed URL quotes part of it, password included."""
+    module = load_module("scripts/promote_admin.py")
+    assert module.main(["ana@example.com", "--dsn", "postgresql://owner:s3cr%zzet@localhost/prism"]) == 1
+    err = capsys.readouterr().err
+    assert "Cannot connect: the database URL is malformed" in err and "s3cr" not in err
+
+
 @pytest.mark.skipif(not os.environ.get("PRISM_TEST_POSTGRES_URL"), reason="PRISM_TEST_POSTGRES_URL is not set")
 def test_the_admin_script_changes_the_role_with_or_without_an_audit_log(capsys):
     """A database the API never started on has user_roles (the dashboard's) but no audit_log."""

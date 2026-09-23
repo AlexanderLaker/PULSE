@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env)
+from prism.database import describe_error  # noqa: E402
 
 try:
     import psycopg2
@@ -47,7 +48,13 @@ def main(argv: list | None = None) -> int:
     print(f"Database: {urlparse(dsn).hostname}")
 
     # TLS is required unless the URL says otherwise, as for the API (prism/database.py).
-    conn = psycopg2.connect(dsn, **({} if "sslmode=" in dsn else {"sslmode": "require"}))
+    # A failed connection is reported by its category: the driver's own message
+    # can quote part of the URL, password included.
+    try:
+        conn = psycopg2.connect(dsn, **({} if "sslmode=" in dsn else {"sslmode": "require"}))
+    except psycopg2.Error as e:
+        print(f"Cannot connect: {describe_error(e)}", file=sys.stderr)
+        return 1
     try:
         return _set_role(conn, email, args.role)
     finally:

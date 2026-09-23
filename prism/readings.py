@@ -230,9 +230,13 @@ def _capitalise(text: str) -> str:
 
 
 def render_text(rec: dict, drv: dict, template: str) -> str:
-    """Fill a template, set sentence-initial capitals and append the basis line."""
+    """Fill a template, set sentence-initial capitals and append the basis line.
+
+    A key the record lacks fails as itself; only a placeholder the fields do
+    not offer is reported as an unknown placeholder."""
+    fields = render_fields(rec, drv)
     try:
-        body = template.format_map(_Strict(render_fields(rec, drv)))
+        body = template.format_map(_Strict(fields))
     except KeyError as e:
         raise KeyError(f"{drv['code']}: unknown placeholder {e}") from e
     return _capitalise(body.rstrip()) + "\n\n" + basis_line(rec)
