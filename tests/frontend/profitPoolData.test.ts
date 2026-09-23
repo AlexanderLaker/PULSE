@@ -5,8 +5,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  PROFIT_POOL_SLIDES, POOL_HORIZON_YEARS, gp1Terminal, poolCagr, itemRevenueEurBn,
-  slidePoolSummary, toPoolRating, toGp1Rating,
+  PROFIT_POOL_VIEWS, POOL_HORIZON_YEARS, gp1Terminal, poolCagr, itemRevenueEurBn,
+  viewPoolSummary, toPoolRating, toGp1Rating,
 } from '@/lib/profitPoolData';
 
 const GRADES = ['reported', 'derived', 'estimate'];
@@ -14,26 +14,26 @@ const DENOMINATIONS = ['RSP', 'MSP', 'scanner-POS', 'salon-mfr', 'model'];
 
 describe('the views', () => {
   it('are the six views, Hair and Laundry & Home Care, once each', () => {
-    expect(PROFIT_POOL_SLIDES.map((s) => s.id).sort()).toEqual([
+    expect(PROFIT_POOL_VIEWS.map((s) => s.id).sort()).toEqual([
       'hair_core_adjacent', 'hair_sub_segments', 'hair_value_chain',
       'laundry_core_adjacent', 'laundry_sub_segments', 'laundry_value_chain',
     ]);
   });
 
   it("each view's revenue shares add up to 1 (to their three-decimal rounding)", () => {
-    for (const slide of PROFIT_POOL_SLIDES) {
-      const total = slide.items.reduce((a, it) => a + it.revenueShare, 0);
-      expect(Math.abs(total - 1), slide.id).toBeLessThanOrEqual(0.002 + 1e-12);
-      const items = slide.items.reduce((a, it) => a + itemRevenueEurBn(slide, it), 0);
-      expect(items).toBeCloseTo(slide.poolSizeEurBn, 6);
+    for (const view of PROFIT_POOL_VIEWS) {
+      const total = view.items.reduce((a, it) => a + it.revenueShare, 0);
+      expect(Math.abs(total - 1), view.id).toBeLessThanOrEqual(0.002 + 1e-12);
+      const items = view.items.reduce((a, it) => a + itemRevenueEurBn(view, it), 0);
+      expect(items).toBeCloseTo(view.poolSizeEurBn, 6);
     }
   });
 
   it('every row has a plausible margin and growth, a unique id and an explained construction', () => {
-    for (const slide of PROFIT_POOL_SLIDES) {
-      expect(slide.construction.length, slide.id).toBeGreaterThan(100);
-      expect(new Set(slide.items.map((it) => it.id)).size).toBe(slide.items.length);
-      for (const it of slide.items) {
+    for (const view of PROFIT_POOL_VIEWS) {
+      expect(view.construction.length, view.id).toBeGreaterThan(100);
+      expect(new Set(view.items.map((it) => it.id)).size).toBe(view.items.length);
+      for (const it of view.items) {
         expect(it.gp1Margin, it.id).toBeGreaterThan(0);
         expect(it.gp1Margin, it.id).toBeLessThan(1);
         expect(Math.abs(it.revenueCAGR), it.id).toBeLessThan(0.3);
@@ -43,8 +43,8 @@ describe('the views', () => {
   });
 
   it('every figure cites a clickable source with a grade and a known denomination', () => {
-    for (const slide of PROFIT_POOL_SLIDES) {
-      for (const it of slide.items) {
+    for (const view of PROFIT_POOL_VIEWS) {
+      for (const it of view.items) {
         const refs = [...it.sources.revenue, ...it.sources.margin];
         expect(it.sources.revenue.length, it.id).toBeGreaterThan(0);
         expect(it.sources.margin.length, it.id).toBeGreaterThan(0);
@@ -70,9 +70,9 @@ describe('the pool arithmetic', () => {
   });
 
   it("a view's weighted pool growth lies between its rows' own growth rates", () => {
-    for (const slide of PROFIT_POOL_SLIDES) {
-      const rates = slide.items.map((it) => poolCagr(it));
-      const { gp1PoolNowEurBn, gp1PoolTerminalEurBn, weightedPoolCagr } = slidePoolSummary(slide);
+    for (const view of PROFIT_POOL_VIEWS) {
+      const rates = view.items.map((it) => poolCagr(it));
+      const { gp1PoolNowEurBn, gp1PoolTerminalEurBn, weightedPoolCagr } = viewPoolSummary(view);
       expect(gp1PoolTerminalEurBn).toBeGreaterThan(0);
       expect(gp1PoolNowEurBn).toBeGreaterThan(0);
       expect(weightedPoolCagr).toBeGreaterThanOrEqual(Math.min(...rates) - 1e-12);

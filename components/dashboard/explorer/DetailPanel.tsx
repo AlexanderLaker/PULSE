@@ -10,7 +10,7 @@ import useOverlay from '@/hooks/useOverlay';
 import {
   POOL_HORIZON_LABEL, POOL_HORIZON_YEARS, poolCagr, gp1Terminal, itemRevenueEurBn,
   itemGp1PoolEurBn, itemGp1PoolEurBnTerminal, toPoolRating, toCagrRating, toGp1Rating,
-  type ProfitPoolSlide, type SlideItem, type CagrRating, type EvidenceGrade,
+  type PoolView, type PoolItem, type CagrRating, type EvidenceGrade,
 } from '@/lib/profitPoolData';
 import { S, SHADOW, INK_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { NO_VALUE } from '@/lib/format';
@@ -18,10 +18,10 @@ import { arrowColorFor, fmtEurBn, fmtShare } from './arrows';
 import { GradeChip, SourceChip, sourceParts, taggedSources } from './sources';
 
 export const DetailPanel: FC<{
-  slide: ProfitPoolSlide;
-  item: SlideItem;
+  view: PoolView;
+  item: PoolItem;
   onClose: () => void;
-}> = ({ slide, item, onClose }) => {
+}> = ({ view, item, onClose }) => {
   const reduceMotion = useReducedMotion();
   const pool = poolCagr(item);
   const poolRating = toPoolRating(pool);
@@ -29,11 +29,11 @@ export const DetailPanel: FC<{
   const gp1Rating = toGp1Rating(item.gp1DeltaBps);
   const name = item.sublabel ? `${item.label} ${item.sublabel}`.trim() : item.label;
 
-  const revEur = itemRevenueEurBn(slide, item);
+  const revEur = itemRevenueEurBn(view, item);
   const revEnd = revEur * Math.pow(1 + item.revenueCAGR, POOL_HORIZON_YEARS);
-  const gp1Now = itemGp1PoolEurBn(slide, item);
-  const gp1End = itemGp1PoolEurBnTerminal(slide, item);
-  const gp1PoolShare = gp1Now / (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
+  const gp1Now = itemGp1PoolEurBn(view, item);
+  const gp1End = itemGp1PoolEurBnTerminal(view, item);
+  const gp1PoolShare = gp1Now / (view.items.reduce((s, it) => s + itemGp1PoolEurBn(view, it), 0) || 1);
   const panelRef = useRef<HTMLElement>(null);
 
   // Every figure in the panel explains its calculation and its source on hover.
@@ -47,7 +47,7 @@ export const DetailPanel: FC<{
   const tips = {
     revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revBasis}`,
     gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
-    revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(slide.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revBasis}`,
+    revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(view.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revBasis}`,
     revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nRationale: ${item.revenueDriver}\nSource: ${revSrcNames} (grade: ${revSrc?.grade ?? 'estimate'}).`,
     revEnd: `2030 revenue = today × (1 + CAGR)^${POOL_HORIZON_YEARS}:\n${fmtEurBn(revEur)} × (1 ${item.revenueCAGR >= 0 ? '+' : '−'} ${pct(Math.abs(item.revenueCAGR))})^${POOL_HORIZON_YEARS} = ${fmtEurBn(revEnd)} (nominal).`,
     gp1Today: `GP1/CM1 proxy ${pct(item.gp1Margin)}: a PRISM structured estimate CALIBRATED against reported FY2025 gross margins (GP1 is not separately disclosed at this level, so it is never graded 'reported').\n\nCalibration anchors: ${mgnSrcNames}.`,
@@ -97,8 +97,8 @@ export const DetailPanel: FC<{
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
-                {slide.kind === 'ValueChain' ? 'Value chain tier' : slide.kind === 'SubSegment' ? 'Sub-segment' : 'Core / adjacent pool'}
-                {' · '}{slide.group === 'Hair' ? 'Hair' : 'Laundry'}
+                {view.kind === 'ValueChain' ? 'Value chain tier' : view.kind === 'SubSegment' ? 'Sub-segment' : 'Core / adjacent pool'}
+                {' · '}{view.group === 'Hair' ? 'Hair' : 'Laundry'}
               </div>
               <h2 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 20, color: S.onBg, margin: 0, lineHeight: 1.2 }}>
                 {name}

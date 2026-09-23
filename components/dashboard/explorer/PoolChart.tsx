@@ -6,8 +6,8 @@
 import { useMemo, useState, type FC } from 'react';
 import { motion } from 'framer-motion';
 import {
-  POOL_HORIZON_LABEL, poolCagr, itemGp1PoolEurBn, toPoolRating, type ProfitPoolSlide,
-  type SlideItem, type CagrRating,
+  POOL_HORIZON_LABEL, poolCagr, itemGp1PoolEurBn, toPoolRating, type PoolView,
+  type PoolItem, type CagrRating,
 } from '@/lib/profitPoolData';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { arrowColorFor, ArrowsSVG } from './arrows';
@@ -35,16 +35,16 @@ const MiniMetric: FC<{ label: string; value: string }> = ({ label, value }) => (
   </div>
 );
 
-export const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: number }> = ({
-  item, slide, x, y,
+export const HoverTip: FC<{ item: PoolItem; view: PoolView; x: number; y: number }> = ({
+  item, view, x, y,
 }) => {
   const pool = poolCagr(item);
   const rating = toPoolRating(pool);
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
   const placeLeft = x > vw - 300;
   const name = item.sublabel ? `${item.label} ${item.sublabel}`.trim() : item.label;
-  const gp1PoolShare = itemGp1PoolEurBn(slide, item) /
-    (slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0) || 1);
+  const gp1PoolShare = itemGp1PoolEurBn(view, item) /
+    (view.items.reduce((s, it) => s + itemGp1PoolEurBn(view, it), 0) || 1);
 
   return (
     <motion.div
@@ -86,15 +86,15 @@ export const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; 
 
 // ─── Pool Chart (SVG) ────────────────────────────────────────────
 interface PoolChartProps {
-  slide: ProfitPoolSlide;
+  view: PoolView;
   selectedId: string | null;
-  onHover: (item: SlideItem, x: number, y: number) => void;
+  onHover: (item: PoolItem, x: number, y: number) => void;
   onLeave: () => void;
-  onSelect: (item: SlideItem) => void;
+  onSelect: (item: PoolItem) => void;
 }
 
 interface BarGeom {
-  item: SlideItem;
+  item: PoolItem;
   xPx0: number;
   xPx1: number;
   hPx: number;
@@ -103,7 +103,7 @@ interface BarGeom {
 
 /** Pure geometry, outside the component so render never reassigns. */
 function computeBars(
-  items: SlideItem[], ml: number, plotW: number, plotH: number, yMax: number,
+  items: PoolItem[], ml: number, plotW: number, plotH: number, yMax: number,
 ): BarGeom[] {
   const totalShare = items.reduce((s, it) => s + it.revenueShare, 0) || 1;
   const out: BarGeom[] = [];
@@ -122,9 +122,9 @@ function computeBars(
   return out;
 }
 
-export const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLeave, onSelect }) => {
+export const PoolChart: FC<PoolChartProps> = ({ view, selectedId, onHover, onLeave, onSelect }) => {
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const ordered = slide.items;
+  const ordered = view.items;
   const W = 960;
   // The margins leave room for the rotated (−35°) x-labels: the longest
   // ("Brand Owner CPG (Retail)", "Conditioners & Treatments") and the first
@@ -149,7 +149,7 @@ export const PoolChart: FC<PoolChartProps> = ({ slide, selectedId, onHover, onLe
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', fontFamily: BODY_FONT }}
       role="group"
-      aria-label={`${slide.title}, pool chart; arrows show profit-pool development ${POOL_HORIZON_LABEL}`}
+      aria-label={`${view.title}, pool chart; arrows show profit-pool development ${POOL_HORIZON_LABEL}`}
     >
       {yTicks.map(t => {
         const y = MT + plotH - (t / yMax) * plotH;

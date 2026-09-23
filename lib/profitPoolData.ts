@@ -65,7 +65,7 @@ import { NO_VALUE } from '@/lib/format';
 // Types
 // ═══════════════════════════════════════════════════════════════════
 
-export type SlideId =
+export type PoolViewId =
   | 'hair_value_chain'
   | 'laundry_value_chain'
   | 'hair_sub_segments'
@@ -74,7 +74,7 @@ export type SlideId =
   | 'laundry_core_adjacent';
 
 export type PoolGroup = 'Hair' | 'LHC';
-export type SlideKind = 'ValueChain' | 'SubSegment' | 'CoreAdjacent';
+export type PoolViewKind = 'ValueChain' | 'SubSegment' | 'CoreAdjacent';
 
 /** Evidence grade of a figure: reported, derived or estimate (see the header). */
 export type EvidenceGrade = 'reported' | 'derived' | 'estimate';
@@ -102,7 +102,7 @@ export interface SourceRef {
   denomination?: Denomination;
 }
 
-export interface SlideItem {
+export interface PoolItem {
   id: string;
   label: string;
   sublabel?: string;
@@ -125,8 +125,8 @@ export interface SlideItem {
   };
 }
 
-export interface ProfitPoolSlide {
-  id: SlideId;
+export interface PoolView {
+  id: PoolViewId;
   title: string;
   subtitle: string;
   /** Display label for the revenue pool, e.g. "~€77bn". */
@@ -134,9 +134,9 @@ export interface ProfitPoolSlide {
   /** Numeric revenue pool in €bn (planning rate 1.15) for the € math in the UI. */
   poolSizeEurBn: number;
   group: PoolGroup;
-  kind: SlideKind;
+  kind: PoolViewKind;
   /** Rows in the authored order: value chain raw to retail, categories by logic, CORE first. */
-  items: SlideItem[];
+  items: PoolItem[];
   /** How the shares and the pool of this view are built: the audit trail. */
   construction: string;
   insights: string[];
@@ -534,10 +534,10 @@ const asDerived = (s: SourceRef, detail: string): SourceRef => ({ ...s, grade: '
 const asEstimate = (s: SourceRef, detail: string): SourceRef => ({ ...s, grade: 'estimate', detail });
 
 // ═══════════════════════════════════════════════════════════════════
-// Slides
+// Views
 // ═══════════════════════════════════════════════════════════════════
 
-export const PROFIT_POOL_SLIDES: ProfitPoolSlide[] = [
+export const PROFIT_POOL_VIEWS: PoolView[] = [
   // ═════════ Hair: value chain (raw → retail) ═════════
   {
     id: 'hair_value_chain',
@@ -1242,7 +1242,7 @@ export const POOL_HORIZON_YEARS = 5;
 export const POOL_HORIZON_LABEL = 'FY2025 → 2030';
 
 /** GP1 margin at the end of the horizon (decimal). */
-export function gp1Terminal(item: Pick<SlideItem, 'gp1Margin' | 'gp1DeltaBps'>): number {
+export function gp1Terminal(item: Pick<PoolItem, 'gp1Margin' | 'gp1DeltaBps'>): number {
   return Math.max(0.01, item.gp1Margin + item.gp1DeltaBps / 10000);
 }
 
@@ -1252,37 +1252,37 @@ export function gp1Terminal(item: Pick<SlideItem, 'gp1Margin' | 'gp1DeltaBps'>):
  * with marginCAGR = (GP1_end / GP1_now)^(1/H) − 1.
  */
 export function poolCagr(
-  item: Pick<SlideItem, 'revenueCAGR' | 'gp1Margin' | 'gp1DeltaBps'>,
+  item: Pick<PoolItem, 'revenueCAGR' | 'gp1Margin' | 'gp1DeltaBps'>,
   years: number = POOL_HORIZON_YEARS,
 ): number {
   const marginCagr = Math.pow(gp1Terminal(item) / item.gp1Margin, 1 / years) - 1;
   return (1 + item.revenueCAGR) * (1 + marginCagr) - 1;
 }
 
-/** Revenue pool of one item in €bn (slide pool × share). */
-export function itemRevenueEurBn(slide: ProfitPoolSlide, item: SlideItem): number {
-  const total = slide.items.reduce((s, it) => s + it.revenueShare, 0) || 1;
-  return slide.poolSizeEurBn * (item.revenueShare / total);
+/** Revenue pool of one item in €bn (view pool × share). */
+export function itemRevenueEurBn(view: PoolView, item: PoolItem): number {
+  const total = view.items.reduce((s, it) => s + it.revenueShare, 0) || 1;
+  return view.poolSizeEurBn * (item.revenueShare / total);
 }
 
 /** GP1 profit pool of one item in €bn today. */
-export function itemGp1PoolEurBn(slide: ProfitPoolSlide, item: SlideItem): number {
-  return itemRevenueEurBn(slide, item) * item.gp1Margin;
+export function itemGp1PoolEurBn(view: PoolView, item: PoolItem): number {
+  return itemRevenueEurBn(view, item) * item.gp1Margin;
 }
 
 /** GP1 profit pool of one item in €bn at the end of the horizon. */
-export function itemGp1PoolEurBnTerminal(slide: ProfitPoolSlide, item: SlideItem): number {
-  return itemGp1PoolEurBn(slide, item) * Math.pow(1 + poolCagr(item), POOL_HORIZON_YEARS);
+export function itemGp1PoolEurBnTerminal(view: PoolView, item: PoolItem): number {
+  return itemGp1PoolEurBn(view, item) * Math.pow(1 + poolCagr(item), POOL_HORIZON_YEARS);
 }
 
-/** Slide-level GP1 pool (€bn) today and at horizon end, plus the weighted pool CAGR. */
-export function slidePoolSummary(slide: ProfitPoolSlide): {
+/** View-level GP1 pool (€bn) today and at horizon end, plus the weighted pool CAGR. */
+export function viewPoolSummary(view: PoolView): {
   gp1PoolNowEurBn: number;
   gp1PoolTerminalEurBn: number;
   weightedPoolCagr: number;
 } {
-  const now = slide.items.reduce((s, it) => s + itemGp1PoolEurBn(slide, it), 0);
-  const terminal = slide.items.reduce((s, it) => s + itemGp1PoolEurBnTerminal(slide, it), 0);
+  const now = view.items.reduce((s, it) => s + itemGp1PoolEurBn(view, it), 0);
+  const terminal = view.items.reduce((s, it) => s + itemGp1PoolEurBnTerminal(view, it), 0);
   const weightedPoolCagr = now > 0 ? Math.pow(terminal / now, 1 / POOL_HORIZON_YEARS) - 1 : 0;
   return { gp1PoolNowEurBn: now, gp1PoolTerminalEurBn: terminal, weightedPoolCagr };
 }

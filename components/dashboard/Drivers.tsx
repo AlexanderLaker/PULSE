@@ -72,7 +72,7 @@ function sortValue(d: Driver, key: SortKey): string | number {
 const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; isAdmin: boolean }> = ({ mode, onChange, isAdmin }) => {
   const opts: Array<{ id: ScoringMode; label: string; dot: string }> = [
     { id: 'list', label: 'Driver List', dot: REVIEWED_COLOR },
-    { id: 'input', label: 'Expert Rating', dot: S.primary },
+    { id: 'rating', label: 'Expert Rating', dot: S.primary },
     ...(isAdmin ? [{ id: 'review' as ScoringMode, label: 'Review & Endorse', dot: EXPERT_COLOR }] : []),
   ];
   return (
@@ -272,7 +272,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
           <p style={{ fontSize: 13, color: S.onSurfaceVariant, maxWidth: '42rem', lineHeight: 1.5 }}>
             {mode === 'list'
               ? 'The scores that feed the model. Scores an admin has changed from the baseline show in green; hover a score for its baseline.'
-              : mode === 'input'
+              : mode === 'rating'
               ? 'Score any driver from a blank slate: open a row and your changes auto-save. Hover a grey dot or blank field to see the baseline.'
               : 'Compare the expert average with the baseline and endorse one driver at a time. Hover an expert score to see who scored what.'}
           </p>
@@ -326,7 +326,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             </span>
             <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
             <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
-              {mode === 'input' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Edited'}
+              {mode === 'rating' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Edited'}
             </span>
           </div>
 

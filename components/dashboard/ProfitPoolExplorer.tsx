@@ -24,8 +24,8 @@ import { AnimatePresence } from 'framer-motion';
 import { Info, Lightbulb, Loader2 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import {
-  PROFIT_POOL_SLIDES, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, slidePoolSummary, toPoolRating,
-  type SlideItem, type SlideKind, type PoolGroup,
+  PROFIT_POOL_VIEWS, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
+  type PoolItem, type PoolViewKind, type PoolGroup,
 } from '@/lib/profitPoolData';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { arrowColorFor, ArrowLegend, ArrowsHTML, fmtEurBn } from './explorer/arrows';
@@ -38,8 +38,8 @@ import { ExplorerBetaNotice, NOTICE_ACK_KEY, noticeAcked } from './explorer/Beta
 const ProfitPoolExplorer: FC = () => {
   const { loading } = usePrism();
   const [group, setGroup] = useState<PoolGroup>('LHC');
-  const [kind, setKind] = useState<SlideKind>('ValueChain');
-  const [hover, setHover] = useState<{ item: SlideItem; x: number; y: number } | null>(null);
+  const [kind, setKind] = useState<PoolViewKind>('ValueChain');
+  const [hover, setHover] = useState<{ item: PoolItem; x: number; y: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // The Beta notice opens once per browser: on the first Explorer visit
@@ -56,20 +56,20 @@ const ProfitPoolExplorer: FC = () => {
     setNoticeOpen(false);
   }, []);
 
-  const slide = useMemo(
+  const view = useMemo(
     () =>
-      PROFIT_POOL_SLIDES.find(s => s.group === group && s.kind === kind)
-      ?? PROFIT_POOL_SLIDES[0],
+      PROFIT_POOL_VIEWS.find(s => s.group === group && s.kind === kind)
+      ?? PROFIT_POOL_VIEWS[0],
     [group, kind],
   );
 
   const selectedItem = useMemo(
-    () => slide.items.find(it => it.id === selectedId) ?? null,
-    [slide, selectedId],
+    () => view.items.find(it => it.id === selectedId) ?? null,
+    [view, selectedId],
   );
 
-  const summary = useMemo(() => slidePoolSummary(slide), [slide]);
-  const slidePoolRating = toPoolRating(summary.weightedPoolCagr);
+  const summary = useMemo(() => viewPoolSummary(view), [view]);
+  const viewPoolRating = toPoolRating(summary.weightedPoolCagr);
 
   const closePanel = useCallback(() => setSelectedId(null), []);
 
@@ -140,13 +140,13 @@ const ProfitPoolExplorer: FC = () => {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 4 }}>
-              {group === 'Hair' ? 'Hair' : 'Laundry'} · {KINDS.find(k => k.id === kind)?.label} · revenue pool {slide.poolSize}
+              {group === 'Hair' ? 'Hair' : 'Laundry'} · {KINDS.find(k => k.id === kind)?.label} · revenue pool {view.poolSize}
             </div>
             <div style={{ fontFamily: HEADLINE_FONT, fontSize: 22, fontWeight: 800, color: S.onBg, lineHeight: 1.2 }}>
-              {slide.title}
+              {view.title}
             </div>
             <div style={{ fontSize: 12, color: S.mutedText, marginTop: 4 }}>
-              {slide.subtitle}
+              {view.subtitle}
             </div>
           </div>
 
@@ -166,11 +166,11 @@ const ProfitPoolExplorer: FC = () => {
               <div style={{ fontSize: 14, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onBg, fontVariantNumeric: 'tabular-nums' }}>
                 {fmtEurBn(summary.gp1PoolNowEurBn)} → {fmtEurBn(summary.gp1PoolTerminalEurBn)}
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: arrowColorFor(slidePoolRating.tone), fontVariantNumeric: 'tabular-nums' }}>
-                {slidePoolRating.label} p.a. pool-weighted
+              <div style={{ fontSize: 11, fontWeight: 700, color: arrowColorFor(viewPoolRating.tone), fontVariantNumeric: 'tabular-nums' }}>
+                {viewPoolRating.label} p.a. pool-weighted
               </div>
             </div>
-            <ArrowsHTML rating={slidePoolRating} size={20} />
+            <ArrowsHTML rating={viewPoolRating} size={20} />
           </div>
         </div>
 
@@ -182,7 +182,7 @@ const ProfitPoolExplorer: FC = () => {
             </div>
           )}
           <PoolChart
-            slide={slide}
+            view={view}
             selectedId={selectedId}
             onHover={(item, x, y) => { if (!selectedId) setHover({ item, x, y }); }}
             onLeave={() => setHover(null)}
@@ -230,7 +230,7 @@ const ProfitPoolExplorer: FC = () => {
             {' '}The arrow combines a verified revenue CAGR with a <b>structured margin-drift estimate</b>{' '}
             (the drift is judgment, graded Estimate in the drill-down; treat the arrow as directional, not a forecast).
             Sub-1% pools render as slim slivers: hover or click a bar to inspect them.
-            {slide.kind === 'ValueChain' && (
+            {view.kind === 'ValueChain' && (
               <> Value-chain tiers <b>overlap</b> (the same end-consumer euro is counted at brand-owner and again at retail), so total chain revenue exceeds the headline consumer pool; areas show where margin sits, not additive pools.</>
             )}
           </span>
@@ -246,7 +246,7 @@ const ProfitPoolExplorer: FC = () => {
           </span>
         </div>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {slide.insights.map((text, i) => (
+          {view.insights.map((text, i) => (
             <li
               key={i}
               style={{
@@ -265,7 +265,7 @@ const ProfitPoolExplorer: FC = () => {
             How this view is built
           </div>
           <div style={{ fontSize: 11, color: S.mutedText, lineHeight: 1.55, maxWidth: 980 }}>
-            {slide.construction}
+            {view.construction}
           </div>
         </div>
 
@@ -284,14 +284,14 @@ const ProfitPoolExplorer: FC = () => {
       {/* Hover tooltip */}
       <AnimatePresence>
         {hover && !selectedItem && (
-          <HoverTip item={hover.item} slide={slide} x={hover.x} y={hover.y} />
+          <HoverTip item={hover.item} view={view} x={hover.x} y={hover.y} />
         )}
       </AnimatePresence>
 
       {/* Drill-down panel */}
       <AnimatePresence>
         {selectedItem && (
-          <DetailPanel slide={slide} item={selectedItem} onClose={closePanel} />
+          <DetailPanel view={view} item={selectedItem} onClose={closePanel} />
         )}
       </AnimatePresence>
 

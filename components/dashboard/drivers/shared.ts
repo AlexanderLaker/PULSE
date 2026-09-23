@@ -37,7 +37,7 @@ export const vcPos = (step: string): string => `${(((stageIndex(step) + 0.5) / 8
 
 /** The table's mode: Driver List, Expert Rating or Review & Endorse (Drivers.tsx
  *  describes them). */
-export type ScoringMode = 'list' | 'input' | 'review';
+export type ScoringMode = 'list' | 'rating' | 'review';
 
 export const EXPERT_COLOR   = S.expert;    // the expert aggregate: violet
 export const REVIEWED_COLOR = EXPANSION;   // an edited or endorsed value, a finished review: green

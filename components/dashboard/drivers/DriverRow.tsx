@@ -32,11 +32,11 @@ const FORCE_TILE: Record<ForceName, { Icon: LucideIcon; bg: string; fg: string }
 // so the columns align. Driver is the one flexible column (min-width 0; the
 // name truncates and shows in full on hover); Probability fits the five dots
 // and widens in Review for the expert mean and its delta. The last column is
-// the Edited chip (list), the expert's own review status (input) or the
+// the Edited chip (list), the expert's own review status (rating) or the
 // number of proposals (review).
 export const ROW_GRID: Record<ScoringMode, string> = {
   list:   'minmax(0, 1fr) 130px 128px 170px 100px 110px',
-  input:  'minmax(0, 1fr) 130px 128px 170px 100px 130px',
+  rating: 'minmax(0, 1fr) 130px 128px 170px 100px 130px',
   review: 'minmax(0, 1fr) 130px 180px 170px 100px 110px',
 };
 
@@ -51,7 +51,7 @@ const ProbCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropo
         title={base != null ? `Baseline ${base} / 5${edited ? ` · edited to ${driver.probability} / 5` : ''}` : undefined} />
     );
   }
-  if (mode === 'input') {
+  if (mode === 'rating') {
     const my = myProposal?.probability ?? driver.proposal_summary.my?.probability;
     return (
       <ColorDots value={my != null ? Math.round(my) : 0} color={S.primary} muted={my == null}
@@ -83,7 +83,7 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
       </span>
     );
   }
-  if (mode === 'input') {
+  if (mode === 'rating') {
     const my = myProposal?.gp1_pct_affected ?? driver.proposal_summary.my?.gp1_pct_affected;
     return (
       <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
@@ -109,7 +109,7 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
   const dirSign = driver.direction === 'Contraction' ? -1 : 1;
 
   // Expert Rating: the expert's own shift, from their own probability and GP1 %.
-  if (mode === 'input') {
+  if (mode === 'rating') {
     const my = myProposal ?? driver.proposal_summary.my;
     const p = my?.probability;
     const g = my?.gp1_pct_affected;
@@ -153,13 +153,13 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
 };
 
 // ── Last column: the Edited chip (list), the expert's own review status
-//    (input), the number of experts who scored the driver (review) ──
+//    (rating), the number of experts who scored the driver (review) ──
 const ReviewStatusCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
   const pill: React.CSSProperties = {
     fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
     textTransform: 'uppercase', padding: '4px 11px', borderRadius: 999,
   };
-  if (mode === 'input') {
+  if (mode === 'rating') {
     const my = myProposal ?? driver.proposal_summary.my;
     const hasProb = my?.probability != null;
     const hasGp1 = my?.gp1_pct_affected != null;
@@ -296,7 +296,7 @@ export const DriverRow: FC<DriverRowProps> = ({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             style={{ overflow: 'hidden', backgroundColor: S.surfaceLow }}
           >
-            {mode === 'input' ? (
+            {mode === 'rating' ? (
               <ExpertInputPanel driver={driver} onMyChange={onMyChange} />
             ) : mode === 'review' ? (
               <ReviewPanel driver={driver} updateDriver={updateDriver} />

@@ -2,7 +2,7 @@
  * The Explorer's navigation: Laundry or Hair, and the view within it.
  */
 import type { FC } from 'react';
-import type { SlideKind, PoolGroup } from '@/lib/profitPoolData';
+import type { PoolViewKind, PoolGroup } from '@/lib/profitPoolData';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
 const GROUPS: { id: PoolGroup; label: string }[] = [
@@ -10,7 +10,7 @@ const GROUPS: { id: PoolGroup; label: string }[] = [
   { id: 'Hair', label: 'Hair' },
 ];
 
-export const KINDS: { id: SlideKind; label: string }[] = [
+export const KINDS: { id: PoolViewKind; label: string }[] = [
   { id: 'ValueChain', label: 'Value Chain' },
   { id: 'SubSegment', label: 'Sub-Segments' },
   { id: 'CoreAdjacent', label: 'Core + Adjacent' },
@@ -49,7 +49,7 @@ export const GroupToggle: FC<{ group: PoolGroup; onSelect: (g: PoolGroup) => voi
   </div>
 );
 
-export const KindPills: FC<{ kind: SlideKind; onSelect: (k: SlideKind) => void }> = ({ kind, onSelect }) => (
+export const KindPills: FC<{ kind: PoolViewKind; onSelect: (k: PoolViewKind) => void }> = ({ kind, onSelect }) => (
   <div role="tablist" aria-label="View" style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
     {KINDS.map(k => {
       const active = k.id === kind;
