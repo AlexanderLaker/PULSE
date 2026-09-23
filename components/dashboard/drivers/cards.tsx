@@ -8,13 +8,13 @@ import {
   TrendingUp, FileText, BarChart3, Newspaper, Globe, ExternalLink, AlertTriangle, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { CATEGORIES, NO_VALUE, REGIONS } from '@/lib/format';
+import { CATEGORIES, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import { VC_STEPS, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverScores, DriverSource, ExposureMap, SourceTier } from '@/types';
-import { curveLabel, pctI, uncLabel } from './shared';
+import { curveLabel, uncLabel } from './shared';
 import { BaselineMark } from './scales';
 
 // ─── Source kind, read from the link (display only) ───────────────
@@ -235,7 +235,7 @@ function baselineDifferences(d: Driver, base: DriverScores): string[] {
     return s == null ? 'unscored' : VC_STEPS[s - 1];
   };
   compare('Probability', `${d.probability} / 5`, `${base.probability} / 5`);
-  compare('GP1 % affected', pctI(d.gp1_pct_affected), pctI(base.gp1_pct_affected));
+  compare('GP1 % affected', fmtPct(d.gp1_pct_affected, 0), fmtPct(base.gp1_pct_affected, 0));
   compare('Peak year', String(d.peak_year), String(base.peak_year));
   compare('Diffusion curve', curveLabel(d.diffusion_curve), curveLabel(base.diffusion_curve));
   compare('Uncertainty', uncLabel(d.uncertainty), uncLabel(base.uncertainty));

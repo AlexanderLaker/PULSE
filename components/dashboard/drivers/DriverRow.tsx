@@ -11,7 +11,7 @@ import { EXPANSION_SOFT, NO_VALUE, fmtPct, fmtShift, shiftColor } from '@/lib/fo
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
-import { baselineOf, EXPERT_COLOR, pctI, REVIEWED_COLOR, type ScoringMode } from './shared';
+import { baselineOf, EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
 import { ColorDots, DeltaChip } from './scales';
 import { Dash, EditedChip } from './cards';
 import { ExpertInputPanel } from './ExpertRating';
@@ -78,7 +78,7 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
     const edited = driver.scores_edited && base != null && Math.round(cur * 100) !== Math.round(base * 100);
     return (
       <span style={{ ...big, color: edited ? REVIEWED_COLOR : S.onSurface, cursor: base != null ? 'help' : undefined }}
-        title={base != null ? `Baseline ${pctI(base)}${edited ? ` · edited to ${pctI(cur)}` : ''}` : undefined}>
+        title={base != null ? `Baseline ${fmtPct(base, 0)}${edited ? ` · edited to ${fmtPct(cur, 0)}` : ''}` : undefined}>
         {fmtPct(cur)}
       </span>
     );
@@ -87,8 +87,8 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
     const my = myProposal?.gp1_pct_affected ?? driver.proposal_summary.my?.gp1_pct_affected;
     return (
       <span style={{ ...big, color: my != null ? S.onSurface : S.onSurfaceVariant, cursor: 'help' }}
-        title={base != null ? `Baseline ${pctI(base)} · open the driver to score` : 'Open the driver to score'}>
-        {pctI(my)}
+        title={base != null ? `Baseline ${fmtPct(base, 0)} · open the driver to score` : 'Open the driver to score'}>
+        {fmtPct(my, 0)}
       </span>
     );
   }
@@ -98,7 +98,7 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
   return (
     <div className="flex items-center gap-2 justify-end">
       <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.05rem', color: EXPERT_COLOR }}
-        title={`Expert average ${pctI(agg.avg)} · ${agg.count} scored`}>{pctI(agg.avg)}</span>
+        title={`Expert average ${fmtPct(agg.avg, 0)} · ${agg.count} scored`}>{fmtPct(agg.avg, 0)}</span>
       {delta != null && <DeltaChip value={delta} unit="pp" digits={0} />}
     </div>
   );
@@ -119,7 +119,7 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
     const myShift = dirSign * (Math.max(1, Math.min(5, p)) / 6) * g;
     return (
       <span className="font-bold text-[14px]"
-        title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${pctI(g)} × ${dirSign > 0 ? '+1' : '−1'}`}
+        title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${fmtPct(g, 0)} × ${dirSign > 0 ? '+1' : '−1'}`}
         style={{ color: shiftColor(myShift), cursor: 'help' }}>
         {fmtShift(myShift)}
       </span>

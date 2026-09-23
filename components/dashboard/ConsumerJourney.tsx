@@ -45,9 +45,9 @@ import Chip, { type ChipKind } from '@/components/dashboard/Chip';
 const forceColor = (force: string): string => FORCE_COLORS[force as ForceName] ?? S.primary;
 
 const TYPE_STYLES: Record<TileType, { label: string; bg: string; fg: string }> = {
-  product: { label: 'Product', bg: '#d6e3ff', fg: '#00519e' },
-  tech: { label: 'Tech', bg: '#dce9ff', fg: '#0052a0' },
-  service: { label: 'Service', bg: '#e5eeff', fg: '#26619d' },
+  product: { label: 'Product', bg: S.primaryContainer, fg: S.onPrimaryContainer },
+  tech: { label: 'Tech', bg: S.surfaceHigh, fg: S.primaryDim },
+  service: { label: 'Service', bg: S.surfaceContainer, fg: S.onSurfaceVariant },
 };
 
 /** Evidence grade as a shared Chip. 'hypothesis' has no Chip kind of its own and renders neutral; its label carries the meaning. */

@@ -71,4 +71,8 @@ export const S = {
   neutral:   '#94a3b8',
   greenSoft: '#d1fae5',
   blueSoft:  '#dbeafe',
+
+  /* ─── Drivers page: the expert aggregate and the delta chip ─── */
+  expert: '#6b4fc4',
+  delta:  '#b07d2b',
 } as const;

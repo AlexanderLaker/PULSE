@@ -8,11 +8,11 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
 } from 'lucide-react';
 import { saveMyProposal } from '@/api/client';
-import { NO_VALUE } from '@/lib/format';
+import { NO_VALUE, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverProposal } from '@/types';
-import { baselineOf, pctI, REVIEWED_COLOR, vcStageLabel } from './shared';
+import { baselineOf, REVIEWED_COLOR, vcStageLabel } from './shared';
 import {
   DiffusionPicker, DotBar, EditableCategoryGrid, EditableRegionGrid, EpicentreSlider,
   UncertaintyPicker,
@@ -177,17 +177,17 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
-                title={base != null ? `Baseline ${pctI(base.gp1_pct_affected)}` : undefined} style={{ flex: 1, cursor: base != null ? 'help' : undefined }} />
+                title={base != null ? `Baseline ${fmtPct(base.gp1_pct_affected, 0)}` : undefined} style={{ flex: 1, cursor: base != null ? 'help' : undefined }} />
               <input type="number" min={0} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
                 aria-label="GP1 percent exposed"
                 onChange={(e) => {
                   const n = parseInt(e.target.value, 10);
                   patch({ gp1_pct_affected: Number.isNaN(n) ? null : Math.max(0, Math.min(100, n)) / 100 });
                 }}
-                title={base != null ? `Baseline ${pctI(base.gp1_pct_affected)}` : undefined}
+                title={base != null ? `Baseline ${fmtPct(base.gp1_pct_affected, 0)}` : undefined}
                 style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
               <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
-              <BaselineRef value={base != null ? pctI(base.gp1_pct_affected) : null} />
+              <BaselineRef value={base != null ? fmtPct(base.gp1_pct_affected, 0) : null} />
             </div>
           </SectionCard>
 

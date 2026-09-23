@@ -11,13 +11,13 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
 import { ApiError } from '@/api/client';
-import { evidenceLine } from '@/lib/format';
+import { evidenceLine, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
 import type { Confidence, Direction, Driver, DriverSource, DriverUpdate, ExposureMap } from '@/types';
-import { baselineOf, curveLabel, DIFFUSION_LABELS, pctI, uncLabel, vcStageLabel } from './shared';
+import { baselineOf, curveLabel, DIFFUSION_LABELS, uncLabel, vcStageLabel } from './shared';
 import {
   CategoryExposureGrid, DiffusionGlyph, DotBar, EditableCategoryGrid, EditableRegionGrid,
   EpicentreRail, EpicentreSlider, RegionExposureGrid, UncertaintyPicker,
@@ -322,7 +322,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   fontFamily: HEADLINE_FONT,
                   fontWeight: 800, fontSize: 15, color: S.primary,
                 }}>
-                  {pctI(driver.gp1_pct_affected)}
+                  {fmtPct(driver.gp1_pct_affected, 0)}
                 </div>
               </div>
             )}

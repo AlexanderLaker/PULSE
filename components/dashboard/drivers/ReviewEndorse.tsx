@@ -9,12 +9,12 @@ import {
   Users, Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Check, MessageSquare,
 } from 'lucide-react';
 import { ApiError } from '@/api/client';
-import { CATEGORIES, NO_VALUE, REGIONS, shortCat } from '@/lib/format';
+import { CATEGORIES, NO_VALUE, REGIONS, fmtPct, shortCat } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, ProposalAgg } from '@/types';
 import {
-  baselineOf, curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, pctI, REVIEWED_COLOR, uncLabel, vcPos,
+  baselineOf, curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos,
 } from './shared';
 import { BaselineMark, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots } from './scales';
 import { FIELD_HELP, FieldLabel, ProposalsUnavailable, SectionCard, Val } from './cards';
@@ -26,7 +26,7 @@ const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (
     <div style={{ position: 'relative', height: 7, borderRadius: 7, backgroundColor: S.surfaceHigh, flex: 1, maxWidth: 150 }}>
       {v != null && <div style={{ position: 'absolute', inset: 0, width: `${Math.min(100, Math.round(v * 100))}%`, backgroundColor: color, borderRadius: 7 }} />}
     </div>
-    <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: v != null ? color : S.onSurfaceVariant }}>{pctI(v)}</span>
+    <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: v != null ? color : S.onSurfaceVariant }}>{fmtPct(v, 0)}</span>
   </div>
 );
 
@@ -320,7 +320,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve' | 'uncertainty'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
     if (rows.length === 0) return undefined;
-    return rows.map((s) => `${s.name}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
+    return rows.map((s) => `${s.name}: ${field === 'gp1_pct_affected' ? fmtPct(s[field] as number, 0) : s[field]}`).join('\n');
   };
   // The expert mean of every cell an expert scored. The API changes only the
   // cells an edit names, so a cell nobody scored keeps its current value.
@@ -415,7 +415,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     const s = srcOf('peak', ePk != null);
     if (s === 'current') return undefined;
     let n: number | undefined;
-    if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(2026, Math.min(2035, m)); }
+    if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(2025, Math.min(2035, m)); }
     else if (s === 'baseline') n = bPk;
     else n = ePk != null ? Math.round(ePk) : undefined;
     if (n == null || !Number.isFinite(n) || n < 2025 || n > 2035) return undefined;
@@ -537,7 +537,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                   expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && bG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
                 <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} baselineOk={bG != null} expertOk={eG != null}
                   manual={<span className="inline-flex items-center gap-1"><input type="number" min={1} max={100} value={man.gp1 ?? ''} onChange={(e) => setM('gp1', e.target.value)} placeholder="%" style={manInput} /><span style={{ fontSize: 12, color: S.mutedText }}>%</span></span>}
-                  result={resultOf('gp1', eG != null, pctI(resolved.gp1), pctI(driver.gp1_pct_affected))} />
+                  result={resultOf('gp1', eG != null, fmtPct(resolved.gp1, 0), fmtPct(driver.gp1_pct_affected, 0))} />
               </SectionCard>
 
               <SectionCard title="Materialization timing" icon={Clock}>
@@ -548,7 +548,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                       baseline={<Val>{bPk ?? NO_VALUE}</Val>}
                       expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null && bPk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
                     <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} baselineOk={bPk != null} expertOk={ePk != null}
-                      manual={<input type="number" min={2026} max={2035} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
+                      manual={<input type="number" min={2025} max={2035} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
                       result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year || NO_VALUE)} />
                   </div>
                   <div>

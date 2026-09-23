@@ -3,7 +3,8 @@
  * and value-chain labels, the uncertainty label, the colours of the scoring
  * modes and a driver's baseline.
  */
-import { EXPANSION, NO_VALUE } from '@/lib/format';
+import { EXPANSION } from '@/lib/format';
+import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { VC_STEPS } from '@/lib/valueChain';
 import type { Driver, DriverScores } from '@/types';
@@ -35,13 +36,9 @@ export const vcPos = (stage: number): string => `${(((stage - 0.5) / 8) * 100).t
  *  describes them). */
 export type ScoringMode = 'list' | 'input' | 'review';
 
-export const EXPERT_COLOR   = '#6b4fc4';   // the expert aggregate: violet
+export const EXPERT_COLOR   = S.expert;    // the expert aggregate: violet
 export const REVIEWED_COLOR = EXPANSION;   // an edited or endorsed value, a finished review: green
-export const DELTA_COLOR    = '#b07d2b';   // the delta chip: gold
-
-/** A share as a whole percentage: 0.22 reads "22%". */
-export const pctI = (v: number | null | undefined): string =>
-  v == null ? NO_VALUE : `${Math.round(v * 100)}%`;
+export const DELTA_COLOR    = S.delta;     // the delta chip: gold
 
 /** The scores a driver is compared with: its baseline, or its own scores
  *  while no admin has edited it. Null for an edited driver without a baseline. */
