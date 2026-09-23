@@ -32,7 +32,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
-                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code, vc_epicentre_step_of)
+                          VALID_DIFFUSION_CURVES, VC_STEPS, canonical_vc_profile, display_code,
+                          vc_epicentre_step_of)
 
 BASE = ROOT / "data" / "drivers" / "driver_base.json"
 ANALYSIS = ROOT / "data" / "drivers" / "driver_analysis.json"
@@ -51,18 +52,18 @@ def q(s) -> str:
 
 
 def first_sentence(text: str, cap: int = 220) -> str:
+    """The description's first sentence, capped. A sentence ends at . ! or ?
+    after a lowercase letter, a digit or a closing mark, so an initialism
+    ("P.L. 119-21", "U.S.") does not end one."""
     text = (text or "").strip()
-    m = re.search(r"(?<=[.!?])\s+(?=[A-Z0-9])", text)
+    m = re.search(r"(?<=[a-z0-9%)\]\"'’”][.!?])\s+(?=[A-Z0-9])", text)
     first = text[: m.start()] if m else text
     return first if len(first) <= cap else first[: cap - 1].rstrip() + "…"
 
 
-def canonical_vc_profile(epicentre: str) -> dict:
-    """The editor's 5/3/1 profile around an epicentre stage."""
-    stage = VC_STEPS.index(epicentre) + 1
-    falloff = [5, 3, 1]
-    return {step: (falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0)
-            for i, step in enumerate(VC_STEPS)}
+def epicentre_profile(epicentre: str) -> dict:
+    """The stored profile of the base's epicentre stage (prism.config.canonical_vc_profile)."""
+    return canonical_vc_profile(VC_STEPS.index(epicentre) + 1)
 
 
 def validate(drivers: list) -> None:
@@ -97,7 +98,7 @@ def validate(drivers: list) -> None:
             problems.append(f"{tag}: an exposure score outside 0-5")
         if d["vc_epicentre"] not in VC_STEPS:
             problems.append(f"{tag}: value-chain epicentre {d['vc_epicentre']!r}")
-        elif vc_epicentre_step_of(canonical_vc_profile(d["vc_epicentre"])) != d["vc_epicentre"]:
+        elif vc_epicentre_step_of(epicentre_profile(d["vc_epicentre"])) != d["vc_epicentre"]:
             problems.append(f"{tag}: the canonical profile does not reproduce its epicentre")
         if not any(s.get("tier") in SOURCE_TIERS for s in d["sources"]):
             problems.append(f"{tag}: no source of tier {'/'.join(SOURCE_TIERS)}")
@@ -117,7 +118,7 @@ def driver_from_base(d: dict, analysis: str = ""):
         gp1_pct_affected=float(d["gp1_pct_affected"]), peak_year=d["peak_year"],
         diffusion_curve=d["diffusion_curve"], uncertainty=d["uncertainty"], confidence=d["confidence"],
         category_exposure={c: d["category_exposure"][c] for c in CATEGORIES},
-        vc_exposure=canonical_vc_profile(d["vc_epicentre"]),
+        vc_exposure=epicentre_profile(d["vc_epicentre"]),
         regional_exposure={r: d["regional_exposure"][r] for r in REGIONS},
         sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "note": s.get("published", "")}
                  for s in d["sources"]],
@@ -198,7 +199,7 @@ def render_seed(drivers: list, texts: dict) -> str:
         a(f"    # {d['code']} · {d['theme']} · {d['foresight_tier']}, {d['scope']} · "
           f"megatrend: {d['megatrend']} · first observed {d['first_observed']}")
         cat, reg = d["category_exposure"], d["regional_exposure"]
-        vc = canonical_vc_profile(d["vc_epicentre"])
+        vc = epicentre_profile(d["vc_epicentre"])
         a("    Driver(")
         a(f"        id={q(d['id'])}, force={q(d['force'])},")
         a(f"        name={q(d['name'])},")
@@ -246,13 +247,13 @@ def render_codemap(drivers: list) -> str:
     a(" * cites drivers by these codes.")
     a(" */")
     a("")
-    a("export type DriverDirection = 'Expansion' | 'Contraction';")
+    a("import type { Direction, ForceName } from '@/types';")
     a("")
     a("export interface DriverCodeInfo {")
     a("  driverId: string;")
     a("  name: string;")
-    a("  force: string;")
-    a("  direction: DriverDirection;")
+    a("  force: ForceName;")
+    a("  direction: Direction;")
     a("  /** First sentence of the description, shown until the drivers API has answered. */")
     a("  fallbackDescription: string;")
     a("}")
@@ -268,7 +269,6 @@ def render_codemap(drivers: list) -> str:
     a("  Object.entries(DRIVER_CODE_MAP).map(([code, v]) => [v.driverId, code]),")
     a(");")
     a("")
-    a("export const driverIdForCode = (code: string): string | undefined => DRIVER_CODE_MAP[code]?.driverId;")
     a("export const codeForDriverId = (driverId: string): string | undefined => ID_TO_CODE[driverId];")
     return "\n".join(lines) + "\n"
 

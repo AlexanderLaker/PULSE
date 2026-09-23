@@ -41,7 +41,7 @@ or the write lock (SQLite), so nothing can write in between.
      - a description that still holds a previously shipped text gets the current
        one (descriptions.json); an edited description is left alone and reported;
      - the newest Consumer Journey content gets the key driverCodes instead of
-       trendCodes and the current tile texts where a tile field still holds the
+       trendCodes and the current tile texts where a tile field still holds a
        previously shipped text (journey_edits.json); it is saved as a new version.
 5. The migration is recorded in schema_migrations and in the audit log.
 
@@ -83,7 +83,7 @@ MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
 #: The current descriptions, with the SHA-256 of each text shipped before them.
 DESCRIPTIONS_FILE = HERE / "descriptions.json"
-#: The current journey tile texts, with the SHA-256 of the text shipped before each.
+#: The current journey tile texts, with the SHA-256 of each text shipped before them.
 JOURNEY_EDITS_FILE = HERE / "journey_edits.json"
 
 #: Previous tables this migration removes, every table before the tables it
@@ -565,7 +565,7 @@ def migrate_journey(db: Database) -> dict:
                         stored = tile.get(e["field"])
                         if stored == e["text"]:
                             already.append(f"{tile['id']}.{e['field']}")
-                        elif sha256(stored) == e["previous_sha256"]:
+                        elif sha256(stored) in e["previous_sha256"]:
                             tile[e["field"]] = e["text"]
                             applied += 1
                         else:

@@ -142,14 +142,14 @@ def compute(out_json: Path = OUT_JSON, verbose: bool = True) -> dict:
     """Derive the record from the driver base, write it to out_json and return it."""
     drivers = base_drivers()
     by_force = defaultdict(list)
-    for t in drivers:
-        by_force[t.force].append(t)
+    for drv in drivers:
+        by_force[drv.force].append(drv)
     n_force = {f: len(by_force[f]) for f in FORCES}
     say = print if verbose else (lambda *a, **k: None)
     say(f"Loaded {len(drivers)} drivers: " + ", ".join(f"{f} {n_force[f]}" for f in FORCES))
 
-    vecs = {t.id: [t.category_exposure.get(c, 0) for c in CATEGORIES] for t in drivers}
-    ids = [t.id for t in drivers]
+    vecs = {drv.id: [drv.category_exposure.get(c, 0) for c in CATEGORIES] for drv in drivers}
+    ids = [drv.id for drv in drivers]
     pair_js = [weighted_jaccard(vecs[a], vecs[b]) for a, b in itertools.combinations(ids, 2)]
     J0 = sum(pair_js) / len(pair_js)
     say(f"J0 random-pair baseline = {J0:.4f} over {len(pair_js):,} pairs")
@@ -160,7 +160,7 @@ def compute(out_json: Path = OUT_JSON, verbose: bool = True) -> dict:
     # within-force
     within_raw, within_excess, within_final = {}, {}, {}
     for f in FORCES:
-        fids = [t.id for t in by_force[f]]
+        fids = [drv.id for drv in by_force[f]]
         pairs = [weighted_jaccard(vecs[a], vecs[b]) for a, b in itertools.combinations(fids, 2)]
         m = sum(pairs) / len(pairs) if pairs else 0.0
         within_raw[f], within_excess[f] = m, excess(m)
@@ -193,7 +193,7 @@ def compute(out_json: Path = OUT_JSON, verbose: bool = True) -> dict:
     dw_mean = sum(n_force[f] * per_force_att[f] for f in FORCES) / len(drivers)
 
     # the default copula correlations must stay positive definite on this base
-    R = np.asarray(build_driver_correlation_matrix([t.force for t in drivers], DEFAULT_WITHIN_FORCE_RHO,
+    R = np.asarray(build_driver_correlation_matrix([drv.force for drv in drivers], DEFAULT_WITHIN_FORCE_RHO,
                                                   DEFAULT_FORCE_CORRELATIONS), dtype=float)
     lambda_min = float(np.linalg.eigvalsh(R).min())
 

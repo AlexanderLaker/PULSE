@@ -14,20 +14,13 @@ if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
 
 import pytest  # noqa: E402
 
-from prism.config import CATEGORIES, REGIONS, VC_STEPS, ModelConfig  # noqa: E402
+from prism.config import CATEGORIES, REGIONS, VC_STEPS, ModelConfig, canonical_vc_profile  # noqa: E402
 from prism.drivers import Driver, DriverSet  # noqa: E402
 
 
 def regions(europe: int, north_america: int, asia: int, high_growth: int) -> dict:
     """A regional exposure profile (0-5 per region) in REGIONS order."""
     return dict(zip(REGIONS, (europe, north_america, asia, high_growth)))
-
-
-def canonical_vc(stage: int) -> dict:
-    """The editor's 5/3/1 value-chain profile around a 1-based epicentre stage."""
-    falloff = [5, 3, 1]
-    return {s: (falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0)
-            for i, s in enumerate(VC_STEPS)}
 
 
 @pytest.fixture
@@ -65,7 +58,7 @@ def mock_drivers_database() -> DriverSet:
                       description="Growing demand for natural products", direction="Expansion",
                       gp1_pct_affected=0.20, probability=4, start_year=2025)
     consumer.category_exposure = {c: (3 if c == "Hair: Color" else 2 if "Hair" in c else 1) for c in CATEGORIES}
-    consumer.vc_exposure = canonical_vc(6)            # Marketing
+    consumer.vc_exposure = canonical_vc_profile(6)            # Marketing
     consumer.regional_exposure = regions(5, 3, 2, 2)  # Europe-heavy
 
     government = driver(id="government_01", force="Government", name="Microplastics Ban",
@@ -73,28 +66,28 @@ def mock_drivers_database() -> DriverSet:
                         gp1_pct_affected=0.25, probability=4, start_year=2026, peak_year=2028,
                         diffusion_curve="s_curve")
     government.category_exposure = {c: (2 if "Body" in c or "Styling" in c else 3) for c in CATEGORIES}
-    government.vc_exposure = canonical_vc(2)            # Formulation
+    government.vc_exposure = canonical_vc_profile(2)            # Formulation
     government.regional_exposure = regions(5, 4, 1, 2)  # EU regulation, low Asia
 
     technology = driver(id="technology_01", force="Technology", name="AI Personalization",
                         description="AI-driven personalised beauty recommendations", direction="Expansion",
                         gp1_pct_affected=0.12, probability=3, start_year=2026)
     technology.category_exposure = {c: 2 for c in CATEGORIES}
-    technology.vc_exposure = canonical_vc(7)            # Commercial
+    technology.vc_exposure = canonical_vc_profile(7)            # Commercial
     technology.regional_exposure = regions(3, 5, 4, 2)  # North America and Asia led
 
     environmental = driver(id="environmental_01", force="Environmental", name="Water Scarcity",
                            description="Water stress affects manufacturing", direction="Contraction",
                            gp1_pct_affected=0.08, probability=3, start_year=2027)
     environmental.category_exposure = {c: 2 for c in CATEGORIES}
-    environmental.vc_exposure = canonical_vc(3)            # Manufacturing
+    environmental.vc_exposure = canonical_vc_profile(3)            # Manufacturing
     environmental.regional_exposure = regions(4, 3, 3, 4)  # broad, High Growth tilt
 
     competitive = driver(id="competitive_01", force="Competitive", name="Private Label Growth",
                          description="Rising private label competition", direction="Contraction",
                          gp1_pct_affected=0.15, probability=4, start_year=2025)
     competitive.category_exposure = {c: 3 for c in CATEGORIES}
-    competitive.vc_exposure = canonical_vc(7)            # Commercial, shared with Technology
+    competitive.vc_exposure = canonical_vc_profile(7)            # Commercial, shared with Technology
     competitive.regional_exposure = regions(5, 2, 2, 1)  # European private label
 
     for d in (consumer, government, technology, environmental, competitive):

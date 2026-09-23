@@ -18,11 +18,11 @@ import sys
 import numpy as np
 import pytest
 
-from prism.config import (CATEGORIES, DEFAULT_CELL_WEIGHTS, DEFAULT_CELL_WEIGHTS_SOURCE, REGIONS, ModelConfig,
-                          cell_weight_marginals)
+from prism.config import (CATEGORIES, DEFAULT_CELL_WEIGHTS, DEFAULT_CELL_WEIGHTS_SOURCE, ESTIMATE_SOURCE_PREFIX,
+                          REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import validate_model_config
 from prism.drivers import Driver, DriverSet
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.simulation.engine import MonteCarloEngine
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RECORD = json.loads((REPO / "data" / "calibration" / "cell_weights_estimate.json").read_text(encoding="utf-8"))
@@ -30,7 +30,7 @@ SEED, ITER = 42, 500
 
 
 def _run(cfg, db, iterations=ITER):
-    return BayesianMonteCarloEngine(cfg, seed=SEED).run(db, iterations=iterations)
+    return MonteCarloEngine(cfg, seed=SEED).run(db, iterations=iterations)
 
 
 def _equal_matrix():
@@ -53,7 +53,7 @@ def _europe_driver(**overrides) -> DriverSet:
 
 class TestRollUpAlgebra:
     def test_equal_weights_give_the_plain_mean_of_the_regions(self, mock_model_config, mock_drivers_database):
-        eng = BayesianMonteCarloEngine(mock_model_config.copy_with(cell_weights=_equal_matrix()), seed=SEED)
+        eng = MonteCarloEngine(mock_model_config.copy_with(cell_weights=_equal_matrix()), seed=SEED)
         cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
         assert np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-15)
 
@@ -62,13 +62,13 @@ class TestRollUpAlgebra:
         region-weighted mean of its cells, iteration by iteration."""
         rw = {"Europe": 0.38, "North America": 0.26, "Asia": 0.17, "High Growth": 0.19}
         W = _outer({c: 1.0 for c in CATEGORIES}, rw)
-        eng = BayesianMonteCarloEngine(mock_model_config.copy_with(cell_weights=W), seed=SEED)
+        eng = MonteCarloEngine(mock_model_config.copy_with(cell_weights=W), seed=SEED)
         cat_s, reg_s = eng._simulate_samples(mock_drivers_database, ITER)
         weights = np.array([rw[r] for r in REGIONS])
         assert np.allclose(cat_s, (reg_s * weights[None, None, :, None]).sum(axis=2), atol=1e-15)
 
     def test_the_estimate_actually_weights(self, mock_model_config, mock_drivers_database):
-        cat_s, reg_s = BayesianMonteCarloEngine(mock_model_config, seed=SEED)._simulate_samples(
+        cat_s, reg_s = MonteCarloEngine(mock_model_config, seed=SEED)._simulate_samples(
             mock_drivers_database, ITER)
         assert not np.allclose(cat_s, reg_s.mean(axis=2), atol=1e-9)
 
@@ -118,7 +118,7 @@ class TestContract:
         assert r["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
 
     def test_multichain_carries_them_too(self, mock_model_config, mock_drivers_database):
-        r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_drivers_database, n_chains=2, iterations=150)
         assert r["cell_weights_used"]["LHC: IC"]["High Growth"] == pytest.approx(RECORD["cells"]["LHC: IC"]["High Growth"])
         assert r["category_weights_used"]["LHC: IC"] == pytest.approx(RECORD["marginals"]["category"]["LHC: IC"])
@@ -171,7 +171,9 @@ class TestEstimatedMix:
 
     def test_the_source_text_is_the_records(self):
         assert DEFAULT_CELL_WEIGHTS_SOURCE == RECORD["source"]
-        assert DEFAULT_CELL_WEIGHTS_SOURCE.startswith("ESTIMATE, not Henkel P&L")
+        # The label every run on the estimate carries; the dashboard reads the basis from it.
+        assert ESTIMATE_SOURCE_PREFIX == "ESTIMATE, not Henkel P&L"
+        assert DEFAULT_CELL_WEIGHTS_SOURCE.startswith(ESTIMATE_SOURCE_PREFIX)
 
     def test_the_generator_reproduces_both_outputs(self):
         out = subprocess.run([sys.executable, str(REPO / "scripts" / "build_cell_weights.py"), "--check"],

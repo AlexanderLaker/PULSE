@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from prism import seed_drivers
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, vc_epicentre_step_of
+from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code, vc_epicentre_step_of
 from prism.drivers import SCORE_FIELDS
 
 REPO = Path(__file__).resolve().parent.parent
@@ -117,7 +117,22 @@ class TestCodeMap:
             letter, number = code.split("-")
             assert letter == LETTER[d.force] and d.id.endswith(f"_r{number}"), code
             assert (info["name"], info["force"], info["direction"]) == (d.name, d.force, d.direction)
-            assert info["fallbackDescription"]
+            # a whole first sentence, not a fragment cut at an initialism
+            assert len(info["fallbackDescription"]) >= 40, (code, info["fallbackDescription"])
+
+    def test_an_initialism_does_not_end_the_first_sentence(self):
+        gen = _generator()
+        assert gen.first_sentence("P.L. 119-21 expanded the rules. States pay more.") == "P.L. 119-21 expanded the rules."
+        assert gen.first_sentence("Demand in the U.S. falls by 3%. Prices hold.") == "Demand in the U.S. falls by 3%."
+        assert gen.first_sentence("One sentence only") == "One sentence only"
+
+    def test_display_codes_come_from_the_id_and_the_force(self):
+        assert display_code("consumer_r01", "Consumer") == "C-01"
+        assert display_code("customer_r13", "Customer") == "K-13"
+        assert display_code("competitive_r15", "Competitive") == "X-15"
+        with pytest.raises(ValueError):
+            display_code("consumer_new", "Consumer")
+        assert {display_code(d.id, d.force) for d in seed_drivers.DRIVERS} == set(_codemap())
 
     def test_the_journey_cites_live_drivers_only(self):
         live = _codemap()

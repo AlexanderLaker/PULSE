@@ -144,8 +144,8 @@ class TestCellWeightsFile:
 
 class TestWorkbook:
     def _result(self, config, db):
-        from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
-        return BayesianMonteCarloEngine(config, seed=42).run_multichain(db, n_chains=2, iterations=200)
+        from prism.simulation.engine import MonteCarloEngine
+        return MonteCarloEngine(config, seed=42).run_multichain(db, n_chains=2, iterations=200)
 
     def test_sheets_and_read_back(self, tmp_path, mock_model_config, mock_drivers_database):
         import openpyxl
@@ -209,22 +209,6 @@ class TestSyncAnalysis:
             assert cursor.fetchone()[0] == 2
         assert sync.main([]) == 0
         assert "0 with an outdated analysis" in capsys.readouterr().out
-
-    def test_the_texts_of_another_rendering(self, seeded, tmp_path, capsys):
-        """--texts writes a rendering outside the repository, such as the build on the finance shares."""
-        import json
-        sync = _load("sync_analysis", REPO / "scripts" / "sync_analysis.py")
-        rendering = tmp_path / "driver_analysis.json"
-        rendering.write_text(json.dumps({"drivers": {"C-01": {"template": "t", "text": "on the finance shares"}}}))
-        assert sync.main(["--texts", str(rendering)]) == 0
-        assert "1 with an outdated analysis" in capsys.readouterr().out
-        analyses = {d.id: d.analysis for d in seeded.load_drivers()}
-        from prism.seed_drivers import DRIVERS
-        assert analyses["consumer_r01"] == "on the finance shares"
-        assert all(analyses[d.id] == d.analysis for d in DRIVERS if d.id != "consumer_r01")
-        rendering.write_text(json.dumps({"drivers": {"Z-99": {"template": "t", "text": "x"}}}))
-        with pytest.raises(SystemExit, match="Z-99"):
-            sync.main(["--texts", str(rendering)])
 
     def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path, capsys):
         import sqlite3

@@ -7,14 +7,13 @@ uniformly stronger attenuation never shrinks the headline.
 import dataclasses
 import math
 
-import numpy as np
 import pytest
 from hypothesis import given, settings, strategies as st, HealthCheck
 
 from prism.config import ModelConfig
 from prism.drivers import DriverSet
 from prism.seed_drivers import get_seed_drivers
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.simulation.engine import MonteCarloEngine
 
 
 @pytest.fixture(scope="module")
@@ -28,7 +27,7 @@ def db():
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
 def test_percentiles_are_monotone(db, seed):
-    r = BayesianMonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
+    r = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
     for cat, cd in r["shift_matrix"].items():
         for year, pct in cd["path"].items():
             p10, p25, med, p75, p90 = (
@@ -46,7 +45,7 @@ def test_percentiles_are_monotone(db, seed):
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
 def test_output_is_finite(db, seed):
-    r = BayesianMonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
+    r = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=300)
     for cat, cd in r["shift_matrix"].items():
         for year, pct in cd["path"].items():
             for k, v in pct.items():
@@ -59,8 +58,8 @@ def test_output_is_finite(db, seed):
           suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(seed=st.integers(min_value=0, max_value=10_000))
 def test_seed_reproducibility(db, seed):
-    a = BayesianMonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
-    b = BayesianMonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
+    a = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
+    b = MonteCarloEngine(ModelConfig(), seed=seed).run(db, iterations=250)
     for cat in a["shift_matrix"]:
         for year in a["shift_matrix"][cat]["path"]:
             ma = a["shift_matrix"][cat]["path"][year]["median"]
@@ -92,31 +91,25 @@ def test_copy_with_is_pure(att, iters):
 
 # ── Invariant 5: attenuation monotonicity of |headline| ─────────────
 # Every per-force attenuation is scaled by one factor; under a fixed seed the
-# magnitude of the headline must not fall as the factor rises (the base is
-# net contraction, so a larger pass-through amplifies it).
+# magnitude of the headline (the terminal-year portfolio median) must not
+# fall as the factor rises (the base is net contraction, so a larger
+# pass-through amplifies it).
 
 @pytest.mark.parametrize("seed", [1, 7, 42])
 def test_attenuation_monotonic_in_headline(db, seed):
     from prism.config import FORCES
     base_pfa = ModelConfig().per_force_attenuation
 
-    def _headline(factor):
+    def headline(factor):
         scaled = {f: max(0.0, min(1.0, base_pfa[f] * factor)) for f in FORCES}
-        cfg = ModelConfig().copy_with(
-            per_force_attenuation=scaled,
-            attenuation_source="admin_override",
-        )
-        r = BayesianMonteCarloEngine(cfg, seed=seed).run(db, iterations=400)
-        last_year = cfg.path_years[-1]
-        meds = [
-            cd["path"][last_year]["median"]
-            for cd in r["shift_matrix"].values()
-        ]
-        return float(np.mean(meds))
+        cfg = ModelConfig().copy_with(per_force_attenuation=scaled,
+                                      attenuation_source=f"test: attenuation x {factor}")
+        r = MonteCarloEngine(cfg, seed=seed).run(db, iterations=400)
+        return float(r["totals"]["portfolio"][cfg.path_years[-1]]["median"])
 
-    h_low = _headline(0.70)   # 30 percent below the default
-    h_base = _headline(1.00)
-    h_high = _headline(1.30)  # 30 percent above
+    h_low = headline(0.70)   # 30 percent below the default
+    h_base = headline(1.00)
+    h_high = headline(1.30)  # 30 percent above
     # monotone in magnitude, with a small tolerance for sampling noise
     assert abs(h_low) <= abs(h_base) + 0.005, (
         f"|headline| not monotone low vs base: {h_low} {h_base}"

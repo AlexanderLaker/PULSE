@@ -2,12 +2,12 @@
 # Build a handover archive: PRISM_HANDOVER_<date>.zip at the repository root,
 # holding a git repository with a single commit of the tracked tree at HEAD.
 #
-# `git archive` exports tracked files only, so .env, .clerk/, local databases
-# and run outputs never reach the archive. A tracked file is exported even if
-# a later .gitignore rule matches it, so the safety gate below checks the
-# exported tree itself: forbidden paths and secret-shaped strings stop the
-# build. The database is handed over separately (pg_dump), and every
-# credential is rotated at handover.
+# `git archive` exports tracked files only, so .env, .clerk/, local databases,
+# workbooks and run outputs never reach the archive. A tracked file is
+# exported even if a later .gitignore rule matches it, so the safety gate
+# below checks the exported tree itself: forbidden paths and secret-shaped
+# strings stop the build. The database is handed over separately (pg_dump),
+# and every credential is rotated at handover.
 #
 # Usage: bash scripts/package_handover.sh
 set -euo pipefail
@@ -30,19 +30,26 @@ echo "Packaging $(git rev-parse --abbrev-ref HEAD) at ${HEAD_SHA}"
 git archive HEAD | tar -x -C "$STAGE"
 
 fail=0
-# Any .env file but the example, local state and the internal record.
+# Any .env file but the example.
 for path in "$STAGE"/.env*; do
   [ -e "$path" ] || continue
   [ "$(basename "$path")" = ".env.example" ] && continue
   echo "Forbidden path in the archive: $(basename "$path")" >&2
   fail=1
 done
-for forbidden in .clerk _NOT_FOR_HANDOVER data/prism.db runs; do
-  if [ -e "$STAGE/$forbidden" ]; then
-    echo "Forbidden path in the archive: $forbidden" >&2
-    fail=1
-  fi
+# Local state: Clerk's folder, the local working folders (a leading
+# underscore), run outputs and archives; and, anywhere in the tree, database
+# files and workbooks, which can hold confidential figures.
+for path in "$STAGE"/.clerk "$STAGE"/_* "$STAGE"/runs "$STAGE"/archive; do
+  [ -e "$path" ] || continue
+  echo "Forbidden path in the archive: ${path#"$STAGE"/}" >&2
+  fail=1
 done
+while IFS= read -r path; do
+  echo "Forbidden file in the archive: ${path#"$STAGE"/}" >&2
+  fail=1
+done < <(find "$STAGE" -type f \( -name '*.db' -o -name '*.db-*' -o -name '*.sqlite' -o -name '*.sqlite3' \
+                                  -o -name '*.xlsx' \))
 # A Clerk secret key, or a connection string with a password. The test
 # database on localhost (CI and docs/OPERATIONS.md) is not a secret.
 # Each match is checked on its own, so a local URL cannot hide a real one on
@@ -56,17 +63,17 @@ if [ -n "$hits" ]; then
   fail=1
 fi
 [ "$fail" -ne 0 ] && exit 1
-echo "Safety check passed: no secrets, no local databases, no run outputs"
+echo "Safety check passed: no secrets, no local databases or workbooks, no run outputs"
 
 (
   cd "$STAGE"
   git init -q -b main
   git add -A
   git -c user.name="PRISM Handover" -c user.email="handover@prism.local" \
-      commit -q -m "PRISM ${DATE}" -m "Exported from ${HEAD_SHA} with a fresh history."
+      commit -q -m "PRISM ${DATE}"
 )
 
 rm -f "$REPO_ROOT/$OUT"
 ( cd "$STAGE" && zip -qr "$REPO_ROOT/$OUT" . )
-echo "Wrote $OUT ($(du -h "$REPO_ROOT/$OUT" | cut -f1), $(find "$STAGE" -type f ! -path '*/.git/*' | wc -l | tr -d ' ') files)"
+echo "Wrote $OUT from ${HEAD_SHA} ($(du -h "$REPO_ROOT/$OUT" | cut -f1), $(find "$STAGE" -type f ! -path '*/.git/*' | wc -l | tr -d ' ') files)"
 echo "Still to do by hand: pg_dump of the database, rotation of every credential (docs/OPERATIONS.md)."

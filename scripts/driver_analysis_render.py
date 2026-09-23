@@ -24,8 +24,9 @@ LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the b
 BASIS_LABEL = "Figures"
 
 #: Category names in the texts: the labels the page shows (lib/format.ts
-#: CATEGORY_DISPLAY), in lower case, so a cell reads "fabric clean Europe"
-#: and the reader can find it in the Shift Matrix without a second table.
+#: CATEGORIES) in lower case, the hair ones named in full ("hair colour",
+#: "body care"), so a cell reads "fabric clean Europe" and the reader can find
+#: it in the Shift Matrix without a second table.
 CATEGORY_SHORT = {
     "Hair: Color": "hair colour", "Hair: Care": "hair care",
     "Hair: Styling": "hair styling", "Hair: Body": "body care",
@@ -35,7 +36,6 @@ CATEGORY_SHORT = {
     "LHC: HSC": "hard-surface cleaner", "LHC: TOI": "toilet care",
     "LHC: IC": "insect control",
 }
-TOP_CELLS = 6
 #: The diffusion curves as the readings name them.
 CURVE_NAMES = {"front_loaded": "front-loaded", "s_curve": "s-curve", "linear": "linear",
                "back_loaded": "back-loaded", "step_function": "step"}
@@ -76,15 +76,22 @@ def cell_label(cat: str, region: str) -> str:
 
 def basis_line(rec: dict) -> str:
     """One sentence naming what the figures reconcile to, in terms a reader can
-    check against the dashboard headline."""
+    check against the dashboard headline.
+
+    The templates are written for the estimated gross-profit mix (several
+    compare shares of it in words), so a record built on other cell weights
+    is refused rather than rendered under the estimate's wording.
+    """
     ref = rec["reference_run"]
     source = str(rec["basis"]["cell_weights_source"])
-    weights = ("the estimated HCB gross-profit mix" if source.startswith(ESTIMATE_SOURCE_PREFIX)
-               else "the finance cell weights")
+    if not source.startswith(ESTIMATE_SOURCE_PREFIX):
+        raise ValueError("the PRISM Analysis templates are written for the estimated gross-profit mix; this record "
+                         f"is built on other cell weights ({source[:60]}...)")
     median = float(ref["portfolio_terminal"]["median"]) * 100
     recipe = f"{ref['chains']} x {ref['iterations']:,} iterations, seed {ref['seed']}"
-    return (f"{BASIS_LABEL}: model attribution on {weights}, reconciled to a 2035 portfolio median of "
-            f"{median:+.1f} percent ({recipe}). Read as exposure if nobody acts, not as a forecast.")
+    return (f"{BASIS_LABEL}: model attribution on the estimated HCB gross-profit mix, reconciled to a 2035 "
+            f"portfolio median of {median:+.1f} percent ({recipe}). Read as exposure if nobody acts, not as a "
+            f"forecast.")
 
 
 def render_fields(rec: dict, drv: dict) -> dict:
@@ -131,7 +138,7 @@ def render_fields(rec: dict, drv: dict) -> dict:
         "by2033": pct(sr["2033"]),
         "half_year": str(t["half_year"] or ""),
         "full_year": str(full_year or ""),
-        "mat2035": pct(t["expected_materialisation"]["2035"]),
+        "mat2035": pct(t["expected_materialization"]["2035"]),
         "p10": fmt_pp(band["p10_pp"]),
         "p90": fmt_pp(band["p90_pp"]),
         "lo": fmt_pp(min(abs(band["p10_pp"]), abs(band["p90_pp"]))),
@@ -171,7 +178,7 @@ def render_fields(rec: dict, drv: dict) -> dict:
     if cat_pool:
         f["pool_lhc"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("LHC")))
         f["pool_hair"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("Hair")))
-    for i, c in enumerate(cells[:TOP_CELLS], start=1):
+    for i, c in enumerate(cells, start=1):   # the record's largest cells, in order
         f[f"cell{i}"] = cell_label(c["category"], c["region"])
         f[f"cell{i}_pp"] = fmt_pp(c["pp"])
         f[f"cell{i}_share"] = pct(c["share_of_driver"])

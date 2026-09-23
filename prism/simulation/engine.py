@@ -42,7 +42,6 @@ NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 logger = logging.getLogger(__name__)
 
 
-
 def distribution(values: np.ndarray) -> dict:
     """P10, P25, median, P75, P90, mean and standard deviation of a sample."""
     return {
@@ -55,8 +54,10 @@ def distribution(values: np.ndarray) -> dict:
         "std": float(np.std(values)),
     }
 
+
 #: Seed of the bootstrap behind mc_standard_error, fixed so the reported
-#: standard errors of a run are reproducible.
+#: standard errors of a run are reproducible (any fixed value would do;
+#: changing it moves the reported errors, not the shifts).
 MC_SE_BOOTSTRAP_SEED = 20260713
 
 
@@ -87,15 +88,23 @@ def floor_event(count: int) -> dict:
     }
 
 
-class BayesianMonteCarloEngine:
-    """Simulates the relative shift of every category and cell over the horizon."""
+class MonteCarloEngine:
+    """Simulates the relative shift of every category and cell over the horizon.
+
+    ``run`` and ``run_multichain`` produce a result. The other public members
+    (the effective attenuation, the cell-weight matrices, the correlation
+    matrix, the copula sampler and the peak-year schedule and draws) are the
+    engine's own arithmetic, which scripts/build_driver_analysis.py reuses so
+    that its decomposition of a result is exact; the underscored ones are
+    internal.
+    """
 
     #: Version of the model. A change to any number it produces means a new
     #: version, regenerated golden pins in the same commit, and a new production
     #: run. A result key the dashboard needs is listed in prism/api/runs.py,
     #: which refuses to serve a run without it.
     MODEL_VERSION = "2.12.0"
-    ENGINE_NAME = "bayesian_copula"
+    ENGINE_NAME = "beta_copula"
 
     def __init__(self, config: ModelConfig, seed: int = 42):
         self.config = config
@@ -105,7 +114,7 @@ class BayesianMonteCarloEngine:
         # with the result and shown next to the run.
         self._integrity_events: list[dict] = []
         self._floored_factor_cells: int = 0
-        self._effective_attenuation = self._compute_effective_attenuation()
+        self.effective_attenuation = self._compute_effective_attenuation()
 
     def _compute_effective_attenuation(self) -> dict:
         """Per-force attenuation from the configuration; all six forces required."""
@@ -149,7 +158,7 @@ class BayesianMonteCarloEngine:
 
     # ── Cell weights ────────────────────────────────────────────────────────
 
-    def _cell_weight_matrix(self) -> np.ndarray:
+    def cell_weight_matrix(self) -> np.ndarray:
         """Gross-profit share matrix W, (categories x regions), normalised to sum 1.
 
         An empty or all-zero configuration falls back to a flat grid with an
@@ -177,13 +186,13 @@ class BayesianMonteCarloEngine:
             total = 1.0
         return W / total
 
-    def _row_normalised_cell_weights(self) -> np.ndarray:
+    def row_normalized_cell_weights(self) -> np.ndarray:
         """Each row of W divided by its sum: a category's regional weights.
 
         A category with no gross profit in any region is averaged with equal
         weights and reported; it carries weight 0 in the portfolio anyway.
         """
-        W = self._cell_weight_matrix()
+        W = self.cell_weight_matrix()
         rows = W.sum(axis=1)
         Wn = np.zeros_like(W)
         zero_rows = []
@@ -210,11 +219,11 @@ class BayesianMonteCarloEngine:
 
     def _category_weight_vector(self) -> np.ndarray:
         """Portfolio weight of each category: the row sums of W."""
-        return self._cell_weight_matrix().sum(axis=1)
+        return self.cell_weight_matrix().sum(axis=1)
 
     def _weights_used(self) -> dict:
         """The weights the run actually applied, as returned with the result."""
-        W = self._cell_weight_matrix()
+        W = self.cell_weight_matrix()
         cats = self.config.category_names
         return {
             "cell_weights_used": {
@@ -243,14 +252,14 @@ class BayesianMonteCarloEngine:
         if problems:
             raise InvalidDriversError(problems)
 
-        corr_matrix = self._build_correlation_matrix(drivers)
-        raw_samples = self._generate_copula_samples(drivers, corr_matrix, n_iter)
+        corr_matrix = self.build_correlation_matrix(drivers)
+        raw_samples = self.generate_copula_samples(drivers, corr_matrix, n_iter)
         cell_samples = self._compute_all_paths_vectorized(
             drivers, raw_samples, n_iter, n_cats, n_regions, n_years
         )
         # Cell index is c * n_regions + r, so the reshape splits cleanly.
         regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
-        Wn = self._row_normalised_cell_weights()
+        Wn = self.row_normalized_cell_weights()
         category_samples = np.einsum("icry,cr->icy", regional_samples, Wn)
         return category_samples, regional_samples
 
@@ -277,7 +286,7 @@ class BayesianMonteCarloEngine:
                 out[cat][region] = {"path": path, "velocity": velocity}
         return out
 
-    def _build_correlation_matrix(self, drivers: list) -> np.ndarray:
+    def build_correlation_matrix(self, drivers: list) -> np.ndarray:
         """Driver-level correlation matrix, repaired (and reported) if not positive definite."""
         n = len(drivers)
         if n == 0:
@@ -299,7 +308,7 @@ class BayesianMonteCarloEngine:
             R = R / np.outer(d, d)
         return R
 
-    def _generate_copula_samples(self, drivers: list, R: np.ndarray, n_iter: int) -> np.ndarray:
+    def generate_copula_samples(self, drivers: list, R: np.ndarray, n_iter: int) -> np.ndarray:
         """Correlated signed scores, (iterations, drivers).
 
         Z ~ N(0, R), U = Phi(Z), probability = BetaInv(U; alpha, beta), and the
@@ -337,7 +346,7 @@ class BayesianMonteCarloEngine:
             samples[:, j] = prob_01 * driver.gp1_pct_affected * driver.direction_sign
         return samples
 
-    def _peak_schedule_table(self, drivers: list) -> tuple:
+    def peak_schedule_table(self, drivers: list) -> tuple:
         """Materialisation schedules over each driver's peak-year offsets.
 
         Returns ``(sched_table, offsets, off_probs_by_driver)``:
@@ -385,7 +394,7 @@ class BayesianMonteCarloEngine:
                     sched_table[j, k, y_idx] = sched.get(yr, 1.0)
         return sched_table, offsets, off_probs_by_driver
 
-    def _draw_peak_offsets(self, off_probs_by_driver: np.ndarray, n_iter: int) -> np.ndarray:
+    def draw_peak_offsets(self, off_probs_by_driver: np.ndarray, n_iter: int) -> np.ndarray:
         """Peak-year offset index per (iteration, driver), by inverse-CDF sampling.
 
         One uniform per (iteration, driver) against the driver's own CDF row.
@@ -455,11 +464,11 @@ class BayesianMonteCarloEngine:
                 "detail": {"count": len(regionless), "driver_ids": regionless[:50]},
             })
 
-        sched_table, offsets, off_probs_by_driver = self._peak_schedule_table(drivers)
-        offset_idx = self._draw_peak_offsets(off_probs_by_driver, n_iter)
+        sched_table, offsets, off_probs_by_driver = self.peak_schedule_table(drivers)
+        offset_idx = self.draw_peak_offsets(off_probs_by_driver, n_iter)
         driver_arange = np.arange(n_drivers)
 
-        eff_att = np.array([self._effective_attenuation[f] for f in force_list])
+        eff_att = np.array([self.effective_attenuation[f] for f in force_list])
 
         # Within-force dampening per force and cell: 1 - overlap x (n_eff - 1) / n_eff,
         # where n_eff = (sum m)^2 / sum m^2 is the participation ratio of the
@@ -598,7 +607,7 @@ class BayesianMonteCarloEngine:
         cats = list(self.config.category_names)
         # Region lens: each (category, region) cell weighted by its own share
         # of the category's gross profit.
-        Wn_lens = self._row_normalised_cell_weights()
+        Wn_lens = self.row_normalized_cell_weights()
         presences = [region_presence(d) for d in drivers]
         force_shares: dict = {}
         region_shares: dict = {}
@@ -747,7 +756,7 @@ class BayesianMonteCarloEngine:
         per_chain_reg = []
         chain_engines = []
         for s in seeds:
-            engine = BayesianMonteCarloEngine(self.config, seed=s)
+            engine = MonteCarloEngine(self.config, seed=s)
             cat_s, reg_s = engine._simulate_samples(db, iterations or self.config.iterations)
             per_chain_cat.append(cat_s)
             per_chain_reg.append(reg_s)

@@ -8,13 +8,13 @@
  * cites drivers by these codes.
  */
 
-export type DriverDirection = 'Expansion' | 'Contraction';
+import type { Direction, ForceName } from '@/types';
 
 export interface DriverCodeInfo {
   driverId: string;
   name: string;
-  force: string;
-  direction: DriverDirection;
+  force: ForceName;
+  direction: Direction;
   /** First sentence of the description, shown until the drivers API has answered. */
   fallbackDescription: string;
 }
@@ -51,7 +51,7 @@ export const DRIVER_CODE_MAP: Record<string, DriverCodeInfo> = {
   'G-06': {"driverId": "government_r06", "name": "Nature and supply-chain due-diligence stack: EUDR (30 December 2026) and CSDDD (26 July 2029, post-Omnibus)", "force": "Government", "direction": "Contraction", "fallbackDescription": "EUDR applies from 30 December 2026 for large and medium operators (30 June 2027 for micro and small) after Regulation (EU) 2025/2650, which also relieves downstream operators: they collect and keep suppliers' due-dilige…"},
   'G-08': {"driverId": "government_r08", "name": "US tariff regime after IEEPA (Section 301/232/122) and transatlantic trade friction", "force": "Government", "direction": "Contraction", "fallbackDescription": "The Supreme Court struck down the IEEPA tariffs on 20 February 2026 (6-3) and refunds accelerated from May 2026; the replacement regime is a Section 122 surcharge of 10% (24 February to 24 July 2026) followed by Section…"},
   'G-13': {"driverId": "government_r13", "name": "MoCRA (in force; GMP and allergen rules delayed) and US state ingredient bans (WA/CO/MN/CA 2025, VT/ME 2026, OR/NM 2027)", "force": "Government", "direction": "Contraction", "fallbackDescription": "MoCRA's registration, listing, adverse-event and safety-substantiation duties are live (more than 16,000 facilities and over a million product listings registered by mid-2026), but the federal layer has turned deregulat…"},
-  'G-15': {"driverId": "government_r15", "name": "US low-income transfer retrenchment (SNAP work requirements from Nov 2025, state cost-share from FY2028) shrinks mass-market demand", "force": "Government", "direction": "Contraction", "fallbackDescription": "P.L."},
+  'G-15': {"driverId": "government_r15", "name": "US low-income transfer retrenchment (SNAP work requirements from Nov 2025, state cost-share from FY2028) shrinks mass-market demand", "force": "Government", "direction": "Contraction", "fallbackDescription": "P.L. 119-21 expanded SNAP work requirements (USDA ended all existing waivers on 2 November 2025) and shifts up to 15% of benefit costs to states, tiered by payment error rate, from 1 October 2027."},
   'G-16': {"driverId": "government_r16", "name": "EU Detergents and Surfactants Regulation 2026/405 (DPP and digital label from Sept 2029, film biodegradability criteria by 2032, phosphorus review) plus CLP relabelling 2026-29", "force": "Government", "direction": "Contraction", "fallbackDescription": "Regulation (EU) 2026/405 of 11 February 2026 (OJ 2 March 2026, in force 22 March 2026) applies from 23 September 2029: a digital product passport and unique identifier for every detergent and end-user surfactant placed…"},
   'G-17': {"driverId": "government_r17", "name": "EU Urban Wastewater Treatment Directive (2024/3019): extended producer responsibility for cosmetics funds quaternary treatment (schemes by end-2028, fees from 2029)", "force": "Government", "direction": "Contraction", "fallbackDescription": "Directive (EU) 2024/3019 makes producers of medicinal products and cosmetics cover at least 80% of the investment and operating cost of quaternary (micropollutant) treatment plus monitoring, through national EPR schemes…"},
   'K-01': {"driverId": "customer_r01", "name": "Discount channel share gain in Europe and the US (Aldi, Lidl; variety discounters as price-floor channels)", "force": "Customer", "direction": "Contraction", "fallbackDescription": "Discounters hold 46.6% of German food-retail revenue (EHI, 2024 data) and remain Europe's fastest-growing physical channel outside Germany: Lidl grew 6.1% to EUR 140bn in FY2025, Aldi Nord grew 7.4% group-wide to about…"},
@@ -77,5 +77,4 @@ const ID_TO_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(DRIVER_CODE_MAP).map(([code, v]) => [v.driverId, code]),
 );
 
-export const driverIdForCode = (code: string): string | undefined => DRIVER_CODE_MAP[code]?.driverId;
 export const codeForDriverId = (driverId: string): string | undefined => ID_TO_CODE[driverId];

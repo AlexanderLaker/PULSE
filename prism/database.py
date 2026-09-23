@@ -423,7 +423,9 @@ class AuditEntry:
     user_id: str = "system"
 
 
-def _insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
+def insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
+    """Write audit entries with the caller's cursor, so they commit or roll
+    back with the change they record."""
     for e in entries:
         cursor.execute(
             f"INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id) "
@@ -469,8 +471,9 @@ def _write_driver_children(cursor, d: Driver) -> None:
 def save_drivers(drivers: List[Driver]) -> None:
     """Insert or replace drivers, keeping each row (and its proposals) alive.
 
-    Used to seed a new database. The driver row is upserted, never deleted,
-    because expert proposals reference it with ON DELETE CASCADE. The exposure
+    Used to seed a new database. The driver row is updated in place (an
+    upsert), never deleted and inserted again, because expert proposals
+    reference it with ON DELETE CASCADE. The exposure
     and source rows are rewritten from the object. ``created_at`` survives;
     ``updated_at`` is refreshed and ``revision`` goes up by one.
     """
@@ -511,7 +514,7 @@ def save_driver_edit(driver: Driver, expected_revision: int, audit: Sequence[Aud
             row = cursor.fetchone()
             raise StaleRevisionError(driver.id, int(expected_revision), int(_row(row)["revision"]) if row else None)
         _write_driver_children(cursor, driver)
-        _insert_audit(cursor, audit)
+        insert_audit(cursor, audit)
     return int(expected_revision) + 1
 
 
@@ -683,7 +686,7 @@ def save_journey_content(content: dict, updated_by: str, base_version: int,
             cursor.execute(sql, (dumps(content), updated_by or ""))
             version = int(cursor.lastrowid)
         if audit is not None:
-            _insert_audit(cursor, [audit(version)])
+            insert_audit(cursor, [audit(version)])
     logger.info("Saved journey content version %d (by %s)", version, updated_by or "unknown")
     return version
 

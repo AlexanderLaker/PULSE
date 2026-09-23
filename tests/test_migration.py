@@ -147,10 +147,11 @@ STORED_JOURNEY = {
               "negativelyImpacted": [{"id": "t.d", "name": "D", "trendCodes": [], "driverNote": "Earlier note D."}]}],
 }
 JOURNEY_EDITS = [
-    {"tile": "t.a", "field": "analysis", "previous_sha256": sha("Earlier read A."), "text": "Current read A."},
-    {"tile": "t.b", "field": "analysis", "previous_sha256": sha("Earlier read B."), "text": "Current read B."},
-    {"tile": "t.c", "field": "analysis", "previous_sha256": sha("Earlier read C."), "text": "Current read C."},
-    {"tile": "t.d", "field": "driverNote", "previous_sha256": sha("Earlier note D."), "text": "Current note D."},
+    {"tile": "t.a", "field": "analysis", "previous_sha256": [sha("First read A."), sha("Earlier read A.")],
+     "text": "Current read A."},
+    {"tile": "t.b", "field": "analysis", "previous_sha256": [sha("Earlier read B.")], "text": "Current read B."},
+    {"tile": "t.c", "field": "analysis", "previous_sha256": [sha("Earlier read C.")], "text": "Current read C."},
+    {"tile": "t.d", "field": "driverNote", "previous_sha256": [sha("Earlier note D.")], "text": "Current note D."},
 ]
 DESCRIPTION_EDITS = {
     "consumer_r01": {"previous_sha256": [sha(PREVIOUS_DESCRIPTION)], "text": SEED["consumer_r01"].description},
@@ -615,8 +616,17 @@ class TestShippedEditFiles:
         for e in edits:
             assert e["tile"] in tiles, e["tile"]
             assert tiles[e["tile"]][e["field"]] == e["text"], (e["tile"], e["field"])
-            assert re.fullmatch(r"[0-9a-f]{64}", e["previous_sha256"]) and sha(e["text"]) != e["previous_sha256"]
+            assert e["previous_sha256"] and all(re.fullmatch(r"[0-9a-f]{64}", h) for h in e["previous_sha256"])
+            assert sha(e["text"]) not in e["previous_sha256"], (e["tile"], e["field"])
         assert len({(e["tile"], e["field"]) for e in edits}) == len(edits)
+
+    def test_the_shipped_tiles_write_their_paragraph_breaks_out(self):
+        """A Strategist Read separates its paragraphs with a blank line, never with
+        an escaped one; the stored copy follows through journey_edits.json."""
+        texts = [t.get("analysis") or "" for journey in shipped_journey().values() for stage in journey
+                 for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])]
+        assert sum("\n\n" in t for t in texts) >= 250
+        assert not any("\\n" in t for t in texts)
 
 
 # ── PostgreSQL (PRISM_TEST_POSTGRES_URL) ────────────────────────────────────

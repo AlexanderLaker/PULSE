@@ -23,7 +23,7 @@ export const GRADE_LEGEND: Record<Grade, string> = {
   "G": "guess, low confidence, carried only because a cell needs a number"
 } as const;
 
-/** The default matrix itself, for detecting whether the live grid is still the estimate. */
+/** The default matrix itself: Settings shows the derivation only for a run whose weights are these. */
 export const ESTIMATED_CELL_WEIGHTS: Record<string, Record<string, number>> = {
   "Hair: Color": {
     "Europe": 0.094047313,

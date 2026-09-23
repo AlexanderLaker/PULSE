@@ -3,8 +3,7 @@
     python3 scripts/build_driver_analysis.py                  record, parity fixture and texts
     python3 scripts/build_driver_analysis.py --reference      also re-run the 3 x 50,000 reference run
     python3 scripts/build_driver_analysis.py --check          CI: the committed files match this code
-    python3 scripts/build_driver_analysis.py --workbook FILE        record which production run is reproduced
-    python3 scripts/build_driver_analysis.py --cell-weights FILE    build on the finance shares, into runs/
+    python3 scripts/build_driver_analysis.py --workbook FILE   record which production run is reproduced
 
 Files
   data/drivers/driver_attribution.json   the figures (generated)
@@ -14,11 +13,11 @@ Files
                                          parity fixture for lib/driverAttribution.ts, the
                                          port of the decomposition the category drill-down uses
 
-The committed files are built on the estimated gross-profit mix. A build on
-the finance shares (--cell-weights FILE) quotes those shares, which stay out
-of the repository, so it writes its record and texts to runs/driver_analysis/
-(git-ignored) instead; scripts/sync_analysis.py --texts writes such texts into
-a database.
+The files are built on the default cell weights, the estimated gross-profit
+mix, and the templates are written for it: several name the estimate and
+compare shares of it in words. There is deliberately no option to render them
+on other shares; readings on the finance shares need templates written for
+those shares first (docs/DRIVER_ANALYSIS.md, "On the finance shares").
 
 What the record is
   The engine's own arithmetic, evaluated at the score means instead of at
@@ -102,7 +101,7 @@ import numpy as np  # noqa: E402
 from prism.config import (DEFAULT_PATH_YEARS, FORCES, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
                           PRODUCTION_SEED, REGIONS, ModelConfig, display_code)
 from prism.drivers import DriverSet  # noqa: E402
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
+from prism.simulation.engine import MonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
 from scripts.driver_analysis_render import render_all  # noqa: E402
 
 DATA_DIR = os.path.join(REPO, "data", "drivers")
@@ -111,12 +110,14 @@ ANALYSIS_PATH = os.path.join(DATA_DIR, "driver_analysis.json")
 #: Parity fixture for lib/driverAttribution.ts (the category drill-down uses
 #: the same decomposition): the inputs and the unscaled expected outputs.
 FIXTURE_PATH = os.path.join(REPO, "tests", "frontend", "fixtures", "driverAttribution.fixture.json")
-#: Where a build on the finance shares goes: git-ignored, never committed.
-LOCAL_DIR = os.path.join(REPO, "runs", "driver_analysis")
 
 TERMINAL_YEAR = DEFAULT_PATH_YEARS[-1]
+#: The draws behind each driver's band share, with a fixed seed so the shares
+#: are reproducible (any fixed value would do; changing it moves the shares).
 BAND_DRAWS = 200_000
 BAND_SEED = 20260917
+#: How many of its largest cells, and same-force partners per cell, the
+#: record keeps for each driver.
 TOP_CELLS = 6
 TOP_PARTNERS = 3
 
@@ -129,18 +130,11 @@ def load_drivers() -> list:
     return base_drivers()
 
 
-def load_cell_weights_file(path: str) -> tuple:
-    """(shares, source) from a finance file, read exactly as run_production.py reads it."""
-    from scripts.run_production import load_cell_weights_file as _load
-    from pathlib import Path
-    return _load(Path(path))
-
-
 # ── the decomposition ──────────────────────────────────────────────────
 
 def decompose(config: ModelConfig, drivers: list) -> dict:
     """Evaluate the engine's arithmetic at the score means, per driver."""
-    eng = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED)
+    eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
     cats = list(config.category_names)
     years = [int(y) for y in config.path_years]
     n, nc, nr, ny = len(drivers), len(cats), len(REGIONS), len(years)
@@ -149,23 +143,23 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     nf = len(forces)
 
     fw = np.array([config.force_weights.get(f, 1.0 / nf) for f in forces])
-    att = np.array([eng._effective_attenuation[f] for f in forces])
-    fidx = np.array([forces.index(t.force) for t in drivers])
+    att = np.array([eng.effective_attenuation[f] for f in forces])
+    fidx = np.array([forces.index(drv.force) for drv in drivers])
 
     # Composite cell exposure, exactly as the engine builds it.
     region_w = np.zeros((n, nr))
     regionless = []
-    for j, t in enumerate(drivers):
-        reg = t.regional_exposure or {}
+    for j, drv in enumerate(drivers):
+        reg = drv.regional_exposure or {}
         vals = np.array([min(float(reg.get(r, 0.0)), 5.0) / 5.0 for r in REGIONS])
         if vals.sum() <= 0:
             vals = np.ones(nr)
-            regionless.append(t.id)
+            regionless.append(drv.id)
         region_w[j, :] = vals
     E = np.zeros((n, ncell))
-    for j, t in enumerate(drivers):
+    for j, drv in enumerate(drivers):
         for c, cat in enumerate(cats):
-            exp = t.category_exposure.get(cat, 0)
+            exp = drv.category_exposure.get(cat, 0)
             ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
             if ce <= 0:
                 continue
@@ -173,7 +167,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
                 E[j, c * nr + r] = ce * region_w[j, r]
 
     # Magnitude-weighted within-force dampening, exactly as the engine.
-    abs_score = np.array([abs(float(t.normalized_score)) for t in drivers])
+    abs_score = np.array([abs(float(drv.normalized_score)) for drv in drivers])
     contrib = abs_score[:, None] * E
     damp = np.ones((nf, ncell))
     n_eff_all = np.zeros((nf, ncell))
@@ -195,9 +189,9 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
         damp[f, :] = np.clip(d, 0.1, 1.0)
 
     # The schedule averaged over each driver's peak-jitter grid.
-    sched, offsets, off_probs = eng._peak_schedule_table(drivers)     # (n, n_off, ny)
+    sched, offsets, off_probs = eng.peak_schedule_table(drivers)     # (n, n_off, ny)
     e_mat = np.einsum("jk,jky->jy", off_probs, sched)                # (n, ny)
-    s_mean = np.array([float(t.normalized_score) for t in drivers])   # E[p] x gp1 x sign
+    s_mean = np.array([float(drv.normalized_score) for drv in drivers])   # E[p] x gp1 x sign
 
     # Additive terms a[j, cell, y] and the per-cell compounding at the means.
     A = (fw[fidx][:, None, None] * att[fidx][:, None, None]
@@ -214,8 +208,8 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
                       cell_shift / np.where(np.abs(additive) > 1e-15, additive, 1.0), 1.0)
     A_cell = A * spread[None, :, :]                                   # sums to cell_shift per cell
 
-    W = eng._cell_weight_matrix()                                     # (nc, nr)
-    Wn = eng._row_normalised_cell_weights()
+    W = eng.cell_weight_matrix()                                     # (nc, nr)
+    Wn = eng.row_normalized_cell_weights()
     w_cell = W.reshape(-1)
     wn_cell = Wn.reshape(-1)
 
@@ -272,10 +266,10 @@ def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) 
                           A_cell[j, :, y_last] / np.where(np.abs(a_raw) > 1e-18, a_raw, 1.0), 1.0)
         K[j] = float((w_cell * term_const * sp).sum()) * factor
 
-    eng = BayesianMonteCarloEngine(config, seed=BAND_SEED)
-    R = eng._build_correlation_matrix(drivers)
-    samples = eng._generate_copula_samples(drivers, R, BAND_DRAWS)      # p x gp1 x sign, (draws, n)
-    off_idx = eng._draw_peak_offsets(dec["off_probs"], BAND_DRAWS)      # (draws, n)
+    eng = MonteCarloEngine(config, seed=BAND_SEED)
+    R = eng.build_correlation_matrix(drivers)
+    samples = eng.generate_copula_samples(drivers, R, BAND_DRAWS)      # p x gp1 x sign, (draws, n)
+    off_idx = eng.draw_peak_offsets(dec["off_probs"], BAND_DRAWS)      # (draws, n)
     mat = dec["sched"][np.arange(n)[None, :], off_idx, y_last]          # (draws, n)
     terms = samples * mat * K[None, :]
     total = terms.sum(axis=1)
@@ -317,7 +311,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
         "cell_weights": {c: {r: round(float(v), 8) for r, v in row.items()} for c, row in config.cell_weights.items()},
         "base_year": int(config.base_year), "path_years": list(config.path_years),
         "peak_year_jitter": int(config.peak_year_jitter),
-        "model_version": BayesianMonteCarloEngine.MODEL_VERSION,
+        "model_version": MonteCarloEngine.MODEL_VERSION,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
@@ -325,7 +319,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
     """The production recipe (prism.config PRODUCTION_*): run_multichain with the master seed."""
     db = DriverSet(drivers=list(drivers))
-    eng = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED)
+    eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
     tot = res["totals"]["portfolio"]
     term = tot.get(TERMINAL_YEAR) or tot.get(str(TERMINAL_YEAR))
@@ -436,7 +430,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
     reg_tot = reg_pp[:, :, y_last].sum(axis=0)
 
     per_driver = {}
-    for j, t in enumerate(drivers):
+    for j, drv in enumerate(drivers):
         f = int(dec["fidx"][j])
         cells_term = A_cell[j, :, y_last] * w_cell                 # portfolio pp by cell
         top = [int(i) for i in np.argsort(-np.abs(cells_term))[:TOP_CELLS] if abs(cells_term[i]) > 0]
@@ -489,15 +483,15 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
         for yi, y in enumerate(years):
             share_realised[str(y)] = r4(dec["e_mat"][j, yi] / e_last) if e_last > 0 else 0.0
         half_year = next((y for yi, y in enumerate(years) if e_last > 0 and dec["e_mat"][j, yi] / e_last >= 0.5), None)
-        per_driver[t.id] = {
-            "code": display_code(t.id, t.force), "name": t.name, "force": t.force, "direction": t.direction,
+        per_driver[drv.id] = {
+            "code": display_code(drv.id, drv.force), "name": drv.name, "force": drv.force, "direction": drv.direction,
             "portfolio_pp": {str(y): r4(port[j, yi] * 100) for yi, y in enumerate(years)},
             "share_of_gross": r4(own / gross_hw) if own < 0 else (r4(own / gross_tw) if own > 0 else 0.0),
             "share_of_net": r4(own / median) if median else 0.0,
             "rank_abs": rank_abs[j], "rank_in_direction": rank_dir.get(j),
             # share of the force's gross headwind (tailwind) among the drivers of the same sign
-            "force_share": (r4(own / force_hw[t.force]) if own < 0 and force_hw[t.force]
-                            else (r4(own / force_tw[t.force]) if own > 0 and force_tw[t.force] else 0.0)),
+            "force_share": (r4(own / force_hw[drv.force]) if own < 0 and force_hw[drv.force]
+                            else (r4(own / force_tw[drv.force]) if own > 0 and force_tw[drv.force] else 0.0)),
             "force_rank": force_rank[j],
             "category_pp": {cats[c]: r4(cat_pp[j, c, y_last] * 100) for c in range(len(cats))},
             "category_share": {cats[c]: (r4(cat_pp[j, c, y_last] / cat_tot[c]) if cat_tot[c] else 0.0) for c in range(len(cats))},
@@ -506,15 +500,15 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             "cells": cells,
             "max_share_cell": max_share_cell,
             "timing": {
-                "expected_materialisation": {str(y): r4(dec["e_mat"][j, yi]) for yi, y in enumerate(years)},
+                "expected_materialization": {str(y): r4(dec["e_mat"][j, yi]) for yi, y in enumerate(years)},
                 "share_realised": share_realised,
                 "half_year": half_year,
             },
             "band": bands[j],
             # the timing scores the reading may name through placeholders, so
             # that a re-scored peak year cannot leave a typed year in a text
-            "scoring": {"peak_year": t.peak_year, "diffusion_curve": t.diffusion_curve,
-                        "start_year": t.start_year},
+            "scoring": {"peak_year": drv.peak_year, "diffusion_curve": drv.diffusion_curve,
+                        "start_year": drv.start_year},
             "structure": {
                 "pass_through": r4(dec["fw"][f] * dec["att"][f]),
                 "reach": r4(reach),
@@ -588,13 +582,13 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
     W = dec["W"]
     inputs = {
         "drivers": [{
-            "id": t.id, "force": t.force,
-            "normalized_score": float(t.normalized_score),
-            "category_exposure": {k: int(v) for k, v in t.category_exposure.items()},
-            "regional_exposure": {k: int(v) for k, v in (t.regional_exposure or {}).items()},
-            "uncertainty": t.uncertainty, "peak_year": t.peak_year,
-            "diffusion_curve": t.diffusion_curve, "start_year": t.start_year,
-        } for t in drivers],
+            "id": drv.id, "force": drv.force,
+            "normalized_score": float(drv.normalized_score),
+            "category_exposure": {k: int(v) for k, v in drv.category_exposure.items()},
+            "regional_exposure": {k: int(v) for k, v in (drv.regional_exposure or {}).items()},
+            "uncertainty": drv.uncertainty, "peak_year": drv.peak_year,
+            "diffusion_curve": drv.diffusion_curve, "start_year": drv.start_year,
+        } for drv in drivers],
         "categories": list(cats),
         "config": {
             "force_weights": {f: float(config.force_weights[f]) for f in FORCES},
@@ -607,11 +601,11 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
     }
     expected = {
         "byDriver": {
-            t.id: {
+            drv.id: {
                 "portfolio": {str(y): float(dec["port"][j, yi]) for yi, y in enumerate(years)},
                 "category": {cat: {str(y): float(dec["cat_pp"][j, c, yi]) for yi, y in enumerate(years)}
                              for c, cat in enumerate(cats)},
-            } for j, t in enumerate(drivers)
+            } for j, drv in enumerate(drivers)
         },
         "portfolioShift": {str(y): float(dec["port"][:, yi].sum()) for yi, y in enumerate(years)},
         "categoryShift": {cat: {str(y): float(dec["cat_pp"][:, c, yi].sum()) for yi, y in enumerate(years)}
@@ -674,25 +668,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reference", action="store_true", help="rerun the reference run (the production recipe)")
     ap.add_argument("--chains", type=int, default=PRODUCTION_CHAINS)
     ap.add_argument("--iterations", type=int, default=PRODUCTION_ITERATIONS)
-    ap.add_argument("--cell-weights", default=None, help="finance cell-weight file, as for run_production.py")
     ap.add_argument("--workbook", default=None,
                     help="the QA workbook of the production run the reference should reproduce")
     args = ap.parse_args(argv)
 
-    finance = bool(args.cell_weights)
-    if finance and args.check:
-        print("REFUSING: --check verifies the committed files, which are built on the estimated mix; "
-              "run it without --cell-weights.")
-        return 1
     drivers = load_drivers()
     config = ModelConfig()
-    if finance:
-        shares, source = load_cell_weights_file(args.cell_weights)
-        config = config.copy_with(cell_weights=shares, cell_weights_source=source)
-    attribution_path = os.path.join(LOCAL_DIR, "driver_attribution.json") if finance else ATTRIBUTION_PATH
-    analysis_out = os.path.join(LOCAL_DIR, "driver_analysis.json") if finance else ANALYSIS_PATH
 
-    committed = _load_json(attribution_path) if os.path.exists(attribution_path) else None
+    committed = _load_json(ATTRIBUTION_PATH) if os.path.exists(ATTRIBUTION_PATH) else None
     current_hash = inputs_hash(config, drivers)
     if args.reference or committed is None:
         print(f"reference run: {args.chains} x {args.iterations} iterations, seed {PRODUCTION_SEED} ...", flush=True)
@@ -704,13 +687,12 @@ def main(argv: list[str] | None = None) -> int:
         if reference.get("inputs_hash") != current_hash and not args.check:
             print("REFUSING: the drivers' scoring state or the configuration changed since the recorded reference "
                   "run, so its median is not the current model's. Re-run with --reference --workbook FILE after "
-                  "the production run (with the same --cell-weights FILE if one was used).")
+                  "the production run.")
             return 1
 
     persisted = read_workbook(args.workbook) if args.workbook else (committed or {}).get("persisted_run")
     record = build_record(config, drivers, reference, persisted)
-    # The parity fixture belongs to the committed, estimate-based build only.
-    fixture = None if finance else build_fixture(config, drivers, decompose(config, drivers))
+    fixture = build_fixture(config, drivers, decompose(config, drivers))
     analysis = _load_json(ANALYSIS_PATH) if os.path.exists(ANALYSIS_PATH) else {"drivers": {}}
     texts = render_all(record, analysis) if analysis.get("drivers") else {}
 
@@ -753,23 +735,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"reference run reproduces persisted run {persisted.get('id')} ({persisted.get('generated')}) "
                   f"at every terminal-year category quantile")
-    os.makedirs(os.path.dirname(attribution_path), exist_ok=True)
-    _dump_json(attribution_path, record)
-    print(f"wrote {os.path.relpath(attribution_path, REPO)} "
+    _dump_json(ATTRIBUTION_PATH, record)
+    print(f"wrote {os.path.relpath(ATTRIBUTION_PATH, REPO)} "
           f"({len(record['drivers'])} drivers, factor {record['reconciliation']['factor']:.4f})")
-    if not finance:
-        os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
-        _dump_json(FIXTURE_PATH, fixture)
-        print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
+    _dump_json(FIXTURE_PATH, fixture)
+    print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
     if texts:
         for code, entry in analysis["drivers"].items():
             driver_id = next(i for i, d in record["drivers"].items() if d["code"] == code)
             entry["text"] = texts[driver_id]
-        _dump_json(analysis_out, analysis)
-        print(f"wrote {os.path.relpath(analysis_out, REPO)} ({len(texts)} rendered texts)")
-    if finance:
-        print("These files quote the finance shares and stay out of the repository. To show the texts on the "
-              f"Drivers page: python3 scripts/sync_analysis.py --texts {os.path.relpath(analysis_out, REPO)}")
+        _dump_json(ANALYSIS_PATH, analysis)
+        print(f"wrote {os.path.relpath(ANALYSIS_PATH, REPO)} ({len(texts)} rendered texts)")
     return 0
 
 

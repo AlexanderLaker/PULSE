@@ -13,14 +13,14 @@ import pytest
 import prism
 from prism.config import vc_epicentre_step_of
 from prism.drivers import DriverSet
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.simulation.engine import MonteCarloEngine
 
 ITER = 500
 SEED = 42
 
 
 def _run(config, db, seed=SEED, iterations=ITER):
-    return BayesianMonteCarloEngine(config, seed=seed).run(db, iterations=iterations)
+    return MonteCarloEngine(config, seed=seed).run(db, iterations=iterations)
 
 
 class TestDeterminism:
@@ -48,9 +48,9 @@ class TestDeterminism:
             r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
     def test_multichain_same_seed_reproduces(self, mock_model_config, mock_drivers_database):
-        r1 = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+        r1 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_drivers_database, n_chains=2, iterations=200)
-        r2 = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+        r2 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_drivers_database, n_chains=2, iterations=200)
         assert r1["chain_seeds"] == r2["chain_seeds"]
         assert r1["shift_matrix"] == r2["shift_matrix"]
@@ -71,15 +71,15 @@ class TestGoldenValues:
     def test_engine_identity(self, mock_model_config, mock_drivers_database):
         r = _run(mock_model_config, mock_drivers_database)
         assert r["model_version"] == "2.12.0"
-        assert r["engine_name"] == "bayesian_copula"
+        assert r["engine_name"] == "beta_copula"
         assert r["seed"] == SEED
         assert r["numerics_backend"].startswith("scipy ")
 
     def test_one_version_everywhere(self):
         """The package, the engine and package.json carry the same version."""
-        assert prism.__version__ == BayesianMonteCarloEngine.MODEL_VERSION
+        assert prism.__version__ == MonteCarloEngine.MODEL_VERSION
         pkg = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_text())
-        assert pkg["version"] == BayesianMonteCarloEngine.MODEL_VERSION
+        assert pkg["version"] == MonteCarloEngine.MODEL_VERSION
 
     def test_category_values(self, mock_model_config, mock_drivers_database):
         sm = _run(mock_model_config, mock_drivers_database)["shift_matrix"]
@@ -109,14 +109,14 @@ class TestGoldenValues:
 
 class TestMultichain:
     def test_seeds(self, mock_model_config, mock_drivers_database):
-        r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_drivers_database, n_chains=3, iterations=200)
         assert r["seed"] == SEED
         assert r["n_chains"] == 3
         assert len(r["chain_seeds"]) == 3 and r["chain_seeds"][0] == SEED
 
     def test_seed_stability(self, mock_model_config, mock_drivers_database):
-        r = BayesianMonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_drivers_database, n_chains=3, iterations=200)
         ss = r["seed_stability"]
         assert ss["metric"] == "terminal_year_portfolio_median"

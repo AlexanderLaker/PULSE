@@ -157,7 +157,7 @@ next start.
 |---|---|
 | `migrate.py` | the migration |
 | `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it |
-| `journey_edits.json` | the current Consumer Journey tile texts, each with the SHA-256 of the text shipped before it |
+| `journey_edits.json` | the current Consumer Journey tile texts, each with the SHA-256 of the texts shipped before it |
 | `previous_names.txt` | the names of the previous schema and code; `tests/test_repository.py` fails when one appears outside this folder and the migration's tests |
 | `archive/` | written by a live run: the dropped rows (git-ignored) |
 

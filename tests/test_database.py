@@ -126,7 +126,8 @@ class TestDrivers:
         assert loaded.sources == [{"title": "new source", "url": "https://example.org/b", "tier": "S", "note": ""}]
 
     def test_an_edit_keeps_the_expert_proposals(self, db):
-        """The row is upserted, never deleted: proposals reference it with ON DELETE CASCADE."""
+        """The row is updated in place, never deleted and inserted again: proposals reference it
+        with ON DELETE CASCADE."""
         for probability in (1, 4, 5):
             db.save_drivers([_driver(probability=probability)])
         rows = {r["user_id"]: r for r in db.load_driver_proposals("consumer_r01")}
@@ -261,6 +262,20 @@ class TestRunsJourneyAudit:
         with pytest.raises(db.StaleRevisionError):
             db.save_driver_edit(_driver(probability=1), loaded.revision, [entry])
         assert _count(db, "SELECT COUNT(*) FROM audit_log") == 1
+
+    def test_an_edit_whose_audit_entry_fails_is_not_stored(self, db, monkeypatch):
+        """The other half of the rule: no edit without its audit entry."""
+        loaded = db.load_drivers()[0]
+
+        def failing(cursor, entries):
+            raise RuntimeError("audit write failed")
+        monkeypatch.setattr(db, "insert_audit", failing)
+        entry = db.AuditEntry("driver_updated", "driver", "consumer_r01", reason="probability", user_id="admin-1")
+        with pytest.raises(RuntimeError, match="audit write failed"):
+            db.save_driver_edit(_driver(probability=5), loaded.revision, [entry])
+        after = db.load_drivers()[0]
+        assert (after.probability, after.revision) == (loaded.probability, loaded.revision)
+        assert _count(db, "SELECT COUNT(*) FROM audit_log") == 0
 
     def test_a_journey_save_and_its_audit_entry_are_stored_together(self, db):
         def audit(version):

@@ -7,7 +7,7 @@
  * against prism/seed_drivers.py.
  */
 import { describe, it, expect } from 'vitest';
-import { DRIVER_CODE_MAP, driverIdForCode, codeForDriverId } from '@/data/driverCodeMap';
+import { DRIVER_CODE_MAP, codeForDriverId } from '@/data/driverCodeMap';
 import { LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX } from '@/data/consumerJourney';
 import driverBase from '@/data/drivers/driver_base.json';
 
@@ -47,13 +47,8 @@ describe('DRIVER_CODE_MAP', () => {
     }
   });
 
-  it('resolves codes and driver ids both ways, and nothing for an unknown one', () => {
-    for (const code of CODES) {
-      const id = DRIVER_CODE_MAP[code].driverId;
-      expect(driverIdForCode(code)).toBe(id);
-      expect(codeForDriverId(id)).toBe(code);
-    }
-    expect(driverIdForCode('Z-99')).toBeUndefined();
+  it('finds the code of a driver id, and nothing for an unknown one', () => {
+    for (const code of CODES) expect(codeForDriverId(DRIVER_CODE_MAP[code].driverId)).toBe(code);
     expect(codeForDriverId('consumer_r99')).toBeUndefined();
   });
 });

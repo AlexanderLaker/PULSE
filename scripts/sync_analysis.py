@@ -7,8 +7,6 @@ with this script whenever the texts have been regenerated.
 
     python3 scripts/sync_analysis.py --dry-run    list the drivers whose text would change
     python3 scripts/sync_analysis.py              write them, in one transaction, with an audit entry each
-    python3 scripts/sync_analysis.py --texts FILE the texts of another rendering instead of the seed's, such
-                                                  as the build on the finance shares in runs/driver_analysis/
 
 The target is the database in POSTGRES_URL or DATABASE_URL (.env is loaded),
 otherwise the local SQLite file. It changes the analysis column and raises
@@ -22,7 +20,6 @@ Exit codes: 0 done (or nothing to do); 1 the database has no drivers table
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -30,33 +27,18 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
-from prism.database import (POSTGRES_URL, USE_POSTGRES, get_db_connection, pending_migration,  # noqa: E402
-                            placeholder, sqlite_path, table_names)
-from prism.config import display_code  # noqa: E402
+from prism.database import (POSTGRES_URL, USE_POSTGRES, AuditEntry, get_db_connection,  # noqa: E402
+                            insert_audit, pending_migration, placeholder, sqlite_path, table_names)
 from prism.seed_drivers import DRIVERS  # noqa: E402
-
-
-def rendered_texts(path: Path) -> dict:
-    """{driver id: text} from a rendered analysis file (data/drivers/driver_analysis.json format)."""
-    entries = json.loads(path.read_text(encoding="utf-8"))["drivers"]
-    ids = {display_code(d.id, d.force): d.id for d in DRIVERS}
-    unknown = sorted(code for code in entries if code not in ids)
-    if unknown:
-        raise SystemExit(f"{path}: codes outside the driver base: {', '.join(unknown)}")
-    return {ids[code]: entry["text"] for code, entry in entries.items()}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dry-run", action="store_true", help="report what would change, write nothing")
-    parser.add_argument("--texts", type=Path, default=None,
-                        help="a rendered analysis file to write instead of the seed's texts")
     args = parser.parse_args(argv)
 
     target = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else f"SQLite at {sqlite_path()}"
     seed = {d.id: d.analysis for d in DRIVERS}
-    if args.texts:
-        seed.update(rendered_texts(args.texts))
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -88,10 +70,9 @@ def main(argv: list[str] | None = None) -> int:
             cursor.execute(f"UPDATE drivers SET analysis = {p}, revision = revision + 1, "
                            f"updated_at = CURRENT_TIMESTAMP WHERE id = {p}",
                            (seed[driver_id], driver_id))
-            cursor.execute(
-                "INSERT INTO audit_log (action, entity_type, entity_id, reason, user_id) "
-                f"VALUES ('analysis_synced', 'driver', {p}, {p}, 'sync-analysis-cli')",
-                (driver_id, "PRISM Analysis replaced by the generated text"))
+        insert_audit(cursor, [AuditEntry("analysis_synced", "driver", driver_id,
+                                         reason="PRISM Analysis replaced by the generated text",
+                                         user_id="sync-analysis-cli") for driver_id in stale])
     print(f"Updated {len(stale)} driver(s).")
     return 0
 

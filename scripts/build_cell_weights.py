@@ -203,7 +203,7 @@ def emit_ts(cells, rec):
         "",
         f"export const GRADE_LEGEND: Record<Grade, string> = {j(rec['grade_legend'])} as const;",
         "",
-        "/** The default matrix itself, for detecting whether the live grid is still the estimate. */",
+        "/** The default matrix itself: Settings shows the derivation only for a run whose weights are these. */",
         f"export const ESTIMATED_CELL_WEIGHTS: Record<string, Record<string, number>> = {j(cells)};",
         "",
         "export const BLOCK_SPLIT = {",

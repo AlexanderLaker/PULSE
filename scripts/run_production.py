@@ -56,7 +56,7 @@ from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, i
                             load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine  # noqa: E402
+from prism.simulation.engine import MonteCarloEngine  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")
@@ -157,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     where = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else "the local SQLite file (test run)"
     log.info("PRISM production run, engine %s, %d x %s iterations, database: %s",
-             BayesianMonteCarloEngine.MODEL_VERSION, args.chains, f"{args.iterations:,}", where)
+             MonteCarloEngine.MODEL_VERSION, args.chains, f"{args.iterations:,}", where)
 
     try:
         init_db()
@@ -209,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * config.iterations >= 100_000 else "")
     started = datetime.now()
-    result = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED).run_multichain(
+    result = MonteCarloEngine(config, seed=PRODUCTION_SEED).run_multichain(
         driver_set, n_chains=args.chains, iterations=config.iterations)
     log.info("  done in %.0f s; seed stability %.4f pp across %d chains",
              (datetime.now() - started).total_seconds(), result["seed_stability"]["spread_pp"], args.chains)

@@ -26,9 +26,9 @@ import numpy as np
 import pytest
 
 from prism import seed_drivers
-from prism.config import ModelConfig
+from prism.config import ESTIMATE_SOURCE_PREFIX, ModelConfig
 from prism.drivers import DriverSet
-from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+from prism.simulation.engine import MonteCarloEngine
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "drivers"
@@ -76,9 +76,9 @@ class TestDecomposition:
     def test_cell_shifts_equal_the_engine_at_the_means_with_jitter_off(self, build, drivers):
         config = ModelConfig().copy_with(peak_year_jitter=0)
         dec = build.decompose(config, drivers)
-        means = np.array([t.normalized_score for t in drivers])
+        means = np.array([d.normalized_score for d in drivers])
         # the engine's vectorised core, fed the Beta means as its "draws"
-        eng = BayesianMonteCarloEngine(config, seed=1)
+        eng = MonteCarloEngine(config, seed=1)
         n_cats, n_reg, n_years = len(config.category_names), 4, len(config.path_years)
         cells = eng._compute_all_paths_vectorized(drivers, np.tile(means, (3, 1)), 3, n_cats, n_reg, n_years)
         assert cells.shape == (3, n_cats * n_reg, n_years)
@@ -96,15 +96,15 @@ class TestDecomposition:
     def test_the_jitter_expectation_is_the_engine_schedule_table_averaged(self, build, drivers):
         config = ModelConfig()
         dec = build.decompose(config, drivers)
-        eng = BayesianMonteCarloEngine(config, seed=1)
-        sched, offsets, probs = eng._peak_schedule_table(drivers)
+        eng = MonteCarloEngine(config, seed=1)
+        sched, offsets, probs = eng.peak_schedule_table(drivers)
         expected = np.einsum("jk,jky->jy", probs, sched)
         np.testing.assert_allclose(dec["e_mat"], expected, rtol=0, atol=1e-15)
         # monotone in the year, and 1 at the horizon for every driver whose
         # peak cannot slip past it
         assert np.all(np.diff(dec["e_mat"], axis=1) >= -1e-12)
-        for j, t in enumerate(drivers):
-            if t.peak_year + 4 <= 2035:
+        for j, d in enumerate(drivers):
+            if d.peak_year + 4 <= 2035:
                 assert dec["e_mat"][j, -1] == pytest.approx(1.0)
 
     def test_a_short_reference_run_reconciles_within_the_stated_tolerance(self, build, drivers):
@@ -112,7 +112,7 @@ class TestDecomposition:
         dec = build.decompose(config, drivers)
         det = float(dec["port"][:, -1].sum())
         db = DriverSet(drivers=list(drivers))
-        res = BayesianMonteCarloEngine(config, seed=42).run(db, iterations=4000)
+        res = MonteCarloEngine(config, seed=42).run(db, iterations=4000)
         median = res["totals"]["portfolio"][2035]["median"]
         # the sum at the means sits within a few per cent of the MC median
         assert abs(median / det - 1) < 0.03
@@ -200,7 +200,7 @@ class TestCommittedArtefacts:
 
     def test_record_basis_and_reconciliation(self, record, drivers):
         assert record["basis"]["drivers"] == 51 == len(drivers)
-        assert record["basis"]["cell_weights_source"].startswith("ESTIMATE, not Henkel P&L")
+        assert record["basis"]["cell_weights_source"].startswith(ESTIMATE_SOURCE_PREFIX)
         rec = record["reconciliation"]
         assert rec["factor"] == pytest.approx(rec["reference_median_pp"] / rec["deterministic_total_pp"], rel=1e-4)
         assert 0.97 < rec["factor"] < 1.03
@@ -215,13 +215,13 @@ class TestCommittedArtefacts:
 
     def test_rendered_texts_and_seed_agree(self, render, record, analysis):
         rendered = render.render_all(record, analysis)
-        by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
-        seed = {t.id: t for t in seed_drivers.DRIVERS}
+        by_code = {d["code"]: driver_id for driver_id, d in record["drivers"].items()}
+        seed = {d.id: d for d in seed_drivers.DRIVERS}
         assert set(analysis["drivers"]) == set(by_code)
         for code, entry in analysis["drivers"].items():
-            tid = by_code[code]
-            assert entry["text"] == rendered[tid], code
-            assert seed[tid].analysis == entry["text"], code
+            driver_id = by_code[code]
+            assert entry["text"] == rendered[driver_id], code
+            assert seed[driver_id].analysis == entry["text"], code
 
     def test_every_placeholder_is_a_field_and_the_key_ones_are_used(self, render, record, analysis):
         by_code = {d["code"]: d for d in record["drivers"].values()}
@@ -265,8 +265,8 @@ class TestCommittedArtefacts:
         """The peak year is a score the page shows and a re-score moves it; a
         template names it only through {peak_year}. The lock reads the
         timing paragraph for "to / at / until <the driver's peak year>"."""
-        seed = {t.id: t for t in seed_drivers.DRIVERS}
-        by_code = {d["code"]: tid for tid, d in record["drivers"].items()}
+        seed = {d.id: d for d in seed_drivers.DRIVERS}
+        by_code = {d["code"]: driver_id for driver_id, d in record["drivers"].items()}
         offenders = []
         for code, entry in analysis["drivers"].items():
             peak = seed[by_code[code]].peak_year
@@ -284,7 +284,7 @@ class TestCommittedArtefacts:
         median the current model does not produce."""
         config = ModelConfig()
         assert record["reference_run"]["inputs_hash"] == build.inputs_hash(config, drivers)
-        rescored = [copy.deepcopy(t) for t in drivers]
+        rescored = [copy.deepcopy(d) for d in drivers]
         rescored[0].probability = max(1, rescored[0].probability - 1)
         assert build.inputs_hash(config, rescored) != record["reference_run"]["inputs_hash"]
         moved = config.copy_with(force_weights={f: (0.17 if f == "Consumer" else v) for f, v in config.force_weights.items()})
@@ -302,34 +302,14 @@ class TestCommittedArtefacts:
         assert build.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
 
-    def test_a_build_on_the_finance_shares_stays_out_of_the_repository(self, build, record, tmp_path, monkeypatch,
-                                                                       capsys):
-        """The finance shares stay out of git, so a build on them writes to
-        runs/driver_analysis/ and never touches the committed files; --check
-        verifies the committed, estimate-based files and refuses the option."""
-        finance = tmp_path / "finance.json"
-        finance.write_text(json.dumps({"source": "Finance test shares", "basis": "gp1_share",
-                                       "cells": ModelConfig().cell_weights}), encoding="utf-8")
-        assert build.main(["--check", "--cell-weights", str(finance)]) == 1
-        assert "REFUSING" in capsys.readouterr().out
-
-        committed = {}
-        for name, source in (("ATTRIBUTION_PATH", ATTRIBUTION), ("ANALYSIS_PATH", ANALYSIS), ("FIXTURE_PATH", FIXTURE)):
-            copy_path = tmp_path / source.name
-            copy_path.write_bytes(source.read_bytes())
-            monkeypatch.setattr(build, name, str(copy_path))
-            committed[copy_path] = copy_path.read_bytes()
-        local = tmp_path / "runs" / "driver_analysis"
-        monkeypatch.setattr(build, "LOCAL_DIR", str(local))
-        monkeypatch.setattr(build, "reference_run", lambda *a, **k: record["reference_run"])
-        assert build.main(["--cell-weights", str(finance)]) == 0
-        assert all(path.read_bytes() == content for path, content in committed.items())
-        built = json.loads((local / "driver_attribution.json").read_text(encoding="utf-8"))
-        assert built["basis"]["cell_weights_source"] == "Finance test shares"
-        texts = json.loads((local / "driver_analysis.json").read_text(encoding="utf-8"))["drivers"]
-        assert all("the finance cell weights" in entry["text"] for entry in texts.values())
-        assert not (local / FIXTURE.name).exists()
-        assert "sync_analysis.py --texts" in capsys.readouterr().out
+    def test_readings_are_rendered_on_the_estimated_mix_only(self, render, record):
+        """The templates compare shares of the estimated mix in words, so a
+        record on other cell weights is refused instead of being rendered
+        under the estimate's wording (docs/DRIVER_ANALYSIS.md)."""
+        other = copy.deepcopy(record)
+        other["basis"]["cell_weights_source"] = "Finance shares, FY2026"
+        with pytest.raises(ValueError, match="written for the estimated gross-profit mix"):
+            render.basis_line(other)
 
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record

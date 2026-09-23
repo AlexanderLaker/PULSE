@@ -5,18 +5,9 @@ from the stored eight-step profile by prism.config.vc_epicentre_of. The
 dashboard's epicentreOf (lib/valueChain.ts) must behave identically, so both
 suites pin the same fixture table; change them together.
 """
-from prism.config import VC_STEPS, vc_epicentre_of, vc_epicentre_step_of
+from prism.config import VC_STEPS, canonical_vc_profile, vc_epicentre_of, vc_epicentre_step_of
 from prism.drivers import Driver
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
-
-
-def _canonical(stage: int) -> dict:
-    """The 5/3/1 profile the editor writes (canonicalVcProfile in lib/valueChain.ts)."""
-    falloff = [5, 3, 1]
-    return {
-        s: (falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0)
-        for i, s in enumerate(VC_STEPS)
-    }
 
 
 class TestCanonicalProfileShape:
@@ -24,19 +15,19 @@ class TestCanonicalProfileShape:
 
     def test_canonical_profile_stage_6(self):
         # Same literal expectation as the vitest case for stage 6.
-        assert _canonical(6) == {
+        assert canonical_vc_profile(6) == {
             "Raw Materials": 0, "Formulation": 0, "Manufacturing": 0,
             "Packaging": 1, "Supply Chain": 3, "Marketing": 5,
             "Commercial": 3, "Consumer": 1,
         }
 
     def test_canonical_profile_clips_at_ends(self):
-        assert _canonical(1) == {
+        assert canonical_vc_profile(1) == {
             "Raw Materials": 5, "Formulation": 3, "Manufacturing": 1,
             "Packaging": 0, "Supply Chain": 0, "Marketing": 0,
             "Commercial": 0, "Consumer": 0,
         }
-        assert _canonical(8) == {
+        assert canonical_vc_profile(8) == {
             "Raw Materials": 0, "Formulation": 0, "Manufacturing": 0,
             "Packaging": 0, "Supply Chain": 0, "Marketing": 1,
             "Commercial": 3, "Consumer": 5,
@@ -48,7 +39,7 @@ class TestEpicentreOf:
 
     def test_round_trips_canonical_profiles_for_every_stage(self):
         for stage in range(1, 9):
-            assert vc_epicentre_of(_canonical(stage)) == stage, stage
+            assert vc_epicentre_of(canonical_vc_profile(stage)) == stage, stage
 
     def test_none_for_unscored_or_all_zero(self):
         assert vc_epicentre_of(None) is None
@@ -75,7 +66,7 @@ class TestEpicentreOf:
         assert vc_epicentre_of({"supply_chain": 5, "Manufacturing": 2}) == VC_STEPS.index("Manufacturing") + 1
 
     def test_step_name_helper(self):
-        assert vc_epicentre_step_of(_canonical(6)) == "Marketing"
+        assert vc_epicentre_step_of(canonical_vc_profile(6)) == "Marketing"
         assert vc_epicentre_step_of({}) is None
 
 
@@ -87,15 +78,15 @@ class TestDriftFollowsTheStage:
     """The drift fingerprint stores the derived stage, not the stored profile."""
 
     def test_the_fingerprint_stores_the_stage(self):
-        assert driver_fingerprint([_driver(_canonical(6))])["a"]["ve"] == 6
+        assert driver_fingerprint([_driver(canonical_vc_profile(6))])["a"]["ve"] == 6
         assert driver_fingerprint([_driver({})])["a"]["ve"] is None
 
     def test_moving_the_stage_is_drift(self):
-        event = compute_input_drift_event(driver_fingerprint([_driver(_canonical(2))]),
-                                          driver_fingerprint([_driver(_canonical(6))]), previous_run_id=1)
+        event = compute_input_drift_event(driver_fingerprint([_driver(canonical_vc_profile(2))]),
+                                          driver_fingerprint([_driver(canonical_vc_profile(6))]), previous_run_id=1)
         assert event["detail"]["structure_changes"] == ["a"]
 
     def test_rewriting_the_profile_around_the_same_stage_is_not(self):
         before = driver_fingerprint([_driver({"Supply Chain": 2, "Marketing": 4, "Commercial": 1})])
-        after = driver_fingerprint([_driver(_canonical(6))])
+        after = driver_fingerprint([_driver(canonical_vc_profile(6))])
         assert compute_input_drift_event(after, before, previous_run_id=1)["detail"]["structure_changes"] == []

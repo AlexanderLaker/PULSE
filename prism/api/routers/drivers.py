@@ -10,7 +10,7 @@ from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
-from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
+from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
 from prism.drivers import MODEL_FIELDS
 
 #: The names an exposure map may use, per field.
@@ -44,7 +44,7 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
         "baseline": d.baseline,
         "scores_edited": d.scores_edited,
         "revision": d.revision,
-        "proposal_summary": build_proposal_summary(proposals, user_id),
+        "proposal_summary": build_proposal_summary(_modelled(d, proposals), user_id),
     }
 
 
@@ -64,11 +64,18 @@ def _exposure_map(name: str, value: dict) -> dict:
 def _check_peak_year(driver, peak_year) -> None:
     """422 unless the peak year comes after the driver's onset (the later of the
     base year and its start year); the engine could not ramp to an earlier one."""
-    if peak_year is None:
-        return
-    onset = max(DEFAULT_BASE_YEAR, driver.start_year or DEFAULT_BASE_YEAR)
-    if peak_year <= onset:
+    if peak_year is not None and peak_year < first_peak_year(driver.start_year):
+        onset = first_peak_year(driver.start_year) - 1
         raise HTTPException(422, f"peak_year {peak_year} must come after the driver's onset ({onset})")
+
+
+def _modelled(driver, proposals: list) -> list:
+    """The proposals with a peak year the engine cannot ramp to (at or before
+    the driver's onset) read as unscored, so the aggregate never averages one
+    and the expert's next save clears it."""
+    first = first_peak_year(driver.start_year)
+    return [{**p, "peak_year": None} if p.get("peak_year") is not None and p["peak_year"] < first else p
+            for p in proposals]
 
 
 def _require_driver(driver_id: str):
@@ -111,7 +118,7 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
     if update.revision != driver.revision:
         raise HTTPException(409, _STALE)
 
-    changes = {}
+    changes, edited = {}, set()
     for name in sorted(sent):
         new = getattr(update, name)
         if name == "sources":
@@ -120,22 +127,35 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
             new = {**getattr(driver, name), **_exposure_map(name, new)}
         if new != getattr(driver, name):
             changes[name] = (getattr(driver, name), new)
+            edited.add(name)
             setattr(driver, name, new)
+    # The repair: names outside the taxonomy go. It changes no score the
+    # engine uses, so on its own it does not mark the scores as edited, and
+    # the audit entry says what was dropped.
+    dropped = {}
     for name, keys in EXPOSURE_KEYS.items():
         current = getattr(driver, name) or {}
         valid = {k: v for k, v in current.items() if k in keys}
         if valid != current:
+            dropped[name] = sorted(set(current) - set(valid))
             changes[name] = (changes[name][0] if name in changes else current, valid)
             setattr(driver, name, valid)
     if not changes:
         return {"status": "unchanged", "driver_id": driver_id, "revision": driver.revision}
 
-    if any(name in MODEL_FIELDS for name in changes):
+    if edited & set(MODEL_FIELDS):
         driver.scores_edited = True
     driver.recompute()
     actor = identity_from_user(user)[0]
+
+    def reason(name: str) -> str:
+        if name not in dropped:
+            return name
+        note = f"names outside the taxonomy dropped: {', '.join(dropped[name])}"
+        return f"{name}; {note}" if name in edited else f"{name}: {note}"
+
     audit = [AuditEntry("driver_updated", "driver", driver_id, old_value=json.dumps(old, default=str),
-                        new_value=json.dumps(new, default=str), reason=name, user_id=actor)
+                        new_value=json.dumps(new, default=str), reason=reason(name), user_id=actor)
              for name, (old, new) in changes.items()]
     try:
         revision = save_driver_edit(driver, update.revision, audit)
@@ -154,8 +174,9 @@ _STALE = ("This driver was changed after you opened it (by another admin or in a
 def get_driver_proposals(driver_id: str, user: dict = Depends(require_auth)):
     """The caller's own proposal, the aggregate across experts and who scored what."""
     from prism.database import load_driver_proposals
-    _require_driver(driver_id)
-    return build_proposals_response(driver_id, load_driver_proposals(driver_id), identity_from_user(user)[0])
+    driver = _require_driver(driver_id)
+    return build_proposals_response(driver_id, _modelled(driver, load_driver_proposals(driver_id)),
+                                    identity_from_user(user)[0])
 
 
 @router.put("/api/v1/drivers/{driver_id}/proposals")
@@ -190,4 +211,4 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
 
     user_id, user_name, _ = identity_from_user(user)
     upsert_driver_proposal(driver_id, user_id, fields, user_name=user_name)
-    return build_proposals_response(driver_id, load_driver_proposals(driver_id), user_id)
+    return build_proposals_response(driver_id, _modelled(driver, load_driver_proposals(driver_id)), user_id)

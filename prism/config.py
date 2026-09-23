@@ -30,6 +30,7 @@ def display_code(driver_id: str, force: str) -> str:
         raise ValueError(f"cannot derive a display code from id {driver_id!r}")
     return f"{FORCE_CODE_LETTERS[force]}-{m.group(1)}"
 
+
 # Shelf order. "LHC: HSC" is surface, bathroom, kitchen, floor and glass
 # cleaning plus bleach and polishes; "LHC: TOI" is toilet cleaners, rim blocks
 # and toilet gels.
@@ -83,10 +84,26 @@ def vc_epicentre_step_of(vc_exposure: Optional[dict]) -> Optional[str]:
     return VC_STEPS[stage - 1] if stage is not None else None
 
 
+def canonical_vc_profile(stage: int) -> dict:
+    """The eight-step profile the editor stores for a 1-based epicentre stage:
+    5 at the stage, 3 one stage away, 1 two away, 0 elsewhere
+    (canonicalVcProfile in lib/valueChain.ts)."""
+    falloff = (5, 3, 1)
+    return {step: falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0
+            for i, step in enumerate(VC_STEPS)}
+
+
 # ── Horizon and materialisation ─────────────────────────────────────────────
 
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
+
+
+def first_peak_year(start_year: Optional[int]) -> int:
+    """The earliest peak year a driver can take: the year after its onset, the
+    later of the base year and its start year (lib/format.ts firstPeakYear)."""
+    return max(DEFAULT_BASE_YEAR, start_year or DEFAULT_BASE_YEAR) + 1
+
 
 #: The production recipe: every published run (scripts/run_production.py) and
 #: the reference run of the PRISM Analysis (scripts/build_driver_analysis.py).

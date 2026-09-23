@@ -61,11 +61,11 @@ def api(monkeypatch, tmp_path):
 def valid_run(mock_model_config, mock_drivers_database):
     """A results bundle exactly as the production run persists it."""
     from prism.input_drift import driver_fingerprint
-    from prism.simulation.bayesian_mc import BayesianMonteCarloEngine
+    from prism.simulation.engine import MonteCarloEngine
     spec = importlib.util.spec_from_file_location("run_production", REPO / "scripts" / "run_production.py")
     production = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(production)
-    result = BayesianMonteCarloEngine(mock_model_config, seed=42).run_multichain(
+    result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(
         mock_drivers_database, n_chains=2, iterations=200)
     return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_drivers_database.drivers))
 
@@ -367,7 +367,7 @@ class TestDrivers:
 
     def test_a_save_drops_exposures_on_names_outside_the_taxonomy(self, api):
         """Such a name cannot be simulated; saving the driver repairs it, and the audit log records it."""
-        from prism.database import load_drivers, save_drivers
+        from prism.database import get_db_connection, load_drivers, save_drivers
         api.get("/api/v1/drivers", headers=bearer())   # the API creates and seeds the database
         stored = next(d for d in load_drivers() if d.id == "consumer_r01")
         stored.category_exposure = {**stored.category_exposure, "Hair: Colour": 3}
@@ -379,6 +379,13 @@ class TestDrivers:
         repaired = next(d for d in load_drivers() if d.id == "consumer_r01")
         assert "Hair: Colour" not in repaired.category_exposure
         assert set(repaired.category_exposure) == set(CATEGORIES)
+        # no score the engine uses changed, so the scores do not count as edited
+        assert repaired.scores_edited is False
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT reason FROM audit_log WHERE action = 'driver_updated' ORDER BY id")
+            reasons = [r[0] for r in cursor.fetchall()]
+        assert reasons == ["description", "category_exposure: names outside the taxonomy dropped: Hair: Colour"]
 
     def test_an_unknown_driver_is_404(self, api):
         response = api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"revision": 1, "probability": 3})
@@ -434,6 +441,25 @@ class TestProposals:
         api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
         assert len(api.get(path, headers=bearer()).json()["scorers"]) == 1
 
+    def test_a_stored_peak_year_the_engine_cannot_ramp_to_reads_as_unscored(self, api):
+        """A proposal stored with a peak year at or before the onset is shown and
+        aggregated as unscored, so the expert's next save (the whole draft, with
+        peak_year null) clears it instead of being refused."""
+        from prism.database import load_driver_proposals, upsert_driver_proposal
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        api.get(path, headers=bearer())   # seeds the database
+        upsert_driver_proposal("consumer_r01", "ana", {"probability": 2, "peak_year": 2025}, user_name="Ana")
+        body = api.get(path, headers=bearer(sub="ana")).json()
+        assert body["my"]["peak_year"] is None and body["aggregate"]["peak_year"] is None
+        assert body["scorers"][0]["peak_year"] is None
+        summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
+                       if d["id"] == "consumer_r01")["proposal_summary"]
+        assert summary["peak_year"] is None
+        draft = {**body["my"], "probability": 4}   # what Expert Rating sends: the whole draft
+        assert api.put(path, headers=bearer(sub="ana"), json=draft).status_code == 200
+        stored = next(r for r in load_driver_proposals("consumer_r01") if r["user_id"] == "ana")
+        assert stored["probability"] == 4 and stored["peak_year"] is None
+
     def test_invalid_proposals(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"
         assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 422
@@ -461,7 +487,7 @@ class TestJourney:
     CONTENT = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [{
         "id": "lhc.sorting.exp.test", "name": "AI stain recognition", "type": "tech", "driverCodes": ["T-01"],
         "driverNote": "T-01", "intensity": 2, "analysis": None,
-        "provenance": {"author": "strategist", "date": "2026-09", "grade": "estimate"}}],
+        "provenance": {"date": "2026-09", "grade": "estimate"}}],
         "negativelyImpacted": []}], "hair": []}
 
     def test_the_bundled_content_applies_until_an_admin_saves(self, api):
