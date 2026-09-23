@@ -101,9 +101,11 @@ class MonteCarloEngine:
     """
 
     #: Version of the model. A change to any number it produces means a new
-    #: version, regenerated golden pins in the same commit, and a new production
-    #: run. A result key the dashboard needs is listed in prism/api/runs.py,
-    #: which refuses to serve a run without it.
+    #: version and, in the same commit, regenerated golden pins and a PRISM
+    #: Analysis record rebuilt from a production run of the new code
+    #: (docs/adr/0014-versioning-and-golden-pins.md). A result key the
+    #: dashboard needs is listed in prism/api/runs.py, which refuses to serve
+    #: a run without it.
     MODEL_VERSION = "2.12.0"
     ENGINE_NAME = "beta_copula"
 

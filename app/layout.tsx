@@ -15,8 +15,9 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', displa
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'PRISM Profit Pool Shift Model',
-  description: 'Profit Pool Simulation Engine: Strategic FMCG Analysis',
+  title: 'PRISM',
+  description: 'PRISM, the Profit Pool Risk & Intelligence Simulation Model: how external drivers shift the gross '
+    + 'profit of Henkel Consumer Brands’ categories, 2026 to 2035.',
   appleWebApp: { capable: true },
 };
 

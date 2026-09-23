@@ -76,10 +76,13 @@ class TestGoldenValues:
         assert r["numerics_backend"].startswith("scipy ")
 
     def test_one_version_everywhere(self):
-        """The package, the engine and package.json carry the same version."""
+        """The package, the engine, package.json and its lock carry the same version."""
         assert prism.__version__ == MonteCarloEngine.MODEL_VERSION
-        pkg = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_text())
-        assert pkg["version"] == MonteCarloEngine.MODEL_VERSION
+        repo = Path(__file__).resolve().parents[1]
+        pkg = json.loads((repo / "package.json").read_text())
+        lock = json.loads((repo / "package-lock.json").read_text())
+        assert pkg["version"] == lock["version"] == lock["packages"][""]["version"] == MonteCarloEngine.MODEL_VERSION
+        assert pkg["name"] == lock["name"] == lock["packages"][""]["name"]
 
     def test_category_values(self, mock_model_config, mock_driver_set):
         sm = _run(mock_model_config, mock_driver_set)["shift_matrix"]

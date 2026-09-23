@@ -274,7 +274,7 @@ const Step1Welcome: FC = () => (
         lineHeight: 1.15,
       }}
     >
-      Welcome to the Profit Pool Engine
+      Welcome to PRISM
     </h2>
 
     <p

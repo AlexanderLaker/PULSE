@@ -108,8 +108,8 @@ A few rules the suite holds:
   a small driver set. They change only with a deliberate change of the model
   (with a new `MODEL_VERSION`, docs/adr/0014-versioning-and-golden-pins.md) or
   of those drivers, in the same commit.
-- **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
-  `package.json` must agree.
+- **One version**: `prism.__version__`, the engine's `MODEL_VERSION`,
+  `package.json` and `package-lock.json` must agree.
 - **Generated files** are never edited by hand.
 - **Parity**: the taxonomies (the names of forces, categories, regions and
   value-chain stages), the source tiers and a source's link and length rules,

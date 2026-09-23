@@ -10,8 +10,8 @@ the API and the dashboard also need to agree on which model they describe.
 
 ## Decision
 
-- One version: `prism.__version__`, the engine's `MODEL_VERSION` and
-  `package.json` agree, and a test checks it.
+- One version: `prism.__version__`, the engine's `MODEL_VERSION`,
+  `package.json` and its lock agree, and a test checks it.
 - A change to any number the model produces is a deliberate model change: a
   new version and, in the same commit, the golden pins of
   `tests/test_golden_pipeline.py` regenerated and the PRISM Analysis record
