@@ -4,6 +4,8 @@ node_modules/
 .vercel/
 dist/
 *.tsbuildinfo
+# Written by next dev and next build (differently), so never committed
+next-env.d.ts
 __pycache__/
 *.pyc
 *.egg-info/

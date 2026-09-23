@@ -4,9 +4,9 @@
  *   - The user comes from the Clerk session; without one the answer is 401
  *     and no cookie is set.
  *   - The token in the cookie always says viewer, admins included. The cookie
- *     authorises reads only; writes go through the dashboard routes with a
- *     separate admin token (lib/backend.ts), so a cross-site request riding
- *     on the cookie can never reach a write.
+ *     authorises reads and the user's own expert proposals, never an admin
+ *     write: admin writes go through the dashboard routes with a separate
+ *     admin token (lib/backend.ts).
  *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
  *     cannot read it and it is sent to the API only.
  *   - It lasts 12 hours; the dashboard asks for a fresh one whenever it loads.

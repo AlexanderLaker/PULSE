@@ -24,8 +24,7 @@
  * grand total and all four lenses show the same grand total in a year. Rows
  * carry no weights of their own: a row total is the one number the simulation
  * produces per (category, year), and the force and cell weights already shape
- * how a row is split. The run's totals.by_force, by_vc and by_region are plain
- * sums over the categories and are not shown.
+ * how a row is split.
  *
  * Above the matrix a KPI strip shows the portfolio band and the most resilient
  * and most exposed categories; a row or a category tile opens the drill-down
@@ -1133,7 +1132,7 @@ const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation }) => {
             {events.map((e, i) => (
               <li key={`${e.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <span style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
-                  backgroundColor: e.severity === 'warning' || e.severity === 'error' ? '#D97706' : S.primary }} />
+                  backgroundColor: e.severity === 'warning' || e.severity === 'error' ? S.amber : S.primary }} />
                 <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>{e.message}</span>
               </li>
             ))}

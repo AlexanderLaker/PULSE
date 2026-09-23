@@ -7,7 +7,8 @@
  *
  *   - secret unset: the route answers 404, as if it did not exist
  *   - wrong or missing header: 403
- *   - no user_roles row for the email (the user has not signed in yet): 404
+ *   - no user_roles row for the email (the Clerk webhook adds one when a
+ *     user signs up; it has not added this user): 404
  *
  * Set the secret in the Vercel project, call the route with
  * { "email": "..." }, then remove the secret again. scripts/promote_admin.py
@@ -50,8 +51,8 @@ export async function POST(req: Request) {
   await ensureUserRolesTable();
   const sql = getSQL();
 
-  // No row is created here: without one the user has not signed up yet, and
-  // a row without a Clerk user id would be a ghost.
+  // No row is created here: the Clerk webhook adds a user's row when they sign
+  // up, and a row without a Clerk user id would be a ghost.
   const rows = (await sql`
     SELECT clerk_user_id, role
       FROM user_roles
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
 
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: `No user with email ${email} has signed in yet` },
+      { error: `No user with email ${email}: the Clerk webhook adds a user when they sign up` },
       { status: 404 }
     );
   }

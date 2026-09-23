@@ -1,8 +1,8 @@
 /**
  * /api/prism-cookie: the cookie the API reads need. It carries a viewer token
  * for every user, admins included, in an httpOnly SameSite=Lax cookie scoped
- * to /api/v1, so a request riding on it can never authorise a write. Callers
- * without a session get no cookie.
+ * to /api/v1, so a request riding on it can never authorise an admin write.
+ * Callers without a session get no cookie.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Inter, Manrope, JetBrains_Mono } from 'next/font/google';
+import { S, BODY_FONT, HEADLINE_FONT } from '@/lib/theme';
 import './globals.css';
 
 /**
@@ -16,22 +17,24 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 export const metadata: Metadata = {
   title: 'PRISM Profit Pool Shift Model',
   description: 'Profit Pool Simulation Engine: Strategic FMCG Analysis',
+  appleWebApp: { capable: true },
 };
 
 // Browser and OS chrome in the brand's deep navy.
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#00345E',
+  themeColor: S.onSurface,
 };
 
 /**
  * Clerk's `appearance` styles every element Clerk renders (sign-in, sign-up
- * and their verification steps) in the dashboard's design system:
- *   - the maritime blue palette (#005db5 primary, #00345e on-surface)
- *   - pill-shaped primary buttons
- *   - Manrope for headings, Inter for body text
- *   - soft tonal accents instead of hard 1px borders
+ * and their verification steps) in the dashboard's design system: the colour
+ * variables come from lib/theme.ts; the element classes below repeat those
+ * values as literal Tailwind classes, because Tailwind only generates classes
+ * it finds written out in the source. Primary buttons are pills, headings use
+ * Manrope and body text Inter, and fields use soft tonal fills instead of hard
+ * borders.
  */
 export default function RootLayout({
   children,
@@ -42,21 +45,18 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         variables: {
-          // The dashboard's palette (lib/theme.ts).
-          colorPrimary: '#005db5',
-          colorText: '#00345e',
-          colorTextSecondary: '#26619d',
-          colorBackground: '#ffffff',
-          colorInputBackground: '#eff4ff',
-          colorInputText: '#00345e',
-          colorNeutral: '#00345e',
-          colorDanger: '#9f403d',
-          colorSuccess: '#15803d',
-          colorWarning: '#b45309',
-          fontFamily:
-            "var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
-          fontFamilyButtons:
-            "var(--font-manrope), 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          colorPrimary: S.primary,
+          colorText: S.onSurface,
+          colorTextSecondary: S.onSurfaceVariant,
+          colorBackground: S.surface,
+          colorInputBackground: S.surfaceLow,
+          colorInputText: S.onSurface,
+          colorNeutral: S.onSurface,
+          colorDanger: S.error,
+          colorSuccess: S.success,
+          colorWarning: S.amber,
+          fontFamily: BODY_FONT,
+          fontFamilyButtons: HEADLINE_FONT,
           fontSize: '14px',
           // Keep this modest: Clerk applies the global radius to its card and
           // main containers too, and a fully rounded one turns a roughly square
@@ -108,19 +108,8 @@ export default function RootLayout({
       }}
     >
       <html lang="en" className={`${inter.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
-        <head>
-          <meta name="apple-mobile-web-app-capable" content="yes" />
-        </head>
-        <body
-          style={{
-            fontFamily:
-              "var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
-            backgroundColor: '#f8f9ff',
-            color: '#00345e',
-          }}
-        >
-          {children}
-        </body>
+        {/* The body's font, background and text colour are set in globals.css. */}
+        <body>{children}</body>
       </html>
     </ClerkProvider>
   );

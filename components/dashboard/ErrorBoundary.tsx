@@ -146,7 +146,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <button
             onClick={this.handleRetry}
             style={RETRY_BUTTON}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0066CC'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = S.primaryDim; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = S.primary; }}
           >
             <RotateCcw size={16} />

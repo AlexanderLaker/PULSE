@@ -1,11 +1,12 @@
 /**
  * Forwarding an admin write from a dashboard route to the PRISM API.
  *
- * The browser's viewer cookie only ever authorises reads, so every write
- * goes through a dashboard route. The route checks the signed-in user's role
- * (lib/roles.ts) and calls the API on its own origin with a five-minute admin
- * token that carries the user's identity; the API verifies the token and
- * writes that identity to its audit log. On Vercel the /api/v1 path is
+ * The browser's viewer cookie carries the viewer role, so it can never
+ * authorise an admin write: every admin write goes through a dashboard route.
+ * The route checks the signed-in user's role (lib/roles.ts) and calls the API
+ * on its own origin with a five-minute admin token that carries the user's
+ * identity; the API verifies the token and writes that identity to its audit
+ * log. On Vercel the /api/v1 path is
  * rewritten to the Python function (vercel.json); in local development
  * next.config.js rewrites it to the API server at PRISM_BACKEND_URL.
  *

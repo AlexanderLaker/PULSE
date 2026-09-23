@@ -1506,10 +1506,14 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
     if (rows.length === 0) return undefined;
     return rows.map((s) => `${s.name}${s.role ? ` (${s.role})` : ''}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
   };
-  const mapCells = (m?: Record<string, ProposalAgg>): ExposureMap | undefined => {
-    if (!m) return undefined;
+  // The expert mean of every cell an expert scored, else the baseline, so a
+  // cell nobody scored keeps its value instead of dropping out of the map.
+  const expertMap = (cells: ExposureRow[]): ExposureMap | undefined => {
     const out: ExposureMap = {};
-    for (const [k, v] of Object.entries(m)) if (v.avg != null) out[k] = Math.round(v.avg);
+    for (const c of cells) {
+      const v = c.expert?.avg != null ? Math.round(c.expert.avg) : c.baseV;
+      if (v != null) out[c.key] = v;
+    }
     return Object.keys(out).length ? out : undefined;
   };
   // Per-field endorse choice. A field defaults to the expert mean when an
@@ -1631,11 +1635,11 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
     const sc = srcOf('category', hasCatE);
     if (sc === 'manual') { const m = buildManualMap('category', catCells); if (m) u.category_exposure = m; }
     else if (sc === 'baseline') { if (baseCat) u.category_exposure = baseCat; }
-    else { const c = mapCells(agg?.category_exposure); if (c) u.category_exposure = c; }
+    else { const c = expertMap(catCells); if (c) u.category_exposure = c; }
     const sr = srcOf('region', hasRegE);
     if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
     else if (sr === 'baseline') { if (baseReg) u.regional_exposure = baseReg; }
-    else { const r = mapCells(agg?.regional_exposure); if (r) u.regional_exposure = r; }
+    else { const r = expertMap(regCells); if (r) u.regional_exposure = r; }
     // The endorsed stage writes its canonical profile; the baseline stage
     // writes the baseline profile itself, so a stage that does not move leaves
     // the stored profile as it is.

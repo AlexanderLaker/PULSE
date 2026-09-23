@@ -19,7 +19,6 @@ const config = [
       '.next/**',
       'node_modules/**',
       'prism/**',
-      'public/**',
       'data/**',
       // Tests are type-checked (tsconfig.check.json), not linted.
       'tests/**',

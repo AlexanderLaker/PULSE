@@ -20,9 +20,6 @@ import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
-/** The access-code gate's error red. */
-const DANGER = '#b3261e';
-
 // NEXT_PUBLIC_* variables are baked into the client bundle at build time.
 const REQUIRED_CODE =
   (process.env.NEXT_PUBLIC_SIGNUP_CODE || 'HCB2026').trim();
@@ -267,19 +264,19 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
         className="w-full px-4 py-3 rounded-xl text-base outline-none transition-all"
         style={{
           backgroundColor: S.surfaceLow,
-          border: `1px solid ${error ? DANGER : S.cardBorder}`,
+          border: `1px solid ${error ? S.error : S.cardBorder}`,
           color: S.onSurface,
           fontFamily: BODY_FONT,
           letterSpacing: '0.04em',
         }}
         onFocus={(e) => {
-          e.currentTarget.style.borderColor = error ? DANGER : S.outlineVariant;
+          e.currentTarget.style.borderColor = error ? S.error : S.outlineVariant;
           e.currentTarget.style.boxShadow = `0 0 0 3px ${
             error ? 'rgba(179, 38, 30, 0.12)' : 'rgba(0, 93, 181, 0.12)'
           }`;
         }}
         onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? DANGER : S.cardBorder;
+          e.currentTarget.style.borderColor = error ? S.error : S.cardBorder;
           e.currentTarget.style.boxShadow = 'none';
         }}
       />
@@ -289,7 +286,7 @@ const AccessCodeGate = ({ onUnlock }: { onUnlock: () => void }) => {
           id="prism-access-code-error"
           role="alert"
           className="mt-2 text-xs leading-relaxed"
-          style={{ color: DANGER }}
+          style={{ color: S.error }}
         >
           {error}
         </div>

@@ -1,13 +1,13 @@
 /**
  * Every request the dashboard makes.
  *
- * Reads go straight to the PRISM API under /api/v1 and are authenticated by
- * the httpOnly viewer cookie that /api/prism-cookie sets (see
- * hooks/usePrism.ts). Admin writes go to the dashboard's own routes under
- * /api, which check the signed-in user's role and forward the write with a
- * short-lived admin token (lib/backend.ts): the viewer cookie can never
- * authorise a write. User management and the role lookup are dashboard
- * routes too (lib/roles.ts).
+ * Reads and the user's own expert proposals go straight to the PRISM API
+ * under /api/v1 and are authenticated by the httpOnly viewer cookie that
+ * /api/prism-cookie sets (see hooks/usePrism.ts). Admin writes go to the
+ * dashboard's own routes under /api, which check the signed-in user's role
+ * and forward the write with a short-lived admin token (lib/backend.ts): the
+ * viewer cookie can never authorise an admin write. User management and the
+ * role lookup are dashboard routes too (lib/roles.ts).
  */
 import type {
   DiagnosticsResult, Driver, DriverProposal, DriverProposalsResponse, DriverUpdate,
