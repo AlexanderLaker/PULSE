@@ -248,10 +248,12 @@ export const DriverForceCard: FC<{
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// Stage context (always visible), looked up by stage label
+// Stage context (always visible), looked up by stage id
 // ════════════════════════════════════════════════════════════════════════
-export const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({ stageLabel, journeyKey }) => {
-  const ctx = (journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX)[stageLabel];
+export const StageContextBlock: FC<{ stageId: string; stageLabel: string; journeyKey: JourneyKey }> = ({
+  stageId, stageLabel, journeyKey,
+}) => {
+  const ctx = (journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX)[stageId];
   if (!ctx) return null;
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Henkel brands', value: ctx.henkelBrands },

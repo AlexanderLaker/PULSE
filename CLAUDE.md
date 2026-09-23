@@ -89,8 +89,12 @@ documents in `docs/` explain everything below in full.
   its ordinary sense or in a foresight tier (Megatrend, Macrotrend).
 - No em dash anywhere: not in code, comments, copy, content or documents
   (`tests/frontend/interfaceCopy.test.tsx` and `tests/test_repository.py`
-  enforce it). Write plain, concrete English, British in interface copy and
-  documents (materialisation, colour); identifiers keep their spelling.
+  enforce it).
+- Write plain, concrete English, British in interface copy, content and
+  documents (materialisation, colour, towards; judgment); identifiers, names
+  and the titles of sources keep their spelling. `tests/spelling.json` lists
+  the forms to avoid and the names that keep theirs; the same two test files
+  enforce it.
 - Documents and comments describe the system as it is. The history of how it
   got here lives in git, not in the tree.
 

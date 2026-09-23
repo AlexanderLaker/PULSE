@@ -33,11 +33,11 @@ What it changes is listed in its docstring; in short:
   `meta.driver_fingerprint`), and each driver fingerprint gains the onset
   years and the exposure maps on the taxonomy's names, so the next production
   run compares like with like; no number changes;
-- each driver gets its current PRISM Analysis text, and descriptions and
-  Consumer Journey tile texts that still hold a previously shipped text get the
-  current one. A text an admin has edited is left alone and listed in the
-  report. The journey tiles cite drivers under `driverCodes`, and a code that
-  is not a driver of the base is removed.
+- each driver gets its current PRISM Analysis text, and descriptions,
+  Consumer Journey tile texts and stage labels that still hold a previously
+  shipped text get the current one. A text an admin has edited is left alone
+  and listed in the report. The journey tiles cite drivers under
+  `driverCodes`, and a code that is not a driver of the base is removed.
 
 A new, empty database needs no migration: the API creates the schema on first
 use and seeds the driver base.
@@ -190,7 +190,7 @@ next start.
 |---|---|
 | `migrate.py` | the migration |
 | `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it |
-| `journey_edits.json` | the current Consumer Journey tile texts, each with the SHA-256 of the texts shipped before it |
+| `journey_edits.json` | the current Consumer Journey tile texts and stage labels, each with the SHA-256 of the texts shipped before it |
 | `previous_names.txt` | the names of the previous schema and code; `tests/test_repository.py` fails when one appears outside this folder and the migration's tests |
 | `archive/` | written by a live run: the dropped rows (git-ignored) |
 

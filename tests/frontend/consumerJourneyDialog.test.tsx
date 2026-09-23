@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 /**
- * The Consumer Journey page: the rail, the tile dialog with its Why-chain and
- * the link to the Drivers page, the stored content that replaces the bundled
- * tiles, and the admin save with its version check.
+ * The Consumer Journey page: the rail, the tile dialog with its Why-chain, the
+ * link to the Drivers page and the stage context, the stored content that
+ * replaces the bundled tiles, and the admin save with its version check.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
 import type { PrismStore } from '@/hooks/usePrism';
-import type { JourneyContent, JourneyTile } from '@/data/consumerJourney';
+import { HAIR_CTX, HAIR_JOURNEY, LHC_CTX, LHC_JOURNEY, type JourneyContent, type JourneyTile } from '@/data/consumerJourney';
 import { ApiError } from '@/lib/apiClient';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import { makeDriver, makeStore } from './fixtures/prism';
@@ -79,6 +79,19 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(dialog.getByText('Strategist-authored · 2026-09')).toBeTruthy();
     expect(dialog.getByText('Estimate')).toBeTruthy();
     expect(dialog.getByText('Authored analysis, not simulated')).toBeTruthy();
+  });
+
+  it('shows the authored context of the tile\'s stage', () => {
+    render(<ConsumerJourney />);
+    const dialog = openTile();
+    expect(dialog.getByText(/^Stage context: /)).toBeTruthy();
+    expect(dialog.getByText('Henkel brands')).toBeTruthy();
+  });
+
+  it('keys every stage context by its stage id, one for each stage', () => {
+    for (const [journey, contexts] of [[LHC_JOURNEY, LHC_CTX], [HAIR_JOURNEY, HAIR_CTX]] as const) {
+      expect(Object.keys(contexts).sort()).toEqual(journey.map((stage) => stage.id).sort());
+    }
   });
 
   it('links a driver card to the Drivers page with the live driver name', () => {

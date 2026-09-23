@@ -69,9 +69,9 @@ or the write lock (SQLite), so nothing can write in between.
        one (descriptions.json); an edited description is left alone and reported;
      - the newest Consumer Journey content gets the key driverCodes instead of
        trendCodes, loses any code that is not a driver of the base, gets the
-       current tile texts where a tile field still holds a previously shipped
-       text (journey_edits.json) and has escaped paragraph breaks written out;
-       it is saved as a new version.
+       current tile texts and stage labels where one still holds a previously
+       shipped text (journey_edits.json) and has escaped paragraph breaks
+       written out; it is saved as a new version.
 6. The migration is recorded in schema_migrations and in the audit log.
 
 Before the commit, every dropped row and column is written to a local archive,
@@ -812,8 +812,9 @@ def migrate_journey(db: Database) -> dict:
     Per tile: trendCodes becomes driverCodes (an empty list where a tile has
     neither); a code that is not a driver of the driver base is removed, since
     the dashboard resolves every code to one; a text that still holds a
-    previously shipped version gets the current one (journey_edits.json); and
-    escaped paragraph breaks ("\\n") in a text an admin saved are written out.
+    previously shipped version gets the current one (journey_edits.json, which
+    lists stage labels the same way); and escaped paragraph breaks ("\\n") in
+    a text an admin saved are written out.
     """
     from prism.seed_drivers import DRIVERS
     codes = {display_code(d.id, d.force) for d in DRIVERS}
@@ -823,13 +824,27 @@ def migrate_journey(db: Database) -> dict:
         return {"stored_content": False}
     content = json_value(rows[0]["content"])
     edits = json.loads(JOURNEY_EDITS_FILE.read_text(encoding="utf-8"))["edits"]
-    by_tile: dict = {}
+    by_id: dict = {}
     for e in edits:
-        by_tile.setdefault(e["tile"], []).append(e)
+        by_id.setdefault(e.get("tile") or e["stage"], []).append(e)
     renamed = applied = unescaped = 0
     already, edited, removed = [], [], {}
+
+    def apply_edits(item: dict) -> None:
+        nonlocal applied
+        for e in by_id.get(item.get("id"), []):
+            stored = item.get(e["field"])
+            if stored == e["text"]:
+                already.append(f"{item['id']}.{e['field']}")
+            elif sha256(stored) in e["previous_sha256"]:
+                item[e["field"]] = e["text"]
+                applied += 1
+            else:
+                edited.append(f"{item['id']}.{e['field']}")
+
     for journey in ("lhc", "hair"):
         for stage in content.get(journey) or []:
+            apply_edits(stage)
             for side in ("benefiting", "negativelyImpacted"):
                 tiles = stage.get(side) or []
                 for i, tile in enumerate(tiles):
@@ -842,15 +857,7 @@ def migrate_journey(db: Database) -> dict:
                     if unknown:
                         tile["driverCodes"] = [c for c in tile["driverCodes"] if c in codes]
                         removed[tile["id"]] = unknown
-                    for e in by_tile.get(tile.get("id"), []):
-                        stored = tile.get(e["field"])
-                        if stored == e["text"]:
-                            already.append(f"{tile['id']}.{e['field']}")
-                        elif sha256(stored) in e["previous_sha256"]:
-                            tile[e["field"]] = e["text"]
-                            applied += 1
-                        else:
-                            edited.append(f"{tile['id']}.{e['field']}")
+                    apply_edits(tile)
                     for field in ("analysis", "driverNote"):
                         if isinstance(tile.get(field), str) and "\\n" in tile[field]:
                             tile[field] = tile[field].replace("\\n", "\n")

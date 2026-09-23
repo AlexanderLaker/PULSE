@@ -106,7 +106,7 @@ export interface PoolItem {
   id: string;
   label: string;
   sublabel?: string;
-  /** Share of the view's revenue pool (decimal), normalized per view. */
+  /** Share of the view's revenue pool (decimal), normalised per view. */
   revenueShare: number;
   /** GP1 / Contribution Margin 1 today (decimal), calibrated against the linked filings. */
   gp1Margin: number;
@@ -554,7 +554,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_vc_1', label: 'Commodity', sublabel: 'Chemicals',
         revenueShare: 0.031, gp1Margin: 0.22, revenueCAGR: 0.030, gp1DeltaBps: -50,
         revenueDriver: 'Volume tracks category; pricing capped by surfactant overcapacity.',
-        marginDriver: 'Energy-cost normalization passed through; commodity tiers cede pricing first.',
+        marginDriver: 'Energy-cost normalisation passed through; commodity tiers cede pricing first.',
         note: 'BASF, Dow, Evonik',
         sources: {
           revenue: [asEstimate(MKT.hairTotal, 'TIER REVENUE ~$5.5bn (2025): input-cost share ≈6% of the $94bn retail value (surfactants/base chemistry bought by hair brand owners).')],
@@ -564,7 +564,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
       {
         id: 'h_vc_2', label: 'Specialty', sublabel: 'Ingredients',
         revenueShare: 0.022, gp1Margin: 0.44, revenueCAGR: 0.055, gp1DeltaBps: 50,
-        revenueDriver: 'Actives & sensorial ingredients outgrow base chemistry on premiumization.',
+        revenueDriver: 'Actives & sensorial ingredients outgrow base chemistry on premiumisation.',
         marginDriver: 'Mix shift to patented actives; innovation pricing holds.',
         note: 'Croda Consumer Care, DSM-Firmenich',
         sources: {
@@ -587,7 +587,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_vc_4', label: 'Brand Owner', sublabel: 'CPG (Retail)',
         revenueShare: 0.268, gp1Margin: 0.53, revenueCAGR: 0.045, gp1DeltaBps: 75,
         revenueDriver: 'Category ~4–5% (Euromonitor ~3% all-category current value + branded premium/treatment-mix lift).',
-        marginDriver: 'Premiumization and RGM outpace private-label drag in beauty-adjacent hair.',
+        marginDriver: 'Premiumisation and RGM outpace private-label drag in beauty-adjacent hair.',
         note: 'P&G Beauty, L’Oréal CPD, Henkel HCB Hair. Tier revenue is MSP (net sales), not the RSP retail total.',
         sources: {
           revenue: [asDerived(MKT.hairTotal, 'TIER REVENUE ~$47bn (2025, MSP): brand-owner net sales ≈ 50% of the $94bn RSP retail value (the RSP→MSP bridge: retailer margin + wholesale + VAT). Supply-side check: P&G Beauty $15.0bn FY2025 net sales; L’Oréal/Henkel/Unilever hair portions fill the rest of a mid-$40s bn tier.')],
@@ -636,7 +636,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_vc_8', label: 'E-Com /', sublabel: 'DTC',
         revenueShare: 0.107, gp1Margin: 0.32, revenueCAGR: 0.110, gp1DeltaBps: 150,
         revenueDriver: 'Online beauty keeps gaining ~2–4pp over category; DTC premium brands scale.',
-        marginDriver: 'Mix shifts toward high-margin DTC + retail-media monetization.',
+        marginDriver: 'Mix shifts towards high-margin DTC + retail-media monetisation.',
         note: 'Amazon Beauty, DTC (bond/treatment brands)',
         sources: {
           revenue: [asEstimate(MKT.hairTotal, 'TIER REVENUE ~$19bn (2025, RSP): ≈20% online share of the $94bn retail value, growing above category (tier CAGR = category +4pp, structured estimate).')],
@@ -743,13 +743,13 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         note: 'Amazon Consumables, retailer apps',
         sources: {
           revenue: [asEstimate(MKT.laundryTotal, 'TIER REVENUE ~$11bn (2025, RSP): ≈11% online share of the $100bn retail value, growing above category.')],
-          margin: [asEstimate(SRC.walmart, 'Online consumables typically 200–400bps above store gross margin before fulfillment; Walmart 24.9% FY2026 as base.')],
+          margin: [asEstimate(SRC.walmart, 'Online consumables typically 200–400bps above store gross margin before fulfilment; Walmart 24.9% FY2026 as base.')],
         },
       },
       {
         id: 'l_vc_8', label: 'Laundry', sublabel: 'Services',
         revenueShare: 0.246, gp1Margin: 0.36, revenueCAGR: 0.073, gp1DeltaBps: 50,
-        revenueDriver: 'Dry-cleaning & laundry services 7.3% CAGR (GVR 2024); urbanization + outsourcing.',
+        revenueDriver: 'Dry-cleaning & laundry services 7.3% CAGR (GVR 2024); urbanisation + outsourcing.',
         marginDriver: 'Route density and automation lift service gross margins slowly.',
         note: 'Own market ($78.2bn, GVR 2024); scope incl. residential (~60%); commercial segment grows 8.0%.',
         sources: {
@@ -787,12 +787,12 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     group: 'Hair',
     kind: 'SubSegment',
     construction:
-      'Rows = Euromonitor Passport’s 8 hair care categories (2-in-1, Colourants, Conditioners & Treatments, Hair Loss Treatments, Perms & Relaxants, Salon Professional, Shampoos, Styling Agents) so an internal Passport extract drops in 1:1. Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover), normalized over their $93.1bn sum vs. the ~$94bn triangulated total. A format patchwork of 8 tier-2 firms would reconcile in total while every slice deviates from Passport: shampoo ~30% high, C&T fragments ~35% low, colour ~65% high (professional double-count), salon professional missing. HCB mapping: Shampoos/C&T/2-in-1/Hair Loss → Hair: Care; Colourants → Hair: Colour; Styling Agents (+ Perms, folded conceptually) → Hair: Styling; Salon Professional = in-total adjacency (Schwarzkopf Professional; no PRISM category). Hair: Body (Fa) lives in Passport Bath & Shower + Deodorants, outside this view. BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
+      'Rows = Euromonitor Passport’s 8 hair care categories (2-in-1, Colourants, Conditioners & Treatments, Hair Loss Treatments, Perms & Relaxants, Salon Professional, Shampoos, Styling Agents) so an internal Passport extract drops in 1:1. Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover), normalised over their $93.1bn sum vs. the ~$94bn triangulated total. A format patchwork of 8 tier-2 firms would reconcile in total while every slice deviates from Passport: shampoo ~30% high, C&T fragments ~35% low, colour ~65% high (professional double-count), salon professional missing. HCB mapping: Shampoos/C&T/2-in-1/Hair Loss → Hair: Care; Colourants → Hair: Colour; Styling Agents (+ Perms, folded conceptually) → Hair: Styling; Salon Professional = in-total adjacency (Schwarzkopf Professional; no PRISM category). Hair: Body (Fa) lives in Passport Bath & Shower + Deodorants, outside this view. BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
     items: [
       {
         id: 'h_sub_1', label: 'Shampoos',
         revenueShare: 0.317, gp1Margin: 0.44, revenueCAGR: 0.045, gp1DeltaBps: -50,
-        revenueDriver: 'Euromonitor: Europe +3.3% (2025) on unit price + premiumization; EM volume lifts world to ~4–5% nominal.',
+        revenueDriver: 'Euromonitor: Europe +3.3% (2025) on unit price + premiumisation; EM volume lifts world to ~4–5% nominal.',
         marginDriver: 'Private label + price anchoring grind the category’s floor.',
         note: 'Share ~32% on the Passport scope; the FBI scope would put it at 43%.',
         sources: {
@@ -837,7 +837,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_sub_5', label: 'Styling', sublabel: 'Agents',
         revenueShare: 0.097, gp1Margin: 0.52, revenueCAGR: 0.050, gp1DeltaBps: 0,
         revenueDriver: 'Euromonitor: Europe styling +5.1% forecast 2026 (wash less, style more); texture looks offset spray decline.',
-        marginDriver: 'Stable: aerosol cost pass-through balances premium texturizers.',
+        marginDriver: 'Stable: aerosol cost pass-through balances premium texturisers.',
         sources: {
           revenue: [MKT.stylingAgents],
           margin: [asDerived(SRC.henkel, 'Henkel group GM 50.8% as floor for its strongest-share category (Taft/got2b; Kline: Henkel #1 in professional styling); modest premium.')],
@@ -894,13 +894,13 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     group: 'Hair',
     kind: 'CoreAdjacent',
     construction:
-      'Pool sizes side by side, normalized over $291.6bn: core retail hair ~$77.5bn (= triangulated Passport hair total ~$94bn MINUS Salon Professional ~$16.5bn, because the professional row is shown separately), salon services ~$150bn (triangulated: no tier-1 source sizes salon SERVICES; FBI’s $203.8bn treated as a scope-inflated ceiling), professional products ~$16.5bn (Kline authority, salon-manufacturer level, not RSP; flagged), tools $29.4bn (FBI 2025), scalp care $15.8bn (CMI 2026; cross-cuts retail formats, flagged), beauty subscriptions $1.6bn (FMI 2025), supplements $0.8bn (GVR 2024; Consumer Health in Passport). Men’s grooming and beauty-tech are left out: their published scopes are too broad to slot honestly.',
+      'Pool sizes side by side, normalised over $291.6bn: core retail hair ~$77.5bn (= triangulated Passport hair total ~$94bn MINUS Salon Professional ~$16.5bn, because the professional row is shown separately), salon services ~$150bn (triangulated: no tier-1 source sizes salon SERVICES; FBI’s $203.8bn treated as a scope-inflated ceiling), professional products ~$16.5bn (Kline authority, salon-manufacturer level, not RSP; flagged), tools $29.4bn (FBI 2025), scalp care $15.8bn (CMI 2026; cross-cuts retail formats, flagged), beauty subscriptions $1.6bn (FMI 2025), supplements $0.8bn (GVR 2024; Consumer Health in Passport). Men’s grooming and beauty-tech are left out: their published scopes are too broad to slot honestly.',
     items: [
       {
         id: 'h_ca_1', label: 'CORE', sublabel: 'Branded Hair (Retail)',
         revenueShare: 0.266, gp1Margin: 0.53, revenueCAGR: 0.045, gp1DeltaBps: 75,
         revenueDriver: 'Euromonitor-anchored: ~4–5% nominal on the ~$77.5bn retail pool (ex-professional).',
-        marginDriver: 'Premiumization + treatment mix outpace PL drag.',
+        marginDriver: 'Premiumisation + treatment mix outpace PL drag.',
         note: 'Core = Passport hair total ~$94bn minus Salon Professional ~$16.5bn (shown as its own bar).',
         sources: {
           revenue: [asDerived(MKT.hairTotal, 'Core retail = triangulated Passport hair total ~$94bn (2025 RSP) minus the Salon Professional row ~$16.5bn ⇒ ~$77.5bn.')],
@@ -911,11 +911,11 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_ca_2', label: 'Salon', sublabel: 'Services',
         revenueShare: 0.514, gp1Margin: 0.42, revenueCAGR: 0.060, gp1DeltaBps: 0,
         revenueDriver: '~6% CAGR (triangulated, not FBI’s 7.6% ceiling): services inflation + premium treatments.',
-        marginDriver: 'Labor 50–60% of revenue caps service GP1 structurally.',
-        note: 'Largest hair pool by far; labor-intensive economics.',
+        marginDriver: 'Labour 50–60% of revenue caps service GP1 structurally.',
+        note: 'Largest hair pool by far; labour-intensive economics.',
         sources: {
           revenue: [MKT.salonServices],
-          margin: [asEstimate(MKT.salonServices, 'Salon-level GP after stylist labor typically ~40–45%; pure franchisors (Regis: 100% GM on fees) are not representative; structured estimate.')],
+          margin: [asEstimate(MKT.salonServices, 'Salon-level GP after stylist labour typically ~40–45%; pure franchisors (Regis: 100% GM on fees) are not representative; structured estimate.')],
         },
       },
       {
@@ -933,7 +933,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
         id: 'h_ca_4', label: 'Hair Tools', sublabel: '& Appliances',
         revenueShare: 0.101, gp1Margin: 0.46, revenueCAGR: 0.053, gp1DeltaBps: -50,
         revenueDriver: 'FBI: 5.3% CAGR; premium dryers/stylers replace cycle.',
-        marginDriver: 'Fast-follower commoditization of premium hardware.',
+        marginDriver: 'Fast-follower commoditisation of premium hardware.',
         sources: {
           revenue: [MKT.hairTools],
           margin: [SRC.helenOfTroy],
@@ -953,18 +953,18 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
       {
         id: 'h_ca_6', label: 'Subscription', sublabel: '/ DTC Beauty',
         revenueShare: 0.0053, gp1Margin: 0.50, revenueCAGR: 0.259, gp1DeltaBps: 100,
-        revenueDriver: 'FMI: 25.9% CAGR; personalization + replenishment lock-in.',
-        marginDriver: 'Scale leverage on fulfillment; churn is the margin risk.',
+        revenueDriver: 'FMI: 25.9% CAGR; personalisation + replenishment lock-in.',
+        marginDriver: 'Scale leverage on fulfilment; churn is the margin risk.',
         sources: {
           revenue: [MKT.beautySub],
-          margin: [asEstimate(SRC.olaplex, 'DTC comp bracket: Olaplex 69.4% product GM less fulfillment/churn economics → ~50% GP1 estimate.')],
+          margin: [asEstimate(SRC.olaplex, 'DTC comp bracket: Olaplex 69.4% product GM less fulfilment/churn economics → ~50% GP1 estimate.')],
         },
       },
       {
         id: 'h_ca_7', label: 'Hair', sublabel: 'Supplements',
         revenueShare: 0.0028, gp1Margin: 0.68, revenueCAGR: 0.155, gp1DeltaBps: 50,
         revenueDriver: 'GVR: 15.5% CAGR from a small base.',
-        marginDriver: 'Ingestible-beauty economics hold while category professionalizes.',
+        marginDriver: 'Ingestible-beauty economics hold while category professionalises.',
         sources: {
           revenue: [MKT.supplements],
           margin: [asEstimate(SRC.olaplex, 'Bracketed by Olaplex 69.4% (premium beauty) and C&D 44.7% (mass VMS).'), SRC.chd],
@@ -973,9 +973,9 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     ],
     insights: [
       'The adjacency map redraws the category: salon services (~€130bn, ~51% of the combined pool) dwarf core retail (~€67bn ex-professional): hair is a services category with a products attach, not the reverse. (Salon sized on the triangulated ~$150bn estimate, not FBI’s $203.8bn ceiling; no tier-1 source sizes salon SERVICES.)',
-      'Henkel’s monetization route into the biggest pool is indirect: professional products (~€14bn, 58% GP1; Kline manufacturer-level salon basis) ride the ~6%-growing services pool: back-bar share is the lever, not salon ownership.',
+      'Henkel’s monetisation route into the biggest pool is indirect: professional products (~€14bn, 58% GP1; Kline manufacturer-level salon basis) ride the ~6%-growing services pool: back-bar share is the lever, not salon ownership.',
       'Scalp care (€14bn, 58% GP1, +100bps drift) is the richest adjacency Henkel can enter from existing chemistry: supplements and subscriptions are options, scalp is the move.',
-      'Tools at 46% GP1 (Helen of Troy 45.7% reported FY2026) lose margin as premium hardware commoditizes: partner, don’t build.',
+      'Tools at 46% GP1 (Helen of Troy 45.7% reported FY2026) lose margin as premium hardware commoditises: partner, don’t build.',
     ],
   },
 
@@ -1128,7 +1128,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     group: 'LHC',
     kind: 'CoreAdjacent',
     construction:
-      'Pool sizes side by side, normalized over $362.6bn: core Laundry Care ~$100bn (2025 RSP triangulation, recipe in the source hover; a ~$85bn estimate runs ~15% low), laundry services $78.2bn (GVR 2024), washing machines $66.9bn (FBI 2025), Surface Care ~$30bn (Passport-consistent; a “~$55bn surface cleaners” figure would mix Surface + Toilet + Bleach + Polishes, and those categories live on the Home Care category view), on-demand laundry $28.5bn (GVR 2023, definition flagged), Hand Dishwashing ~$19bn and Automatic Dishwashing ~$14bn (Passport-consistent splits of Dishwashing ~$33bn; Market.us’ $19.2bn ADW runs ~35% high), Air Care ~$14bn (Passport-consistent; Precedence $17.2bn scope-inflated), smart washers $12.0bn (GVR 2024).',
+      'Pool sizes side by side, normalised over $362.6bn: core Laundry Care ~$100bn (2025 RSP triangulation, recipe in the source hover; a ~$85bn estimate runs ~15% low), laundry services $78.2bn (GVR 2024), washing machines $66.9bn (FBI 2025), Surface Care ~$30bn (Passport-consistent; a “~$55bn surface cleaners” figure would mix Surface + Toilet + Bleach + Polishes, and those categories live on the Home Care category view), on-demand laundry $28.5bn (GVR 2023, definition flagged), Hand Dishwashing ~$19bn and Automatic Dishwashing ~$14bn (Passport-consistent splits of Dishwashing ~$33bn; Market.us’ $19.2bn ADW runs ~35% high), Air Care ~$14bn (Passport-consistent; Precedence $17.2bn scope-inflated), smart washers $12.0bn (GVR 2024).',
     items: [
       {
         id: 'l_ca_1', label: 'CORE', sublabel: 'Laundry (Branded)',

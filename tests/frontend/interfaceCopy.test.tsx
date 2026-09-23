@@ -9,7 +9,10 @@
  *      content may use the word in its ordinary sense (a fashion trend), so
  *      data/ is not swept.
  *   2. No em dash in any dashboard source, content, copy or comment.
- *   3. Render checks on the entry gate and the Drivers page: the labels are
+ *   3. British spelling in every readable string of the interface code and in
+ *      the journey content and driver code map (tests/spelling.json lists the
+ *      American forms and the names that keep their own spelling).
+ *   4. Render checks on the entry gate and the Drivers page: the labels are
  *      there and no readable text or accessible attribute says trend.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -40,10 +43,15 @@ function sourceFiles(dirs: string[]): string[] {
   return out;
 }
 
-function readableMentions(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
+/** A string a person can read, and where it is. */
+interface Readable { where: string; text: string }
+
+/** Every string literal, template chunk and JSX text of a file, except module
+ *  paths, object keys and the class names and styles of JSX elements. */
+function readableStrings(file: string, src = fs.readFileSync(file, 'utf8')): Readable[] {
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true,
     file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const hits: string[] = [];
+  const out: Readable[] = [];
   const visit = (node: ts.Node) => {
     let text: string | null = null;
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
@@ -51,20 +59,48 @@ function readableMentions(file: string, src = fs.readFileSync(file, 'utf8')): st
       const isModule = p && (ts.isImportDeclaration(p) || ts.isExportDeclaration(p)
         || (ts.isCallExpression(p) && p.expression.kind === ts.SyntaxKind.ImportKeyword));
       const isKey = p && ts.isPropertyAssignment(p) && p.name === node;
-      if (!isModule && !isKey) text = node.text;
+      const isStyling = p && ts.isJsxAttribute(p) && ['className', 'style'].includes(p.name.getText());
+      if (!isModule && !isKey && !isStyling) text = node.text;
     } else if (ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
       text = node.text;
     } else if (ts.isJsxText(node)) {
       text = node.getText();
     }
-    if (text !== null && WORD.test(text)) {
+    if (text !== null) {
       const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
-      hits.push(`${path.relative(REPO, file)}:${line + 1} ${JSON.stringify(text.trim().slice(0, 120))}`);
+      out.push({ where: `${path.relative(REPO, file)}:${line + 1}`, text });
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return hits;
+  return out;
+}
+
+function readableMentions(file: string, src = fs.readFileSync(file, 'utf8')): string[] {
+  return readableStrings(file, src)
+    .filter((r) => WORD.test(r.text))
+    .map((r) => `${r.where} ${JSON.stringify(r.text.trim().slice(0, 120))}`);
+}
+
+// ─── British spelling ──────────────────────────────────────────────────────
+const SPELLING = JSON.parse(fs.readFileSync(path.join(REPO, 'tests', 'spelling.json'), 'utf8')) as {
+  american: string[]; names: string[];
+};
+const AMERICAN = SPELLING.american.map((p) => new RegExp(p, 'gi'));
+// A class list or a style value is not copy: every word of it is a class or a
+// CSS token ("items-center", "background-color 0.15s ease, color 0.15s ease").
+const STYLE_TOKEN = new RegExp('^(?:[\\w.[\\]/%#()]*[-:][\\w.[\\]/%#:()-]*|\\d[\\w.%]*'
+  + '|ease|linear|solid|auto|none|all|color|opacity|transform'
+  + '|flex|grid|block|inline|hidden|relative|absolute|fixed|sticky|uppercase|italic|truncate)$');
+const isStyling = (text: string): boolean => text.split(/[\s,]+/).filter(Boolean).every((t) => STYLE_TOKEN.test(t));
+
+/** The American forms in one readable string: a string of several words,
+ *  without its links and the names that keep their own spelling. */
+function americanForms(text: string): string[] {
+  if (!/\s/.test(text.trim()) || isStyling(text)) return [];
+  let prose = text.replace(/https?:\/\/\S+/g, ' ');
+  for (const name of SPELLING.names) prose = prose.split(name).join(' ');
+  return AMERICAN.flatMap((rx) => prose.match(rx) ?? []);
 }
 
 describe('the driver vocabulary', () => {
@@ -87,6 +123,32 @@ describe('the driver vocabulary', () => {
   it('the top navigation names the page "Drivers"', () => {
     const page = fs.readFileSync(path.join(REPO, 'app', 'dashboard', 'page.tsx'), 'utf8');
     expect(page).toMatch(/\{ id: 'drivers', label: 'Drivers' \}/);
+  });
+});
+
+describe('British spelling', () => {
+  it('no readable string of the interface, the journey content or the driver code map spells the American way', () => {
+    const files = [
+      ...sourceFiles(COPY_DIRS).filter((f) => !f.endsWith('.css')),
+      path.join(REPO, 'data', 'consumerJourney.ts'),
+      path.join(REPO, 'data', 'driverCodeMap.ts'),
+    ];
+    const hits = files.flatMap((f) => readableStrings(f).flatMap((r) => {
+      const forms = americanForms(r.text);
+      return forms.length ? [`${r.where} ${forms.join(', ')}`] : [];
+    }));
+    expect(hits).toEqual([]);
+  });
+
+  it('the check finds American forms in copy and spares names, links, identifiers and styles', () => {
+    expect(americanForms('Optimized cold-wash programs toward lower odor')).toEqual(
+      ['odor', 'toward', 'programs', 'Optimized']);
+    expect(americanForms('colour-safe care for grey hair, sized for travel')).toEqual([]);
+    expect(americanForms('Keratin Color and Color Wow at https://example.org/color-center')).toEqual([]);
+    expect(americanForms('normalized_score')).toEqual([]);
+    expect(americanForms('flex items-center justify-center')).toEqual([]);
+    expect(americanForms('color 150ms ease')).toEqual([]);
+    expect(americanForms('border-color 0.15s, background-color 0.15s')).toEqual([]);
   });
 });
 

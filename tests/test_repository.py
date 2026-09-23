@@ -10,7 +10,12 @@
   and category palettes from lib/format.ts): a literal colour anywhere else in
   its code, a named one or a class of Tailwind's own palette included, is
   either a token that is missing or a copy that will drift.
+- British spelling in the documents and in the drivers' own texts
+  (tests/spelling.json lists the American forms and the names that keep their
+  own spelling; tests/frontend/interfaceCopy.test.tsx holds the dashboard to
+  the same list).
 """
+import json
 import re
 import shutil
 import subprocess
@@ -50,6 +55,18 @@ LITERAL_COLOUR = re.compile(
     r"-(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky"
     r"|blue|indigo|violet|purple|fuchsia|pink|rose)(?![\w])"
 )
+
+
+SPELLING = json.loads((REPO / "tests" / "spelling.json").read_text(encoding="utf-8"))
+AMERICAN = [re.compile(p, re.I) for p in SPELLING["american"]]
+
+
+def american_forms(text: str) -> list:
+    """The American forms in a text, without its links and the names that keep their spelling."""
+    text = re.sub(r"https?://\S+", " ", text)
+    for name in SPELLING["names"]:
+        text = text.replace(name, " ")
+    return [m.group(0) for rx in AMERICAN for m in rx.finditer(text)]
 
 
 def text_files() -> list:
@@ -110,3 +127,30 @@ def test_colours_come_from_the_theme():
             if LITERAL_COLOUR.search(line):
                 hits.append(f"{rel}:{i}: {line.strip()[:100]}")
     assert not hits, "\n".join(hits[:25])
+
+
+DOCUMENTS = [f for f in FILES if f.suffix == ".md"]
+
+
+@pytest.mark.parametrize("path", DOCUMENTS, ids=[f.relative_to(REPO).as_posix() for f in DOCUMENTS])
+def test_documents_spell_the_british_way(path):
+    """Code, names of the code and link targets keep their spelling; the prose does not."""
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`[^`]*`", " ", text)
+    text = re.sub(r"\]\([^)]*\)", "]", text)
+    assert american_forms(text) == []
+
+
+def test_the_drivers_texts_spell_the_british_way():
+    from prism.seed_drivers import DRIVERS
+    hits = [f"{d.id} {field}: {form}" for d in DRIVERS for field in ("name", "description", "analysis")
+            for form in american_forms(getattr(d, field))]
+    assert hits == []
+
+
+def test_the_spelling_check_spares_names_links_and_the_size_family():
+    assert american_forms("Optimized cold-wash programs toward lower odor") == [
+        "odor", "toward", "programs", "Optimized"]
+    assert american_forms("Keratin Color, Colorado, one-size-fits-all, downsizing, a prize, "
+                          "https://example.org/hair-color") == []

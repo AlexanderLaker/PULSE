@@ -169,6 +169,7 @@ JOURNEY_EDITS = [
     {"tile": "t.b", "field": "analysis", "previous_sha256": [sha("Earlier read B.")], "text": "Current read B."},
     {"tile": "t.c", "field": "analysis", "previous_sha256": [sha("Earlier read C.")], "text": "Current read C."},
     {"tile": "t.d", "field": "driverNote", "previous_sha256": [sha("Earlier note D.")], "text": "Current note D."},
+    {"stage": "wash", "field": "label", "previous_sha256": [sha("Wash")], "text": "Washing"},
 ]
 DESCRIPTION_EDITS = {
     "consumer_r01": {"previous_sha256": [sha(PREVIOUS_DESCRIPTION)], "text": SEED["consumer_r01"].description},
@@ -562,7 +563,7 @@ class TestMigration:
     def test_the_journey_content_is_saved_as_a_new_version(self, migration, previous, capsys):
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
-        assert report == {"stored_content": True, "tiles_renamed": 3, "texts_updated": 2, "texts_already_current": 1,
+        assert report == {"stored_content": True, "tiles_renamed": 3, "texts_updated": 3, "texts_already_current": 1,
                           "texts_edited_left_alone": ["t.c.analysis"], "texts_with_breaks_written_out": 0,
                           "codes_removed": {}, "new_version_saved": True}
         rows = query(previous, "SELECT content, updated_by FROM journey_content ORDER BY id")
@@ -575,6 +576,7 @@ class TestMigration:
         assert list(a) == ["id", "name", "driverCodes", "analysis"] and a["driverCodes"] == ["C-01"]
         assert (a["analysis"], b["analysis"], c["analysis"], d["driverNote"]) == (
             "Current read A.", "Current read B.", "Read an admin wrote.", "Current note D.")
+        assert (content["lhc"][0]["label"], content["hair"][0]["label"]) == ("Sorting", "Washing")
         assert "trendCodes" not in json.dumps(content)
 
     def test_journey_codes_are_drivers_and_breaks_are_written_out(self, migration, previous, capsys):
@@ -830,17 +832,23 @@ class TestShippedEditFiles:
             assert e["previous_sha256"] and all(re.fullmatch(r"[0-9a-f]{64}", h) for h in e["previous_sha256"])
             assert sha(e["text"]) not in e["previous_sha256"], driver_id
 
-    def test_journey_edits_end_on_the_shipped_tiles(self):
+    def test_journey_edits_end_on_the_shipped_content(self):
+        """Every entry ends on the text the dashboard ships: a tile's name, driver note or read, or a stage's
+        label."""
         edits = json.loads((MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]
-        tiles = {t["id"]: t for journey in shipped_journey().values() for stage in journey
-                 for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])}
+        journeys = shipped_journey().values()
+        items = {s["id"]: s for journey in journeys for s in journey}
+        items.update({t["id"]: t for journey in journeys for stage in journey
+                      for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])})
         assert edits
         for e in edits:
-            assert e["tile"] in tiles, e["tile"]
-            assert tiles[e["tile"]][e["field"]] == e["text"], (e["tile"], e["field"])
+            key = e.get("tile") or e["stage"]
+            assert e["field"] == "label" if "stage" in e else e["field"] in ("name", "driverNote", "analysis"), e
+            assert key in items, key
+            assert items[key][e["field"]] == e["text"], (key, e["field"])
             assert e["previous_sha256"] and all(re.fullmatch(r"[0-9a-f]{64}", h) for h in e["previous_sha256"])
-            assert sha(e["text"]) not in e["previous_sha256"], (e["tile"], e["field"])
-        assert len({(e["tile"], e["field"]) for e in edits}) == len(edits)
+            assert sha(e["text"]) not in e["previous_sha256"], (key, e["field"])
+        assert len({(e.get("tile") or e["stage"], e["field"]) for e in edits}) == len(edits)
 
     def test_the_shipped_tiles_write_their_paragraph_breaks_out(self):
         """A Strategist Read separates its paragraphs with a blank line, never with
@@ -987,7 +995,7 @@ def test_postgres(migration, monkeypatch, capsys, json_type):
         assert migration.main(["--postgres"]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
         assert report["copied"]["drivers"] == 51 and report["descriptions"]["edited_left_alone"] == ["consumer_r04"]
-        assert report["journey"]["texts_updated"] == 2 and report["runs"]["with_renamed_keys"] == 1
+        assert report["journey"]["texts_updated"] == 3 and report["runs"]["with_renamed_keys"] == 1
         assert report["baselines"]["from_the_current_scores"] == ["technology_r01"]
         assert migration.main(["--postgres"]) == 0 and "already on the driver schema" in capsys.readouterr().out
 

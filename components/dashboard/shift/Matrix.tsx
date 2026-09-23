@@ -6,7 +6,7 @@
 import React, { useMemo, useState, type FC } from 'react';
 import { Info } from 'lucide-react';
 import {
-  NO_VALUE, fmtShift, fmtPct, shiftArrow, shiftColor, heatFill, heatText, heatScaleFor,
+  BASE_YEAR, HORIZON, NO_VALUE, fmtShift, fmtPct, shiftArrow, shiftColor, heatFill, heatText, heatScaleFor,
 } from '@/lib/format';
 import {
   S, SHADOW, EXPANSION_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT,
@@ -538,16 +538,15 @@ export const PeakStressTooltip: FC = () => {
             peak years spread across the horizon.
           </p>
           <p className="mb-2">
-            That means the category grand total can be <strong>non-monotonic</strong>:
-            front-loaded consumer shifts and step-function regulation compound hardest
-            mid-horizon (H1→H2), while later-maturing longevity and biotech drivers
-            only pick up in H3, sometimes in the opposite direction, partially
-            offsetting the stress.
+            So a category&rsquo;s total need not move in one direction: headwinds that
+            arrive early can be offset later by tailwinds that peak towards the end of
+            the horizon, and the path can <strong>flatten or turn back</strong> before{' '}
+            {HORIZON}.
           </p>
           <p className="mb-0" style={{ color: S.onSurfaceVariant }}>
-            Read a cell as the <strong>cumulative level vs 2025</strong> at that
+            Read a cell as the <strong>cumulative level vs {BASE_YEAR}</strong> at that
             year: the compounded impact up to that measurement point, not a
-            year-over-year delta.
+            year-on-year change.
           </p>
         </div>
       )}

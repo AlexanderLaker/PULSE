@@ -20,8 +20,9 @@ SOURCE = (
 )
 
 # Marginals, in percent:
-#   categories Color 17.1, Care 13.0, Styling 7.1, Body 8.0, FCN 24.1,
-#   FCA 4.3, FFI 6.7, LAD 2.6, HDW 3.4, ADW 6.5, HSC 4.1, TOI 2.5, IC 0.6
+#   categories Hair: Color 17.1, Hair: Care 13.0, Hair: Styling 7.1,
+#   Hair: Body 8.0, LHC: FCN 24.1, LHC: FCA 4.3, LHC: FFI 6.7, LHC: LAD 2.6,
+#   LHC: HDW 3.4, LHC: ADW 6.5, LHC: HSC 4.1, LHC: TOI 2.5, LHC: IC 0.6
 #   regions Europe 51.4, North America 23.2, Asia 5.6, High Growth 19.8
 CELL_WEIGHTS = {
     "Hair: Color":   {"Europe": 0.094047313, "North America": 0.025649267, "Asia": 0.010259707, "High Growth": 0.041038827},

@@ -45,7 +45,7 @@ export const DetailPanel: FC<{
   const marginCagr = Math.pow(gp1EndPct / item.gp1Margin, 1 / POOL_HORIZON_YEARS) - 1;
   const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}%`;
   const tips = {
-    revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalized per view).\n\nRow size basis: ${revBasis}`,
+    revShare: `Revenue share = this row's revenue ÷ sum of all rows on this view (shares normalised per view).\n\nRow size basis: ${revBasis}`,
     gp1Share: `GP1 pool share = this row's GP1 pool (${fmtEurBn(gp1Now)}) ÷ the sum of all rows' GP1 pools on this view.\n\nGP1 pool = revenue × GP1 margin per row (see the trajectory table).`,
     revToday: `${fmtEurBn(revEur)} = ${fmtShare(item.revenueShare)} share × ${fmtEurBn(view.poolSizeEurBn)} view revenue pool (€ at planning rate 1.15).\n\nSize basis: ${revBasis}`,
     revPa: `Forward revenue CAGR ${revRating.label} p.a. (nominal).\n\nRationale: ${item.revenueDriver}\nSource: ${revSrcNames} (grade: ${revSrc?.grade ?? 'estimate'}).`,

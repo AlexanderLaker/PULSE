@@ -1,0 +1,38 @@
+{
+ "about": "British English in everything a person reads: the dashboard's copy and content, the driver texts and the documents (CLAUDE.md, Words), with -ise endings and judgment written as the documents write it. The patterns match the forms to avoid, case-insensitively; the names keep their own spelling. Read by tests/test_repository.py and tests/frontend/interfaceCopy.test.tsx.",
+ "american": [
+  "\\bcolor(?:s|ed|ing|ful|less|ist|ists|ant|ants|ation)?\\b",
+  "\\b(?:mal)?odors?\\b|\\bodorless\\b",
+  "\\bgray(?:s|ing|er|est)?\\b",
+  "\\b(?:un)?favor(?:s|ed|ing|ite|ites|able)?\\b",
+  "\\bbehavior(?:s|al)?\\b",
+  "\\bflavor(?:s|ed|ing)?\\b",
+  "\\b(?:micro)?fibers?\\b",
+  "\\bcenter(?:s|ed|ing)?\\b",
+  "\\blabor(?:s|er|ers)?\\b",
+  "\\b(?:toward|afterward)\\b",
+  "\\bcatalogs?\\b",
+  "\\bfulfillment\\b",
+  "\\backnowledgments?\\b",
+  "\\b(?:defense|offense)s?\\b",
+  "\\bjudgements?\\b",
+  "\\baluminum\\b",
+  "\\bmold(?:s|ed|ing)?\\b",
+  "\\banalyz(?:e|es|ed|ing|er|ers)\\b",
+  "\\bprograms?\\b",
+  "\\b(?:travel|model|label|cancel|fuel|signal|level|total|channel)(?:ed|ing)\\b",
+  "\\b(?!\\w*(?:siz(?:e|es|ed|ing|able|eable)|priz(?:e|es)|seiz(?:e|es|ed|ing))\\b)\\w+iz(?:e|es|ed|ing|er|ers|ation|ations|able)\\b"
+ ],
+ "names": [
+  "Hair: Color",
+  "Color Expert",
+  "Color Wow",
+  "Keratin Color",
+  "Syoss Color",
+  "Hair Colorants",
+  "Joint Center",
+  "Colorado",
+  "Delhaize",
+  "Pfizer"
+ ]
+}

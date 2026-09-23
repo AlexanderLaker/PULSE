@@ -192,9 +192,9 @@ texts. After an edit to `driver_base.json`:
    changed description to them: the new text becomes the `text` of the
    driver's entry in `migrations/0001_driver_schema/descriptions.json` (an
    entry is added where the driver has none) and the SHA-256 of the text it
-   replaces joins `previous_sha256`. A changed Consumer Journey tile text
-   goes into `journey_edits.json` the same way. The migration's tests check
-   that every entry ends on the shipped text;
+   replaces joins `previous_sha256`. A changed Consumer Journey tile text or
+   stage label goes into `journey_edits.json` the same way. The migration's
+   tests check that every entry ends on the shipped text;
 5. commit the regenerated files; CI checks all of them.
 
 A new database picks up the base when it is seeded. An existing database

@@ -44,8 +44,8 @@ const ProfitPoolExplorer: FC = () => {
 
   // The Beta notice opens once per browser: on the first Explorer visit
   // (the tab stays mounted once visited) and never again once acknowledged.
-  // "Got it" stores the acknowledgment; Escape or a backdrop click only
-  // dismisses. The acknowledgment is read in the state initializer: this tab
+  // "Got it" stores the acknowledgement; Escape or a backdrop click only
+  // dismisses. The acknowledgement is read in the state initializer: this tab
   // renders on the client only (`ssr: false` in page.tsx) and
   // `noticeAcked()` is SSR-safe anyway, so there is nothing to hydrate
   // against and no effect is needed to reach the open state.

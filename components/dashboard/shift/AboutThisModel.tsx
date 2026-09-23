@@ -6,7 +6,7 @@
  */
 import { useState, type FC } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
-import { FORCES, YEARS, fmtDate, fmtPct } from '@/lib/format';
+import { BASE_YEAR, FORCES, YEARS, fmtDate, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import { RunDetails } from './RunDetails';
@@ -18,7 +18,7 @@ const GLOSSARY: Array<[string, string]> = [
   ['P10 to P90', 'The range covering 80% of simulated outcomes: 10% of runs land below P10, 10% above P90.'],
   ['Category codes', 'LHC = Laundry & Home Care. FCN Fabric Clean · FCA Fabric Care · FFI Fabric Finishers · LAD Laundry Additives · HDW Hand Dishwash · ADW Auto Dishwash · HSC Hard-Surface Cleaner · TOI Toilet Care · IC Insect Control.'],
   ['Attenuation', 'Dampening factor applied to overlapping drivers so co-occurring effects are not double-counted.'],
-  ['Cumulative shift', 'Each cell is the compounded level vs 2025 at that year, not a year-over-year change.'],
+  ['Cumulative shift', `Each cell is the compounded level vs ${BASE_YEAR} at that year, not a year-on-year change.`],
 ];
 
 /** Score k as the Beta(k, 6 - k) prior at uncertainty score 3: its mean and
@@ -163,7 +163,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Methodology</div>
           {/* A three-line plain read first, so the curious reader gets the gist before the technical prose. */}
           <ul className="text-[12px] mb-3" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, fontFamily: BODY_FONT, margin: '0 0 12px', paddingLeft: 18 }}>
-            <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs 2025 at that year: a compounded level, not a year-over-year change.</li>
+            <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs {BASE_YEAR} at that year: a compounded level, not a year-on-year change.</li>
             <li style={{ marginBottom: 3 }}>Totals are category-weighted averages (not sums), so the portfolio number reads as one interpretable shift.</li>
             <li>The model holds Henkel and competitor strategy constant: it propagates external drivers only.</li>
           </ul>
@@ -177,13 +177,13 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
                 dependencies, {run.driver_count} drivers)
               </>
             ) : ' (Gaussian-copula dependencies)'}. The driver
-            probability priors are <strong>structured expert judgement</strong> (Beta shapes set
-            from analyst 1&ndash;5 scores); the model expresses uncertainty in those judgements and
+            probability priors are <strong>structured expert judgment</strong> (Beta shapes set
+            from analyst 1&ndash;5 scores); the model expresses uncertainty in those judgments and
             does not learn or update from data. Each cell is a{' '}
-            <strong>cumulative shift level vs 2025</strong> at that measurement year, i.e. the
-            compounded impact from {YEARS[0]} up to that year, not a year-over-year delta.
+            <strong>cumulative shift level vs {BASE_YEAR}</strong> at that measurement year, i.e. the
+            compounded impact from {YEARS[0]} up to that year, not a year-on-year change.
             The Force, Value Chain and Region lenses are per-year decompositions written by
-            the engine. <strong>Region also enters the shift itself</strong>: the engine solves
+            the engine. <strong>Region is a dimension of the simulation, not only a lens</strong>: the engine solves
             a category &times; region &times; year tensor (each driver weighted by category
             exposure &times; regional exposure) and rolls a category&rsquo;s regional shifts up
             with its own row of the cell weights, so a regionally concentrated driver only
@@ -192,7 +192,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             exposure scores with the force weights and the run&rsquo;s cell weights; the{' '}
             <strong>Value Chain lens is a categorical epicentre partition</strong>: each
             driver&rsquo;s contribution is assigned wholly to the single stage where experts
-            located its impact epicentre, with no per-step weights and no modelled
+            located its impact epicentre, with no split across stages and no modelled
             propagation up or down the chain (holding responses constant, propagation would
             be a management or market story, not a driver property). Every row total equals
             the MC median shift for that (category, year) and is therefore identical across

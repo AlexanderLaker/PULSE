@@ -57,7 +57,7 @@ function sortValue(d: Driver, key: SortKey): string | number {
 //   list    the scores that feed the model, read-only. A score an admin has
 //           changed from the driver's baseline shows in green; hover a score
 //           for its baseline.
-//   input   any signed-in expert scores a driver from a blank slate in the
+//   rating  any signed-in expert scores a driver from a blank slate in the
 //           expanded panel, with the baseline on hover; changes save as they
 //           are made.
 //   review  admins only: the expert aggregate against the baseline, with the

@@ -35,7 +35,7 @@ export const PanelBody: FC<{
   selected, journeyKey, driversById, driversLoaded,
   canEdit, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onNavigateToDriver,
 }) => {
-  const { tile, stageLabel, side } = selected;
+  const { tile, stageId, stageLabel, side } = selected;
   const isExp = side === 'benefiting';
   const ts = TYPE_STYLES[tile.type];
   const canPrev = !!position && position.index > 0;
@@ -121,7 +121,7 @@ export const PanelBody: FC<{
               </div>
             </DetailSection>
 
-            <StageContextBlock stageLabel={stageLabel} journeyKey={journeyKey} />
+            <StageContextBlock stageId={stageId} stageLabel={stageLabel} journeyKey={journeyKey} />
 
             {canEdit && !editing && (
               <button type="button"

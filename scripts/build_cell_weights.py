@@ -238,7 +238,7 @@ def module_text(rec) -> str:
     """prism/cell_weight_estimate.py as the record gives it."""
     cells, marginals = rec["cells"], rec["marginals"]
     width = max(len(c) for c in CATEGORIES) + 3
-    cats = [f"{c.split(': ')[1]} {marginals['category'][c] * 100:.1f}" for c in CATEGORIES]
+    cats = [f"{c} {marginals['category'][c] * 100:.1f}" for c in CATEGORIES]
     regs = [f"{r} {marginals['region'][r] * 100:.1f}" for r in REGIONS]
     source = rec["source"]
     source_lines = []
@@ -277,7 +277,7 @@ def module_text(rec) -> str:
 
 
 def _wrap(items: list, width: int) -> list:
-    """A label and its items ("Color 17.1") as lines of at most width
+    """A label and its items ("Hair: Care 13.0") as lines of at most width
     characters, broken only between items."""
     label, *rest = items
     out, line = [], label
