@@ -18,7 +18,7 @@ from typing import Optional
 from prism.config import vc_epicentre_of
 
 #: Fingerprint fields beyond probability, GP1 share, direction and force.
-STRUCTURE_KEYS = ("ce", "ve", "re", "pk", "dc", "u")
+STRUCTURE_KEYS = ("ce", "ve", "re", "s", "pk", "dc", "u")
 
 
 def _exposure_map(m) -> dict:
@@ -33,7 +33,8 @@ def driver_fingerprint(drivers) -> dict:
     Keys per driver: p probability, g GP1 share, d direction, f force,
     ce / re category and regional exposure, ve the value-chain epicentre stage
     (the stage, not the stored profile, because only the stage enters the
-    value-chain lens), pk peak year, dc diffusion curve, u uncertainty.
+    value-chain lens), s onset year, pk peak year, dc diffusion curve,
+    u uncertainty.
     """
     fp = {}
     for d in drivers:
@@ -45,6 +46,7 @@ def driver_fingerprint(drivers) -> dict:
             "ce": _exposure_map(d.category_exposure),
             "ve": vc_epicentre_of(d.vc_exposure or {}),
             "re": _exposure_map(d.regional_exposure),
+            "s": int(d.start_year) if d.start_year is not None else None,
             "pk": int(d.peak_year or 0),
             "dc": str(d.diffusion_curve or ""),
             "u": int(d.uncertainty) if d.uncertainty is not None else None,
@@ -71,7 +73,9 @@ def compute_input_drift_event(
 
     Returns None when there is nothing to compare against (the first run).
     Returns an info event when nothing changed: the absence of drift is worth
-    recording too.
+    recording too. A structural key is compared only when both fingerprints
+    carry it, so a fingerprint stored before a key existed raises no false
+    drift.
     """
     if not previous_fp:
         return None
@@ -89,7 +93,7 @@ def compute_input_drift_event(
             gp1_changes.append(did)
         if a.get("d") != b.get("d"):
             direction_flips.append(did)
-        if any(a.get(key) != b.get(key) for key in STRUCTURE_KEYS):
+        if any(key in a and key in b and a[key] != b[key] for key in STRUCTURE_KEYS):
             structure_changes.append(did)
 
     scores_changed = sorted(set(prob_changes) | set(gp1_changes))
@@ -123,7 +127,7 @@ def compute_input_drift_event(
             "detail": detail,
         }
 
-    struct_txt = (f", {len(structure_changes)} structural change(s) (exposures, peak year, curve, uncertainty)"
+    struct_txt = (f", {len(structure_changes)} structural change(s) (exposures, onset, peak year, curve, uncertainty)"
                   if structure_changes else "")
     add_rm_txt = f", {len(added)} driver(s) added, {len(removed)} removed" if (added or removed) else ""
     bal_txt = ("; per-force balance change: " + ", ".join(f"{f} {d:+d}" for f, d in balance_delta.items())

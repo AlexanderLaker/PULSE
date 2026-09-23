@@ -2,6 +2,7 @@
 import copy
 import json
 import logging
+import math
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -45,12 +46,13 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
 
 
 def _exposure_map(name: str, value: dict) -> dict:
-    """An exposure map with every score a number in [0, 5]."""
+    """An exposure map whose scores are whole numbers from 0 to 5; 422 otherwise."""
     out = {}
     for key, score in value.items():
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
-            raise HTTPException(422, f"{name}['{key}'] must be a number")
-        out[str(key)] = max(0, min(5, score))
+        if (isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score)
+                or score != int(score) or not 0 <= score <= 5):
+            raise HTTPException(422, f"{name}['{key}'] must be a whole number from 0 to 5")
+        out[str(key)] = int(score)
     return out
 
 
@@ -129,7 +131,7 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     sent = proposal.model_fields_set
     if "diffusion_curve" in sent and proposal.diffusion_curve is not None \
             and proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
-        raise HTTPException(400, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+        raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
 
     fields: dict = {}
     for name in ("probability", "gp1_pct_affected", "peak_year", "uncertainty", "diffusion_curve"):
@@ -138,10 +140,7 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     for name in ("category_exposure", "regional_exposure", "vc_exposure"):
         if name in sent:
             value = getattr(proposal, name)
-            fields[name] = None if value is None else {
-                str(k): max(0.0, min(5.0, float(v))) for k, v in value.items()
-                if isinstance(v, (int, float)) and not isinstance(v, bool)
-            }
+            fields[name] = None if value is None else _exposure_map(name, value)
     if "comment" in sent:
         text = (proposal.comment or "").strip()
         fields["comment"] = text[:2000] or None

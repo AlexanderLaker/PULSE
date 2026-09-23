@@ -1,6 +1,6 @@
 {
  "record_version": 1,
- "built": "2026-09-22",
+ "built": "2026-09-23",
  "method": "Expected-value decomposition of the engine's compounding arithmetic at the score means (Beta mean = probability/6, materialisation averaged over each driver's peak jitter), cross-terms spread in proportion to the additive terms, rolled up with the cell gross-profit shares. The sum reproduces the reference run's terminal-year mean; every contribution is then scaled by one factor, the run's median over that mean (the skew of the portfolio distribution), so the contributions add up to the median headline the dashboard shows. Attribution, not simulation.",
  "basis": {
   "drivers": 51,
@@ -115,8 +115,8 @@
     "p90": -0.028763
    }
   },
-  "inputs_hash": "8dbf7c79d0f9d403223cc83aa754dd24c52f45f04f116e997bac26ce3c78eaed",
-  "run_at_utc": "2026-09-22T21:45:58+00:00"
+  "inputs_hash": "61030c7404525b7f380054972bda0a1b3fc3b571c57bd4f5e89863046e09145d",
+  "run_at_utc": "2026-09-23T00:05:46+00:00"
  },
  "persisted_run": {
   "id": 99,

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Give a user the admin role (or take it away) directly in the database.
 
-Roles live in the user_roles table that the dashboard creates when a user
-first signs in (lib/roles.ts). The in-app route /api/admin/bootstrap does the
+Roles live in the user_roles table (lib/roles.ts); the Clerk webhook adds a
+user's row when they sign up. The in-app route /api/admin/bootstrap does the
 same job when ADMIN_BOOTSTRAP_SECRET is set; this script is the path that
 needs nothing but database access.
 
@@ -18,6 +18,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -42,6 +43,7 @@ def main() -> int:
         print("No database URL: set POSTGRES_URL in .env or pass --dsn.", file=sys.stderr)
         return 2
     email = args.email.strip().lower()
+    print(f"Database: {urlparse(dsn).hostname}")
 
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("SELECT to_regclass('user_roles') IS NOT NULL AS present")
@@ -51,8 +53,8 @@ def main() -> int:
         cur.execute("SELECT clerk_user_id, role FROM user_roles WHERE lower(email) = %s LIMIT 1", (email,))
         row = cur.fetchone()
         if row is None:
-            print(f"No user with the email {email}; the user has to sign in to the dashboard once first.",
-                  file=sys.stderr)
+            print(f"No user with the email {email}: the Clerk webhook adds a user when they sign up "
+                  "(its deliveries are listed in the Clerk dashboard).", file=sys.stderr)
             return 3
         if row["role"] == args.role:
             print(f"{email} is already {args.role}; nothing changed.")

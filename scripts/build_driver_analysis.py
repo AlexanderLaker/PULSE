@@ -303,18 +303,15 @@ def band_analysis(config: ModelConfig, drivers: list, dec: dict, factor: float) 
 
 def inputs_hash(config: ModelConfig, drivers: list) -> str:
     """A digest of everything the reference run depends on: the scoring
-    state of every driver (its input-drift fingerprint plus the onset year),
-    the force layers, the cell weights, the path and the engine version. The
-    reference run is stamped with it, and a record whose inputs no longer
-    match its reference run is refused, so that a re-scored base cannot be
-    reconciled to a median it does not produce."""
+    state of every driver (its input-drift fingerprint, which includes the
+    onset year), the force layers, the cell weights, the path and the engine
+    version. The reference run is stamped with it, and a record whose inputs
+    no longer match its reference run is refused, so that a re-scored base
+    cannot be reconciled to a median it does not produce."""
     import hashlib
     from prism.input_drift import driver_fingerprint
-    fp = driver_fingerprint(drivers)
-    for t in drivers:
-        fp[str(t.id)]["sy"] = int(t.start_year or 0)
     payload = {
-        "drivers": fp,
+        "drivers": driver_fingerprint(drivers),
         "force_weights": {f: round(float(config.force_weights[f]), 6) for f in FORCES},
         "per_force_attenuation": {f: round(float(config.per_force_attenuation[f]), 6) for f in FORCES},
         "within_force_overlap": {f: round(float(config.within_force_overlap.get(f, 0.0)), 6) for f in FORCES},

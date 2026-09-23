@@ -54,10 +54,6 @@ export interface Decompositions {
 export interface Totals {
   /** category -> year -> median shift (the row totals of every lens). */
   category_path: Record<string, Record<string, number>>;
-  /** year -> dimension -> sum over the categories (column totals per lens). */
-  by_force: Record<string, Record<string, number>>;
-  by_vc: Record<string, Record<string, number>>;
-  by_region: Record<string, Record<string, number>>;
   /** The portfolio band: the joint percentiles of the gross-profit-weighted portfolio shift. */
   portfolio: ShiftPath;
 }

@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
                   "Lower the cross-force correlations in prism/config.py, or pass --allow-nonpsd.")
         return 4
 
-    log.info("Simulating (a few minutes at 3 x 50,000)...")
+    log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * config.iterations >= 100_000 else "")
     started = datetime.now()
     result = BayesianMonteCarloEngine(config, seed=MASTER_SEED).run_multichain(
         driver_set, n_chains=args.chains, iterations=config.iterations)

@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from prism.api import state
 from prism.api.app import create_app
+from prism.config import CATEGORIES
 
 REPO = Path(__file__).resolve().parents[1]
 SECRET = "pytest-secret-" + "x" * 40
@@ -125,7 +126,8 @@ class TestAuthentication:
         api.cookies.set("prism-token", token())
         assert api.get("/api/v1/drivers").status_code == 200
 
-    @pytest.mark.parametrize("bad", ["not-a-token", "a.b.c", token(exp_offset=-10), token(secret="z" * 40)])
+    @pytest.mark.parametrize("bad", ["not-a-token", "a.b.c", token(exp_offset=-10), token(secret="z" * 40)],
+                             ids=["garbage", "malformed", "expired", "wrong-secret"])
     def test_an_invalid_token_is_refused(self, api, bad):
         assert api.get("/api/v1/drivers", headers={"Authorization": f"Bearer {bad}"}).status_code == 401
 
@@ -258,11 +260,18 @@ class TestDrivers:
     def test_invalid_edits_are_refused(self, api, body):
         assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json=body).status_code == 422
 
-    def test_exposures_are_clamped_to_0_to_5(self, api):
+    @pytest.mark.parametrize("score", [9, -2, 2.5, "3", True])
+    def test_an_exposure_score_is_a_whole_number_from_0_to_5(self, api, score):
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"category_exposure": {"Hair: Care": score}})
+        assert response.status_code == 422
+
+    def test_an_exposure_map_is_stored_as_sent(self, api):
+        exposure = {c: 3 for c in CATEGORIES} | {"Hair: Care": 5}
         api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                json={"category_exposure": {"Hair: Care": 9, "Hair: Color": -2}})
+                json={"category_exposure": {**exposure, "Hair: Color": 4.0}})
         driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        assert driver["category_exposure"] == {"Hair: Care": 5, "Hair: Color": 0}
+        assert driver["category_exposure"] == exposure | {"Hair: Color": 4}
 
     def test_an_unknown_driver_is_404(self, api):
         assert api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"probability": 3}).status_code == 404
@@ -290,10 +299,10 @@ class TestProposals:
         body = api.put(path, headers=bearer(sub="ana", name="Ana"), json={"peak_year": 2031}).json()
         assert body["my"]["probability"] == 4 and body["my"]["peak_year"] == 2031 and body["my"]["comment"] == "looks high"
         api.put(path, headers=bearer(sub="ben", email="ben@example.com"),
-                json={"probability": 2, "category_exposure": {"Hair: Care": 7}})
+                json={"probability": 2, "category_exposure": {"Hair: Care": 4}})
         body = api.get(path, headers=bearer(sub="ben", email="ben@example.com")).json()
         assert body["aggregate"]["probability"] == {"avg": 3.0, "count": 2}
-        assert body["aggregate"]["category_exposure"] == {"Hair: Care": {"avg": 5.0, "count": 1}}
+        assert body["aggregate"]["category_exposure"] == {"Hair: Care": {"avg": 4.0, "count": 1}}
         assert [s["name"] for s in body["scorers"]] == ["Ana", "ben"]
         assert body["my"]["probability"] == 2
         summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
@@ -308,7 +317,8 @@ class TestProposals:
 
     def test_invalid_proposals(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"
-        assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 400
+        assert api.put(path, headers=bearer(), json={"diffusion_curve": "exponential"}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 7}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
         assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
         assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404

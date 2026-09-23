@@ -445,7 +445,7 @@ def save_simulation_run(iterations: int, results: dict) -> int:
         else:
             cursor.execute(sql, (iterations, dumps(results)))
             run_id = cursor.lastrowid
-    logger.info("Saved simulation run %s (%d iterations)", run_id, iterations)
+    logger.debug("Saved simulation run %s (%d iterations)", run_id, iterations)
     return run_id
 
 

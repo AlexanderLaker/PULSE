@@ -47,9 +47,10 @@ PERCENTILES = [10, 25, 50, 75, 90]
 class BayesianMonteCarloEngine:
     """Simulates the relative shift of every category and cell over the horizon."""
 
-    #: Version of the model and of the result contract. Changing the numbers or
-    #: the shape of a result means a new version, regenerated golden pins in the
-    #: same commit, and a new production run.
+    #: Version of the model. A change to any number it produces means a new
+    #: version, regenerated golden pins in the same commit, and a new production
+    #: run. A result key the dashboard needs is listed in prism/api/runs.py,
+    #: which refuses to serve a run without it.
     MODEL_VERSION = "2.12.0"
     ENGINE_NAME = "bayesian_copula"
 
@@ -69,7 +70,7 @@ class BayesianMonteCarloEngine:
         missing = [f for f in FORCES if f not in per_force]
         if missing:
             raise KeyError(f"per_force_attenuation missing forces: {missing}. All six forces required: {FORCES}")
-        logger.info("Per-force attenuation (source=%s): %s", self.config.attenuation_source,
+        logger.debug("Per-force attenuation (source=%s): %s", self.config.attenuation_source,
                     ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
 
@@ -635,23 +636,6 @@ class BayesianMonteCarloEngine:
                 vc_decomp[yi][cat] = {s: float(vc_shares[cat][s] * median_cy) for s in VC_STEPS}
                 region_decomp[yi][cat] = {r: float(region_shares[cat][r] * median_cy) for r in REGIONS}
 
-        # ── Totals ──────────────────────────────────────────────────────────
-        category_path_totals: dict = {
-            cat: {int(y): float(shift_matrix[cat]["path"][y]["median"]) for y in years} for cat in cats
-        }
-        by_force_totals: dict = {int(y): {f: 0.0 for f in FORCES} for y in years}
-        by_vc_totals: dict = {int(y): {s: 0.0 for s in VC_STEPS} for y in years}
-        by_region_totals: dict = {int(y): {r: 0.0 for r in REGIONS} for y in years}
-        for year in years:
-            yi = int(year)
-            for cat in cats:
-                for f in FORCES:
-                    by_force_totals[yi][f] += force_decomp[yi][cat][f]
-                for s in VC_STEPS:
-                    by_vc_totals[yi][s] += vc_decomp[yi][cat][s]
-                for r in REGIONS:
-                    by_region_totals[yi][r] += region_decomp[yi][cat][r]
-
         decompositions = {
             "force": force_decomp,    # year -> category -> force  -> shift
             "vc": vc_decomp,          # year -> category -> step   -> shift
@@ -681,12 +665,13 @@ class BayesianMonteCarloEngine:
             cell["std"] = float(np.std(ys))
             portfolio_path[int(year)] = cell
 
+        # A lens's column totals are category-weighted averages of the lens
+        # values (lib/shiftMatrix.ts computes them where they are shown).
         totals = {
-            "category_path": category_path_totals,  # row totals
-            "by_force": by_force_totals,            # column totals per lens
-            "by_vc": by_vc_totals,
-            "by_region": by_region_totals,
-            "portfolio": portfolio_path,            # the headline band
+            # category -> year -> median: the row total of every lens
+            "category_path": {cat: {int(y): float(shift_matrix[cat]["path"][y]["median"]) for y in years}
+                              for cat in cats},
+            "portfolio": portfolio_path,  # the headline band
         }
 
         return {

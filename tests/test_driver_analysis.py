@@ -140,7 +140,7 @@ FORBIDDEN = [
     (re.compile(r"\b(?:Henkel|HCB) (?:should|must|needs to|has to|ought to|could|would need to|can offset)\b|"
                 r"\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure", re.I),
      "a management response"),
-    (re.compile(r"[—–]"), "a dash"),
+    (re.compile("[\u2014\u2013]"), "a dash"),
     (re.compile(r"\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b", re.I), "filler"),
     (re.compile(r"\btrends?\b", re.I), "the word trend"),
     (re.compile(r"\{\w+\}"), "an unfilled placeholder"),
@@ -311,7 +311,7 @@ class TestCommittedArtefacts:
         assert persisted and persisted["id"] and persisted["model_version"] == record["basis"]["model_version"]
         assert len(persisted["categories_terminal"]) == 13
         assert build.reference_reproduces(record["reference_run"], persisted) == []
-        # the headline quoted in docs/MODEL.md is the reference run's, to the displayed decimals
+        # the published headline is the reference run's, to the displayed decimals
         term = record["reference_run"]["portfolio_terminal"]
         assert (round(term["median"] * 100, 2), round(term["p10"] * 100, 2), round(term["p90"] * 100, 2)) == (-5.58, -6.16, -4.89)
 

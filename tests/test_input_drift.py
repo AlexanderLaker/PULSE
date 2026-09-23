@@ -46,6 +46,20 @@ def test_structural_changes_are_counted_separately():
     assert "1 structural change(s)" in event["message"]
 
 
+def test_the_onset_year_is_structural():
+    event = compute_input_drift_event(_fp(_driver("a", start_year=2029)), _fp(_driver("a", start_year=2027)))
+    assert event["detail"]["structure_changes"] == ["a"]
+    assert "(exposures, onset, peak year, curve, uncertainty)" in event["message"]
+
+
+def test_a_key_the_previous_fingerprint_lacks_is_not_drift():
+    """A fingerprint stored before a key existed compares on the keys both carry."""
+    previous = _fp(_driver("a"))
+    del previous["a"]["s"]
+    event = compute_input_drift_event(_fp(_driver("a")), previous)
+    assert event["detail"]["structure_changes"] == [] and event["severity"] == "info"
+
+
 def test_the_value_chain_counts_by_epicentre_stage():
     """Only the epicentre stage enters the model, so a profile rewrite that keeps
     the stage is not drift, and moving the stage is."""

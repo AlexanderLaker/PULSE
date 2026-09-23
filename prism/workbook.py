@@ -89,7 +89,7 @@ def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
     _velocity(wb.create_sheet("Velocity"), result, config)
     _metadata(wb.create_sheet("Metadata"), result, config, run_id, driver_count)
     wb.save(output_path)
-    logger.info("QA workbook written to %s", output_path)
+    logger.debug("QA workbook written to %s", output_path)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────

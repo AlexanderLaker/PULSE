@@ -83,9 +83,6 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
   const split = (dims: readonly string[]) => Object.fromEntries(YEARS.map((y) => [String(y), Object.fromEntries(
     CATEGORY_NAMES.map((c) => [c, Object.fromEntries(dims.map((d) => [d, median(c, y) / dims.length]))]),
   )]));
-  const columnTotals = (dims: readonly string[]) => Object.fromEntries(YEARS.map((y) => [String(y), Object.fromEntries(
-    dims.map((d) => [d, CATEGORY_NAMES.reduce((a, c) => a + median(c, y) / dims.length, 0)]),
-  )]));
   const portfolioTerminal = CATEGORY_NAMES.reduce((a, c, i) => a + categoryWeights[c] * terminal(i), 0);
   return {
     shifts,
@@ -100,9 +97,6 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
     },
     totals: {
       category_path: Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(YEARS.map((y) => [String(y), median(c, y)]))])),
-      by_force: columnTotals(FORCES),
-      by_vc: columnTotals(VC_STEPS),
-      by_region: columnTotals(REGIONS),
       portfolio: linearPath(portfolioTerminal),
     },
     cell_weights_used: ESTIMATED_CELL_WEIGHTS,

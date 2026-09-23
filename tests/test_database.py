@@ -1,10 +1,27 @@
-"""Persistence on SQLite (the same SQL runs on PostgreSQL): schema, drivers, proposals, runs, journey, audit."""
+"""Persistence: schema, drivers, proposals, runs, journey, audit.
+
+The tests run on SQLite. With PRISM_TEST_POSTGRES_URL set, the last test runs
+this whole module again in a fresh interpreter against an empty PostgreSQL
+schema (prism.database fixes its backend when it is imported), so the SQL is
+checked on both backends.
+"""
 import json
+import os
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
 from prism.config import CATEGORIES, REGIONS, VC_STEPS
 from prism.drivers import Driver
+
+REPO = Path(__file__).resolve().parents[1]
+POSTGRES_URL = os.environ.get("PRISM_TEST_POSTGRES_URL")
+#: Set for the interpreter that re-runs this module on PostgreSQL.
+ON_POSTGRES = os.environ.get("PRISM_TEST_DATABASE_ON_POSTGRES") == "1"
 
 
 def _driver(driver_id="consumer_r01", **overrides) -> Driver:
@@ -23,9 +40,16 @@ def _driver(driver_id="consumer_r01", **overrides) -> Driver:
 
 @pytest.fixture
 def db(monkeypatch, tmp_path):
-    """A fresh SQLite database holding one driver with two expert proposals."""
-    monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "prism.db"))
+    """A fresh database holding one driver with two expert proposals."""
     import prism.database as dbm
+    assert dbm.USE_POSTGRES == ON_POSTGRES
+    if dbm.USE_POSTGRES:
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            for table in dbm.table_names(cursor):
+                cursor.execute(f"DROP TABLE {table} CASCADE")
+    else:
+        monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "prism.db"))
     dbm.init_db()
     d = _driver()
     d.baseline = d.scores()
@@ -36,11 +60,16 @@ def db(monkeypatch, tmp_path):
     return dbm
 
 
+def _values(row) -> tuple:
+    """A row's values in column order (PostgreSQL rows arrive as dicts)."""
+    return tuple(row.values()) if isinstance(row, dict) else tuple(row)
+
+
 def _count(dbm, sql: str) -> int:
     with dbm.get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(sql)
-        return cursor.fetchone()[0]
+        return _values(cursor.fetchone())[0]
 
 
 class TestSchema:
@@ -54,6 +83,7 @@ class TestSchema:
                 "driver_sources", "driver_score_proposals", "journey_content", "simulation_runs", "audit_log",
                 "schema_migrations"} <= tables
 
+    @pytest.mark.skipif(ON_POSTGRES, reason="builds a SQLite file")
     def test_a_database_of_the_previous_schema_is_refused(self, monkeypatch, tmp_path):
         import sqlite3
         import prism.database as dbm
@@ -117,7 +147,7 @@ class TestDrivers:
         with db.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT created_at, updated_at FROM drivers")
-            created, updated = cursor.fetchone()
+            created, updated = _values(cursor.fetchone())
         assert str(created).startswith("2020-01-01") and not str(updated).startswith("2020-01-01")
         assert db.drivers_stamp() != before
 
@@ -187,13 +217,35 @@ class TestRunsJourneyAudit:
         with db.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT action, entity_id, old_value, new_value, reason, user_id FROM audit_log")
-            assert tuple(cursor.fetchone()) == ("driver_updated", "consumer_r01", "3", "4", "probability", "admin-1")
+            assert _values(cursor.fetchone()) == ("driver_updated", "consumer_r01", "3", "4", "probability", "admin-1")
 
     def test_diagnostics_never_raise(self, db, monkeypatch):
         diag = db.diagnose_connection()
-        assert diag["db_reachable"] is True and diag["db_mode"] == "sqlite" and diag["error"] is None
+        assert diag["db_reachable"] is True and diag["error"] is None
+        assert diag["db_mode"] == ("postgres" if db.USE_POSTGRES else "sqlite")
         monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route")))
         monkeypatch.setattr(db.time, "sleep", lambda s: None)
         broken = db.diagnose_connection()
         assert broken["db_reachable"] is False and "no route" in broken["error"]
         assert json.dumps(broken)
+
+
+@pytest.mark.skipif(not POSTGRES_URL or ON_POSTGRES, reason="PRISM_TEST_POSTGRES_URL is not set")
+def test_the_same_tests_pass_on_postgres():
+    """This module again, in a fresh interpreter, against an empty PostgreSQL schema."""
+    import psycopg2
+    schema = f"db_{uuid.uuid4().hex[:8]}"
+    admin = psycopg2.connect(POSTGRES_URL)
+    admin.autocommit = True
+    admin.cursor().execute(f"CREATE SCHEMA {schema}")
+    try:
+        sep = "&" if "?" in POSTGRES_URL else "?"
+        env = {**os.environ, "POSTGRES_URL": f"{POSTGRES_URL}{sep}options={quote(f'-c search_path={schema}')}",
+               "DATABASE_URL": "", "PRISM_TEST_ALLOW_POSTGRES": "1", "PRISM_TEST_DATABASE_ON_POSTGRES": "1"}
+        result = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", __file__],
+                                cwd=REPO, env=env, capture_output=True, text=True, timeout=300)
+        assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-2000:]
+        assert " passed" in result.stdout and " failed" not in result.stdout
+    finally:
+        admin.cursor().execute(f"DROP SCHEMA {schema} CASCADE")
+        admin.close()
