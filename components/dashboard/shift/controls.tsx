@@ -20,8 +20,8 @@ export const VIEW_META: Record<ViewMode, { label: string; description: string; I
 
 export const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
   total:       { label: 'Net',                 description: 'Net shift: expansion and contraction drivers combined.', Icon: Activity },
-  expansion:   { label: 'Expansion drivers',   description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingUp },
-  contraction: { label: 'Contraction drivers', description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingDown },
+  expansion:   { label: 'Expansion drivers',   description: 'The part of each year\'s net shift the expanding drivers carry, from their contributions at the score means: a split of the net run, not a separate one.', Icon: TrendingUp },
+  contraction: { label: 'Contraction drivers', description: 'The part of each year\'s net shift the contracting drivers carry, from their contributions at the score means: a split of the net run, not a separate one.', Icon: TrendingDown },
 };
 
 // ─── Controls ────────────────────────────────────────────────────────────
@@ -30,7 +30,8 @@ export const IMPACT_META: Record<ImpactFilter, { label: string; description: str
  *  impact filter). The bordered track and the raised active segment keep it
  *  distinct from the year stepper and the info button beside it. */
 export const SegControl: FC<{
-  items: Array<{ id: string; label: string; Icon?: LucideIcon }>;
+  /** An item with a `disabledReason` cannot be chosen; the reason is its tooltip. */
+  items: Array<{ id: string; label: string; Icon?: LucideIcon; disabledReason?: string }>;
   activeId: string;
   onSelect: (id: string) => void;
   ariaLabel: string;
@@ -52,13 +53,15 @@ export const SegControl: FC<{
         overflowX: 'auto',
       }}
     >
-      {items.map(({ id, label, Icon }) => {
+      {items.map(({ id, label, Icon, disabledReason }) => {
         const active = id === activeId;
         return (
           <button
             key={id}
             type="button"
             aria-pressed={active}
+            disabled={disabledReason != null}
+            title={disabledReason}
             onClick={() => onSelect(id)}
             className={`inline-flex items-center transition-all ${sm
               ? 'gap-1.5 px-2.5 py-1.5 text-[12px]'
@@ -71,7 +74,8 @@ export const SegControl: FC<{
               fontWeight: active ? 700 : 600,
               boxShadow: active ? SHADOW.raised : 'none',
               fontFamily: BODY_FONT,
-              cursor: 'pointer',
+              cursor: disabledReason != null ? 'not-allowed' : 'pointer',
+              opacity: disabledReason != null ? 0.45 : 1,
               whiteSpace: 'nowrap',
             }}
           >

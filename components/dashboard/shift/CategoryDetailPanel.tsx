@@ -7,8 +7,8 @@
  * The contributing drivers are attributed at the score means with
  * lib/driverAttribution.ts, the decomposition the PRISM Analysis on the
  * Drivers page is written on, so a driver's rank here and its reading agree.
- * When the model configuration did not load, the ranking falls back to an
- * exposure proxy; the footer names the basis in use.
+ * Without the model configuration there is no attribution, and the panel
+ * says so instead of ranking the drivers another way.
  *
  * The panel shares the Shift Analysis surface (S tokens, Manrope headlines,
  * JetBrains Mono figures, white cards on the light page background), so the
@@ -18,13 +18,13 @@ import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Activity, Zap, Layers, LineChart, Globe } from 'lucide-react';
 import {
-  CATEGORIES, CATEGORY_NAMES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay,
+  CATEGORIES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay,
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
-import { computeDriverAttribution, scoredDrivers } from '@/lib/driverAttribution';
+import type { AttributionResult } from '@/lib/driverAttribution';
 import useOverlay from '@/hooks/useOverlay';
-import type { Driver, ModelConfig, SimulationResult } from '@/types';
+import type { Driver, SimulationResult } from '@/types';
 import {
   ForceDecomposition, MiniPathChart, RegionalDecomposition,
   type RegionalRow, Section,
@@ -38,8 +38,8 @@ interface CategoryDetailPanelProps {
   year: number;
   simulation: SimulationResult;
   drivers: Driver[];
-  /** The model configuration; null when it did not load, which leaves the exposure proxy. */
-  config: ModelConfig | null;
+  /** The drivers' parts of the shift at the score means; null without the model configuration. */
+  attribution: AttributionResult | null;
   onClose: () => void;
   /** Opens the Drivers page searched for a driver's name; makes every driver card a link. */
   onOpenDriver?: (name: string) => void;
@@ -49,7 +49,7 @@ interface CategoryDetailPanelProps {
 const pt = (v: number): string => `${v >= FLAT_EPS ? '+' : ''}${(Math.abs(v) < FLAT_EPS ? 0 : v * 100).toFixed(1)} pt`;
 
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
-  category, year, simulation, drivers, config, onClose, onOpenDriver,
+  category, year, simulation, drivers, attribution, onClose, onOpenDriver,
 }) => {
   const group = CATEGORIES.find((c) => c.name === category)?.group;
   const path = simulation.shifts[category];
@@ -72,13 +72,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       .sort((a, b) => Math.abs(b.median) - Math.abs(a.median));
   }, [simulation, category, year]);
 
-  // The decomposition needs the model configuration and every driver fully
-  // scored; without either the contributors fall back to the exposure proxy.
-  const scored = useMemo(() => scoredDrivers(drivers), [drivers]);
-  const attribution = useMemo(() => (config && scored
-    ? computeDriverAttribution({ drivers: scored, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
-    : null), [scored, config, simulation.cell_weights_used]);
-
   const shiftEnd = path[String(HORIZON)].median;
   const shiftStart = path[String(FIRST_YEAR)].median;
   const velocity = shiftEnd - shiftStart;
@@ -86,8 +79,12 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const lastYearChange = simulation.velocity[category]?.[String(HORIZON)];
 
   const contributors = useMemo(
-    () => rankContributors(category, drivers, attribution, shiftEnd),
+    () => (attribution ? rankContributors(category, drivers, attribution, shiftEnd) : []),
     [category, drivers, attribution, shiftEnd],
+  );
+  const exposedDrivers = useMemo(
+    () => drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0).length,
+    [category, drivers],
   );
 
   // Share of the category's movement carried by its five largest drivers.
@@ -385,7 +382,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   lineHeight: 1,
                 }}
               >
-                {contributors.length}
+                {exposedDrivers}
               </div>
             </div>
           </div>
@@ -438,6 +435,14 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {!attribution && exposedDrivers > 0 && (
+              <Section title="Contributing Drivers" icon={Layers}>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
+                  The drivers behind this row are attributed with the model configuration, which did not
+                  load. Reload the page to try again.
+                </p>
+              </Section>
+            )}
             {contributors.length > 0 && (
               <Section
                 title="Contributing Drivers"
@@ -538,9 +543,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             />
             Shifts are cumulative vs 2025 from the Monte Carlo engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
-            {contributors.length > 0 && (attribution
-              ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'
-              : ` Contributing drivers: exposure proxy (Shift × category exposure), because ${scored ? 'the model configuration did not load' : 'a driver misses a score the model needs'}; the PRISM Analysis on the Drivers page is attributed at the score means.`)}
+            {contributors.length > 0
+              && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
           </footer>
         </div>
       </motion.aside>

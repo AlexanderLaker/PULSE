@@ -4,8 +4,9 @@
  * diagnosis (unreachable, no run yet, a run that cannot be served, no
  * database, a database awaiting the migration, none configured); above the
  * matrix it says when the drivers or the engine have moved on since the run;
- * its "About this model" footer names the run's cell-weight basis and the
- * pass-through of the served configuration.
+ * the impact filter splits the net by the drivers' contributions and needs
+ * the model configuration; its "About this model" footer names the run's
+ * cell-weight basis and the pass-through of the served configuration.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
@@ -124,6 +125,31 @@ describe('Shift Matrix lenses', () => {
     expect(aside.getAttribute('aria-label')).toBe('Toilet Care drill-down');
     expect(aside.textContent).toContain('Regional Shift');
     expect(aside.textContent).toContain('North America');
+  });
+});
+
+describe('the impact filter', () => {
+  const total2035 = () => screen.getByTitle(/^2035, column total: /).getAttribute('title');
+
+  it('splits the net by the drivers behind it: all of it for the contracting side here, none for the other', () => {
+    STORE.store = makeStore();   // one driver, a contracting one
+    render(<ShiftAnalysis />);
+    const net = total2035();
+    fireEvent.click(screen.getByRole('button', { name: 'Contraction drivers' }));
+    expect(total2035()).toBe(net);
+    fireEvent.click(screen.getByRole('button', { name: 'Expansion drivers' }));
+    expect(total2035()).toMatch(/: [+-]?0\.0%$/);
+  });
+
+  it('cannot be used without the model configuration, which the split needs', () => {
+    STORE.store = makeStore({ config: null });
+    render(<ShiftAnalysis />);
+    for (const name of ['Expansion drivers', 'Contraction drivers']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.title).toContain('model configuration');
+    }
+    expect((screen.getByRole('button', { name: 'Net' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

@@ -8,7 +8,7 @@ set -euo pipefail
 fail=0
 
 # 1. No second declaration of a lib/shiftMatrix function, in any style.
-if grep -rnE "(function[[:space:]]+(weightedAvg|categoryShares|getYearPercentiles|computeImpactFractions)[[:space:]]*\()|((const|let|var)[[:space:]]+(weightedAvg|categoryShares|getYearPercentiles|computeImpactFractions)[[:space:]]*=)" components app hooks 2>/dev/null; then
+if grep -rnE "(function[[:space:]]+(weightedAvg|categoryShares|getYearPercentiles)[[:space:]]*\()|((const|let|var)[[:space:]]+(weightedAvg|categoryShares|getYearPercentiles)[[:space:]]*=)" components app hooks 2>/dev/null; then
   echo "ERROR: a lib/shiftMatrix function is declared again; import it from '@/lib/shiftMatrix'." >&2
   fail=1
 fi

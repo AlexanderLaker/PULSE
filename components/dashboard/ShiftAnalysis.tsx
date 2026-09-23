@@ -26,6 +26,12 @@
  * produces per (category, year), and the force and cell weights already shape
  * how a row is split.
  *
+ * On the Time Path the impact filter shows the part of each cell the
+ * expanding or the contracting drivers carry, splitting the median by the
+ * drivers' contributions at the score means (lib/driverAttribution.ts). The
+ * same attribution ranks the drivers in the drill-down; without the model
+ * configuration there is none, and the filter and the ranking say so.
+ *
  * Above the matrix a KPI strip shows the portfolio band and the most resilient
  * and most exposed categories; a row or a category tile opens the drill-down
  * (CategoryDetailPanel). Without a run the page says why, from the service's
@@ -44,7 +50,8 @@ import usePrism from '@/hooks/usePrism';
 import { getDiagnostics } from '@/lib/apiClient';
 import { CATEGORIES, CATEGORY_NAMES, HORIZON, categoryDisplay } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { categoryShares, computeImpactFractions, getYearPercentiles } from '@/lib/shiftMatrix';
+import { categoryShares, getYearPercentiles } from '@/lib/shiftMatrix';
+import { computeDriverAttribution, scoredDrivers, signSplit } from '@/lib/driverAttribution';
 import { cellWeightsBasis } from '@/lib/cellWeights';
 import CategoryDetailPanel from './shift/CategoryDetailPanel';
 import type { DiagnosticsResult } from '@/types';
@@ -95,23 +102,29 @@ const ShiftAnalysis: FC<{
     () => (simulation ? categoryShares(simulation.category_weights_used, CATEGORY_NAMES) : []),
     [simulation],
   );
-  const impactFractions = useMemo(() => computeImpactFractions(drivers, CATEGORIES), [drivers]);
+  // The drivers' parts of the shift at the score means: the drill-down ranks
+  // its drivers with it and the impact filter splits the net with it. It
+  // needs the configuration and every driver fully scored.
+  const attribution = useMemo(() => {
+    const scored = scoredDrivers(drivers);
+    return simulation && config && scored
+      ? computeDriverAttribution({ drivers: scored, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
+      : null;
+  }, [drivers, config, simulation]);
+  const filter: ImpactFilter = attribution ? impactFilter : 'total';
 
   const matrix = useMemo<MatrixModel | null>(() => {
     if (!simulation) return null;
     const model = buildMatrix(simulation, view, selectedYear, categoryWeights);
-    if (view !== 'time' || impactFilter === 'total') return model;
-    // The filter scales each row by its category's fraction. The P10–P90
-    // bands describe the unfiltered distribution, so they are dropped.
-    const data: CellMap = Object.fromEntries(CATEGORY_NAMES.map((c) => {
-      const fraction = impactFractions[c][impactFilter];
-      return [c, Object.fromEntries(model.columns.map((col) => {
-        const v = model.data[c][col];
-        return [col, v == null || !isFinite(v) ? null : v * fraction];
-      }))];
-    }));
+    if (view !== 'time' || filter === 'total' || !attribution) return model;
+    // The filter scales each cell by its category's split in that year. The
+    // P10–P90 bands describe the unfiltered distribution, so they are dropped.
+    const data: CellMap = Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(model.columns.map((col) => {
+      const v = model.data[c][col];
+      return [col, v == null || !isFinite(v) ? null : v * signSplit(attribution, c, Number(col))[filter]];
+    }))]));
     return { ...model, data, colTotals: columnTotals(data, model.columns, categoryWeights), cellDetails: undefined };
-  }, [simulation, view, selectedYear, categoryWeights, impactFilter, impactFractions]);
+  }, [simulation, view, selectedYear, categoryWeights, filter, attribution]);
 
   // The KPI strip: the joint portfolio band at the horizon, and the most
   // resilient and most exposed categories with their own bands.
@@ -171,8 +184,11 @@ const ShiftAnalysis: FC<{
               id: f,
               label: IMPACT_META[f].label,
               Icon: IMPACT_META[f].Icon,
+              disabledReason: f !== 'total' && !attribution
+                ? 'Needs the model configuration, which did not load; reload the page to try again.'
+                : undefined,
             }))}
-            activeId={impactFilter}
+            activeId={filter}
             onSelect={(id) => setImpactFilter(id as ImpactFilter)}
           />
         ) : (
@@ -312,8 +328,8 @@ const ShiftAnalysis: FC<{
               data={matrix.data}
               subtitle={
                 view === 'time'
-                  ? (impactFilter !== 'total'
-                      ? `${meta.label} · ${IMPACT_META[impactFilter].label}: ${IMPACT_META[impactFilter].description}`
+                  ? (filter !== 'total'
+                      ? `${meta.label} · ${IMPACT_META[filter].label}: ${IMPACT_META[filter].description}`
                       : `${meta.label} · ${meta.description}`)
                   : `${meta.label} · ${selectedYear} · ${meta.description}`
               }
@@ -341,7 +357,7 @@ const ShiftAnalysis: FC<{
               year={selectedYear}
               simulation={simulation}
               drivers={drivers}
-              config={config}
+              attribution={attribution}
               onClose={() => setSelectedCategory(null)}
               onOpenDriver={onNavigateToDriver}
             />

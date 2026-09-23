@@ -1,7 +1,6 @@
 /**
- * The drivers behind a category's terminal-year shift: the ranking, at the
- * score means (lib/driverAttribution.ts) or by the exposure proxy when the
- * model configuration did not load, and the card of one driver.
+ * The drivers behind a category's terminal-year shift: the ranking at the
+ * score means (lib/driverAttribution.ts) and the card of one driver.
  */
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
@@ -25,19 +24,15 @@ interface Contributor {
 }
 
 /**
- * The drivers that touch the category, largest part first. With an
- * attribution a driver's part is its contribution at the score means;
- * without one it is the exposure proxy, the driver's Shift (normalized_score)
- * x category exposure / 5. One basis for every driver of the list, rescaled
- * so the parts add up to the median the matrix shows.
+ * The drivers that touch the category, largest part first: each driver's
+ * contribution at the score means in the terminal year, rescaled so the parts
+ * add up to the median the matrix shows.
  */
 export function rankContributors(
-  category: string, drivers: Driver[], attribution: AttributionResult | null, median: number,
+  category: string, drivers: Driver[], attribution: AttributionResult, median: number,
 ): Contributor[] {
   const exposed = drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0);
-  const raw = exposed.map((d) => (attribution
-    ? attribution.byDriver[d.id].category[category][HORIZON]
-    : d.normalized_score * (Math.min(5, d.category_exposure[category]) / 5)));
+  const raw = exposed.map((d) => attribution.byDriver[d.id].category[category][HORIZON]);
   const rawTotal = raw.reduce((a, b) => a + b, 0);
   const scale = Math.abs(rawTotal) > 1e-9 && Math.abs(median) > 1e-9 ? median / rawTotal : 1;
   const scaled = raw.map((v) => v * scale);

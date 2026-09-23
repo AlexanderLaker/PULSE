@@ -7,10 +7,10 @@
  * the fixture's inputs and whose category medians are the fixture's category
  * shifts; the fabric-clean row is opened, and the drill-down must
  *
- *   1. name the score-means basis in its footer (never the exposure proxy),
+ *   1. name the score-means basis in its footer,
  *   2. rank the drivers as the fixture does (X-15, C-01, C-06 first),
- *   3. fall back to the labelled exposure proxy, ranked by Shift x exposure,
- *      when the configuration did not load.
+ *   3. say, when the configuration did not load, that the drivers cannot be
+ *      attributed, and rank none of them another way.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
@@ -111,7 +111,6 @@ describe('category drill-down: contributing drivers at the score means', () => {
     const aside = openFabricClean(container);
 
     expect(aside.textContent).toContain('the same decomposition as the PRISM Analysis');
-    expect(aside.textContent).not.toContain('exposure proxy');
     expect(within(aside).getByText(/Contributing Drivers/)).toBeTruthy();
 
     const expected = FIXTURE.inputs.drivers
@@ -129,15 +128,13 @@ describe('category drill-down: contributing drivers at the score means', () => {
     expect(openDriver).toHaveBeenCalledWith('competitive_r15');
   });
 
-  it('falls back to the labelled exposure proxy when the configuration did not load', () => {
+  it('says the drivers cannot be attributed when the configuration did not load, and ranks nothing', () => {
     STORE.store = buildStore(false);
     const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
     const aside = openFabricClean(container);
 
-    expect(aside.textContent).toContain('Contributing drivers: exposure proxy');
+    expect(aside.textContent).toContain('attributed with the model configuration, which did not load');
     expect(aside.textContent).not.toContain('the same decomposition as the PRISM Analysis');
-    // The proxy ranks by Shift x exposure / 5: private label (the largest) first.
-    const order = cardOrder(aside);
-    expect(order.slice(0, 3)).toEqual(['consumer_r01', 'competitive_r15', 'customer_r13']);
+    expect(within(aside).queryAllByRole('button', { name: /on the Drivers page$/ })).toHaveLength(0);
   });
 });

@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
-  peakJitterFor, scoredDrivers,
+  peakJitterFor, scoredDrivers, signSplit, type AttributionResult,
 } from '@/lib/driverAttribution';
 import { BASE_YEAR, YEARS } from '@/lib/format';
 
@@ -144,5 +144,46 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
       regional_exposure: {}, uncertainty: 2, peak_year: 2029, diffusion_curve: 'linear' };
     expect(scoredDrivers([full])).toEqual([full]);
     expect(scoredDrivers([full, { ...full, id: 'b', uncertainty: null }])).toBeNull();
+  });
+});
+
+describe('signSplit: the expansion and contraction parts of a category in a year', () => {
+  const result = (parts: number[]): AttributionResult => ({
+    years: [2035],
+    byDriver: Object.fromEntries(parts.map((v, i) => [`d${i}`, { portfolio: {}, category: { 'Hair: Color': { 2035: v } } }])),
+    categoryShift: {},
+    portfolioShift: {},
+  });
+
+  it('gives signed fractions of the net that add up to 1', () => {
+    const f = signSplit(result([0.3, -0.1]), 'Hair: Color', 2035);
+    expect(f.expansion + f.contraction).toBeCloseTo(1, 12);
+    expect(f.expansion).toBeCloseTo(1.5, 12);
+    expect(f.contraction).toBeCloseTo(-0.5, 12);
+  });
+
+  it('falls back to shares of the gross movement where the parts cancel', () => {
+    const f = signSplit(result([0.2, -0.2]), 'Hair: Color', 2035);
+    expect(f.expansion).toBeCloseTo(0.5, 12);
+    expect(f.contraction).toBeCloseTo(-0.5, 12);
+  });
+
+  it('is zero where no driver contributes', () => {
+    expect(signSplit(result([0, 0]), 'Hair: Color', 2035)).toEqual({ expansion: 0, contraction: 0 });
+    expect(signSplit(result([0.1]), 'LHC: FCN', 2035)).toEqual({ expansion: 0, contraction: 0 });
+  });
+
+  it('splits the fixture category by category, year by year, into parts that add up to the net', () => {
+    const fx = load();
+    const r = computeDriverAttribution(fx.inputs);
+    for (const cat of fx.inputs.categories) {
+      for (const year of r.years) {
+        const net = Object.values(r.byDriver).reduce((a, d) => a + d.category[cat][year], 0);
+        const f = signSplit(r, cat, year);
+        expect(net * f.expansion + net * f.contraction).toBeCloseTo(net, 12);
+        expect(net * f.expansion).toBeGreaterThanOrEqual(-1e-15);
+        expect(net * f.contraction).toBeLessThanOrEqual(1e-15);
+      }
+    }
   });
 });

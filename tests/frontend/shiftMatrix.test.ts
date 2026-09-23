@@ -2,9 +2,8 @@
  * lib/shiftMatrix: the arithmetic behind every total of the Shift Matrix.
  */
 import { describe, it, expect } from 'vitest';
-import { categoryShares, computeImpactFractions, getYearPercentiles, weightedAvg } from '@/lib/shiftMatrix';
-import { CATEGORIES } from '@/lib/format';
-import { distribution, makeDriver } from './fixtures/prism';
+import { categoryShares, getYearPercentiles, weightedAvg } from '@/lib/shiftMatrix';
+import { distribution } from './fixtures/prism';
 
 describe('weightedAvg', () => {
   it('divides by the weights, which need not add up to 1', () => {
@@ -45,33 +44,5 @@ describe('getYearPercentiles', () => {
     expect(getYearPercentiles(undefined, 'Hair: Color', 2030)).toBeNull();
     expect(getYearPercentiles(shifts, 'LHC: FCN', 2030)).toBeNull();
     expect(getYearPercentiles(shifts, 'Hair: Color', 2029)).toBeNull();
-  });
-});
-
-describe('computeImpactFractions', () => {
-  const colour = CATEGORIES.filter((c) => c.name === 'Hair: Color');
-  const driver = (score: number, exposure = 5) =>
-    makeDriver({ normalized_score: score, category_exposure: { 'Hair: Color': exposure } });
-
-  it('splits a category into its expanding and contracting part, which add up to 1', () => {
-    const f = computeImpactFractions([driver(0.3), driver(-0.1)], colour)['Hair: Color'];
-    expect(f.expansion + f.contraction).toBeCloseTo(1, 12);
-    expect(f.expansion).toBeCloseTo(1.5, 12);
-    expect(f.contraction).toBeCloseTo(-0.5, 12);
-  });
-
-  it('weights each driver by its exposure / 5', () => {
-    const f = computeImpactFractions([driver(0.3, 5), driver(-0.3, 1)], colour)['Hair: Color'];
-    expect(f.expansion).toBeCloseTo(0.3 / 0.24, 12);
-  });
-
-  it('falls back to magnitude shares when the two parts cancel', () => {
-    const f = computeImpactFractions([driver(0.2), driver(-0.2)], colour)['Hair: Color'];
-    expect(f.expansion).toBeCloseTo(0.5, 12);
-    expect(f.contraction).toBeCloseTo(-0.5, 12);
-  });
-
-  it('is zero for a category no driver touches', () => {
-    expect(computeImpactFractions([driver(0.3, 0)], colour)['Hair: Color']).toEqual({ expansion: 0, contraction: 0 });
   });
 });

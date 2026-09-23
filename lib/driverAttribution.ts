@@ -28,10 +28,11 @@
  * cell weights, the portfolio the share-weighted sum over all cells.
  *
  * Read the result as attribution, never as a second simulation: the Monte
- * Carlo medians of the persisted run stay the published numbers, and the
- * drill-down scales the drivers of a category to that median.
+ * Carlo medians of the persisted run stay the published numbers. The
+ * drill-down scales the drivers of a category to that median, and the
+ * matrix's Expansion and Contraction filters split it (signSplit).
  */
-import { BASE_YEAR, FORCES, REGIONS, YEARS } from '@/lib/format';
+import { FORCES, REGIONS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
 
@@ -52,7 +53,7 @@ export interface AttributionDriver {
 
 /** The drivers as the decomposition reads them, or null when one of them misses
  *  a score: the production run refuses such a driver, so there is nothing to
- *  attribute to it, and the drill-down falls back to the exposure proxy. */
+ *  attribute, and the page says so instead of ranking the drivers another way. */
 export function scoredDrivers<
   D extends { uncertainty: number | null; peak_year: number | null; diffusion_curve: string | null },
 >(drivers: D[]): Array<D & AttributionDriver> | null {
@@ -60,14 +61,15 @@ export function scoredDrivers<
   return complete ? (drivers as Array<D & AttributionDriver>) : null;
 }
 
+/** The parameters the decomposition reads, as GET /api/v1/config serves them. */
 export interface AttributionConfig {
   force_weights: Record<string, number>;
   per_force_attenuation: Record<string, number>;
   within_force_overlap: Record<string, number>;
-  base_year?: number;
-  path_years?: number[];
-  /** The per-iteration peak-year jitter (on unless the configuration says otherwise). */
-  peak_year_jitter?: boolean;
+  base_year: number;
+  path_years: number[];
+  /** The per-iteration peak-year jitter. */
+  peak_year_jitter: boolean;
 }
 
 export interface AttributionInputs {
@@ -191,15 +193,15 @@ function clamp5(v: number | undefined): number {
  */
 export function computeDriverAttribution(inputs: AttributionInputs): AttributionResult {
   const { drivers, categories, config, cellWeights } = inputs;
-  const years = config.path_years?.length ? config.path_years.map(Number) : YEARS;
-  const baseYear = config.base_year ?? BASE_YEAR;
-  const jitterOn = config.peak_year_jitter ?? true;
+  const years = config.path_years.map(Number);
+  const baseYear = config.base_year;
+  const jitterOn = config.peak_year_jitter;
   const nCat = categories.length, nReg = REGIONS.length, nCell = nCat * nReg, nYear = years.length;
   const n = drivers.length;
 
-  const fw = FORCES.map((f) => config.force_weights?.[f] ?? 1 / FORCES.length);
-  const att = FORCES.map((f) => config.per_force_attenuation?.[f] ?? 0);
-  const fidx = drivers.map((d) => Math.max(0, FORCES.indexOf(d.force)));
+  const fw = FORCES.map((f) => config.force_weights[f]);
+  const att = FORCES.map((f) => config.per_force_attenuation[f]);
+  const fidx = drivers.map((d) => FORCES.indexOf(d.force));
 
   // Composite cell exposure; a driver without regional scores counts as
   // present in every region, as in the engine.
@@ -209,7 +211,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     if (rv.reduce((a, b) => a + b, 0) <= 0) rv = REGIONS.map(() => 1);
     const row = new Array<number>(nCell).fill(0);
     categories.forEach((cat, c) => {
-      const ce = clamp5(d.category_exposure?.[cat]);
+      const ce = clamp5(d.category_exposure[cat]);
       if (ce <= 0) return;
       for (let r = 0; r < nReg; r++) row[c * nReg + r] = ce * rv[r];
     });
@@ -218,10 +220,10 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
 
   // Within-force dampening per (force, cell), from the magnitude-weighted
   // effective number of drivers (the participation ratio).
-  const absScore = drivers.map((d) => Math.abs(Number(d.normalized_score ?? 0)));
+  const absScore = drivers.map((d) => Math.abs(d.normalized_score));
   const damp: number[][] = FORCES.map(() => new Array<number>(nCell).fill(1));
   FORCES.forEach((force, f) => {
-    const ov = config.within_force_overlap?.[force] ?? 0;
+    const ov = config.within_force_overlap[force];
     if (ov <= 0) return;
     for (let cell = 0; cell < nCell; cell++) {
       let s1 = 0, s2 = 0;
@@ -240,7 +242,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, jitterOn));
 
   // Additive terms, force sums, compounding and the proportional spread.
-  const score = drivers.map((d) => Number(d.normalized_score ?? 0));
+  const score = drivers.map((d) => d.normalized_score);
   const A: number[][][] = drivers.map((_, j) => {
     const f = fidx[j];
     const k = fw[f] * att[f] * score[j];
@@ -263,7 +265,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   // Roll-up weights: w over all cells (portfolio), wn within each category's row.
   const W = new Array<number>(nCell).fill(0);
   categories.forEach((cat, c) => REGIONS.forEach((r, ri) => {
-    W[c * nReg + ri] = Math.max(0, Number(cellWeights?.[cat]?.[r] ?? 0));
+    W[c * nReg + ri] = Math.max(0, Number(cellWeights[cat]?.[r] ?? 0));
   }));
   const wTotal = W.reduce((a, b) => a + b, 0);
   const w = wTotal > 0 ? W.map((v) => v / wTotal) : W.map(() => 1 / nCell);
@@ -316,4 +318,29 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   });
 
   return { years, byDriver, categoryShift, portfolioShift };
+}
+
+/**
+ * The parts of a category's shift in one year that its expanding and its
+ * contracting drivers carry, for the matrix's Expansion and Contraction
+ * filters. With pos and neg the sums of the drivers' positive and negative
+ * contributions, expansion = pos / (pos + neg) and contraction =
+ * neg / (pos + neg): signed fractions of the net that add up to 1, so scaling
+ * the run's median by one of them splits it without a second simulation.
+ * Where the two cancel the split falls back to shares of the gross movement.
+ */
+export function signSplit(
+  result: AttributionResult, category: string, year: number,
+): { expansion: number; contraction: number } {
+  let pos = 0;
+  let neg = 0;
+  for (const d of Object.values(result.byDriver)) {
+    const v = d.category[category]?.[year] ?? 0;
+    if (v > 0) pos += v;
+    else neg += v;
+  }
+  const net = pos + neg;
+  if (Math.abs(net) >= 1e-12) return { expansion: pos / net, contraction: neg / net };
+  const gross = pos - neg;
+  return gross > 1e-12 ? { expansion: pos / gross, contraction: neg / gross } : { expansion: 0, contraction: 0 };
 }
