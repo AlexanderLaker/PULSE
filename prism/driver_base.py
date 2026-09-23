@@ -31,7 +31,7 @@ ENTRY_FIELDS = ("id", "code", "force", "name", "description", "direction", "prob
                 "category_exposure", "regional_exposure", "vc_epicentre", "sources")
 
 
-def validate(entries: list, highest_numbers: dict) -> None:
+def validate(entries: list, retired_numbers: dict) -> None:
     """Raise InvalidBaseError listing every problem of the base's entries.
 
     The model inputs are held to the engine's own rules
@@ -40,15 +40,14 @@ def validate(entries: list, highest_numbers: dict) -> None:
     and have sources the API would accept back from the editor, each with a
     title and an http(s) link, at least one of them of tier S, A or B.
 
-    ``highest_numbers`` is the highest driver number each force has used.
-    Stored runs, proposals, the audit log and the journey content refer to
-    drivers by id or code, so a number is never given to a second driver: a
-    new driver takes the next number and raises the record with it, and an
-    entry above its force's record is refused.
+    ``retired_numbers`` lists, per force, the numbers of drivers that left the
+    base. Stored runs, proposals, the audit log and the journey content refer
+    to drivers by id or code, so a number is never given to a second driver:
+    every number up to a force's highest must be a driver's or retired, and
+    none may be both. A new driver therefore takes the next number, and a
+    driver that leaves moves its number to the list.
     """
     problems = [f"duplicate code {c}" for c, n in collections.Counter(d.get("code") for d in entries).items() if n > 1]
-    problems += [f"highest_numbers has no whole number for {f}" for f in FORCES
-                 if isinstance(highest_numbers.get(f), bool) or not isinstance(highest_numbers.get(f), int)]
     complete = []
     for d in entries:
         tag = d.get("code") or d.get("id")
@@ -61,9 +60,6 @@ def validate(entries: list, highest_numbers: dict) -> None:
         if d["force"] in FORCES and (not m or m.group(1) != d["force"].lower()
                                      or d["code"] != display_code(d["id"], d["force"])):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
-        elif m and isinstance(highest := highest_numbers.get(d["force"]), int) and int(m.group(2)) > highest:
-            problems.append(f"{tag}: number {int(m.group(2))} is above the highest {d['force']} number the base "
-                            f"records ({highest}); raise highest_numbers with the new driver")
         if isinstance(d["start_year"], int) and d["start_year"] < DEFAULT_BASE_YEAR:
             problems.append(f"{tag}: onset {d['start_year']} before the base year {DEFAULT_BASE_YEAR}")
         if isinstance(d["peak_year"], int) and d["peak_year"] > DEFAULT_PATH_YEARS[-1]:
@@ -74,9 +70,36 @@ def validate(entries: list, highest_numbers: dict) -> None:
             problems.append(f"{tag}: no source of tier {'/'.join(REQUIRED_SOURCE_TIERS)}")
         for s in d["sources"]:
             problems += [f"{tag}: source {s.get('title') or s.get('url')!r}: {p}" for p in _source_problems(s)]
+    problems += _numbering_problems(complete, retired_numbers)
     problems += simulation_problems([_entry_driver(d) for d in complete])
     if problems:
         raise InvalidBaseError("driver base is not valid:\n  " + "\n  ".join(problems))
+
+
+def _numbering_problems(entries: list, retired_numbers: dict) -> list:
+    """Numbers given twice, or numbers neither a driver's nor retired (see validate)."""
+    problems = []
+    live = collections.defaultdict(set)
+    for d in entries:
+        m = re.fullmatch(r"[a-z]+_r(\d{2})", str(d["id"]))
+        if m and d["force"] in FORCES:
+            live[d["force"]].add(int(m.group(1)))
+    for force in FORCES:
+        retired = retired_numbers.get(force)
+        whole = isinstance(retired, list) and all(isinstance(n, int) and not isinstance(n, bool) and n >= 1
+                                                   for n in retired)
+        if not whole:
+            problems.append(f"retired_numbers has no list of whole numbers for {force}")
+            continue
+        used = live[force] | set(retired)
+        following = max(used, default=0) + 1
+        for n in sorted(live[force] & set(retired)):
+            problems.append(f"{force} number {n} belongs to a driver that left the base; a new driver takes "
+                            f"{following}")
+        for n in sorted(set(range(1, following)) - used):
+            problems.append(f"{force} number {n} is neither a driver's nor retired: a new driver takes the next "
+                            f"number, and a driver that leaves moves its number to retired_numbers")
+    return problems
 
 
 def _source_problems(source: dict) -> list:
@@ -107,7 +130,7 @@ def _entry_driver(d: dict) -> Driver:
 def load_base(path: Path = BASE_PATH) -> list:
     """The base's entries as stored, after validate()."""
     base = json.loads(path.read_text(encoding="utf-8"))
-    validate(base["drivers"], base["highest_numbers"])
+    validate(base["drivers"], base["retired_numbers"])
     return base["drivers"]
 
 
