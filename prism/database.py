@@ -42,6 +42,10 @@ else:
 #: result of all of them; init_db records them on a new database, and every
 #: migration records itself in schema_migrations when it has run.
 SCHEMA_MIGRATIONS = ("0001_driver_schema",)
+#: The PostgreSQL advisory lock init_db holds while it creates the schema (the
+#: bytes of "prism" as a number), so that instances starting on a new database
+#: at the same moment create it one after the other.
+SCHEMA_LOCK = int.from_bytes(b"prism", "big")
 
 
 class MigrationPendingError(RuntimeError):
@@ -325,7 +329,8 @@ def pending_migration(cursor) -> Optional[str]:
 
 
 def init_db() -> None:
-    """Create any missing table; safe to call on every start.
+    """Create any missing table; safe to call on every start, from any number
+    of instances at once.
 
     Refuses a database that still needs a migration, because creating the
     new tables next to its own would hide the real data behind an empty
@@ -333,15 +338,25 @@ def init_db() -> None:
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        if USE_POSTGRES:
+            # Two transactions creating the same table at once collide in the
+            # catalogue; the lock makes the second wait and find it created.
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", (SCHEMA_LOCK,))
+        else:
+            # Outside a transaction SQLite commits each CREATE TABLE on its
+            # own, and a second instance could find some tables but no
+            # migration list yet and take the file for an old database. In
+            # one write transaction the schema appears at once, and the second
+            # instance waits for it.
+            cursor.execute("BEGIN IMMEDIATE")
         migration = pending_migration(cursor)
         if migration:
             raise MigrationPendingError(migration)
         for statement in _schema():
             cursor.execute(statement)
         for version in SCHEMA_MIGRATIONS:
-            cursor.execute(f"SELECT 1 FROM schema_migrations WHERE version = {placeholder()}", (version,))
-            if cursor.fetchone() is None:
-                cursor.execute(f"INSERT INTO schema_migrations (version) VALUES ({placeholder()})", (version,))
+            cursor.execute(f"INSERT INTO schema_migrations (version) VALUES ({placeholder()}) "
+                           "ON CONFLICT (version) DO NOTHING", (version,))
     logger.info("Database initialised (%s)", "postgres" if USE_POSTGRES else "sqlite")
 
 

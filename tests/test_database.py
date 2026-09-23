@@ -84,6 +84,32 @@ class TestSchema:
                 "driver_sources", "driver_score_proposals", "journey_content", "simulation_runs", "audit_log",
                 "schema_migrations"} <= tables
 
+    def test_instances_starting_on_a_new_database_at_once(self, db, monkeypatch, tmp_path):
+        """Four instances creating the schema at the same moment all succeed; on PostgreSQL the
+        catalogue refuses all but one of them unless they take turns."""
+        import threading
+        if db.USE_POSTGRES:
+            with db.get_db_connection() as conn:
+                cursor = conn.cursor()
+                for table in db.table_names(cursor):
+                    cursor.execute(f"DROP TABLE {table} CASCADE")
+        else:
+            monkeypatch.setenv("PRISM_DB_PATH", str(tmp_path / "new.db"))
+        errors = []
+
+        def start():
+            try:
+                db.init_db()
+            except Exception as e:   # noqa: BLE001 (collected for the assertion)
+                errors.append(e)
+        threads = [threading.Thread(target=start) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(30)
+        assert errors == []
+        assert _count(db, "SELECT COUNT(*) FROM schema_migrations") == len(db.SCHEMA_MIGRATIONS)
+
     @pytest.mark.skipif(ON_POSTGRES, reason="builds a SQLite file")
     def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path):
         import prism.database as dbm
