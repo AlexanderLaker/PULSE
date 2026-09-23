@@ -67,9 +67,8 @@ export const WhyChain: FC<{
           <div style={{ marginTop: 8 }}>
             {drivers.length === 0 ? (
               <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
-                {tile.driverNote.startsWith('No modelled driver')
-                  ? `${tile.driverNote}. The Strategist Read below stands as authored judgment; nothing here feeds the Shift Matrix.`
-                  : 'No drivers linked to this tile.'}
+                No modelled driver is linked to this moment. The Strategist Read below stands as authored
+                judgment; nothing here feeds the Shift Matrix.
               </p>
             ) : (
               <div className="flex flex-col gap-2">

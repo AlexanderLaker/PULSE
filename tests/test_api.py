@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from prism.api import state
 from prism.api.app import create_app
 from prism.config import CATEGORIES
-from support import database_awaiting_a_migration, load_module
+from support import bundled_journey, database_awaiting_a_migration, load_module
 
 REPO = Path(__file__).resolve().parents[1]
 SECRET = "pytest-secret-" + "x" * 40
@@ -609,23 +609,32 @@ class TestJourney:
         (journey_with({"intensity": 4}), "intensity must be 1, 2 or 3"),
         (journey_with({"intensity": True}), "intensity must be 1, 2 or 3"),
         (journey_with({"provenance": {"date": "2026-09", "grade": "Verified"}}), "provenance must hold"),
+        (journey_with({"provenance": {"date": "September", "grade": "estimate"}}), "provenance must hold"),
+        (journey_with({"provenance": {"author": "ai", "date": "2026-09", "grade": "estimate"}}),
+         "provenance must hold"),
         (journey_with({"provenance": ...}), "provenance must hold"),
         (journey_with({"driverNote": None}), "driverNote must be text"),
         (journey_with({"analysis": ["not", "text"]}), "analysis must be text or null"),
-        (journey_with({"poolImpact": {"grade": "Huge", "direction": "tailwind"}}), "poolImpact must hold"),
+        (journey_with({"analysis": ...}), "analysis must be text or null"),
+        (journey_with({"poolImpact": {"grade": "Huge"}}), "poolImpact must hold"),
+        (journey_with({"poolImpact": {"grade": "Med", "direction": "tailwind"}}), "poolImpact must hold"),
+        (journey_with({"pending": True}), "holds pending, which a tile does not have"),
+        ({"lhc": [{"id": "s", "label": "S", "icon": "x", "benefiting": [], "negativelyImpacted": []}], "hair": []},
+         "lhc[0] holds icon, which a stage does not have"),
     ])
     def test_a_malformed_body_is_refused(self, api, content, reason):
-        """The shape the dashboard renders; a tile it could not render is refused with its id and the reason."""
+        """The shape the dashboard renders, and nothing it does not read; a tile it could not render is
+        refused with its id and the reason."""
         response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
         assert response.status_code == 422
         assert reason in response.json()["detail"]
 
-    def test_the_previous_tiles_extra_provenance_is_kept(self, api):
-        """Tiles saved by the previous release carry an author in their provenance; they are stored as they are."""
-        content = journey_with({"provenance": {"author": "strategist", "date": "2026-09", "grade": "estimate"},
-                              "poolImpact": {"grade": "Med", "direction": "tailwind"}})
+    def test_the_bundled_content_can_be_saved(self, api):
+        """The content the dashboard ships is the shape the API stores: an admin's first save is the
+        bundled content with the edit."""
+        content = bundled_journey()
         response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
-        assert response.status_code == 200
+        assert response.status_code == 200 and response.json()["tiles"] == 300
         assert api.get("/api/v1/journey", headers=bearer()).json()["content"] == content
 
     def test_the_body_needs_the_base_version(self, api):

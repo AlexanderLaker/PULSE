@@ -14,6 +14,8 @@
  *      American forms and the names that keep their own spelling).
  *   4. Render checks on the entry gate and the Drivers page: the labels are
  *      there and no readable text or accessible attribute says trend.
+ *   5. The journey content describes the model as it is: it names the drivers
+ *      behind a moment and never lists what the model leaves out.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
@@ -144,11 +146,24 @@ describe('British spelling', () => {
     expect(americanForms('Optimized cold-wash programs toward lower odor')).toEqual(
       ['odor', 'toward', 'programs', 'Optimized']);
     expect(americanForms('colour-safe care for grey hair, sized for travel')).toEqual([]);
+    expect(americanForms('a range that emphasizes scent, oversized packs')).toEqual(['emphasizes']);
     expect(americanForms('Keratin Color and Color Wow at https://example.org/color-center')).toEqual([]);
     expect(americanForms('row_normalized_cell_weights')).toEqual([]);
     expect(americanForms('flex items-center justify-center')).toEqual([]);
     expect(americanForms('color 150ms ease')).toEqual([]);
     expect(americanForms('border-color 0.15s, background-color 0.15s')).toEqual([]);
+  });
+});
+
+describe('the journey content', () => {
+  // The content names the drivers behind each moment and never lists what the
+  // model leaves out; the dialog of a tile without a driver says none is linked.
+  const LEFT_OUT = /\bnot (?:a )?modell?ed\b|\bunmodell?ed\b|\bstrategist['’]s (?:read|view)\b|\bleft the model\b|\bno longer modell?ed\b/i;
+  it('never says what the model leaves out', () => {
+    const hits = readableStrings(path.join(REPO, 'data', 'consumerJourney.ts'))
+      .filter((r) => LEFT_OUT.test(r.text))
+      .map((r) => `${r.where} ${JSON.stringify(r.text.slice(0, 100))}`);
+    expect(hits).toEqual([]);
   });
 });
 

@@ -113,8 +113,9 @@ A few rules the suite holds:
 - **Generated files** are never edited by hand.
 - **Parity**: the taxonomies (the names of forces, categories, regions and
   value-chain stages), the source tiers and a source's link and length rules,
-  the uncertainty tables, the per-driver attribution and the PRISM Analysis
-  labels exist in Python and TypeScript; tests keep each pair identical.
+  the uncertainty tables, the per-driver attribution, the PRISM Analysis
+  labels and the Consumer Journey tile shape exist in Python and TypeScript;
+  tests keep each pair identical.
 - **Colours** come from `lib/theme.ts` (the force and category palettes
   from `lib/format.ts`): a literal colour anywhere else in the dashboard's
   code, a named one or a class of Tailwind's own palette included, fails

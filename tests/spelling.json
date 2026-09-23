@@ -21,7 +21,8 @@
   "\\banalyz(?:e|es|ed|ing|er|ers)\\b",
   "\\bprograms?\\b",
   "\\b(?:travel|model|label|cancel|fuel|signal|level|total|channel)(?:ed|ing)\\b",
-  "\\b(?!\\w*(?:siz(?:e|es|ed|ing|able|eable)|priz(?:e|es)|seiz(?:e|es|ed|ing))\\b)\\w+iz(?:e|es|ed|ing|er|ers|ation|ations|able)\\b"
+  "\\b(?!\\w*(?:siz(?:e|es|ed|ing|able|eable)|priz(?:e|es)|seiz(?:e|es|ed|ing))\\b)\\w+iz(?:e|es|ed|ing|er|ers|ation|ations|able)\\b",
+  "\\b\\w*(?:emphasi|synthesi|hypothesi|fantasi|parenthesi|metastasi)z(?:e|es|ed|ing)\\b"
  ],
  "names": [
   "Hair: Color",

@@ -97,8 +97,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   const driversById = useMemo(() => new Map(drivers.map(d => [d.id, d])), [drivers]);
 
   const totals = useMemo(() => ({
-    benefiting: stages.reduce((n, s) => n + s.benefiting.length, 0),
-    declining: stages.reduce((n, s) => n + s.negativelyImpacted.length, 0),
+    tailwinds: stages.reduce((n, s) => n + s.benefiting.length, 0),
+    headwinds: stages.reduce((n, s) => n + s.negativelyImpacted.length, 0),
   }), [stages]);
 
   const openTile = useCallback((tile: JourneyTile, stageId: string, stageLabel: string, side: Side) => {
@@ -325,10 +325,10 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             {ready && (
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.expansion, fontFamily: HEADLINE_FONT }}>
-                  <TrendingUp size={12} strokeWidth={2.5} /> Tailwind {totals.benefiting}
+                  <TrendingUp size={12} strokeWidth={2.5} /> Tailwind {totals.tailwinds}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.error, fontFamily: HEADLINE_FONT }}>
-                  <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.declining}
+                  <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.headwinds}
                 </span>
               </div>
             )}

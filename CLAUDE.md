@@ -66,9 +66,11 @@ README.md; the documents in `docs/` explain everything below in full.
   length rules (`prism/config.py`, `prism/drivers.py` and `lib/format.ts`,
   `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
   `lib/uncertainty.ts`), the per-driver attribution (`prism/attribution.py`
-  and `lib/driverAttribution.ts`) and the PRISM Analysis labels
+  and `lib/driverAttribution.ts`), the PRISM Analysis labels
   (`prism/readings.py` and `components/dashboard/drivers/PrismAnalysis.tsx`)
-  exist twice and are tested against each other; change both or neither.
+  and the Consumer Journey tile shape (`prism/journey.py` and
+  `data/consumerJourney.ts`) exist twice and are tested against each other;
+  change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the

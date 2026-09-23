@@ -95,7 +95,7 @@ engine.
 | `GET /api/v1/simulation` | signed in | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count, overlap-correction source and time of storage), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
 | `GET /api/v1/config` | signed in | The model configuration the production run uses, read-only |
 | `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
-| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between) |
+| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |
 
 A body the API cannot accept is answered 422 with the reason, and a write made
 on an outdated revision or version 409; the dashboard shows both messages as
@@ -218,9 +218,10 @@ role-change entries of the audit log), `prismJwt.ts` and `backend.ts`. The
 types in `types/` mirror the API's JSON.
 
 The Consumer Journey content ships with the dashboard
-(`data/consumerJourney.ts`); once an admin saves an edit, the newest stored
-version replaces the bundled tiles. The Profit Pool Explorer's data is
-`lib/profitPoolData.ts` (docs/EXPLORER.md). Neither feeds the simulation.
+(`data/consumerJourney.ts`, which also defines its shape); once an admin saves
+an edit, the newest stored version replaces the bundled tiles. The Profit Pool
+Explorer's data is `lib/profitPoolData.ts` (docs/EXPLORER.md). Neither feeds
+the simulation.
 
 ## The database
 

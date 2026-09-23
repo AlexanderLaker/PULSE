@@ -14,7 +14,8 @@ or the write lock (SQLite), so nothing can write in between.
    has no such rule, so such a driver is refused too. While any driver fails a
    check the migration changes nothing and lists every problem, to be
    corrected in the dashboard of the release still deployed (a force, a start
-   year or a confidence, which that dashboard cannot edit, with SQL).
+   year or a confidence, which that dashboard cannot edit, with SQL). The
+   newest Consumer Journey content is checked at the same time (step 5).
 2. The driver tables are created and filled from the previous ones:
      trends                    -> drivers      (ai_suggestion -> baseline,
                                                 user_override -> scores_edited;
@@ -80,8 +81,13 @@ or the write lock (SQLite), so nothing can write in between.
      - the newest Consumer Journey content gets the key driverCodes instead of
        trendCodes, loses any code that is not a driver of the base, gets the
        current tile texts and stage labels where one still holds a previously
-       shipped text (journey_edits.json) and has escaped paragraph breaks
-       written out; it is saved as a new version.
+       shipped text (journey_edits.json), has escaped paragraph breaks
+       written out and loses every key the tile map no longer has (the author
+       in a tile's provenance, and the direction of its pool impact, which the
+       tile's side gives); it is saved as a new version. A tile the previous
+       editor still marks as an AI suggestion pending review, or content the
+       API would refuse, stops the migration before anything changes, as a
+       driver that needs correcting does.
 6. The migration is recorded in schema_migrations and in the audit log.
 
 Before the commit, every dropped row and column is written to a local archive,
@@ -97,8 +103,8 @@ Without --sqlite the target is POSTGRES_URL or DATABASE_URL (from the shell or
 changes a PostgreSQL database needs --postgres; a dry run does not.
 
 Exit codes: 0 migrated or already migrated; 1 refused (no suitable database,
-not the previous schema, --postgres missing, or drivers that need correcting);
-2 failed and rolled back.
+not the previous schema, --postgres missing, or drivers or journey content that
+need correcting); 2 failed and rolled back.
 """
 from __future__ import annotations
 
@@ -119,11 +125,13 @@ sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
-                          VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
+                          VALID_DIFFUSION_CURVES, VC_STAGES)
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
                            SOURCE_URL_PATTERN)
 from prism.database import describe_error  # noqa: E402
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
+from prism.journey import (DRIVER_CODES, JOURNEYS, OPTIONAL_TILE_KEYS, POOL_IMPACT_KEYS,  # noqa: E402
+                           PROVENANCE_KEYS, SIDES, STAGE_KEYS, TILE_KEYS, content_problem, unknown_keys)
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -482,12 +490,13 @@ def json_value(value):
     return json.loads(value) if isinstance(value, str) else value
 
 
-class DriversNeedCorrection(ValueError):
-    """Drivers the driver schema cannot store as they are; the message lists every problem."""
+class NeedsCorrection(ValueError):
+    """Drivers or journey content the driver schema cannot store as they are; the
+    message lists every problem."""
 
     def __init__(self, problems: list):
         self.problems = list(problems)
-        super().__init__("\n  ".join(["these drivers need correcting before the migration can run:"] + self.problems))
+        super().__init__("\n  ".join(["these need correcting before the migration can run:"] + self.problems))
 
 
 def whole(value, low: int, high: int) -> bool:
@@ -659,11 +668,13 @@ def migrate(db: Database) -> dict:
         locked = [t for t in DROP_TABLES + LOCKED_TABLES if t in tables]
         db.execute(f"LOCK TABLE {', '.join(locked)} IN ACCESS EXCLUSIVE MODE")
 
-    # ── the drivers, checked before anything changes ────────────────────────
+    # ── the drivers and the journey content, checked before anything changes ─
     drivers = read_previous_drivers(db, tables)
     problems = [f"{d['row']['id']}: {line}" for d in drivers for line in d["problems"]]
+    journey, journey_report, journey_problems = updated_journey(db)
+    problems += journey_problems
     if problems:
-        raise DriversNeedCorrection(problems)
+        raise NeedsCorrection(problems)
 
     # ── what is dropped, archived first ─────────────────────────────────────
     for table in DROP_TABLES:
@@ -823,7 +834,10 @@ def migrate(db: Database) -> dict:
             edited.append(driver_id)
     report["descriptions"] = {"updated": len(moved), "already_current": len(current), "edited_left_alone": edited}
 
-    report["journey"] = migrate_journey(db)
+    if journey is not None:
+        db.execute(f"INSERT INTO journey_content (content, updated_by) VALUES ({p}, {p})",
+                   (json.dumps(journey), f"migration {MIGRATION}"))
+    report["journey"] = journey_report
 
     db.execute(f"INSERT INTO schema_migrations (version) VALUES ({p})", (MIGRATION,))
     summary = (f"{len(drivers)} drivers, {source_count} sources, {len(proposals)} proposals copied; "
@@ -866,29 +880,37 @@ def drop_run_columns(db: Database, columns: list) -> None:
     db.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_date ON simulation_runs(run_date)")
 
 
-def migrate_journey(db: Database) -> dict:
-    """Bring the newest stored journey content up to date and save it as a new version.
+def updated_journey(db: Database) -> tuple:
+    """The newest stored journey content brought up to date, without writing it.
 
     Per tile: trendCodes becomes driverCodes (an empty list where a tile has
     neither); a code that is not a driver of the driver base is removed, since
     the dashboard resolves every code to one; a text that still holds a
     previously shipped version gets the current one (journey_edits.json, which
-    lists stage labels the same way); and escaped paragraph breaks ("\\n") in
-    a text an admin saved are written out.
+    lists stage labels the same way); escaped paragraph breaks ("\\n") in a
+    text an admin saved are written out; and every key the tile map no longer
+    has is removed (the author in a tile's provenance, the direction of its pool
+    impact, which its side gives). A tile the previous editor still marked as an
+    AI suggestion pending review cannot be stored as it is, since every tile
+    now reads as strategist-authored, and neither can content the API would
+    refuse; both come back as problems.
+
+    Returns (the content to save as a new version, or None when nothing
+    changed; the report; the problems).
     """
-    from prism.seed_drivers import DRIVERS
-    codes = {display_code(d.id, d.force) for d in DRIVERS}
-    p = db.p
     rows = db.rows("SELECT id, content FROM journey_content ORDER BY id DESC LIMIT 1")
     if not rows:
-        return {"stored_content": False}
+        return None, {"stored_content": False}, []
     content = json_value(rows[0]["content"])
+    if not isinstance(content, dict):
+        return None, {"stored_content": True}, ["journey content: the newest version is not a tile map"]
     edits = json.loads(JOURNEY_EDITS_FILE.read_text(encoding="utf-8"))["edits"]
     by_id: dict = {}
     for e in edits:
         by_id.setdefault(e.get("tile") or e["stage"], []).append(e)
     renamed = applied = unescaped = 0
-    already, edited, removed = [], [], {}
+    already, edited, removed, pending = [], [], {}, []
+    keys_removed: dict = {}
 
     def apply_edits(item: dict) -> None:
         nonlocal applied
@@ -902,34 +924,56 @@ def migrate_journey(db: Database) -> dict:
             else:
                 edited.append(f"{item['id']}.{e['field']}")
 
-    for journey in ("lhc", "hair"):
+    def remove_unknown(item, allowed: tuple, prefix: str) -> None:
+        if isinstance(item, dict):
+            for key in unknown_keys(item, allowed):
+                del item[key]
+                keys_removed[prefix + key] = keys_removed.get(prefix + key, 0) + 1
+
+    remove_unknown(content, JOURNEYS, "")
+    for journey in JOURNEYS:
         for stage in content.get(journey) or []:
+            if not isinstance(stage, dict):
+                continue
+            remove_unknown(stage, STAGE_KEYS, "stage.")
             apply_edits(stage)
-            for side in ("benefiting", "negativelyImpacted"):
-                tiles = stage.get(side) or []
+            for side in SIDES:
+                tiles = stage.get(side) if isinstance(stage.get(side), list) else []
                 for i, tile in enumerate(tiles):
+                    if not isinstance(tile, dict):
+                        continue
                     if "driverCodes" not in tile:
                         tile = {("driverCodes" if k == "trendCodes" else k): v for k, v in tile.items()}
                         tile.setdefault("driverCodes", [])
                         tiles[i] = tile
                         renamed += 1
-                    unknown = [c for c in tile["driverCodes"] if c not in codes]
-                    if unknown:
-                        tile["driverCodes"] = [c for c in tile["driverCodes"] if c in codes]
-                        removed[tile["id"]] = unknown
+                    if isinstance(tile["driverCodes"], list):
+                        unknown = [c for c in tile["driverCodes"] if c not in DRIVER_CODES]
+                        if unknown:
+                            tile["driverCodes"] = [c for c in tile["driverCodes"] if c in DRIVER_CODES]
+                            removed[tile.get("id")] = unknown
+                    provenance = tile.get("provenance")
+                    if isinstance(provenance, dict) and provenance.get("author") == "ai":
+                        pending.append(tile.get("id"))
+                    remove_unknown(provenance, PROVENANCE_KEYS, "provenance.")
+                    remove_unknown(tile.get("poolImpact"), POOL_IMPACT_KEYS, "poolImpact.")
+                    remove_unknown(tile, TILE_KEYS + OPTIONAL_TILE_KEYS, "tile.")
                     apply_edits(tile)
                     for field in ("analysis", "driverNote"):
                         if isinstance(tile.get(field), str) and "\\n" in tile[field]:
                             tile[field] = tile[field].replace("\\n", "\n")
                             unescaped += 1
-    changed = bool(renamed or applied or unescaped or removed)
-    if changed:
-        db.execute(f"INSERT INTO journey_content (content, updated_by) VALUES ({p}, {p})",
-                   (json.dumps(content), f"migration {MIGRATION}"))
-    return {"stored_content": True, "tiles_renamed": renamed, "texts_updated": applied,
-            "texts_already_current": len(already), "texts_edited_left_alone": edited,
-            "texts_with_breaks_written_out": unescaped, "codes_removed": removed,
-            "new_version_saved": changed}
+    problems = [f"journey tile {tile_id}: an AI suggestion still pending review; accept or delete it"
+                for tile_id in pending]
+    problem = content_problem(content)
+    if problem:
+        problems.append(f"journey content: {problem}")
+    changed = bool(renamed or applied or unescaped or removed or keys_removed)
+    report = {"stored_content": True, "tiles_renamed": renamed, "texts_updated": applied,
+              "texts_already_current": len(already), "texts_edited_left_alone": edited,
+              "texts_with_breaks_written_out": unescaped, "codes_removed": removed,
+              "keys_removed": keys_removed, "new_version_saved": changed}
+    return (content if changed else None), report, problems
 
 
 def main(argv: list | None = None) -> int:
@@ -969,7 +1013,7 @@ def main(argv: list | None = None) -> int:
     db.begin()
     try:
         result = migrate(db)
-    except DriversNeedCorrection as e:
+    except NeedsCorrection as e:
         db.rollback()
         print(f"{db.where}: nothing changed; {e}")
         print("Correct them in the dashboard of the release still deployed, then run the dry run again.")

@@ -27,8 +27,9 @@ import pytest
 
 from prism.config import CATEGORIES, VC_STAGES
 from prism.input_drift import FINGERPRINT_KEYS, driver_fingerprint
+from prism.journey import content_problem
 from prism.seed_drivers import DRIVERS
-from support import load_module
+from support import bundled_journey, load_module
 
 REPO = Path(__file__).resolve().parents[1]
 MIGRATION_DIR = REPO / "migrations" / "0001_driver_schema"
@@ -153,15 +154,29 @@ def previous_schema(serial: str, json_type: str, older: bool = False) -> list:
     return config_first + older_leftovers(serial)
 
 
+def previous_tile(tile_id: str, name: str, codes: list, side: str = "benefiting", codes_key: str = "trendCodes",
+                  pool_impact: bool = True, **fields) -> dict:
+    """A tile as the previous editor saved it: its codes under trendCodes, an
+    author in its provenance and, in its pool impact, the direction its side
+    gives."""
+    tile = {"id": tile_id, "name": name, "type": "product", codes_key: codes, "driverNote": "", "intensity": 2,
+            "provenance": {"author": "strategist", "date": "2026-06", "grade": "estimate"}}
+    if pool_impact:
+        tile["poolImpact"] = {"grade": "Med", "direction": "tailwind" if side == "benefiting" else "headwind"}
+    return {**tile, "analysis": None, **fields}
+
+
+#: The journey content the previous release stored: t.c was saved after the
+#: codes were renamed, t.d was added in the editor and has no pool impact.
 STORED_JOURNEY = {
     "lhc": [{"id": "sorting", "label": "Sorting",
-             "benefiting": [
-                 {"id": "t.a", "name": "A", "trendCodes": ["C-01"], "analysis": "Earlier read A."},
-                 {"id": "t.b", "name": "B", "trendCodes": ["T-01"], "analysis": "Current read B."}],
-             "negativelyImpacted": [
-                 {"id": "t.c", "name": "C", "driverCodes": ["G-04"], "analysis": "Read an admin wrote."}]}],
+             "benefiting": [previous_tile("t.a", "A", ["C-01"], analysis="Earlier read A."),
+                            previous_tile("t.b", "B", ["T-01"], analysis="Current read B.")],
+             "negativelyImpacted": [previous_tile("t.c", "C", ["G-04"], "negativelyImpacted", "driverCodes",
+                                                  analysis="Read an admin wrote.")]}],
     "hair": [{"id": "wash", "label": "Wash", "benefiting": [],
-              "negativelyImpacted": [{"id": "t.d", "name": "D", "trendCodes": [], "driverNote": "Earlier note D."}]}],
+              "negativelyImpacted": [previous_tile("t.d", "D", [], "negativelyImpacted", pool_impact=False,
+                                                   driverNote="Earlier note D.")]}],
 }
 JOURNEY_EDITS = [
     {"tile": "t.a", "field": "analysis", "previous_sha256": [sha("First read A."), sha("Earlier read A.")],
@@ -319,6 +334,15 @@ def older(tmp_path) -> Path:
     fill_previous_database(conn, "?", "INTEGER PRIMARY KEY AUTOINCREMENT", older=True)
     conn.close()
     return path
+
+
+def store_journey(path: Path, content: dict) -> None:
+    """Save a newer version of the journey content, as an admin of the previous release would."""
+    conn = sqlite3.connect(path)
+    conn.execute("INSERT INTO journey_content (content, updated_by) VALUES (?, 'admin@example.com')",
+                 (json.dumps(content),))
+    conn.commit()
+    conn.close()
 
 
 def dump(path: Path) -> list:
@@ -612,35 +636,75 @@ class TestMigration:
             SourceRef(**source)
 
     def test_the_journey_content_is_saved_as_a_new_version(self, migration, previous, capsys):
+        """The newest version, brought up to date, is saved as content the API accepts; the previous
+        version stays in the table."""
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
         assert report == {"stored_content": True, "tiles_renamed": 3, "texts_updated": 3, "texts_already_current": 1,
                           "texts_edited_left_alone": ["t.c.analysis"], "texts_with_breaks_written_out": 0,
-                          "codes_removed": {}, "new_version_saved": True}
+                          "codes_removed": {}, "keys_removed": {"provenance.author": 4, "poolImpact.direction": 3},
+                          "new_version_saved": True}
         rows = query(previous, "SELECT content, updated_by FROM journey_content ORDER BY id")
         assert json.loads(rows[0]["content"]) == STORED_JOURNEY
         assert rows[1]["updated_by"] == "migration 0001_driver_schema"
         content = json.loads(rows[1]["content"])
+        assert content_problem(content) is None
         a, b = content["lhc"][0]["benefiting"]
         c = content["lhc"][0]["negativelyImpacted"][0]
         d = content["hair"][0]["negativelyImpacted"][0]
-        assert list(a) == ["id", "name", "driverCodes", "analysis"] and a["driverCodes"] == ["C-01"]
+        assert list(a) == ["id", "name", "type", "driverCodes", "driverNote", "intensity", "provenance",
+                           "poolImpact", "analysis"]
+        assert a["driverCodes"] == ["C-01"] and a["provenance"] == {"date": "2026-06", "grade": "estimate"}
+        assert (a["poolImpact"], c["poolImpact"], "poolImpact" in d) == ({"grade": "Med"}, {"grade": "Med"}, False)
         assert (a["analysis"], b["analysis"], c["analysis"], d["driverNote"]) == (
             "Current read A.", "Current read B.", "Read an admin wrote.", "Current note D.")
         assert (content["lhc"][0]["label"], content["hair"][0]["label"]) == ("Sorting", "Washing")
         assert "trendCodes" not in json.dumps(content)
 
-    def test_journey_codes_are_drivers_and_breaks_are_written_out(self, migration, previous, capsys):
+    def test_keys_the_tile_map_no_longer_has_are_removed(self, migration, previous, capsys):
+        """Whatever the previous editor stored beyond the current shape goes, and the report counts it."""
+        stored = copy.deepcopy(STORED_JOURNEY)
+        stored["lhc"][0]["icon"] = "basket"
+        stored["lhc"][0]["benefiting"][0]["pending"] = False
+        store_journey(previous, stored)
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
+        assert report["keys_removed"] == {"stage.icon": 1, "tile.pending": 1, "provenance.author": 4,
+                                          "poolImpact.direction": 3}
+        newest = query(previous, "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")[0]
+        newest = json.loads(newest["content"])
+        assert content_problem(newest) is None
+        assert "icon" not in newest["lhc"][0] and "pending" not in newest["lhc"][0]["benefiting"][0]
+
+    def test_journey_content_that_cannot_be_stored_stops_the_migration(self, migration, previous, capsys):
+        """A tile still marked as an AI suggestion pending review would read as strategist-authored, and
+        content the API refuses could not be saved again from the editor: nothing changes, and the
+        problems are listed with the drivers'."""
+        stored = copy.deepcopy(STORED_JOURNEY)
+        stored["lhc"][0]["benefiting"][1]["provenance"]["author"] = "ai"
+        stored["hair"][0]["negativelyImpacted"][0]["type"] = "gadget"
+        store_journey(previous, stored)
         conn = sqlite3.connect(previous)
-        stored = json.loads(json.dumps(STORED_JOURNEY))
+        conn.execute("UPDATE trends SET peak_year = 0 WHERE id = 'technology_r01'")
+        conn.commit()
+        conn.close()
+        before = dump(previous)
+        assert migration.main(["--sqlite", str(previous)]) == 1
+        out = capsys.readouterr().out
+        assert "nothing changed" in out and "the dry run again" in out
+        for line in ("technology_r01: peak year 0 is not a year after the onset",
+                     "journey tile t.b: an AI suggestion still pending review; accept or delete it",
+                     "journey content: tile 't.d': type must be one of product, tech, service"):
+            assert line in out, line
+        assert dump(previous) == before and not migration.ARCHIVE_DIR.exists()
+
+    def test_journey_codes_are_drivers_and_breaks_are_written_out(self, migration, previous, capsys):
+        stored = copy.deepcopy(STORED_JOURNEY)
         a = stored["lhc"][0]["benefiting"][0]
         a["trendCodes"] = ["C-01", "C-99", "T-06"]
         a["analysis"] = "**One.** First.\\n\\n**Two.** Second."
         del stored["hair"][0]["negativelyImpacted"][0]["trendCodes"]
-        conn.execute("INSERT INTO journey_content (content, updated_by) VALUES (?, 'admin@example.com')",
-                     (json.dumps(stored),))
-        conn.commit()
-        conn.close()
+        store_journey(previous, stored)
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
         assert report["codes_removed"] == {"t.a": ["C-99", "T-06"]} and report["texts_with_breaks_written_out"] == 1
@@ -743,9 +807,9 @@ class TestMigration:
     def test_a_failure_rolls_everything_back(self, migration, previous, monkeypatch, capsys):
         before = dump(previous)
 
-        def fail(db):
+        def fail(results):
             raise RuntimeError("disk full")
-        monkeypatch.setattr(migration, "migrate_journey", fail)
+        monkeypatch.setattr(migration, "rename_run_keys", fail)   # after the drops
         assert migration.main(["--sqlite", str(previous)]) == 2
         out = capsys.readouterr().out
         assert "rolled back" in out and "disk full" in out
@@ -868,35 +932,6 @@ class TestHelpers:
 
 # ── the real edit files match the shipped content ───────────────────────────
 
-def shipped_journey() -> dict:
-    """LHC_JOURNEY and HAIR_JOURNEY from data/consumerJourney.ts (JSON-style literals)."""
-    src = (REPO / "data" / "consumerJourney.ts").read_text(encoding="utf-8")
-
-    def extract(name):
-        start = src.index("[", src.index("=", src.index(f"export const {name}")))
-        depth, in_string, escaped = 0, False, False
-        for i in range(start, len(src)):
-            ch = src[i]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == "\\":
-                    escaped = True
-                elif ch == '"':
-                    in_string = False
-                continue
-            if ch == '"':
-                in_string = True
-            elif ch in "[{":
-                depth += 1
-            elif ch in "]}":
-                depth -= 1
-                if depth == 0:
-                    return json.loads(src[start:i + 1])
-        raise AssertionError(f"{name} not found")
-    return {"lhc": extract("LHC_JOURNEY"), "hair": extract("HAIR_JOURNEY")}
-
-
 class TestShippedEditFiles:
     def test_descriptions_end_on_the_seed_texts(self):
         entries = json.loads((MIGRATION_DIR / "descriptions.json").read_text(encoding="utf-8"))["descriptions"]
@@ -910,7 +945,7 @@ class TestShippedEditFiles:
         """Every entry ends on the text the dashboard ships: a tile's name, driver note or read, or a stage's
         label."""
         edits = json.loads((MIGRATION_DIR / "journey_edits.json").read_text(encoding="utf-8"))["edits"]
-        journeys = shipped_journey().values()
+        journeys = bundled_journey().values()
         items = {s["id"]: s for journey in journeys for s in journey}
         items.update({t["id"]: t for journey in journeys for stage in journey
                       for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])})
@@ -927,7 +962,7 @@ class TestShippedEditFiles:
     def test_the_shipped_tiles_write_their_paragraph_breaks_out(self):
         """A Strategist Read separates its paragraphs with a blank line, never with
         an escaped one; the stored copy follows through journey_edits.json."""
-        texts = [t.get("analysis") or "" for journey in shipped_journey().values() for stage in journey
+        texts = [t.get("analysis") or "" for journey in bundled_journey().values() for stage in journey
                  for side in ("benefiting", "negativelyImpacted") for t in stage.get(side, [])]
         assert sum("\n\n" in t for t in texts) >= 250
         assert not any("\\n" in t for t in texts)

@@ -13,7 +13,8 @@ What it changes is listed in its docstring; in short:
   engine can simulate: every score present and on its scale, a peak year
   after the onset, a value chain and at least one region with an exposure.
   While a driver fails a check the migration changes nothing and lists every
-  problem (see step 3 of the runbook);
+  problem (see step 2 of the runbook). The newest Consumer Journey content is
+  checked at the same time (the last point below);
 - the driver tables are created and filled from the previous ones, every row
   and every expert proposal included. Where an admin saved a driver's source
   list in the previous editor, that saved list becomes the driver's sources.
@@ -39,7 +40,12 @@ What it changes is listed in its docstring; in short:
   a previously shipped text get the current one. A text an admin has edited
   is left alone and listed in the report. The journey tiles cite drivers
   under `driverCodes`, and a code that is not a driver of the base is
-  removed. The previous PRISM Analysis column is not carried over: the
+  removed. Keys the tile map no longer has are removed: the author in a
+  tile's provenance (every tile reads as strategist-authored) and the
+  direction of its pool impact (the tile's side gives it). A tile the
+  previous editor still marks as an AI suggestion pending review stops the
+  migration until it is accepted or deleted, and so does content the API
+  would refuse. The previous PRISM Analysis column is not carried over: the
   readings ship with the code.
 
 A new, empty database needs no migration: the API creates the schema on first
@@ -79,12 +85,13 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    rehearsal branch and its archive file afterwards (the archive holds user
    emails).
 
-   If a driver fails a check, the dry run prints `nothing changed` and one
-   line per problem, exits with code 1 and changes nothing. Correct each
-   problem in production, in the dashboard that is still deployed, or with
-   SQL for a force, a start year or a confidence, which that dashboard cannot
-   edit. Then delete the rehearsal branch and start this step again from a
-   fresh one.
+   If a driver or the journey content fails a check, the dry run prints
+   `nothing changed` and one line per problem, exits with code 1 and changes
+   nothing. Correct each problem in production, in the dashboard that is
+   still deployed (a journey tile marked as an AI suggestion is accepted or
+   deleted in its Consumer Journey editor), or with SQL for a force, a start
+   year or a confidence, which that dashboard cannot edit. Then delete the
+   rehearsal branch and start this step again from a fresh one.
 
 3. **Preview.** Run the dry run against Neon. It performs the whole migration
    inside a transaction, prints the report and rolls back:
@@ -121,7 +128,9 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    - `descriptions.edited_left_alone` and `journey.texts_edited_left_alone`:
      each entry is a text an admin changed, which the migration keeps as it
      is; `journey.codes_removed` lists, per tile, the codes that are not
-     drivers of the base.
+     drivers of the base, and `journey.keys_removed` counts the keys removed
+     from the tile map (expect `provenance.author` and `poolImpact.direction`
+     on every tile).
 
    The migration locks the tables it changes for its whole transaction, so
    while the dry run runs the live dashboard's database reads wait. Run it at
@@ -203,7 +212,7 @@ ships: a description on the driver base's, a journey text on
 | Code | Meaning |
 |---|---|
 | 0 | migrated, or the database was already migrated |
-| 1 | refused, nothing changed: no database, not a database of the previous schema, `--postgres` missing for a PostgreSQL target, or drivers that need correcting (listed) |
+| 1 | refused, nothing changed: no database, not a database of the previous schema, `--postgres` missing for a PostgreSQL target, or drivers or journey content that need correcting (listed) |
 | 2 | failed and rolled back; the database is unchanged |
 
 ## Files
