@@ -89,6 +89,9 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   }, []);
 
   const stages = content[tab];
+  // Nothing is shown from the bundled copy while the saved journey loads: it
+  // would flash, and a tile opened from it would stay the old text.
+  const ready = origin !== 'loading';
 
   const driversLoaded = drivers.length > 0;
   const driversById = useMemo(() => new Map(drivers.map(d => [d.id, d])), [drivers]);
@@ -258,6 +261,20 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </p>
         </div>
 
+        {origin === 'unavailable' && (
+          <div role="status" className="mb-5 flex items-center justify-between gap-3 flex-wrap rounded-xl px-4 py-3"
+            style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer }}>
+            <p className="text-[12.5px]" style={{ lineHeight: 1.55, margin: 0 }}>
+              The saved journey could not be loaded, so these are the texts shipped with PRISM; an admin may
+              have changed them since.
+            </p>
+            <button type="button" onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
+              style={{ backgroundColor: S.surface, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
+              Try again
+            </button>
+          </div>
+        )}
+
         {/* ─── Tabs and filters ─── */}
         <section className="mb-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
@@ -292,14 +309,16 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.expansion, fontFamily: HEADLINE_FONT }}>
-                <TrendingUp size={12} strokeWidth={2.5} /> Tailwind {totals.benefiting}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.error, fontFamily: HEADLINE_FONT }}>
-                <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.declining}
-              </span>
-            </div>
+            {ready && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.expansion, fontFamily: HEADLINE_FONT }}>
+                  <TrendingUp size={12} strokeWidth={2.5} /> Tailwind {totals.benefiting}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: S.error, fontFamily: HEADLINE_FONT }}>
+                  <TrendingDown size={12} strokeWidth={2.5} /> Headwind {totals.declining}
+                </span>
+              </div>
+            )}
             <div className="h-5 w-px" style={{ backgroundColor: S.cardBorder }} aria-hidden="true" />
             <div className="flex gap-1.5">
               {(Object.keys(TYPE_STYLES) as TileType[]).map(key => (
@@ -326,6 +345,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           className="rounded-2xl overflow-hidden"
           style={{ backgroundColor: S.surface, boxShadow: SHADOW.card }}
         >
+          {!ready ? (
+            <div role="status" className="px-8 py-16 text-center text-[13px]"
+              style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
+              Loading the saved journey…
+            </div>
+          ) : (
           <div>
             <div
               className="grid"
@@ -453,6 +478,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* Flow indicator */}
           <div className="px-8 py-3.5 flex items-center gap-3" style={{ borderTop: `1px solid ${S.cardBorder}` }}>

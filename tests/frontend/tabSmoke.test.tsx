@@ -49,10 +49,10 @@ describe('every tab mounts on a complete store', () => {
     expect(container.textContent).toContain('Private label structural penetration');
   });
 
-  it('Consumer Journey', () => {
-    const { container } = render(<ConsumerJourney />);
+  it('Consumer Journey', async () => {
+    const { container, findByText } = render(<ConsumerJourney />);
     expect(container.textContent).toContain('Where Profit Pools Shift Along the Journey');
-    expect(container.textContent).toContain('AI stain/fabric recognition apps');
+    expect(await findByText('AI stain/fabric recognition apps')).toBeTruthy();
   });
 
   it('the entry gate', () => {

@@ -46,14 +46,16 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-function openTile(name = TILE) {
-  fireEvent.click(screen.getByText(name));
+/** Opens a tile once the saved journey has answered (the rail waits for it). */
+async function openTile(name = TILE) {
+  fireEvent.click(await screen.findByText(name));
   return within(screen.getByRole('dialog'));
 }
 
 describe('ConsumerJourney: rail and tile dialog', () => {
-  it('strips trailing parentheticals from tile names in the rail', () => {
+  it('strips trailing parentheticals from tile names in the rail', async () => {
     const { container } = render(<ConsumerJourney />);
+    await screen.findByText(TILE);
     expect(container.textContent).toContain('Garment care advisory service');
     expect(container.textContent).not.toContain('(digital)');
     expect(container.textContent).not.toContain('(auto-dose)');
@@ -65,9 +67,9 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(screen.getByText(/the Home Care \(dish \/ surface \/ WC\) journey is not built yet/)).toBeTruthy();
   });
 
-  it('opens a dialog with the Why-chain, the provenance and the live driver', () => {
+  it('opens a dialog with the Why-chain, the provenance and the live driver', async () => {
     render(<ConsumerJourney />);
-    const dialog = openTile();
+    const dialog = await openTile();
 
     expect(dialog.getByText('Why this moment is expanding')).toBeTruthy();
     expect(dialog.getByText('Drivers behind this moment')).toBeTruthy();
@@ -81,9 +83,9 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     expect(dialog.getByText('Authored analysis, not simulated')).toBeTruthy();
   });
 
-  it('shows the authored context of the tile\'s stage', () => {
+  it('shows the authored context of the tile\'s stage', async () => {
     render(<ConsumerJourney />);
-    const dialog = openTile();
+    const dialog = await openTile();
     expect(dialog.getByText(/^Stage context: /)).toBeTruthy();
     expect(dialog.getByText('Henkel brands')).toBeTruthy();
   });
@@ -94,31 +96,31 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     }
   });
 
-  it('links a driver card to the Drivers page with the live driver name', () => {
+  it('links a driver card to the Drivers page with the live driver name', async () => {
     const onNavigateToDriver = vi.fn();
     render(<ConsumerJourney onNavigateToDriver={onNavigateToDriver} />);
-    fireEvent.click(openTile().getByText('View in Drivers'));
+    fireEvent.click((await openTile()).getByText('View in Drivers'));
     expect(onNavigateToDriver).toHaveBeenCalledWith('AI and automation productivity (live row)');
   });
 
-  it('shows the code map entry until the drivers arrive', () => {
+  it('shows the code map entry until the drivers arrive', async () => {
     STORE.current = makeStore({ drivers: [] });
     render(<ConsumerJourney />);
-    const dialog = openTile();
+    const dialog = await openTile();
     expect(dialog.getByText(DRIVER_CODE_MAP['T-01'].name)).toBeTruthy();
     expect(dialog.getByText(/\(offline fallback\)/)).toBeTruthy();
   });
 
   it('closes on Escape', async () => {
     render(<ConsumerJourney />);
-    openTile();
+    await openTile();
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('steps to the next tile with the arrow keys, but not while the caret is in a field', async () => {
     render(<ConsumerJourney />);
-    const first = openTile().getByRole('heading', { level: 2 }).textContent;
+    const first = (await openTile()).getByRole('heading', { level: 2 }).textContent;
     const field = document.createElement('input');
     screen.getByRole('dialog').appendChild(field);
     fireEvent.keyDown(field, { key: 'ArrowRight' });
@@ -128,9 +130,9 @@ describe('ConsumerJourney: rail and tile dialog', () => {
       expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).not.toBe(first));
   });
 
-  it('leaves the arrow keys alone while its pane is hidden', () => {
+  it('leaves the arrow keys alone while its pane is hidden', async () => {
     const { rerender } = render(<PaneActiveContext.Provider value><ConsumerJourney /></PaneActiveContext.Provider>);
-    const first = openTile().getByRole('heading', { level: 2 }).textContent;
+    const first = (await openTile()).getByRole('heading', { level: 2 }).textContent;
     rerender(<PaneActiveContext.Provider value={false}><ConsumerJourney /></PaneActiveContext.Provider>);
     fireEvent.keyDown(window, { key: 'ArrowRight' });   // meant for the view on screen
     expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toBe(first);
@@ -212,7 +214,29 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     await startEditing();
     expect(await screen.findByText(/saving is off so it cannot be overwritten/)).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
+  });
+
+  it('shows nothing from the bundled copy while the saved journey loads', async () => {
+    let answer: (stored: { version: number; content: null }) => void = () => {};
+    API.getJourneyContent.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    render(<ConsumerJourney />);
+    expect(screen.getByRole('status').textContent).toBe('Loading the saved journey…');
+    expect(screen.queryByText(TILE)).toBeNull();
+    answer({ version: 0, content: null });
+    expect(await screen.findByText(TILE)).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('tells a viewer when the saved journey could not be loaded, and loads it again on request', async () => {
+    API.getJourneyContent.mockRejectedValueOnce(new ApiError(500, 'database down'));
+    render(<ConsumerJourney />);
+    expect(await screen.findByText(/these are the texts shipped with PRISM; an admin may have changed them/))
+      .toBeTruthy();
+    expect(screen.getByText(TILE)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/texts shipped with PRISM/)).toBeNull());
   });
 });
 
