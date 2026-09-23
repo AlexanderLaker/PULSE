@@ -10,6 +10,10 @@
  *   4. Tab and Shift+Tab stay inside it.
  *   5. Focus returns to the element that opened it.
  *
+ * Overlays can stack (Settings opened over a drill-down): only the one opened
+ * last answers Escape and Tab, and the page stays locked until the last one
+ * closes.
+ *
  *   const ref = useRef<HTMLElement | null>(null);
  *   useOverlay(open, onClose, ref);
  *   <aside ref={ref} role="dialog" aria-modal="true">...</aside>
@@ -28,6 +32,38 @@ export const PaneActiveContext = createContext(true);
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** The overlays holding the page, the one opened last at the end. */
+const stack: object[] = [];
+/** The body's own scroll style while the page is held, restored when the last overlay lets go. */
+let bodyStyle: { overflow: string; paddingRight: string } | null = null;
+
+function hold(overlay: object) {
+  if (stack.length === 0) {
+    // (2) Lock the page scroll without a layout shift from the
+    // disappearing scrollbar.
+    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
+    bodyStyle = { overflow: document.body.style.overflow, paddingRight: document.body.style.paddingRight };
+    document.body.style.overflow = 'hidden';
+    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
+  }
+  stack.push(overlay);
+}
+
+function release(overlay: object) {
+  const i = stack.indexOf(overlay);
+  if (i >= 0) stack.splice(i, 1);
+  if (stack.length === 0 && bodyStyle) {
+    document.body.style.overflow = bodyStyle.overflow;
+    document.body.style.paddingRight = bodyStyle.paddingRight;
+    bodyStyle = null;
+  }
+}
+
+const isTopmost = (overlay: object) => stack[stack.length - 1] === overlay;
+
+/** Whether an overlay holds the page now: the page's own shortcut keys wait until none does. */
+export const overlayOpen = (): boolean => stack.length > 0;
 
 export default function useOverlay(
   open: boolean,
@@ -53,14 +89,8 @@ export default function useOverlay(
 
   useEffect(() => {
     if (!active) return;
-
-    // (2) Lock the page scroll without a layout shift from the
-    // disappearing scrollbar.
-    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
-    const prevOverflow = document.body.style.overflow;
-    const prevPaddingRight = document.body.style.paddingRight;
-    document.body.style.overflow = 'hidden';
-    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
+    const overlay = {};
+    hold(overlay);
 
     // (3) Move focus into the dialog (first focusable, else the container).
     const container = containerRef.current;
@@ -72,8 +102,9 @@ export default function useOverlay(
     // After the open animation has mounted content.
     const raf = requestAnimationFrame(focusFirst);
 
-    // (1) Escape + (4) focus trap.
+    // (1) Escape + (4) focus trap, for the overlay opened last only.
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!isTopmost(overlay)) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
         onCloseRef.current();
@@ -103,8 +134,7 @@ export default function useOverlay(
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = prevOverflow;
-      document.body.style.paddingRight = prevPaddingRight;
+      release(overlay);
     };
   }, [active, containerRef]);
 }

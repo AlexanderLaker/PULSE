@@ -11,6 +11,7 @@
  *      neutral tint when there is no run.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { useRef } from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import type { PrismStore } from '@/hooks/usePrism';
 import { linearPath, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
@@ -19,6 +20,7 @@ const STATE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 vi.mock('@/hooks/usePrism', () => ({ default: () => STATE.store }));
 
 import HomeGate from '@/components/dashboard/HomeGate';
+import useOverlay from '@/hooks/useOverlay';
 
 const DRIVERS = [
   makeDriver({ id: 'consumer_r01' }),
@@ -83,6 +85,22 @@ describe('HomeGate', () => {
     rerender(<HomeGate active={false} onNavigate={navigate} />);
     fireEvent.keyDown(window, { key: '2' });
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('leaves keys 1–4 to a dialog open over the gate', () => {
+    STATE.store = makeStore();
+    const navigate = vi.fn();
+    const Dialog = () => {
+      const ref = useRef<HTMLDivElement | null>(null);
+      useOverlay(true, () => {}, ref);
+      return <div ref={ref} role="dialog" aria-label="Welcome"><button type="button">Got it</button></div>;
+    };
+    const { rerender } = render(<><HomeGate active onNavigate={navigate} /><Dialog /></>);
+    fireEvent.keyDown(window, { key: '1' });
+    expect(navigate).not.toHaveBeenCalled();
+    rerender(<HomeGate active onNavigate={navigate} />);
+    fireEvent.keyDown(window, { key: '1' });
+    expect(navigate).toHaveBeenCalledWith('drivers');
   });
 
   it("draws the run's category medians and portfolio band, and the neutral tint without a run", () => {

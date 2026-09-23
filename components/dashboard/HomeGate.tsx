@@ -27,6 +27,7 @@
 import { useEffect, useMemo, type FC, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import usePrism from '@/hooks/usePrism';
+import { overlayOpen } from '@/hooks/useOverlay';
 import {
   S, INK_RGB, PRIMARY_RGB, CONTRACTION_RGB, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT,
 } from '@/lib/theme';
@@ -393,11 +394,12 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
 
   const band = simulation?.totals.portfolio[String(HORIZON)] ?? null;
 
-  // Keys 1–4 open a tab while the gate is the visible pane.
+  // Keys 1–4 open a tab while the gate is the visible pane and no dialog
+  // (the welcome dialog, Settings) covers it.
   useEffect(() => {
     if (!active) return undefined;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || overlayOpen()) return;
       const tag = (document.activeElement?.tagName ?? '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       const room = ROOM_KEYS[e.key];
