@@ -1,5 +1,5 @@
 {
- "about": "Driver descriptions this migration brings up to date. A stored description is replaced by the text below only while it is one of the previously shipped texts (their SHA-256); a description an admin has edited is left alone and reported.",
+ "about": "Driver descriptions this migration brings up to date. A stored description is replaced by the text below only while it is a text an earlier version of the driver base gave it (every version since release 2.11.0, the first on the 51-driver base; the SHA-256 of each is listed); a description an admin has edited is left alone and reported.",
  "descriptions": {
   "competitive_r15": {
    "previous_sha256": [

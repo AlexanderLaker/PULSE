@@ -13,9 +13,9 @@ or the write lock (SQLite), so nothing can write in between.
    without any regional exposure as present in every region; the driver schema
    has no such rule, so such a driver is refused too. While any driver fails a
    check the migration changes nothing and lists every problem, to be
-   corrected in the dashboard of the release still deployed (a force, a start
-   year or a confidence, which that dashboard cannot edit, with SQL). The
-   newest Consumer Journey content is checked at the same time (step 5).
+   corrected in the previous release's dashboard (a force, a start year or a
+   confidence, which that dashboard cannot edit, with SQL). The newest
+   Consumer Journey content is checked at the same time (step 5).
 2. The driver tables are created and filled from the previous ones:
      trends                    -> drivers      (ai_suggestion -> baseline,
                                                 user_override -> scores_edited;
@@ -75,19 +75,20 @@ or the write lock (SQLite), so nothing can write in between.
    that cannot be known; its exposure maps move onto the taxonomy's names as
    the drivers' do, so the next production run compares like with like. No
    number changes.
-5. The content is brought up to date:
+5. The content is brought up to date. A previously shipped text is one that
+   any version since release 2.11.0 (the first on the 51-driver base) shipped:
      - a description that still holds a previously shipped text gets the current
        one (descriptions.json); an edited description is left alone and reported;
      - the newest Consumer Journey content gets the key driverCodes instead of
        trendCodes, loses any code that is not a driver of the base, gets the
        current tile texts and stage labels where one still holds a previously
-       shipped text (journey_edits.json), has escaped paragraph breaks
-       written out and loses every key the tile map no longer has (the author
-       in a tile's provenance, and the direction of its pool impact, which the
-       tile's side gives); it is saved as a new version. A tile the previous
-       editor still marks as an AI suggestion pending review, or content the
-       API would refuse, stops the migration before anything changes, as a
-       driver that needs correcting does.
+       shipped text (journey_edits.json), has escaped paragraph breaks written
+       out and loses every key outside the tile shape of prism/journey.py (the
+       author in a tile's provenance, and the direction of its pool impact,
+       which the tile's side gives); it is saved as a new version. A tile the
+       previous editor still marks as an AI suggestion pending review, or
+       content the API would refuse, stops the migration before anything
+       changes, as a driver that needs correcting does.
 6. The migration is recorded in schema_migrations and in the audit log.
 
 Before the commit, every dropped row and column is written to a local archive,
@@ -889,12 +890,12 @@ def updated_journey(db: Database) -> tuple:
     the dashboard resolves every code to one; a text that still holds a
     previously shipped version gets the current one (journey_edits.json, which
     lists stage labels the same way); escaped paragraph breaks ("\\n") in a
-    text an admin saved are written out; and every key the tile map no longer
-    has is removed (the author in a tile's provenance, the direction of its pool
-    impact, which its side gives). A tile the previous editor still marked as an
-    AI suggestion pending review cannot be stored as it is, since every tile
-    now reads as strategist-authored, and neither can content the API would
-    refuse; both come back as problems.
+    text an admin saved are written out; and every key outside the tile shape
+    of prism/journey.py is removed (the author in a tile's provenance, the
+    direction of its pool impact, which its side gives). A tile the previous
+    editor still marked as an AI suggestion pending review cannot be stored as
+    it is, since every tile now reads as strategist-authored, and neither can
+    content the API would refuse; both come back as problems.
 
     Returns (the content to save as a new version, or None when nothing
     changed; the report; the problems).
@@ -1017,7 +1018,8 @@ def main(argv: list | None = None) -> int:
     except NeedsCorrection as e:
         db.rollback()
         print(f"{db.where}: nothing changed; {e}")
-        print("Correct them in the dashboard of the release still deployed, then run the dry run again.")
+        print("Correct them in the previous release's dashboard (after the deploy, promote the previous "
+              "production deployment in Vercel first), then run the dry run again.")
         return 1
     except Exception as e:  # noqa: BLE001 (rolled back and reported)
         db.rollback()

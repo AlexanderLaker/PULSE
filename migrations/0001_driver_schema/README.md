@@ -37,11 +37,12 @@ docstring; in short:
   maps on the taxonomy's names, so the next production run compares like
   with like; no number changes;
 - descriptions, Consumer Journey tile texts and stage labels that still hold
-  a previously shipped text get the current one. A text an admin has edited
-  is left alone and listed in the report. The journey tiles cite drivers
-  under `driverCodes`, and a code that is not a driver of the base is
-  removed. Keys the tile map no longer has are removed: the author in a
-  tile's provenance (every tile reads as strategist-authored) and the
+  a text shipped before (any version since release 2.11.0, the first on the
+  51-driver base) get the current one. A text an admin has edited is left
+  alone and listed in the report. The journey tiles cite drivers under
+  `driverCodes`, and a code that is not a driver of the base is removed.
+  Keys outside the tile shape (`prism/journey.py`) are removed: the author
+  in a tile's provenance (every tile reads as strategist-authored) and the
   direction of its pool impact (the tile's side gives it). A tile the
   previous editor still marks as an AI suggestion pending review stops the
   migration until it is accepted or deleted, and so does content the API
@@ -59,8 +60,8 @@ ones. The dashboard is unavailable from the deploy (step 4) until the
 migration has committed (step 5): plan a few quiet minutes.
 
 You need the repository at the commit you are deploying, the Python
-environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
-`POSTGRES_URL`) is the Neon production database.
+environment from `requirements-dev.txt` and a `.env` whose `POSTGRES_URL`
+(or, when that is not set, `DATABASE_URL`) is the Neon production database.
 
 1. **Back up.** In the Neon console, create a branch of the production branch
    (Branches, Create branch, from the current state). It is an instant
@@ -88,9 +89,11 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    If a driver or the journey content fails a check, the dry run prints
    `nothing changed` and one line per problem, exits with code 1 and changes
    nothing. Correct each problem in production, in the dashboard that is
-   still deployed (a journey tile marked as an AI suggestion is accepted or
-   deleted in its Consumer Journey editor), or with SQL for a force, a start
-   year or a confidence, which that dashboard cannot edit. Then delete the
+   still deployed: a driver's scores in its editor, and a journey tile
+   marked as an AI suggestion, or one the API would refuse (a line
+   `journey content: tile ...` names the tile and what is wrong with it), in
+   the Consumer Journey editor. A force, a start year or a confidence, which
+   that dashboard cannot edit, is corrected with SQL. Then delete the
    rehearsal branch and start this step again from a fresh one.
 
 3. **Preview.** Run the dry run against Neon. It performs the whole migration
@@ -129,8 +132,8 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
      each entry is a text an admin changed, which the migration keeps as it
      is; `journey.codes_removed` lists, per tile, the codes that are not
      drivers of the base, and `journey.keys_removed` counts the keys removed
-     from the tile map (expect `provenance.author` and `poolImpact.direction`
-     on every tile).
+     from the tile map (expect `provenance.author` on every tile, and
+     `poolImpact.direction` on every tile that has a pool impact).
 
    The migration locks the tables it changes for its whole transaction, so
    while the dry run runs the live dashboard's database reads wait. Run it at
@@ -153,7 +156,11 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    fails it rolls back by itself, exits with code 2 and the database is
    unchanged; see Rollback. It waits at most ten seconds for its locks: if a
    long request of the live service holds one, it stops the same way, and
-   running it again is safe.
+   running it again is safe. If it exits with code 1 instead, a driver or
+   the journey content was changed after the preview and needs correcting;
+   nothing changed. Promote the previous production deployment in Vercel,
+   correct the listed problems in its dashboard as in step 2, and start
+   again from step 3.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.
@@ -191,11 +198,13 @@ with the driver base, the first time a request needs the database.
   Restore service by promoting the previous production deployment in Vercel
   (Deployments, the previous one, Promote to Production), then look at the
   error the script printed.
-- **A problem shows after the migration committed:** promote the previous
-  production deployment and restore the Neon branch from step 1 (in Neon,
-  restore the production branch from the backup branch, or point
-  `DATABASE_URL` at the backup branch). The archive file of step 5 holds the
-  dropped rows as well.
+- **A problem shows after the migration committed:** go back to the state
+  of step 1. Either restore the production branch from the backup branch in
+  Neon and promote the previous production deployment in Vercel, or point
+  the Vercel project's database URL at the backup branch (`POSTGRES_URL`
+  where the project sets it, since it wins over `DATABASE_URL`) and redeploy
+  the previous release: a deployment keeps the settings it was built with.
+  The archive file of step 5 holds the dropped rows as well.
 
 ## When a shipped text changes
 
@@ -213,7 +222,7 @@ ships: a description on the driver base's, a journey text on
 | Code | Meaning |
 |---|---|
 | 0 | migrated, or the database was already migrated |
-| 1 | refused, nothing changed: no database, not a database of the previous schema, `--postgres` missing for a PostgreSQL target, or drivers or journey content that need correcting (listed) |
+| 1 | refused, nothing changed: the database cannot be opened, it is not a database of the previous schema, `--postgres` is missing for a PostgreSQL target, or drivers or journey content need correcting (listed) |
 | 2 | failed and rolled back; the database is unchanged |
 
 ## Files
@@ -221,8 +230,8 @@ ships: a description on the driver base's, a journey text on
 | File | Content |
 |---|---|
 | `migrate.py` | the migration |
-| `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it |
-| `journey_edits.json` | the current Consumer Journey tile texts and stage labels, each with the SHA-256 of the texts shipped before it |
+| `descriptions.json` | the current driver descriptions, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
+| `journey_edits.json` | the current Consumer Journey tile texts and stage labels, each with the SHA-256 of the texts shipped before it since release 2.11.0 |
 | `previous_names.txt` | the names of the previous schema and code; `tests/test_repository.py` fails when one appears outside this folder and the migration's tests |
 | `archive/` | written by a live run: the dropped rows (git-ignored) |
 
