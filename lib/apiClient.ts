@@ -16,6 +16,7 @@ import type {
   HealthStatus, ModelConfig, Role, SimulationPayload, SimulationResult,
 } from '@/types';
 import type { JourneyContent } from '@/data/consumerJourney';
+import { errorDetail } from '@/lib/apiError';
 
 /** No request may hang: 20 s covers a serverless database waking up. */
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -25,17 +26,6 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
-}
-
-/** One readable line from an error body ({detail} from the API, {error} from the dashboard routes). */
-function errorMessage(body: unknown, status: number): string {
-  const b = (body ?? {}) as { detail?: unknown; error?: unknown };
-  const detail = b.detail ?? b.error;
-  if (typeof detail === 'string') return detail;
-  if (detail && typeof detail === 'object' && typeof (detail as { error?: unknown }).error === 'string') {
-    return (detail as { error: string }).error;
-  }
-  return detail != null ? JSON.stringify(detail) : `Request failed (${status})`;
 }
 
 async function send<T>(url: string, init: RequestInit = {}, retried = false): Promise<T> {
@@ -57,7 +47,7 @@ async function send<T>(url: string, init: RequestInit = {}, retried = false): Pr
     return send<T>(url, init, true);
   }
   if (!res.ok) {
-    throw new ApiError(res.status, errorMessage(await res.json().catch(() => null), res.status));
+    throw new ApiError(res.status, errorDetail(await res.json().catch(() => null)) ?? `Request failed (${res.status})`);
   }
   return (await res.json()) as T;
 }

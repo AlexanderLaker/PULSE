@@ -217,8 +217,8 @@ export const DriverRow: FC<DriverRowProps> = ({
   return (
     <div style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
       {/* The row toggles the expanded panel. It is a div with role=button
-          rather than a <button type="button"> because it lays out block content in a grid,
-          which a button may not contain. */}
+          rather than a <button> because it lays out block content in a
+          grid, which a button may not contain. */}
       <div
         role="button"
         tabIndex={0}

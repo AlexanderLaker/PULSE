@@ -174,6 +174,61 @@ describe('usePrism', () => {
     }
   });
 
+  it('keeps the run through a database outage and loads again once the database answers', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
+      mount();
+      await loaded();
+      expect(api.getSimulation).toHaveBeenCalledTimes(1);
+      // The database stops answering: the next check brings up the notice and nothing else.
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
+        status: 'degraded', has_simulation: false, simulation_reason: 'db_error', driver_count: 0,
+        latest_run_id: null,
+      }));
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      await waitFor(() => expect(screen.getByTestId('database').textContent).toBe('db_error'));
+      expect(screen.getByTestId('run').textContent).toBe('yes');
+      expect(screen.getByTestId('drivers').textContent).toBe('1');
+      expect(api.getDrivers).toHaveBeenCalledTimes(1);
+      // It answers again: the check 30 s later, while degraded, loads everything again.
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+      await waitFor(() => expect(api.getSimulation).toHaveBeenCalledTimes(2));
+      expect(screen.getByTestId('database').textContent).toBe('');
+      expect(screen.getByTestId('run').textContent).toBe('yes');
+      expect(screen.getByTestId('loading').textContent).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the run when the service comes back degraded after being unreachable', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
+      mount();
+      await loaded();
+      vi.mocked(api.getHealth).mockRejectedValue(new Error('network'));
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      await waitFor(() => expect(screen.getByTestId('available').textContent).toBe('false'));
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
+        status: 'degraded', has_simulation: false, simulation_reason: 'db_error', driver_count: 0,
+        latest_run_id: null,
+      }));
+      vi.mocked(api.getDrivers).mockRejectedValue(new Error('The database cannot be reached'));
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+      await waitFor(() => expect(screen.getByTestId('database').textContent).toBe('db_error'));
+      await loaded();
+      expect(screen.getByTestId('available').textContent).toBe('true');
+      expect(screen.getByTestId('run').textContent).toBe('yes');
+      expect(screen.getByTestId('drivers').textContent).toBe('1');
+      expect(screen.getByTestId('run-error').textContent).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('picks up a newer run on its next health check, without a loading state', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

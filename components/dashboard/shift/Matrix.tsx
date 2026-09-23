@@ -7,9 +7,10 @@ import React, { useMemo, useState, type FC } from 'react';
 import { Info } from 'lucide-react';
 import {
   NO_VALUE, fmtShift, fmtPct, shiftArrow, shiftColor, heatFill, heatText, heatScaleFor,
-  EXPANSION_RGB, CONTRACTION_RGB,
 } from '@/lib/format';
-import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import {
+  S, SHADOW, EXPANSION_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT,
+} from '@/lib/theme';
 import type { PercentileDistribution } from '@/types';
 import type { CellMap, MatrixRow } from './matrixModel';
 

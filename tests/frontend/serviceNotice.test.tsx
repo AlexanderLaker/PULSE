@@ -2,7 +2,7 @@
 /**
  * Two pieces of the dashboard shell:
  *
- *   - the service notice under the navigation says why the views are empty
+ *   - the service notice under the navigation says why nothing new loads
  *     while the database cannot be used (migration, no database, outage);
  *   - an overlay inside a hidden dashboard pane lets go of the page: the
  *     scroll lock and its keys come back when the pane shows again, and

@@ -27,10 +27,10 @@
 import { useEffect, useMemo, type FC, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import usePrism from '@/hooks/usePrism';
-import { S, INK_RGB, PRIMARY_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import {
-  CATEGORIES, CONTRACTION_RGB, EXPANSION_RGB, FORCE_COLORS, YEARS, heatFill, heatScaleFor,
-} from '@/lib/format';
+  S, INK_RGB, PRIMARY_RGB, CONTRACTION_RGB, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT,
+} from '@/lib/theme';
+import { CATEGORIES, FLAT_EPS, FORCE_COLORS, HORIZON, heatFill, heatScaleFor } from '@/lib/format';
 import { getYearPercentiles } from '@/lib/shiftMatrix';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import type { ForceName } from '@/types';
@@ -83,7 +83,6 @@ const CLUSTER_SPOTS: Array<Array<[number, number, number]>> = [
 const BASE_FORCE_COUNTS = Object.values(DRIVER_CODE_MAP).reduce<Record<string, number>>(
   (counts, d) => ({ ...counts, [d.force]: (counts[d.force] ?? 0) + 1 }), {}) as Record<ForceName, number>;
 
-const TERMINAL_YEAR = YEARS[YEARS.length - 1];
 const CATEGORY_COLOR: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
 // One cell per category in CATEGORIES order, four to a row; the portfolio
 // band sits under the fourth row, inside the shared 300 x 230 viewBox.
@@ -173,6 +172,10 @@ const JourneyArt: FC = () => {
   );
 };
 
+/** The band's tint: the shift's hue, or the ink when the median is flat (as shiftColor has it). */
+const bandTone = (band: { median: number } | null): string =>
+  !band || Math.abs(band.median) < FLAT_EPS ? INK_RGB : band.median > 0 ? EXPANSION_RGB : CONTRACTION_RGB;
+
 /** The categories' terminal-year medians and, below them, the portfolio band. */
 const ShiftArt: FC<{
   cells: Array<number | null>;
@@ -208,7 +211,7 @@ const ShiftArt: FC<{
         <>
           <rect
             x={bandGeom.x10} y={BAND_Y - 2} width={Math.max(bandGeom.x90 - bandGeom.x10, 6)} height={9} rx={4.5}
-            fill={`rgba(${band && band.median >= 0 ? EXPANSION_RGB : CONTRACTION_RGB}, 0.16)`}
+            fill={`rgba(${bandTone(band)}, 0.16)`}
           />
           <rect x={bandGeom.xMed - 1.25} y={BAND_Y - 7} width={2.5} height={19} rx={1.25} fill={S.onBg} />
         </>
@@ -328,7 +331,7 @@ const Door: FC<{
     <span
       aria-hidden="true"
       className="absolute right-[22px] top-6 flex h-[22px] w-[22px] items-center justify-center rounded-[7px]
-                 border bg-white/85 text-[11px] opacity-0 transition-opacity duration-300
+                 border bg-theme-surface/85 text-[11px] opacity-0 transition-opacity duration-300
                  group-hover:opacity-90 group-focus-visible:opacity-90"
       style={{ fontFamily: MONO_FONT, color: S.onSurfaceVariant, borderColor: S.cardBorderStrong }}
     >
@@ -340,7 +343,7 @@ const Door: FC<{
       aria-hidden="true"
       className="absolute bottom-[22px] right-[22px] flex h-[38px] w-[38px] items-center justify-center
                  rounded-full border text-base opacity-75 backdrop-blur-[6px] transition-all duration-300
-                 bg-white/85 text-theme-on-surface-variant border-theme-card-border
+                 bg-theme-surface/85 text-theme-on-surface-variant border-theme-card-border
                  group-hover:-rotate-45 group-hover:opacity-100 group-hover:bg-theme-primary
                  group-hover:text-theme-on-primary group-hover:border-theme-primary
                  group-focus-visible:opacity-100 group-focus-visible:bg-theme-primary
@@ -376,7 +379,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
   const driverCount = drivers.length || Object.keys(DRIVER_CODE_MAP).length;
 
   const matrixCells = useMemo<Array<number | null>>(
-    () => CATEGORIES.map((c) => getYearPercentiles(simulation?.shifts, c.name, TERMINAL_YEAR)?.median ?? null),
+    () => CATEGORIES.map((c) => getYearPercentiles(simulation?.shifts, c.name, HORIZON)?.median ?? null),
     [simulation],
   );
   const highlightIdx = useMemo<number | null>(() => {
@@ -388,7 +391,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
     return idx;
   }, [matrixCells]);
 
-  const band = simulation?.totals.portfolio[String(TERMINAL_YEAR)] ?? null;
+  const band = simulation?.totals.portfolio[String(HORIZON)] ?? null;
 
   // Keys 1–4 open a tab while the gate is the visible pane.
   useEffect(() => {
@@ -446,9 +449,9 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
         </Door>
 
         <Door
-          eyebrow="The output" title="Profit Pool Shift Analysis" caption={`Every category's shift to ${TERMINAL_YEAR}.`}
+          eyebrow="The output" title="Profit Pool Shift Analysis" caption={`Every category's shift to ${HORIZON}.`}
           keyHint="3" wash={WASH.shift} delay={0.24} reduced={reduced}
-          ariaLabel={`Profit Pool Shift Analysis, the output. Every category's shift to ${TERMINAL_YEAR}. Shortcut key 3.`}
+          ariaLabel={`Profit Pool Shift Analysis, the output. Every category's shift to ${HORIZON}. Shortcut key 3.`}
           onOpen={() => onNavigate('shift-analysis')}
         >
           <ShiftArt cells={matrixCells} highlightIdx={highlightIdx} band={band} />

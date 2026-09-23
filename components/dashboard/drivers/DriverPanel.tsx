@@ -11,7 +11,7 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
 import { ApiError } from '@/lib/apiClient';
-import { YEARS, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
+import { HORIZON, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
@@ -28,7 +28,6 @@ import {
 } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
 
-const HORIZON = YEARS[YEARS.length - 1]!;
 
 interface ExpandedPanelProps {
   driver: Driver;

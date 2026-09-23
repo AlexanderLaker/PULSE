@@ -147,20 +147,20 @@ export function peakJitterFor(uncertainty: number | null | undefined, globalJitt
 /**
  * The expected materialisation of one driver per path year: its schedule
  * averaged over the symmetric triangular peak-jitter grid, with the jittered
- * peak clamped at onset + 1 exactly as the engine's _peak_schedule_table does.
+ * peak clamped at onset + 1 exactly as the engine's peak_schedule_table does.
  */
-export function expectedMaterialisation(
-  t: AttributionDriver, years: number[], baseYear: number, globalJitter: number,
+export function expectedMaterialization(
+  d: AttributionDriver, years: number[], baseYear: number, globalJitter: number,
 ): { byYear: number[]; approximate: boolean } {
-  const jt = peakJitterFor(t.uncertainty, globalJitter);
+  const jt = peakJitterFor(d.uncertainty, globalJitter);
   const offsets: number[] = [];
   for (let o = -jt; o <= jt; o++) offsets.push(o);
   const weights = offsets.map((o) => (jt <= 0 ? 1 : Math.max(0, jt + 1 - Math.abs(o))));
   const wsum = weights.reduce((a, b) => a + b, 0);
-  const sy = t.start_year == null ? null : Math.trunc(t.start_year);
+  const sy = d.start_year == null ? null : Math.trunc(d.start_year);
   const onset = sy == null ? baseYear : Math.max(baseYear, sy);
-  const basePk = t.peak_year ?? 0;
-  const dc = t.diffusion_curve ?? '';
+  const basePk = d.peak_year ?? 0;
+  const dc = d.diffusion_curve ?? '';
   const byYear = years.map(() => 0);
   let approximate = false;
   offsets.forEach((off, k) => {
@@ -205,17 +205,17 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
 
   const fw = FORCES.map((f) => config.force_weights?.[f] ?? 1 / FORCES.length);
   const att = FORCES.map((f) => config.per_force_attenuation?.[f] ?? 0);
-  const fidx = drivers.map((t) => Math.max(0, FORCES.indexOf(t.force)));
+  const fidx = drivers.map((d) => Math.max(0, FORCES.indexOf(d.force)));
 
   // Composite cell exposure; a driver without regional scores counts as
   // present in every region, as in the engine.
-  const E: number[][] = drivers.map((t) => {
-    const reg = t.regional_exposure ?? {};
+  const E: number[][] = drivers.map((d) => {
+    const reg = d.regional_exposure ?? {};
     let rv = REGIONS.map((r) => clamp5(reg[r]));
     if (rv.reduce((a, b) => a + b, 0) <= 0) rv = REGIONS.map(() => 1);
     const row = new Array<number>(nCell).fill(0);
     categories.forEach((cat, c) => {
-      const ce = clamp5(t.category_exposure?.[cat]);
+      const ce = clamp5(d.category_exposure?.[cat]);
       if (ce <= 0) return;
       for (let r = 0; r < nReg; r++) row[c * nReg + r] = ce * rv[r];
     });
@@ -224,7 +224,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
 
   // Within-force dampening per (force, cell), from the magnitude-weighted
   // effective number of drivers (the participation ratio).
-  const absScore = drivers.map((t) => Math.abs(Number(t.normalized_score ?? 0)));
+  const absScore = drivers.map((d) => Math.abs(Number(d.normalized_score ?? 0)));
   const damp: number[][] = FORCES.map(() => new Array<number>(nCell).fill(1));
   FORCES.forEach((force, f) => {
     const ov = config.within_force_overlap?.[force] ?? 0;
@@ -237,16 +237,16 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
         s1 += m; s2 += m * m;
       });
       const nEff = s2 > 0 ? (s1 * s1) / s2 : 0;
-      const d = nEff > 1 ? 1 - ov * (nEff - 1) / Math.max(nEff, 1) : 1;
-      damp[f][cell] = Math.min(1, Math.max(0.1, d));
+      const factor = nEff > 1 ? 1 - ov * (nEff - 1) / Math.max(nEff, 1) : 1;
+      damp[f][cell] = Math.min(1, Math.max(0.1, factor));
     }
   });
 
   // Expected materialisation per driver and year (onset, curve, peak jitter).
-  const mats = drivers.map((t) => expectedMaterialisation(t, years, baseYear, globalJitter));
+  const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, globalJitter));
 
   // Additive terms, force sums, compounding and the proportional spread.
-  const score = drivers.map((t) => Number(t.normalized_score ?? 0));
+  const score = drivers.map((d) => Number(d.normalized_score ?? 0));
   const A: number[][][] = drivers.map((_, j) => {
     const f = fidx[j];
     const k = fw[f] * att[f] * score[j];
@@ -281,7 +281,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   });
 
   const byDriver: Record<string, DriverAttribution> = {};
-  drivers.forEach((t, j) => {
+  drivers.forEach((d, j) => {
     const portfolio: Record<number, number> = {};
     const category: Record<string, Record<number, number>> = {};
     years.forEach((yr, y) => {
@@ -301,7 +301,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
       });
       category[cat] = row;
     });
-    byDriver[t.id] = { portfolio, category, approximate: mats[j].approximate };
+    byDriver[d.id] = { portfolio, category, approximate: mats[j].approximate };
   });
 
   const categoryShift: Record<string, Record<number, number>> = {};

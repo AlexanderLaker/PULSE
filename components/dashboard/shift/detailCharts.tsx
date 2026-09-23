@@ -13,9 +13,6 @@ import { FORCE_COLORS, YEARS, fmtShift, fmtPct } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import type { ForceName, ShiftPath } from '@/types';
 
-export const HORIZON_START = YEARS[0];
-export const HORIZON_END = YEARS[YEARS.length - 1];
-
 // ─── Section: card with an uppercase header ────────────────────────────────
 
 interface SectionProps {

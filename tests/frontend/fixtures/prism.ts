@@ -117,7 +117,7 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
     },
     run_meta: {
       run_id: 99, run_date: '2026-09-13T23:04:39+00:00', iterations: 50000, seed: 42, chain_seeds: [42, 1000045, 2000048],
-      chains: 3, model_version: '2.12.0', engine_name: 'bayesian_copula', numerics_backend: 'scipy 1.17.1 · numpy 2.4.6',
+      chains: 3, model_version: '2.12.0', engine_name: 'beta_copula', numerics_backend: 'scipy 1.17.1 · numpy 2.4.6',
       driver_count: 51, attenuation_source: 'overlap-correction-2026-09', persisted_at_utc: '2026-09-13T23:04:39+00:00',
     },
     inputs_since_run: { changed: [], added: [], removed: [] },

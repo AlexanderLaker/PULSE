@@ -11,7 +11,16 @@ import type { JourneyTile } from '@/data/consumerJourney';
 import type { Driver } from '@/types';
 import { S, SHADOW, HEADLINE_FONT } from '@/lib/theme';
 import { citedDrivers, type Side } from './shared';
-import { DriverForceCard, StepDot } from './tiles';
+import { DriverForceCard } from './tiles';
+
+/** The numbered dot of a step. */
+const StepDot: FC<{ n: number }> = ({ n }) => (
+  <span style={{
+    position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: 999,
+    backgroundColor: S.primary, color: S.onPrimary, fontFamily: HEADLINE_FONT, fontWeight: 800,
+    fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
+  }}>{n}</span>
+);
 
 export const WhyChain: FC<{
   tile: JourneyTile;

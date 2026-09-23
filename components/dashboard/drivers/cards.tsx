@@ -1,15 +1,12 @@
 /**
  * The Drivers page's chips and labels: the per-field help of the section
  * cards, the meta and Edited chips, the source item with its credibility
- * tier, and the small labels the panels share. The section card itself is
+ * tier and publishing host, and the small labels the panels share. The section card itself is
  * shared with the Settings sheet (components/dashboard/SectionCard.tsx).
  */
 import React, { type FC } from 'react';
-import {
-  TrendingUp, FileText, BarChart3, Newspaper, Globe, ExternalLink, AlertTriangle,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { CATEGORIES, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
+import { FileText, ExternalLink, AlertTriangle } from 'lucide-react';
+import { CATEGORIES, FIRST_YEAR, HORIZON, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import { VC_STEPS, epicentreOf } from '@/lib/valueChain';
@@ -18,38 +15,23 @@ import type { Driver, DriverScores, DriverSource, ExposureMap, SourceTier } from
 import { curveLabel, uncLabel } from './shared';
 import { BaselineMark } from './scales';
 
-// ─── Source kind, read from the link (display only) ───────────────
-type SourceKind =
-  | 'EUR-Lex' | 'ECHA' | 'SEC EDGAR' | 'Google Trends' | 'Reddit' | 'YouTube'
-  | 'Semantic Scholar' | 'GDELT' | 'Consulting' | 'Trade Press' | 'Press';
-
-function classifySource(url: string): SourceKind {
-  const u = url.toLowerCase();
-  if (u.includes('eur-lex') || u.includes('europa.eu')) return 'EUR-Lex';
-  if (u.includes('echa')) return 'ECHA';
-  if (u.includes('sec.gov') || u.includes('edgar')) return 'SEC EDGAR';
-  if (u.includes('trends.google')) return 'Google Trends';
-  if (u.includes('reddit')) return 'Reddit';
-  if (u.includes('youtube')) return 'YouTube';
-  if (u.includes('scholar') || u.includes('doi.org') || u.includes('nature.com') || u.includes('pubmed')) return 'Semantic Scholar';
-  if (u.includes('gdelt')) return 'GDELT';
-  if (u.includes('mckinsey') || u.includes('bain') || u.includes('bcg')) return 'Consulting';
-  if (u.includes('cosmetics') || u.includes('happi') || u.includes('retaildetail') || u.includes('grocery') || u.includes('packaging')) return 'Trade Press';
-  return 'Press';
+// ─── Where a source is published ──────────────────────────────────
+/** A source link's host without "www." ("eur-lex.europa.eu"), shown under its
+ *  title; null for a link that is not a URL. */
+export function sourceHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || null;
+  } catch {
+    return null;
+  }
 }
-
-const SOURCE_ICON: Record<SourceKind, LucideIcon> = {
-  GDELT: Globe, 'Google Trends': TrendingUp, ECHA: AlertTriangle, 'EUR-Lex': FileText,
-  'SEC EDGAR': BarChart3, Reddit: Globe, YouTube: Globe, 'Semantic Scholar': FileText,
-  Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
-};
 
 // ─── Per-field help, shown by the info tips on the section cards ─
 export const FIELD_HELP = {
   probability: 'Likelihood this driver materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The 1–5 score sets a Beta prior whose MEAN is score/6, deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five in six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (6 for an unscored driver), sampled by the Monte Carlo.',
   uncertainty: `How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (${UNCERTAINTY_KAPPA.join('/')}; the mean stays probability/6) and the peak-year jitter (${UNCERTAINTY_PEAK_JITTER.join('/')} years). Unscored: concentration 6 and the model-wide ±1-year jitter.`,
   gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this driver can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
-  timing: 'When the driver reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
+  timing: `When the driver reaches full impact (Peak Year) and the shape of how it builds toward that peak over ${FIRST_YEAR}–${HORIZON} (Diffusion Curve).`,
   category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored: a cell you leave blank is not part of your proposal.',
   regional: 'How strongly this driver plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
   vc: 'The stage of the value chain, from raw materials through to the consumer, where this driver’s impact centres (its epicentre). One stage per driver: the value-chain attribution assigns the driver’s whole contribution to this stage, which is stored as a profile around it (5 at the stage, 3 one stage away, 1 two stages away).',
@@ -86,8 +68,7 @@ export const TIER_OPTIONS = Object.keys(TIER_CONFIG) as SourceTier[];
 
 // ─── Source item ──────────────────────────────────────────────────
 export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
-  const kind = classifySource(src.url);
-  const Icon = SOURCE_ICON[kind];
+  const caption = [sourceHost(src.url), src.note].filter(Boolean).join(' · ');
   const tier = src.tier ? TIER_CONFIG[src.tier] : undefined;
   return (
     <a
@@ -108,7 +89,7 @@ export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: S.surface, color: S.primary,
       }}>
-        <Icon size={14} />
+        <FileText size={14} />
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
@@ -139,7 +120,7 @@ export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
         <span style={{
           display: 'block', fontSize: 11, color: S.mutedText, marginTop: 2,
         }}>
-          {kind}{src.note ? ` · ${src.note}` : ''}
+          {caption}
         </span>
       </span>
       <ExternalLink size={12} style={{ color: S.mutedText, marginTop: 4 }} />

@@ -6,8 +6,9 @@
   and the migration's tests may name them.
 - No tracked file is executable: the scripts are run as python3 or bash
   scripts/<name>, as the documents show.
-- The dashboard's colours and shadows come from lib/theme.ts (and the shift
-  colours from lib/format.ts): a literal colour anywhere else in its code is
+- The dashboard's colours and shadows come from lib/theme.ts (and the force
+  and category palettes from lib/format.ts): a literal colour anywhere else in
+  its code, a named one or a class of Tailwind's own palette included, is
   either a token that is missing or a copy that will drift.
 """
 import re
@@ -31,8 +32,8 @@ PREVIOUS_NAMES = re.compile("|".join(
     if line.strip() and not line.startswith("#")))
 MAY_NAME_THE_PREVIOUS_RELEASE = ("migrations/0001_driver_schema/", "tests/test_migration.py")
 
-#: Where the dashboard's code may write a colour: the theme, the shift colours,
-#: and three palettes that belong to a single view.
+#: Where the dashboard's code may write a colour: the theme, the force and
+#: category palettes, and three palettes that belong to a single view.
 COLOUR_HOMES = {
     "lib/theme.ts",
     "lib/format.ts",
@@ -40,7 +41,15 @@ COLOUR_HOMES = {
     "components/dashboard/drivers/cards.tsx",      # the source-grade chips
     "components/dashboard/explorer/PoolChart.tsx",  # the mekko's bar fills
 }
-LITERAL_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}(?=['\"`;\s])|rgba?\(\s*\d")
+LITERAL_COLOUR = re.compile(
+    r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}(?=['\"`;\s])|rgba?\(\s*\d"
+    # a named colour as a style value
+    r"|(?:color|background|backgroundColor|fill|stroke|borderColor)\s*:\s*['\"]?(?:white|black)\b"
+    # Tailwind's own palette instead of the theme's tokens (bg-white, text-slate-500, hover:bg-black/5)
+    r"|(?<![\w-])(?:bg|text|border|ring|fill|stroke|from|via|to|outline|divide|decoration|placeholder|accent|caret)"
+    r"-(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky"
+    r"|blue|indigo|violet|purple|fuchsia|pink|rose)(?![\w])"
+)
 
 
 def text_files() -> list:

@@ -11,19 +11,19 @@
  *   - Below FLAT_EPS a shift counts as flat: no sign, no arrow, no colour.
  */
 import type { ForceName } from '@/types';
+import { CONTRACTION_RGB, EXPANSION_RGB, S } from '@/lib/theme';
 
 // ── Shift colours ───────────────────────────────────────────────────────────
+// The pair is the theme's (lib/theme.ts), so a surface and a number in the
+// same hue never drift apart. Tints with their own alpha use the theme's
+// channels: `rgba(${EXPANSION_RGB}, 0.2)`.
 
-export const EXPANSION = '#1f7a3d';
-export const CONTRACTION = '#9f403d';
-export const NEUTRAL = '#64748b';
+export const EXPANSION = S.expansion;
+export const CONTRACTION = S.contraction;
+const NEUTRAL = S.mutedText;
 
 /** A light expansion tint for badges (the Reviewed pill). */
-export const EXPANSION_SOFT = 'rgba(31, 122, 61, 0.10)';
-
-/** RGB channels of the pair, for tints with their own alpha: `rgba(${EXPANSION_RGB}, 0.2)`. */
-export const EXPANSION_RGB = '31, 122, 61';
-export const CONTRACTION_RGB = '159, 64, 61';
+export const EXPANSION_SOFT = `rgba(${EXPANSION_RGB}, 0.10)`;
 
 /** Below this absolute shift a value is flat. */
 export const FLAT_EPS = 0.0005;
@@ -63,7 +63,7 @@ export interface CategoryDefinition {
 
 /** The 13 categories in the engine's order (prism/config.py CATEGORIES). */
 export const CATEGORIES: CategoryDefinition[] = [
-  { name: 'Hair: Color',   label: 'Colour',               short: 'Color',   group: 'Hair', color: '#b0504a' },
+  { name: 'Hair: Color',   label: 'Colour',               short: 'Colour',  group: 'Hair', color: '#b0504a' },
   { name: 'Hair: Care',    label: 'Care',                 short: 'Care',    group: 'Hair', color: '#b07d2b' },
   { name: 'Hair: Styling', label: 'Styling',              short: 'Styling', group: 'Hair', color: '#c79a3a' },
   { name: 'Hair: Body',    label: 'Body',                 short: 'Body',    group: 'Hair', color: '#6f9c3a' },
@@ -95,9 +95,12 @@ export function groupDisplay(group: string | null | undefined): string {
   return group === 'LHC' ? 'Laundry & Home Care' : group;
 }
 
-/** "Hair: Color" -> "Color". */
+/** The short label of a category key ("Hair: Color" -> "Colour", "LHC: FCN" -> "FCN"); an
+ *  unknown key loses its group prefix. */
 export function shortCat(cat: string | null | undefined): string {
   if (!cat) return '';
+  const known = CATEGORY_BY_NAME[cat]?.short;
+  if (known) return known;
   const parts = cat.split(':');
   return parts.length > 1 ? (parts[1]?.trim() ?? cat) : cat;
 }
@@ -107,6 +110,9 @@ export const BASE_YEAR = 2025;
 
 /** The path years (prism/config.py DEFAULT_PATH_YEARS): the ten-year horizon. */
 export const YEARS: number[] = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+/** The first path year, and the last: the horizon every headline quotes. */
+export const FIRST_YEAR = YEARS[0]!;
+export const HORIZON = YEARS[YEARS.length - 1]!;
 
 /** The earliest peak year a driver may take: the year after its onset (the
  *  later of the base year and its start year), as the API requires. */
@@ -204,8 +210,8 @@ export function shiftArrow(v: number | null | undefined): string {
 // text keeps at least 5:1 contrast; flat and missing cells take the surface
 // colour, so a near-zero cell reads as blank rather than faintly tinted.
 
-const HEAT_SURFACE = '#eff4ff';
-const HEAT_NEUTRAL_TEXT = '#26619d';
+const HEAT_SURFACE = S.surfaceLow;
+const HEAT_NEUTRAL_TEXT = S.onSurfaceVariant;
 
 export function heatFill(v: number | null | undefined, scale = 0.05): string {
   if (v == null || !isFinite(v) || Math.abs(v) < FLAT_EPS) return HEAT_SURFACE;
@@ -217,7 +223,7 @@ export function heatFill(v: number | null | undefined, scale = 0.05): string {
 /** Text over a heatFill cell: the dark ink of the shift's hue. */
 export function heatText(v: number | null | undefined): string {
   if (v == null || !isFinite(v) || Math.abs(v) < FLAT_EPS) return HEAT_NEUTRAL_TEXT;
-  return v > 0 ? '#0f5132' : '#6a2a27';
+  return v > 0 ? S.expansionInk : S.contractionInk;
 }
 
 /**

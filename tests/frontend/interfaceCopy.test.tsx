@@ -5,9 +5,9 @@
  *   1. The modelled item is a driver ("Profit Pool Drivers" in full, "Drivers"
  *      in menus and headers). A static sweep over every string literal,
  *      template chunk and JSX text of the interface code (app/, components/,
- *      hooks/, lib/, api/) finds no "trend" or "trends", apart from
- *      third-party names. The authored journey content may use the word in
- *      its ordinary sense (a fashion trend), so data/ is not swept.
+ *      hooks/, lib/, api/) finds no "trend" or "trends". The authored journey
+ *      content may use the word in its ordinary sense (a fashion trend), so
+ *      data/ is not swept.
  *   2. No em dash in any dashboard source, content, copy or comment.
  *   3. Render checks on the entry gate and the Drivers page: the labels are
  *      there and no readable text or accessible attribute says trend.
@@ -25,11 +25,6 @@ const COPY_DIRS = ['app', 'components', 'hooks', 'lib', 'api'];
 const WORD = /\btrends?\b/i;
 const EM_DASH = String.fromCharCode(0x2014);
 
-/** Whole string literals that may contain the word: third-party names only. */
-const ALLOWED: RegExp[] = [
-  /^trends\.google$/,   // source-domain detection
-  /^Google Trends$/,    // a third-party product
-];
 
 function sourceFiles(dirs: string[]): string[] {
   const out: string[] = [];
@@ -62,7 +57,7 @@ function trendStrings(file: string, src = fs.readFileSync(file, 'utf8')): string
     } else if (ts.isJsxText(node)) {
       text = node.getText();
     }
-    if (text !== null && WORD.test(text) && !ALLOWED.some((re) => re.test(text!.trim()))) {
+    if (text !== null && WORD.test(text)) {
       const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
       hits.push(`${path.relative(REPO, file)}:${line + 1} ${JSON.stringify(text.trim().slice(0, 120))}`);
     }

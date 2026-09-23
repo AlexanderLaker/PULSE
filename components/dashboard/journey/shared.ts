@@ -1,16 +1,17 @@
 /**
- * What the Consumer Journey's parts share: the tile types and grades as
- * chips and tints, the state types of the board and the editor, the ordering
- * of tiles within a stage, and the drivers a tile cites, resolved to the live
- * drivers.
+ * What the Consumer Journey's parts share: the force colours, the tile types
+ * and grades as chips and tints, the state types of the board and the
+ * editor, the month an edit stamps, a tile's display name, the ordering of
+ * tiles within a stage and a stage's width, the words for intensity, and the
+ * drivers a tile cites, resolved to the live drivers.
  */
 import type {
   JourneyKey, JourneyStageDef, JourneyTile, TileType, PoolImpactGrade, ProvenanceGrade,
 } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP, type DriverCodeInfo } from '@/data/driverCodeMap';
 import type { Driver, ForceName } from '@/types';
-import { S } from '@/lib/theme';
-import { FORCE_COLORS, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
+import { S, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/theme';
+import { FORCE_COLORS } from '@/lib/format';
 import type { ChipKind } from '@/components/dashboard/Chip';
 
 /** Force chips use the one force palette of lib/format, so a force has the same colour on every tab. */
@@ -29,11 +30,11 @@ export const GRADE_CHIP: Record<ProvenanceGrade, { kind: ChipKind; label: string
   hypothesis: { kind: 'neutral', label: 'Hypothesis' },
 };
 
-/** The month an edit stamps on a tile, YYYY-MM. */
-export const CURRENT_YYYYMM = (() => {
+/** The month an edit stamps on a tile, YYYY-MM, read when it is saved. */
+export const currentMonth = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-})();
+};
 
 /** The side of a stage a tile sits on: tailwind (benefiting) or headwind (negativelyImpacted). */
 export type Side = 'benefiting' | 'negativelyImpacted';
@@ -67,6 +68,11 @@ export interface CitedDriver {
   info: DriverCodeInfo;
   live: Driver | undefined;
 }
+
+/** A Strategist Read with escaped paragraph breaks ("\\n") written out. A text
+ *  an admin saved before migration 0001 may still carry them; the reader and
+ *  the editor show it with real breaks, and the editor saves it that way. */
+export const unescapeBreaks = (text: string): string => text.replace(/\\n/g, '\n');
 
 /** A tile's name without a trailing parenthetical; the full name stays in the content and in the tooltip. */
 export const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();

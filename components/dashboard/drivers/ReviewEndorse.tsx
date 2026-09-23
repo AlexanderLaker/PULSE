@@ -9,10 +9,8 @@ import {
   Users, Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Check, MessageSquare,
 } from 'lucide-react';
 import { ApiError } from '@/lib/apiClient';
-import {
-  CATEGORIES, EXPANSION_RGB, NO_VALUE, REGIONS, YEARS, firstPeakYear, fmtPct, shortCat,
-} from '@/lib/format';
-import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { CATEGORIES, HORIZON, NO_VALUE, REGIONS, firstPeakYear, fmtPct, shortCat } from '@/lib/format';
+import { S, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, ProposalAgg } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -23,7 +21,6 @@ import { BaselineMark, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadD
 import { FIELD_HELP, FieldLabel, ProposalsUnavailable, Val } from './cards';
 import { useDriverProposals } from './useDriverProposals';
 
-const HORIZON = YEARS[YEARS.length - 1]!;
 
 // ── Mini 0–100% bar (the GP1 % comparison) ──
 const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (

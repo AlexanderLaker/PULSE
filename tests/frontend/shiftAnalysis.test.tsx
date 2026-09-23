@@ -170,6 +170,9 @@ describe('About this model', () => {
     expect(screen.getByText('estimated HCB mix, not Henkel P&L (52 cells)')).toBeTruthy();
     expect(screen.getByText('0.010 pp spread across 3 seeds (2035 portfolio median)')).toBeTruthy();
     expect(screen.getByText('at most 0.001 pp (2035 category medians)')).toBeTruthy();
+    // and the page says it next to the numbers, not only in the footer
+    expect(screen.getByTestId('estimate-note').textContent).toContain('estimated HCB gross-profit mix');
+    expect(screen.getByTestId('estimate-note').textContent).toContain('not Henkel P&L');
   });
 
   it("names a weights file by its own label, whatever its numbers", () => {
@@ -184,6 +187,7 @@ describe('About this model', () => {
     expect(screen.getByText('from the file given to the run (52 cells)')).toBeTruthy();
     expect(screen.getByText('Finance GP1 shares FY2025')).toBeTruthy();
     expect(screen.queryByText(/estimated HCB mix/)).toBeNull();
+    expect(screen.queryByTestId('estimate-note')).toBeNull();
   });
 
   it('reads the basis from the label the run stored, not from matching numbers', () => {

@@ -13,6 +13,7 @@ import {
   ForbiddenError, UnauthorizedError,
 } from '@/lib/roles';
 import { getSQL } from '@/lib/db';
+import { recordRoleChange } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,23 +61,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
     await setRole(targetUserId, nextRole);
 
-    // Best effort: the role change stands even if the audit entry fails.
-    try {
-      await sql`
-        INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id)
-        VALUES (
-          'role_change',
-          'user',
-          ${targetUserId},
-          ${existing ?? 'null'},
-          ${nextRole},
-          'via /api/users/[userId]/role',
-          ${admin.clerkUserId}
-        )
-      `;
-    } catch (auditErr) {
-      console.warn('[/api/users/:id/role] audit write failed:', auditErr);
-    }
+    await recordRoleChange({
+      userId: targetUserId, from: existing, to: nextRole, via: 'via /api/users/[userId]/role',
+      actor: admin.clerkUserId,
+    });
 
     return NextResponse.json({ role: nextRole });
   } catch (err) {

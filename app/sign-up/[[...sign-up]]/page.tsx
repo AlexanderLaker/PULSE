@@ -19,8 +19,7 @@
 import Link from 'next/link';
 import { useState, useSyncExternalStore, type FormEvent } from 'react';
 import { SignUp } from '@clerk/nextjs';
-import { S, SHADOW, PRIMARY_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { CONTRACTION_RGB } from '@/lib/format';
+import { S, SHADOW, PRIMARY_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 // NEXT_PUBLIC_* variables are baked into the client bundle at build time.
 const REQUIRED_CODE =

@@ -8,7 +8,7 @@
  * baseline. Admins edit a driver in its expanded Driver List panel. The PRISM
  * Analysis card is read-only for every role.
  *
- * Visual language: Maritime tonal layering rather than borders, Manrope
+ * Visual language: tonal layering rather than borders, Manrope
  * headlines over Inter body text, pill filter chips, a force icon tile on
  * every row, dot scales for probability and exposure.
  */
@@ -19,7 +19,7 @@ import React, { useMemo, useState, useCallback, type FC } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Layers, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Info } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import { CATEGORIES } from '@/lib/format';
+import { CATEGORIES, HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal } from '@/types';
 import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './drivers/shared';
@@ -241,7 +241,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
               style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}
             >
               {drivers.length ? `The ${drivers.length} Profit Pool Drivers` : 'The Profit Pool Drivers'} behind each category&apos;s
-              shift to 2035.
+              shift to {HORIZON}.
             </p>
           </div>
 

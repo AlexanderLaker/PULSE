@@ -4,7 +4,8 @@
  * A banner under the navigation while the service answers but its database
  * cannot be used: while it awaits a schema migration, on a deployment
  * without a database URL, or when the database cannot be reached. The views
- * below it then show their empty states; this says why, once, for all of them.
+ * below keep what they last loaded (on a first visit they have nothing to
+ * show); this says why, once, for all of them.
  */
 import type { FC } from 'react';
 import { AlertTriangle } from 'lucide-react';
@@ -14,7 +15,7 @@ import type { DatabaseFailure } from '@/types';
 
 export const SERVICE_NOTICES: Record<DatabaseFailure, string> = {
   migration_pending:
-    'PRISM is being updated: its database is moving to the current schema. The drivers and the run return as soon as the update has finished.',
+    'PRISM is being updated: its database is moving to the current schema. The dashboard loads the drivers and the run again by itself as soon as the update has finished.',
   no_database:
     'This deployment has no database configured, so there is nothing to show. An administrator sets DATABASE_URL in the Vercel project settings.',
   db_error:

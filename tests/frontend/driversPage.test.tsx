@@ -6,6 +6,7 @@
  *   - A drill-through replaces the search and clears the category filter,
  *     every time, even for the same driver twice.
  *   - A list that failed to load says so instead of "no drivers match".
+ *   - A source names the host it is published on.
  *   - The Expert Rating panel cannot be edited before the expert's stored
  *     proposal has loaded (a save from a blank draft would overwrite it); its
  *     saves go out one at a time with the newest draft; a field clicked again
@@ -31,6 +32,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 
 import Drivers from '@/components/dashboard/Drivers';
 import { ExpertInputPanel } from '@/components/dashboard/drivers/ExpertRating';
+import { sourceHost } from '@/components/dashboard/drivers/cards';
 
 // framer-motion restores the scroll position after measuring an expanded panel.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
@@ -77,6 +79,14 @@ describe('a drill-through from another view', () => {
     rerender(<Drivers search={{ query: 'GLP-1', seq: 2 }} />);
     expect((screen.getByPlaceholderText('Search drivers…') as HTMLInputElement).value).toBe('GLP-1');
     expect(rows().some((t) => t?.includes('GLP-1'))).toBe(true);
+  });
+});
+
+describe('a source', () => {
+  it('names the host it is published on, without guessing what kind of source it is', () => {
+    expect(sourceHost('https://www.eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1781')).toBe('eur-lex.europa.eu');
+    expect(sourceHost('https://pubmed.ncbi.nlm.nih.gov/?term=semaglutide')).toBe('pubmed.ncbi.nlm.nih.gov');
+    expect(sourceHost('not a link')).toBeNull();
   });
 });
 

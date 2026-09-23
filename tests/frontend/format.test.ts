@@ -114,7 +114,9 @@ describe('taxonomy', () => {
     expect(categoryDisplay('LHC: FCN')).toBe('Fabric Clean');
     expect(categoryDisplay('Unknown')).toBe('Unknown');
     expect(groupDisplay('LHC')).toBe('Laundry & Home Care');
-    expect(shortCat('Hair: Color')).toBe('Color');
+    expect(shortCat('Hair: Color')).toBe('Colour');
+    expect(shortCat('LHC: FCN')).toBe('FCN');
+    expect(shortCat('Other: Thing')).toBe('Thing');
   });
 });
 

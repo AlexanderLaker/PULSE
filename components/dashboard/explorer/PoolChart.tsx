@@ -11,7 +11,6 @@ import {
 } from '@/lib/profitPoolData';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { arrowColorFor, ArrowsSVG } from './arrows';
-import { MiniMetric } from './DetailPanel';
 
 const BAR_FILL = 'rgba(214, 227, 255, 0.85)';
 const BAR_FILL_ACTIVE = 'rgba(178, 205, 255, 0.95)';
@@ -24,6 +23,18 @@ const BAR_STROKE = S.primaryDim;
 const DECOR_MIN_W = 26;
 
 // ─── Hover tooltip (slim: the click carries the depth) ───────────
+/** One figure of the hover card, with its label above. */
+const MiniMetric: FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div>
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 1 }}>
+      {label}
+    </div>
+    <div style={{ fontSize: 13, fontWeight: 800, color: S.onBg, fontFamily: HEADLINE_FONT, fontVariantNumeric: 'tabular-nums' }}>
+      {value}
+    </div>
+  </div>
+);
+
 export const HoverTip: FC<{ item: SlideItem; slide: ProfitPoolSlide; x: number; y: number }> = ({
   item, slide, x, y,
 }) => {

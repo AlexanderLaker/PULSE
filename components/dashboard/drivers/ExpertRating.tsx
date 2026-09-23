@@ -8,7 +8,7 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
 } from 'lucide-react';
 import { saveMyProposal } from '@/lib/apiClient';
-import { NO_VALUE, YEARS, firstPeakYear, fmtPct } from '@/lib/format';
+import { HORIZON, NO_VALUE, firstPeakYear, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverProposal } from '@/types';
@@ -22,7 +22,6 @@ import { BaselineRef, FIELD_HELP, FieldLabel, ProposalsUnavailable, SourceItem }
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
 import { queueProposalSave, useDriverProposals } from './useDriverProposals';
 
-const HORIZON = YEARS[YEARS.length - 1]!;
 
 /** A year field for the Expert Rating: the proposal takes the value only while
  *  it is a whole year from `min` (the year after the driver's onset) to the

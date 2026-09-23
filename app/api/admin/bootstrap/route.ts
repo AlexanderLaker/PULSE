@@ -19,6 +19,8 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSQL } from '@/lib/db';
 import { ensureUserRolesTable } from '@/lib/roles';
+import { recordRoleChange } from '@/lib/audit';
+import type { Role } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
       FROM user_roles
      WHERE lower(email) = ${email}
      LIMIT 1
-  `) as Array<{ clerk_user_id: string; role: string }>;
+  `) as Array<{ clerk_user_id: string; role: Role }>;
 
   if (rows.length === 0) {
     return NextResponse.json(
@@ -92,23 +94,10 @@ export async function POST(req: Request) {
      WHERE clerk_user_id = ${clerkUserId}
   `;
 
-  // Best effort: the promotion stands even if the audit entry fails.
-  try {
-    await sql`
-      INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id)
-      VALUES (
-        'role_change',
-        'user',
-        ${clerkUserId},
-        ${previousRole},
-        'admin',
-        'via /api/admin/bootstrap (shared-secret)',
-        'bootstrap'
-      )
-    `;
-  } catch (auditErr) {
-    console.warn('[/api/admin/bootstrap] audit write failed:', auditErr);
-  }
+  await recordRoleChange({
+    userId: clerkUserId, from: previousRole, to: 'admin',
+    via: 'via /api/admin/bootstrap (shared-secret)', actor: 'bootstrap',
+  });
 
   return NextResponse.json({
     clerkUserId,

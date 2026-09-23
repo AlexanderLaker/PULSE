@@ -12,9 +12,6 @@ const BACKEND_URL = process.env.PRISM_BACKEND_URL || 'http://127.0.0.1:8000';
 
 const nextConfig = {
   reactStrictMode: true,
-  images: {
-    unoptimized: true,
-  },
   async rewrites() {
     if (process.env.NODE_ENV === 'production') return [];
     return [{ source: '/api/v1/:path*', destination: `${BACKEND_URL}/api/v1/:path*` }];

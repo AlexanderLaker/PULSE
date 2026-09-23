@@ -42,7 +42,6 @@ export interface MatrixRow {
 export const ROWS: MatrixRow[] = CATEGORIES.map((c) => ({
   id: c.name, label: c.label, code: c.code, group: groupDisplay(c.group),
 }));
-export const HORIZON = YEARS[YEARS.length - 1];
 
 /** category -> column -> value; null where the run has none. */
 export type CellMap = Record<string, Record<string, number | null>>;

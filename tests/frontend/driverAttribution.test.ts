@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  computeDriverAttribution, computeMaterializationSchedule, expectedMaterialisation,
+  computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
   peakJitterFor,
 } from '@/lib/driverAttribution';
 import { BASE_YEAR, YEARS } from '@/lib/format';
@@ -120,7 +120,7 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
     expect(late[2028]).toBe(0);
     expect(late[2029]).toBe(0.1429);
     expect(late[2034]).toBe(0.8571);
-    const m = expectedMaterialisation(
+    const m = expectedMaterialization(
       { id: 'x', force: 'Consumer', normalized_score: 0.1, category_exposure: {}, uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 },
       YEARS, BASE_YEAR, 1,
     );

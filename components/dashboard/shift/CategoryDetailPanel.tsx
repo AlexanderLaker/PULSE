@@ -18,7 +18,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Activity, Zap, Layers, LineChart, Globe } from 'lucide-react';
 import {
-  CATEGORIES, CATEGORY_NAMES, FLAT_EPS, fmtShift, fmtPct, categoryDisplay, groupDisplay,
+  CATEGORIES, CATEGORY_NAMES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay,
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
@@ -26,7 +26,7 @@ import { computeDriverAttribution } from '@/lib/driverAttribution';
 import useOverlay from '@/hooks/useOverlay';
 import type { Driver, ModelConfig, SimulationResult } from '@/types';
 import {
-  ForceDecomposition, HORIZON_END, HORIZON_START, MiniPathChart, RegionalDecomposition,
+  ForceDecomposition, MiniPathChart, RegionalDecomposition,
   type RegionalRow, Section,
 } from './detailCharts';
 import { DriverCard, rankContributors } from './contributors';
@@ -76,11 +76,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     ? computeDriverAttribution({ drivers, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
     : null), [drivers, config, simulation.cell_weights_used]);
 
-  const shiftEnd = path[String(HORIZON_END)].median;
-  const shiftStart = path[String(HORIZON_START)].median;
+  const shiftEnd = path[String(HORIZON)].median;
+  const shiftStart = path[String(FIRST_YEAR)].median;
   const velocity = shiftEnd - shiftStart;
   // The change in the final year, per iteration (the run's velocity band).
-  const lastYearChange = simulation.velocity[category]?.[String(HORIZON_END)];
+  const lastYearChange = simulation.velocity[category]?.[String(HORIZON)];
 
   const contributors = useMemo(
     () => rankContributors(category, drivers, attribution, shiftEnd),
@@ -288,7 +288,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontFamily: HEADLINE_FONT,
                 }}
               >
-                {HORIZON_END} Shift
+                {HORIZON} Shift
               </div>
               <div
                 style={{
@@ -315,7 +315,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                 showMomentumHelp(e);
               }}
               tabIndex={0}
-              aria-label={`Momentum: ${momentum.msg}, ${momentum.pts} between ${HORIZON_START} and ${HORIZON_END}`}
+              aria-label={`Momentum: ${momentum.msg}, ${momentum.pts} between ${FIRST_YEAR} and ${HORIZON}`}
               style={{
                 position: 'relative',
                 padding: '12px 14px',
@@ -351,7 +351,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               </div>
               <div style={{ marginTop: 3, fontSize: 11, fontWeight: 600, color: momentum.color, fontFamily: BODY_FONT, lineHeight: 1.25 }}>
                 {momentum.msg}{' '}
-                <span style={{ color: S.mutedText, fontWeight: 400 }}>· {HORIZON_START} → {HORIZON_END}</span>
+                <span style={{ color: S.mutedText, fontWeight: 400 }}>· {FIRST_YEAR} → {HORIZON}</span>
               </div>
             </div>
 
@@ -402,7 +402,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
             <Section
-              title={`Shift Path · ${HORIZON_START}–${HORIZON_END}`}
+              title={`Shift Path · ${FIRST_YEAR}–${HORIZON}`}
               icon={LineChart}
               trailing={
                 <span
@@ -536,7 +536,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               size={10}
               style={{ display: 'inline', verticalAlign: -1, marginRight: 4 }}
             />
-            Shifts are cumulative vs 2025 from the Bayesian MC engine. Force shares sum to
+            Shifts are cumulative vs 2025 from the Monte Carlo engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
             {contributors.length > 0 && (attribution
               ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'
@@ -589,7 +589,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </div>
           {lastYearChange && (
             <div style={{ marginTop: 6, lineHeight: 1.5, opacity: 0.92 }}>
-              Change in {HORIZON_END} alone: median {pt(lastYearChange.median)}, 80% of iterations between{' '}
+              Change in {HORIZON} alone: median {pt(lastYearChange.median)}, 80% of iterations between{' '}
               {pt(lastYearChange.p10)} and {pt(lastYearChange.p90)}.
             </div>
           )}

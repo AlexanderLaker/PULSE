@@ -66,7 +66,6 @@ export interface Driver extends DriverScores {
  */
 export interface DriverUpdate {
   revision: number;
-  name?: string;
   description?: string;
   direction?: Direction;
   probability?: number;

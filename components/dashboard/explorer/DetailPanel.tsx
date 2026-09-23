@@ -17,17 +17,6 @@ import { NO_VALUE } from '@/lib/format';
 import { arrowColorFor, fmtEurBn, fmtShare } from './arrows';
 import { GradeChip, SourceChip, sourceParts, taggedSources } from './sources';
 
-export const MiniMetric: FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div>
-    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: S.onSurfaceVariant, marginBottom: 1 }}>
-      {label}
-    </div>
-    <div style={{ fontSize: 13, fontWeight: 800, color: S.onBg, fontFamily: HEADLINE_FONT, fontVariantNumeric: 'tabular-nums' }}>
-      {value}
-    </div>
-  </div>
-);
-
 export const DetailPanel: FC<{
   slide: ProfitPoolSlide;
   item: SlideItem;

@@ -54,7 +54,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           <Info size={14} style={{ color: S.primary }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT }}>About this model</span>
           <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
-            Bayesian Monte Carlo · {run
+            Monte Carlo with Beta priors · {run
               ? `${run.iterations.toLocaleString('en-US')} iterations × ${run.chains} chains · ${run.driver_count} drivers · `
               : ''}run details &amp; methodology
           </span>
@@ -169,7 +169,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           </ul>
           <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
             <span style={{ fontWeight: 600, color: S.onSurfaceVariant }}>Methodology:</span>{' '}
-            All cell values in this matrix are produced by the Bayesian Monte Carlo engine
+            All cell values in this matrix are produced by the Monte Carlo engine
             {run ? (
               <>
                 {' '}(<code style={{ fontFamily: MONO_FONT }}>{run.engine_name}</code>,{' '}

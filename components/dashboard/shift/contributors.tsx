@@ -6,11 +6,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
-import { FORCE_COLORS, NO_VALUE, fmtShift, fmtPct } from '@/lib/format';
+import { FORCE_COLORS, HORIZON, NO_VALUE, fmtShift, fmtPct } from '@/lib/format';
 import { S, SHADOW, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import type { AttributionResult } from '@/lib/driverAttribution';
 import type { Driver } from '@/types';
-import { HORIZON_END } from './detailCharts';
 
 // ─── Contributing drivers ──────────────────────────────────────────────────
 
@@ -37,7 +36,7 @@ export function rankContributors(
 ): Contributor[] {
   const exposed = drivers.filter((d) => (d.category_exposure[category] ?? 0) > 0);
   const raw = exposed.map((d) => (attribution
-    ? attribution.byDriver[d.id].category[category][HORIZON_END]
+    ? attribution.byDriver[d.id].category[category][HORIZON]
     : d.normalized_score * (Math.min(5, d.category_exposure[category]) / 5)));
   const rawTotal = raw.reduce((a, b) => a + b, 0);
   const scale = Math.abs(rawTotal) > 1e-9 && Math.abs(median) > 1e-9 ? median / rawTotal : 1;

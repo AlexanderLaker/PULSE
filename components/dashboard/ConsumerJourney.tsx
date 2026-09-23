@@ -27,10 +27,9 @@ import { ApiError, getJourneyContent, saveJourneyContent } from '@/lib/apiClient
 import {
   LHC_JOURNEY, HAIR_JOURNEY, type JourneyContent, type JourneyKey, type JourneyTile, type TileType,
 } from '@/data/consumerJourney';
-import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
+import { S, SHADOW, EXPANSION_RGB, CONTRACTION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
-  type ContentOrigin, CURRENT_YYYYMM, displayTileName, type SaveState, type SelectedTile,
+  type ContentOrigin, currentMonth, displayTileName, type SaveState, type SelectedTile,
   type Side, sortTilesForDisplay, stageSpan, type TileEdits, TYPE_STYLES,
 } from './journey/shared';
 import { JourneySwitch, StageRollup, TilePill, TypeChip } from './journey/tiles';
@@ -168,7 +167,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       driverNote: edits.driverNote,
       driverCodes: edits.driverCodes,
       analysis: edits.analysis.trim() ? edits.analysis : sel.tile.analysis,
-      provenance: { ...sel.tile.provenance, date: CURRENT_YYYYMM },   // an edit re-dates the tile
+      provenance: { ...sel.tile.provenance, date: currentMonth() },   // an edit re-dates the tile
     };
     mutateTiles(sel.stageId, sel.side, tiles => tiles.map(t => (t.id === sel.tile.id ? updated : t)));
     setSelected({ ...sel, tile: updated });
@@ -189,7 +188,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       driverCodes: [],
       driverNote: '',
       intensity: 2,
-      provenance: { date: CURRENT_YYYYMM, grade: 'estimate' },
+      provenance: { date: currentMonth(), grade: 'estimate' },
       analysis: '',
     };
     mutateTiles(stageId, side, tiles => [...tiles, tile]);

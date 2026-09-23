@@ -15,6 +15,7 @@
  */
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { errorDetail } from './apiError';
 import { signPrismJwt } from './prismJwt';
 import { ForbiddenError, UnauthorizedError, requireAdmin } from './roles';
 
@@ -29,28 +30,15 @@ async function apiUrl(path: string): Promise<string> {
   return `${proto}://${host}${path}`;
 }
 
-/** One readable line from an API error body. FastAPI validation errors arrive
- *  as a list of {loc, msg}, which would otherwise render as "[object Object]". */
+/** One readable line from the API's error body (lib/apiError.ts), else its raw text. */
 function formatApiError(body: string, status: number): string {
+  let detail: string | null = null;
   try {
-    const parsed = JSON.parse(body) as { detail?: unknown; error?: unknown };
-    const detail = parsed?.detail ?? parsed?.error;
-    if (typeof detail === 'string') return detail;
-    if (Array.isArray(detail)) {
-      const parts = detail.map((item) => {
-        if (!item || typeof item !== 'object') return String(item);
-        const rec = item as { loc?: unknown; msg?: unknown };
-        const loc = (Array.isArray(rec.loc) ? rec.loc : []).filter((l) => l !== 'body').join('.');
-        const msg = typeof rec.msg === 'string' ? rec.msg : JSON.stringify(item);
-        return loc ? `${loc}: ${msg}` : msg;
-      });
-      if (parts.length) return parts.join('; ');
-    }
-    if (detail && typeof detail === 'object') return JSON.stringify(detail);
+    detail = errorDetail(JSON.parse(body));
   } catch {
-    // not JSON: fall through to the raw text
+    // not JSON: the raw text follows
   }
-  return body || `The PRISM API answered ${status}`;
+  return detail ?? (body || `The PRISM API answered ${status}`);
 }
 
 /**

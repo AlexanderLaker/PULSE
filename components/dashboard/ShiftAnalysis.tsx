@@ -42,13 +42,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { getDiagnostics } from '@/lib/apiClient';
-import { CATEGORIES, CATEGORY_NAMES, categoryDisplay } from '@/lib/format';
+import { CATEGORIES, CATEGORY_NAMES, HORIZON, categoryDisplay } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { categoryShares, computeImpactFractions, getYearPercentiles } from '@/lib/shiftMatrix';
+import { cellWeightsBasis } from '@/lib/cellWeights';
 import CategoryDetailPanel from './shift/CategoryDetailPanel';
 import type { DiagnosticsResult } from '@/types';
 import {
-  buildMatrix, type CellMap, columnTotals, HORIZON, type ImpactFilter, type MatrixModel, ROWS,
+  buildMatrix, type CellMap, columnTotals, type ImpactFilter, type MatrixModel, ROWS,
   type ViewMode,
 } from './shift/matrixModel';
 import { IMPACT_META, SegControl, VIEW_META, YearStepper } from './shift/controls';
@@ -78,14 +79,17 @@ const ShiftAnalysis: FC<{
 
   // The service's own diagnosis, fetched only while there is no run to show,
   // so the page can say why: undefined until it answers, null when the
-  // service cannot be reached.
+  // service cannot be reached. Asked again when the service's database state
+  // changes (an outage, a migration, a first run).
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null | undefined>(undefined);
+  const healthStatus = health?.status;
+  const healthReason = health?.simulation_reason;
   useEffect(() => {
     if (loading || simulation || !backendAvailable) return;
     let cancelled = false;
     void getDiagnostics().then((d) => { if (!cancelled) setDiagnostics(d); });
     return () => { cancelled = true; };
-  }, [loading, simulation, backendAvailable]);
+  }, [loading, simulation, backendAvailable, healthStatus, healthReason]);
 
   const categoryWeights = useMemo(
     () => (simulation ? categoryShares(simulation.category_weights_used, CATEGORY_NAMES) : []),
@@ -126,6 +130,7 @@ const ShiftAnalysis: FC<{
 
   const meta = VIEW_META[view];
   const noRun = simulation ? undefined : noRunReason(backendAvailable, diagnostics);
+  const onEstimate = simulation != null && cellWeightsBasis(simulation.cell_weights_source) === 'estimate';
   const showOffline = !loading && !backendAvailable;
 
   // The matrix card's toolbar speaks three distinct vocabularies, so its jobs
@@ -249,11 +254,19 @@ const ShiftAnalysis: FC<{
             Where Profit Pools Shift
           </h1>
           {/* The page carries the relative-exposure framing once, here; the
-              full reading note is in "About this model". */}
+              full reading note is in "About this model". A run on the
+              estimated cell weights says so next to its numbers. */}
           <p className="mt-1.5 max-w-3xl text-[13.5px]" style={{ color: S.onSurfaceVariant, lineHeight: 1.55 }}>
             Relative exposure if no one acts, not a forecast. Four lenses, one set of totals;{' '}
             <span style={{ fontWeight: 600, color: S.onSurface }}>click any value to drill in.</span>
           </p>
+          {onEstimate && (
+            <p data-testid="estimate-note" className="mt-1 max-w-3xl text-[12.5px]"
+              style={{ color: S.mutedText, lineHeight: 1.5 }}>
+              Categories and the portfolio are weighted with an estimated HCB gross-profit mix built from public
+              reporting, not Henkel P&amp;L. Settings shows how it is built.
+            </p>
+          )}
         </div>
 
         {/* The three headline numbers; each band opens on hover, focus or tap.

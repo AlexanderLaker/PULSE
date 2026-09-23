@@ -1,7 +1,7 @@
 /**
  * The journey board's small parts: the journey switch and type filter, a
  * stage's roll-up, a tile in the stage rail, the sections of the tile dialog,
- * a cited driver's card and the stage context.
+ * the text of a Strategist Read, a cited driver's card and the stage context.
  */
 import type { FC, ReactNode } from 'react';
 import { TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
@@ -9,13 +9,14 @@ import { LHC_CTX, HAIR_CTX, type JourneyKey, type JourneyTile, type TileType } f
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import {
   type CitedDriver, displayTileName, forceColor, gradeBarOpacity, gradeTint, type Side,
-  TYPE_STYLES,
+  TYPE_STYLES, unescapeBreaks,
 } from './shared';
 
 /** Renders a Strategist Read: **bold** spans and blank-line paragraph breaks. */
 export const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
-  // The content stores its breaks escaped ("\\n\\n"); real breaks work too.
-  const paragraphs = text.replace(/\\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  // Paragraphs are separated by a blank line (unescapeBreaks covers a text
+  // saved with escaped ones).
+  const paragraphs = unescapeBreaks(text).split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
   return (
     <>
       {paragraphs.map((para, i) => (
@@ -277,12 +278,3 @@ export const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey 
     </DetailSection>
   );
 };
-
-/** The numbered dot of a why-chain step. */
-export const StepDot: FC<{ n: number }> = ({ n }) => (
-  <span style={{
-    position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: 999,
-    backgroundColor: S.primary, color: S.onPrimary, fontFamily: HEADLINE_FONT, fontWeight: 800,
-    fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
-  }}>{n}</span>
-);

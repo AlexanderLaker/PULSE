@@ -14,8 +14,10 @@
  * "nothing there" from "could not be loaded". The store checks the
  * service's health every 60 s, and every 30 s while the service is
  * unreachable or its database cannot be used. It loads everything again
- * when the service answers again, when its database state changes (after a
- * migration or an outage) and when a newer run appears.
+ * when the service answers again, when its database can be used again (after
+ * a migration or an outage) and when a newer run appears. While the database
+ * cannot be used, the views keep what they last loaded and the service notice
+ * says why.
  *
  * A .ts module without JSX: the provider is built with createElement.
  */
@@ -67,6 +69,10 @@ const settle = <T,>(promise: Promise<T>): Promise<Settled<T>> =>
     (e: unknown): Settled<T> => ({ ok: false, error: (e as Error)?.message || 'Request failed' }),
   );
 
+/** Whether two health answers say the same, so an unchanged answer re-renders nothing. */
+const sameHealth = (a: HealthStatus | null, b: HealthStatus): boolean =>
+  a !== null && (Object.keys(b) as (keyof HealthStatus)[]).every((k) => a[k] === b[k]);
+
 function usePrismStore(): PrismStore {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -117,6 +123,9 @@ function usePrismStore(): PrismStore {
         setHealth(h);
         if (d.ok) { setDrivers(d.value); setDriversError(null); } else setDriversError(d.error);
         if (c.ok) { setConfig(c.value); setConfigError(null); } else setConfigError(c.error);
+        // A degraded answer says nothing about the run (has_simulation is
+        // false because the database could not be asked): keep the last run.
+        if (h.status !== 'ok') return undefined;
         return loadSimulation(h.has_simulation, current);
       })
       .catch((e: unknown) => {
@@ -153,12 +162,12 @@ function usePrismStore(): PrismStore {
         return;
       }
       const prev = healthRef.current;
-      setHealth(h);
-      // The database became usable or failed, or a production run wrote a
-      // newer run: load again, without the loading state, so open views keep
-      // their place.
-      if (!prev || prev.status !== h.status || prev.simulation_reason !== h.simulation_reason
-          || prev.latest_run_id !== h.latest_run_id) void load();
+      if (!sameHealth(prev, h)) setHealth(h);
+      // The database can be used again, or a production run wrote a newer run
+      // (or the runs were removed): load again, without the loading state, so
+      // open views keep their place. A degraded answer only brings up the
+      // service notice; the views keep what they have.
+      if (h.status === 'ok' && (prev?.status !== 'ok' || prev.latest_run_id !== h.latest_run_id)) void load();
     } catch {
       if (mounted.current) setConnectionState('offline');
     }

@@ -6,7 +6,7 @@
  * data loads once and every pane reads the same store.
  *
  * Only signed-in users get here: proxy.ts sends everyone else to /sign-in.
- * Clerk (v6) supplies the identity; the role comes from /api/me, asked once
+ * Clerk supplies the identity; the role comes from /api/me, asked once
  * here and handed to every view with admin controls as `isAdmin`. Every tab
  * is open to every role.
  *
@@ -20,6 +20,7 @@
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import { MotionConfig } from 'framer-motion';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import * as api from '@/lib/apiClient';
@@ -175,7 +176,7 @@ export default function DashboardPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-theme-bg">
         <FullPageSkeleton />
       </div>
     );
@@ -241,8 +242,12 @@ export default function DashboardPage() {
     </div>
   );
 
+  // The framer-motion animations are script-driven, so the reduced-motion rule
+  // in globals.css does not reach them: MotionConfig drops their movement for
+  // a reader who asks the system for less motion.
   return (
     <PrismProvider>
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen" style={{ backgroundColor: S.bg }}>
       <nav
         className="sticky top-0 z-50 backdrop-blur-xl"
@@ -257,7 +262,7 @@ export default function DashboardPage() {
               onClick={() => setMobileNavOpen((v) => !v)}
               aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
               aria-expanded={mobileNavOpen}
-              className="md:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-black/5"
+              className="md:hidden p-2 -ml-1 rounded-full transition-colors hover:bg-theme-on-surface/5"
               style={{ color: S.onBg }}
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
@@ -287,7 +292,7 @@ export default function DashboardPage() {
             <button type="button"
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
-              className="p-2 rounded-full transition-colors hover:bg-black/5"
+              className="p-2 rounded-full transition-colors hover:bg-theme-on-surface/5"
               style={{ color: S.onSurfaceVariant }}
             >
               <Settings size={18} />
@@ -350,6 +355,7 @@ export default function DashboardPage() {
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} isAdmin={isAdmin} />
       <WelcomeModal open={welcomeOpen} onClose={closeWelcome} />
     </div>
+    </MotionConfig>
     </PrismProvider>
   );
 }

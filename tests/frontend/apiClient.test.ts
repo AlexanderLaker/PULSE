@@ -58,3 +58,16 @@ describe('the journey content', () => {
     expect(JSON.parse(String((save[1] as RequestInit).body))).toEqual({ base_version: 7, content: { lhc: [], hair: [] } });
   });
 });
+
+describe('an error answer', () => {
+  it('reads as one line: the detail, the validation list, or the status', async () => {
+    answer(json(409, { detail: 'This driver was changed after you opened it.' }));
+    await expect(getDrivers()).rejects.toThrow('This driver was changed after you opened it.');
+    answer(json(422, { detail: [{ loc: ['body', 'probability'], msg: 'Input should be less than or equal to 5' }] }));
+    await expect(getDrivers()).rejects.toThrow('probability: Input should be less than or equal to 5');
+    answer(json(403, { error: 'Admins only' }));
+    await expect(getDrivers()).rejects.toThrow('Admins only');
+    answer(new Response('<html>Bad gateway</html>', { status: 502 }));
+    await expect(getDrivers()).rejects.toThrow('Request failed (502)');
+  });
+});

@@ -30,11 +30,11 @@ export const viewport: Viewport = {
 /**
  * Clerk's `appearance` styles every element Clerk renders (sign-in, sign-up
  * and their verification steps) in the dashboard's design system: the colour
- * variables come from lib/theme.ts; the element classes below repeat those
- * values as literal Tailwind classes, because Tailwind only generates classes
- * it finds written out in the source. Primary buttons are pills, headings use
- * Manrope and body text Inter, and fields use soft tonal fills instead of hard
- * borders.
+ * variables come from lib/theme.ts, and the element classes name the same
+ * tokens as Tailwind classes (tailwind.config.ts), written out in full because
+ * Tailwind only generates the classes it finds in the source. Primary buttons
+ * are pills, headings use Manrope and body text Inter, and fields use soft
+ * tonal fills instead of hard borders.
  */
 export default function RootLayout({
   children,
@@ -68,7 +68,7 @@ export default function RootLayout({
         elements: {
           // Primary button: a pill, like the dashboard's primary buttons.
           formButtonPrimary:
-            'rounded-full bg-theme-primary hover:bg-theme-primary-dim text-white font-semibold tracking-tight shadow-primary-button transition-colors normal-case',
+            'rounded-full bg-theme-primary hover:bg-theme-primary-dim text-theme-on-primary font-semibold tracking-tight shadow-primary-button transition-colors normal-case',
           // The sign-in and sign-up pages draw their own card around Clerk's
           // form, so Clerk's card stays invisible; their appearance props
           // refine this further.
@@ -87,7 +87,7 @@ export default function RootLayout({
           // Form fields: soft fill, no visible border.
           formFieldLabel: 'text-theme-on-surface font-semibold',
           formFieldInput:
-            'bg-theme-surface-low border-none text-theme-on-surface focus:ring-2 focus:ring-theme-primary focus:bg-white',
+            'bg-theme-surface-low border-none text-theme-on-surface focus:ring-2 focus:ring-theme-primary focus:bg-theme-surface',
           formFieldInputShowPasswordButton: 'text-theme-on-surface-variant hover:text-theme-primary',
           formFieldHintText: 'text-theme-on-surface-variant',
           // Links (e.g. "Forgot password?", "Sign up")
