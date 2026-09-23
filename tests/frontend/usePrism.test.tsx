@@ -124,6 +124,42 @@ describe('usePrism', () => {
     expect(api.getSimulation).toHaveBeenCalledTimes(1);          // nothing was saved, so the run is not reloaded
   });
 
+  it('loads the run after an edit when the service holds one, although the last load of it failed', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    vi.mocked(api.getSimulation).mockRejectedValueOnce(new Error('timed out'));
+    mount();
+    await loaded();
+    expect(screen.getByTestId('run').textContent).toBe('no');
+    expect(screen.getByTestId('run-error').textContent).toBe('timed out');
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
+    });
+    await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
+    expect(screen.getByTestId('run').textContent).toBe('yes');
+    expect(screen.getByTestId('run-error').textContent).toBe('');
+  });
+
+  it('never lets a load still in flight overwrite the drivers an edit reloaded', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    mount();
+    await loaded();
+    let answerStale: (drivers: ReturnType<typeof makeDriver>[]) => void = () => {};
+    vi.mocked(api.getDrivers)
+      .mockImplementationOnce(() => new Promise((resolve) => { answerStale = resolve; }))
+      .mockResolvedValue([makeDriver({ revision: 2 }), makeDriver({ id: 'consumer_r02' })]);
+    act(() => { screen.getByTestId('reload').click(); });
+    await waitFor(() => expect(api.getDrivers).toHaveBeenCalledTimes(2));
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
+    });
+    await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
+    expect(screen.getByTestId('drivers').textContent).toBe('2');
+    await act(async () => { answerStale([makeDriver({ revision: 1 })]); });
+    expect(screen.getByTestId('drivers').textContent).toBe('2');
+    expect(lastStore!.drivers[0]!.revision).toBe(2);
+    expect(screen.getByTestId('loading').textContent).toBe('false');
+  });
+
   it('reports a part that failed to load and keeps what loaded before', async () => {
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
     mount();

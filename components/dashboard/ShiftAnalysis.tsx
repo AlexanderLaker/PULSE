@@ -348,7 +348,8 @@ const ShiftAnalysis: FC<{
               }
             />
           ) : noRun ? (
-            <NoRunState reason={noRun} isAdmin={isAdmin} diagnostics={diagnostics} requestError={simulationError} />
+            <NoRunState reason={noRun} isAdmin={isAdmin} diagnostics={diagnostics} requestError={simulationError}
+              onRetry={() => { void reload(); }} />
           ) : loadingState}
         </motion.section>
 

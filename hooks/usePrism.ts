@@ -53,8 +53,9 @@ export interface PrismStore {
   /**
    * Admin edit of a driver. Rejects when the write fails (with status 409 when
    * the driver changed after `update.revision`); either way the drivers are
-   * reloaded afterwards, and after a save the run too, so the "edited since
-   * the run" notice follows.
+   * reloaded afterwards, and after a save the run too when the service holds
+   * one, so the "edited since the run" notice follows. The reload is a load of
+   * its own: a load still in flight cannot overwrite it.
    */
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
   /** Load everything again (the retry and reconnect buttons). */
@@ -186,10 +187,6 @@ function usePrismStore(): PrismStore {
     return () => { mounted.current = false; };
   }, [load]);
 
-  // updateDriver reads whether a run is shown through a ref, so it stays stable.
-  const simulationRef = useRef<SimulationResult | null>(null);
-  useEffect(() => { simulationRef.current = simulation; }, [simulation]);
-
   const updateDriver = useCallback(async (driverId: string, update: DriverUpdate) => {
     let saved = false;
     try {
@@ -197,17 +194,21 @@ function usePrismStore(): PrismStore {
       saved = true;
     } finally {
       // After a save, and after a refusal (another change got there first),
-      // show the drivers as they now are. A failed edit is the editor's
-      // message to show, not a store-wide error.
+      // show the drivers as they now are; after a save the run too, when the
+      // service holds one. A new sequence number, so a load still in flight
+      // cannot overwrite this. A failed edit is the editor's message to show,
+      // not a store-wide error.
+      const sequence = ++loadSequence.current;
+      const current = () => mounted.current && sequence === loadSequence.current;
       const fresh = await settle(api.getDrivers());
-      if (mounted.current && fresh.ok) {
+      if (current() && fresh.ok) {
         setDrivers(fresh.value);
         setDriversError(null);
       }
-      if (saved && mounted.current) {
-        const sequence = loadSequence.current;
-        void loadSimulation(simulationRef.current !== null, () => mounted.current && sequence === loadSequence.current);
-      }
+      const h = healthRef.current;
+      if (saved && current() && h?.status === 'ok') await loadSimulation(h.has_simulation, current);
+      // The load this one replaced leaves the loading state to it.
+      if (current()) setLoading(false);
     }
   }, [loadSimulation]);
 

@@ -90,6 +90,8 @@ describe('Shift Analysis without a run', () => {
     render(<ShiftAnalysis isAdmin />);
     expect(await screen.findByText('The run cannot be loaded')).toBeTruthy();
     expect(screen.getByText('Invalid or expired token')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(STORE.store.reload).toHaveBeenCalled();
   });
 
   it('treats a store that lost the service as unreachable without asking it', () => {

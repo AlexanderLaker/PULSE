@@ -45,7 +45,9 @@ export const NoRunState: FC<{
   diagnostics: DiagnosticsResult | null | undefined;
   /** Why the dashboard's own request for the run failed, when it did. */
   requestError: string | null;
-}> = ({ reason, isAdmin, diagnostics, requestError }) => {
+  /** Loads everything again; offered wherever something failed. */
+  onRetry: () => void;
+}> = ({ reason, isAdmin, diagnostics, requestError, onRetry }) => {
   const problem = reason !== 'no_run';
   const Icon = problem ? AlertTriangle : Info;
   return (
@@ -127,8 +129,8 @@ export const NoRunState: FC<{
               </p>
             )}
             <p className="text-[12px]" style={{ color: S.onSurfaceVariant }}>
-              The service&rsquo;s own read-out (database mode, host and the variable in use)
-              is at <code style={CODE}>/api/v1/diagnostics</code>.
+              The service&rsquo;s own read-out is at <code style={CODE}>/api/v1/diagnostics</code>;
+              the function&rsquo;s log in Vercel names the kind of failure.
             </p>
           </>
         ) : reason === 'unservable' ? (
@@ -162,6 +164,16 @@ export const NoRunState: FC<{
           </>
         )}
       </div>
+      {problem && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-5 px-4 py-1.5 rounded-full text-[12px] font-semibold"
+          style={{ backgroundColor: S.primary, color: S.onPrimary, border: 'none', cursor: 'pointer' }}
+        >
+          Try again
+        </button>
+      )}
     </div>
   );
 };
