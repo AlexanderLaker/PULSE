@@ -28,7 +28,9 @@ Outputs, never edited by hand:
   prism/cell_weight_estimate.py               the matrix and its source text, which prism/config.py reads
 
 A new estimate moves the category and portfolio numbers: it gets a new
-VERSION, and a new MODEL_VERSION and golden pins go with it.
+VERSION, and a new MODEL_VERSION, golden pins and a PRISM Analysis record
+rebuilt from a production run of the new code go with it (CLAUDE.md,
+docs/DRIVER_ANALYSIS.md).
 """
 import argparse
 import json

@@ -1,15 +1,14 @@
 """Render the PRISM Analysis readings from their templates and the attribution record.
 
 Pure functions without an engine import: scripts/build_driver_analysis.py
-renders the readings with them from the record prism/attribution.py
-computes, scripts/generate_seed.py checks the committed texts against them,
-and the tests hold both to the same renderer.
+renders the readings with them from the record prism/attribution.py computes,
+and its --check and the tests hold the committed texts to the same renderer.
 
 A template is prose with named placeholders in braces; every figure in a
 reading comes from a placeholder, and ``render_fields`` lists them all. The
-rendered text is what prism/seed_drivers.py carries as ``analysis`` and what
-the Drivers page shows. docs/DRIVER_ANALYSIS.md sets out the rules the
-readings follow.
+rendered text is what prism/analysis_texts.py holds for each driver, what the
+API serves with it and what the Drivers page shows. docs/DRIVER_ANALYSIS.md
+sets out the rules the readings follow.
 
 Paragraphs are separated by a blank line. A paragraph that opens with one of
 the fixed labels and a colon ("Weight in the answer:", "Where it lands:",

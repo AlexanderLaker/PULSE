@@ -149,18 +149,19 @@ them, and on top of those the id and code pattern, the numbering above, an
 onset and a peak inside the horizon, a known confidence, and sources the
 editor can save again (a title, an http(s) link, a tier on the scale or
 none, within the API's lengths), at least one of them of tier S, A or B.
-`scripts/generate_seed.py` writes three files from it that are never edited
-by hand:
+`scripts/generate_seed.py` writes two files from it that are never edited by
+hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with, each
   with its baseline, the scores the Edited chip compares against;
-- `prism/analysis_texts.py`: each driver's PRISM Analysis text
-  (docs/DRIVER_ANALYSIS.md), which the API serves with the stored driver;
 - `data/driverCodeMap.ts`: display code to driver id, with each driver's
   name, force, direction and the first sentence of its description.
 
-`generate_seed.py --check` fails when any of them differs from what the base
-produces; CI runs it.
+`generate_seed.py --check` fails when either differs from what the base
+produces; CI runs it. Each driver's PRISM Analysis text is built from the
+base as well, by `scripts/build_driver_analysis.py` (docs/DRIVER_ANALYSIS.md),
+which writes `prism/analysis_texts.py`, the texts the API serves with the
+stored drivers.
 
 ## Changing a driver
 
@@ -202,12 +203,11 @@ texts. After an edit to `driver_base.json`, in this order:
 2. if a score, an exposure or the set of drivers changed, regenerate the
    PRISM Analysis as docs/DRIVER_ANALYSIS.md describes; an added driver needs
    its template in `data/drivers/driver_analysis.json` first;
-3. run `scripts/generate_seed.py`. It writes the analysis texts too, so it
-   comes after them. A changed source needs only this step, a changed
-   description this step and step 4. A changed name needs
-   `python3 scripts/build_driver_analysis.py` before it (without
-   `--reference`: the attribution record carries each driver's name, the
-   reference run does not depend on it);
+3. run `scripts/generate_seed.py`. A changed source needs only this step, a
+   changed description this step and step 4. A changed name also needs
+   `python3 scripts/build_driver_analysis.py` (without `--reference`: the
+   attribution record carries each driver's name, the reference run does
+   not depend on it);
 4. while migration 0001 has not run on every database, a changed
    description also goes into the migration's `descriptions.json`, which
    carries it to them (its README, "When a shipped text changes"; a changed

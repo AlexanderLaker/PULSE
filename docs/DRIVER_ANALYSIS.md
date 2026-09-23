@@ -113,9 +113,10 @@ prose in which every figure the model produces is a named placeholder, such as
 `{pp}` for its contribution, `{reach}`, `{peak_year}` or `{pool_europe}`
 (`render_fields` in `prism/readings.py` lists them all). The renderer fills
 the placeholders from the record and appends the basis line. The rendered text
-is stored next to the template and carried into `prism/analysis_texts.py` by
-the seed generator; the API serves it with each driver, so a deploy brings new
-texts and no database holds them (a driver the base does not know has none).
+is stored next to the template, for review, and in `prism/analysis_texts.py`,
+both written by `scripts/build_driver_analysis.py`; the API serves it with
+each driver, so a deploy brings new texts and no database holds them (a
+driver the base does not know has none).
 The Drivers page renders the four labels as small headings, the basis line in
 small type and a footnote under the card: "Attribution at the score means,
 reconciled to the portfolio median in the basis line; a reading authored on
@@ -232,8 +233,8 @@ When the scores or the model's parameters change:
 3. read the re-rendered texts, in particular every comparative claim ("the
    widest range in the base"): the figures inside a comparative regenerate,
    the comparative itself does not;
-4. run `python3 scripts/generate_seed.py`, commit the regenerated files and
-   deploy: the dashboard shows the new texts from the deploy on.
+4. commit the regenerated files and deploy: the dashboard shows the new
+   texts from the deploy on.
 
 ### On the finance shares
 

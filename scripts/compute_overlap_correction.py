@@ -20,7 +20,9 @@ correlations imply on this driver base; it must stay positive.
 The result depends on the exposure space and on how many drivers each force
 has, so re-run the script whenever the taxonomy, the exposure scores or the
 drivers change, with a new VERSION. The new values move the model's numbers:
-a new MODEL_VERSION and new golden pins go with them.
+a new MODEL_VERSION, new golden pins and a PRISM Analysis record rebuilt from
+a production run of the new code go with them (CLAUDE.md,
+docs/DRIVER_ANALYSIS.md).
 
     python3 scripts/compute_overlap_correction.py           write both outputs
     python3 scripts/compute_overlap_correction.py --check   exit 1 if either output is out of date (CI)

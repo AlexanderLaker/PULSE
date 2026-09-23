@@ -340,6 +340,18 @@ class TestCommittedArtefacts:
         assert script.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
 
+    def test_check_fails_on_served_texts_that_are_not_the_rendered_ones(
+            self, script, tmp_path, monkeypatch, capsys):
+        """prism/analysis_texts.py is written by this build, and --check holds it to the rendering."""
+        served = (REPO / "prism" / "analysis_texts.py").read_text(encoding="utf-8")
+        p = tmp_path / "analysis_texts.py"
+        p.write_text(served.replace("Weight in the answer:", "Weight in the answer :", 1), encoding="utf-8")
+        monkeypatch.setattr(script, "TEXTS_PATH", str(p))
+        assert script.main(["--check"]) == 1
+        assert "differs from the rendered texts" in capsys.readouterr().out
+        p.write_text(served, encoding="utf-8")
+        assert script.main(["--check"]) == 0
+
     def test_a_build_refuses_a_production_run_the_reference_does_not_reproduce(
             self, script, tmp_path, monkeypatch, capsys):
         """A record whose reference run misses the recorded production run would
