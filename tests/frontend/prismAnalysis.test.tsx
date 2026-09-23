@@ -229,7 +229,7 @@ describe('Drivers page: the admin editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText(/changed by someone else while you were editing/)).toBeTruthy();
+    expect(await screen.findByText(/has changed since the version you are editing/)).toBeTruthy();
     expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
   });
 });

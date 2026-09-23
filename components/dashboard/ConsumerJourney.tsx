@@ -75,7 +75,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         setVersion(stored.version);
         setOrigin(stored.content ? 'stored' : 'bundled');
       })
-      .catch(() => { if (!cancelled) setOrigin('unavailable'); });
+      .catch(() => {
+        if (cancelled) return;
+        // What the notice then says is on screen: the bundled texts.
+        setContent({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
+        setOrigin('unavailable');
+      });
     return () => { cancelled = true; };
   }, [loadAttempt]);
   /** Load the stored content again, dropping unsaved edits (after a conflict or a failed load). */
@@ -155,18 +160,23 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   // ── Admin edits: local until "Save to server" ──
   // A save whose outcome is unknown, or one refused because someone saved
   // meanwhile, needs the stored version loaded before the next save; an edit
-  // leaves that notice and the hold on saving in place.
+  // leaves that notice and the hold on saving in place. An edit made while a
+  // save is on its way leaves the save's state alone: the save reports it.
   const needsReload = saveState === 'uncertain' || saveState === 'conflict';
+  const holdState = needsReload || saveState === 'saving';
   const mutateTiles = useCallback((stageId: string, side: Side, update: (tiles: JourneyTile[]) => JourneyTile[]) => {
     setContent(prev => ({
       ...prev,
       [tab]: prev[tab].map(s => (s.id === stageId ? { ...s, [side]: update(s[side]) } : s)),
     }));
-    if (!needsReload) {
+    if (!holdState) {
       setSaveState('idle');
       setSaveMsg(null);
     }
-  }, [tab, needsReload]);
+  }, [tab, holdState]);
+  // The content on screen now, for a save that lands after further edits.
+  const contentRef = useRef(content);
+  useEffect(() => { contentRef.current = content; }, [content]);
 
   const applyEdits = useCallback((sel: SelectedTile, edits: TileEdits) => {
     const updated: JourneyTile = {
@@ -210,13 +220,19 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
    *  caller is an admin, and 409 when someone saved after this content loaded. */
   const saveToServer = useCallback(async () => {
     if (origin !== 'stored' && origin !== 'bundled') return;
+    const sent = content;
     setSaveState('saving');
     setSaveMsg(null);
     try {
-      const saved = await saveJourneyContent(content, version);
+      const saved = await saveJourneyContent(sent, version);
       setVersion(saved.version);
       setOrigin('stored');
-      setSaveState('saved');
+      if (contentRef.current === sent) {
+        setSaveState('saved');
+      } else {
+        setSaveState('idle');
+        setSaveMsg('Saved, except the edits made while it was saving: save again to keep them.');
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         setSaveState('forbidden');

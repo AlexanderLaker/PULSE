@@ -116,7 +116,7 @@ interface DriversProps {
 }
 
 const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
-  const { drivers, driversError, loading, apiAvailable, updateDriver, reload } = usePrism();
+  const { drivers, driversError, databaseFailure, loading, apiAvailable, updateDriver, reload } = usePrism();
   // The category a driver must be exposed to, by its API name; null shows all.
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [search, setSearch] = useState(opened?.query ?? '');
@@ -299,6 +299,26 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
             ))}
           </div>
         </section>
+
+        {/* A reload that fails keeps the drivers as last loaded, perhaps from
+            before the latest save. While the database cannot be used, the
+            service notice says so for every view. */}
+        {apiAvailable && !databaseFailure && driversError && drivers.length > 0 && (
+          <div role="status" className="mb-4 px-5 py-2.5 rounded-xl flex items-center gap-2.5 text-[13px]"
+            style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer, lineHeight: 1.5 }}>
+            <AlertTriangle size={15} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+            <span className="flex-1">
+              The drivers could not be reloaded: {driversError}. The list shows them as they were last loaded.
+            </span>
+            <button type="button" onClick={() => { void reload(); }} style={{
+              padding: '5px 14px', borderRadius: 999, border: `1px solid ${S.onAmberContainer}`,
+              background: 'transparent', color: S.onAmberContainer, fontFamily: HEADLINE_FONT,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+            }}>
+              Try again
+            </button>
+          </div>
+        )}
 
         {/* Editorial "paper" card holding the driver list */}
         <motion.div

@@ -233,6 +233,42 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a save that landed under later edits, and saves those from the new version', async () => {
+    let land: (saved: { status: string; version: number; tiles: number }) => void = () => {};
+    API.saveJourneyContent.mockReturnValueOnce(new Promise((resolve) => { land = resolve; }));
+    render(<ConsumerJourney isAdmin />);
+    await startEditing();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(screen.getAllByRole('button', { name: /^Add a tailwind tile to / })[0]!);   // while it saves
+    expect((screen.getByRole('button', { name: 'Saving…' }) as HTMLButtonElement).disabled).toBe(true);
+    land({ status: 'saved', version: 4, tiles: 300 });
+    expect(await screen.findByText(/Saved, except the edits made while it was saving/)).toBeTruthy();
+    expect(screen.queryByText('Saved')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    await waitFor(() => expect(API.saveJourneyContent).toHaveBeenCalledTimes(2));
+    expect(API.saveJourneyContent.mock.calls[1]![1]).toBe(4);
+  });
+
+  it('shows the shipped texts when the saved version cannot be loaded after a refused save', async () => {
+    const tile: JourneyTile = {
+      id: 'lhc.sorting.exp.stored', name: 'Stored tile', type: 'tech', driverCodes: [], driverNote: '',
+      intensity: 2, provenance: { date: '2026-10', grade: 'verified' }, analysis: null,
+    };
+    API.getJourneyContent
+      .mockResolvedValueOnce({ version: 7, content: { lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [tile],
+        negativelyImpacted: [] }], hair: [] } })
+      .mockRejectedValueOnce(new ApiError(500, 'database down'));
+    API.saveJourneyContent.mockRejectedValue(new ApiError(409, 'saved by someone else'));
+    render(<ConsumerJourney isAdmin />);
+    expect(await screen.findByText('Stored tile')).toBeTruthy();
+    await startEditing();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load the saved version' }));
+    expect(await screen.findByText(/these are the texts shipped with PRISM/)).toBeTruthy();
+    expect(screen.queryByText('Stored tile')).toBeNull();
+    expect(screen.getByText(TILE)).toBeTruthy();
+  });
+
   it('turns saving off while the saved journey cannot be loaded', async () => {
     API.getJourneyContent.mockRejectedValue(new ApiError(500, 'database down'));
     render(<ConsumerJourney isAdmin />);

@@ -17,7 +17,9 @@ import { makeConfig, makeSimulation, makeStore } from './fixtures/prism';
 const STATE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 vi.mock('@/hooks/usePrism', () => ({ default: () => STATE.store }));
 
-const API = vi.hoisted(() => ({ getUsers: vi.fn(), setUserRole: vi.fn(), clearViewerCookie: vi.fn(async () => {}) }));
+const API = vi.hoisted(() => ({
+  getUsers: vi.fn(), setUserRole: vi.fn(), clearViewerCookie: vi.fn(async () => {}), resumeViewerCookie: vi.fn(),
+}));
 vi.mock('@/lib/apiClient', () => API);
 
 // Every hook returns the same objects on every call: the profile form syncs

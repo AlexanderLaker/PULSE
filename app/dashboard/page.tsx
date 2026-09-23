@@ -174,6 +174,8 @@ export default function DashboardPage() {
       await signOut({ redirectUrl: '/sign-in' });
     } catch (error) {
       console.error('Logout failed:', error);
+      // Still signed in: the page may read again.
+      api.resumeViewerCookie();
       setIsLoggingOut(false);
     }
   };

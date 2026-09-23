@@ -109,6 +109,26 @@ describe('the states around the list', () => {
     expect(STORE.current.reload).toHaveBeenCalled();
   });
 
+  it('says when the listed drivers could not be reloaded, in the list and in an open panel', async () => {
+    // After a save whose reload failed, the list may show a driver as it was before the save.
+    STORE.current = makeStore({ drivers: [PRIVATE_LABEL, GLP1], driversError: 'The PRISM service could not be reached' });
+    const { rerender } = render(<Drivers isAdmin />);
+    expect(screen.getByRole('status').textContent).toBe(
+      'The drivers could not be reloaded: The PRISM service could not be reached. '
+      + 'The list shows them as they were last loaded.Try again');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(STORE.current.reload).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    expect(await screen.findByText('The drivers could not be reloaded, so this may not show the latest save.')).toBeTruthy();
+
+    // While the database cannot be used, the service notice says it for every view.
+    STORE.current = makeStore({
+      drivers: [PRIVATE_LABEL, GLP1], driversError: 'Try again in a moment', databaseFailure: 'db_error',
+    });
+    rerender(<Drivers isAdmin />);
+    expect(screen.queryByText(/The list shows them as they were last loaded/)).toBeNull();
+  });
+
   it('offers to clear a search that matches nothing', () => {
     render(<Drivers />);
     fireEvent.change(screen.getByPlaceholderText('Search drivers…'), { target: { value: 'nothing like this' } });
@@ -147,10 +167,48 @@ describe('the admin editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     STORE.current = makeStore({ drivers: [{ ...driver, revision: 8, description: 'My wording.' }], updateDriver });
     rerender(<Drivers isAdmin />);
-    expect(screen.queryByText(/changed by someone else/)).toBeNull();
+    expect(screen.queryByText(/has changed since/)).toBeNull();
     await act(async () => { resolveSave(); });
     expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
-    expect(screen.queryByText(/changed by someone else/)).toBeNull();
+    expect(screen.queryByText(/has changed since/)).toBeNull();
+  });
+
+  it('says so when the driver changes while it is being edited, and saves nothing until the edits are discarded', async () => {
+    const driver = makeDriver({ revision: 7 });
+    STORE.current = makeStore({ drivers: [driver] });
+    const { rerender } = render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
+    // Another save reaches the driver first; the store brings it.
+    STORE.current = makeStore({ drivers: [{ ...driver, revision: 8, description: 'Their wording.' }] });
+    rerender(<Drivers isAdmin />);
+    expect(screen.getByRole('alert').textContent).toBe(
+      'This driver has changed since you started editing; saving would be refused. '
+      + 'Discard your edits to see the current version.');
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard edits' }));
+    expect(screen.getByText('Their wording.')).toBeTruthy();
+    expect(STORE.current.updateDriver).not.toHaveBeenCalled();
+  });
+
+  it('holds the form still while its save is on the way', async () => {
+    // The editor closes when the save lands: an edit typed meanwhile would be lost unseen.
+    const driver = makeDriver({ revision: 7 });
+    let resolveSave: () => void = () => {};
+    const updateDriver = vi.fn<PrismStore['updateDriver']>(() => new Promise((resolve) => { resolveSave = resolve; }));
+    STORE.current = makeStore({ drivers: [driver], updateDriver });
+    render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(screen.getByDisplayValue('My wording.'), { target: { value: 'Typed while saving.' } });
+    expect(screen.queryByDisplayValue('Typed while saving.')).toBeNull();
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+    await act(async () => { resolveSave(); });
+    expect(vi.mocked(updateDriver).mock.calls[0]![1]).toEqual({ revision: 7, description: 'My wording.' });
   });
 
   it('sends the value-chain epicentre as the stage it names', async () => {

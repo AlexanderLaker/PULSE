@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
 vi.mock('@/lib/apiClient', () => ({
+  resumeViewerCookie: vi.fn(),
   primeViewerCookie: vi.fn(async () => undefined),
   getHealth: vi.fn(),
   getDrivers: vi.fn(),
@@ -58,6 +59,8 @@ describe('usePrism', () => {
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
     mount();
     await loaded();
+    // A store starts for a signed-in user: the cookie may be set again after a sign-out on this page.
+    expect(api.resumeViewerCookie).toHaveBeenCalledBefore(vi.mocked(api.primeViewerCookie));
     expect(api.primeViewerCookie).toHaveBeenCalledBefore(vi.mocked(api.getHealth));
     expect(screen.getByTestId('available').textContent).toBe('true');
     expect(screen.getByTestId('drivers').textContent).toBe('1');
@@ -122,6 +125,24 @@ describe('usePrism', () => {
     expect(lastStore!.drivers[0]!.revision).toBe(3);
     expect(screen.getByTestId('error').textContent).toBe('');   // the editor shows the message, not the whole page
     expect(api.getSimulation).toHaveBeenCalledTimes(1);          // nothing was saved, so the run is not reloaded
+  });
+
+  it('says so when the drivers cannot be reloaded after a save, keeping them as last loaded', async () => {
+    // Otherwise the editor closes on the driver as it was before the save, and
+    // nothing tells the admin why their change is not there.
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    mount();
+    await loaded();
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
+    });
+    vi.mocked(api.getDrivers).mockRejectedValueOnce(new Error('The PRISM service could not be reached'));
+    await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
+    expect(screen.getByTestId('drivers-error').textContent).toBe('The PRISM service could not be reached');
+    expect(lastStore!.drivers[0]!.revision).toBe(1);
+    act(() => { screen.getByTestId('reload').click(); });
+    await loaded();
+    expect(screen.getByTestId('drivers-error').textContent).toBe('');
   });
 
   it('loads the run after an edit when the service holds one, although the last load of it failed', async () => {

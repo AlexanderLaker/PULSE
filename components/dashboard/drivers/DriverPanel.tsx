@@ -10,6 +10,7 @@ import { useState, type FC } from 'react';
 import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
+import usePrism from '@/hooks/usePrism';
 import { ApiError } from '@/lib/apiClient';
 import { HORIZON, SOURCE_FIELD_LIMITS, SOURCE_URL, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
@@ -104,6 +105,9 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
 
 export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDriver }) => {
   const base = driver.baseline;
+  // Set when the drivers could not be reloaded, after a save among others:
+  // the panel may then show the driver as it was before that save.
+  const { driversError } = usePrism();
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -112,7 +116,9 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
   // admin has seen the driver as it is stored now.
   const [uncertain, setUncertain] = useState(false);
   const [draft, setDraft] = useState(() => draftOf(driver));
-  const edit = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  // The form holds still while its save is on the way: the editor closes when
+  // the save lands, and an edit typed meanwhile would be lost unseen.
+  const edit = (patch: Partial<Draft>) => { if (!saving) setDraft((prev) => ({ ...prev, ...patch })); };
   // The peak year as typed: the draft takes it only while it is a year the
   // peak may take, and Save waits until it is.
   const [peakText, setPeakText] = useState(String(driver.peak_year));
@@ -171,8 +177,8 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
         ? 'The save got no answer and may still have been stored. Discard your edits to see the '
           + 'driver as it is stored now, and make the change again if it is missing.'
         : e instanceof ApiError && e.status === 409
-          ? 'This driver was changed by someone else while you were editing. Your edits are still here; '
-            + 'discard them to see the current version, then make your change again.'
+          ? 'This driver has changed since the version you are editing, so the save was refused. Your edits '
+            + 'are still here; discard them to see the current version, then make your change again.'
           : (e as Error)?.message ?? 'Save failed');
     } finally {
       setSaving(false);
@@ -192,6 +198,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
   return (
     <div
       onClick={(e) => e.stopPropagation()}
+      aria-busy={saving || undefined}
       style={{
         padding: '28px 32px 36px',
         backgroundColor: S.surface,
@@ -410,7 +417,9 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                     aria-invalid={!peakOk}
                     aria-describedby={`peak-year-${driver.id}`}
                     value={peakText}
+                    readOnly={saving}
                     onChange={(e) => {
+                      if (saving) return;
                       const t = e.target.value.trim();
                       setPeakText(t);
                       if (validPeak(t, peakMin)) edit({ peak_year: Number(t) });
@@ -680,8 +689,13 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
         }}>
           {isEditing && (saveError || changedMeanwhile) && (
             <span role="alert" style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
-              {saveError ?? 'This driver was changed by someone else while you were editing; saving would be refused. '
+              {saveError ?? 'This driver has changed since you started editing; saving would be refused. '
                 + 'Discard your edits to see the current version.'}
+            </span>
+          )}
+          {!isEditing && driversError && (
+            <span role="status" style={{ color: S.onSurfaceVariant, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
+              The drivers could not be reloaded, so this may not show the latest save.
             </span>
           )}
           {isEditing && !saveError && !changedMeanwhile && !formOk && (
@@ -732,7 +746,7 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !formOk || uncertain}
+                disabled={saving || !formOk || uncertain || changedMeanwhile}
                 style={{
                   padding: '8px 20px',
                   borderRadius: 999,
@@ -742,8 +756,8 @@ export const DriverPanel: FC<DriverPanelProps> = ({ driver, isAdmin, updateDrive
                   backgroundColor: S.primary,
                   color: S.onPrimary,
                   border: 'none',
-                  cursor: saving || !formOk || uncertain ? 'not-allowed' : 'pointer',
-                  opacity: saving || !formOk || uncertain ? 0.5 : 1,
+                  cursor: saving || !formOk || uncertain || changedMeanwhile ? 'not-allowed' : 'pointer',
+                  opacity: saving || !formOk || uncertain || changedMeanwhile ? 0.5 : 1,
                 }}
               >
                 {saving ? 'Saving…' : 'Save'}

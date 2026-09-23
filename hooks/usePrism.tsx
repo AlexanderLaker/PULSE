@@ -53,7 +53,8 @@ export interface PrismStore {
    * the driver changed after `update.revision`); either way the drivers are
    * reloaded afterwards, and after a save the run too when the service holds
    * one, so the "edited since the run" notice follows. The reload is a load of
-   * its own: a load still in flight cannot overwrite it.
+   * its own: a load still in flight cannot overwrite it. A reload that fails
+   * leaves the drivers as last loaded and says why in `driversError`.
    */
   updateDriver: (driverId: string, update: DriverUpdate) => Promise<void>;
   /** Load everything again (the retry and reconnect buttons). */
@@ -183,6 +184,9 @@ function usePrismStore(): PrismStore {
 
   useEffect(() => {
     mounted.current = true;
+    // A store starts only for a signed-in user, perhaps on a page that signed
+    // someone out before: the viewer cookie may be set again.
+    api.resumeViewerCookie();
     void load();
     return () => { mounted.current = false; };
   }, [load]);
@@ -200,13 +204,18 @@ function usePrismStore(): PrismStore {
       // whenever the one on screen is not the newest, as when this load
       // replaced one that was bringing a newer run. The edit resolves once
       // the drivers are in; the run follows. A failed edit is the editor's
-      // message to show, not a store-wide error.
+      // message to show, not a store-wide error; a failed reload is the
+      // store's, since the drivers on screen may now predate the save.
       const sequence = ++loadSequence.current;
       const current = () => mounted.current && sequence === loadSequence.current;
       const fresh = await settle(api.getDrivers());
-      if (current() && fresh.ok) {
-        setDrivers(fresh.value);
-        setDriversError(null);
+      if (current()) {
+        if (fresh.ok) {
+          setDrivers(fresh.value);
+          setDriversError(null);
+        } else {
+          setDriversError(fresh.error);
+        }
       }
       const h = healthRef.current;
       const shown = simulationRef.current?.run_meta.run_id ?? null;

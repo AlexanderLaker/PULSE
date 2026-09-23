@@ -60,15 +60,46 @@ describe('the viewer cookie', () => {
     expect(requests).toEqual([['/api/prism-cookie', 'GET'], ['/api/prism-cookie', 'DELETE']]);
   });
 
-  it('is never set again by this page once it is cleared for a sign-out', async () => {
+  it('is not set again once it is cleared for a sign-out, until a signed-in store resumes it', async () => {
     vi.resetModules();
     const client = await import('@/lib/apiClient');
+    const requests = () => vi.mocked(fetch).mock.calls
+      .map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? 'GET'} ${url}`);
     answer(json(401, { detail: 'Invalid or expired token' }), json(401, { detail: 'Invalid or expired token' }));
     await client.clearViewerCookie();
     await client.primeViewerCookie();
     await expect(client.getDrivers()).rejects.toThrow('Invalid or expired token');
-    expect(vi.mocked(fetch).mock.calls.map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? 'GET'} ${url}`))
-      .toEqual(['DELETE /api/prism-cookie', 'GET /api/v1/drivers', 'GET /api/v1/drivers']);
+    expect(requests()).toEqual(['DELETE /api/prism-cookie', 'GET /api/v1/drivers', 'GET /api/v1/drivers']);
+
+    // A sign-in that follows on the same page starts a new store, which resumes it.
+    answer(json(200, [{ id: 'consumer_r01' }]));
+    client.resumeViewerCookie();
+    await client.primeViewerCookie();
+    await expect(client.getDrivers()).resolves.toEqual([{ id: 'consumer_r01' }]);
+    expect(requests()).toEqual(['GET /api/prism-cookie', 'GET /api/v1/drivers']);
+  });
+
+  it('is asked for once by requests answered 401 together, and expired only after it has landed', async () => {
+    vi.resetModules();
+    const client = await import('@/lib/apiClient');
+    const log: string[] = [];
+    let land: () => void = () => {};
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      const request = `${init?.method ?? 'GET'} ${url}`;
+      log.push(request);
+      if (request === 'GET /api/prism-cookie') {
+        return new Promise<Response>((resolve) => { land = () => { log.push('cookie set'); resolve(json(200, { ok: true })); }; });
+      }
+      return Promise.resolve(json(200, { ok: true }));
+    }));
+    const first = client.primeViewerCookie();
+    const second = client.primeViewerCookie();
+    const clearing = client.clearViewerCookie();
+    await Promise.resolve();
+    expect(log).toEqual(['GET /api/prism-cookie']);   // one request, and no expiry before it lands
+    land();
+    await Promise.all([first, second, clearing]);
+    expect(log).toEqual(['GET /api/prism-cookie', 'cookie set', 'DELETE /api/prism-cookie']);
   });
 });
 

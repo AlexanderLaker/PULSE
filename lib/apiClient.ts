@@ -4,13 +4,14 @@
  * Reads and the user's own expert proposals go straight to the PRISM API
  * under /api/v1 and are authenticated by the httpOnly viewer cookie that
  * /api/prism-cookie sets (see hooks/usePrism.tsx). The cookie lasts thirty
- * minutes; a /api/v1 request answered 401 asks for a new one and is sent once
- * more, so a dashboard left open keeps working while the session lasts, and
- * signing out expires the cookie first (clearViewerCookie). Admin writes go to the
- * dashboard's own routes under /api, which check the signed-in user's role
- * and forward the write with a short-lived admin token (lib/adminWrite.ts): the
- * viewer cookie can never authorise an admin write. User management and the
- * role lookup are dashboard routes too (lib/roles.ts).
+ * minutes; a /api/v1 request answered 401 asks for a new one and is sent
+ * once more, so a dashboard left open keeps working while the session lasts,
+ * and signing out expires the cookie first (clearViewerCookie). Admin writes
+ * go to the dashboard's own routes under /api, which check the signed-in
+ * user's role and forward the write with a short-lived admin token
+ * (lib/adminWrite.ts): the viewer cookie can never authorise an admin write.
+ * User management and the role lookup are dashboard routes too
+ * (lib/roles.ts).
  */
 import type {
   DiagnosticsResult, Driver, DriverProposal, DriverProposalsResponse, DriverUpdate,
@@ -71,9 +72,13 @@ export const getHealth = (): Promise<HealthStatus> => send('/api/v1/health');
 export const getDiagnostics = (): Promise<DiagnosticsResult | null> =>
   send<DiagnosticsResult>('/api/v1/diagnostics').catch(() => null);
 
-/** Set once the viewer cookie is expired for a sign-out or an ended session:
- *  no request of this page may set it again (the page navigates away next). */
+/** Set while the page is signing out, or its session has ended: no request
+ *  may set the viewer cookie again until a signed-in store starts
+ *  (resumeViewerCookie). */
 let cookieRetired = false;
+/** The request setting the viewer cookie, while one is on its way: requests
+ *  answered 401 at the same moment share it, and an expiry waits for it. */
+let priming: Promise<void> | null = null;
 
 /** Expires the viewer cookie. Resolves whether or not it succeeded. */
 const expireViewerCookie = (): Promise<void> =>
@@ -82,16 +87,27 @@ const expireViewerCookie = (): Promise<void> =>
 /** Sets the viewer cookie the /api/v1 reads need. When it cannot be set, any
  *  cookie left in the browser (perhaps another user's) is expired instead, so
  *  the reads that follow fail rather than go out under it. Resolves either way. */
-export const primeViewerCookie = (): Promise<void> =>
-  cookieRetired
-    ? Promise.resolve()
-    : fetch('/api/prism-cookie').then((res) => (res.ok ? undefined : expireViewerCookie()), expireViewerCookie);
+export const primeViewerCookie = (): Promise<void> => {
+  if (cookieRetired) return Promise.resolve();
+  priming ??= fetch('/api/prism-cookie')
+    .then((res) => (res.ok ? undefined : expireViewerCookie()), expireViewerCookie)
+    .finally(() => { priming = null; });
+  return priming;
+};
 
-/** Expires the viewer cookie for good on this page: before signing out, and
- *  when the session has ended. Resolves whether or not it succeeded. */
-export const clearViewerCookie = (): Promise<void> => {
+/** Expires the viewer cookie before signing out and when the session has
+ *  ended, after any cookie on its way has landed; until resumeViewerCookie,
+ *  nothing sets it again. Resolves whether or not it succeeded. */
+export const clearViewerCookie = async (): Promise<void> => {
   cookieRetired = true;
+  await priming;
   return expireViewerCookie();
+};
+
+/** Lets the viewer cookie be set again: a signed-in store starts (a sign-in
+ *  that followed a sign-out on the same page), or a sign-out failed. */
+export const resumeViewerCookie = (): void => {
+  cookieRetired = false;
 };
 
 // ── Drivers ─────────────────────────────────────────────────────────────────
