@@ -313,8 +313,9 @@ sign-up.
 `bash scripts/package_handover.sh` builds `PRISM_HANDOVER_<date>.zip`: a git
 repository with a single commit of the tracked tree at `HEAD`. It refuses a
 dirty working tree and fails if the exported tree holds `.env`, Clerk's local
-folder, a local working folder (a leading underscore), a database file, a
-workbook, run outputs or archives, or a string that looks like a secret.
+folder or a local working folder (a leading underscore) at the root, a
+`runs/` or `archive/` folder, a database file or a workbook anywhere, or a
+string that looks like a secret.
 Three things travel separately:
 
 - the database, as a `pg_dump` of the Neon production branch;

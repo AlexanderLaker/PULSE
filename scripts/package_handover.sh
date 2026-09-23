@@ -37,14 +37,19 @@ for path in "$STAGE"/.env*; do
   echo "Forbidden path in the archive: $(basename "$path")" >&2
   fail=1
 done
-# Local state: Clerk's folder, the local working folders (a leading
-# underscore), run outputs and archives; and, anywhere in the tree, database
-# files and workbooks, which can hold confidential figures.
-for path in "$STAGE"/.clerk "$STAGE"/_* "$STAGE"/runs "$STAGE"/archive; do
+# Local state: at the root, Clerk's folder and the local working folders (a
+# leading underscore); anywhere in the tree, the folders .gitignore keeps out
+# at every depth (run outputs and migration archives), database files and
+# workbooks, which can hold confidential figures.
+for path in "$STAGE"/.clerk "$STAGE"/_*; do
   [ -e "$path" ] || continue
   echo "Forbidden path in the archive: ${path#"$STAGE"/}" >&2
   fail=1
 done
+while IFS= read -r path; do
+  echo "Forbidden folder in the archive: ${path#"$STAGE"/}" >&2
+  fail=1
+done < <(find "$STAGE" -type d \( -name runs -o -name archive \))
 while IFS= read -r path; do
   echo "Forbidden file in the archive: ${path#"$STAGE"/}" >&2
   fail=1

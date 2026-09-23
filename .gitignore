@@ -24,7 +24,7 @@ __pycache__/
 *.db-shm
 
 # Outputs that can hold confidential figures or personal data: production run
-# workbooks, and the archives written by migrations and maintenance scripts
+# workbooks, and the archives the migrations write
 runs/
 *.xlsx
 archive/
