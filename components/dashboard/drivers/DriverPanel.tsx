@@ -11,7 +11,7 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
 import { ApiError } from '@/lib/apiClient';
-import { HORIZON, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
+import { HORIZON, SOURCE_FIELD_LIMITS, SOURCE_URL, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
@@ -69,10 +69,17 @@ const sameSources = (a: DriverSource[], b: DriverSource[]): boolean =>
     s.title === b[i].title && s.url === b[i].url && s.tier === b[i].tier && s.published === b[i].published
   ));
 
+/** Whether a year is a whole year the peak may take: after the onset, by the horizon. */
+const validPeak = (text: string, min: number): boolean =>
+  /^\d{4}$/.test(text) && Number(text) >= min && Number(text) <= HORIZON;
+
+/** Whether a source's link is one the API accepts: none, or an http(s) address. */
+const validLink = (url: string): boolean => url.trim() === '' || SOURCE_URL.test(url.trim());
+
 /** The DriverUpdate of a save: the revision the draft was taken from, and only
  *  the fields the admin changed (of an exposure map, only the changed cells),
- *  within the ranges the API accepts, and only sources with a title or a
- *  link. The PRISM Analysis is never part of it. */
+ *  and only sources with a title or a link. The form lets nothing outside the
+ *  API's ranges through. The PRISM Analysis is never part of it. */
 function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   const update: DriverUpdate = { revision: d.revision };
   if (draft.description !== d.description) update.description = draft.description;
@@ -80,9 +87,7 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   if (draft.confidence !== d.confidence) update.confidence = draft.confidence;
   if (draft.probability !== d.probability) update.probability = draft.probability;
   if (draft.gp1_pct_affected !== d.gp1_pct_affected) update.gp1_pct_affected = draft.gp1_pct_affected;
-  if (draft.peak_year !== d.peak_year) {
-    update.peak_year = Math.max(firstPeakYear(d.start_year), Math.min(HORIZON, Math.round(draft.peak_year)));
-  }
+  if (draft.peak_year !== d.peak_year) update.peak_year = draft.peak_year;
   if (draft.diffusion_curve !== d.diffusion_curve) update.diffusion_curve = draft.diffusion_curve;
   if (draft.uncertainty !== d.uncertainty) update.uncertainty = draft.uncertainty;
   const category = changedCells(draft.category_exposure, d.category_exposure);
@@ -90,7 +95,9 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   const regional = changedCells(draft.regional_exposure, d.regional_exposure);
   if (regional) update.regional_exposure = regional;
   if (draft.vc_epicentre !== d.vc_epicentre) update.vc_epicentre = draft.vc_epicentre;
-  const sources = draft.sources.filter((s) => s.title.trim() || s.url.trim());
+  const sources = draft.sources
+    .filter((s) => s.title.trim() || s.url.trim())
+    .map((s) => ({ ...s, url: s.url.trim() }));
   if (!sameSources(sources, d.sources)) update.sources = sources;
   return update;
 }
@@ -103,6 +110,9 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draft, setDraft] = useState(() => draftOf(driver));
   const edit = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  // The peak year as typed: the draft takes it only while it is a year the
+  // peak may take, and Save waits until it is.
+  const [peakText, setPeakText] = useState(String(driver.peak_year));
 
   // The driver the draft was taken from. Outside editing it follows every new
   // driver object (after a save the store reloads the drivers); while editing
@@ -112,12 +122,18 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   if (!isEditing && draftBase !== driver) {
     setDraftBase(driver);
     setDraft(draftOf(driver));
+    setPeakText(String(driver.peak_year));
   }
   const changedMeanwhile = isEditing && draftBase.revision !== driver.revision;
+  const peakMin = firstPeakYear(draftBase.start_year);
+  const peakOk = validPeak(peakText, peakMin);
+  const linksOk = draft.sources.every((src) => validLink(src.url));
+  const formOk = peakOk && linksOk;
 
   const startEditing = () => {
     setDraftBase(driver);
     setDraft(draftOf(driver));
+    setPeakText(String(driver.peak_year));
     setSaveError(null);
     setIsEditing(true);
   };
@@ -125,11 +141,13 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   const handleCancel = () => {
     setDraftBase(driver);
     setDraft(draftOf(driver));
+    setPeakText(String(driver.peak_year));
     setSaveError(null);
     setIsEditing(false);
   };
 
   const handleSave = async () => {
+    if (!formOk) return;
     const update = updateFrom(draft, draftBase);
     if (Object.keys(update).length === 1) {   // the revision alone: nothing changed
       handleCancel();
@@ -231,6 +249,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
           <SectionCard title="Description" icon={FileText}>
             {isEditing ? (
               <textarea
+                aria-label="Description"
                 value={draft.description}
                 onChange={(e) => edit({ description: e.target.value })}
                 rows={6}
@@ -289,6 +308,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input
                   type="range"
+                  aria-label="GP1 % affected"
                   min={1} max={100} step={1}
                   value={Math.round(draft.gp1_pct_affected * 100)}
                   onChange={(e) => edit({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
@@ -296,6 +316,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                 />
                 <input
                   type="number"
+                  aria-label="GP1 % affected, in percent"
                   min={1} max={100} step={1}
                   value={Math.round(draft.gp1_pct_affected * 100)}
                   onChange={(e) => edit({ gp1_pct_affected: Math.max(1, Math.min(100, parseInt(e.target.value || '1', 10))) / 100 })}
@@ -372,13 +393,20 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                 <FieldLabel>Peak Year</FieldLabel>
                 {isEditing ? (
                   <input
-                    type="number"
-                    min={firstPeakYear(driver.start_year)} max={HORIZON} step={1}
-                    value={draft.peak_year}
-                    onChange={(e) => edit({ peak_year: Number.parseInt(e.target.value, 10) || driver.peak_year })}
+                    type="text"
+                    inputMode="numeric"
+                    aria-label={`Peak year, ${peakMin} to ${HORIZON}`}
+                    aria-invalid={!peakOk}
+                    aria-describedby={`peak-year-${driver.id}`}
+                    value={peakText}
+                    onChange={(e) => {
+                      const t = e.target.value.trim();
+                      setPeakText(t);
+                      if (validPeak(t, peakMin)) edit({ peak_year: Number(t) });
+                    }}
                     style={{
                       width: '100%', padding: '8px 10px', borderRadius: 8,
-                      border: `1px solid ${S.cardBorder}`,
+                      border: `1px solid ${peakOk ? S.cardBorder : S.error}`,
                       backgroundColor: S.surfaceLow, color: S.onSurface,
                       fontSize: 13, fontWeight: 700,
                     }}
@@ -393,14 +421,17 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                     {driver.peak_year}
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
-                  Year when 100% of impact materialises
+                <div id={`peak-year-${driver.id}`} style={{ fontSize: 11, color: isEditing && !peakOk ? S.error : S.mutedText, marginTop: 4 }}>
+                  {isEditing && !peakOk
+                    ? `A whole year from ${peakMin} (after the onset) to ${HORIZON}`
+                    : 'Year when 100% of impact materialises'}
                 </div>
               </div>
               <div>
                 <FieldLabel>Diffusion Curve</FieldLabel>
                 {isEditing ? (
                   <select
+                    aria-label="Diffusion curve"
                     value={draft.diffusion_curve}
                     onChange={(e) => edit({ diffusion_curve: e.target.value })}
                     style={{
@@ -475,8 +506,9 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                         <input
                           type="text"
                           placeholder="Source title"
+                          aria-label="Source title"
                           value={s.title}
-                          maxLength={500}
+                          maxLength={SOURCE_FIELD_LIMITS.title}
                           onChange={(e) => patchSource(i, { title: e.target.value })}
                           style={{
                             flex: 2, padding: '6px 10px', borderRadius: 6,
@@ -489,6 +521,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                           value={s.tier}
                           onChange={(e) => patchSource(i, { tier: e.target.value as DriverSource['tier'] })}
                           title="Source rating"
+                          aria-label="Source rating"
                           style={{
                             padding: '6px 10px', borderRadius: 6,
                             border: `1px solid ${S.cardBorder}`,
@@ -505,6 +538,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                           type="button"
                           onClick={() => removeSource(i)}
                           title="Remove source"
+                          aria-label="Remove source"
                           style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 30, height: 30, borderRadius: 6,
@@ -520,12 +554,14 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                         <input
                           type="url"
                           placeholder="https://…"
+                          aria-label="Source link"
+                          aria-invalid={!validLink(s.url)}
                           value={s.url}
-                          maxLength={2000}
+                          maxLength={SOURCE_FIELD_LIMITS.url}
                           onChange={(e) => patchSource(i, { url: e.target.value })}
                           style={{
                             flex: 2, padding: '6px 10px', borderRadius: 6,
-                            border: `1px solid ${S.cardBorder}`,
+                            border: `1px solid ${validLink(s.url) ? S.cardBorder : S.error}`,
                             backgroundColor: S.surface, color: S.onSurface,
                             fontSize: 12,
                           }}
@@ -535,7 +571,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                           placeholder="Published (e.g. Apr 2026)"
                           aria-label="Published"
                           value={s.published}
-                          maxLength={500}
+                          maxLength={SOURCE_FIELD_LIMITS.published}
                           onChange={(e) => patchSource(i, { published: e.target.value })}
                           style={{
                             flex: 3, padding: '6px 10px', borderRadius: 6,
@@ -545,6 +581,11 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                           }}
                         />
                       </div>
+                      {!validLink(s.url) && (
+                        <div style={{ fontSize: 11, color: S.error }}>
+                          A link starts with http:// or https:// and has no spaces; leave it empty for a source without one.
+                        </div>
+                      )}
                     </div>
                   ))}
                   <button
@@ -632,6 +673,12 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                 + 'Discard your edits to see the current version.'}
             </span>
           )}
+          {isEditing && !saveError && !changedMeanwhile && !formOk && (
+            <span style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
+              {!peakOk ? 'The peak year needs correcting before the driver can be saved.'
+                : 'A source link needs correcting before the driver can be saved.'}
+            </span>
+          )}
           {!isEditing && (
             <button
               type="button"
@@ -674,7 +721,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || !formOk}
                 style={{
                   padding: '8px 20px',
                   borderRadius: 999,
@@ -684,8 +731,8 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   backgroundColor: S.primary,
                   color: S.onPrimary,
                   border: 'none',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                  opacity: saving ? 0.7 : 1,
+                  cursor: saving || !formOk ? 'not-allowed' : 'pointer',
+                  opacity: saving || !formOk ? 0.5 : 1,
                 }}
               >
                 {saving ? 'Saving…' : 'Save'}

@@ -2,7 +2,8 @@
 
 The dashboard reads and writes forces, categories, regions, value-chain
 stages and source tiers by name, and the API refuses a name that is not the
-model's; it lays out the matrix by the path years. Its lists (lib/format.ts,
+model's; it lays out the matrix by the path years, and its editor checks a
+source's link and lengths as the API will. Its copies (lib/format.ts,
 lib/valueChain.ts) must therefore hold the values of prism/config.py and
 prism/drivers.py, in the same order.
 """
@@ -10,7 +11,7 @@ import re
 from pathlib import Path
 
 from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, VC_STAGES
-from prism.drivers import SOURCE_TIERS
+from prism.drivers import SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 
 LIB = Path(__file__).resolve().parents[1] / "lib"
 FORMAT = (LIB / "format.ts").read_text(encoding="utf-8")
@@ -51,3 +52,10 @@ def test_horizon():
 
 def test_source_tiers():
     assert tuple(quoted(FORMAT, "export const SOURCE_TIERS =")) == SOURCE_TIERS
+
+
+def test_source_rules():
+    pattern = re.search(r"export const SOURCE_URL = /\^(.+)\$/;", FORMAT).group(1)
+    assert pattern.replace("\\/", "/") == SOURCE_URL_PATTERN
+    limits = re.search(r"export const SOURCE_FIELD_LIMITS = \{([^}]*)\}", FORMAT).group(1)
+    assert {k: int(v) for k, v in re.findall(r"(\w+): (\d+)", limits)} == SOURCE_FIELD_LIMITS

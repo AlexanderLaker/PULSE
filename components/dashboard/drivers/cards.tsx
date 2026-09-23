@@ -67,23 +67,20 @@ export const TIER_CONFIG: Record<SourceTier, { color: string; description: strin
 export const TIER_OPTIONS: readonly SourceTier[] = SOURCE_TIERS;
 
 // ─── Source item ──────────────────────────────────────────────────
+/** One source: a link when it has one, otherwise the same card as plain text. */
 export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
   const caption = [sourceHost(src.url), src.published].filter(Boolean).join(' · ');
   const tier = src.tier ? TIER_CONFIG[src.tier] : undefined;
-  return (
-    <a
-      href={src.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        display: 'flex', gap: 10, alignItems: 'flex-start',
-        padding: '10px 12px',
-        backgroundColor: S.surfaceLow,
-        borderRadius: 10,
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
-    >
+  const card: React.CSSProperties = {
+    display: 'flex', gap: 10, alignItems: 'flex-start',
+    padding: '10px 12px',
+    backgroundColor: S.surfaceLow,
+    borderRadius: 10,
+    textDecoration: 'none',
+    color: 'inherit',
+  };
+  const body = (
+    <>
       <span style={{
         flexShrink: 0, width: 28, height: 28, borderRadius: 8,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -97,7 +94,7 @@ export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
           fontSize: 13, fontWeight: 600,
           color: S.onSurface, lineHeight: 1.35,
         }}>
-          <span style={{ fontWeight: 600 }}>{src.title}</span>
+          <span style={{ fontWeight: 600 }}>{src.title || sourceHost(src.url) || src.url}</span>
           {tier && (
             <span
               title={`Source rating ${src.tier}: ${tier.description}`}
@@ -117,14 +114,23 @@ export const SourceItem: FC<{ src: DriverSource }> = ({ src }) => {
             </span>
           )}
         </span>
-        <span style={{
-          display: 'block', fontSize: 11, color: S.mutedText, marginTop: 2,
-        }}>
-          {caption}
-        </span>
+        {caption && (
+          <span style={{
+            display: 'block', fontSize: 11, color: S.mutedText, marginTop: 2,
+          }}>
+            {caption}
+          </span>
+        )}
       </span>
-      <ExternalLink size={12} style={{ color: S.mutedText, marginTop: 4 }} />
+    </>
+  );
+  return src.url ? (
+    <a href={src.url} target="_blank" rel="noopener noreferrer" style={card}>
+      {body}
+      <ExternalLink size={12} aria-label="opens in a new tab" style={{ color: S.mutedText, marginTop: 4 }} />
     </a>
+  ) : (
+    <div style={card}>{body}</div>
   );
 };
 

@@ -32,7 +32,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 
 import Drivers from '@/components/dashboard/Drivers';
 import { ExpertInputPanel } from '@/components/dashboard/drivers/ExpertRating';
-import { sourceHost } from '@/components/dashboard/drivers/cards';
+import { SourceItem, sourceHost } from '@/components/dashboard/drivers/cards';
 
 // framer-motion restores the scroll position after measuring an expanded panel.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
@@ -83,6 +83,15 @@ describe('a drill-through from another view', () => {
 });
 
 describe('a source', () => {
+  it('is a link when it has one, and plain text when it has none', () => {
+    const { rerender } = render(<SourceItem src={{ title: 'Trade note', url: '', tier: 'B', published: 'Apr 2026' }} />);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByText('Trade note')).toBeTruthy();
+    rerender(<SourceItem src={{ title: '', url: 'https://www.example.org/report', tier: '', published: '' }} />);
+    expect(screen.getByRole('link').getAttribute('href')).toBe('https://www.example.org/report');
+    expect(screen.getAllByText('example.org').length).toBeGreaterThan(0);   // a source without a title shows its host
+  });
+
   it('names the host it is published on, without guessing what kind of source it is', () => {
     expect(sourceHost('https://www.eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1781')).toBe('eur-lex.europa.eu');
     expect(sourceHost('https://pubmed.ncbi.nlm.nih.gov/?term=semaglutide')).toBe('pubmed.ncbi.nlm.nih.gov');
@@ -136,6 +145,54 @@ describe('the admin editor', () => {
     await waitFor(() => expect(STORE.current!.updateDriver).toHaveBeenCalledTimes(1));
     expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([
       driver.id, { revision: 7, vc_epicentre: 'Marketing' }]);
+  });
+});
+
+describe('the admin editor checks what the API would refuse', () => {
+  async function openEditor(driver = makeDriver({ revision: 7 })) {
+    STORE.current = makeStore({ drivers: [driver] });
+    render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    return driver;
+  }
+  const save = () => screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+
+  it('holds Save while the peak year is not a year after the onset up to 2035, then sends it as typed', async () => {
+    const driver = await openEditor();
+    const year = screen.getByRole('textbox', { name: 'Peak year, 2026 to 2035' });
+    for (const typed of ['203', '2040', '2025', 'x']) {
+      fireEvent.change(year, { target: { value: typed } });
+      expect(year.getAttribute('aria-invalid')).toBe('true');
+      expect(save().disabled).toBe(true);
+      expect(screen.getByText('A whole year from 2026 (after the onset) to 2035')).toBeTruthy();
+    }
+    fireEvent.change(year, { target: { value: '2033' } });
+    expect(save().disabled).toBe(false);
+    fireEvent.click(save());
+    await waitFor(() => expect(STORE.current!.updateDriver).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([driver.id, { revision: 7, peak_year: 2033 }]);
+  });
+
+  it('holds Save while a source link is not an http(s) address', async () => {
+    const driver = await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Add source' }));
+    const titles = screen.getAllByRole('textbox', { name: 'Source title' });
+    fireEvent.change(titles[titles.length - 1]!, { target: { value: 'Trade note' } });
+    const links = screen.getAllByRole('textbox', { name: 'Source link' });
+    const link = links[links.length - 1]!;
+    for (const typed of ['www.example.org/note', 'https://example.org/a note.pdf', 'javascript:alert(1)']) {
+      fireEvent.change(link, { target: { value: typed } });
+      expect(link.getAttribute('aria-invalid')).toBe('true');
+      expect(save().disabled).toBe(true);
+    }
+    fireEvent.change(link, { target: { value: ' https://example.org/note ' } });
+    fireEvent.click(save());
+    await waitFor(() => expect(STORE.current!.updateDriver).toHaveBeenCalledTimes(1));
+    const sent = vi.mocked(STORE.current!.updateDriver).mock.calls[0]![1];
+    expect(sent.revision).toBe(7);
+    expect(sent.sources!.at(-1)).toEqual({ title: 'Trade note', url: 'https://example.org/note', tier: '', published: '' });
+    expect(sent.sources!.length).toBe(driver.sources.length + 1);
   });
 });
 

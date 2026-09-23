@@ -57,11 +57,11 @@ documents in `docs/` explain everything below in full.
   `docs/adr/0007-honest-display.md` has the reasons.
 - **Only the drivers feed the Shift Matrix.** The Consumer Journey and the
   Profit Pool Explorer never read or write the simulation.
-- **Parity.** The taxonomies and the source tiers (`prism/config.py`,
-  `prism/drivers.py` and `lib/format.ts`, `lib/valueChain.ts`), the
-  uncertainty tables (`prism/config.py` and `lib/uncertainty.ts`), the
-  per-driver attribution (`prism/attribution.py` and
-  `lib/driverAttribution.ts`) and the PRISM Analysis labels
+- **Parity.** The taxonomies, the source tiers and a source's link and
+  length rules (`prism/config.py`, `prism/drivers.py` and `lib/format.ts`,
+  `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
+  `lib/uncertainty.ts`), the per-driver attribution (`prism/attribution.py`
+  and `lib/driverAttribution.ts`) and the PRISM Analysis labels
   (`prism/readings.py` and `components/dashboard/drivers/PrismAnalysis.tsx`)
   exist twice and are tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;

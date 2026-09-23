@@ -178,6 +178,14 @@ export function fmtDateTimeUtc(d: string | number | Date | null | undefined): st
  *  SOURCE_TIERS holds the same list; docs/DRIVERS.md describes them). */
 export const SOURCE_TIERS = ['S', 'A', 'A-', 'B+', 'B', 'B-', 'C', 'D', 'E'] as const;
 
+/** A source's link, when it has one: an http(s) address without spaces
+ *  (prism/drivers.py SOURCE_URL_PATTERN; the API refuses any other). */
+export const SOURCE_URL = /^https?:\/\/\S+$/;
+
+/** The most characters a source's title, link and publication note may hold
+ *  (prism/drivers.py SOURCE_FIELD_LIMITS). */
+export const SOURCE_FIELD_LIMITS = { title: 500, url: 2000, published: 500 } as const;
+
 /**
  * A driver's evidence in one line: the publisher of each of its first three
  * sources with its publication date, as in "Circana (Apr 2026); YouGov
