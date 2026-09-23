@@ -140,10 +140,13 @@ above, each entry carries a classification (theme, foresight tier, scope,
 megatrend, the year first observed, the mechanism); the model and the
 dashboard do not use it.
 
-`prism/driver_base.py` reads and validates the base (known forces and
-taxonomy keys, scores in range, an onset before the peak, a known epicentre,
-an S, A or B source behind every driver) for everything built from it: the
-seed, the overlap correction and the PRISM Analysis. `scripts/generate_seed.py`
+`prism/driver_base.py` reads and validates the base for everything built
+from it (the seed, the overlap correction and the PRISM Analysis): every
+model input by the engine's own rules, as the database and the API apply
+them, and on top of those the id and code pattern, an onset and a peak inside
+the horizon, a known confidence, and sources the editor can save again (a
+title, an http(s) link, a tier on the scale or none, within the API's
+lengths), at least one of them of tier S, A or B. `scripts/generate_seed.py`
 writes two files from it that are never edited by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with,

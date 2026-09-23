@@ -118,7 +118,8 @@ sys.path.insert(0, str(REPO))
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS  # noqa: E402
+from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS,  # noqa: E402
+                           SOURCE_URL_PATTERN)
 from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
@@ -152,8 +153,8 @@ RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_
 EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscored_driver_ids"}
 DIMENSION_RENAMES = {"vc_steps": "vc_stages"}
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
-#: A source link as the API accepts it (prism/api/schemas.py, SourceRef.url).
-WEB_ADDRESS = re.compile(r"https?://\S+")
+#: A source link as the API accepts it.
+WEB_ADDRESS = re.compile(SOURCE_URL_PATTERN)
 
 
 def one_of(values) -> str:

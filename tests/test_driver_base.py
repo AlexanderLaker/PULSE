@@ -101,8 +101,51 @@ class TestBaseValidation:
     def test_a_missing_category_is_refused(self):
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         del bad[0]["category_exposure"]["LHC: TOI"]
-        with pytest.raises(InvalidBaseError, match="category or regional exposure keys"):
+        with pytest.raises(InvalidBaseError, match="category_exposure has no score for LHC: TOI"):
             validate(bad)
+
+    @pytest.mark.parametrize("change, words", [
+        ({"probability": 3.5}, "probability 3.5 is not a whole number from 1 to 5"),
+        ({"uncertainty": True}, "uncertainty True is not a whole number from 0 to 5"),
+        ({"start_year": 2024}, "onset 2024 before the base year"),
+        ({"peak_year": 2036}, "peak 2036 after the horizon"),
+    ])
+    def test_the_base_is_held_to_the_engines_rules(self, change, words):
+        """A score the database and the engine would refuse is refused in the base, before a seed is written."""
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        bad[0].update(change)
+        with pytest.raises(InvalidBaseError, match=words):
+            validate(bad)
+
+    def test_an_exposure_that_is_not_a_whole_score_is_refused(self):
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        bad[0]["regional_exposure"]["Asia"] = 2.5
+        with pytest.raises(InvalidBaseError, match="is not a whole number from 0 to 5"):
+            validate(bad)
+
+    @pytest.mark.parametrize("change, words", [
+        ({"url": "www.example.org/report"}, "its link is not an http\\(s\\) address"),
+        ({"url": "https://example.org/a report.pdf"}, "its link is not an http\\(s\\) address"),
+        ({"title": " "}, "no title"),
+        ({"tier": "A+"}, "tier 'A\\+' is not on the scale"),
+        ({"published": None}, "no publication note"),
+        ({"title": "x" * 501}, "title longer than 500 characters"),
+    ])
+    def test_a_source_the_api_would_refuse_is_refused(self, change, words):
+        """A seeded source must be one the editor can save again (prism.drivers SOURCE_URL_PATTERN and
+        SOURCE_FIELD_LIMITS, the rules of the API's SourceRef)."""
+        bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        bad[0]["sources"][0].update(change)
+        with pytest.raises(InvalidBaseError, match=words):
+            validate(bad)
+
+    def test_an_unrated_source_is_accepted_beside_a_graded_one(self):
+        drivers = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
+        drivers[0]["sources"].append({"title": "Trade note", "url": "", "tier": "", "published": ""})
+        with pytest.raises(InvalidBaseError, match="its link is not an http"):
+            validate(drivers)
+        drivers[0]["sources"][-1]["url"] = "https://example.org/note"
+        validate(drivers)
 
 
 class TestCodeMap:

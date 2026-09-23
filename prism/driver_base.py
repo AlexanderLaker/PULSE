@@ -12,58 +12,85 @@ import json
 import re
 from pathlib import Path
 
-from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,
-                          VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, Driver
+from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS, display_code
+from prism.drivers import (CONFIDENCE_LEVELS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN, Driver,
+                           simulation_problems)
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "data" / "drivers" / "driver_base.json"
-#: The tiers of which every driver needs at least one source.
-SOURCE_TIERS = ("S", "A", "B")
+#: Every driver of the base has at least one source of these tiers.
+REQUIRED_SOURCE_TIERS = ("S", "A", "B")
 
 
 class InvalidBaseError(ValueError):
     """The base holds an entry the engine or the dashboard could not use."""
 
 
+#: The fields every entry of the base carries (it may carry more, such as its theme).
+ENTRY_FIELDS = ("id", "code", "force", "name", "description", "direction", "probability", "start_year",
+                "peak_year", "gp1_pct_affected", "diffusion_curve", "uncertainty", "confidence",
+                "category_exposure", "regional_exposure", "vc_epicentre", "sources")
+
+
 def validate(entries: list) -> None:
-    """Raise InvalidBaseError listing every problem of the base's entries."""
-    problems = []
-    ids, codes = collections.Counter(d["id"] for d in entries), collections.Counter(d["code"] for d in entries)
-    problems += [f"duplicate id {i}" for i, n in ids.items() if n > 1]
-    problems += [f"duplicate code {c}" for c, n in codes.items() if n > 1]
+    """Raise InvalidBaseError listing every problem of the base's entries.
+
+    The model inputs are held to the engine's own rules
+    (prism.drivers.simulation_problems); on top of those an entry must follow
+    the id and code pattern, lie inside the horizon, carry a known confidence
+    and have sources the API would accept back from the editor, each with a
+    title and an http(s) link, at least one of them of tier S, A or B.
+    """
+    problems = [f"duplicate code {c}" for c, n in collections.Counter(d.get("code") for d in entries).items() if n > 1]
+    complete = []
     for d in entries:
-        tag = d.get("code", d.get("id"))
-        m = re.fullmatch(r"([a-z]+)_r(\d{2})", d["id"])
-        if d["force"] not in FORCES:
-            problems.append(f"{tag}: unknown force {d['force']!r}")
-        elif not m or m.group(1) != d["force"].lower() or d["code"] != display_code(d["id"], d["force"]):
+        tag = d.get("code") or d.get("id")
+        missing = [k for k in ENTRY_FIELDS if k not in d]
+        if missing:
+            problems.append(f"{tag}: no {', '.join(missing)}")
+            continue
+        complete.append(d)
+        m = re.fullmatch(r"([a-z]+)_r(\d{2})", str(d["id"]))
+        if d["force"] in FORCES and (not m or m.group(1) != d["force"].lower()
+                                     or d["code"] != display_code(d["id"], d["force"])):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
-        if d["direction"] not in DIRECTIONS:
-            problems.append(f"{tag}: direction {d['direction']!r}")
-        if not 1 <= d["probability"] <= 5 or not 0 <= d["uncertainty"] <= 5:
-            problems.append(f"{tag}: probability or uncertainty out of range")
-        if not 0 < d["gp1_pct_affected"] <= 1:
-            problems.append(f"{tag}: gp1_pct_affected {d['gp1_pct_affected']} outside (0, 1]")
-        if not DEFAULT_BASE_YEAR <= d["start_year"] < d["peak_year"] <= DEFAULT_PATH_YEARS[-1]:
-            problems.append(f"{tag}: onset {d['start_year']} and peak {d['peak_year']} out of order or range "
-                            "(the peak comes after the onset)")
-        if d["diffusion_curve"] not in VALID_DIFFUSION_CURVES:
-            problems.append(f"{tag}: diffusion curve {d['diffusion_curve']!r}")
+        if isinstance(d["start_year"], int) and d["start_year"] < DEFAULT_BASE_YEAR:
+            problems.append(f"{tag}: onset {d['start_year']} before the base year {DEFAULT_BASE_YEAR}")
+        if isinstance(d["peak_year"], int) and d["peak_year"] > DEFAULT_PATH_YEARS[-1]:
+            problems.append(f"{tag}: peak {d['peak_year']} after the horizon {DEFAULT_PATH_YEARS[-1]}")
         if d["confidence"] not in CONFIDENCE_LEVELS:
             problems.append(f"{tag}: confidence {d['confidence']!r}")
-        if set(d["category_exposure"]) != set(CATEGORIES) or set(d["regional_exposure"]) != set(REGIONS):
-            problems.append(f"{tag}: category or regional exposure keys differ from the taxonomy")
-        if any(not 0 <= v <= 5 for v in list(d["category_exposure"].values()) + list(d["regional_exposure"].values())):
-            problems.append(f"{tag}: an exposure score outside 0-5")
-        if d["vc_epicentre"] not in VC_STAGES:
-            problems.append(f"{tag}: value-chain epicentre {d['vc_epicentre']!r}")
-        if not any(s.get("tier") in SOURCE_TIERS for s in d["sources"]):
-            problems.append(f"{tag}: no source of tier {'/'.join(SOURCE_TIERS)}")
+        if not any(s.get("tier") in REQUIRED_SOURCE_TIERS for s in d["sources"]):
+            problems.append(f"{tag}: no source of tier {'/'.join(REQUIRED_SOURCE_TIERS)}")
         for s in d["sources"]:
-            if not str(s.get("url", "")).startswith("http") or not s.get("title"):
-                problems.append(f"{tag}: a source without a title or an http(s) URL")
+            problems += [f"{tag}: source {s.get('title') or s.get('url')!r}: {p}" for p in _source_problems(s)]
+    problems += simulation_problems([_entry_driver(d) for d in complete])
     if problems:
         raise InvalidBaseError("driver base is not valid:\n  " + "\n  ".join(problems))
+
+
+def _source_problems(source: dict) -> list:
+    """What keeps a source of the base from being stored and saved again from the editor."""
+    out = []
+    if not str(source.get("title") or "").strip():
+        out.append("no title")
+    if not re.fullmatch(SOURCE_URL_PATTERN, str(source.get("url") or "")):
+        out.append("its link is not an http(s) address")
+    if source.get("tier") not in ("",) + SOURCE_TIERS:
+        out.append(f"tier {source.get('tier')!r} is not on the scale")
+    if not isinstance(source.get("published"), str):
+        out.append("no publication note")
+    out += [f"{name} longer than {limit} characters" for name, limit in SOURCE_FIELD_LIMITS.items()
+            if len(str(source.get(name) or "")) > limit]
+    return out
+
+
+def _entry_driver(d: dict) -> Driver:
+    """A base entry as a Driver with its exposure maps as written, for the checks."""
+    return Driver(id=d["id"], force=d["force"], direction=d["direction"], probability=d["probability"],
+                  start_year=d["start_year"], gp1_pct_affected=d["gp1_pct_affected"], peak_year=d["peak_year"],
+                  diffusion_curve=d["diffusion_curve"], uncertainty=d["uncertainty"],
+                  category_exposure=d["category_exposure"], regional_exposure=d["regional_exposure"],
+                  vc_epicentre=d["vc_epicentre"])
 
 
 def load_base(path: Path = BASE_PATH) -> list:

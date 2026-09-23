@@ -11,9 +11,9 @@ Outputs (committed, never edited by hand)
   data/driverCodeMap.ts              display code <-> driver id for the dashboard
 
 The base is validated before anything is written (prism/driver_base.py): every
-taxonomy key present, scores in range, onset before peak, the value-chain
-epicentre a known stage, and at least one source of tier S, A or B behind
-every driver.
+model input by the engine's rules (prism.drivers.simulation_problems), an
+onset and a peak inside the horizon, and sources the editor can save again,
+at least one of tier S, A or B behind every driver.
 
     python3 scripts/generate_seed.py            write both files
     python3 scripts/generate_seed.py --check    exit 1 if a committed file differs

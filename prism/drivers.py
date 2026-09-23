@@ -22,6 +22,12 @@ CONFIDENCE_LEVELS = ("High", "Medium", "Low")
 #: Sources); lib/format.ts SOURCE_TIERS holds the same list. A source may be
 #: unrated ("").
 SOURCE_TIERS = ("S", "A", "A-", "B+", "B", "B-", "C", "D", "E")
+#: A source's link, when it has one: an http(s) address without spaces, which
+#: the dashboard renders as a link. The API, the driver base and the migration
+#: hold every link to it.
+SOURCE_URL_PATTERN = r"https?://\S+"
+#: The most characters a source's title, link and publication note may hold.
+SOURCE_FIELD_LIMITS = {"title": 500, "url": 2000, "published": 500}
 
 
 @dataclass

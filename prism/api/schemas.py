@@ -5,7 +5,7 @@ from typing import Annotated, Optional
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, model_validator
 
 from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS
-from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS
+from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 
 #: The years a peak year can take: after the base year, within the horizon.
 #: The API also refuses a peak year at or before the driver's own onset.
@@ -34,10 +34,10 @@ class SourceRef(BaseModel):
     published."""
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field("", max_length=500)
-    url: str = Field("", max_length=2000, pattern=r"^(https?://\S+)?$")
+    title: str = Field("", max_length=SOURCE_FIELD_LIMITS["title"])
+    url: str = Field("", max_length=SOURCE_FIELD_LIMITS["url"], pattern=f"^({SOURCE_URL_PATTERN})?$")
     tier: str = Field("", pattern=pattern_one_of(("",) + SOURCE_TIERS))
-    published: str = Field("", max_length=500)
+    published: str = Field("", max_length=SOURCE_FIELD_LIMITS["published"])
 
     @model_validator(mode="after")
     def _title_or_url(self):
