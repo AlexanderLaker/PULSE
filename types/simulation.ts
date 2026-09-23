@@ -103,7 +103,6 @@ export interface RunMeta {
   numerics_backend: string;
   driver_count: number;
   attenuation_source: string;
-  persisted_at_utc: string;
 }
 
 /** GET /api/v1/simulation as it arrives. */

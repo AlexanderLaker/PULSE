@@ -1,7 +1,7 @@
 /**
  * The Profit Pool Explorer's data: Bain-style profit pool views of the Hair
- * and Laundry / Home Care industries on a GP1 basis, every figure sourced and
- * graded.
+ * and the Laundry & Home Care industries on a GP1 basis, every figure sourced
+ * and graded.
  *
  * Pool development is the headline. Each row carries a revenue CAGR and a
  * structured GP1 margin drift over the horizon (gp1DeltaBps), and the growth
@@ -55,8 +55,10 @@
  * carries its base year. The horizon for all development arrows is ~5 years
  * (≈2025 → 2030).
  *
- * This is the one place in the dashboard with absolute € figures; the Shift
- * Analysis stays relative (percent only).
+ * The Explorer is the one view built on amounts of money; elsewhere an amount
+ * appears only as quoted evidence in a text (a driver's description or
+ * sources, a Consumer Journey tile), and the Shift Analysis stays relative
+ * (percent only).
  */
 
 import { NO_VALUE, type CategoryGroup } from '@/lib/format';
@@ -135,6 +137,9 @@ export interface PoolView {
   /** Numeric revenue pool in €bn (planning rate 1.15) for the € math in the UI. */
   poolSizeEurBn: number;
   group: PoolGroup;
+  /** What the view covers, which can be narrower than its group ("Laundry
+   *  Care" within Laundry & Home Care); the title opens with it. */
+  scope: string;
   kind: PoolViewKind;
   /** Rows in the authored order: value chain raw to retail, categories by logic, CORE first. */
   items: PoolItem[];
@@ -547,6 +552,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€153bn',
     poolSizeEurBn: 152.6,
     group: 'Hair',
+    scope: 'Hair Care',
     kind: 'ValueChain',
     construction:
       'EACH TIER IS SIZED ON ITS OWN REVENUE BASE and the chain pool = the SUM of tier revenues ($175.5bn ≈ €153bn): revenue cascades through the chain, so tiers deliberately double-count the same consumer euro; read bars as “this tier’s own revenue”, not slices of the retail total. Bases (2025, $bn): store retail 75.2 (= ~80% of the $94bn RSP retail triangulation) · e-com/DTC 18.8 (~20% online share) · brand owner 47 (RSP→MSP bridge: net sales ≈ 50% of retail value; supply-side check: P&G Beauty $15.0bn FY2025 net sales) · professional products 16.5 (Kline, salon-manufacturer level: own base, never a share of RSP) · wholesale 7.5 (~8% of retail value flows through) · specialty ingredients 3.8 and commodity chemicals 5.5 (input-cost shares of brand COGS) · fragrance/actives 1.2. Derivations per tier in the source hovers; retail total Passport-unconfirmed.',
@@ -661,6 +667,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€277bn',
     poolSizeEurBn: 276.9,
     group: 'LHC',
+    scope: 'Laundry Care',
     kind: 'ValueChain',
     construction:
       'EACH TIER IS SIZED ON ITS OWN REVENUE BASE and the chain pool = the SUM of tier revenues ($318.4bn ≈ €277bn): revenue cascades, so tiers deliberately double-count the same consumer euro; read bars as “this tier’s own revenue”, not slices of the retail total. Bases (2025, $bn): store retail 89 (= ~89% of the $100bn RSP retail triangulation) · e-com 11 (~11% online share) · brand owner 50 (RSP→MSP bridge: net sales ≈ 50% of retail value; supply-side check: P&G Fabric & Home Care $29.6bn FY2025 net sales, MSP) · laundry services 78.2 (GVR 2024, own market) · appliance OEMs 66.9 (FBI 2025, own market) · wholesale 7 (~7% of retail flows through) · commodity chemicals 10, enzymes 1.3 (GVR), fragrance/encapsulation 5 (input-cost bases). Derivations per tier in the source hovers; retail total Passport-unconfirmed.',
@@ -786,6 +793,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€82bn',
     poolSizeEurBn: 81.7,
     group: 'Hair',
+    scope: 'Hair Care',
     kind: 'Categories',
     construction:
       'Rows = Euromonitor Passport’s 8 hair care categories (2-in-1, Colourants, Conditioners & Treatments, Hair Loss Treatments, Perms & Relaxants, Salon Professional, Shampoos, Styling Agents) so an internal Passport extract drops in 1:1. Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover), normalised over their $93.1bn sum vs. the ~$94bn triangulated total. A format patchwork of 8 tier-2 firms would reconcile in total while every slice deviates from Passport: shampoo ~30% high, C&T fragments ~35% low, colour ~65% high (professional double-count), salon professional missing. HCB mapping: Shampoos/C&T/2-in-1/Hair Loss → Hair: Care; Colourants → Hair: Colour; Styling Agents (+ Perms, folded conceptually) → Hair: Styling; Salon Professional = in-total adjacency (Schwarzkopf Professional; no PRISM category). Hair: Body (Fa) lives in Passport Bath & Shower + Deodorants, outside this view. BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
@@ -893,6 +901,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€254bn',
     poolSizeEurBn: 253.5,
     group: 'Hair',
+    scope: 'Hair Care',
     kind: 'CoreAdjacent',
     construction:
       'Pool sizes side by side, normalised over $291.6bn: core retail hair ~$77.5bn (= triangulated Passport hair total ~$94bn MINUS Salon Professional ~$16.5bn, because the professional row is shown separately), salon services ~$150bn (triangulated: no tier-1 source sizes salon SERVICES; FBI’s $203.8bn treated as a scope-inflated ceiling), professional products ~$16.5bn (Kline authority, salon-manufacturer level, not RSP; flagged), tools $29.4bn (FBI 2025), scalp care $15.8bn (CMI 2026; cross-cuts retail formats, flagged), beauty subscriptions $1.6bn (FMI 2025), supplements $0.8bn (GVR 2024; Consumer Health in Passport). Men’s grooming and beauty-tech are left out: their published scopes are too broad to slot honestly.',
@@ -988,6 +997,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€186bn',
     poolSizeEurBn: 185.7,
     group: 'LHC',
+    scope: 'Home Care',
     kind: 'Categories',
     construction:
       'Rows = Euromonitor Passport’s Home Care tree (Laundry Care split into Detergents / Fabric Softeners / Laundry Aids; Dishwashing split Hand / Automatic; Surface, Toilet, Bleach, Polishes, Home Insecticides, Air Care) so an internal Passport extract drops in 1:1, and every PRISM Laundry & Home Care category has a row (Toilet Care for Bref, Home Insecticides for IC). Passport values are not shareable (licence), so every size is a PUBLIC TRIANGULATION at 2025 RSP (recipes in each source hover); the 11 rows sum to $213.5bn ≈ the triangulated Home Care total. The bars stay on one hierarchy level (categories, not detergent formats next to categories), and stain removers are sized on the Passport scope rather than a surface-stain-inflated one that would overweight them ~3×; the detergent format mix (liquid ≈ half, powder ≈ ⅓, unit-dose ≈ 10–14%) lives inside the Laundry Detergents row note, matching Passport’s drill-down level. HCB mapping: Detergents → FCN+FCA (internal split: Passport has no fine-fabric category); Softeners → FFI; Aids (+ Carpet Cleaners, folded) → LAD; Hand/Auto Dishwashing → HDW/ADW; Surface+Bleach+Polishes → HSC cluster and Toilet → TOI (Toilet Care is its own PRISM category, separate from Hard-Surface Cleaner); Home Insecticides → IC; Air Care → no HCB category (white-space adjacency). BASIS NOTE: bar widths are category revenue at RSP (retail value); GP1 % is a brand-owner proxy, so € GP1 pools on this view read as pool-at-retail-value; brand-owner-level GP1 € is ≈ half (RSP ≈ 2× MSP; the value-chain view carries the per-tier € honestly).',
@@ -1127,6 +1137,7 @@ export const PROFIT_POOL_VIEWS: PoolView[] = [
     poolSize: '~€315bn',
     poolSizeEurBn: 315.3,
     group: 'LHC',
+    scope: 'Laundry Care',
     kind: 'CoreAdjacent',
     construction:
       'Pool sizes side by side, normalised over $362.6bn: core Laundry Care ~$100bn (2025 RSP triangulation, recipe in the source hover; a ~$85bn estimate runs ~15% low), laundry services $78.2bn (GVR 2024), washing machines $66.9bn (FBI 2025), Surface Care ~$30bn (Passport-consistent; a “~$55bn surface cleaners” figure would mix Surface + Toilet + Bleach + Polishes, and those categories live on the Home Care category view), on-demand laundry $28.5bn (GVR 2023, definition flagged), Hand Dishwashing ~$19bn and Automatic Dishwashing ~$14bn (Passport-consistent splits of Dishwashing ~$33bn; Market.us’ $19.2bn ADW runs ~35% high), Air Care ~$14bn (Passport-consistent; Precedence $17.2bn scope-inflated), smart washers $12.0bn (GVR 2024).',
@@ -1343,16 +1354,14 @@ export function toCagrRating(cagr: number): CagrRating {
 }
 
 /**
- * Rating for a GP1 margin drift in basis points over the horizon:
+ * GP1 margin drift ladder, in basis points over the horizon:
  *   |Δ| < 25bps flat · 25–75 one · 75–125 two · ≥125 three.
  */
+const GP1_DRIFT_THRESHOLDS = { flat: 25, one: 75, two: 125 } as const;
+
+const bpsFmt = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}bps`;
+
+/** Rating for a GP1 margin drift in basis points (drill-down decomposition row). */
 export function toGp1Rating(deltaBps: number): CagrRating {
-  if (!isFinite(deltaBps)) return { direction: 'flat', arrows: 0, label: NO_VALUE, tone: 'grey' };
-  const abs = Math.abs(deltaBps);
-  const label = `${deltaBps > 0 ? '+' : ''}${Math.round(deltaBps)}bps`;
-  if (abs < 25) return { direction: 'flat', arrows: 0, label, tone: 'grey' };
-  const arrows: 1 | 2 | 3 = abs < 75 ? 1 : abs < 125 ? 2 : 3;
-  return deltaBps > 0
-    ? { direction: 'up', arrows, label, tone: 'green' }
-    : { direction: 'down', arrows, label, tone: 'red' };
+  return rate(deltaBps, GP1_DRIFT_THRESHOLDS, bpsFmt);
 }

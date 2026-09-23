@@ -69,7 +69,7 @@ any of these keys (`prism/api/runs.py`).
 | `mc_standard_error` | Bootstrap standard error of each category's terminal-year median, P10 and P90 |
 | `seed_stability` | The terminal-year portfolio median of each chain and their spread |
 | `integrity_events` | Everything the run repaired or clipped, and the input drift |
-| `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, time of storage, and the drivers' fingerprint for the next run |
+| `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, and the drivers' fingerprint for the next run |
 
 docs/MODEL.md explains each quantity.
 
@@ -92,7 +92,7 @@ engine.
 | `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
 | `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
 | `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
-| `GET /api/v1/simulation` | signed in | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count, overlap-correction source and time of storage), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
+| `GET /api/v1/simulation` | signed in | The latest run: the bundle above, with `run_meta` in place of `meta` (the run's id, date and iterations per chain, and from `meta` the seeds, chain count, model version, engine, numerics backend, driver count and overlap-correction source), and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
 | `GET /api/v1/config` | signed in | The model configuration the production run uses, read-only |
 | `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
 | `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between); a map the dashboard could not render, or one citing a code that is not a driver, is refused (`prism/journey.py`) |

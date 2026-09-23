@@ -165,7 +165,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           {/* A three-line plain read first, so the curious reader gets the gist before the technical prose. */}
           <ul className="text-[12px] mb-3" style={{ color: S.onSurfaceVariant, lineHeight: 1.55, fontFamily: BODY_FONT, margin: '0 0 12px', paddingLeft: 18 }}>
             <li style={{ marginBottom: 3 }}>Each cell is the cumulative % shift vs {BASE_YEAR} at that year: a compounded level, not a year-on-year change.</li>
-            <li style={{ marginBottom: 3 }}>Totals are category-weighted averages (not sums), so the portfolio number reads as one interpretable shift.</li>
+            <li style={{ marginBottom: 3 }}>The matrix totals are category-weighted averages of the category medians, not sums; the portfolio figure above the matrix is the median of the portfolio shift itself, so the two can differ slightly.</li>
             <li>The model holds Henkel and competitor strategy constant: it propagates external drivers only.</li>
           </ul>
           <p className="text-[12px]" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
@@ -191,9 +191,11 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             experts placed each driver&rsquo;s epicentre (with responses held constant, the model
             carries no propagation along the chain). A lens&rsquo;s row total is the
             category&rsquo;s median, the same in all four lenses. <strong>Column and grand totals
-            are category-weighted averages</strong> with the run&rsquo;s category shares (the row
-            sums of its cell weights), so a year&rsquo;s grand total is the same in every lens and
-            reads as one portfolio shift.
+            are category-weighted averages</strong> of the category medians, with the run&rsquo;s
+            category shares (the row sums of its cell weights), so a year&rsquo;s grand total is the
+            same in every lens. The portfolio figure above the matrix is another number: the median
+            of the portfolio shift computed in every draw, with its P10 to P90 band. An average of
+            medians is not the median of the average, so the two can differ slightly.
           </p>
         </div>
       )}

@@ -20,7 +20,7 @@ REQUIRED_KEYS = (
 #: Run metadata passed through to the dashboard's run information.
 META_KEYS = (
     "seed", "chain_seeds", "chains", "model_version", "engine_name", "numerics_backend",
-    "driver_count", "attenuation_source", "persisted_at_utc",
+    "driver_count", "attenuation_source",
 )
 
 

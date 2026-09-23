@@ -48,7 +48,7 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -135,7 +135,6 @@ def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerp
             "numerics_backend": result["numerics_backend"],
             "driver_count": driver_count,
             "attenuation_source": config.attenuation_source,
-            "persisted_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             # The next run compares its drivers with this fingerprint.
             "driver_fingerprint": fingerprint,
         },

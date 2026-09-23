@@ -75,7 +75,7 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
   const maxSe = Math.max(0, ...Object.values(simulation.mc_standard_error).map((e) => e.median_se_pp));
   const rows: Array<[string, string]> = [
     ['Iterations', `${(m.iterations / 1000).toFixed(0)}k × ${m.chains} chains`],
-    ['Seed', String(m.seed)],
+    ['Seed', `${m.seed} (chain seeds ${m.chain_seeds.join(', ')})`],
     // The largest standard error of a terminal-year category median, and the
     // spread of the terminal-year portfolio median across the independently
     // seeded chains; the note under the rows says what neither measures.
