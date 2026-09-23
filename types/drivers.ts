@@ -49,7 +49,7 @@ export interface Driver extends DriverScores {
   start_year: number;
   confidence: Confidence;
   /** Beta-prior mean x GP1 share x direction sign: the driver's expected signed effect before exposures
-   *  (the Drivers page's Shift column). */
+   *  (the Drivers page's Expected effect column). */
   expected_effect: number;
   /** The generated PRISM Analysis text; read-only everywhere. */
   analysis: string;

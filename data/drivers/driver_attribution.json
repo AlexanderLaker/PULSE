@@ -521,8 +521,7 @@
    "structure": {
     "pass_through": 0.0798,
     "reach": 0.7118,
-    "effective_dampening": 0.9642,
-    "raw_shift": -0.1667
+    "effective_dampening": 0.9642
    }
   },
   "competitive_r16": {
@@ -789,8 +788,7 @@
    "structure": {
     "pass_through": 0.0798,
     "reach": 0.2508,
-    "effective_dampening": 0.9389,
-    "raw_shift": -0.1
+    "effective_dampening": 0.9389
    }
   },
   "competitive_r17": {
@@ -1027,8 +1025,7 @@
    "structure": {
     "pass_through": 0.0798,
     "reach": 0.2431,
-    "effective_dampening": 0.9655,
-    "raw_shift": 0.04
+    "effective_dampening": 0.9655
    }
   },
   "competitive_r18": {
@@ -1295,8 +1292,7 @@
    "structure": {
     "pass_through": 0.0798,
     "reach": 0.2758,
-    "effective_dampening": 0.9387,
-    "raw_shift": -0.08
+    "effective_dampening": 0.9387
    }
   },
   "consumer_r01": {
@@ -1583,8 +1579,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.5655,
-    "effective_dampening": 0.9227,
-    "raw_shift": -0.1833
+    "effective_dampening": 0.9227
    }
   },
   "consumer_r02": {
@@ -1871,8 +1866,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1202,
-    "effective_dampening": 0.9121,
-    "raw_shift": 0.04
+    "effective_dampening": 0.9121
    }
   },
   "consumer_r03": {
@@ -2159,8 +2153,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.33,
-    "effective_dampening": 0.9129,
-    "raw_shift": 0.15
+    "effective_dampening": 0.9129
    }
   },
   "consumer_r04": {
@@ -2447,8 +2440,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.3126,
-    "effective_dampening": 0.915,
-    "raw_shift": 0.0667
+    "effective_dampening": 0.915
    }
   },
   "consumer_r05": {
@@ -2735,8 +2727,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.3286,
-    "effective_dampening": 0.9166,
-    "raw_shift": 0.0533
+    "effective_dampening": 0.9166
    }
   },
   "consumer_r06": {
@@ -3023,8 +3014,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.5629,
-    "effective_dampening": 0.9214,
-    "raw_shift": -0.1667
+    "effective_dampening": 0.9214
    }
   },
   "consumer_r07": {
@@ -3311,8 +3301,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1675,
-    "effective_dampening": 0.9122,
-    "raw_shift": 0.04
+    "effective_dampening": 0.9122
    }
   },
   "consumer_r10": {
@@ -3599,8 +3588,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1902,
-    "effective_dampening": 0.9123,
-    "raw_shift": 0.0333
+    "effective_dampening": 0.9123
    }
   },
   "consumer_r11": {
@@ -3887,8 +3875,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.2257,
-    "effective_dampening": 0.9126,
-    "raw_shift": -0.0533
+    "effective_dampening": 0.9126
    }
   },
   "consumer_r16": {
@@ -4175,8 +4162,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.0454,
-    "effective_dampening": 0.9115,
-    "raw_shift": -0.0467
+    "effective_dampening": 0.9115
    }
   },
   "consumer_r18": {
@@ -4463,8 +4449,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1625,
-    "effective_dampening": 0.9167,
-    "raw_shift": 0.0533
+    "effective_dampening": 0.9167
    }
   },
   "consumer_r24": {
@@ -4751,8 +4736,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1586,
-    "effective_dampening": 0.9125,
-    "raw_shift": 0.04
+    "effective_dampening": 0.9125
    }
   },
   "consumer_r25": {
@@ -5039,8 +5023,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.4498,
-    "effective_dampening": 0.9221,
-    "raw_shift": -0.04
+    "effective_dampening": 0.9221
    }
   },
   "consumer_r27": {
@@ -5327,8 +5310,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.0578,
-    "effective_dampening": 0.9326,
-    "raw_shift": 0.0267
+    "effective_dampening": 0.9326
    }
   },
   "consumer_r28": {
@@ -5615,8 +5597,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1905,
-    "effective_dampening": 0.9241,
-    "raw_shift": 0.0533
+    "effective_dampening": 0.9241
    }
   },
   "consumer_r29": {
@@ -5903,8 +5884,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1744,
-    "effective_dampening": 0.9241,
-    "raw_shift": 0.0533
+    "effective_dampening": 0.9241
    }
   },
   "consumer_r34": {
@@ -6191,8 +6171,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1699,
-    "effective_dampening": 0.9177,
-    "raw_shift": -0.0533
+    "effective_dampening": 0.9177
    }
   },
   "consumer_r35": {
@@ -6479,8 +6458,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.2417,
-    "effective_dampening": 0.9127,
-    "raw_shift": -0.0667
+    "effective_dampening": 0.9127
    }
   },
   "consumer_r36": {
@@ -6767,8 +6745,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.3118,
-    "effective_dampening": 0.9191,
-    "raw_shift": -0.1
+    "effective_dampening": 0.9191
    }
   },
   "consumer_r37": {
@@ -7055,8 +7032,7 @@
    "structure": {
     "pass_through": 0.0812,
     "reach": 0.1776,
-    "effective_dampening": 0.9164,
-    "raw_shift": 0.1
+    "effective_dampening": 0.9164
    }
   },
   "customer_r01": {
@@ -7343,8 +7319,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.5708,
-    "effective_dampening": 0.8331,
-    "raw_shift": -0.125
+    "effective_dampening": 0.8331
    }
   },
   "customer_r02": {
@@ -7631,8 +7606,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.4649,
-    "effective_dampening": 0.8368,
-    "raw_shift": -0.0667
+    "effective_dampening": 0.8368
    }
   },
   "customer_r03": {
@@ -7919,8 +7893,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.4747,
-    "effective_dampening": 0.8286,
-    "raw_shift": -0.1
+    "effective_dampening": 0.8286
    }
   },
   "customer_r04": {
@@ -8207,8 +8180,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.2764,
-    "effective_dampening": 0.822,
-    "raw_shift": 0.04
+    "effective_dampening": 0.822
    }
   },
   "customer_r07": {
@@ -8495,8 +8467,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.2497,
-    "effective_dampening": 0.8214,
-    "raw_shift": 0.0833
+    "effective_dampening": 0.8214
    }
   },
   "customer_r12": {
@@ -8783,8 +8754,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.3947,
-    "effective_dampening": 0.8231,
-    "raw_shift": -0.0667
+    "effective_dampening": 0.8231
    }
   },
   "customer_r13": {
@@ -9071,8 +9041,7 @@
    "structure": {
     "pass_through": 0.0695,
     "reach": 0.5662,
-    "effective_dampening": 0.8345,
-    "raw_shift": -0.15
+    "effective_dampening": 0.8345
    }
   },
   "environmental_r01": {
@@ -9339,8 +9308,7 @@
    "structure": {
     "pass_through": 0.063,
     "reach": 0.5197,
-    "effective_dampening": 0.7571,
-    "raw_shift": -0.1
+    "effective_dampening": 0.7571
    }
   },
   "environmental_r03": {
@@ -9627,8 +9595,7 @@
    "structure": {
     "pass_through": 0.063,
     "reach": 0.3403,
-    "effective_dampening": 0.7303,
-    "raw_shift": -0.0667
+    "effective_dampening": 0.7303
    }
   },
   "environmental_r07": {
@@ -9915,8 +9882,7 @@
    "structure": {
     "pass_through": 0.063,
     "reach": 0.321,
-    "effective_dampening": 0.7308,
-    "raw_shift": -0.05
+    "effective_dampening": 0.7308
    }
   },
   "environmental_r12": {
@@ -10193,8 +10159,7 @@
    "structure": {
     "pass_through": 0.063,
     "reach": 0.6747,
-    "effective_dampening": 0.7557,
-    "raw_shift": -0.125
+    "effective_dampening": 0.7557
    }
   },
   "government_r02": {
@@ -10481,8 +10446,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.3317,
-    "effective_dampening": 0.9112,
-    "raw_shift": -0.0417
+    "effective_dampening": 0.9112
    }
   },
   "government_r03": {
@@ -10769,8 +10733,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.2587,
-    "effective_dampening": 0.9098,
-    "raw_shift": -0.1
+    "effective_dampening": 0.9098
    }
   },
   "government_r04": {
@@ -11057,8 +11020,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.5137,
-    "effective_dampening": 0.9121,
-    "raw_shift": -0.125
+    "effective_dampening": 0.9121
    }
   },
   "government_r05": {
@@ -11345,8 +11307,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.3771,
-    "effective_dampening": 0.9119,
-    "raw_shift": -0.0333
+    "effective_dampening": 0.9119
    }
   },
   "government_r06": {
@@ -11633,8 +11594,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.3279,
-    "effective_dampening": 0.9112,
-    "raw_shift": -0.0267
+    "effective_dampening": 0.9112
    }
   },
   "government_r08": {
@@ -11921,8 +11881,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.183,
-    "effective_dampening": 0.9118,
-    "raw_shift": -0.04
+    "effective_dampening": 0.9118
    }
   },
   "government_r13": {
@@ -12209,8 +12168,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.106,
-    "effective_dampening": 0.9077,
-    "raw_shift": -0.05
+    "effective_dampening": 0.9077
    }
   },
   "government_r15": {
@@ -12497,8 +12455,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.1769,
-    "effective_dampening": 0.9127,
-    "raw_shift": -0.0667
+    "effective_dampening": 0.9127
    }
   },
   "government_r16": {
@@ -12785,8 +12742,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.2788,
-    "effective_dampening": 0.9138,
-    "raw_shift": -0.1
+    "effective_dampening": 0.9138
    }
   },
   "government_r17": {
@@ -13017,8 +12973,7 @@
    "structure": {
     "pass_through": 0.0743,
     "reach": 0.2194,
-    "effective_dampening": 0.907,
-    "raw_shift": -0.1
+    "effective_dampening": 0.907
    }
   },
   "technology_r01": {
@@ -13305,8 +13260,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.5798,
-    "effective_dampening": 0.7159,
-    "raw_shift": 0.04
+    "effective_dampening": 0.7159
    }
   },
   "technology_r02": {
@@ -13593,8 +13547,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.4928,
-    "effective_dampening": 0.7017,
-    "raw_shift": 0.025
+    "effective_dampening": 0.7017
    }
   },
   "technology_r03": {
@@ -13881,8 +13834,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.345,
-    "effective_dampening": 0.6973,
-    "raw_shift": 0.0667
+    "effective_dampening": 0.6973
    }
   },
   "technology_r08": {
@@ -14169,8 +14121,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.335,
-    "effective_dampening": 0.6933,
-    "raw_shift": -0.025
+    "effective_dampening": 0.6933
    }
   },
   "technology_r11": {
@@ -14457,8 +14408,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.4339,
-    "effective_dampening": 0.7027,
-    "raw_shift": -0.075
+    "effective_dampening": 0.7027
    }
   },
   "technology_r13": {
@@ -14745,8 +14695,7 @@
    "structure": {
     "pass_through": 0.0687,
     "reach": 0.4973,
-    "effective_dampening": 0.7149,
-    "raw_shift": -0.0533
+    "effective_dampening": 0.7149
    }
   }
  }

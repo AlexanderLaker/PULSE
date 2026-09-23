@@ -399,7 +399,6 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
                 "pass_through": r4(dec["fw"][f] * dec["att"][f]),
                 "reach": r4(reach),
                 "effective_dampening": r4(eff_damp),
-                "raw_shift": r4(float(dec["s_mean"][j])),
             },
         }
 

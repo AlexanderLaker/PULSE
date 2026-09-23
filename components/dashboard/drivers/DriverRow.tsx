@@ -104,7 +104,7 @@ const Gp1Cell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPropos
   );
 };
 
-const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
+const ExpectedEffectCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverProposal }> = ({ driver, mode, myProposal }) => {
   const [tip, setTip] = useState(false);
   const dirSign = driver.direction === 'Contraction' ? -1 : 1;
 
@@ -269,7 +269,7 @@ export const DriverRow: FC<DriverRowProps> = ({
         {/* Direction */}
         <div><Chip kind={driver.direction === 'Expansion' ? 'expansion' : 'contraction'} compact /></div>
 
-        {/* Probability, GP1 % and Shift: read-only here */}
+        {/* Probability, GP1 % and the expected effect: read-only here */}
         <div><ProbCell driver={driver} mode={mode} myProposal={myProposal} /></div>
 
         <div className="text-right">
@@ -277,7 +277,7 @@ export const DriverRow: FC<DriverRowProps> = ({
         </div>
 
         <div className="text-right">
-          <RowEndCell driver={driver} mode={mode} myProposal={myProposal} />
+          <ExpectedEffectCell driver={driver} mode={mode} myProposal={myProposal} />
         </div>
 
         {/* The Edited chip, your review status or the proposal count */}

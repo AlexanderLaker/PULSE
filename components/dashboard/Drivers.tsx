@@ -23,6 +23,7 @@ import { CATEGORIES, HORIZON } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal } from '@/types';
 import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './drivers/shared';
+import { FIELD_HELP } from './drivers/cards';
 import { DriverRow, ROW_GRID } from './drivers/DriverRow';
 
 // ─── Sort helpers ──────────────────────────────────────────────────
@@ -443,9 +444,7 @@ const Gp1InfoTip: FC = () => {
           fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500, textTransform: 'none',
           letterSpacing: 0, textAlign: 'left', boxShadow: SHADOW.tip,
           pointerEvents: 'none', whiteSpace: 'normal' }}>
-          <b>GP1 % Affected</b>: the share of a category&apos;s GP1 (gross profit after cost of goods)
-          that this driver can realistically move at full materialisation. Multiplied by probability and
-          direction, it gives the Expected effect column.
+          <b>GP1 % Affected.</b> {FIELD_HELP.gp1}
         </span>
       )}
     </span>
