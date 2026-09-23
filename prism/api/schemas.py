@@ -27,12 +27,13 @@ class DriverUpdate(BaseModel):
     /api/v1/drivers); the edit is refused if the driver has changed since.
     Every other field is optional and only the fields sent change;
     ``uncertainty`` may be sent as null to clear the score, and an exposure
-    map may name only the cells that change.
+    map may name only the cells that change. The name, the force and the
+    onset (start year) come from the driver base and are not edited here; a
+    peak year must come after the onset.
     """
     model_config = ConfigDict(extra="forbid")
 
     revision: int = Field(..., ge=1)
-    name: Optional[str] = Field(None, min_length=1, max_length=300)
     description: Optional[str] = Field(None, max_length=20000)
     direction: Optional[str] = Field(None, pattern="^(Expansion|Contraction)$")
     probability: Optional[int] = Field(None, ge=1, le=5)

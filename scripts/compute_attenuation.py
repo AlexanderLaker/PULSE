@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Derive the overlap correction (attenuation and overlap matrices) from the driver base.
 
 Some mechanisms are carried by more than one driver or force: a packaging
@@ -13,8 +12,8 @@ drivers' category exposure vectors, not a fit to outcomes:
   4. an additive mechanism adjustment per cell, each with its written reason below
   5. clamps: within-force [0.10, 0.45], cross-force [0.00, 0.45]
 
-and per force the attenuation is 0.5 x (1 - mean of the force's row in the
-cross-force matrix). The script also reports the minimum eigenvalue of the
+and per force the attenuation is 0.5 x (1 - the mean of the force's row in the
+cross-force matrix over the five other forces). The script also reports the minimum eigenvalue of the
 driver-level copula correlation matrix the default correlations imply on this
 driver base; it must stay positive.
 
@@ -214,11 +213,12 @@ def compute(out_json: Path = OUT_JSON, verbose: bool = True) -> dict:
         f"({'positive definite' if lambda_min > 0 else 'NOT positive definite: rescale DEFAULT_FORCE_CORRELATIONS'})")
 
     out = {
+        "generated_by": "scripts/compute_attenuation.py",
         "calibration_version": CALIBRATION_VERSION,
         "method": ("Weighted Jaccard on the 13-category exposure vectors, excess over the random-pair "
                    "baseline J0, asymmetric force-size factor across forces, per-cell mechanism "
                    "adjustments with written reasons, clamps within [0.10, 0.45] and across "
-                   "[0.00, 0.45]; attenuation = 0.5 x (1 - mean cross-force row overlap)"),
+                   "[0.00, 0.45]; attenuation = 0.5 x (1 - mean overlap with the five other forces)"),
         "n_drivers": len(drivers),
         "force_counts": n_force,
         "J0_baseline": round(J0, 6),

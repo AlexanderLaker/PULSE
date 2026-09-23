@@ -2,11 +2,16 @@
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
 
+from prism.database import PENDING_MIGRATION_MARKERS
+
 REPO = Path(__file__).resolve().parents[1]
+#: The table only a database still awaiting migration 0001 has (prism/database.py).
+AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
 
 
 def _load(name: str, path: Path):
@@ -39,11 +44,11 @@ class TestProductionRun:
         monkeypatch.setattr(production, "USE_POSTGRES", False)
         assert production.main([]) == 1
 
-    def test_refuses_a_database_of_the_previous_schema(self, production, monkeypatch, tmp_path):
+    def test_refuses_a_database_awaiting_a_migration(self, production, monkeypatch, tmp_path):
         import sqlite3
-        legacy = tmp_path / "legacy.db"
-        sqlite3.connect(legacy).execute("CREATE TABLE trends (id TEXT PRIMARY KEY)").connection.close()
-        monkeypatch.setenv("PRISM_DB_PATH", str(legacy))
+        awaiting = tmp_path / "awaiting.db"
+        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         assert production.main(["--allow-sqlite"]) == 1
 
     def test_refuses_an_empty_database(self, production, monkeypatch, tmp_path):
@@ -127,6 +132,15 @@ class TestCellWeightsFile:
         with pytest.raises(ValueError):
             production.load_cell_weights_file(self._file(tmp_path, cells))
 
+    def test_a_label_that_opens_like_the_estimate_is_refused(self, production, tmp_path):
+        """The dashboard reads that opening as the built-in estimate."""
+        from prism.config import CATEGORIES, REGIONS
+        cells = {c: {r: 1.0 / 52 for r in REGIONS} for c in CATEGORIES}
+        with pytest.raises(ValueError, match="built-in estimate"):
+            production.load_cell_weights_file(self._file(tmp_path, cells, source="Estimate, not Henkel P&L (FY25)"))
+        shares, source = production.load_cell_weights_file(self._file(tmp_path, cells, source="Estimated mix, Finance"))
+        assert source == "Estimated mix, Finance"
+
 
 class TestWorkbook:
     def _result(self, config, db):
@@ -196,14 +210,57 @@ class TestSyncAnalysis:
         assert sync.main([]) == 0
         assert "0 with an outdated analysis" in capsys.readouterr().out
 
-    def test_a_database_of_the_previous_schema_is_refused(self, monkeypatch, tmp_path, capsys):
+    def test_the_texts_of_another_rendering(self, seeded, tmp_path, capsys):
+        """--texts writes a rendering outside the repository, such as the build on the finance shares."""
+        import json
+        sync = _load("sync_analysis", REPO / "scripts" / "sync_analysis.py")
+        rendering = tmp_path / "driver_analysis.json"
+        rendering.write_text(json.dumps({"drivers": {"C-01": {"template": "t", "text": "on the finance shares"}}}))
+        assert sync.main(["--texts", str(rendering)]) == 0
+        assert "1 with an outdated analysis" in capsys.readouterr().out
+        analyses = {d.id: d.analysis for d in seeded.load_drivers()}
+        from prism.seed_drivers import DRIVERS
+        assert analyses["consumer_r01"] == "on the finance shares"
+        assert all(analyses[d.id] == d.analysis for d in DRIVERS if d.id != "consumer_r01")
+        rendering.write_text(json.dumps({"drivers": {"Z-99": {"template": "t", "text": "x"}}}))
+        with pytest.raises(SystemExit, match="Z-99"):
+            sync.main(["--texts", str(rendering)])
+
+    def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path, capsys):
         import sqlite3
-        legacy = tmp_path / "legacy.db"
-        sqlite3.connect(legacy).execute("CREATE TABLE trends (id TEXT PRIMARY KEY)").connection.close()
-        monkeypatch.setenv("PRISM_DB_PATH", str(legacy))
+        awaiting = tmp_path / "awaiting.db"
+        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         sync = _load("sync_analysis", REPO / "scripts" / "sync_analysis.py")
         assert sync.main(["--dry-run"]) == 1
         assert "migrations/0001_driver_schema" in capsys.readouterr().out
+
+
+class TestEnvFile:
+    def test_the_file_is_loaded_and_the_shell_wins(self, tmp_path, monkeypatch):
+        from prism import env_loader
+        env = tmp_path / ".env"
+        env.write_text("PRISM_TEST_FROM_FILE=file\nPRISM_TEST_BOTH=file\n", encoding="utf-8")
+        monkeypatch.delenv("PRISM_TEST_FROM_FILE", raising=False)
+        monkeypatch.setenv("PRISM_TEST_BOTH", "shell")
+        try:
+            assert env_loader.load_env_file(env) is True
+            assert os.environ["PRISM_TEST_FROM_FILE"] == "file" and os.environ["PRISM_TEST_BOTH"] == "shell"
+        finally:
+            os.environ.pop("PRISM_TEST_FROM_FILE", None)
+
+    def test_without_python_dotenv_the_file_is_skipped_with_a_warning(self, tmp_path, monkeypatch, caplog):
+        """A host that installs only api/requirements.txt still starts the API."""
+        from prism import env_loader
+        env = tmp_path / ".env"
+        env.write_text("PRISM_TEST_SKIPPED=1\n", encoding="utf-8")
+        monkeypatch.setitem(sys.modules, "dotenv", None)   # importing dotenv now fails
+        assert env_loader.load_env_file(env) is False
+        assert "python-dotenv is not installed" in caplog.text and "PRISM_TEST_SKIPPED" not in os.environ
+
+    def test_no_file_no_change(self, tmp_path):
+        from prism import env_loader
+        assert env_loader.load_env_file(tmp_path / ".env") is False
 
 
 def test_the_admin_script_imports():

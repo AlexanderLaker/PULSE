@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Migration 0001: move a PRISM database from the previous schema to the driver schema.
 
 Run it once per database, right after deploying the code that expects the

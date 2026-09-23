@@ -10,7 +10,7 @@ from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
+from prism.config import CATEGORIES, DEFAULT_BASE_YEAR, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
 from prism.drivers import MODEL_FIELDS
 
 #: The names an exposure map may use, per field.
@@ -61,6 +61,16 @@ def _exposure_map(name: str, value: dict) -> dict:
     return out
 
 
+def _check_peak_year(driver, peak_year) -> None:
+    """422 unless the peak year comes after the driver's onset (the later of the
+    base year and its start year); the engine could not ramp to an earlier one."""
+    if peak_year is None:
+        return
+    onset = max(DEFAULT_BASE_YEAR, driver.start_year or DEFAULT_BASE_YEAR)
+    if peak_year <= onset:
+        raise HTTPException(422, f"peak_year {peak_year} must come after the driver's onset ({onset})")
+
+
 def _require_driver(driver_id: str):
     driver = state.driver_set().get_driver_by_id(driver_id)
     if driver is None:
@@ -84,9 +94,11 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
     The edit names the driver revision it was made on; if the driver has
     changed since (another admin, another tab), nothing is written and the
     answer is 409. An exposure map may name only some cells: those cells
-    change and the others keep their scores.
+    change and the others keep their scores. A stored exposure on a name
+    outside the taxonomy cannot be simulated; every save drops it, so an
+    admin can repair such a driver by saving it.
     """
-    from prism.database import StaleRevisionError, log_audit, save_driver_edit
+    from prism.database import AuditEntry, StaleRevisionError, save_driver_edit
     driver = copy.deepcopy(_require_driver(driver_id))
     sent = update.model_fields_set - {"revision"}
     for name in sent:
@@ -94,6 +106,8 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
             raise HTTPException(422, f"{name} cannot be null")
     if "diffusion_curve" in sent and update.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+    if "peak_year" in sent:
+        _check_peak_year(driver, update.peak_year)
     if update.revision != driver.revision:
         raise HTTPException(409, _STALE)
 
@@ -107,24 +121,28 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
         if new != getattr(driver, name):
             changes[name] = (getattr(driver, name), new)
             setattr(driver, name, new)
+    for name, keys in EXPOSURE_KEYS.items():
+        current = getattr(driver, name) or {}
+        valid = {k: v for k, v in current.items() if k in keys}
+        if valid != current:
+            changes[name] = (changes[name][0] if name in changes else current, valid)
+            setattr(driver, name, valid)
     if not changes:
         return {"status": "unchanged", "driver_id": driver_id, "revision": driver.revision}
 
     if any(name in MODEL_FIELDS for name in changes):
         driver.scores_edited = True
     driver.recompute()
+    actor = identity_from_user(user)[0]
+    audit = [AuditEntry("driver_updated", "driver", driver_id, old_value=json.dumps(old, default=str),
+                        new_value=json.dumps(new, default=str), reason=name, user_id=actor)
+             for name, (old, new) in changes.items()]
     try:
-        revision = save_driver_edit(driver, update.revision)
+        revision = save_driver_edit(driver, update.revision, audit)
     except StaleRevisionError:
         raise HTTPException(409, _STALE) from None
     finally:
         state.reset_drivers()
-
-    actor = identity_from_user(user)[0]
-    for name, (old, new) in changes.items():
-        log_audit("driver_updated", "driver", driver_id,
-                  old_value=json.dumps(old, default=str), new_value=json.dumps(new, default=str),
-                  reason=name, user_id=actor)
     return {"status": "updated", "driver_id": driver_id, "changed": sorted(changes), "revision": revision}
 
 
@@ -149,11 +167,13 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     changes the driver; an admin endorses it by editing the driver.
     """
     from prism.database import load_driver_proposals, upsert_driver_proposal
-    _require_driver(driver_id)
+    driver = _require_driver(driver_id)
     sent = proposal.model_fields_set
     if "diffusion_curve" in sent and proposal.diffusion_curve is not None \
             and proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+    if "peak_year" in sent:
+        _check_peak_year(driver, proposal.peak_year)
 
     fields: dict = {}
     for name in ("probability", "gp1_pct_affected", "peak_year", "uncertainty", "diffusion_curve"):

@@ -1,4 +1,5 @@
 {
+ "generated_by": "scripts/build_driver_analysis.py",
  "record_version": 1,
  "built": "2026-09-23",
  "method": "Expected-value decomposition of the engine's compounding arithmetic at the score means (Beta mean = probability/6, materialisation averaged over each driver's peak jitter), cross-terms spread in proportion to the additive terms, rolled up with the cell gross-profit shares. The sum reproduces the reference run's terminal-year mean; every contribution is then scaled by one factor, the run's median over that mean (the skew of the portfolio distribution), so the contributions add up to the median headline the dashboard shows. Attribution, not simulation.",

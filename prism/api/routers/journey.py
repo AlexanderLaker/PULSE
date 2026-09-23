@@ -84,16 +84,20 @@ def put_journey_content(body: JourneySave, user: dict = Depends(require_admin)):
     problem = content_problem(body.content)
     if problem:
         raise HTTPException(422, problem)
-    from prism.database import StaleVersionError, log_audit, save_journey_content
+    from prism.database import AuditEntry, StaleVersionError, save_journey_content
     state.ensure_schema()
     user_id = identity_from_user(user)[0]
+    n_tiles = sum(len(stage[side]) for j in JOURNEYS for stage in body.content[j] for side in SIDES)
+
+    def audit(version: int) -> AuditEntry:
+        return AuditEntry("journey_content_updated", "journey", "default",
+                          new_value=f"version {version}, {n_tiles} tiles",
+                          reason="Journey content saved in the editor", user_id=user_id)
+
     try:
         version = save_journey_content(body.content, updated_by=str(user.get("email") or user_id),
-                                       base_version=body.base_version)
+                                       base_version=body.base_version, audit=audit)
     except StaleVersionError:
         raise HTTPException(409, "The journey content was saved by someone else after you opened it. "
                                  "Reload the page to see that version, then make your edit again.") from None
-    n_tiles = sum(len(stage[side]) for j in JOURNEYS for stage in body.content[j] for side in SIDES)
-    log_audit("journey_content_updated", "journey", "default", new_value=f"version {version}, {n_tiles} tiles",
-              reason="Journey content saved in the editor", user_id=user_id)
     return {"status": "saved", "version": version, "tiles": n_tiles}

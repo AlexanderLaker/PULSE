@@ -133,9 +133,10 @@ FORBIDDEN = [
                 r"\balmost certain\b|\bvery unlikely\b|\b(?:one|two) in (?:three|four|five|six) chance\b|"
                 r"\bchance of\b|\bthe odds\b", re.I),
      "a score restated in words"),
-    (re.compile(r"September 2026 review|the (?:2026 )?review\b|old base|earlier base|previous base|prior base|"
-                r"was corrected|was deleted|were wrong|was wrong|report mill|could not be verified|unverified|"
-                r"unsourced|watch list|merged into|folded into|\brenamed\b|\bretired\b", re.I),
+    (re.compile(r"\breview(?:ed|s)?\b|\b(?:old|earlier|previous|prior|former) (?:base|version|model|scores?)\b|"
+                r"\b(?:was|were) (?:corrected|deleted|wrong)\b|\bno longer\b|\bused to\b|"
+                r"\bpreviously\b|\bformerly\b|\bcould not be verified\b|\bunverified\b|\bunsourced\b|"
+                r"\bmerged into\b|\bfolded into\b|\brenamed\b|\bretired\b", re.I),
      "a reference to the history of the base"),
     (re.compile(r"\b(?:Henkel|HCB) (?:should|must|needs to|has to|ought to|could|would need to|can offset)\b|"
                 r"\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure", re.I),
@@ -300,6 +301,35 @@ class TestCommittedArtefacts:
         # a build without --reference refuses instead of reconciling to the old median
         assert build.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
+
+    def test_a_build_on_the_finance_shares_stays_out_of_the_repository(self, build, record, tmp_path, monkeypatch,
+                                                                       capsys):
+        """The finance shares stay out of git, so a build on them writes to
+        runs/driver_analysis/ and never touches the committed files; --check
+        verifies the committed, estimate-based files and refuses the option."""
+        finance = tmp_path / "finance.json"
+        finance.write_text(json.dumps({"source": "Finance test shares", "basis": "gp1_share",
+                                       "cells": ModelConfig().cell_weights}), encoding="utf-8")
+        assert build.main(["--check", "--cell-weights", str(finance)]) == 1
+        assert "REFUSING" in capsys.readouterr().out
+
+        committed = {}
+        for name, source in (("ATTRIBUTION_PATH", ATTRIBUTION), ("ANALYSIS_PATH", ANALYSIS), ("FIXTURE_PATH", FIXTURE)):
+            copy_path = tmp_path / source.name
+            copy_path.write_bytes(source.read_bytes())
+            monkeypatch.setattr(build, name, str(copy_path))
+            committed[copy_path] = copy_path.read_bytes()
+        local = tmp_path / "runs" / "driver_analysis"
+        monkeypatch.setattr(build, "LOCAL_DIR", str(local))
+        monkeypatch.setattr(build, "reference_run", lambda *a, **k: record["reference_run"])
+        assert build.main(["--cell-weights", str(finance)]) == 0
+        assert all(path.read_bytes() == content for path, content in committed.items())
+        built = json.loads((local / "driver_attribution.json").read_text(encoding="utf-8"))
+        assert built["basis"]["cell_weights_source"] == "Finance test shares"
+        texts = json.loads((local / "driver_analysis.json").read_text(encoding="utf-8"))["drivers"]
+        assert all("the finance cell weights" in entry["text"] for entry in texts.values())
+        assert not (local / FIXTURE.name).exists()
+        assert "sync_analysis.py --texts" in capsys.readouterr().out
 
     def test_the_reference_run_reproduces_the_persisted_production_run(self, build, record):
         """The readings describe the run the dashboard shows: the record

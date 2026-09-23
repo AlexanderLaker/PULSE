@@ -59,7 +59,7 @@ def test_a_move_to_another_force_is_structural():
 
 
 def test_a_key_the_previous_fingerprint_lacks_is_not_drift():
-    """A fingerprint stored before a key existed compares on the keys both carry."""
+    """Two fingerprints are compared on the structural keys both carry."""
     previous = _fp(_driver("a"))
     del previous["a"]["s"]
     event = compute_input_drift_event(_fp(_driver("a")), previous)

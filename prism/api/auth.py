@@ -98,11 +98,12 @@ def identity_from_user(user: Optional[dict]) -> tuple:
 
     This is the only source of identity for the audit log and the expert
     proposals; nothing a client sends in a body or header is trusted for it.
-    The id is the token's ``sub`` (else its email); the name is ``name`` or
-    ``full_name``, else the email's local part; the role defaults to viewer.
+    The id is the token's ``sub`` (else its email); the name is its ``name``
+    (the user's full name in Clerk), else the email's local part; the role
+    defaults to viewer.
     """
     user = user or {}
     email = user.get("email") or ""
     user_id = str(user.get("sub") or email or "anonymous")
-    name = user.get("name") or user.get("full_name") or (email.split("@", 1)[0] if "@" in email else user_id)
+    name = user.get("name") or (email.split("@", 1)[0] if "@" in email else user_id)
     return user_id, str(name), str(user.get("role") or "viewer")

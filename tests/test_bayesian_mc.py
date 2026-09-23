@@ -32,8 +32,7 @@ class TestResultShape:
         for cat in CATEGORIES:
             for year in cfg.path_years:
                 cell = sm[cat]["path"][year]
-                for key in ("p10", "p25", "p50", "median", "p75", "p90", "mean", "std"):
-                    assert key in cell, (cat, year, key)
+                assert set(cell) == {"p10", "p25", "median", "p75", "p90", "mean", "std"}, (cat, year)
 
     def test_percentiles_are_ordered(self, mock_model_config, mock_drivers_database):
         cfg = mock_model_config.copy_with(iterations=500)
@@ -41,7 +40,7 @@ class TestResultShape:
         for cat in CATEGORIES:
             for year in cfg.path_years:
                 c = sm[cat]["path"][year]
-                assert c["p10"] <= c["p25"] <= c["p50"] <= c["p75"] <= c["p90"], (cat, year)
+                assert c["p10"] <= c["p25"] <= c["median"] <= c["p75"] <= c["p90"], (cat, year)
                 assert c["std"] >= 0
 
     def test_raw_samples(self, mock_model_config, mock_drivers_database):

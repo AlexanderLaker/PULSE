@@ -16,9 +16,10 @@ import logging
 import os
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
 from prism.drivers import Driver
@@ -38,13 +39,34 @@ else:
 #: them on a new database so a migration script never runs on it.
 SCHEMA_MIGRATIONS = ("0001_driver_schema",)
 
+#: For each migration, the table only a database still awaiting it has (and
+#: the table the migration creates, so a migrated database never matches).
+PENDING_MIGRATION_MARKERS = {"0001_driver_schema": ("trends", "drivers")}
 
-class LegacySchemaError(RuntimeError):
-    """The database predates the current schema and must be migrated first."""
+
+class MigrationPendingError(RuntimeError):
+    """The database needs a migration from migrations/ before this code may use it."""
+
+    def __init__(self, migration: str):
+        self.migration = migration
+        super().__init__(f"This database needs migration {migration} before this release can use it: run "
+                         f"migrations/{migration}/migrate.py (its README is the runbook).")
+
+
+def pending_migration(tables: set) -> Optional[str]:
+    """The migration a database with these tables still needs, or None."""
+    for migration, (marker, created) in PENDING_MIGRATION_MARKERS.items():
+        if marker in tables and created not in tables:
+            return migration
+    return None
 
 
 class DatabaseNotConfiguredError(RuntimeError):
     """No database URL is set where one is required (a Vercel deployment)."""
+
+
+class DatabaseUnavailableError(ConnectionError):
+    """The database could not be reached, even after the retries."""
 
 
 class StaleRevisionError(RuntimeError):
@@ -135,7 +157,8 @@ def get_db_connection():
                 logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs", attempt + 1, e, wait)
                 time.sleep(wait)
     if conn is None:
-        raise ConnectionError(f"Failed to connect to the database after 3 attempts: {last_error}") from last_error
+        raise DatabaseUnavailableError(
+            f"Failed to connect to the database after 3 attempts: {last_error}") from last_error
     try:
         yield conn
         conn.commit()
@@ -283,17 +306,15 @@ def table_names(cursor) -> set:
 def init_db() -> None:
     """Create any missing table; safe to call on every start.
 
-    Refuses a database that still has the tables of the previous schema,
-    because creating the new tables next to them would hide the real data
-    behind an empty driver base.
+    Refuses a database that still needs a migration, because creating the
+    new tables next to its own would hide the real data behind an empty
+    driver base.
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        existing = table_names(cursor)
-        if "trends" in existing and "drivers" not in existing:
-            raise LegacySchemaError(
-                "This database uses the previous schema (table 'trends'). Run "
-                "migrations/0001_driver_schema/migrate.py against it before starting PRISM.")
+        migration = pending_migration(table_names(cursor))
+        if migration:
+            raise MigrationPendingError(migration)
         for statement in _schema():
             cursor.execute(statement)
         for version in SCHEMA_MIGRATIONS:
@@ -304,10 +325,10 @@ def init_db() -> None:
 
 
 def failure_reason(e: BaseException) -> str:
-    """legacy_schema (the database needs migration 0001), no_database (no URL
+    """migration_pending (the database needs a migration), no_database (no URL
     where one is required) or db_error (anything else)."""
-    if isinstance(e, LegacySchemaError):
-        return "legacy_schema"
+    if isinstance(e, MigrationPendingError):
+        return "migration_pending"
     if isinstance(e, DatabaseNotConfiguredError):
         return "no_database"
     return "db_error"
@@ -320,8 +341,8 @@ def describe_error(e: BaseException) -> str:
     percent-escape echoes part of the password), so /api/v1/diagnostics shows
     this category instead of the raw text; the raw text goes to the log.
     """
-    if isinstance(e, LegacySchemaError):
-        return "the database uses the previous schema; run migrations/0001_driver_schema/migrate.py"
+    if isinstance(e, MigrationPendingError):
+        return str(e)
     if isinstance(e, DatabaseNotConfiguredError):
         return "no database URL is set for this deployment"
     cause = e.__cause__ or e
@@ -368,9 +389,10 @@ def diagnose_connection() -> Dict[str, Any]:
             cursor = conn.cursor()
             tables = table_names(cursor)
             out["db_reachable"] = True
-            if "trends" in tables and "drivers" not in tables:
-                legacy = LegacySchemaError()
-                out["error"], out["reason"] = describe_error(legacy), failure_reason(legacy)
+            migration = pending_migration(tables)
+            if migration:
+                pending = MigrationPendingError(migration)
+                out["error"], out["reason"] = describe_error(pending), failure_reason(pending)
                 return out
             if "simulation_runs" not in tables:   # a new database the API has not initialised yet
                 return out
@@ -384,6 +406,29 @@ def diagnose_connection() -> Dict[str, Any]:
         out["error"], out["reason"] = describe_error(e), failure_reason(e)
         logger.warning("diagnose_connection: database probe failed: %s", e)
     return out
+
+
+# ── Audit log ───────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class AuditEntry:
+    """One row of the audit log. The writes that are audited take their
+    entries with them and store them in their own transaction."""
+    action: str
+    entity_type: str
+    entity_id: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    reason: Optional[str] = None
+    user_id: str = "system"
+
+
+def _insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
+    for e in entries:
+        cursor.execute(
+            f"INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id) "
+            f"VALUES ({ph(7)})",
+            (e.action, e.entity_type, e.entity_id, e.old_value, e.new_value, e.reason, e.user_id))
 
 
 # ── Drivers ─────────────────────────────────────────────────────────────────
@@ -444,13 +489,14 @@ def save_drivers(drivers: List[Driver]) -> None:
     logger.info("Saved %d drivers", len(drivers))
 
 
-def save_driver_edit(driver: Driver, expected_revision: int) -> int:
-    """Write an admin edit of one stored driver; returns its new revision.
+def save_driver_edit(driver: Driver, expected_revision: int, audit: Sequence[AuditEntry] = ()) -> int:
+    """Write an admin edit of one stored driver and its audit entries; returns its new revision.
 
     The row is written only if it is still at ``expected_revision`` (the
     revision the editor loaded), in the same statement that raises it, so of
     two edits made from the same state only the first lands. The second
-    raises StaleRevisionError and changes nothing.
+    raises StaleRevisionError and changes nothing. The audit entries are
+    written in the same transaction: an edit is never stored without them.
     """
     p = placeholder()
     columns = [c for c in _DRIVER_COLUMNS if c != "id"]
@@ -465,6 +511,7 @@ def save_driver_edit(driver: Driver, expected_revision: int) -> int:
             row = cursor.fetchone()
             raise StaleRevisionError(driver.id, int(expected_revision), int(_row(row)["revision"]) if row else None)
         _write_driver_children(cursor, driver)
+        _insert_audit(cursor, audit)
     return int(expected_revision) + 1
 
 
@@ -607,13 +654,16 @@ def load_journey_content() -> Dict[str, Any]:
     return {"version": int(r["id"]), "content": _loads(r["content"])}
 
 
-def save_journey_content(content: dict, updated_by: str, base_version: int) -> int:
+def save_journey_content(content: dict, updated_by: str, base_version: int,
+                         audit: Optional[Callable[[int], AuditEntry]] = None) -> int:
     """Store a new version of the journey content ({lhc, hair}); returns its version.
 
     ``base_version`` is the version the editor loaded (0 for the bundled
     content). If another save has happened since, StaleVersionError is raised
     and nothing is written. The check and the insert run under a lock that
-    serialises saves (PostgreSQL) or under SQLite's write lock.
+    serialises saves (PostgreSQL) or under SQLite's write lock. ``audit``
+    builds the save's audit entry from the new version; it is written in the
+    same transaction.
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -632,6 +682,8 @@ def save_journey_content(content: dict, updated_by: str, base_version: int) -> i
         else:
             cursor.execute(sql, (dumps(content), updated_by or ""))
             version = int(cursor.lastrowid)
+        if audit is not None:
+            _insert_audit(cursor, [audit(version)])
     logger.info("Saved journey content version %d (by %s)", version, updated_by or "unknown")
     return version
 
@@ -734,16 +786,3 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
 
     merged.update(user_id=user_id, user_name=user_name or "")
     return merged
-
-
-# ── Audit log ───────────────────────────────────────────────────────────────
-
-def log_audit(action: str, entity_type: str, entity_id: str, old_value: Optional[str] = None,
-              new_value: Optional[str] = None, reason: Optional[str] = None,
-              user_id: str = "system") -> None:
-    """Append one entry to the audit log."""
-    with get_db_connection() as conn:
-        conn.cursor().execute(
-            f"INSERT INTO audit_log (action, entity_type, entity_id, old_value, new_value, reason, user_id) "
-            f"VALUES ({ph(7)})",
-            (action, entity_type, entity_id, old_value, new_value, reason, user_id))

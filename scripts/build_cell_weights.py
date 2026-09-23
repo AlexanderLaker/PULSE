@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build the estimated HCB cell-weight matrix (13 categories x 4 regions).
 
 The engine rolls its 52 category x region cells up with each cell's share of
@@ -150,6 +149,7 @@ def record(cells):
     for c, (w, g, why) in HAIRBODY_MIX.items():
         mix[c] = {"block": "Hair & Body", "share_of_block": w, "grade": g, "note": why}
     return {
+        "generated_by": "scripts/build_cell_weights.py",
         "version": VERSION,
         "source": SOURCE,
         "basis": "gp1_share",

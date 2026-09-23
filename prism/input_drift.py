@@ -91,8 +91,7 @@ def compute_input_drift_event(
     Returns None when there is nothing to compare against (the first run).
     Returns an info event when nothing changed: the absence of drift is worth
     recording too. A structural key is compared only when both fingerprints
-    carry it, so a fingerprint stored before a key existed raises no false
-    drift.
+    carry it: a stored fingerprint without a key has nothing to say about it.
     """
     if not previous_fp:
         return None

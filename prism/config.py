@@ -10,12 +10,25 @@ hand. docs/MODEL.md explains the method behind each parameter.
 
 import copy
 import math
+import re
 from dataclasses import dataclass, field, fields
 from typing import Optional
 
 # ── Taxonomies ──────────────────────────────────────────────────────────────
 
 FORCES = ["Consumer", "Customer", "Technology", "Government", "Environmental", "Competitive"]
+
+#: The letter of each force in a driver's display code: C-01, K-13, X-15.
+FORCE_CODE_LETTERS = {"Consumer": "C", "Customer": "K", "Technology": "T",
+                      "Government": "G", "Environmental": "E", "Competitive": "X"}
+
+
+def display_code(driver_id: str, force: str) -> str:
+    """A driver's display code from its id and force: consumer_r01 -> C-01."""
+    m = re.search(r"_r(\d{2})$", driver_id)
+    if not m:
+        raise ValueError(f"cannot derive a display code from id {driver_id!r}")
+    return f"{FORCE_CODE_LETTERS[force]}-{m.group(1)}"
 
 # Shelf order. "LHC: HSC" is surface, bathroom, kitchen, floor and glass
 # cleaning plus bleach and polishes; "LHC: TOI" is toilet cleaners, rim blocks
@@ -74,6 +87,12 @@ def vc_epicentre_step_of(vc_exposure: Optional[dict]) -> Optional[str]:
 
 DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
+
+#: The production recipe: every published run (scripts/run_production.py) and
+#: the reference run of the PRISM Analysis (scripts/build_driver_analysis.py).
+PRODUCTION_SEED = 42
+PRODUCTION_CHAINS = 3
+PRODUCTION_ITERATIONS = 50_000
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
 
 # Default schedules for a driver scored without a peak year or diffusion curve:
@@ -247,8 +266,8 @@ DEFAULT_FORCE_WEIGHTS = {f: 1.0 / len(FORCES) for f in FORCES}
 # tests/test_calibration.py holds these constants to that record.
 #
 # Per force, the engine multiplies the force's compounded contribution by its
-# attenuation, 0.5 x (1 - mean overlap of the force's row in the cross-force
-# matrix). Within a force, same-force contributions are dampened by
+# attenuation, 0.5 x (1 - the mean of the force's row in the cross-force
+# matrix over the five other forces). Within a force, same-force contributions are dampened by
 # 1 - overlap x (n_eff - 1) / n_eff, with n_eff the magnitude-weighted
 # effective number of contributing drivers in the cell.
 
@@ -274,7 +293,8 @@ DEFAULT_WITHIN_FORCE_OVERLAP = {
 
 # O[i][j]: the share of force i's signal already carried by force j (not
 # symmetric by design). It is the derivation input of the attenuation above,
-# 0.5 x (1 - mean of the force's row); the engine reads only the attenuation.
+# 0.5 x (1 - the mean of the force's row over the five other forces); the
+# engine reads only the attenuation.
 # The dashboard's configuration sheet shows it as the attenuation's provenance.
 DEFAULT_FORCE_OVERLAP_MATRIX = {
     "Consumer": {"Consumer": 0.000, "Customer": 0.050, "Technology": 0.000, "Government": 0.030, "Environmental": 0.000, "Competitive": 0.050},
@@ -385,6 +405,10 @@ DEFAULT_CELL_WEIGHTS_SOURCE = (
     "data/calibration/cell_weights_estimate.json. A finance file passed to "
     "run_production.py --cell-weights replaces it."
 )
+#: How DEFAULT_CELL_WEIGHTS_SOURCE opens. A run whose weights source opens with
+#: it ran on the estimate; the production run refuses a finance file whose
+#: label does, so the dashboard can tell the two apart (lib/cellWeights.ts).
+ESTIMATE_SOURCE_PREFIX = "ESTIMATE, not Henkel P&L"
 
 
 def cell_weight_marginals(cell_weights: dict, categories=None) -> tuple:

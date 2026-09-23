@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run the production simulation and persist it as the run the dashboard serves.
 
     python3 scripts/run_production.py                              3 x 50,000 iterations against the database in .env
@@ -27,7 +26,7 @@ the engine nor the database ever sees an amount.
 Exit codes
     0  the run is persisted (the QA workbook is best effort)
     1  no usable database: none configured (and no --allow-sqlite), unreachable,
-       or still on the previous schema (run migrations/0001_driver_schema first)
+       or still awaiting a migration (the message names it)
     2  the database holds no drivers
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
@@ -50,9 +49,10 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
-from prism.config import CATEGORIES, REGIONS, ModelConfig  # noqa: E402
+from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
+                          PRODUCTION_SEED, REGIONS, ModelConfig)
 from prism.config_validation import correlation_lambda_min, validate_model_config  # noqa: E402
-from prism.database import (POSTGRES_URL, USE_POSTGRES, LegacySchemaError, init_db, load_drivers,  # noqa: E402
+from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, init_db, load_drivers,  # noqa: E402
                             load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
@@ -61,7 +61,6 @@ from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")
 
-MASTER_SEED = 42
 RUNS_DIR = REPO / "runs"
 
 
@@ -98,6 +97,9 @@ def load_cell_weights_file(path: Path) -> tuple:
                          f"(within 0.01), not {total:.4f}")
     shares = {c: {r: v / total for r, v in row.items()} for c, row in values.items()}
     source = str(raw.get("source") or f"cell-weights file {Path(path).name}")
+    if source.strip().upper().startswith(ESTIMATE_SOURCE_PREFIX.upper()):
+        raise ValueError(f"the source label may not open with {ESTIMATE_SOURCE_PREFIX!r}: that marks the built-in "
+                         "estimate, and the dashboard would show the file's weights as the estimate")
     if basis == "gp1_absolute":
         source += " (absolute gross profit divided by its total at run time; no amount is stored)"
     return shares, source
@@ -135,8 +137,10 @@ def results_bundle(result: dict, config: ModelConfig, driver_count: int, fingerp
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--iterations", type=int, default=50_000, help="iterations per chain (default 50000)")
-    parser.add_argument("--chains", type=int, default=3, help="independent chains (default 3)")
+    parser.add_argument("--iterations", type=int, default=PRODUCTION_ITERATIONS,
+                        help=f"iterations per chain (default {PRODUCTION_ITERATIONS})")
+    parser.add_argument("--chains", type=int, default=PRODUCTION_CHAINS,
+                        help=f"independent chains (default {PRODUCTION_CHAINS})")
     parser.add_argument("--cell-weights", metavar="FILE", default=None,
                         help="finance cell weights (see above); without it the run uses the estimated HCB mix")
     parser.add_argument("--allow-sqlite", action="store_true",
@@ -158,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         init_db()
         drivers = load_drivers()
-    except LegacySchemaError as e:
+    except MigrationPendingError as e:
         log.error("%s", e)
         return 1
     except Exception as e:  # noqa: BLE001 (reported with exit code 1)
@@ -172,7 +176,9 @@ def main(argv: list[str] | None = None) -> int:
         log.error("These drivers cannot be simulated:")
         for line in problems:
             log.error("  %s", line)
-        log.error("Scores and exposures can be corrected on the Drivers page; anything else needs a database fix.")
+        log.error("Scores, directions, curves and exposures can be corrected on the Drivers page (saving a driver "
+                  "drops exposures on names outside the taxonomy); an unknown force or a duplicate id needs a fix "
+                  "in the database.")
         return 6
     from prism.seed_drivers import DRIVERS as SEED
     if len(drivers) != len(SEED):
@@ -203,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * config.iterations >= 100_000 else "")
     started = datetime.now()
-    result = BayesianMonteCarloEngine(config, seed=MASTER_SEED).run_multichain(
+    result = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED).run_multichain(
         driver_set, n_chains=args.chains, iterations=config.iterations)
     log.info("  done in %.0f s; seed stability %.4f pp across %d chains",
              (datetime.now() - started).total_seconds(), result["seed_stability"]["spread_pp"], args.chains)

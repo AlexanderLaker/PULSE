@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """Build the per-driver attribution record and render the PRISM Analysis texts from it.
 
     python3 scripts/build_driver_analysis.py                  record, parity fixture and texts
     python3 scripts/build_driver_analysis.py --reference      also re-run the 3 x 50,000 reference run
     python3 scripts/build_driver_analysis.py --check          CI: the committed files match this code
-    python3 scripts/build_driver_analysis.py --cell-weights FILE   the finance file, as for run_production.py
     python3 scripts/build_driver_analysis.py --workbook FILE        record which production run is reproduced
+    python3 scripts/build_driver_analysis.py --cell-weights FILE    build on the finance shares, into runs/
 
 Files
   data/drivers/driver_attribution.json   the figures (generated)
@@ -14,6 +13,12 @@ Files
   tests/frontend/fixtures/driverAttribution.fixture.json
                                          parity fixture for lib/driverAttribution.ts, the
                                          port of the decomposition the category drill-down uses
+
+The committed files are built on the estimated gross-profit mix. A build on
+the finance shares (--cell-weights FILE) quotes those shares, which stay out
+of the repository, so it writes its record and texts to runs/driver_analysis/
+(git-ignored) instead; scripts/sync_analysis.py --texts writes such texts into
+a database.
 
 What the record is
   The engine's own arithmetic, evaluated at the score means instead of at
@@ -72,9 +77,9 @@ without the analysis being regenerated. It also checks that the reference
 run was made on the current inputs (their digest) and that it reproduces
 the production run recorded with --workbook.
 
-After a re-scoring or a new finance file: run scripts/run_production.py,
-then this script with --reference --workbook FILE, review the re-rendered
-texts, run scripts/generate_seed.py and scripts/sync_analysis.py.
+After a re-scoring: run scripts/run_production.py, then this script with
+--reference --workbook FILE, review the re-rendered texts, run
+scripts/generate_seed.py and scripts/sync_analysis.py.
 """
 from __future__ import annotations
 
@@ -82,7 +87,6 @@ import argparse
 import datetime as _dt
 import json
 import os
-import re
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -95,7 +99,8 @@ os.environ["POSTGRES_URL"] = ""
 
 import numpy as np  # noqa: E402
 
-from prism.config import ModelConfig, FORCES, REGIONS  # noqa: E402
+from prism.config import (DEFAULT_PATH_YEARS, FORCES, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
+                          PRODUCTION_SEED, REGIONS, ModelConfig, display_code)
 from prism.drivers import DriverSet  # noqa: E402
 from prism.simulation.bayesian_mc import BayesianMonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
 from scripts.driver_analysis_render import render_all  # noqa: E402
@@ -106,12 +111,10 @@ ANALYSIS_PATH = os.path.join(DATA_DIR, "driver_analysis.json")
 #: Parity fixture for lib/driverAttribution.ts (the category drill-down uses
 #: the same decomposition): the inputs and the unscaled expected outputs.
 FIXTURE_PATH = os.path.join(REPO, "tests", "frontend", "fixtures", "driverAttribution.fixture.json")
+#: Where a build on the finance shares goes: git-ignored, never committed.
+LOCAL_DIR = os.path.join(REPO, "runs", "driver_analysis")
 
-FORCE_LETTER = {
-    "Consumer": "C", "Customer": "K", "Technology": "T",
-    "Government": "G", "Environmental": "E", "Competitive": "X",
-}
-TERMINAL_YEAR = 2035
+TERMINAL_YEAR = DEFAULT_PATH_YEARS[-1]
 BAND_DRAWS = 200_000
 BAND_SEED = 20260917
 TOP_CELLS = 6
@@ -126,13 +129,6 @@ def load_drivers() -> list:
     return base_drivers()
 
 
-def code_of(driver) -> str:
-    m = re.search(r"_r(\d{2})$", driver.id)
-    if not m:
-        raise ValueError(f"cannot derive a display code from id {driver.id!r}")
-    return f"{FORCE_LETTER[driver.force]}-{m.group(1)}"
-
-
 def load_cell_weights_file(path: str) -> tuple:
     """(shares, source) from a finance file, read exactly as run_production.py reads it."""
     from scripts.run_production import load_cell_weights_file as _load
@@ -144,7 +140,7 @@ def load_cell_weights_file(path: str) -> tuple:
 
 def decompose(config: ModelConfig, drivers: list) -> dict:
     """Evaluate the engine's arithmetic at the score means, per driver."""
-    eng = BayesianMonteCarloEngine(config, seed=42)
+    eng = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED)
     cats = list(config.category_names)
     years = [int(y) for y in config.path_years]
     n, nc, nr, ny = len(drivers), len(cats), len(REGIONS), len(years)
@@ -327,9 +323,9 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
 
 
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
-    """The production recipe: run_multichain(3 x 50k, master seed 42)."""
+    """The production recipe (prism.config PRODUCTION_*): run_multichain with the master seed."""
     db = DriverSet(drivers=list(drivers))
-    eng = BayesianMonteCarloEngine(config, seed=42)
+    eng = BayesianMonteCarloEngine(config, seed=PRODUCTION_SEED)
     res = eng.run_multichain(db, n_chains=chains, iterations=iterations)
     tot = res["totals"]["portfolio"]
     term = tot.get(TERMINAL_YEAR) or tot.get(str(TERMINAL_YEAR))
@@ -339,7 +335,7 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
         cell = p.get(TERMINAL_YEAR) or p.get(str(TERMINAL_YEAR))
         cats[cat] = {k: round(float(cell[k]), 6) for k in ("p10", "median", "p90")}
     return {
-        "seed": 42, "chains": chains, "iterations": iterations,
+        "seed": PRODUCTION_SEED, "chains": chains, "iterations": iterations,
         "pooled_iterations": chains * iterations,
         "numerics_backend": NUMERICS_BACKEND,
         "model_version": res["model_version"],
@@ -452,7 +448,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             same_force = [k for k in range(len(drivers)) if dec["fidx"][k] == f and k != j and abs(A_cell[k, i, y_last]) > 0]
             same_force.sort(key=lambda k: -abs(A_cell[k, i, y_last]))
             for k in same_force[:TOP_PARTNERS]:
-                partners.append({"id": drivers[k].id, "code": code_of(drivers[k]),
+                partners.append({"id": drivers[k].id, "code": display_code(drivers[k].id, drivers[k].force),
                                  "pp": r4(A_cell[k, i, y_last] * w_cell[i] * 100)})
             cells.append({
                 "category": cats[c], "region": REGIONS[r],
@@ -494,7 +490,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             share_realised[str(y)] = r4(dec["e_mat"][j, yi] / e_last) if e_last > 0 else 0.0
         half_year = next((y for yi, y in enumerate(years) if e_last > 0 and dec["e_mat"][j, yi] / e_last >= 0.5), None)
         per_driver[t.id] = {
-            "code": code_of(t), "name": t.name, "force": t.force, "direction": t.direction,
+            "code": display_code(t.id, t.force), "name": t.name, "force": t.force, "direction": t.direction,
             "portfolio_pp": {str(y): r4(port[j, yi] * 100) for yi, y in enumerate(years)},
             "share_of_gross": r4(own / gross_hw) if own < 0 else (r4(own / gross_tw) if own > 0 else 0.0),
             "share_of_net": r4(own / median) if median else 0.0,
@@ -528,6 +524,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
         }
 
     record = {
+        "generated_by": "scripts/build_driver_analysis.py",
         "record_version": 1,
         "built": _dt.date.today().isoformat(),
         "method": (
@@ -674,38 +671,46 @@ def records_match(a, b, atol: float, rtol: float = 0.0) -> bool:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="verify the committed record and texts, write nothing")
-    ap.add_argument("--reference", action="store_true", help="rerun the reference MC (3 x 50k, seed 42)")
-    ap.add_argument("--chains", type=int, default=3)
-    ap.add_argument("--iterations", type=int, default=50_000)
+    ap.add_argument("--reference", action="store_true", help="rerun the reference run (the production recipe)")
+    ap.add_argument("--chains", type=int, default=PRODUCTION_CHAINS)
+    ap.add_argument("--iterations", type=int, default=PRODUCTION_ITERATIONS)
     ap.add_argument("--cell-weights", default=None, help="finance cell-weight file, as for run_production.py")
     ap.add_argument("--workbook", default=None,
                     help="the QA workbook of the production run the reference should reproduce")
     args = ap.parse_args(argv)
 
+    finance = bool(args.cell_weights)
+    if finance and args.check:
+        print("REFUSING: --check verifies the committed files, which are built on the estimated mix; "
+              "run it without --cell-weights.")
+        return 1
     drivers = load_drivers()
     config = ModelConfig()
-    if args.cell_weights:
+    if finance:
         shares, source = load_cell_weights_file(args.cell_weights)
         config = config.copy_with(cell_weights=shares, cell_weights_source=source)
+    attribution_path = os.path.join(LOCAL_DIR, "driver_attribution.json") if finance else ATTRIBUTION_PATH
+    analysis_out = os.path.join(LOCAL_DIR, "driver_analysis.json") if finance else ANALYSIS_PATH
 
-    committed = _load_json(ATTRIBUTION_PATH) if os.path.exists(ATTRIBUTION_PATH) else None
+    committed = _load_json(attribution_path) if os.path.exists(attribution_path) else None
     current_hash = inputs_hash(config, drivers)
     if args.reference or committed is None:
-        print(f"reference run: {args.chains} x {args.iterations} iterations, seed 42 ...", flush=True)
+        print(f"reference run: {args.chains} x {args.iterations} iterations, seed {PRODUCTION_SEED} ...", flush=True)
         reference = reference_run(config, drivers, args.chains, args.iterations)
         print(f"  terminal-year portfolio median {reference['portfolio_terminal']['median']*100:+.3f} pp "
               f"[{reference['portfolio_terminal']['p10']*100:+.3f}, {reference['portfolio_terminal']['p90']*100:+.3f}]")
     else:
         reference = committed["reference_run"]
         if reference.get("inputs_hash") != current_hash and not args.check:
-            print("REFUSING: the drivers' scoring state or the configuration changed since the committed reference "
+            print("REFUSING: the drivers' scoring state or the configuration changed since the recorded reference "
                   "run, so its median is not the current model's. Re-run with --reference --workbook FILE after "
                   "the production run (with the same --cell-weights FILE if one was used).")
             return 1
 
     persisted = read_workbook(args.workbook) if args.workbook else (committed or {}).get("persisted_run")
     record = build_record(config, drivers, reference, persisted)
-    fixture = build_fixture(config, drivers, decompose(config, drivers))
+    # The parity fixture belongs to the committed, estimate-based build only.
+    fixture = None if finance else build_fixture(config, drivers, decompose(config, drivers))
     analysis = _load_json(ANALYSIS_PATH) if os.path.exists(ANALYSIS_PATH) else {"drivers": {}}
     texts = render_all(record, analysis) if analysis.get("drivers") else {}
 
@@ -748,18 +753,23 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"reference run reproduces persisted run {persisted.get('id')} ({persisted.get('generated')}) "
                   f"at every terminal-year category quantile")
-    _dump_json(ATTRIBUTION_PATH, record)
-    print(f"wrote {os.path.relpath(ATTRIBUTION_PATH, REPO)} "
+    os.makedirs(os.path.dirname(attribution_path), exist_ok=True)
+    _dump_json(attribution_path, record)
+    print(f"wrote {os.path.relpath(attribution_path, REPO)} "
           f"({len(record['drivers'])} drivers, factor {record['reconciliation']['factor']:.4f})")
-    os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
-    _dump_json(FIXTURE_PATH, fixture)
-    print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
+    if not finance:
+        os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
+        _dump_json(FIXTURE_PATH, fixture)
+        print(f"wrote {os.path.relpath(FIXTURE_PATH, REPO)} (parity fixture for lib/driverAttribution.ts)")
     if texts:
         for code, entry in analysis["drivers"].items():
             driver_id = next(i for i, d in record["drivers"].items() if d["code"] == code)
             entry["text"] = texts[driver_id]
-        _dump_json(ANALYSIS_PATH, analysis)
-        print(f"wrote {os.path.relpath(ANALYSIS_PATH, REPO)} ({len(texts)} rendered texts)")
+        _dump_json(analysis_out, analysis)
+        print(f"wrote {os.path.relpath(analysis_out, REPO)} ({len(texts)} rendered texts)")
+    if finance:
+        print("These files quote the finance shares and stay out of the repository. To show the texts on the "
+              f"Drivers page: python3 scripts/sync_analysis.py --texts {os.path.relpath(analysis_out, REPO)}")
     return 0
 
 

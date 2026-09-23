@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import re
 
+from prism.config import ESTIMATE_SOURCE_PREFIX
+
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
 BASIS_LABEL = "Figures"
 
@@ -77,7 +79,8 @@ def basis_line(rec: dict) -> str:
     check against the dashboard headline."""
     ref = rec["reference_run"]
     source = str(rec["basis"]["cell_weights_source"])
-    weights = "the estimated HCB gross-profit mix" if source.upper().startswith("ESTIMATE") else "the finance cell weights"
+    weights = ("the estimated HCB gross-profit mix" if source.startswith(ESTIMATE_SOURCE_PREFIX)
+               else "the finance cell weights")
     median = float(ref["portfolio_terminal"]["median"]) * 100
     recipe = f"{ref['chains']} x {ref['iterations']:,} iterations, seed {ref['seed']}"
     return (f"{BASIS_LABEL}: model attribution on {weights}, reconciled to a 2035 portfolio median of "

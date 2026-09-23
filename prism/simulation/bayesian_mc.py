@@ -41,7 +41,19 @@ NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
 
 logger = logging.getLogger(__name__)
 
-PERCENTILES = [10, 25, 50, 75, 90]
+
+
+def distribution(values: np.ndarray) -> dict:
+    """P10, P25, median, P75, P90, mean and standard deviation of a sample."""
+    return {
+        "p10": float(np.percentile(values, 10)),
+        "p25": float(np.percentile(values, 25)),
+        "median": float(np.percentile(values, 50)),
+        "p75": float(np.percentile(values, 75)),
+        "p90": float(np.percentile(values, 90)),
+        "mean": float(np.mean(values)),
+        "std": float(np.std(values)),
+    }
 
 #: Seed of the bootstrap behind mc_standard_error, fixed so the reported
 #: standard errors of a run are reproducible.
@@ -253,12 +265,7 @@ class BayesianMonteCarloEngine:
                 series = regional_samples[:, c_idx, r_idx, :]
                 path = {}
                 for y_idx, year in enumerate(years):
-                    ys = series[:, y_idx]
-                    cell = {f"p{p}": float(np.percentile(ys, p)) for p in PERCENTILES}
-                    cell["median"] = cell["p50"]
-                    cell["mean"] = float(np.mean(ys))
-                    cell["std"] = float(np.std(ys))
-                    path[int(year)] = cell
+                    path[int(year)] = distribution(series[:, y_idx])
                 velocity = {}
                 for i in range(1, len(years)):
                     deltas = series[:, i] - series[:, i - 1]
@@ -520,26 +527,13 @@ class BayesianMonteCarloEngine:
             cat_data = samples[:, c_idx, :]
             path = {}
             for y_idx, year in enumerate(years):
-                year_samples = cat_data[:, y_idx]
-                path[year] = {f"p{p}": float(np.percentile(year_samples, p)) for p in PERCENTILES}
-                path[year]["median"] = path[year]["p50"]
-                path[year]["mean"] = float(np.mean(year_samples))
-                path[year]["std"] = float(np.std(year_samples))
+                path[year] = distribution(cat_data[:, y_idx])
 
             # Velocity is the distribution of each iteration's year-on-year
             # change, not the difference of two medians.
             velocity = {}
             for i in range(1, len(years)):
-                deltas = cat_data[:, i] - cat_data[:, i - 1]
-                velocity[years[i]] = {
-                    "median": float(np.percentile(deltas, 50)),
-                    "p10": float(np.percentile(deltas, 10)),
-                    "p25": float(np.percentile(deltas, 25)),
-                    "p75": float(np.percentile(deltas, 75)),
-                    "p90": float(np.percentile(deltas, 90)),
-                    "mean": float(np.mean(deltas)),
-                    "std": float(np.std(deltas)),
-                }
+                velocity[years[i]] = distribution(cat_data[:, i] - cat_data[:, i - 1])
             shift_matrix[cat] = {"path": path, "velocity": velocity}
 
         mc_standard_error = self._mc_standard_error(samples)
@@ -669,12 +663,7 @@ class BayesianMonteCarloEngine:
         port = np.tensordot(samples, w, axes=([1], [0]))
         portfolio_path = {}
         for y_idx, year in enumerate(years):
-            ys = port[:, y_idx]
-            cell = {f"p{p}": float(np.percentile(ys, p)) for p in PERCENTILES}
-            cell["median"] = cell["p50"]
-            cell["mean"] = float(np.mean(ys))
-            cell["std"] = float(np.std(ys))
-            portfolio_path[int(year)] = cell
+            portfolio_path[int(year)] = distribution(port[:, y_idx])
 
         # A lens's column totals are category-weighted averages of the lens
         # values (lib/shiftMatrix.ts computes them where they are shown).

@@ -18,9 +18,12 @@ from fastapi.testclient import TestClient
 from prism.api import state
 from prism.api.app import create_app
 from prism.config import CATEGORIES
+from prism.database import PENDING_MIGRATION_MARKERS
 
 REPO = Path(__file__).resolve().parents[1]
 SECRET = "pytest-secret-" + "x" * 40
+#: The table only a database still awaiting migration 0001 has (prism/database.py).
+AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
 
 
 def token(role="viewer", sub="user-1", email="ana@example.com", exp_offset=300, secret=SECRET, **claims) -> str:
@@ -180,17 +183,27 @@ class TestHealthAndDiagnostics:
         assert diag["db_reachable"] is False and diag["simulation_reason"] == "db_error"
         assert diag["error"] == "database error (RuntimeError)"   # the raw message stays in the log
 
-    def test_a_database_of_the_previous_schema_asks_for_the_migration(self, api, monkeypatch, tmp_path):
-        legacy = tmp_path / "legacy.db"
-        sqlite3.connect(legacy).execute("CREATE TABLE trends (id TEXT PRIMARY KEY)").connection.close()
-        monkeypatch.setenv("PRISM_DB_PATH", str(legacy))
+    def test_the_data_routes_answer_503_while_the_database_cannot_be_reached(self, api, monkeypatch):
+        import prism.database as dbm
+        monkeypatch.setattr(dbm, "_connect", lambda: (_ for _ in ()).throw(
+            RuntimeError('could not connect to server at "ep-secret.neon.tech" as "owner"')))
+        monkeypatch.setattr(dbm.time, "sleep", lambda s: None)
+        state.reset()
+        response = api.get("/api/v1/drivers", headers=bearer())
+        assert response.status_code == 503
+        assert response.json() == {"detail": "The database cannot be reached right now; try again in a moment."}
+
+    def test_a_database_awaiting_a_migration_asks_for_it(self, api, monkeypatch, tmp_path):
+        awaiting = tmp_path / "awaiting.db"
+        sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
+        monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
         state.reset()
         response = api.get("/api/v1/drivers", headers=bearer())
         assert response.status_code == 503 and "migrations/0001_driver_schema" in response.json()["detail"]
         health = api.get("/api/v1/health").json()
-        assert health["status"] == "degraded" and health["simulation_reason"] == "legacy_schema"
+        assert health["status"] == "degraded" and health["simulation_reason"] == "migration_pending"
         diag = api.get("/api/v1/diagnostics").json()
-        assert diag["simulation_reason"] == "legacy_schema" and "migrate.py" in diag["error"]
+        assert diag["simulation_reason"] == "migration_pending" and "migrate.py" in diag["error"]
 
     def test_on_vercel_a_missing_database_url_is_named(self, api, monkeypatch):
         monkeypatch.setenv("VERCEL", "1")
@@ -229,7 +242,7 @@ class TestSimulation:
         path = "/api/v1/simulation"
         assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {"changed": [], "added": [], "removed": []}
         api.put("/api/v1/drivers/technology_r01", headers=bearer("admin"), json={"revision": 1, "probability": 1})
-        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "name": "text only"})
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "description": "text only"})
         assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {
             "changed": ["technology_r01"], "added": [], "removed": []}
 
@@ -255,12 +268,12 @@ class TestDrivers:
     def test_an_admin_edit(self, api):
         from prism.database import get_db_connection
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                           json={"revision": 1, "probability": 4, "uncertainty": 3, "name": "Private label, edited"})
+                           json={"revision": 1, "probability": 4, "uncertainty": 3, "description": "Edited."})
         assert response.status_code == 200
         assert response.json() == {"status": "updated", "driver_id": "consumer_r01",
-                                   "changed": ["name", "probability", "uncertainty"], "revision": 2}
+                                   "changed": ["description", "probability", "uncertainty"], "revision": 2}
         edited = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        assert (edited["probability"], edited["uncertainty"], edited["name"]) == (4, 3, "Private label, edited")
+        assert (edited["probability"], edited["uncertainty"], edited["description"]) == (4, 3, "Edited.")
         assert edited["scores_edited"] is True and edited["baseline"]["probability"] == 5
         assert edited["normalized_score"] == pytest.approx(-4 / 6 * 0.22)
         with get_db_connection() as conn:
@@ -268,9 +281,8 @@ class TestDrivers:
             cursor.execute("SELECT reason, old_value, new_value, user_id FROM audit_log "
                            "WHERE action = 'driver_updated' ORDER BY id")
             rows = [tuple(r) for r in cursor.fetchall()]
-        assert rows == [("name", json.dumps("Private label structural penetration and premium own-label tiers (Europe)"),
-                         json.dumps("Private label, edited"), "user-1"),
-                        ("probability", "5", "4", "user-1"), ("uncertainty", "2", "3", "user-1")]
+        assert rows[0][0] == "description" and rows[0][2:] == (json.dumps("Edited."), "user-1")
+        assert rows[1:] == [("probability", "5", "4", "user-1"), ("uncertainty", "2", "3", "user-1")]
 
     def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
         sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "note": "Apr 2026"}]
@@ -290,10 +302,10 @@ class TestDrivers:
         first = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
         assert first.status_code == 200 and first.json()["revision"] == 2
         second = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
-                         json={"revision": 1, "probability": 2, "name": "Overwritten?"})
+                         json={"revision": 1, "probability": 2, "description": "Overwritten?"})
         assert second.status_code == 409 and "Reload" in second.json()["detail"]
         driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
-        assert (driver["probability"], driver["revision"]) == (4, 2) and driver["name"] != "Overwritten?"
+        assert (driver["probability"], driver["revision"]) == (4, 2) and driver["description"] != "Overwritten?"
 
     def test_a_concurrent_save_between_the_check_and_the_write_is_refused(self, api, monkeypatch):
         """The revision check in the API passes, but another save lands before the write: the database refuses."""
@@ -301,23 +313,28 @@ class TestDrivers:
         import prism.database as dbm
         original = dbm.save_driver_edit
 
-        def someone_else_first(driver, expected):
+        def someone_else_first(driver, expected, audit):
             other = next(d for d in load_drivers() if d.id == "consumer_r01")
             other.name = "saved in between"
             save_drivers([other])
-            return original(driver, expected)
+            return original(driver, expected, audit)
         monkeypatch.setattr(dbm, "save_driver_edit", someone_else_first)
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
         assert response.status_code == 409
         driver = next(d for d in load_drivers() if d.id == "consumer_r01")
         assert (driver.name, driver.probability) == ("saved in between", 5)
+        with dbm.get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'driver_updated'")
+            assert cursor.fetchone()[0] == 0   # the refused edit left no audit entry
 
     def test_an_edit_needs_the_revision(self, api):
         assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4}).status_code == 422
 
     @pytest.mark.parametrize("body", [
         {"probability": 9}, {"uncertainty": 6}, {"gp1_pct_affected": 0}, {"direction": "Sideways"},
-        {"diffusion_curve": "exponential"}, {"name": None}, {"analysis": "typed by hand"},
+        {"diffusion_curve": "exponential"}, {"description": None}, {"analysis": "typed by hand"},
+        {"name": "Renamed"}, {"force": "Customer"}, {"start_year": 2026}, {"peak_year": 2025},
         {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},
         {"regional_exposure": {"Latin America": 2}}, {"vc_exposure": {"Retail": 5}},
         {"sources": [{"title": "", "url": ""}]}, {"sources": [{"title": "x", "tier": "Z"}]},
@@ -339,6 +356,29 @@ class TestDrivers:
         driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
         assert driver["category_exposure"] == before["category_exposure"] | {"Hair: Care": 5, "Hair: Color": 4}
         assert set(driver["category_exposure"]) == set(CATEGORIES)
+
+    def test_a_peak_year_must_come_after_the_onset(self, api):
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        onset = max(2025, driver["start_year"])
+        path = "/api/v1/drivers/consumer_r01"
+        refused = api.put(path, headers=bearer("admin"), json={"revision": 1, "peak_year": onset})
+        assert refused.status_code == 422 and "after the driver's onset" in refused.json()["detail"]
+        assert api.put(path, headers=bearer("admin"), json={"revision": 1, "peak_year": onset + 1}).status_code == 200
+
+    def test_a_save_drops_exposures_on_names_outside_the_taxonomy(self, api):
+        """Such a name cannot be simulated; saving the driver repairs it, and the audit log records it."""
+        from prism.database import load_drivers, save_drivers
+        api.get("/api/v1/drivers", headers=bearer())   # the API creates and seeds the database
+        stored = next(d for d in load_drivers() if d.id == "consumer_r01")
+        stored.category_exposure = {**stored.category_exposure, "Hair: Colour": 3}
+        save_drivers([stored])
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"revision": driver["revision"], "description": "Checked."})
+        assert response.status_code == 200 and "category_exposure" in response.json()["changed"]
+        repaired = next(d for d in load_drivers() if d.id == "consumer_r01")
+        assert "Hair: Colour" not in repaired.category_exposure
+        assert set(repaired.category_exposure) == set(CATEGORIES)
 
     def test_an_unknown_driver_is_404(self, api):
         response = api.put("/api/v1/drivers/nope", headers=bearer("admin"), json={"revision": 1, "probability": 3})
@@ -400,6 +440,7 @@ class TestProposals:
         assert api.put(path, headers=bearer(), json={"category_exposure": {"Hair: Care": 7}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"regional_exposure": {"Mars": 2}}).status_code == 422
         assert api.put(path, headers=bearer(), json={"probability": 0}).status_code == 422
+        assert api.put(path, headers=bearer(), json={"peak_year": 2025}).status_code == 422   # not after the onset
         assert api.put(path, headers=bearer(), json={"user_id": "someone-else"}).status_code == 422
         assert api.put("/api/v1/drivers/nope/proposals", headers=bearer(), json={"probability": 3}).status_code == 404
 

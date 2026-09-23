@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Give a user the admin role (or take it away) directly in the database.
 
 Roles live in the user_roles table (lib/roles.ts); the Clerk webhook adds a

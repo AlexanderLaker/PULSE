@@ -16,10 +16,13 @@ from urllib.parse import quote
 import pytest
 
 from prism.config import CATEGORIES, REGIONS, VC_STEPS
+from prism.database import PENDING_MIGRATION_MARKERS
 from prism.drivers import Driver
 
 REPO = Path(__file__).resolve().parents[1]
 POSTGRES_URL = os.environ.get("PRISM_TEST_POSTGRES_URL")
+#: The table only a database still awaiting migration 0001 has (prism/database.py).
+AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
 #: Set for the interpreter that re-runs this module on PostgreSQL.
 ON_POSTGRES = os.environ.get("PRISM_TEST_DATABASE_ON_POSTGRES") == "1"
 
@@ -83,13 +86,13 @@ class TestSchema:
                 "schema_migrations"} <= tables
 
     @pytest.mark.skipif(ON_POSTGRES, reason="builds a SQLite file")
-    def test_a_database_of_the_previous_schema_is_refused(self, monkeypatch, tmp_path):
+    def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path):
         import sqlite3
         import prism.database as dbm
-        path = tmp_path / "legacy.db"
-        sqlite3.connect(path).execute("CREATE TABLE trends (id TEXT PRIMARY KEY)").connection.close()
+        path = tmp_path / "awaiting.db"
+        sqlite3.connect(path).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
         monkeypatch.setenv("PRISM_DB_PATH", str(path))
-        with pytest.raises(dbm.LegacySchemaError, match="migrations/0001_driver_schema"):
+        with pytest.raises(dbm.MigrationPendingError, match="migrations/0001_driver_schema"):
             dbm.init_db()
 
 
@@ -244,13 +247,32 @@ class TestRunsJourneyAudit:
         assert (refused.value.expected, refused.value.current) == (0, v1)
         assert db.load_journey_content()["content"]["v"] == 1
 
-    def test_audit_entries_are_appended(self, db):
-        db.log_audit("driver_updated", "driver", "consumer_r01", old_value="3", new_value="4",
-                     reason="probability", user_id="admin-1")
+    def test_an_edit_and_its_audit_entries_are_stored_together(self, db):
+        """The audit entries go into the edit's transaction: stored with it, and never without it."""
+        entry = db.AuditEntry("driver_updated", "driver", "consumer_r01", old_value="3", new_value="5",
+                              reason="probability", user_id="admin-1")
+        loaded = db.load_drivers()[0]
+        db.save_driver_edit(_driver(probability=5), loaded.revision, [entry])
         with db.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT action, entity_id, old_value, new_value, reason, user_id FROM audit_log")
-            assert _values(cursor.fetchone()) == ("driver_updated", "consumer_r01", "3", "4", "probability", "admin-1")
+            assert [_values(r) for r in cursor.fetchall()] == [
+                ("driver_updated", "consumer_r01", "3", "5", "probability", "admin-1")]
+        with pytest.raises(db.StaleRevisionError):
+            db.save_driver_edit(_driver(probability=1), loaded.revision, [entry])
+        assert _count(db, "SELECT COUNT(*) FROM audit_log") == 1
+
+    def test_a_journey_save_and_its_audit_entry_are_stored_together(self, db):
+        def audit(version):
+            return db.AuditEntry("journey_content_updated", "journey", "default", new_value=f"version {version}",
+                                 user_id="admin-1")
+        v1 = db.save_journey_content({"lhc": [], "hair": []}, "a@example.com", base_version=0, audit=audit)
+        with pytest.raises(db.StaleVersionError):
+            db.save_journey_content({"lhc": [], "hair": []}, "b@example.com", base_version=0, audit=audit)
+        with db.get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT action, new_value, user_id FROM audit_log")
+            assert [_values(r) for r in cursor.fetchall()] == [("journey_content_updated", f"version {v1}", "admin-1")]
 
     def test_diagnostics_never_raise(self, db, monkeypatch):
         diag = db.diagnose_connection()

@@ -13,12 +13,16 @@ needed. Run it locally with ``uvicorn prism.api.app:app --port 8000``; the
 repository's .env is loaded first, so the database URL there applies.
 """
 import prism.env_loader  # noqa: F401  (before prism.database reads the database URL)
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from prism import __version__
 from prism.api.routers import config, drivers, journey, simulation, system
-from prism.database import DatabaseNotConfiguredError, LegacySchemaError
+from prism.database import DatabaseNotConfiguredError, DatabaseUnavailableError, MigrationPendingError
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -28,12 +32,21 @@ def create_app() -> FastAPI:
         description="Read access to the persisted PRISM run, the drivers and the journey content.",
     )
 
-    @app.exception_handler(LegacySchemaError)
+    @app.exception_handler(MigrationPendingError)
     @app.exception_handler(DatabaseNotConfiguredError)
     def _not_ready(request: Request, exc: Exception) -> JSONResponse:
-        # The database needs migration 0001, or no database is configured:
+        # The database needs a migration, or no database is configured:
         # nothing is served and nothing is written until that is fixed.
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+    @app.exception_handler(DatabaseUnavailableError)
+    def _unreachable(request: Request, exc: Exception) -> JSONResponse:
+        # A passing outage (a waking serverless database, a network fault).
+        # The driver's message can name the host and the user, so the answer
+        # names neither; the log has the details.
+        logger.warning("%s %s: %s", request.method, request.url.path, exc)
+        return JSONResponse(status_code=503, content={
+            "detail": "The database cannot be reached right now; try again in a moment."})
 
     for module in (system, drivers, simulation, config, journey):
         app.include_router(module.router)

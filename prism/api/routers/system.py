@@ -17,10 +17,10 @@ def health():
 
     Cheap on purpose (the dashboard polls it): it reads the run's id, never
     its results. When the database fails, status is "degraded" and
-    simulation_reason says why (legacy_schema: it still needs migration 0001;
-    no_database: no URL is configured; db_error: anything else). A run that
-    exists but cannot be served shows up in /api/v1/diagnostics and
-    /api/v1/simulation.
+    simulation_reason says why (migration_pending: it needs a migration from
+    migrations/ first; no_database: no URL is configured; db_error: anything
+    else). A run that exists but cannot be served shows up in
+    /api/v1/diagnostics and /api/v1/simulation.
     """
     from prism.api import state
     from prism.database import failure_reason, latest_run_summary

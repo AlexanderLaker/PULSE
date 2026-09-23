@@ -1,0 +1,21 @@
+# Names the schema and code before this migration used and the current tree
+# never does: the package and product name, modules and components, keys and
+# columns. tests/test_repository.py fails when one of them appears anywhere
+# outside this folder and tests/test_migration.py. One regular expression per
+# line; lines starting with # are comments.
+\bPULSE\b
+\bpulse[./]\w
+\b(?:from|import) pulse\b
+Trends2
+ProfitPoolAnalysis2
+ConsumerJourney2
+seed_trends
+trendCodeMap
+run_50k_prod
+trend_fingerprint
+trend_count
+strategic_implication
+probability_posterior
+ai_suggestion
+user_override
+trend_base_2026

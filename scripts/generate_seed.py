@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate the seed module and the display-code map from the driver base.
 
 Inputs
@@ -32,8 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from prism.config import (CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES,  # noqa: E402
-                          VC_STEPS, vc_epicentre_step_of)
+from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
+                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code, vc_epicentre_step_of)
 
 BASE = ROOT / "data" / "drivers" / "driver_base.json"
 ANALYSIS = ROOT / "data" / "drivers" / "driver_analysis.json"
@@ -41,8 +40,6 @@ ATTRIBUTION = ROOT / "data" / "drivers" / "driver_attribution.json"
 SEED_OUT = ROOT / "prism" / "seed_drivers.py"
 CODEMAP_OUT = ROOT / "data" / "driverCodeMap.ts"
 
-FORCE_LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T",
-                "Government": "G", "Environmental": "E", "Competitive": "X"}
 #: Order of the forces in the generated files (largest first, then related).
 FORCE_ORDER = ["Consumer", "Customer", "Competitive", "Technology", "Government", "Environmental"]
 SOURCE_TIERS = ("S", "A", "B")
@@ -79,7 +76,7 @@ def validate(drivers: list) -> None:
         m = re.fullmatch(r"([a-z]+)_r(\d{2})", d["id"])
         if d["force"] not in FORCES:
             problems.append(f"{tag}: unknown force {d['force']!r}")
-        elif not m or m.group(1) != d["force"].lower() or d["code"] != f"{FORCE_LETTER[d['force']]}-{m.group(2)}":
+        elif not m or m.group(1) != d["force"].lower() or d["code"] != display_code(d["id"], d["force"]):
             problems.append(f"{tag}: id {d['id']!r} and code {d['code']!r} do not follow force + number")
         if d["direction"] not in ("Expansion", "Contraction"):
             problems.append(f"{tag}: direction {d['direction']!r}")
@@ -87,8 +84,9 @@ def validate(drivers: list) -> None:
             problems.append(f"{tag}: probability or uncertainty out of range")
         if not 0 < d["gp1_pct_affected"] <= 1:
             problems.append(f"{tag}: gp1_pct_affected {d['gp1_pct_affected']} outside (0, 1]")
-        if not 2025 <= d["start_year"] <= d["peak_year"] <= 2035:
-            problems.append(f"{tag}: onset {d['start_year']} and peak {d['peak_year']} out of order or range")
+        if not DEFAULT_BASE_YEAR <= d["start_year"] < d["peak_year"] <= DEFAULT_PATH_YEARS[-1]:
+            problems.append(f"{tag}: onset {d['start_year']} and peak {d['peak_year']} out of order or range "
+                            "(the peak comes after the onset)")
         if d["diffusion_curve"] not in VALID_DIFFUSION_CURVES:
             problems.append(f"{tag}: diffusion curve {d['diffusion_curve']!r}")
         if d["confidence"] not in ("High", "Medium", "Low"):

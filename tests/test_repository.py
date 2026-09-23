@@ -1,10 +1,9 @@
 """Rules for every text file in the repository.
 
 - No em dash, in code, comments, content or documents.
-- None of the previous release's names: the old package and product name,
-  the renamed modules and components, the trend-named keys and columns. Only
-  the migration that moves a database of that release, and its tests, may
-  name them.
+- None of the names the schema and code before migration 0001 used: the
+  migration's folder lists them (previous_names.txt), and only that folder
+  and the migration's tests may name them.
 - No tracked file is executable: the scripts are run as python3 or bash
   scripts/<name>, as the documents show.
 """
@@ -22,11 +21,11 @@ SKIP_DIRS = {"node_modules", ".git", ".next", ".vercel", "__pycache__", ".venv",
              ".hypothesis", "runs", "archive"}
 EM_DASH = chr(0x2014)
 
-#: Names only the previous release used, and the places allowed to name them.
-PREVIOUS_NAMES = re.compile(
-    r"\bPULSE\b|\bpulse[./]\w|\b(?:from|import) pulse\b|Trends2|ProfitPoolAnalysis2|ConsumerJourney2|"
-    r"seed_trends|trendCodeMap|run_50k_prod|trend_fingerprint|trend_count|strategic_implication|"
-    r"probability_posterior|ai_suggestion|user_override|trend_base_2026")
+#: The names before migration 0001, and the places allowed to name them.
+_NAMES_FILE = REPO / "migrations" / "0001_driver_schema" / "previous_names.txt"
+PREVIOUS_NAMES = re.compile("|".join(
+    line.strip() for line in _NAMES_FILE.read_text(encoding="utf-8").splitlines()
+    if line.strip() and not line.startswith("#")))
 MAY_NAME_THE_PREVIOUS_RELEASE = ("migrations/0001_driver_schema/", "tests/test_migration.py")
 
 
@@ -60,7 +59,7 @@ def test_no_names_of_the_previous_release():
     hits = []
     for path in FILES:
         rel = path.relative_to(REPO).as_posix()
-        if rel.startswith(MAY_NAME_THE_PREVIOUS_RELEASE) or rel == "tests/test_repository.py":
+        if rel.startswith(MAY_NAME_THE_PREVIOUS_RELEASE):
             continue
         for i, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             m = PREVIOUS_NAMES.search(line)

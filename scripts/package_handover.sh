@@ -30,7 +30,14 @@ echo "Packaging $(git rev-parse --abbrev-ref HEAD) at ${HEAD_SHA}"
 git archive HEAD | tar -x -C "$STAGE"
 
 fail=0
-for forbidden in .env .env.deploy .clerk _NOT_FOR_HANDOVER data/prism.db runs; do
+# Any .env file but the example, local state and the internal record.
+for path in "$STAGE"/.env*; do
+  [ -e "$path" ] || continue
+  [ "$(basename "$path")" = ".env.example" ] && continue
+  echo "Forbidden path in the archive: $(basename "$path")" >&2
+  fail=1
+done
+for forbidden in .clerk _NOT_FOR_HANDOVER data/prism.db runs; do
   if [ -e "$STAGE/$forbidden" ]; then
     echo "Forbidden path in the archive: $forbidden" >&2
     fail=1
