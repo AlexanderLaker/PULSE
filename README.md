@@ -1,129 +1,131 @@
-# PRISM — Profit Pool Simulation Platform
+# PRISM
 
-PRISM (formerly PULSE) is a profit-pool simulation platform for FMCG category
-strategy, built on scored Profit Pool Drivers. It combines a Bayesian Monte-Carlo
-simulation engine (Python) with an interactive analysis dashboard (Next.js)
-deployed on Vercel. (The app says "Drivers"; the code, the API routes and the
-database keep the older name `trend`, owner ruling O15.)
+PRISM (Profit Pool Risk & Intelligence Simulation Model) estimates how the
+external drivers of Henkel Consumer Brands' business shift the gross profit
+(GP1) of its categories between 2026 and 2035. Experts score 51 Profit Pool
+Drivers; a Monte Carlo engine turns the scores into relative shifts per
+category, region, force and year, each with a P10 to P90 band; a dashboard
+shows the latest production run next to the drivers behind it.
 
-## Architecture
+The numbers are relative shifts, never amounts: a reader applies them to their
+own figures, `GP1_2035 = GP1_today x (1 + shift)`. They hold strategy
+constant, so a negative total reads as exposure if nobody acts, not as a
+forecast. The gross-profit mix the engine weights its cells with is, until
+finance provides the real one, an estimate built from public reporting and
+not Henkel P&L.
+
+## How it fits together
 
 ```
-Browser ──▶ Next.js 16 (App Router)            ──  UI, auth, role gating
-              │   Clerk        → identity (sign-in/up, sessions)
-              │   lib/roles.ts → authorization (admin/viewer, Neon Postgres)
-              │   fetch('/api/v1/…')
-              ▼
-            Vercel rewrite (vercel.json)
-              ▼
-            api/index.py  ──▶  pulse/ (FastAPI engine — READ-ONLY in prod, F2)
-                                ├─ simulation/   Bayesian MC, Gaussian copula (scipy)
-                                ├─ audit/        input-drift telemetry, audit log
-                                └─ api/app.py    REST endpoints (/api/v1/*)
+scripts/run_production.py        offline, on a machine with scipy
+  reads the drivers, runs 3 x 50,000 iterations,
+  writes the run and a QA workbook
+        |
+        v
+PostgreSQL (Neon)                drivers, runs, journey content, audit log, user roles
+        ^
+        |  reads; driver edits, expert proposals and journey saves write back
+PRISM API (prism/api, FastAPI)   serves the latest run; never simulates
+        ^
+        |  /api/v1 on the same origin
+Dashboard (Next.js)              Clerk sign-in, roles, four views
 ```
 
-Auth bridge: Next.js API routes verify the Clerk session, then mint a short-lived
-HS256 JWT (`lib/prismJwt.ts`, signed with `PRISM_JWT_SECRET`). The Python engine
-verifies that JWT (`pulse/api/auth.py`) and enforces admin gates on mutating
-endpoints. The engine has no user store of its own.
+The dashboard has four views: **Drivers** (the scored drivers, their sources
+and the PRISM Analysis of each), **Consumer Journey** (an authored overlay of
+consumer moments and the drivers behind them), **Profit Pool Shift Analysis**
+(the Shift Matrix with its drill-downs) and the **Profit Pool Explorer**
+(beta: sourced views of the industry profit pools).
+
+## Quick start
+
+Prerequisites: Node.js 22, Python 3.10 or later, a Clerk application (test
+keys are enough) and a Neon database for development. Never develop against
+the production database.
+
+```bash
+npm install
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env              # fill in the values, see Configuration
+
+uvicorn prism.api.app:app --reload --port 8000    # the API, first terminal
+npm run dev                                       # the dashboard on :3000, second terminal
+```
+
+The dashboard proxies `/api/v1` to the API (next.config.js). On first use the
+API creates the tables and seeds the drivers. The Shift Analysis stays empty
+until a run exists; a short one takes seconds:
+
+```bash
+python3 scripts/run_production.py --iterations 2000
+```
+
+Roles come from a Clerk webhook, which cannot reach a development machine on
+its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 
 ## Repository layout
 
-| Path | Purpose |
-|------|---------|
-| `app/` | Next.js pages + API routes (BFF: Clerk→engine auth bridge, user/role admin) |
-| `components/dashboard/` | Dashboard views (Drivers, Consumer Journey, Profit Pool Shift Analysis, Profit Pool Explorer) |
-| `hooks/usePrism.ts` | Central data hook — single source of truth for engine state |
-| `api/client.ts` | Typed API client for all `/api/v1/*` calls (20 s timeout on every request) |
-| `lib/` | Server-side helpers (roles, db, Clerk→PRISM JWT bridge) + pure display/math modules (`format.ts`, `shiftMatrix.ts` — lint-guarded single sources) |
-| `types/` | Shared TypeScript types |
-| `api/index.py` | Vercel serverless adapter wrapping the FastAPI app |
-| `pulse/` | Python simulation engine + FastAPI app |
-| `data/` | Static front-end content (consumer journey tiles, driver code map `trendCodeMap.ts`) + attenuation calibration JSON |
-| `tests/` | pytest suite (engine, API, ops) + `tests/frontend/` vitest suite |
-| `scripts/` | Production run, ops helpers, `package_handover.sh` (`scripts/archive/` holds spent one-off migrations) |
-| `docs/` | Deep-dive docs incl. `docs/governance/` (decision log, findings register, remediation records) — see `docs/INDEX.md` |
-| `*.md` (repo root) | The five canonical docs: README, HANDOVER, CLAUDE, DEPLOY, CONCEPT_PRISM_ONLINE_AI |
+| Path | Content |
+|---|---|
+| `app/` | Next.js pages and the dashboard's server routes (roles, admin writes, the viewer cookie, the Clerk webhook) |
+| `components/dashboard/` | The views and their shared pieces |
+| `hooks/`, `api/client.ts`, `types/` | The data store, the API client and the types that mirror the API's JSON |
+| `lib/` | Shared logic: formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
+| `data/` | Dashboard content (the Consumer Journey, the driver code map) and the source files of generated artefacts (`drivers/`, `calibration/`) |
+| `prism/` | The Python package: the engine (`simulation/`), the model configuration, persistence and the API (`api/`) |
+| `api/index.py` | The Vercel entry point of the API |
+| `scripts/` | The production run, the generators and maintenance tools |
+| `migrations/` | One-time database migrations, each with its runbook |
+| `tests/` | The Python suite; `tests/frontend/` holds the dashboard suite |
+| `docs/` | The documentation listed below |
 
-## Prerequisites
+## Commands
 
-- **Node.js 22.x** (see `package.json` engines)
-- **Python 3.10+**
-- Accounts/keys: **Clerk** (auth), **Neon Postgres** (roles DB); optional: Resend, Anthropic
+| Command | What it does |
+|---|---|
+| `npm run dev` | The dashboard with hot reload (the API runs separately) |
+| `npm run verify` | Every check CI runs: types, lint, both test suites |
+| `npm run typecheck`, `npm run lint`, `npm test` | The dashboard checks one by one |
+| `python3 -m pytest -n auto` | The Python suite |
+| `ruff check .` | The Python lint |
+| `python3 scripts/run_production.py` | The production run against the database in `.env` |
 
-## Local setup
+Four generators keep committed files in step with their inputs; each takes
+`--check` to verify them, and CI runs all four (docs/OPERATIONS.md):
+`scripts/generate_seed.py`, `scripts/build_cell_weights.py`,
+`scripts/compute_attenuation.py` and `scripts/build_driver_analysis.py`.
 
-```bash
-# 1. Install frontend deps
-npm install
+## Configuration
 
-# 2. Install engine deps (virtualenv recommended)
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt        # full dev set (incl. scipy, pytest)
-# (production/Vercel uses the slimmer api/requirements.txt)
+`.env.example` lists every variable; copy it to `.env` (never committed). On
+Vercel the same variables are set in the project settings.
 
-# 3. Configure environment
-cp .env.example .env                       # then fill in the values — see table below
+| Variable | Needed by | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | dashboard (also at build time) | Clerk publishable key |
+| `CLERK_SECRET_KEY` | dashboard | Clerk secret key |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that adds new users to `user_roles` |
+| `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database. The API and the scripts also accept `POSTGRES_URL`, which wins when both are set; the dashboard reads `DATABASE_URL` only |
+| `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
+| `NEXT_PUBLIC_SIGNUP_CODE` | dashboard | The access code the sign-up page asks for (without it the page asks for `HCB2026`) |
+| `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set; remove it once an admin exists |
+| `PRISM_BACKEND_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
+| `PRISM_DB_PATH` | API, scripts | The SQLite file used when no database URL is set (default `data/prism.db`) |
 
-# 4. Run both processes (two terminals)
-python -m uvicorn pulse.api.app:app --reload --port 8000   # engine
-npm run dev                                                 # frontend on :3000
-```
+Variables set in the shell take precedence over `.env`, so one command can be
+pointed at another database: `DATABASE_URL=... python3 scripts/run_production.py`.
 
-`next.config.js` proxies `/api/v1/*` from :3000 to :8000 in dev. In production,
-`vercel.json` rewrites `/api/v1/*` to the Python serverless function instead.
+## Documentation
 
-## Environment variables
-
-| Variable | Required | Used by | Purpose |
-|----------|----------|---------|---------|
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | frontend | Clerk publishable key (`pk_…`) |
-| `CLERK_SECRET_KEY` | yes | Next server | Clerk secret key (`sk_…`) |
-| `CLERK_WEBHOOK_SIGNING_SECRET` | yes (prod) | Next server | Verifies Clerk `user.*` webhooks (svix) |
-| `DATABASE_URL` (or `POSTGRES_URL`) | yes | Next server + engine | Neon Postgres (roles, drivers, audit) |
-| `PRISM_JWT_SECRET` | yes | Next server + engine | Shared secret for the Clerk→engine JWT bridge (≥32 chars) |
-| `NEXT_PUBLIC_SIGNUP_CODE` | recommended | frontend | Access code required on the sign-up page |
-| `ADMIN_BOOTSTRAP_SECRET` | optional | Next server | Shared secret for `/api/admin/bootstrap` (first admin) |
-| `BACKEND_URL` / `PRISM_BACKEND_URL` | dev only | Next server | Engine URL override (default `http://127.0.0.1:8000`) |
-| `PRISM_DB_PATH` | optional | engine | SQLite path for local runs without Postgres |
-| `CORS_ORIGINS` | optional | engine | CORS override |
-
-Note (M17, July 2026): real shell environment variables **win** over `.env`
-values — you can redirect a single run with `DATABASE_URL=… python3 …`.
-(The former AI-layer and transactional-email variables were removed with
-their features.)
-
-## Scripts & tests
-
-```bash
-npm run dev / build / start    # Next.js
-npm run verify                 # the full local gate: typecheck + eslint +
-                               # single-source guard + vitest + pytest
-                               # (CI runs the same two jobs)
-```
-
-Engine determinism: simulations use a fixed master seed (42) via
-`np.random.default_rng`; drivers load in a fixed order (`ORDER BY id`, C2) —
-identical inputs produce identical results by design (reproducibility for
-audits). Multi-chain runs derive distinct chain seeds from the master and
-persist both; the cross-seed spread is reported as `seed_stability`.
-
-## Deployment (Vercel)
-
-`vercel.json` drives the build: `next build`,
-plus the `/api/v1/*` → `api/index.py` rewrite. Set all required env vars in the
-Vercel project settings. See `DEPLOY.md` for the step-by-step guide and
-`docs/CLERK_MIGRATION.md` for the auth setup history.
-
-## Further documentation
-
-Start with `HANDOVER.md` (takeover guide), then `CLAUDE.md` (full developer
-handbook / spec). Deep-dive docs (methodology, brand/category mapping, trend
-audits, testing, design system) live under `docs/` — see `docs/INDEX.md`.
-The governance record (decision log, findings register, review remediation)
-is committed under `docs/governance/` — code comments cite it by finding ID.
-Target-state concept for Henkel hosting + online AI: `CONCEPT_PRISM_ONLINE_AI.md`.
-
-Strategy decks, management reports and personal working files are NOT part
-of this repository. The handover package is built by
-`bash scripts/package_handover.sh` (fresh-history export, secret-checked).
+| Document | Read it for |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The components, the data flow, the API, authentication and the database |
+| [docs/MODEL.md](docs/MODEL.md) | The engine: what it computes, how, and its limits |
+| [docs/DRIVERS.md](docs/DRIVERS.md) | The driver base: every field and how to change it |
+| [docs/DRIVER_ANALYSIS.md](docs/DRIVER_ANALYSIS.md) | The PRISM Analysis on the Drivers page |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Running, testing, deploying and maintaining PRISM |
+| [docs/DESIGN.md](docs/DESIGN.md) | The visual design system |
+| [docs/EXPLORER.md](docs/EXPLORER.md) | The data behind the Profit Pool Explorer |
+| [docs/adr/](docs/adr/README.md) | The design decisions and why they were taken |
+| [migrations/0001_driver_schema/README.md](migrations/0001_driver_schema/README.md) | Moving a database of the previous release onto this one |

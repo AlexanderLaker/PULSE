@@ -1,0 +1,291 @@
+# Operations
+
+How to develop, test, run, deploy and look after PRISM.
+
+## Environments
+
+| | Production | Development |
+|---|---|---|
+| Dashboard and API | Vercel project `prism-profit-pool`, https://prism-hcb.vercel.app | `npm run dev` and uvicorn on your machine |
+| Database | Neon PostgreSQL | a Neon development branch (the dashboard's role table needs Neon); the API and the scripts can also use a local SQLite file |
+| Sign-in | Clerk production instance | Clerk development instance (test keys) |
+| Source | GitHub `AlexanderLaker/PRISM`, branch `main`; every push deploys | any branch |
+
+The production run, the generators and the migrations run on a developer
+machine with the full Python environment. The scripts that touch a database
+act on the one in `DATABASE_URL` (or `POSTGRES_URL`) and print which one that
+is; read it before you go on.
+
+## Local development
+
+```bash
+npm install
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env
+```
+
+Fill in `.env` (README.md lists every variable). Then, in two terminals:
+
+```bash
+uvicorn prism.api.app:app --reload --port 8000
+npm run dev
+```
+
+and open http://localhost:3000. The Next.js dev server sends `/api/v1` to the
+API (`PRISM_BACKEND_URL` changes the target). On first use the API creates
+its tables and seeds the drivers. For a Shift Analysis to look at, write a
+short run:
+
+```bash
+python3 scripts/run_production.py --iterations 2000
+```
+
+Keep the virtual environment active whenever you run Python: `npm run
+test:py` and `npm run verify` call `python3`, and outside the environment that
+is the system Python without pytest.
+
+To keep the API and the scripts on SQLite while the dashboard uses Neon,
+blank the URL for them only: `DATABASE_URL= uvicorn ...` (a variable set in
+the shell, even empty, wins over `.env`); the production run then also needs
+`--allow-sqlite`.
+
+### Roles on a development machine
+
+The Clerk webhook that adds new users to `user_roles` cannot reach
+localhost, so a user who signs up locally has no row and is a viewer. Either
+point the development instance's webhook at a tunnel to port 3000 (for
+example `ngrok http 3000`, then the webhook URL
+`https://<tunnel>/api/webhooks/clerk`), or add your row by hand in the
+development database:
+
+```sql
+INSERT INTO user_roles (clerk_user_id, email, role) VALUES ('<your Clerk user id>', '<your email>', 'admin');
+```
+
+The Clerk user id is in the Clerk dashboard under Users.
+
+## Tests and checks
+
+| Command | Checks |
+|---|---|
+| `npm run verify` | everything below except the generators, in the order CI runs it |
+| `npm run typecheck` | TypeScript (`tsconfig.check.json`) |
+| `npm run lint` | ESLint with no warnings allowed, then `scripts/check_single_source.sh`, which keeps the Shift Matrix arithmetic in `lib/shiftMatrix.ts` |
+| `npm test` | the dashboard suite (Vitest, `tests/frontend/`) |
+| `ruff check .` | Python lint |
+| `python3 -m pytest -n auto` | the Python suite (`tests/`) |
+
+The Python suite runs on a throwaway SQLite file: `tests/conftest.py` blanks
+the database URLs before anything is imported, so a production URL in
+`.env` never reaches a test. Set `PRISM_TEST_POSTGRES_URL` to a PostgreSQL
+database the tests may create and drop schemas in, and the migration and the
+database layer are also tested on PostgreSQL:
+
+```bash
+PRISM_TEST_POSTGRES_URL="postgresql://prism:prism@localhost:5432/prism_test?sslmode=disable" python3 -m pytest -n auto
+```
+
+The generated files each have a check that regenerates them in memory and
+compares:
+
+```bash
+python3 scripts/generate_seed.py --check          # prism/seed_drivers.py, data/driverCodeMap.ts
+python3 scripts/build_cell_weights.py --check     # the cell-weight record, lib/cellWeightProvenance.ts
+python3 scripts/compute_attenuation.py --check    # the overlap-correction record and prism/config.py
+python3 scripts/build_driver_analysis.py --check  # the attribution record, the PRISM Analysis texts, the parity fixture
+```
+
+CI (`.github/workflows/ci.yml`) runs two jobs on every push to `main` and on
+every pull request: the dashboard checks, and the Python lint, suite (with a
+PostgreSQL service) and the four generator checks. It does not run `next
+build`, which needs the Clerk keys; Vercel builds every push.
+
+A few rules the suite holds:
+
+- **Golden pins** (`tests/test_golden_pipeline.py`) fix the engine's output on
+  a small driver set. They change only with a deliberate model change, in the
+  same commit, with a new `MODEL_VERSION` (docs/adr/0014).
+- **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
+  `package.json` must agree.
+- **Generated files** are never edited by hand.
+- **Parity**: the value-chain rule and the per-driver attribution exist in
+  Python and TypeScript; shared fixtures keep them identical.
+
+## The production run
+
+```bash
+python3 scripts/run_production.py
+python3 scripts/run_production.py --cell-weights /path/outside/the/repo/cell_weights.json
+```
+
+The run reads the database in `DATABASE_URL` (or `POSTGRES_URL`), refuses to
+start without one unless `--allow-sqlite` is given, and takes a few minutes
+at the default 3 x 50,000 iterations. It writes a new row to
+`simulation_runs`; the dashboard serves the newest row from its next request
+on, and earlier rows stay for the drift comparison. It also writes the QA
+workbook to `runs/` (git-ignored): the Shift Matrix with its percentiles, the
+regional medians, the cell weights (with the graded derivation when the
+estimate was used), the velocities and the run's metadata.
+
+| Option | Effect |
+|---|---|
+| `--cell-weights FILE` | the finance cell weights instead of the estimate |
+| `--iterations N`, `--chains N` | iterations per chain (default 50,000) and chains (default 3) |
+| `--allow-sqlite` | use the local SQLite file when no database URL is set |
+| `--allow-nonpsd` | run although the correlation matrix is not positive definite on this driver mix; the engine repairs it and records an integrity event |
+
+The cell-weights file is JSON, kept outside the repository:
+
+```json
+{
+  "source": "HCB finance, gross profit FY2025",
+  "basis": "gp1_share",
+  "cells": {
+    "Hair: Color": {"Europe": 0.094, "North America": 0.026, "Asia": 0.010, "High Growth": 0.041},
+    "...": {}
+  }
+}
+```
+
+`cells` must name every category and region of `prism/config.py`. With
+`"basis": "gp1_share"` the 52 shares must add up to 1 within 0.01; with
+`"gp1_absolute"` the values are divided by their total before the engine sees
+them, and no amount is stored anywhere. The `source` text is stored with the
+run and shown next to it.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | the run is persisted (the workbook is best effort) |
+| 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or still on the previous schema |
+| 2 | the database holds no drivers |
+| 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
+| 4 | the correlation matrix is not positive definite on this driver mix |
+| 5 | the cell-weights file is missing or invalid |
+
+After a run, the Shift Analysis's "About this model" footer shows the new
+run's id, date, seeds, numerics and integrity events, including the input
+drift against the previous run.
+
+When the inputs of the PRISM Analysis changed (a re-scored base, a
+recalibration, the finance cell weights), regenerate the readings after the
+run as docs/DRIVER_ANALYSIS.md describes.
+
+## Deploying
+
+Push to `main`: Vercel builds the dashboard and the Python function and
+promotes the build to production in about two minutes. Other branches get
+preview deployments. The environment variables live in the Vercel project
+settings (Production and Preview); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is
+needed at build time, the others at run time.
+
+After a deploy:
+
+```bash
+curl -s https://prism-hcb.vercel.app/api/v1/health
+```
+
+must answer `"status": "ok"` with the driver count and `"has_simulation":
+true`. Then open the dashboard and check that the Shift Analysis shows the
+expected run. `/api/v1/diagnostics` explains a problem (next section).
+
+A deploy never needs a restart for data to appear: each API instance checks
+the database on every request and reloads the drivers or the run when they
+changed.
+
+**Rollback**: in the Vercel dashboard, promote the previous production
+deployment (Deployments, the deployment, Promote to Production), or revert
+the commit and push. A deploy that came with a database migration is rolled
+back as that migration's runbook says.
+
+## The database
+
+- **Backups.** Before any change to production data (a migration, a sync),
+  create a Neon branch of the production branch. It is instant and it is the
+  rollback.
+- **Migrations.** A change to the schema or to existing data is a folder
+  under `migrations/`, numbered, with the script and a runbook. The pattern
+  of `0001_driver_schema`: everything in one transaction; a `--dry-run` that
+  performs the migration and rolls back; `--postgres` required to change a
+  PostgreSQL database; every dropped row written to a local archive before
+  the commit; the migration recorded in `schema_migrations` and the audit
+  log; texts an admin edited reported and left alone; tests on SQLite and
+  PostgreSQL. `prism/database.py` lists the migrations a new database already
+  contains (`SCHEMA_MIGRATIONS`).
+- **The PRISM Analysis texts** of an existing database follow the generated
+  ones with `scripts/sync_analysis.py` (`--dry-run` first). It changes only
+  the analysis column and writes one audit entry per driver.
+- **The audit log** records every driver edit (one row per changed field),
+  journey save, role change, analysis sync and migration, with the acting
+  identity. Nothing deletes from it.
+
+## Roles and users
+
+The first user who signs up becomes admin; everyone after that is a viewer.
+Admins change roles in Settings, under User management; an admin cannot demote
+themselves, so the last admin can never lock everyone out. Two ways exist to
+set a role without an admin session:
+
+- `python3 scripts/promote_admin.py someone@example.com` (or `--role viewer`)
+  with database access;
+- `POST /api/admin/bootstrap` with the header `x-bootstrap-secret` equal to
+  `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}`. The route exists
+  only while the variable is set; remove it afterwards.
+
+Both need the user's row in `user_roles`, which the Clerk webhook adds at
+sign-up.
+
+## Setting up Clerk for a new environment
+
+1. Create a Clerk application with email sign-in (and any SSO provider
+   wanted).
+2. Copy the publishable and secret keys into `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   and `CLERK_SECRET_KEY`.
+3. Add a webhook endpoint `https://<domain>/api/webhooks/clerk` for the
+   events `user.created`, `user.updated` and `user.deleted`, and copy its
+   signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any
+   request without a valid signature.
+4. Deploy, sign up, and check that `user_roles` holds your row with the
+   admin role.
+
+## Troubleshooting
+
+| Symptom | Cause and remedy |
+|---|---|
+| Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
+| The dashboard says the service is unavailable | Check `/api/v1/diagnostics`: `db_error` means the API cannot reach the database (the `error` field says why); a database of the previous schema answers 503 and needs `migrations/0001_driver_schema` |
+| The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
+| Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
+| The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
+| `git` reports a lock file in a synced folder (OneDrive, iCloud) | If no git process runs, rename the stale lock (`mv .git/index.lock .git/index.lock.stale`); synced folders sometimes refuse to delete it |
+
+## Handover
+
+`bash scripts/package_handover.sh` builds `PRISM_HANDOVER_<date>.zip`: a git
+repository with a single commit of the tracked tree at `HEAD`. It refuses a
+dirty working tree and fails if the exported tree holds `.env`, a local
+database, run outputs or a string that looks like a secret. Three things
+travel separately:
+
+- the database, as a `pg_dump` of the Neon production branch;
+- the finance cell-weights file, if one exists;
+- the credentials, which are not handed over but rotated: the Clerk keys and
+  webhook secret, the Neon password, `PRISM_JWT_SECRET` (every session then
+  signs in again), `NEXT_PUBLIC_SIGNUP_CODE` and any `ADMIN_BOOTSTRAP_SECRET`.
+
+## Hosting elsewhere
+
+PRISM needs four things, which Vercel, Neon and Clerk provide today:
+
+- a Node.js 22 host for the Next.js dashboard;
+- a Python host for the ASGI app `prism.api.app:app`, reachable on the
+  dashboard's origin under `/api/v1` (the dashboard's server routes call it
+  on the same origin). It needs only `api/requirements.txt`;
+- PostgreSQL. The dashboard reaches it through Neon's serverless driver
+  (`lib/db.ts`); another PostgreSQL service means replacing that driver;
+- an identity provider. Clerk sits behind `lib/roles.ts`, `proxy.ts`, the
+  sign-in pages and the webhook; the API only verifies PRISM's own tokens.
+
+The production run needs a machine or a job runner with the full Python
+environment and access to the database. It must keep scipy: there is no
+approximate engine.

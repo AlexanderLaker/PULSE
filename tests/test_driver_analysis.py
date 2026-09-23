@@ -311,9 +311,14 @@ class TestCommittedArtefacts:
         assert persisted and persisted["id"] and persisted["model_version"] == record["basis"]["model_version"]
         assert len(persisted["categories_terminal"]) == 13
         assert build.reference_reproduces(record["reference_run"], persisted) == []
-        # the published headline is the reference run's, to the displayed decimals
-        term = record["reference_run"]["portfolio_terminal"]
-        assert (round(term["median"] * 100, 2), round(term["p10"] * 100, 2), round(term["p90"] * 100, 2)) == (-5.58, -6.16, -4.89)
+        # docs/MODEL.md quotes the reference run's headline and Europe's share of it
+        term, totals = record["reference_run"]["portfolio_terminal"], record["totals"]
+        model_md = " ".join((REPO / "docs" / "MODEL.md").read_text(encoding="utf-8").split())
+        headline = (f"the 2035 portfolio median is {term['median'] * 100:.2f} percent, with a P10 to P90 band of "
+                    f"{term['p10'] * 100:.2f} to {term['p90'] * 100:.2f} percent")
+        europe = f"carries {-totals['by_region_pp']['Europe']:.2f} of the {-totals['net_pp']:.2f} points"
+        assert headline in model_md, headline
+        assert europe in model_md, europe
 
 
 # ── (c) the readings follow the rules ────────────────────────────────────────

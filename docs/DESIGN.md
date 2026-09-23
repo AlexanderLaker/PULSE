@@ -1,82 +1,112 @@
-# PRISM Design System — "Maritime Editorial"
+# Design
 
-Single source of truth for the PRISM UI. Tokens are defined in `tailwind.config.js`
-(Tailwind classes) and `app/globals.css` (CSS variables). Views may mirror these values
-in a local `const S = {...}` — values must match this file exactly.
+The dashboard uses one visual language on every surface: views, dialogs,
+loading and error states, and the sign-in pages. It is a light editorial
+look: navy ink on pale blue surfaces, Manrope headlines, Inter text, and
+numbers that carry the hierarchy while the chrome stays quiet.
 
-## Principles
+## Where the tokens live
 
-1. **One language everywhere.** Every surface — views, modals, loading, error, auth — uses
-   this palette. No second system.
-2. **Editorial, not dashboard-generic.** Manrope display type, generous whitespace,
-   pill-shaped controls, soft navy shadows.
-3. **Answer-first.** Numbers carry the hierarchy; chrome stays quiet.
+| File | Holds |
+|---|---|
+| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders and status; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
+| `lib/format.ts` | the shift colours (`EXPANSION`, `CONTRACTION`, `NEUTRAL` and their soft tints), the matrix heat ramp, the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
+| `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion |
+| `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance, built from the same tokens |
 
-## Color Tokens
+Components style themselves inline from these tokens and use Tailwind's
+default utilities for layout and spacing only. A colour that appears in a
+component and in none of these files is a bug, with two deliberate
+exceptions: the source-tier colours on the Drivers page and the tints of the
+entry gate's four tiles.
 
-| Token | Value | Tailwind | Use |
-|---|---|---|---|
-| Canvas | `#f8f9ff` | `bg-canvas` | Page background |
-| Surface | `#ffffff` | `bg-surface` | Cards, nav, modals |
-| Surface Low | `#eff4ff` | `bg-surface-low` | Chips, secondary buttons, table headers |
-| Surface Container | `#e5eeff` | `bg-surface-container` | Nested panels |
-| Surface High | `#dce9ff` | `bg-surface-high` | Hover fills, scrollbar |
-| Surface Highest | `#d2e4ff` | `bg-surface-highest` | Pressed/selected fills |
-| Primary | `#005db5` | `text-primary` / `bg-primary` | Brand, active tab, primary actions |
-| Primary Dim | `#0052a0` | `*-primary-dim` | Primary hover |
-| Primary Container | `#d6e3ff` | `bg-primary-container` | Selected chips |
-| On Primary Container | `#00519e` | `text-primary-oncontainer` | Text on primary container |
-| Ink | `#00345e` | `text-ink` | Headlines, primary text |
-| Ink Variant | `#26619d` | `text-ink-variant` | Secondary text, inactive tabs |
-| Ink Muted | `#64748b` | `text-ink-muted` | Captions, helper text, beta labels |
-| Outline | `#477dbb` | `border-outline` | Strong borders |
-| Outline Variant | `#81b5f6` | `border-outline-variant` | Decorative borders |
-| Card Border | `rgba(0,52,94,0.10)` | `border-outline-faint` | Default card/divider border |
-| Danger | `#9f403d` | `text-danger` | Errors, negative values |
-| Danger Container | `#fe8983` | `bg-danger-container` | Error fills |
-| On Danger Container | `#752121` | `text-danger-oncontainer` | Text on error fills |
+## Colour
 
-**Data palette (charts only, not UI chrome):** the six force colors and category colors
-live in `lib/format.ts` (`FORCES`, `CATEGORIES`). They encode data series identity and are
-allowed to differ from the UI tokens above.
-
-## Typography
-
-| Role | Font | Tailwind |
+| Token (`S`) | Value | Use |
 |---|---|---|
-| Display / headlines / numbers | Manrope (800 for headlines) | `font-display` |
-| Body / UI | Inter | `font-sans` |
-| Code / formulas | JetBrains Mono → ui-monospace | `font-mono` |
+| `bg` | `#f8f9ff` | page background |
+| `surface` | `#ffffff` | cards, navigation, dialogs |
+| `surfaceLow` | `#eff4ff` | chips, secondary buttons, table headers |
+| `surfaceContainer` | `#e5eeff` | nested panels |
+| `surfaceHigh`, `surfaceHighest` | `#dce9ff`, `#d2e4ff` | hover and selected fills |
+| `primary` | `#005db5` | the active tab, primary actions, links |
+| `onSurface` | `#00345e` | headlines and body text (the deep navy of the brand) |
+| `onSurfaceVariant` | `#26619d` | secondary text, inactive tabs |
+| `mutedText` | `#64748b` | captions, helper text, beta labels |
+| `cardBorder` | `rgba(0, 52, 94, 0.10)` | card and divider borders |
+| `error` | `#9f403d` | errors |
+| `amber` | `#b45309` | warnings, estimate grades |
 
-Loaded in `app/layout.tsx` via Google Fonts (Inter 400–800, Manrope 400–800).
-Minimum text size: **12px**. Uppercase micro-labels use `tracking-[0.15em]` and ≥11px
-only for decorative overlines, never for data.
+Shadows are navy-based (`rgba(0, 52, 94, ...)`), never black; the card shadow
+is `0 4px 60px -15px rgba(0, 52, 94, 0.08)`.
 
-## Shape & Elevation
+### Shifts
 
-- Cards: `rounded-2xl` (16px) + `shadow-card` (`0 4px 60px -15px rgba(0,52,94,0.08)`)
-- Controls (buttons, chips, tabs-pills): `rounded-full`
-- Small nested elements (inputs, selects): 8–10px radius
-- Nav: white at 75% opacity + `backdrop-blur-xl` + `shadow-nav`
-- Modal overlay: `rgba(0,52,94,0.45)` + `shadow-overlay` on the dialog
-- All shadows are **navy-based** (`rgba(0,52,94,…)`) — never pure black
+One colour pair means direction everywhere: green `#1f7a3d` for expansion,
+red `#9f403d` for contraction, slate for flat. Colour is never the only
+signal: a shift always carries its sign, and headline figures an arrow as
+well (`components/dashboard/ShiftValue.tsx`), so the direction survives
+colour-vision deficiency, a projector and greyscale print. The Shift Matrix
+tints its cells in the shift's own hue, stronger with the magnitude up to the
+95th percentile of the values in view; the tint stops where the cell text
+would drop below 5:1 contrast, and the legend states the scale in use.
 
-## Recurring Patterns
+### Forces and categories
 
-- **Top nav:** brand wordmark + production tabs (left), beta tabs + settings + identity +
-  sign-out pill (right). Active tab = `#005db5` with 2px underline; beta tabs use the
-  muted ink scale.
-- **Filter chips:** `rounded-full`, `bg-surface-low` inactive / `bg-primary-container` active.
-- **Tables:** header row `bg-surface-low`, 12px uppercase tracked labels, sortable headers
-  with direction icon; data cells ≥12px.
-- **Beta disclaimers:** one modal per session (sessionStorage-keyed), or persistent inline
-  banner — never repeat-on-every-open.
-- **States:** loading skeletons, empty rows and error screens use this palette
-  (`components/dashboard/LoadingSkeleton.tsx`, `ErrorBoundary.tsx`).
+The six forces have one palette (`FORCE_COLORS`): Consumer `#005db5`,
+Customer `#6b4fc4`, Technology `#0e8aa8`, Government `#b07d2b`, Environmental
+`#2f8f4e`, Competitive `#b0504a`. Each category has its own colour in
+`CATEGORIES`. These identify data series in charts and legends; they are not
+used for interface chrome.
 
-## Don'ts
+## Type
 
-- No second palette: any hex not in this file (outside the data palette) is a bug.
-- No black-based shadows; no pure-black text.
-- No text below 12px for data or labels users must read.
-- No new fonts.
+| Role | Font |
+|---|---|
+| Headlines, tab labels, large figures | Manrope, 700 to 800 |
+| Body text and controls | Inter |
+| Figures in tables and formulas | JetBrains Mono, or Inter with tabular numerals |
+
+The fonts are self-hosted at build time, so the page makes no request to a
+font service. Body text is 13 to 14 px, labels and table text 11 to 12 px,
+and small uppercase overlines use wide letter spacing. The smallest
+annotations (grade legends, counters) go down to 9 px and never carry a
+value a reader needs.
+
+## Numbers
+
+- A percentage shows at most one decimal: a Monte Carlo median does not
+  support more. `fmtShift` and `fmtPct` in `lib/format.ts` are the only
+  formatters.
+- A shift always shows its sign; below 0.05 percent it counts as flat and
+  shows neither sign nor colour.
+- A missing value shows `–`.
+- A band is written P10 to P90. The matrix cells show medians only; on the
+  time-path lens the band is in the cell's tooltip, and every category's band
+  is in its drill-down's fan chart, so the grid stays readable.
+- Dates read "26 Jun 2026" whatever the browser's locale.
+
+## Shapes and patterns
+
+- Cards: 16 px radius, white, the card shadow. Controls (buttons, chips, tab
+  pills): fully rounded. Inputs and small nested elements: 8 to 10 px.
+- Top navigation: the wordmark and the production tabs on the left; the beta
+  tab, settings and the user on the right. The active tab is primary blue with
+  an underline; beta tabs use the muted scale.
+- Tables: a `surfaceLow` header row with small uppercase labels, sortable
+  headers with a direction icon.
+- Provenance and grades are chips with text (`components/dashboard/Chip.tsx`),
+  never colour alone.
+- Loading, empty and error states use the same palette
+  (`LoadingSkeleton.tsx`, `ErrorBoundary.tsx`) and say what is missing and why.
+- Overlays close on Escape, keep the page behind them from scrolling, keep
+  focus inside while open and return it afterwards (`hooks/useOverlay.ts`).
+
+## Accessibility
+
+- Interactive elements are real buttons or links, reachable by keyboard,
+  with the focus ring from `globals.css`.
+- Time-path cells of the matrix carry an accessible label with the median and
+  the band.
+- Ratings are radio groups; the scoring mode toggle is a tab list.
+- Motion respects `prefers-reduced-motion`.
