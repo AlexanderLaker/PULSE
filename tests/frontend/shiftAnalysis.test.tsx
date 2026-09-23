@@ -36,8 +36,7 @@ import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 
 function diagnosis(overrides: Partial<DiagnosticsResult>): DiagnosticsResult {
   return {
-    db_mode: 'postgres', db_host: 'ep-example.neon.tech', db_url_env: 'POSTGRES_URL', db_reachable: true,
-    simulation_run_count: 0, latest_run_id: null, latest_run_date: null, error: null,
+    db_reachable: true, simulation_run_count: 0, latest_run_id: null, error: null,
     simulation_reason: 'no_rows', version: 'test', ...overrides,
   };
 }
@@ -63,7 +62,7 @@ describe('Shift Analysis without a run', () => {
       [diagnosis({ simulation_reason: 'malformed', latest_run_id: 99 }), 'Latest run cannot be served'],
       [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'Backend cannot reach the database'],
       [diagnosis({ simulation_reason: 'migration_pending' }), 'The database awaits a migration'],
-      [diagnosis({ simulation_reason: 'no_database', db_reachable: false, db_host: null }), 'No database configured'],
+      [diagnosis({ simulation_reason: 'no_database', db_reachable: false }), 'No database configured'],
     ];
     for (const [result, title] of cases) {
       STORE.store = makeStore({ simulation: null });

@@ -48,16 +48,12 @@ export type DatabaseFailure = 'migration_pending' | 'no_database' | 'db_error';
 /** Why a run cannot be shown: no run yet, a run missing part of its contract, or a database failure. */
 export type SimulationReason = 'ok' | 'no_rows' | 'malformed' | DatabaseFailure;
 
-/** GET /api/v1/diagnostics: what the service sees of its database. No credentials. */
+/** GET /api/v1/diagnostics: whether the service reaches its database and can serve a run. Anonymous, so it
+ *  names nothing about the database itself. */
 export interface DiagnosticsResult {
-  db_mode: 'postgres' | 'sqlite';
-  /** Host name only, never a credential; null when it cannot be read. */
-  db_host: string | null;
-  db_url_env: 'POSTGRES_URL' | 'DATABASE_URL' | null;
   db_reachable: boolean;
   simulation_run_count: number;
   latest_run_id: number | null;
-  latest_run_date: string | null;
   /** The failure in words that name no host, user or password. */
   error: string | null;
   simulation_reason: SimulationReason;

@@ -159,15 +159,6 @@ export const NoRunState: FC<{
               (Time Path, Force, Value Chain and Region) populate here
               automatically.
             </p>
-            {diagnostics?.db_host && (
-              <p className="text-[12px]" style={{ color: S.onSurfaceVariant }}>
-                Connected to{' '}
-                <code style={CODE}>{diagnostics.db_host}</code>
-                {' · '}
-                <strong>{diagnostics.simulation_run_count}</strong>{' '}
-                runs in this database.
-              </p>
-            )}
           </>
         )}
       </div>

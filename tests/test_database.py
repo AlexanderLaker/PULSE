@@ -406,7 +406,7 @@ class TestRunsJourneyAudit:
     def test_diagnostics_never_raise(self, db, monkeypatch):
         diag = db.diagnose_connection()
         assert diag["db_reachable"] is True and diag["error"] is None
-        assert diag["db_mode"] == ("postgres" if db.USE_POSTGRES else "sqlite")
+        assert set(diag) == {"db_reachable", "simulation_run_count", "latest_run_id", "error", "reason"}
         monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("no route")))
         monkeypatch.setattr(db.time, "sleep", lambda s: None)
         broken = db.diagnose_connection()

@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Collection, Dict, List, Optional, Sequence
-from urllib.parse import urlparse
 
 from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES
 from prism.drivers import (CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_TIERS, Driver, InvalidDriversError,
@@ -389,23 +388,17 @@ def diagnose_connection() -> Dict[str, Any]:
 
     Never raises: a failure is reported in ``error`` as describe_error()
     words, so the dashboard can tell "cannot reach the database" from
-    "reachable but empty" without a credential ever reaching a response.
+    "reachable but empty". The answer is anonymous, so it names nothing about
+    the database itself: no host, no user, no credential.
     """
-    which_env = "POSTGRES_URL" if os.environ.get("POSTGRES_URL") else (
-        "DATABASE_URL" if os.environ.get("DATABASE_URL") else None)
     out: Dict[str, Any] = {
-        "db_mode": "postgres" if USE_POSTGRES else "sqlite",
-        "db_host": None,
-        "db_url_env": which_env,
         "db_reachable": False,
         "simulation_run_count": 0,
         "latest_run_id": None,
-        "latest_run_date": None,
         "error": None,
         "reason": None,
     }
     try:
-        out["db_host"] = (urlparse(POSTGRES_URL).hostname or "unknown") if USE_POSTGRES else "local SQLite file"
         with get_db_connection() as conn:
             cursor = conn.cursor()
             tables = table_names(cursor)
@@ -422,7 +415,6 @@ def diagnose_connection() -> Dict[str, Any]:
         latest = latest_run_summary()
         if latest:
             out["latest_run_id"] = latest["id"]
-            out["latest_run_date"] = latest["run_date"]
     except Exception as e:  # noqa: BLE001 (reported, never raised)
         out["error"], out["reason"] = describe_error(e), failure_reason(e)
         logger.warning("diagnose_connection: database probe failed: %s", e)
