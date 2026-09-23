@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import pytest
 
-from prism.config import CATEGORIES, REGIONS, VC_STEPS
+from prism.config import CATEGORIES, REGIONS
 from prism.database import PENDING_MIGRATION_MARKERS
 from prism.drivers import Driver
 
@@ -33,7 +33,7 @@ def _driver(driver_id="consumer_r01", **overrides) -> Driver:
         direction="Contraction", probability=3, gp1_pct_affected=0.10, start_year=2025, peak_year=2030,
         diffusion_curve="linear", confidence="Medium", uncertainty=2, analysis="the reading",
         category_exposure={c: 1 for c in CATEGORIES}, regional_exposure={r: 1 for r in REGIONS},
-        vc_exposure={v: 1 for v in VC_STEPS},
+        vc_epicentre="Supply Chain",
         sources=[{"title": "original source", "url": "https://example.org/a", "tier": "A", "note": "Apr 2026"}],
     )
     fields.update(overrides)
@@ -81,7 +81,7 @@ class TestSchema:
         assert _count(db, "SELECT COUNT(*) FROM schema_migrations WHERE version = '0001_driver_schema'") == 1
         with db.get_db_connection() as conn:
             tables = db.table_names(conn.cursor())
-        assert {"drivers", "driver_category_exposure", "driver_vc_exposure", "driver_regional_exposure",
+        assert {"drivers", "driver_category_exposure", "driver_regional_exposure",
                 "driver_sources", "driver_score_proposals", "journey_content", "simulation_runs", "audit_log",
                 "schema_migrations"} <= tables
 
@@ -102,7 +102,7 @@ class TestDrivers:
         expected = _driver()
         for field in ("id", "force", "name", "description", "direction", "probability", "gp1_pct_affected",
                       "start_year", "peak_year", "diffusion_curve", "confidence", "uncertainty", "analysis",
-                      "category_exposure", "regional_exposure", "vc_exposure", "sources"):
+                      "category_exposure", "regional_exposure", "vc_epicentre", "sources"):
             assert getattr(loaded, field) == getattr(expected, field), field
         assert loaded.baseline == expected.scores()
         assert loaded.scores_edited is False and loaded.revision == 1
@@ -136,9 +136,8 @@ class TestDrivers:
 
     def test_exposures_and_sources_are_replaced(self, db):
         db.save_drivers([_driver(category_exposure={"Hair: Care": 5}, regional_exposure={"Europe": 5},
-                                 vc_exposure={VC_STEPS[0]: 5}, sources=[])])
-        for table, n in (("driver_category_exposure", 1), ("driver_regional_exposure", 1),
-                         ("driver_vc_exposure", 1), ("driver_sources", 0)):
+                                 sources=[])])
+        for table, n in (("driver_category_exposure", 1), ("driver_regional_exposure", 1), ("driver_sources", 0)):
             assert _count(db, f"SELECT COUNT(*) FROM {table}") == n, table
 
     def test_created_at_survives_and_updated_at_moves(self, db):
@@ -201,6 +200,10 @@ class TestProposals:
     def test_a_partial_proposal_merges(self, db):
         merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"peak_year": 2031}, "Expert A")
         assert (merged["probability"], merged["uncertainty"], merged["peak_year"]) == (2, 4, 2031)
+        merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"vc_epicentre": "Marketing"}, "Expert A")
+        assert (merged["peak_year"], merged["vc_epicentre"]) == (2031, "Marketing")
+        row = next(r for r in db.load_driver_proposals("consumer_r01") if r["user_id"] == "expert-a")
+        assert row["vc_epicentre"] == "Marketing" and row["comment"] == "keep me"
 
     def test_a_field_can_be_cleared(self, db):
         merged = db.upsert_driver_proposal("consumer_r01", "expert-a", {"probability": None}, "Expert A")

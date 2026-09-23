@@ -40,57 +40,15 @@ CATEGORIES = [
     "LHC: HDW", "LHC: ADW", "LHC: HSC", "LHC: TOI", "LHC: IC",
 ]
 
+# The value chain in order. A driver names one stage, its epicentre: the stage
+# where its impact centres. The value-chain lens assigns the driver's whole
+# contribution to it; propagation along the chain is not modelled.
 VC_STEPS = [
     "Raw Materials", "Formulation", "Manufacturing", "Packaging",
     "Supply Chain", "Marketing", "Commercial", "Consumer",
 ]
 
 REGIONS = ["Europe", "North America", "Asia", "High Growth"]
-
-
-def vc_epicentre_of(vc_exposure: Optional[dict]) -> Optional[int]:
-    """1-based value-chain epicentre stage of a driver, or None if unscored.
-
-    Experts score the value chain as one epicentre stage; the stored eight-step
-    0-5 profile is the editor's serialisation of that choice. The epicentre is
-    the highest-scoring stage; ties resolve towards the exposure-weighted
-    centroid, and an exact tie in distance goes to the earlier stage.
-
-    ``epicentreOf`` in lib/valueChain.ts implements the same rule.
-    tests/test_vc_epicentre.py and tests/frontend/vcEpicentre.test.ts pin both
-    to one fixture table, so the engine and the interface always agree on a
-    driver's stage.
-    """
-    if not vc_exposure:
-        return None
-    vs = [float(vc_exposure.get(step) or 0.0) for step in VC_STEPS]
-    total = sum(vs)
-    if total <= 0:
-        return None
-    mx = max(vs)
-    centroid = sum(v * (i + 1) for i, v in enumerate(vs)) / total
-    best: Optional[int] = None
-    for i, v in enumerate(vs):
-        if v != mx:
-            continue
-        if best is None or abs(i + 1 - centroid) < abs(best - centroid):
-            best = i + 1
-    return best
-
-
-def vc_epicentre_step_of(vc_exposure: Optional[dict]) -> Optional[str]:
-    """Name of a driver's epicentre stage (a VC_STEPS entry), or None."""
-    stage = vc_epicentre_of(vc_exposure)
-    return VC_STEPS[stage - 1] if stage is not None else None
-
-
-def canonical_vc_profile(stage: int) -> dict:
-    """The eight-step profile the editor stores for a 1-based epicentre stage:
-    5 at the stage, 3 one stage away, 1 two away, 0 elsewhere
-    (canonicalVcProfile in lib/valueChain.ts)."""
-    falloff = (5, 3, 1)
-    return {step: falloff[abs(i + 1 - stage)] if abs(i + 1 - stage) < len(falloff) else 0
-            for i, step in enumerate(VC_STEPS)}
 
 
 # ── Horizon and materialisation ─────────────────────────────────────────────

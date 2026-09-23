@@ -36,9 +36,9 @@ afterEach(() => {
   PROPOSALS.fail = false;
 });
 
-const scorer = (userId: string, name: string) => ({
+const scorer = (userId: string, name: string, stage: string | null = null) => ({
   user_id: userId, name, probability: 4, gp1_pct_affected: null, peak_year: null,
-  diffusion_curve: null, uncertainty: null, vc_exposure: null, comment: null,
+  diffusion_curve: null, uncertainty: null, vc_epicentre: stage, comment: null,
 });
 
 /** A driver an admin has edited (probability 3 and GP1 30 %, against a baseline
@@ -56,10 +56,9 @@ function reviewedDriver(): Driver {
     my: null,
     aggregate: {
       probability: { avg: 4, count: 2 }, gp1_pct_affected: null, peak_year: null, diffusion_curve: null,
-      uncertainty: null,
+      uncertainty: null, vc_epicentre: null,
       category_exposure: { 'Hair: Care': { avg: 4.6, count: 2 } },
       regional_exposure: { Asia: { avg: 1.4, count: 1 } },
-      vc_exposure: {},
     },
     scorers: [scorer('ana', 'Ana'), scorer('ben', 'Ben')],
   };
@@ -115,6 +114,23 @@ describe('Review & Endorse', () => {
       category_exposure: { 'Hair: Care': 5 },
       regional_exposure: { Asia: 1 },
     });
+  });
+
+  it('endorses the stage the experts agree on, by name', async () => {
+    const driver = reviewedDriver();
+    PROPOSALS.current!.scorers = [scorer('ana', 'Ana', 'Marketing'), scorer('ben', 'Ben', 'Marketing')];
+    await openReview(driver);
+    const [, update] = await endorse();
+    expect(update.vc_epicentre).toBe('Marketing');
+  });
+
+  it('keeps the current stage when the expert votes tie', async () => {
+    const driver = reviewedDriver();
+    PROPOSALS.current!.scorers = [scorer('ana', 'Ana', 'Marketing'), scorer('ben', 'Ben', 'Consumer')];
+    await openReview(driver);
+    expect(await screen.findByText(/no majority/)).toBeTruthy();
+    const [, update] = await endorse();
+    expect(update).not.toHaveProperty('vc_epicentre');
   });
 
   it('writes the baseline only where the admin chooses it', async () => {

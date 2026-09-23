@@ -91,7 +91,7 @@ class TestDriverModel:
     def test_fingerprint_carries_score_and_diffs_it(self):
         base = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
                      category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
-                     vc_exposure={"Marketing": 5}, peak_year=2029, diffusion_curve="linear", uncertainty=2)
+                     vc_epicentre="Marketing", peak_year=2029, diffusion_curve="linear", uncertainty=2)
         fp0 = driver_fingerprint([base])
         assert fp0["u1"]["u"] == 2
         base.uncertainty = 4
@@ -109,7 +109,7 @@ def _db(uncertainties):
             id=f"t{i}", force="Consumer", name=f"t{i}", direction="Contraction",
             probability=4, start_year=2025, gp1_pct_affected=0.20, peak_year=2029,
             diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-            regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5},
+            regional_exposure={"Europe": 5}, vc_epicentre="Marketing",
             uncertainty=u,
         ))
     return DriverSet(drivers=drivers)
@@ -207,11 +207,11 @@ class TestDatabaseRoundTrip:
         t = Driver(id="unc_1", force="Consumer", name="x", direction="Contraction",
                   probability=4, start_year=2025, gp1_pct_affected=0.2, peak_year=2029,
                   diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-                  regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5}, uncertainty=2)
+                  regional_exposure={"Europe": 5}, vc_epicentre="Marketing", uncertainty=2)
         t2 = Driver(id="unc_2", force="Consumer", name="y", direction="Expansion",
                    probability=3, start_year=2025, gp1_pct_affected=0.1, peak_year=2030,
                    diffusion_curve="linear", category_exposure={"Hair: Care": 5},
-                   regional_exposure={"Europe": 5}, vc_exposure={"Marketing": 5})
+                   regional_exposure={"Europe": 5}, vc_epicentre="Marketing")
         dbm.save_drivers([t, t2])
         loaded = {x.id: x for x in dbm.load_drivers()}
         assert loaded["unc_1"].uncertainty == 2
@@ -242,7 +242,7 @@ class TestOnsetClamp:
         return Driver(id="clamp", force="Consumer", name="c", direction="Contraction", probability=5,
                      start_year=2025, gp1_pct_affected=0.2, peak_year=2027, diffusion_curve="linear",
                      category_exposure={"Hair: Care": 5}, regional_exposure={"Europe": 5},
-                     vc_exposure={"Marketing": 5}, uncertainty=u)
+                     vc_epicentre="Marketing", uncertainty=u)
 
     def test_schedule_table_is_monotone_earlier_for_negative_offsets(self, mock_model_config):
         cfg = mock_model_config.copy_with(peak_year_jitter=True,

@@ -47,7 +47,7 @@ const response = (my: DriverProposal | null): DriverProposalsResponse => ({
   driver_id: PRIVATE_LABEL.id, my, scorers: [],
   aggregate: {
     probability: null, gp1_pct_affected: null, peak_year: null, diffusion_curve: null, uncertainty: null,
-    category_exposure: {}, regional_exposure: {}, vc_exposure: {},
+    vc_epicentre: null, category_exposure: {}, regional_exposure: {},
   },
 });
 
@@ -123,6 +123,20 @@ describe('the admin editor', () => {
     expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([
       driver.id, { revision: 7, category_exposure: { 'Hair: Color': 4 } }]);
   });
+
+  it('sends the value-chain epicentre as the stage it names', async () => {
+    const driver = makeDriver({ revision: 7 });
+    STORE.current = makeStore({ drivers: [driver] });
+    render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(screen.getByRole('button', { name: 'Comm' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Mktg' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(STORE.current!.updateDriver).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([
+      driver.id, { revision: 7, vc_epicentre: 'Marketing' }]);
+  });
 });
 
 /** Opens the Expert Rating panel of the private-label driver. */
@@ -170,6 +184,20 @@ describe('the Expert Rating panel', () => {
     await act(async () => { vi.advanceTimersByTime(700); });
     await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(1));
     expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ probability: null, category_exposure: { 'Hair: Care': 4 } });
+  });
+
+  it('proposes the value-chain epicentre as a stage and clears it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    openExpertRating();
+    await screen.findByRole('radiogroup', { name: /^Probability/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Mktg' }));
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(1));
+    expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ vc_epicentre: 'Marketing' });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await act(async () => { vi.advanceTimersByTime(700); });
+    await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(2));
+    expect(API.saveMyProposal.mock.calls[1]![1]).toMatchObject({ vc_epicentre: null });
   });
 
   it('sends its saves one at a time, each with the newest draft', async () => {

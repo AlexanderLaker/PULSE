@@ -9,7 +9,6 @@ import { FileText, ExternalLink, AlertTriangle } from 'lucide-react';
 import { CATEGORIES, FIRST_YEAR, HORIZON, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT } from '@/lib/theme';
-import { VC_STEPS, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverScores, DriverSource, ExposureMap, SourceTier } from '@/types';
 import { curveLabel, uncLabel } from './shared';
@@ -34,7 +33,7 @@ export const FIELD_HELP = {
   timing: `When the driver reaches full impact (Peak Year) and the shape of how it builds toward that peak over ${FIRST_YEAR}–${HORIZON} (Diffusion Curve).`,
   category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored: a cell you leave blank is not part of your proposal.',
   regional: 'How strongly this driver plays out across regions (Europe, North America, Asia, High Growth), on a 0–5 scale.',
-  vc: 'The stage of the value chain, from raw materials through to the consumer, where this driver’s impact centres (its epicentre). One stage per driver: the value-chain attribution assigns the driver’s whole contribution to this stage, which is stored as a profile around it (5 at the stage, 3 one stage away, 1 two stages away).',
+  vc: 'The stage of the value chain, from raw materials through to the consumer, where this driver’s impact centres (its epicentre). One stage per driver: the value-chain attribution assigns the driver’s whole contribution to this stage. It does not change the shift.',
 } as const;
 
 // ─── Meta chip: the confidence and evidence pills of the meta row ──
@@ -144,10 +143,6 @@ function baselineDifferences(d: Driver, base: DriverScores): string[] {
       .map(([key, label]) => `${label} ${now[key] ?? 0} (baseline ${then[key] ?? 0})`);
     if (changed.length) lines.push(`${input}: ${changed.join(', ')}`);
   };
-  const stage = (profile: ExposureMap): string => {
-    const s = epicentreOf(profile);
-    return s == null ? 'unscored' : VC_STEPS[s - 1];
-  };
   compare('Probability', `${d.probability} / 5`, `${base.probability} / 5`);
   compare('GP1 % affected', fmtPct(d.gp1_pct_affected, 0), fmtPct(base.gp1_pct_affected, 0));
   compare('Peak year', String(d.peak_year), String(base.peak_year));
@@ -155,7 +150,7 @@ function baselineDifferences(d: Driver, base: DriverScores): string[] {
   compare('Uncertainty', uncLabel(d.uncertainty), uncLabel(base.uncertainty));
   compareCells('Category exposure', CATEGORIES.map((c) => [c.name, c.short] as const), d.category_exposure, base.category_exposure);
   compareCells('Regional exposure', REGIONS.map((r) => [r, r] as const), d.regional_exposure, base.regional_exposure);
-  compare('Value chain epicentre', stage(d.vc_exposure), stage(base.vc_exposure));
+  compare('Value chain epicentre', d.vc_epicentre ?? 'unscored', base.vc_epicentre ?? 'unscored');
   return lines;
 }
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from prism import seed_drivers
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code, vc_epicentre_step_of
+from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code
 from prism.drivers import SCORE_FIELDS
 
 REPO = Path(__file__).resolve().parent.parent
@@ -51,7 +51,7 @@ class TestSeed:
             assert d.diffusion_curve in VALID_DIFFUSION_CURVES and d.confidence in ("Low", "Medium", "High")
             assert 0 <= d.uncertainty <= 5
             assert set(d.category_exposure) == set(CATEGORIES) and set(d.regional_exposure) == set(REGIONS)
-            assert set(d.vc_exposure) == set(VC_STEPS) and vc_epicentre_step_of(d.vc_exposure) is not None
+            assert d.vc_epicentre in VC_STEPS
             assert max(d.category_exposure.values()) > 0 and max(d.regional_exposure.values()) > 0
             assert d.name and d.description and d.analysis
             assert d.sources and all(s["url"].startswith("http") and s["tier"] in ("S", "A", "B") for s in d.sources)
@@ -71,7 +71,7 @@ class TestSeed:
             b = from_base[d.id]
             for field in ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
                           "peak_year", "diffusion_curve", "uncertainty", "confidence", "category_exposure",
-                          "vc_exposure", "regional_exposure", "sources"):
+                          "regional_exposure", "vc_epicentre", "sources"):
                 assert getattr(d, field) == getattr(b, field), (d.id, field)
 
     def test_the_committed_files_are_the_generator_output(self):

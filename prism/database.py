@@ -206,6 +206,7 @@ def _schema() -> List[str]:
             diffusion_curve TEXT,
             gp1_pct_affected REAL,
             uncertainty INTEGER,
+            vc_epicentre TEXT,
             confidence TEXT DEFAULT 'Medium',
             analysis TEXT,
             baseline TEXT,
@@ -219,12 +220,6 @@ def _schema() -> List[str]:
             category TEXT NOT NULL,
             exposure_score INTEGER,
             PRIMARY KEY (driver_id, category)
-        )""",
-        """CREATE TABLE IF NOT EXISTS driver_vc_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            vc_step TEXT NOT NULL,
-            exposure_score INTEGER,
-            PRIMARY KEY (driver_id, vc_step)
         )""",
         """CREATE TABLE IF NOT EXISTS driver_regional_exposure (
             driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
@@ -254,7 +249,7 @@ def _schema() -> List[str]:
             uncertainty INTEGER,
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_exposure TEXT,
+            vc_epicentre TEXT,
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
@@ -437,7 +432,7 @@ def insert_audit(cursor, entries: Sequence[AuditEntry]) -> None:
 
 _DRIVER_COLUMNS = (
     "id", "force", "name", "description", "direction", "probability", "start_year",
-    "peak_year", "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence",
+    "peak_year", "diffusion_curve", "gp1_pct_affected", "uncertainty", "vc_epicentre", "confidence",
     "analysis", "baseline", "scores_edited",
 )
 
@@ -445,21 +440,18 @@ _DRIVER_COLUMNS = (
 def _driver_values(d: Driver) -> tuple:
     """The values of _DRIVER_COLUMNS for one driver, in that order."""
     return (d.id, d.force, d.name, d.description, d.direction, d.probability, d.start_year,
-            d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.confidence,
+            d.peak_year, d.diffusion_curve, d.gp1_pct_affected, d.uncertainty, d.vc_epicentre, d.confidence,
             d.analysis, dumps(d.baseline) if d.baseline else None, d.scores_edited)
 
 
 def _write_driver_children(cursor, d: Driver) -> None:
     """Rewrite a driver's exposure and source rows from the object."""
     p = placeholder()
-    for table in ("driver_category_exposure", "driver_vc_exposure", "driver_regional_exposure", "driver_sources"):
+    for table in ("driver_category_exposure", "driver_regional_exposure", "driver_sources"):
         cursor.execute(f"DELETE FROM {table} WHERE driver_id = {p}", (d.id,))
     for category, score in d.category_exposure.items():
         cursor.execute(f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
                        (d.id, category, score))
-    for step, score in d.vc_exposure.items():
-        cursor.execute(f"INSERT INTO driver_vc_exposure (driver_id, vc_step, exposure_score) VALUES ({ph(3)})",
-                       (d.id, step, score))
     for region, score in d.regional_exposure.items():
         cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
                        (d.id, region, score))
@@ -529,9 +521,8 @@ def load_drivers() -> List[Driver]:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM drivers ORDER BY id")
         rows = [_row(r) for r in cursor.fetchall()]
-        exposures: Dict[str, Dict[str, dict]] = {r["id"]: {"category": {}, "vc": {}, "region": {}} for r in rows}
+        exposures: Dict[str, Dict[str, dict]] = {r["id"]: {"category": {}, "region": {}} for r in rows}
         for table, key, column in (("driver_category_exposure", "category", "category"),
-                                   ("driver_vc_exposure", "vc", "vc_step"),
                                    ("driver_regional_exposure", "region", "region")):
             cursor.execute(f"SELECT driver_id, {column} AS k, exposure_score FROM {table}")
             for r in cursor.fetchall():
@@ -559,8 +550,8 @@ def load_drivers() -> List[Driver]:
             start_year=r["start_year"],
             analysis=r["analysis"] or "",
             category_exposure=e["category"],
-            vc_exposure=e["vc"],
             regional_exposure=e["region"],
+            vc_epicentre=r["vc_epicentre"],
             sources=sources[r["id"]],
             confidence=r["confidence"] or "Medium",
             # A missing score stays missing, so the engine refuses to run
@@ -696,11 +687,12 @@ def save_journey_content(content: dict, updated_by: str, base_version: int,
 # A proposal is partial: any subset of the scoreable fields may be set, and a
 # NULL field means "this expert did not score that".
 
-_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty")
-_PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
+_PROPOSAL_SCALAR_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
+                           "vc_epicentre")
+_PROPOSAL_MAP_FIELDS = ("category_exposure", "regional_exposure")
 _PROPOSAL_TEXT_FIELDS = ("comment",)
 _PROPOSAL_COLUMNS = ("user_id, user_name, probability, gp1_pct_affected, peak_year, "
-                     "diffusion_curve, uncertainty, category_exposure, regional_exposure, vc_exposure, "
+                     "diffusion_curve, uncertainty, vc_epicentre, category_exposure, regional_exposure, "
                      "comment, updated_at")
 
 
@@ -714,9 +706,9 @@ def _proposal(raw) -> dict:
         "peak_year": r.get("peak_year"),
         "diffusion_curve": r.get("diffusion_curve"),
         "uncertainty": _int_or_none(r.get("uncertainty")),
+        "vc_epicentre": r.get("vc_epicentre"),
         "category_exposure": _loads(r.get("category_exposure")),
         "regional_exposure": _loads(r.get("regional_exposure")),
-        "vc_exposure": _loads(r.get("vc_exposure")),
         "comment": r.get("comment"),
         "updated_at": r.get("updated_at"),
     }
@@ -768,23 +760,23 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
 
         values = (user_name or "",
                   merged.get("probability"), merged.get("gp1_pct_affected"), merged.get("peak_year"),
-                  merged.get("diffusion_curve"), merged.get("uncertainty"),
+                  merged.get("diffusion_curve"), merged.get("uncertainty"), merged.get("vc_epicentre"),
                   enc(merged.get("category_exposure")), enc(merged.get("regional_exposure")),
-                  enc(merged.get("vc_exposure")), merged.get("comment"))
+                  merged.get("comment"))
         if existing:
             cursor.execute(
                 f"""UPDATE driver_score_proposals
                     SET user_name = {p}, probability = {p}, gp1_pct_affected = {p},
-                        peak_year = {p}, diffusion_curve = {p}, uncertainty = {p},
-                        category_exposure = {p}, regional_exposure = {p}, vc_exposure = {p},
+                        peak_year = {p}, diffusion_curve = {p}, uncertainty = {p}, vc_epicentre = {p},
+                        category_exposure = {p}, regional_exposure = {p},
                         comment = {p}, updated_at = CURRENT_TIMESTAMP
                     WHERE driver_id = {p} AND user_id = {p}""",
                 values + (driver_id, user_id))
         else:
             cursor.execute(
                 f"""INSERT INTO driver_score_proposals (driver_id, user_id, user_name, probability,
-                        gp1_pct_affected, peak_year, diffusion_curve, uncertainty, category_exposure,
-                        regional_exposure, vc_exposure, comment)
+                        gp1_pct_affected, peak_year, diffusion_curve, uncertainty, vc_epicentre,
+                        category_exposure, regional_exposure, comment)
                     VALUES ({ph(12)})""",
                 (driver_id, user_id) + values)
 

@@ -232,8 +232,7 @@ the list next to the run.
 | `correlation_pd_repair`, `cholesky_repair` | the correlation matrix had to be repaired |
 | `regional_exposure_coverage` | a driver without regional exposure was treated as present everywhere |
 | `compounding_floor` | a compounding factor was floored at -100 percent |
-| `vc_epicentre_coverage` | a driver has no value-chain epicentre and is missing from that lens |
-| `vc_attribution_fallback` | a category had no contributing driver with an epicentre and shows an even split |
+| `vc_attribution_fallback` | no driver reaches a category, so the value-chain lens shows an even split there |
 | `cell_weight_zero_row` | a category has a zero gross-profit share in every region |
 | `cell_weights_fallback` | the cell weights were empty or all zero and a flat grid was used |
 

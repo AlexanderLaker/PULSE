@@ -259,7 +259,7 @@ class TestDrivers:
         assert set(first) == {
             "id", "force", "name", "description", "direction", "probability", "start_year", "peak_year",
             "diffusion_curve", "gp1_pct_affected", "uncertainty", "confidence", "normalized_score",
-            "category_exposure", "vc_exposure", "regional_exposure", "analysis", "sources",
+            "category_exposure", "regional_exposure", "vc_epicentre", "analysis", "sources",
             "baseline", "scores_edited", "revision", "proposal_summary"}
         assert first["baseline"]["probability"] == first["probability"] and first["scores_edited"] is False
         assert first["revision"] == 1
@@ -283,6 +283,14 @@ class TestDrivers:
             rows = [tuple(r) for r in cursor.fetchall()]
         assert rows[0][0] == "description" and rows[0][2:] == (json.dumps("Edited."), "user-1")
         assert rows[1:] == [("probability", "5", "4", "user-1"), ("uncertainty", "2", "3", "user-1")]
+
+    def test_the_value_chain_is_edited_as_one_stage(self, api):
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"revision": 1, "vc_epicentre": "Marketing"})
+        assert response.status_code == 200 and response.json()["changed"] == ["vc_epicentre"]
+        driver = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json() if d["id"] == "consumer_r01")
+        assert driver["vc_epicentre"] == "Marketing" and driver["scores_edited"] is True
+        assert driver["baseline"]["vc_epicentre"] == "Commercial"
 
     def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
         sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "note": "Apr 2026"}]
@@ -337,7 +345,8 @@ class TestDrivers:
         {"diffusion_curve": "exponential"}, {"description": None}, {"analysis": "typed by hand"},
         {"name": "Renamed"}, {"force": "Customer"}, {"start_year": 2026}, {"peak_year": 2025},
         {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},
-        {"regional_exposure": {"Latin America": 2}}, {"vc_exposure": {"Retail": 5}},
+        {"regional_exposure": {"Latin America": 2}}, {"vc_epicentre": "Retail"}, {"vc_epicentre": None},
+        {"vc_exposure": {"Marketing": 5}},
         {"sources": [{"title": "", "url": ""}]}, {"sources": [{"title": "x", "tier": "Z"}]},
     ])
     def test_invalid_edits_are_refused(self, api, body):
@@ -409,8 +418,8 @@ class TestProposals:
         assert api.get(path, headers=bearer()).json() == {
             "driver_id": "consumer_r01", "my": None, "scorers": [],
             "aggregate": {"probability": None, "gp1_pct_affected": None, "peak_year": None, "uncertainty": None,
-                          "diffusion_curve": None, "category_exposure": {}, "regional_exposure": {},
-                          "vc_exposure": {}}}
+                          "diffusion_curve": None, "vc_epicentre": None, "category_exposure": {},
+                          "regional_exposure": {}}}
         api.put(path, headers=bearer(sub="ana", name="Ana"), json={"probability": 4, "comment": "  looks high  "})
         body = api.put(path, headers=bearer(sub="ana", name="Ana"), json={"peak_year": 2031}).json()
         assert body["my"]["probability"] == 4 and body["my"]["peak_year"] == 2031 and body["my"]["comment"] == "looks high"
@@ -425,6 +434,20 @@ class TestProposals:
         summary = next(d for d in api.get("/api/v1/drivers", headers=bearer()).json()
                        if d["id"] == "consumer_r01")["proposal_summary"]
         assert summary["count"] == 2 and summary["probability"] == {"avg": 3.0, "count": 2}
+
+    def test_the_value_chain_is_proposed_as_one_stage(self, api):
+        path = "/api/v1/drivers/consumer_r01/proposals"
+        api.put(path, headers=bearer(sub="ana", name="Ana"), json={"vc_epicentre": "Marketing"})
+        api.put(path, headers=bearer(sub="ben", name="Ben"), json={"vc_epicentre": "Marketing"})
+        body = api.put(path, headers=bearer(sub="cy", name="Cy"), json={"vc_epicentre": "Consumer"}).json()
+        assert body["aggregate"]["vc_epicentre"] == {
+            "mode": "Marketing", "distribution": {"Marketing": 2, "Consumer": 1}, "count": 3}
+        assert [(s["name"], s["vc_epicentre"]) for s in body["scorers"]] == [
+            ("Ana", "Marketing"), ("Ben", "Marketing"), ("Cy", "Consumer")]
+        assert body["my"]["vc_epicentre"] == "Consumer"
+        assert api.put(path, headers=bearer(sub="cy"), json={"vc_epicentre": "Retail"}).status_code == 422
+        assert api.put(path, headers=bearer(sub="cy", name="Cy"), json={"vc_epicentre": None}).json()["my"][
+            "vc_epicentre"] is None
 
     def test_a_field_is_cleared_with_null_and_a_map_with_null_or_empty(self, api):
         path = "/api/v1/drivers/consumer_r01/proposals"

@@ -25,6 +25,7 @@ from urllib.parse import quote
 
 import pytest
 
+from prism.config import VC_STEPS
 from prism.seed_drivers import DRIVERS
 
 REPO = Path(__file__).resolve().parents[1]
@@ -46,6 +47,20 @@ EDITOR_SOURCES = [
 
 def sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def previous_profile(stage: str) -> dict:
+    """The eight value-chain scores the previous editor stored for a chosen stage:
+    5 there, 3 one stage away, 1 two away, 0 elsewhere."""
+    at = VC_STEPS.index(stage)
+    return {step: {0: 5, 1: 3, 2: 1}.get(abs(i - at), 0) for i, step in enumerate(VC_STEPS)}
+
+
+def previous_scores(d) -> dict:
+    """A seed driver's scores as the previous schema's baseline (ai_suggestion) held them."""
+    scores = d.scores()
+    scores["vc_exposure"] = previous_profile(scores.pop("vc_epicentre"))
+    return scores
 
 
 # ── the previous schema ─────────────────────────────────────────────────────
@@ -188,9 +203,9 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
              4 if admin_edit else d.probability, d.start_year, d.normalized_score, f"Earlier analysis of {d.id}.",
              json.dumps(EDITOR_SOURCES) if admin_edit else "Circana (Apr 2026); YouGov (Jul 2026)", "",
              d.confidence, False, admin_edit, None, d.gp1_pct_affected, d.peak_year,
-             d.diffusion_curve, None if d.id == "technology_r01" else json.dumps(d.scores()), d.uncertainty))
+             d.diffusion_curve, None if d.id == "technology_r01" else json.dumps(previous_scores(d)), d.uncertainty))
         for table, key, values in (("trend_category_exposure", "category", d.category_exposure),
-                                   ("trend_vc_exposure", "vc_step", d.vc_exposure),
+                                   ("trend_vc_exposure", "vc_step", previous_profile(d.vc_epicentre)),
                                    ("trend_regional_exposure", "region", d.regional_exposure)):
             for k, v in values.items():
                 cur.execute(f"INSERT INTO {table} (trend_id, {key}, exposure_score) VALUES ({p}, {p}, {p})",
@@ -200,8 +215,9 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
             cur.execute(f"INSERT INTO trend_sources (trend_id, title, url, source_type, tier) "
                         f"VALUES ({p}, {p}, {p}, {p}, {p})", (d.id, s["title"], s["url"], kind, s["tier"]))
     cur.execute(f"INSERT INTO trend_score_proposals (trend_id, user_id, user_name, user_role, probability, "
-                f"category_exposure, comment) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})",
-                ("consumer_r01", "ana", "Ana", "viewer", 4, json.dumps({"Hair: Care": 4}), "Looks high"))
+                f"category_exposure, vc_exposure, comment) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})",
+                ("consumer_r01", "ana", "Ana", "viewer", 4, json.dumps({"Hair: Care": 4}),
+                 json.dumps(previous_profile("Marketing")), "Looks high"))
     cur.execute(f"INSERT INTO trend_score_proposals (trend_id, user_id, user_name, user_role, uncertainty) "
                 f"VALUES ({p}, {p}, {p}, {p}, {p})", ("consumer_r02", "ben", "Ben", "viewer", 3))
     attribution = "causal_decomposition" if older else "force_attribution"   # renamed in the previous release
@@ -308,7 +324,7 @@ def sqlite_schema(path: Path) -> dict:
 
 DRIVER_FIELDS = ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
                  "peak_year", "diffusion_curve", "uncertainty", "confidence", "analysis",
-                 "category_exposure", "regional_exposure", "vc_exposure", "sources", "baseline", "scores_edited")
+                 "category_exposure", "regional_exposure", "vc_epicentre", "sources", "baseline", "scores_edited")
 #: consumer_r02's sources after the migration: the list saved in the editor.
 MIGRATED_EDITOR_SOURCES = [
     *({"title": s["title"], "url": s["url"], "tier": "S" if i == 0 else s["tier"], "note": s["note"]}
@@ -318,7 +334,8 @@ MIGRATED_EDITOR_SOURCES = [
 
 
 def expected_driver(d) -> dict:
-    """A seed driver as the migrated database must hold it."""
+    """A seed driver as the migrated database must hold it: its baseline in the
+    driver schema's form, with the value-chain stage."""
     out = {f: getattr(d, f) for f in DRIVER_FIELDS}
     out.update(baseline=None if d.id == "technology_r01" else d.scores(), scores_edited=False)
     if d.id == "consumer_r02":
@@ -353,6 +370,8 @@ class TestMigration:
             "consumer_r02": {"saved_in_editor": len(SEED["consumer_r02"].sources) + 1,
                              "table_rows": len(SEED["consumer_r02"].sources)}}
         assert report["orphans_skipped"] == {}
+        assert report["value_chain"] == {"drivers_with_a_stage": 51, "drivers_without_one": [],
+                                         "proposals_with_a_stage": 1}
         assert report["analysis_updated"] == 51
         assert report["descriptions"] == {"updated": 1, "already_current": 1, "edited_left_alone": ["consumer_r04"]}
         assert report["runs_with_renamed_keys"] == 1
@@ -362,9 +381,28 @@ class TestMigration:
         drivers = {d.id: {f: getattr(d, f) for f in DRIVER_FIELDS} for d in dbm.load_drivers()}
         check_migrated_drivers(json.loads(json.dumps(drivers)))
         ana = dbm.load_driver_proposals("consumer_r01")
-        assert [(r["user_id"], r["probability"], r["category_exposure"], r["comment"]) for r in ana] == [
-            ("ana", 4, {"Hair: Care": 4}, "Looks high")]
-        assert dbm.load_driver_proposals("consumer_r02")[0]["uncertainty"] == 3
+        assert [(r["user_id"], r["probability"], r["category_exposure"], r["vc_epicentre"], r["comment"])
+                for r in ana] == [("ana", 4, {"Hair: Care": 4}, "Marketing", "Looks high")]
+        ben = dbm.load_driver_proposals("consumer_r02")[0]
+        assert ben["uncertainty"] == 3 and ben["vc_epicentre"] is None
+
+    def test_a_driver_without_a_value_chain_is_reported(self, migration, previous, capsys, monkeypatch):
+        conn = sqlite3.connect(previous)
+        conn.execute("DELETE FROM trend_vc_exposure WHERE trend_id = 'government_r02'")
+        conn.execute("UPDATE trend_vc_exposure SET exposure_score = 0 WHERE trend_id = 'consumer_r05'")
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["value_chain"]["drivers_with_a_stage"] == 49
+        assert report["value_chain"]["drivers_without_one"] == ["consumer_r05", "government_r02"]
+        monkeypatch.setenv("PRISM_DB_PATH", str(previous))
+        import prism.database as dbm
+        from prism.drivers import simulation_problems
+        drivers = {d.id: d for d in dbm.load_drivers()}
+        assert drivers["government_r02"].vc_epicentre is None and drivers["consumer_r05"].vc_epicentre is None
+        assert any("government_r02" in line and "value-chain epicentre None" in line
+                   for line in simulation_problems(drivers.values()))
 
     def test_the_schema_is_the_schema_of_a_new_database(self, migration, previous, monkeypatch, tmp_path):
         assert migration.main(["--sqlite", str(previous)]) == 0
@@ -561,6 +599,32 @@ class TestHelpers:
         for not_a_list in (None, "", "Circana (Apr 2026)", "[not json", '{"a": 1}', "[]", '["a"]',
                            json.dumps([{"title": "", "url": ""}])):
             assert migration.editor_sources(not_a_list) is None, not_a_list
+
+    def test_a_stored_profile_reads_as_the_stage_it_centres_on(self, migration):
+        """The rule the previous engine and dashboard read a profile with, so each
+        driver keeps the stage it was shown with."""
+        for stage in VC_STEPS:
+            assert migration.epicentre_of(previous_profile(stage)) == stage, stage
+        # the highest score of any profile
+        assert migration.epicentre_of({"Manufacturing": 1, "Packaging": 1, "Supply Chain": 2, "Marketing": 4,
+                                       "Commercial": 5, "Consumer": 4}) == "Commercial"
+        # a tie goes to the stage nearest the score-weighted centre (here pulled downstream)
+        assert migration.epicentre_of({"Raw Materials": 3, "Commercial": 2, "Consumer": 3}) == "Consumer"
+        # a flat profile centres at 4.5; of the two equally near stages the earlier wins
+        assert migration.epicentre_of({step: 2 for step in VC_STEPS}) == "Packaging"
+        # names outside the chain, and values that are not numbers, count as 0
+        assert migration.epicentre_of({"supply_chain": 5, "Manufacturing": 2}) == "Manufacturing"
+        assert migration.epicentre_of({"Marketing": "high", "Consumer": 1}) == "Consumer"
+        for nothing in (None, {}, {"Marketing": 0, "Consumer": 0}, {"Retail": 5}, [5, 3, 1], "Marketing"):
+            assert migration.epicentre_of(nothing) is None, nothing
+
+    def test_a_baseline_carries_the_stage_instead_of_the_profile(self, migration):
+        old = {"probability": 4, "vc_exposure": previous_profile("Supply Chain")}
+        assert json.loads(migration.baseline_of(json.dumps(old))) == {"probability": 4, "vc_epicentre": "Supply Chain"}
+        assert json.loads(migration.baseline_of(old)) == {"probability": 4, "vc_epicentre": "Supply Chain"}   # JSONB
+        assert json.loads(migration.baseline_of('{"vc_exposure": {}}')) == {"vc_epicentre": None}
+        for unchanged in (None, "", '{"probability": 4}', "{not json", "[1, 2]"):
+            assert migration.baseline_of(unchanged) == unchanged, unchanged
 
     def test_json_columns_arrive_as_text_or_decoded(self, migration):
         assert migration.json_text({"a": 1}) == '{"a": 1}' and migration.json_text('{"a": 1}') == '{"a": 1}'

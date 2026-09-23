@@ -14,7 +14,6 @@ import { ApiError } from '@/lib/apiClient';
 import { HORIZON, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
 import type { Confidence, Direction, Driver, DriverSource, DriverUpdate, ExposureMap } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -38,7 +37,7 @@ interface ExpandedPanelProps {
 // ─── The admin editor's working copy ──────────────────────────────
 type Draft = Pick<Driver,
   | 'description' | 'direction' | 'confidence' | 'probability' | 'gp1_pct_affected' | 'peak_year'
-  | 'diffusion_curve' | 'uncertainty' | 'category_exposure' | 'regional_exposure' | 'vc_exposure' | 'sources'>;
+  | 'diffusion_curve' | 'uncertainty' | 'category_exposure' | 'regional_exposure' | 'vc_epicentre' | 'sources'>;
 
 const sourceCopy = (s: DriverSource): DriverSource => ({ title: s.title, url: s.url, tier: s.tier, note: s.note });
 
@@ -53,7 +52,7 @@ const draftOf = (d: Driver): Draft => ({
   uncertainty: d.uncertainty,
   category_exposure: { ...d.category_exposure },
   regional_exposure: { ...d.regional_exposure },
-  vc_exposure: { ...d.vc_exposure },
+  vc_epicentre: d.vc_epicentre,
   sources: d.sources.map(sourceCopy),
 });
 
@@ -91,17 +90,14 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   if (category) update.category_exposure = category;
   const regional = changedCells(draft.regional_exposure, d.regional_exposure);
   if (regional) update.regional_exposure = regional;
-  const valueChain = changedCells(draft.vc_exposure, d.vc_exposure);
-  if (valueChain) update.vc_exposure = valueChain;
+  if (draft.vc_epicentre != null && draft.vc_epicentre !== d.vc_epicentre) update.vc_epicentre = draft.vc_epicentre;
   const sources = draft.sources.filter((s) => s.title.trim() || s.url.trim());
   if (!sameSources(sources, d.sources)) update.sources = sources;
   return update;
 }
 
 export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }) => {
-  const vcStage = epicentreOf(driver.vc_exposure);
   const base = baselineOf(driver);
-  const baseVcStage = epicentreOf(base?.vc_exposure);
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -163,7 +159,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
     edit({ sources: draft.sources.map((s, i) => (i === idx ? { ...s, ...patch } : s)) });
 
   const curve = isEditing ? draft.diffusion_curve : driver.diffusion_curve;
-  const editVcStage = epicentreOf(draft.vc_exposure);
+  const vcStage = isEditing ? draft.vc_epicentre : driver.vc_epicentre;
 
   return (
     <div
@@ -599,15 +595,15 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
           <SectionCard
             title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
             right={
-              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: (isEditing ? editVcStage : vcStage) != null ? S.primary : S.mutedText }}>
-                {vcStageLabel(isEditing ? editVcStage : vcStage)}
+              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: vcStage != null ? S.primary : S.mutedText }}>
+                {vcStageLabel(vcStage)}
               </span>
             }
           >
             {isEditing ? (
-              <EpicentreSlider value={editVcStage} baseline={baseVcStage} onChange={(st) => edit({ vc_exposure: canonicalVcProfile(st) })} />
+              <EpicentreSlider value={vcStage} baseline={base?.vc_epicentre} onChange={(st) => edit({ vc_epicentre: st })} />
             ) : (
-              <EpicentreRail stage={vcStage} baseline={baseVcStage} />
+              <EpicentreRail stage={vcStage} baseline={base?.vc_epicentre} />
             )}
           </SectionCard>
         </div>

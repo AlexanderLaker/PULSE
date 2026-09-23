@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 import prism
-from prism.config import vc_epicentre_step_of
 from prism.drivers import DriverSet
 from prism.simulation.engine import MonteCarloEngine
 
@@ -140,7 +139,7 @@ class TestAttributionIdentities:
     def test_value_chain_lens_is_a_partition_by_epicentre(self, mock_model_config, mock_drivers_database):
         """Each driver's contribution sits wholly on its epicentre stage; every other stage carries 0."""
         r = _run(mock_model_config, mock_drivers_database)
-        stages = {vc_epicentre_step_of(d.vc_exposure) for d in mock_drivers_database.drivers}
+        stages = {d.vc_epicentre for d in mock_drivers_database.drivers}
         assert stages == {"Formulation", "Manufacturing", "Marketing", "Commercial"}
         for year, by_cat in r["decompositions"]["vc"].items():
             for cat, row in by_cat.items():
@@ -151,15 +150,16 @@ class TestAttributionIdentities:
                     elif abs(median) > 1e-15:
                         assert value != 0.0, (cat, year, step)
 
-    def test_unscored_value_chain_is_reported(self, mock_model_config, mock_drivers_database):
+    def test_a_category_no_driver_reaches_is_reported(self, mock_model_config, mock_drivers_database):
+        """With no driver in a category, the lens spreads that category's median
+        (zero) evenly over the stages, and an integrity event says so."""
         db = copy.deepcopy(mock_drivers_database)
-        db.drivers[0].vc_exposure = {}
+        for d in db.drivers:
+            d.category_exposure["LHC: IC"] = 0
         r = _run(mock_model_config, db)
-        events = [e for e in r["integrity_events"] if e["type"] == "vc_epicentre_coverage"]
+        events = [e for e in r["integrity_events"] if e["type"] == "vc_attribution_fallback"]
         assert len(events) == 1 and events[0]["severity"] == "warning"
-        assert db.drivers[0].id in events[0]["message"]
-        assert events[0]["detail"]["unscored_driver_ids"] == [db.drivers[0].id]
+        assert events[0]["detail"] == {"categories": ["LHC: IC"]} and "LHC: IC" in events[0]["message"]
         for year, by_cat in r["decompositions"]["vc"].items():
-            for cat, row in by_cat.items():
-                assert sum(row.values()) == pytest.approx(
-                    r["shift_matrix"][cat]["path"][int(year)]["median"], rel=1e-9, abs=1e-12)
+            assert r["shift_matrix"]["LHC: IC"]["path"][int(year)]["median"] == 0.0
+            assert set(by_cat["LHC: IC"].values()) == {0.0}

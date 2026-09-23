@@ -14,7 +14,7 @@ from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, 
 from prism.drivers import MODEL_FIELDS
 
 #: The names an exposure map may use, per field.
-EXPOSURE_KEYS = {"category_exposure": CATEGORIES, "regional_exposure": REGIONS, "vc_exposure": VC_STEPS}
+EXPOSURE_KEYS = {"category_exposure": CATEGORIES, "regional_exposure": REGIONS}
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +37,8 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
         "confidence": d.confidence,
         "normalized_score": d.normalized_score,
         "category_exposure": d.category_exposure,
-        "vc_exposure": d.vc_exposure,
         "regional_exposure": d.regional_exposure,
+        "vc_epicentre": d.vc_epicentre,
         "analysis": d.analysis,
         "sources": d.sources,
         "baseline": d.baseline,
@@ -113,6 +113,8 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
             raise HTTPException(422, f"{name} cannot be null")
     if "diffusion_curve" in sent and update.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+    if "vc_epicentre" in sent and update.vc_epicentre not in VC_STEPS:
+        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STEPS}")
     if "peak_year" in sent:
         _check_peak_year(driver, update.peak_year)
     if update.revision != driver.revision:
@@ -193,11 +195,13 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     if "diffusion_curve" in sent and proposal.diffusion_curve is not None \
             and proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
+    if "vc_epicentre" in sent and proposal.vc_epicentre is not None and proposal.vc_epicentre not in VC_STEPS:
+        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STEPS}")
     if "peak_year" in sent:
         _check_peak_year(driver, proposal.peak_year)
 
     fields: dict = {}
-    for name in ("probability", "gp1_pct_affected", "peak_year", "uncertainty", "diffusion_curve"):
+    for name in ("probability", "gp1_pct_affected", "peak_year", "uncertainty", "diffusion_curve", "vc_epicentre"):
         if name in sent:
             fields[name] = getattr(proposal, name)
     for name in EXPOSURE_KEYS:

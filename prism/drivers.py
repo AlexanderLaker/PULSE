@@ -8,7 +8,7 @@ from typing import Optional
 
 #: The scores experts can propose; a driver's baseline records the same fields.
 SCORE_FIELDS = ("probability", "gp1_pct_affected", "peak_year", "diffusion_curve", "uncertainty",
-                "category_exposure", "regional_exposure", "vc_exposure")
+                "category_exposure", "regional_exposure", "vc_epicentre")
 
 #: Every editable field that feeds the model: the scores plus the direction.
 #: An admin edit to any of them sets ``scores_edited``.
@@ -34,8 +34,8 @@ class Driver:
     start_year: Optional[int] = None
     analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}
-    vc_exposure: dict = field(default_factory=dict)        # {value-chain step: 0-5}
     regional_exposure: dict = field(default_factory=dict)  # {region: 0-5}
+    vc_epicentre: Optional[str] = None  # the value-chain stage where the impact centres (config.VC_STEPS)
     sources: list = field(default_factory=list)           # [{title, url, tier, note}]
     confidence: str = "Medium"        # how well the present state is evidenced (display only)
     # Share of the category's gross profit the driver can move at full
@@ -102,8 +102,9 @@ def simulation_problems(drivers) -> list:
     Contraction), a missing or unknown diffusion curve (as the S-curve), a
     missing or impossible GP1 share (NaN everywhere), a probability or
     uncertainty score missing or outside its scale, a peak year missing or not
-    after the onset, and exposure scores outside 0-5 or on a name outside the
-    taxonomy (never read). Duplicate ids are refused as well.
+    after the onset, a missing or unknown value-chain epicentre, and exposure
+    scores outside 0-5 or on a name outside the taxonomy (never read).
+    Duplicate ids are refused as well.
     """
     from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
@@ -127,9 +128,10 @@ def simulation_problems(drivers) -> list:
         elif not _score_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
             problems.append(f"{where}: peak year {d.peak_year!r} is not a year after the onset "
                             f"(from {first_peak_year(d.start_year)})")
+        if d.vc_epicentre not in VC_STEPS:
+            problems.append(f"{where}: value-chain epicentre {d.vc_epicentre!r} is not one of {VC_STEPS}")
         for name, exposure, keys in (("category_exposure", d.category_exposure, CATEGORIES),
-                                     ("regional_exposure", d.regional_exposure, REGIONS),
-                                     ("vc_exposure", d.vc_exposure, VC_STEPS)):
+                                     ("regional_exposure", d.regional_exposure, REGIONS)):
             for key, score in (exposure or {}).items():
                 if key not in keys:
                     problems.append(f"{where}: {name} names {key!r}, which is not in the taxonomy")

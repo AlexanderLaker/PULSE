@@ -10,7 +10,6 @@ import {
 import { saveMyProposal } from '@/lib/apiClient';
 import { HORIZON, NO_VALUE, firstPeakYear, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverProposal } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { baselineOf, proposalOnTaxonomy, REVIEWED_COLOR, vcStageLabel } from './shared';
@@ -124,8 +123,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
   }, [flush, onMyChange, driver.id]);
 
   const base = baselineOf(driver);
-  const baseVcStage = epicentreOf(base?.vc_exposure);
-  const myVcStage = epicentreOf(draft.vc_exposure);
+  const myVcStage = draft.vc_epicentre ?? null;
   const gp1Int = draft.gp1_pct_affected != null ? Math.round(draft.gp1_pct_affected * 100) : undefined;
   const dist = data?.aggregate.diffusion_curve?.distribution;
   const statusText = status === 'saving' ? 'Saving…'
@@ -247,7 +245,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
                   {vcStageLabel(myVcStage)}
                 </span>
                 {myVcStage != null && (
-                  <button type="button" onClick={() => patch({ vc_exposure: null })}
+                  <button type="button" onClick={() => patch({ vc_epicentre: null })}
                     style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: S.onSurfaceVariant, textDecoration: 'underline' }}>
                     Clear
                   </button>
@@ -256,7 +254,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
             }
             footnote="One choice: the stage where this driver’s impact centres. The value-chain attribution assigns the driver’s whole contribution to this stage; leave it unscored and it is not part of your proposal."
           >
-            <EpicentreSlider value={myVcStage} baseline={baseVcStage} onChange={(st) => patch({ vc_exposure: canonicalVcProfile(st) })} />
+            <EpicentreSlider value={myVcStage} baseline={base?.vc_epicentre} onChange={(st) => patch({ vc_epicentre: st })} />
           </SectionCard>
 
           <SectionCard title="Comment" icon={MessageSquare} accent={S.primary} footnote="Optional. Shared with the reviewers under Review &amp; Endorse: explain your reasoning, flag a caveat or note evidence.">

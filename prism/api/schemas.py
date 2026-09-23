@@ -26,9 +26,10 @@ class DriverUpdate(BaseModel):
     ``revision`` is the driver revision the edit was made on (from GET
     /api/v1/drivers); the edit is refused if the driver has changed since.
     Every other field is optional and only the fields sent change (none may
-    be sent as null); an exposure map may name only the cells that change.
-    The name, the force and the onset (start year) come from the driver base
-    and are not edited here; a peak year must come after the onset.
+    be sent as null); an exposure map may name only the cells that change,
+    and ``vc_epicentre`` names one value-chain stage. The name, the force and
+    the onset (start year) come from the driver base and are not edited here;
+    a peak year must come after the onset.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -42,8 +43,8 @@ class DriverUpdate(BaseModel):
     uncertainty: Optional[int] = Field(None, ge=0, le=5)
     confidence: Optional[str] = Field(None, pattern="^(High|Medium|Low)$")
     category_exposure: Optional[dict] = None
-    vc_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
+    vc_epicentre: Optional[str] = None
     sources: Optional[list[SourceRef]] = None
 
 
@@ -63,5 +64,5 @@ class ProposalUpdate(BaseModel):
     uncertainty: Optional[int] = Field(None, ge=0, le=5)
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
-    vc_exposure: Optional[dict] = None
+    vc_epicentre: Optional[str] = None
     comment: Optional[str] = None

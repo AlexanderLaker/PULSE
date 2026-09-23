@@ -10,15 +10,14 @@ the model does not describe how an effect propagates up or down the chain.
 
 ## Decision
 
-- Each driver has one epicentre stage. The stored eight-step profile is the
-  editor's 5/3/1 serialisation of that choice; reading it back takes the
-  highest stage, ties resolved towards the exposure-weighted centroid.
+- Each driver stores one stage, its epicentre (`vc_epicentre`, one of the
+  eight stages in `prism/config.py`). Experts propose a stage and an admin
+  endorses one; proposals are counted as votes, never averaged.
 - The value-chain lens gives each driver's share of a category wholly to its
   epicentre stage. The value chain never changes a shift.
-- The rule exists in Python (`prism/config.py`) and TypeScript
-  (`lib/valueChain.ts`); both are tested against one fixture table.
 
 ## Consequences
 
 The lens shows where drivers act, not how effects travel. A driver without an
-epicentre is left out of the lens and reported in the run's integrity events.
+epicentre cannot be simulated: the production run refuses it, as it refuses
+any driver with a missing score.

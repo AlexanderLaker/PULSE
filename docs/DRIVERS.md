@@ -97,12 +97,11 @@ model through the cell weights (docs/MODEL.md), never through the exposures.
 
 Experts place each driver at one of eight value-chain stages: Raw Materials,
 Formulation, Manufacturing, Packaging, Supply Chain, Marketing, Commercial,
-Consumer. The database stores the editor's profile around that stage (5 at
-the epicentre, 3 one stage away, 1 two stages away, 0 elsewhere); reading a
-profile back takes its highest stage, and a tie goes to the stage nearest
-the exposure-weighted centroid. `prism/config.py` and `lib/valueChain.ts`
-implement the same rule and are tested against one table. The stage feeds
-the value-chain lens of the Shift Analysis only; it never changes a shift.
+Consumer. The driver stores the stage's name (`vc_epicentre`). The stage
+feeds the value-chain lens of the Shift Analysis only; it never changes a
+shift. Under Review & Endorse the experts' stages are counted as votes, never
+averaged: a Supply Chain vote and two Commercial votes do not make Marketing,
+and a tie leaves the choice to the admin.
 
 ### Sources
 

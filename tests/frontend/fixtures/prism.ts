@@ -10,7 +10,7 @@ import type {
 import type { PrismStore } from '@/hooks/usePrism';
 import { CATEGORY_NAMES, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { ESTIMATED_CELL_WEIGHTS, ESTIMATE_SOURCE } from '@/lib/cellWeightProvenance';
-import { VC_STEPS, canonicalVcProfile } from '@/lib/valueChain';
+import { VC_STEPS } from '@/lib/valueChain';
 
 /** A distribution around a median. */
 export function distribution(median: number, spread = 0.01): PercentileDistribution {
@@ -42,7 +42,7 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     uncertainty: 2,
     category_exposure: Object.fromEntries(CATEGORY_NAMES.map((c) => [c, 3])),
     regional_exposure: Object.fromEntries(REGIONS.map((r) => [r, 5])),
-    vc_exposure: canonicalVcProfile(VC_STEPS.indexOf('Commercial') + 1),
+    vc_epicentre: 'Commercial',
   };
   return {
     id: 'consumer_r01',

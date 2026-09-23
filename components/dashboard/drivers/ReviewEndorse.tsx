@@ -11,7 +11,7 @@ import {
 import { ApiError } from '@/lib/apiClient';
 import { CATEGORIES, HORIZON, NO_VALUE, REGIONS, firstPeakYear, fmtPct, shortCat } from '@/lib/format';
 import { S, EXPANSION_RGB, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
+import { VC_STEPS, VC_SHORT_LABELS, shortStage } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, ProposalAgg } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
 import {
@@ -128,15 +128,15 @@ const Decide: FC<{
 // the majority or the baseline stage, or clicks any stage on the rail; a tie
 // leaves no majority and stays visible.
 const EpicentreVotePanel: FC<{
-  baseline: number | null;
+  baseline: string | null;
   /** The driver's stage now. */
-  current: number | null;
-  votes: Array<{ name: string; stage: number }>;
-  majority: { stage: number; n: number } | null;
-  endorsed: number | null;
-  onEndorse: (stage: number) => void;
+  current: string | null;
+  votes: Array<{ name: string; stage: string }>;
+  majority: { stage: string; n: number } | null;
+  endorsed: string | null;
+  onEndorse: (stage: string) => void;
 }> = ({ baseline, current, votes, majority, endorsed, onEndorse }) => {
-  const byStage = new Map<number, Array<{ name: string }>>();
+  const byStage = new Map<string, Array<{ name: string }>>();
   for (const v of votes) {
     const l = byStage.get(v.stage) ?? [];
     l.push(v);
@@ -158,12 +158,12 @@ const EpicentreVotePanel: FC<{
     <div>
       <div style={{ position: 'relative', height: 78 }}>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 54, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-        {VC_STEPS.map((step, i) => (
+        {VC_STEPS.map((step) => (
           <button
-            key={step} type="button" onClick={() => onEndorse(i + 1)}
+            key={step} type="button" onClick={() => onEndorse(step)}
             title={`Endorse ${step}`} aria-label={`Endorse ${step}`}
             style={{
-              position: 'absolute', top: 52, left: vcPos(i + 1), width: 10, height: 10,
+              position: 'absolute', top: 52, left: vcPos(step), width: 10, height: 10,
               borderRadius: 999, backgroundColor: S.surfaceHighest, border: 'none',
               padding: 0, cursor: 'pointer', transform: 'translateX(-50%)',
             }}
@@ -177,7 +177,7 @@ const EpicentreVotePanel: FC<{
               {list.slice(0, 3).map((v, j) => (
                 <span
                   key={`${stage}-${j}`}
-                  title={j === 2 && list.length > 3 ? who : `${v.name} → ${VC_STEPS[stage - 1]}`}
+                  title={j === 2 && list.length > 3 ? who : `${v.name} → ${stage}`}
                   style={{
                     position: 'absolute', top: 36 - 13 * j, left: vcPos(stage), width: 10, height: 10,
                     borderRadius: 999, backgroundColor: EXPERT_COLOR, opacity: 0.65,
@@ -194,23 +194,23 @@ const EpicentreVotePanel: FC<{
           );
         })}
         {baseline != null && (
-          <span title={`Baseline · ${VC_STEPS[baseline - 1]}`} style={{ position: 'absolute', top: 64, left: vcPos(baseline), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
+          <span title={`Baseline · ${baseline}`} style={{ position: 'absolute', top: 64, left: vcPos(baseline), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
         )}
         {endorsed != null && (
-          <span title={`Endorsed · ${VC_STEPS[endorsed - 1]}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+          <span title={`Endorsed · ${endorsed}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
         )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
         {VC_STEPS.map((step, i) => (
           <button
-            key={step} type="button" onClick={() => onEndorse(i + 1)}
-            aria-pressed={i + 1 === endorsed}
+            key={step} type="button" onClick={() => onEndorse(step)}
+            aria-pressed={step === endorsed}
             title={`Endorse ${step}`}
             style={{
               border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
               fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-              color: i + 1 === endorsed ? REVIEWED_COLOR : S.mutedText,
-              fontWeight: i + 1 === endorsed ? 800 : 400,
+              color: step === endorsed ? REVIEWED_COLOR : S.mutedText,
+              fontWeight: step === endorsed ? 800 : 400,
             }}
           >
             {VC_SHORT_LABELS[i]}
@@ -231,7 +231,7 @@ const EpicentreVotePanel: FC<{
             aria-pressed={current != null && endorsed === current}
             style={{ ...pillStyle(current != null && endorsed === current, current == null), borderRight: `1px solid ${S.cardBorder}` }}
           >
-            {current != null ? `Keep · ${VC_STEPS[current - 1]}` : `Keep ${NO_VALUE}`}
+            {current != null ? `Keep · ${current}` : `Keep ${NO_VALUE}`}
           </button>
           <button
             type="button" disabled={baseline == null}
@@ -239,7 +239,7 @@ const EpicentreVotePanel: FC<{
             aria-pressed={baseline != null && endorsed === baseline}
             style={{ ...pillStyle(baseline != null && endorsed === baseline, baseline == null), borderRight: `1px solid ${S.cardBorder}` }}
           >
-            {baseline != null ? `Baseline · ${VC_STEPS[baseline - 1]}` : `Baseline ${NO_VALUE}`}
+            {baseline != null ? `Baseline · ${baseline}` : `Baseline ${NO_VALUE}`}
           </button>
           <button
             type="button" disabled={majority == null}
@@ -248,14 +248,14 @@ const EpicentreVotePanel: FC<{
             style={pillStyle(majority != null && endorsed === majority.stage, majority == null)}
           >
             {majority != null
-              ? `Majority · ${VC_STEPS[majority.stage - 1]} (${majority.n}/${votes.length})`
+              ? `Majority · ${majority.stage} (${majority.n}/${votes.length})`
               : votes.length > 0 ? 'No majority: a tie' : 'No expert votes yet'}
           </button>
         </div>
         <span style={{ fontSize: 11.5, color: S.mutedText }}>or click a stage on the rail</span>
         {endorsed != null && srcText && (
           <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, fontFamily: HEADLINE_FONT, color: S.onSurface }}>
-            → <span style={{ color: REVIEWED_COLOR }}>{VC_STEPS[endorsed - 1]}</span> · {srcText}
+            → <span style={{ color: REVIEWED_COLOR }}>{endorsed}</span> · {srcText}
           </span>
         )}
       </div>
@@ -270,9 +270,9 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const [man, setMan] = useState<Record<string, string>>({});
   const [manExpo, setManExpo] = useState<Record<string, ExposureMap>>({});
   // The value chain is endorsed as one stage: the admin's pick, else the
-  // expert majority, else the baseline stage. Never an average (see
+  // expert majority, else the stage the driver has now. Never an average (see
   // EpicentreVotePanel).
-  const [endorsedVc, setEndorsedVc] = useState<number | null>(null);
+  const [endorsedVc, setEndorsedVc] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -291,21 +291,18 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const bU = base?.uncertainty;
   const baseCat = base?.category_exposure;
   const baseReg = base?.regional_exposure;
-  const baseVc = base?.vc_exposure;
-  const baseVcStage = epicentreOf(baseVc);
+  const baseVcStage = base?.vc_epicentre ?? null;
   const eP = agg?.probability?.avg, eG = agg?.gp1_pct_affected?.avg, ePk = agg?.peak_year?.median, eCv = agg?.diffusion_curve?.mode;
   const eU = agg?.uncertainty?.median;
-  // One value-chain vote per expert: the epicentre of the expert's profile.
+  // One value-chain vote per expert who picked a stage.
   const vcVotes = useMemo(
-    () => scorers
-      .map((s) => ({ name: s.name, stage: epicentreOf(s.vc_exposure) }))
-      .filter((v): v is { name: string; stage: number } => v.stage != null),
+    () => scorers.flatMap((s) => (s.vc_epicentre != null ? [{ name: s.name, stage: s.vc_epicentre }] : [])),
     [scorers],
   );
   const vcMajority = useMemo(() => {
-    const counts = new Map<number, number>();
+    const counts = new Map<string, number>();
     for (const v of vcVotes) counts.set(v.stage, (counts.get(v.stage) ?? 0) + 1);
-    let best: { stage: number; n: number } | null = null;
+    let best: { stage: string; n: number } | null = null;
     let tied = false;
     for (const [stage, n] of counts) {
       if (best == null || n > best.n) { best = { stage, n }; tied = false; }
@@ -313,8 +310,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     }
     return tied ? null : best;
   }, [vcVotes]);
-  // The stage the driver has now; endorsing it leaves the stored profile as it is.
-  const currentVcStage = epicentreOf(driver.vc_exposure);
+  // The stage the driver has now; endorsing it writes nothing.
+  const currentVcStage = driver.vc_epicentre;
   const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? currentVcStage;
   const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
@@ -343,7 +340,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   // on screen now has not been written yet.
   const setS = (key: string, s: EndorseSource) => { setDone(false); setSrc((p) => ({ ...p, [key]: s })); };
   const setM = (key: string, v: string) => { setDone(false); setMan((p) => ({ ...p, [key]: v })); };
-  const chooseVc = (stage: number) => { setDone(false); setEndorsedVc(stage); };
+  const chooseVc = (stage: string) => { setDone(false); setEndorsedVc(stage); };
   const setAll = (s: EndorseSource) => {
     setDone(false);
     // "Set all to Manual" seeds the scalar inputs with the expert mean, else
@@ -471,14 +468,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
     else if (sr === 'baseline') { if (baseReg) u.regional_exposure = baseReg; }
     else if (sr === 'expert') { const r = expertMap(regCells); if (r) u.regional_exposure = r; }
-    // A stage that does not move leaves the stored profile as it is; the
-    // baseline stage writes the baseline profile itself, any other stage its
-    // canonical profile.
-    if (endorsedVcStage != null && endorsedVcStage !== currentVcStage) {
-      u.vc_exposure = baseVcStage != null && endorsedVcStage === baseVcStage && baseVc
-        ? baseVc
-        : canonicalVcProfile(endorsedVcStage);
-    }
+    if (endorsedVcStage != null && endorsedVcStage !== currentVcStage) u.vc_epicentre = endorsedVcStage;
     try { await updateDriver(driver.id, u); setDone(true); }
     catch (e) {
       setErr(e instanceof ApiError && e.status === 409
@@ -611,8 +601,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                 title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
                 right={
                   <span title="Stages are categories: votes are counted, never averaged" style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, backgroundColor: S.amberContainer, color: S.onAmberContainer, whiteSpace: 'nowrap', cursor: 'help' }}>
-                    {baseVcStage != null ? `Baseline ${VC_SHORT_LABELS[baseVcStage - 1]}` : `Baseline ${NO_VALUE}`}
-                    {vcMajority != null ? ` · Majority ${VC_SHORT_LABELS[vcMajority.stage - 1]} ×${vcMajority.n}` : vcVotes.length > 0 ? ' · no majority' : ' · no votes'}
+                    {baseVcStage != null ? `Baseline ${shortStage(baseVcStage)}` : `Baseline ${NO_VALUE}`}
+                    {vcMajority != null ? ` · Majority ${shortStage(vcMajority.stage)} ×${vcMajority.n}` : vcVotes.length > 0 ? ' · no majority' : ' · no votes'}
                   </span>
                 }
               >

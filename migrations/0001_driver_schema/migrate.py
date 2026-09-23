@@ -10,14 +10,21 @@ or the write lock (SQLite), so nothing can write in between.
      trends                    -> drivers      (strategic_implication -> analysis,
                                                 ai_suggestion -> baseline,
                                                 user_override -> scores_edited)
-     trend_category_exposure, trend_vc_exposure, trend_regional_exposure
-                               -> driver_category_exposure, driver_vc_exposure,
-                                  driver_regional_exposure
+     trend_category_exposure, trend_regional_exposure
+                               -> driver_category_exposure, driver_regional_exposure
+     trend_vc_exposure         -> drivers.vc_epicentre (the stage the stored
+                                                         profile centres on)
      trend_sources             -> driver_sources (source_type -> note: the publication
                                                   date where the old value read
                                                   "<kind> (<date>)", else the old text)
      trend_score_proposals     -> driver_score_proposals (without user_role, which
                                                          held "viewer" for everyone)
+   The previous schema stored a value chain as eight 0-5 scores, the editor's
+   rendering of one chosen stage (5 there, 3 next to it, 1 two away). The
+   driver schema stores the stage itself. A driver's stage, a proposal's and
+   the one in a baseline are read from the stored scores with the rule the
+   previous engine and dashboard used (epicentre_of), so each keeps the stage
+   it was shown with; the report names any driver that had no value chain.
    The previous editor saved a driver's source list as JSON in trends.data_source
    while the sources table kept the rows the driver was created with. Where
    data_source holds such a list, that list (the one the admin last saved)
@@ -78,6 +85,7 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
+from prism.config import VC_STEPS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -127,6 +135,7 @@ def _ddl(postgres: bool) -> list:
             diffusion_curve TEXT,
             gp1_pct_affected REAL,
             uncertainty INTEGER,
+            vc_epicentre TEXT,
             confidence TEXT DEFAULT 'Medium',
             analysis TEXT,
             baseline TEXT,
@@ -140,12 +149,6 @@ def _ddl(postgres: bool) -> list:
             category TEXT NOT NULL,
             exposure_score INTEGER,
             PRIMARY KEY (driver_id, category)
-        )""",
-        """CREATE TABLE driver_vc_exposure (
-            driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
-            vc_step TEXT NOT NULL,
-            exposure_score INTEGER,
-            PRIMARY KEY (driver_id, vc_step)
         )""",
         """CREATE TABLE driver_regional_exposure (
             driver_id TEXT REFERENCES drivers(id) ON DELETE CASCADE,
@@ -173,7 +176,7 @@ def _ddl(postgres: bool) -> list:
             uncertainty INTEGER,
             category_exposure TEXT,
             regional_exposure TEXT,
-            vc_exposure TEXT,
+            vc_epicentre TEXT,
             comment TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (driver_id, user_id)
@@ -225,6 +228,34 @@ def source_note(old: str) -> str:
     if m:
         return m.group(1).strip()
     return "" if text.lower() in SOURCE_KINDS else text
+
+
+def epicentre_of(profile):
+    """The value-chain stage a stored eight-step profile centres on, or None.
+
+    The stage is the highest score; a tie goes to the stage nearest the
+    score-weighted centre of the profile, and an exact tie in distance to the
+    earlier stage. A profile that scores nothing (none stored, all zero, or
+    only names outside VC_STEPS) has no stage.
+    """
+    if not isinstance(profile, dict):
+        return None
+    scores = []
+    for step in VC_STEPS:
+        try:
+            scores.append(float(profile.get(step) or 0))
+        except (TypeError, ValueError):
+            scores.append(0.0)
+    total = sum(scores)
+    if total <= 0:
+        return None
+    top = max(scores)
+    centre = sum(v * (i + 1) for i, v in enumerate(scores)) / total
+    best = None
+    for i, v in enumerate(scores):
+        if v == top and (best is None or abs(i + 1 - centre) < abs(best - centre)):
+            best = i + 1
+    return VC_STEPS[best - 1]
 
 
 def editor_sources(data_source):
@@ -354,6 +385,21 @@ def json_value(value):
     return json.loads(value) if isinstance(value, str) else value
 
 
+def baseline_of(ai_suggestion):
+    """The baseline JSON from the previous ai_suggestion: the same scores, with a
+    stored value-chain profile replaced by its stage (vc_epicentre)."""
+    text = json_text(ai_suggestion)
+    try:
+        snapshot = json.loads(text) if text else None
+    except ValueError:
+        return text
+    if not isinstance(snapshot, dict) or "vc_exposure" not in snapshot:
+        return text
+    profile = snapshot.pop("vc_exposure")
+    snapshot.setdefault("vc_epicentre", epicentre_of(profile))
+    return json.dumps(snapshot)
+
+
 def migrate(db: Database) -> dict:
     """Apply the migration inside the open transaction; returns the report and the archive."""
     report: dict = {"database": db.where}
@@ -384,25 +430,33 @@ def migrate(db: Database) -> dict:
     for statement in _ddl(db.postgres):
         db.execute(statement)
 
+    # Child rows are copied only where their driver exists; SQLite does not
+    # enforce the previous foreign keys, so a database can hold orphans.
+    owned = "trend_id IN (SELECT id FROM trends)"
+    profiles: dict = {}
+    if "trend_vc_exposure" in tables:
+        for r in db.rows(f"SELECT trend_id, vc_step, exposure_score FROM trend_vc_exposure WHERE {owned}"):
+            profiles.setdefault(r["trend_id"], {})[r["vc_step"]] = r["exposure_score"]
+
     drivers = db.rows("SELECT * FROM trends ORDER BY id")
     from_editor: dict = {}
+    without_stage = []
     for r in drivers:
+        stage = epicentre_of(profiles.get(r["id"]))
+        if stage is None:
+            without_stage.append(r["id"])
         db.execute(
             "INSERT INTO drivers (id, force, name, description, direction, probability, start_year, peak_year, "
-            "diffusion_curve, gp1_pct_affected, uncertainty, confidence, analysis, baseline, "
-            f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 17)})",
+            "diffusion_curve, gp1_pct_affected, uncertainty, vc_epicentre, confidence, analysis, baseline, "
+            f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 18)})",
             (r["id"], r["force"], r["name"], r.get("description"), r.get("direction"), r.get("probability"),
              r.get("start_year"), r.get("peak_year") or None, r.get("diffusion_curve") or None,
-             r.get("gp1_pct_affected"), r.get("uncertainty"), r.get("confidence") or "Medium",
-             r.get("strategic_implication"), json_text(r.get("ai_suggestion")),
+             r.get("gp1_pct_affected"), r.get("uncertainty"), stage, r.get("confidence") or "Medium",
+             r.get("strategic_implication"), baseline_of(r.get("ai_suggestion")),
              bool(r.get("user_override")), r.get("created_at"), r.get("updated_at")))
         saved = editor_sources(r.get("data_source"))
         if saved is not None:
             from_editor[r["id"]] = saved
-
-    # Child rows are copied only where their driver exists; SQLite does not
-    # enforce the previous foreign keys, so a database can hold orphans.
-    owned = "trend_id IN (SELECT id FROM trends)"
     orphans = {}
     for child in CHILD_TABLES:
         if child in tables:
@@ -410,7 +464,6 @@ def migrate(db: Database) -> dict:
             if n:
                 orphans[child] = int(n)
     for new, old, key in (("driver_category_exposure", "trend_category_exposure", "category"),
-                          ("driver_vc_exposure", "trend_vc_exposure", "vc_step"),
                           ("driver_regional_exposure", "trend_regional_exposure", "region")):
         if old in tables:
             db.execute(f"INSERT INTO {new} (driver_id, {key}, exposure_score) "
@@ -433,17 +486,30 @@ def migrate(db: Database) -> dict:
         driver_id: {"saved_in_editor": len(saved), "table_rows": len(table_sources.get(driver_id, []))}
         for driver_id, saved in sorted(from_editor.items())}
 
-    proposals = 0
+    proposals = proposal_stages = 0
     if "trend_score_proposals" in tables:
         present = set(db.columns("trend_score_proposals"))
         fields = ("user_id", "user_name", "probability", "gp1_pct_affected", "peak_year",
-                  "diffusion_curve", "uncertainty", "category_exposure", "regional_exposure", "vc_exposure",
+                  "diffusion_curve", "uncertainty", "category_exposure", "regional_exposure",
                   "comment", "updated_at")
         select = ", ".join(f if f in present else f"NULL AS {f}" for f in fields)
         db.execute(f"INSERT INTO driver_score_proposals (driver_id, {', '.join(fields)}) "
                    f"SELECT trend_id, {select} FROM trend_score_proposals WHERE {owned} ORDER BY id")
         proposals = db.rows("SELECT COUNT(*) AS n FROM driver_score_proposals")[0]["n"]
+        if "vc_exposure" in present:
+            for r in db.rows(f"SELECT trend_id, user_id, vc_exposure FROM trend_score_proposals "
+                             f"WHERE {owned} AND vc_exposure IS NOT NULL"):
+                try:
+                    stage = epicentre_of(json_value(r["vc_exposure"]))
+                except ValueError:
+                    stage = None
+                if stage is not None:
+                    db.execute(f"UPDATE driver_score_proposals SET vc_epicentre = {p} "
+                               f"WHERE driver_id = {p} AND user_id = {p}", (stage, r["trend_id"], r["user_id"]))
+                    proposal_stages += 1
     report["copied"] = {"drivers": len(drivers), "sources": source_count, "proposals": int(proposals)}
+    report["value_chain"] = {"drivers_with_a_stage": len(drivers) - len(without_stage),
+                             "drivers_without_one": without_stage, "proposals_with_a_stage": proposal_stages}
     report["orphans_skipped"] = orphans
 
     # ── drop what nothing uses ──────────────────────────────────────────────

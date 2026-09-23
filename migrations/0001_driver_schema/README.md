@@ -14,6 +14,10 @@ What it changes is listed in its docstring; in short:
   list in the previous editor, that saved list becomes the driver's sources.
   Rows of the previous child tables whose driver no longer exists are not
   copied;
+- the value chain becomes one stage per driver. The previous schema stored it
+  as eight scores drawn around the stage an expert chose; the migration keeps
+  the stage those scores centre on, the one the dashboard showed, for every
+  driver, every expert proposal and every baseline;
 - the tables and `simulation_runs` columns nothing reads are dropped, after
   their rows are written to a local archive file. Nothing is dropped with
   `CASCADE`: if a table the migration does not know depends on one it drops,
@@ -78,6 +82,10 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
      how many rows it has and how many rows the old sources table held;
    - `orphans_skipped`: per previous child table, the rows whose driver no
      longer exists. They are not copied; the archive keeps them;
+   - `value_chain`: how many drivers and proposals got a value-chain stage.
+     `drivers_without_one` should be empty: a driver listed there had no
+     value chain stored, and the production run refuses to simulate it until
+     an admin sets its epicentre on the Drivers page;
    - `descriptions.edited_left_alone` and `journey.texts_edited_left_alone`:
      each entry is a text an admin changed, which the migration keeps as it
      is.

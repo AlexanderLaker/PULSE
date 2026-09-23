@@ -12,9 +12,7 @@ Outputs (committed, never edited by hand)
 
 The generator validates the base before writing: every taxonomy key present,
 scores in range, onset before peak, the value-chain epicentre a known stage,
-and at least one source of tier S, A or B behind every driver. The value
-chain is written as the editor's canonical 5/3/1 profile around the
-epicentre, which is the only part of it the engine reads.
+and at least one source of tier S, A or B behind every driver.
 
     python3 scripts/generate_seed.py            write both files
     python3 scripts/generate_seed.py --check    exit 1 if a committed file differs
@@ -32,8 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
-                          VALID_DIFFUSION_CURVES, VC_STEPS, canonical_vc_profile, display_code,
-                          vc_epicentre_step_of)
+                          VALID_DIFFUSION_CURVES, VC_STEPS, display_code)
 
 BASE = ROOT / "data" / "drivers" / "driver_base.json"
 ANALYSIS = ROOT / "data" / "drivers" / "driver_analysis.json"
@@ -59,11 +56,6 @@ def first_sentence(text: str, cap: int = 220) -> str:
     m = re.search(r"(?<=[a-z0-9%)\]\"'’”][.!?])\s+(?=[A-Z0-9])", text)
     first = text[: m.start()] if m else text
     return first if len(first) <= cap else first[: cap - 1].rstrip() + "…"
-
-
-def epicentre_profile(epicentre: str) -> dict:
-    """The stored profile of the base's epicentre stage (prism.config.canonical_vc_profile)."""
-    return canonical_vc_profile(VC_STEPS.index(epicentre) + 1)
 
 
 def validate(drivers: list) -> None:
@@ -98,8 +90,6 @@ def validate(drivers: list) -> None:
             problems.append(f"{tag}: an exposure score outside 0-5")
         if d["vc_epicentre"] not in VC_STEPS:
             problems.append(f"{tag}: value-chain epicentre {d['vc_epicentre']!r}")
-        elif vc_epicentre_step_of(epicentre_profile(d["vc_epicentre"])) != d["vc_epicentre"]:
-            problems.append(f"{tag}: the canonical profile does not reproduce its epicentre")
         if not any(s.get("tier") in SOURCE_TIERS for s in d["sources"]):
             problems.append(f"{tag}: no source of tier {'/'.join(SOURCE_TIERS)}")
         for s in d["sources"]:
@@ -118,8 +108,8 @@ def driver_from_base(d: dict, analysis: str = ""):
         gp1_pct_affected=float(d["gp1_pct_affected"]), peak_year=d["peak_year"],
         diffusion_curve=d["diffusion_curve"], uncertainty=d["uncertainty"], confidence=d["confidence"],
         category_exposure={c: d["category_exposure"][c] for c in CATEGORIES},
-        vc_exposure=epicentre_profile(d["vc_epicentre"]),
         regional_exposure={r: d["regional_exposure"][r] for r in REGIONS},
+        vc_epicentre=d["vc_epicentre"],
         sources=[{"title": s["title"], "url": s["url"], "tier": s["tier"], "note": s.get("published", "")}
                  for s in d["sources"]],
         analysis=analysis,
@@ -174,16 +164,12 @@ def render_seed(drivers: list, texts: dict) -> str:
     a('"""')
     a("import copy")
     a("")
-    a("from prism.config import CATEGORIES, REGIONS, VC_STEPS")
+    a("from prism.config import CATEGORIES, REGIONS")
     a("from prism.drivers import Driver")
     a("")
     a("")
     a("def _categories(*scores):")
     a("    return dict(zip(CATEGORIES, scores))")
-    a("")
-    a("")
-    a("def _value_chain(*scores):")
-    a("    return dict(zip(VC_STEPS, scores))")
     a("")
     a("")
     a("def _regions(*scores):")
@@ -199,7 +185,6 @@ def render_seed(drivers: list, texts: dict) -> str:
         a(f"    # {d['code']} · {d['theme']} · {d['foresight_tier']}, {d['scope']} · "
           f"megatrend: {d['megatrend']} · first observed {d['first_observed']}")
         cat, reg = d["category_exposure"], d["regional_exposure"]
-        vc = epicentre_profile(d["vc_epicentre"])
         a("    Driver(")
         a(f"        id={q(d['id'])}, force={q(d['force'])},")
         a(f"        name={q(d['name'])},")
@@ -209,9 +194,8 @@ def render_seed(drivers: list, texts: dict) -> str:
           f"diffusion_curve={q(d['diffusion_curve'])}, uncertainty={d['uncertainty']},")
         a(f"        confidence={q(d['confidence'])},")
         a("        category_exposure=_categories(" + ", ".join(str(cat[c]) for c in CATEGORIES) + "),")
-        a("        vc_exposure=_value_chain(" + ", ".join(str(vc[s]) for s in VC_STEPS)
-          + f"),  # epicentre {d['vc_epicentre']}")
         a("        regional_exposure=_regions(" + ", ".join(str(reg[r]) for r in REGIONS) + "),")
+        a(f"        vc_epicentre={q(d['vc_epicentre'])},")
         a("        sources=[")
         for s in d["sources"]:
             a(f"            {{\"title\": {q(s['title'])}, \"url\": {q(s['url'])}, "

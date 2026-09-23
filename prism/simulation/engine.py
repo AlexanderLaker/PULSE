@@ -28,7 +28,7 @@ from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
 from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STEPS, ModelConfig, build_driver_correlation_matrix,
-                          compute_materialization_schedule, peak_jitter_for, vc_epicentre_step_of)
+                          compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
 beta_ppf = _beta_dist.ppf
@@ -543,40 +543,23 @@ class MonteCarloEngine:
         # exposure / 5, goes wholly to its epicentre stage. Propagation along
         # the chain is not modelled.
         drivers = db.drivers
-        driver_epicentre = {d.id: vc_epicentre_step_of(d.vc_exposure or {}) for d in drivers}
-        unscored_vc = sorted(did for did, s in driver_epicentre.items() if s is None)
-
         vc_shares: dict = {}
         vc_fallback_cats: list = []
         for cat in CATEGORIES:
             vsum = {s: 0.0 for s in VC_STEPS}
             for driver in drivers:
                 cat_exp = driver.category_exposure.get(cat, 0)
-                step = driver_epicentre.get(driver.id)
-                if cat_exp > 0 and step is not None:
-                    vsum[step] += abs(driver.normalized_score) * (min(cat_exp, 5) / 5.0)
+                if cat_exp > 0:
+                    vsum[driver.vc_epicentre] += abs(driver.normalized_score) * (min(cat_exp, 5) / 5.0)
             vtot = sum(vsum.values())
             if vtot > 0:
                 vc_shares[cat] = {s: v / vtot for s, v in vsum.items()}
             else:
-                # No contributing driver has an epicentre: an even spread keeps
-                # the lens adding up, and the integrity event below says so.
+                # No driver reaches the category: an even spread keeps the lens
+                # adding up, and the integrity event below says so.
                 vc_shares[cat] = {s: 1.0 / len(VC_STEPS) for s in VC_STEPS}
                 vc_fallback_cats.append(cat)
 
-        if unscored_vc:
-            self._integrity_events.append({
-                "type": "vc_epicentre_coverage",
-                "severity": "warning",
-                "message": (
-                    f"{len(unscored_vc)} driver(s) carry no value-chain epicentre, so the "
-                    f"value-chain lens leaves them out while they still move the shift "
-                    f"numbers. Score them on the Drivers page: "
-                    + ", ".join(unscored_vc[:10])
-                    + ("…" if len(unscored_vc) > 10 else "")
-                ),
-                "detail": {"count": len(unscored_vc), "unscored_driver_ids": unscored_vc[:50]},
-            })
         if vc_fallback_cats:
             self._integrity_events.append({
                 "type": "vc_attribution_fallback",
@@ -584,9 +567,8 @@ class MonteCarloEngine:
                 "message": (
                     f"{len(vc_fallback_cats)} categor"
                     f"{'y' if len(vc_fallback_cats) == 1 else 'ies'} had no contributing "
-                    f"driver with a value-chain epicentre; the value-chain lens shows an "
-                    f"even 1/8 spread there, a structural fallback rather than expert "
-                    f"judgment: " + ", ".join(vc_fallback_cats)
+                    f"driver; the value-chain lens shows an even 1/8 spread there, a "
+                    f"structural fallback rather than expert judgment: " + ", ".join(vc_fallback_cats)
                 ),
                 "detail": {"categories": list(vc_fallback_cats)},
             })

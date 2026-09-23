@@ -6,7 +6,7 @@
 import { CATEGORY_NAMES, EXPANSION, REGIONS } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
-import { VC_STEPS } from '@/lib/valueChain';
+import { VC_STEPS, stageIndex } from '@/lib/valueChain';
 import type { Driver, DriverProposal, DriverScores, ExposureMap } from '@/types';
 
 // ─── Diffusion curves ─────────────────────────────────────────────
@@ -20,17 +20,20 @@ export const DIFFUSION_LABELS: Record<string, { label: string; description: stri
 export const curveLabel = (curve: string): string => DIFFUSION_LABELS[curve]?.label ?? curve;
 
 // ─── Value chain epicentre ─────────────────────────────────────────
-// A driver's value chain is entered and read as one stage, the epicentre of
-// its impact (lib/valueChain.ts). Review & Endorse treats the stage as a
-// category: expert picks are counted as votes, never averaged, since a
-// Supply Chain vote and two Commercial votes must not blend into Marketing.
+// A driver's value chain is one stage, the epicentre of its impact
+// (lib/valueChain.ts). Review & Endorse treats the stage as a category:
+// expert picks are counted as votes, never averaged, since a Supply Chain
+// vote and two Commercial votes must not blend into Marketing.
 
-const vcZone = (stage: number): string =>
-  stage <= 4 ? 'upstream' : stage === 5 ? 'mid-chain' : 'downstream';
-export const vcStageLabel = (stage: number | null): string =>
-  stage == null ? 'unscored' : `${VC_STEPS[stage - 1]} · ${vcZone(stage)}`;
+const vcZone = (index: number): string =>
+  index <= 3 ? 'upstream' : index === 4 ? 'mid-chain' : 'downstream';
+/** A stage with its part of the chain ("Marketing · downstream"), or "unscored". */
+export const vcStageLabel = (step: string | null | undefined): string => {
+  const i = stageIndex(step);
+  return i < 0 ? 'unscored' : `${VC_STEPS[i]} · ${vcZone(i)}`;
+};
 /** A stage's pin position on the rail: the centre of its eighth. */
-export const vcPos = (stage: number): string => `${(((stage - 0.5) / 8) * 100).toFixed(2)}%`;
+export const vcPos = (step: string): string => `${(((stageIndex(step) + 0.5) / 8) * 100).toFixed(2)}%`;
 
 /** The table's mode: Driver List, Expert Rating or Review & Endorse (Drivers.tsx
  *  describes them). */
@@ -49,15 +52,14 @@ export const baselineOf = (d: Driver): DriverScores | null => d.baseline ?? (d.s
 export const uncLabel = (v: number | null | undefined): string =>
   v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
 
-const TAXONOMY: Record<'category_exposure' | 'regional_exposure' | 'vc_exposure', ReadonlySet<string>> = {
+const TAXONOMY: Record<'category_exposure' | 'regional_exposure', ReadonlySet<string>> = {
   category_exposure: new Set(CATEGORY_NAMES),
   regional_exposure: new Set(REGIONS),
-  vc_exposure: new Set<string>(VC_STEPS),
 };
 
-/** A proposal whose exposure maps keep only the taxonomy's names: the API
- *  refuses any other name, so a draft taken from a stored proposal that holds
- *  one could never be saved. */
+/** A proposal that names only the taxonomy's categories, regions and stages:
+ *  the API refuses any other name, so a draft taken from a stored proposal
+ *  that holds one could never be saved. */
 export function proposalOnTaxonomy(p: DriverProposal): DriverProposal {
   const out: DriverProposal = { ...p };
   for (const field of Object.keys(TAXONOMY) as Array<keyof typeof TAXONOMY>) {
@@ -66,5 +68,6 @@ export function proposalOnTaxonomy(p: DriverProposal): DriverProposal {
       out[field] = Object.fromEntries(Object.entries(map).filter(([k]) => TAXONOMY[field].has(k))) as ExposureMap;
     }
   }
+  if (p.vc_epicentre != null && stageIndex(p.vc_epicentre) < 0) out.vc_epicentre = null;
   return out;
 }

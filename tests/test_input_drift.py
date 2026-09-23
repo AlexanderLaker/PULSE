@@ -4,10 +4,10 @@ from prism.drivers import Driver
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint
 
 
-def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", **kw):
+def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", vc_epicentre=VC_STEPS[5], **kw):
     return Driver(id=id_, force=force, probability=probability, gp1_pct_affected=gp1, direction=direction,
                   category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
-                  vc_exposure={VC_STEPS[5]: 5}, peak_year=2030, diffusion_curve="s_curve", **kw)
+                  vc_epicentre=vc_epicentre, peak_year=2030, diffusion_curve="s_curve", **kw)
 
 
 def _fp(*drivers):
@@ -66,16 +66,13 @@ def test_a_key_the_previous_fingerprint_lacks_is_not_drift():
     assert event["detail"]["structure_changes"] == [] and event["severity"] == "info"
 
 
-def test_the_value_chain_counts_by_epicentre_stage():
-    """Only the epicentre stage enters the model, so a profile rewrite that keeps
-    the stage is not drift, and moving the stage is."""
-    same_stage = _driver("a")
-    same_stage.vc_exposure = {VC_STEPS[4]: 3, VC_STEPS[5]: 5, VC_STEPS[6]: 3}
-    moved = _driver("a")
-    moved.vc_exposure = {VC_STEPS[1]: 5}
-    base = _fp(_driver("a"))
-    assert compute_input_drift_event(_fp(same_stage), base)["detail"]["structure_changes"] == []
-    assert compute_input_drift_event(_fp(moved), base)["detail"]["structure_changes"] == ["a"]
+def test_the_value_chain_stage_is_fingerprinted_by_its_place_in_the_chain():
+    """"ve" is the epicentre's position in VC_STEPS, 1 to 8, the value the stored
+    runs carry; moving the stage is drift."""
+    assert _fp(_driver("a"))["a"]["ve"] == 6
+    assert _fp(_driver("a", vc_epicentre=None))["a"]["ve"] is None
+    moved = _fp(_driver("a", vc_epicentre=VC_STEPS[1]))
+    assert compute_input_drift_event(moved, _fp(_driver("a")))["detail"]["structure_changes"] == ["a"]
 
 
 def test_adding_a_driver_is_a_warning():

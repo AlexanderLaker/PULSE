@@ -8,7 +8,7 @@ import type { FC } from 'react';
 import { CATEGORIES, NO_VALUE, REGIONS, shortCat } from '@/lib/format';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { VC_STEPS, VC_SHORT_LABELS } from '@/lib/valueChain';
+import { VC_STEPS, VC_SHORT_LABELS, stageIndex, type VcStep } from '@/lib/valueChain';
 import type { ExposureMap } from '@/types';
 import { DELTA_COLOR, DIFFUSION_LABELS, EXPERT_COLOR, uncLabel, vcPos, vcStageLabel } from './shared';
 
@@ -101,17 +101,17 @@ export const BaselineMark: FC<{ size?: number }> = ({ size = 9 }) => (
 /** Read-only epicentre rail with its stage labels, for the expanded panel
  *  only: the collapsed rows carry no value-chain cell. A diamond marks the
  *  baseline stage where it differs. */
-export const EpicentreRail: FC<{ stage: number | null; baseline?: number | null }> = ({ stage, baseline }) => {
+export const EpicentreRail: FC<{ stage: string | null; baseline?: string | null }> = ({ stage, baseline }) => {
   const title = stage == null
     ? 'Value chain: unscored'
-    : `Value chain epicentre: ${vcStageLabel(stage)}${baseline != null && baseline !== stage ? ` · baseline: ${VC_STEPS[baseline - 1]}` : ''}`;
+    : `Value chain epicentre: ${vcStageLabel(stage)}${baseline != null && baseline !== stage ? ` · baseline: ${baseline}` : ''}`;
   return (
     <div title={title} aria-label={title} style={{ cursor: 'help' }}>
       <div style={{ position: 'relative', height: 40 }}>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 17, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-        {VC_STEPS.map((step, i) => (
+        {VC_STEPS.map((step) => (
           <span key={step} style={{
-            position: 'absolute', top: 16, left: vcPos(i + 1),
+            position: 'absolute', top: 16, left: vcPos(step),
             width: 8, height: 8, borderRadius: 999,
             backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
           }} />
@@ -133,13 +133,13 @@ export const EpicentreRail: FC<{ stage: number | null; baseline?: number | null 
         )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
-        {VC_SHORT_LABELS.map((l, i) => (
-          <span key={l} style={{
+        {VC_STEPS.map((step, i) => (
+          <span key={step} style={{
             fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-            color: i + 1 === stage ? S.primary : S.mutedText,
-            fontWeight: i + 1 === stage ? 800 : 400,
+            color: step === stage ? S.primary : S.mutedText,
+            fontWeight: step === stage ? 800 : 400,
           }}>
-            {l}
+            {VC_SHORT_LABELS[i]}
           </span>
         ))}
       </div>
@@ -150,21 +150,21 @@ export const EpicentreRail: FC<{ stage: number | null; baseline?: number | null 
 /** Editable epicentre slider (Expert Rating and the admin editor): drag the
  *  pin or click a stage; the value snaps to one of the eight stages. */
 export const EpicentreSlider: FC<{
-  value: number | null;
-  baseline?: number | null;
-  onChange: (stage: number) => void;
+  value: string | null;
+  baseline?: string | null;
+  onChange: (stage: VcStep) => void;
 }> = ({ value, baseline, onChange }) => (
   <div>
     <div style={{ position: 'relative', height: 44 }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 19, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
-      {VC_STEPS.map((step, i) => (
+      {VC_STEPS.map((step) => (
         <span key={step} style={{
-          position: 'absolute', top: 17, left: vcPos(i + 1), width: 10, height: 10,
+          position: 'absolute', top: 17, left: vcPos(step), width: 10, height: 10,
           borderRadius: 999, backgroundColor: S.surfaceHighest, transform: 'translateX(-50%)',
         }} />
       ))}
       {baseline != null && baseline !== value && (
-        <span title={`Baseline: ${VC_STEPS[baseline - 1]}`} style={{
+        <span title={`Baseline: ${baseline}`} style={{
           position: 'absolute', top: 17, left: vcPos(baseline), width: 10, height: 10,
           backgroundColor: S.bg, border: `2px solid ${S.onSurface}`,
           transform: 'translateX(-50%) rotate(45deg)', cursor: 'help',
@@ -179,9 +179,9 @@ export const EpicentreSlider: FC<{
         }} />
       )}
       <input
-        type="range" min={1} max={8} step={1}
-        value={value ?? baseline ?? 5}
-        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+        type="range" min={0} max={VC_STEPS.length - 1} step={1}
+        value={Math.max(0, stageIndex(value ?? baseline ?? 'Supply Chain'))}
+        onChange={(e) => onChange(VC_STEPS[parseInt(e.target.value, 10)])}
         aria-label="Value chain epicentre"
         aria-valuetext={value != null ? vcStageLabel(value) : 'unscored'}
         style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
@@ -190,14 +190,14 @@ export const EpicentreSlider: FC<{
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
       {VC_STEPS.map((step, i) => (
         <button
-          key={step} type="button" onClick={() => onChange(i + 1)}
-          aria-pressed={i + 1 === value}
-          title={baseline === i + 1 ? `${step} (baseline)` : step}
+          key={step} type="button" onClick={() => onChange(step)}
+          aria-pressed={step === value}
+          title={baseline === step ? `${step} (baseline)` : step}
           style={{
             border: 'none', background: 'transparent', padding: '4px 0', cursor: 'pointer',
             fontFamily: BODY_FONT, fontSize: 11, textAlign: 'center', lineHeight: 1.25,
-            color: i + 1 === value ? S.primary : S.mutedText,
-            fontWeight: i + 1 === value ? 800 : 400,
+            color: step === value ? S.primary : S.mutedText,
+            fontWeight: step === value ? 800 : 400,
           }}
         >
           {VC_SHORT_LABELS[i]}
@@ -211,7 +211,7 @@ export const EpicentreSlider: FC<{
         backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontSize: 11, fontWeight: 700,
         fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap', cursor: 'help',
       }}>
-        <BaselineMark /> {baseline != null ? `Baseline: ${VC_STEPS[baseline - 1]}` : `Baseline ${NO_VALUE}`}
+        <BaselineMark /> {baseline != null ? `Baseline: ${baseline}` : `Baseline ${NO_VALUE}`}
       </span>
       <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Downstream</span>
     </div>

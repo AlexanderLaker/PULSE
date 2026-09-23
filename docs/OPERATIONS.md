@@ -110,9 +110,9 @@ A few rules the suite holds:
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
   `package.json` must agree.
 - **Generated files** are never edited by hand.
-- **Parity**: the value-chain rule, the uncertainty tables and the
-  per-driver attribution exist in Python and TypeScript; tests keep each pair
-  identical.
+- **Parity**: the taxonomies (the names of forces, categories, regions and
+  value-chain stages), the uncertainty tables and the per-driver attribution
+  exist in Python and TypeScript; tests keep each pair identical.
 - **Colours** come from `lib/theme.ts` (and the shift colours from
   `lib/format.ts`): a literal colour anywhere else in the dashboard's code
   fails `tests/test_repository.py`, apart from three palettes that belong to

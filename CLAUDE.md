@@ -50,11 +50,11 @@ documents in `docs/` explain everything below in full.
   docs/adr/0007 has the reasons.
 - **Only the drivers feed the Shift Matrix.** The Consumer Journey and the
   Profit Pool Explorer never read or write the simulation.
-- **Parity.** The value-chain rule (`prism/config.py` and `lib/valueChain.ts`),
-  the uncertainty tables (`prism/config.py` and `lib/uncertainty.ts`) and the
-  per-driver attribution (`scripts/build_driver_analysis.py` and
-  `lib/driverAttribution.ts`) exist twice and are tested against each other;
-  change both or neither.
+- **Parity.** The taxonomies (`prism/config.py` and `lib/format.ts`,
+  `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
+  `lib/uncertainty.ts`) and the per-driver attribution
+  (`scripts/build_driver_analysis.py` and `lib/driverAttribution.ts`) exist
+  twice and are tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the

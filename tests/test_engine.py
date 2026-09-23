@@ -10,7 +10,8 @@ from prism.simulation.engine import MonteCarloEngine
 def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, direction="Contraction",
                       peak_year=2026, curve="linear", start_year=2025):
     d = Driver(id="d1", force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=prob,
-               peak_year=peak_year, diffusion_curve=curve, start_year=start_year, uncertainty=3)
+               peak_year=peak_year, diffusion_curve=curve, start_year=start_year, uncertainty=3,
+               vc_epicentre="Commercial")
     d.category_exposure = {cat: cat_exp}
     d.regional_exposure = dict(zip(REGIONS, regional))
     return DriverSet(drivers=[d])
@@ -18,7 +19,8 @@ def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, 
 
 def _global_driver(id_, direction, gp1, probability, exposure=5):
     d = Driver(id=id_, force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=probability,
-               peak_year=2028, diffusion_curve="s_curve", start_year=2025, uncertainty=3)
+               peak_year=2028, diffusion_curve="s_curve", start_year=2025, uncertainty=3,
+               vc_epicentre="Commercial")
     d.category_exposure = {"Hair: Color": exposure}
     d.regional_exposure = dict(zip(REGIONS, [5, 5, 5, 5]))
     return d
@@ -173,6 +175,8 @@ class TestDriverChecks:
         ({"peak_year": 2025}, r"peak year 2025 is not a year after the onset \(from 2026\)"),
         ({"start_year": 2027, "peak_year": 2027}, r"peak year 2027 is not a year after the onset \(from 2028\)"),
         ({"start_year": "soon"}, "start year 'soon' is not a year"),
+        ({"vc_epicentre": None}, "value-chain epicentre None is not one of"),
+        ({"vc_epicentre": "Shelf"}, "value-chain epicentre 'Shelf' is not one of"),
         ({"category_exposure": {"Hair: Colour": 3}}, "not in the taxonomy"),
         ({"regional_exposure": {"Europe": 7}}, "is not a whole number from 0 to 5"),
     ])
@@ -195,9 +199,9 @@ class TestDriverChecks:
             assert sum(words in p for p in problems) == 1, words
         for words in ("direction None", "probability None", "gp1_pct_affected None"):
             assert sum(words in p for p in problems) == 1, words
-        for words in ("uncertainty None", "diffusion curve None", "peak year None"):
+        for words in ("uncertainty None", "diffusion curve None", "peak year None", "value-chain epicentre None"):
             assert sum(words in p for p in problems) == 2, words
-        assert len(problems) == 1 + 4 + 3 + 3 * 2
+        assert len(problems) == 1 + 4 + 3 + 4 * 2
 
     def test_the_driver_base_passes(self):
         from prism.drivers import simulation_problems

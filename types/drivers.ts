@@ -15,7 +15,7 @@ export interface DriverSource {
   note: string;
 }
 
-/** Scores 0 to 5 keyed by category, region or value-chain stage. */
+/** Scores 0 to 5 keyed by category or by region. */
 export type ExposureMap = Record<string, number>;
 
 /** The inputs the model reads from a driver. */
@@ -32,7 +32,10 @@ export interface DriverScores {
   uncertainty: number | null;
   category_exposure: ExposureMap;
   regional_exposure: ExposureMap;
-  vc_exposure: ExposureMap;
+  /** The value-chain stage where the impact centres (a VC_STEPS name). Null
+   *  only for a driver stored without one, which the production run refuses
+   *  until it has one. */
+  vc_epicentre: string | null;
 }
 
 /** One row of GET /api/v1/drivers. */
@@ -78,7 +81,7 @@ export interface DriverUpdate {
   confidence?: Confidence;
   category_exposure?: ExposureMap;
   regional_exposure?: ExposureMap;
-  vc_exposure?: ExposureMap;
+  vc_epicentre?: string;
   sources?: DriverSource[];
 }
 
@@ -97,7 +100,7 @@ export interface DriverProposal {
   uncertainty?: number | null;
   category_exposure?: ExposureMap | null;
   regional_exposure?: ExposureMap | null;
-  vc_exposure?: ExposureMap | null;
+  vc_epicentre?: string | null;
   comment?: string | null;
 }
 
@@ -107,9 +110,9 @@ export interface ProposalAgg {
   avg?: number;
   /** Median: peak year, uncertainty. */
   median?: number;
-  /** Most frequent value: diffusion curve. */
+  /** Most frequent value: diffusion curve, value-chain epicentre. */
   mode?: string;
-  /** Votes per value: diffusion curve. */
+  /** Votes per value: diffusion curve, value-chain epicentre. */
   distribution?: Record<string, number>;
   /** Number of experts who scored the field. */
   count: number;
@@ -124,8 +127,7 @@ export interface ProposalScorer {
   peak_year: number | null;
   diffusion_curve: string | null;
   uncertainty: number | null;
-  /** Read for the expert's value-chain epicentre vote. */
-  vc_exposure: ExposureMap | null;
+  vc_epicentre: string | null;
   comment: string | null;
 }
 
@@ -139,9 +141,9 @@ export interface DriverProposalsResponse {
     peak_year: ProposalAgg | null;
     diffusion_curve: ProposalAgg | null;
     uncertainty: ProposalAgg | null;
+    vc_epicentre: ProposalAgg | null;
     category_exposure: Record<string, ProposalAgg>;
     regional_exposure: Record<string, ProposalAgg>;
-    vc_exposure: Record<string, ProposalAgg>;
   };
   scorers: ProposalScorer[];
 }

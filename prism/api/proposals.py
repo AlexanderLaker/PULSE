@@ -3,12 +3,13 @@
 Plain Python with no web or database imports, so it is easy to test. A
 proposal is one expert's partial view of a driver's scoreable fields:
 probability (1-5), gp1_pct_affected (0-1), peak_year, diffusion_curve,
-uncertainty (0-5) and the category, regional and value-chain exposure maps.
+uncertainty (0-5), the value-chain epicentre and the category and regional
+exposure maps.
 
 Aggregation across experts:
   - probability, gp1_pct_affected: mean of the scored values (2 decimals) and a count
   - peak_year: median; uncertainty: median rounded half up to a whole score
-  - diffusion_curve: the most frequent value and the full vote distribution
+  - diffusion_curve, vc_epicentre: the most frequent value and the full vote distribution
   - exposure maps: per cell, the mean and the count
   - a field nobody scored aggregates to None
 """
@@ -17,7 +18,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 SCALAR_MEAN_FIELDS = ("probability", "gp1_pct_affected")
-EXPOSURE_FIELDS = ("category_exposure", "regional_exposure", "vc_exposure")
+EXPOSURE_FIELDS = ("category_exposure", "regional_exposure")
 
 
 def _non_null(values: List[Any]) -> List[Any]:
@@ -52,8 +53,8 @@ def _mean2(values: List[float]) -> Optional[Dict[str, Any]]:
 
 def _mode_distribution(values: List[Any]) -> Optional[Dict[str, Any]]:
     """Most-frequent value + the full vote distribution for a categorical
-    field (diffusion_curve). Ties broken deterministically by first-seen
-    insertion order so repeated calls are stable."""
+    field (diffusion_curve, vc_epicentre). Ties broken deterministically by
+    first-seen insertion order so repeated calls are stable."""
     vals = _non_null(values)
     if not vals:
         return None
@@ -116,6 +117,7 @@ def aggregate_proposals(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     agg["uncertainty"] = _uncertainty_agg(rows)
 
     agg["diffusion_curve"] = _mode_distribution([r.get("diffusion_curve") for r in rows])
+    agg["vc_epicentre"] = _mode_distribution([r.get("vc_epicentre") for r in rows])
 
     for f in EXPOSURE_FIELDS:
         agg[f] = _aggregate_exposure(rows, f)
@@ -132,20 +134,16 @@ def _my_block(my_row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         "peak_year": my_row.get("peak_year"),
         "diffusion_curve": my_row.get("diffusion_curve"),
         "uncertainty": my_row.get("uncertainty"),
+        "vc_epicentre": my_row.get("vc_epicentre"),
         "category_exposure": my_row.get("category_exposure"),
         "regional_exposure": my_row.get("regional_exposure"),
-        "vc_exposure": my_row.get("vc_exposure"),
         "comment": my_row.get("comment"),
     }
 
 
 def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Who scored what: the headline fields, the comment and the value-chain profile.
-
-    The value chain is endorsed as one epicentre stage, so the review panel
-    counts one stage vote per expert from each profile rather than averaging
-    cells into a position nobody took.
-    """
+    """Who scored what: the headline fields, the value-chain epicentre and the
+    comment, so the review panel can show each expert's vote by name."""
     out = []
     for r in rows:
         out.append({
@@ -156,7 +154,7 @@ def _scorer_block(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "peak_year": r.get("peak_year"),
             "diffusion_curve": r.get("diffusion_curve"),
             "uncertainty": r.get("uncertainty"),
-            "vc_exposure": r.get("vc_exposure"),
+            "vc_epicentre": r.get("vc_epicentre"),
             "comment": r.get("comment"),
         })
     return out

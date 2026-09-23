@@ -14,7 +14,7 @@ if os.environ.get("PRISM_TEST_ALLOW_POSTGRES") != "1":
 
 import pytest  # noqa: E402
 
-from prism.config import CATEGORIES, REGIONS, VC_STEPS, ModelConfig, canonical_vc_profile  # noqa: E402
+from prism.config import CATEGORIES, REGIONS, ModelConfig  # noqa: E402
 from prism.drivers import Driver, DriverSet  # noqa: E402
 
 
@@ -25,15 +25,14 @@ def regions(europe: int, north_america: int, asia: int, high_growth: int) -> dic
 
 @pytest.fixture
 def mock_driver() -> Driver:
-    """One driver with a flat value-chain profile (all stages tied at 2)."""
+    """One fully scored driver."""
     driver = Driver(
         id="test_driver_01", force="Consumer", name="Test natural movement",
         description="A test driver about natural products", direction="Expansion",
         gp1_pct_affected=0.15, probability=4, start_year=2025, peak_year=2029, diffusion_curve="linear",
-        uncertainty=2, confidence="High",
+        uncertainty=2, confidence="High", vc_epicentre="Packaging",
     )
     driver.category_exposure = {c: (2 if "Hair" in c else 1) for c in CATEGORIES}
-    driver.vc_exposure = {s: 2 for s in VC_STEPS}
     driver.regional_exposure = regions(5, 3, 2, 2)
     return driver
 
@@ -62,7 +61,7 @@ def mock_drivers_database() -> DriverSet:
                       gp1_pct_affected=0.20, probability=4, start_year=2025, peak_year=2029,
                       diffusion_curve="front_loaded", uncertainty=2)
     consumer.category_exposure = {c: (3 if c == "Hair: Color" else 2 if "Hair" in c else 1) for c in CATEGORIES}
-    consumer.vc_exposure = canonical_vc_profile(6)            # Marketing
+    consumer.vc_epicentre = "Marketing"
     consumer.regional_exposure = regions(5, 3, 2, 2)  # Europe-heavy
 
     government = driver(id="government_01", force="Government", name="Microplastics Ban",
@@ -70,7 +69,7 @@ def mock_drivers_database() -> DriverSet:
                         gp1_pct_affected=0.25, probability=4, start_year=2026, peak_year=2028,
                         diffusion_curve="s_curve", uncertainty=1)
     government.category_exposure = {c: (2 if "Body" in c or "Styling" in c else 3) for c in CATEGORIES}
-    government.vc_exposure = canonical_vc_profile(2)            # Formulation
+    government.vc_epicentre = "Formulation"
     government.regional_exposure = regions(5, 4, 1, 2)  # EU regulation, low Asia
 
     technology = driver(id="technology_01", force="Technology", name="AI Personalization",
@@ -78,7 +77,7 @@ def mock_drivers_database() -> DriverSet:
                         gp1_pct_affected=0.12, probability=3, start_year=2026, peak_year=2030,
                         diffusion_curve="back_loaded", uncertainty=3)
     technology.category_exposure = {c: 2 for c in CATEGORIES}
-    technology.vc_exposure = canonical_vc_profile(7)            # Commercial
+    technology.vc_epicentre = "Commercial"
     technology.regional_exposure = regions(3, 5, 4, 2)  # North America and Asia led
 
     environmental = driver(id="environmental_01", force="Environmental", name="Water Scarcity",
@@ -86,7 +85,7 @@ def mock_drivers_database() -> DriverSet:
                            gp1_pct_affected=0.08, probability=3, start_year=2027, peak_year=2030,
                            diffusion_curve="linear", uncertainty=4)
     environmental.category_exposure = {c: 2 for c in CATEGORIES}
-    environmental.vc_exposure = canonical_vc_profile(3)            # Manufacturing
+    environmental.vc_epicentre = "Manufacturing"
     environmental.regional_exposure = regions(4, 3, 3, 4)  # broad, High Growth tilt
 
     competitive = driver(id="competitive_01", force="Competitive", name="Private Label Growth",
@@ -94,7 +93,7 @@ def mock_drivers_database() -> DriverSet:
                          gp1_pct_affected=0.15, probability=4, start_year=2025, peak_year=2027,
                          diffusion_curve="step_function", uncertainty=2)
     competitive.category_exposure = {c: 3 for c in CATEGORIES}
-    competitive.vc_exposure = canonical_vc_profile(7)            # Commercial, shared with Technology
+    competitive.vc_epicentre = "Commercial"  # shared with Technology
     competitive.regional_exposure = regions(5, 2, 2, 1)  # European private label
 
     for d in (consumer, government, technology, environmental, competitive):
