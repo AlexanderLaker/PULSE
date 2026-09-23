@@ -12,10 +12,23 @@ import type { SimulationResult } from '@/types';
 
 // ─── What the served run does not show yet ──────────────────────────────
 
+/** Whether dotted version `a` is newer than `b` (2.13.0 over 2.12.0). */
+const isNewer = (a: string, b: string): boolean => {
+  const pa = a.split('.').map((p) => parseInt(p, 10) || 0);
+  const pb = b.split('.').map((p) => parseInt(p, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d > 0;
+  }
+  return false;
+};
+
 /**
  * Notes above the matrix when the served run no longer matches the drivers or
  * the engine: drivers edited since the run (their effect shows after the next
- * production run) and a run computed by another engine version.
+ * production run) and a run computed by another engine version. A model
+ * change is run before it is deployed (docs/adr/0014), so a newer run than
+ * the service is expected for a while; an older one waits for its next run.
  */
 export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: string | null }> = ({
   simulation, serviceVersion,
@@ -31,8 +44,12 @@ export const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: stri
       + `(${shown}). The numbers below show the drivers as they were; the next production run takes the changes in.`);
   }
   if (serviceVersion && serviceVersion !== version) {
-    notes.push(`This run was computed by engine ${version}; the service runs ${serviceVersion}. `
-      + 'The numbers follow the current engine after the next production run.');
+    notes.push(isNewer(version, serviceVersion)
+      ? `This run was computed by engine ${version}, which the service does not run yet (it runs `
+        + `${serviceVersion}). What the dashboard takes from the service's configuration follows once `
+        + `${version} is deployed.`
+      : `This run was computed by engine ${version}; the service runs ${serviceVersion}. `
+        + 'The numbers follow the current engine after the next production run.');
   }
   if (!notes.length) return null;
   return (

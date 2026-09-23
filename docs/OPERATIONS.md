@@ -245,9 +245,9 @@ back as that migration's runbook says.
   (its inputs and grades) with a new `VERSION`. Run it: it writes the record,
   `lib/cellWeightProvenance.ts` and `prism/cell_weight_estimate.py`, which
   `prism/config.py` reads. The new weights move the category and portfolio
-  numbers: the change carries a new `MODEL_VERSION` and golden pins, then the
-  PRISM Analysis is regenerated after the next production run
-  (docs/DRIVER_ANALYSIS.md).
+  numbers: the change carries a new `MODEL_VERSION`, golden pins and a PRISM
+  Analysis record rebuilt from a production run of the new code, all in one
+  commit (docs/DRIVER_ANALYSIS.md, "Regeneration").
 - **The PRISM Analysis texts** of an existing database follow the generated
   ones with `scripts/sync_analysis.py` (`--dry-run` first; writing to
   PostgreSQL needs `--postgres`). It changes the analysis column, raises the

@@ -28,11 +28,13 @@ documents in `docs/` explain everything below in full.
 - **Exact numerics only.** scipy is a hard requirement of the engine. Never
   add an approximate fallback or a try/except around the scipy import.
 - **Numbers move only deliberately.** A change to any number the model
-  produces bumps `MODEL_VERSION` (and `prism.__version__` and `package.json`),
-  regenerates the golden pins in `tests/test_golden_pipeline.py` in the same
-  commit, and needs a new production run after the deploy. A change to the
-  fixture drivers the pins are computed on also regenerates them, without a
-  new version. Never regenerate pins to make a test pass.
+  produces bumps `MODEL_VERSION` (and `prism.__version__` and `package.json`)
+  and, in the same commit, regenerates the golden pins in
+  `tests/test_golden_pipeline.py` and the PRISM Analysis record, rebuilt from
+  a production run of the new code (docs/DRIVER_ANALYSIS.md); that run
+  therefore comes before the commit and the deploy. A change to the fixture
+  drivers the pins are computed on also regenerates them, without a new
+  version. Never regenerate pins to make a test pass.
 - **Generated files are never edited by hand**: `prism/seed_drivers.py`,
   `prism/overlap_correction.py`, `prism/cell_weight_estimate.py`,
   `data/driverCodeMap.ts`, `data/parameters/*.json`,

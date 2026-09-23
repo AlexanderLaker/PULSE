@@ -3,7 +3,7 @@
  * The Shift Analysis page without a run says why, from the service's own
  * diagnosis (unreachable, no run yet, a run that cannot be served, no
  * database, a database awaiting the migration, none configured); above the
- * matrix it says when the drivers or the engine have moved on since the run;
+ * matrix it says when the drivers or the engine no longer match the run;
  * the impact filter splits the net by the drivers' contributions and needs
  * the model configuration and the drivers; its "About this model" footer names the run's
  * cell-weight basis and the pass-through of the served configuration.
@@ -246,10 +246,24 @@ describe('what the served run does not show yet', () => {
     expect(screen.getByRole('status').textContent).toContain('2 drivers have changed since this run (C-01, T-01)');
   });
 
-  it('says when the run comes from another engine version', () => {
+  it('says when the run comes from an older engine: the next production run catches up', () => {
     STORE.store = makeStore({ health: { ...makeStore().health!, version: '2.13.0' } });
     render(<ShiftAnalysis />);
-    expect(screen.getByRole('status').textContent).toContain('computed by engine 2.12.0; the service runs 2.13.0');
+    const text = screen.getByRole('status').textContent;
+    expect(text).toContain('computed by engine 2.12.0; the service runs 2.13.0');
+    expect(text).toContain('after the next production run');
+  });
+
+  it('says when the run comes from a newer engine, as between a model change\'s run and its deploy', () => {
+    // 2.9.0 against 2.12.0: the parts compare as numbers, not as text.
+    for (const service of ['2.11.0', '2.9.0']) {
+      STORE.store = makeStore({ health: { ...makeStore().health!, version: service } });
+      render(<ShiftAnalysis />);
+      const text = screen.getByRole('status').textContent;
+      expect(text).toContain(`computed by engine 2.12.0, which the service does not run yet (it runs ${service})`);
+      expect(text).not.toContain('next production run');
+      cleanup();
+    }
   });
 
   it('says nothing while the run matches the drivers and the engine', () => {
