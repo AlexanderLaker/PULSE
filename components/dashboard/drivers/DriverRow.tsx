@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Store, Cpu, Landmark, Leaf, Swords, ChevronDown, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { EXPANSION_SOFT, NO_VALUE, fmtPct, fmtShift, shiftColor } from '@/lib/format';
-import { S, HEADLINE_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
 import { baselineOf, EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
@@ -141,8 +141,8 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
         <div role="tooltip" onClick={(e) => e.stopPropagation()} style={{
           position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 40, minWidth: 240, maxWidth: 320,
           padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
-          fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, lineHeight: 1.5, textAlign: 'left',
-          boxShadow: '0 10px 24px rgba(0,52,94,0.28)', pointerEvents: 'none',
+          fontFamily: MONO_FONT, fontSize: 11, lineHeight: 1.5, textAlign: 'left',
+          boxShadow: SHADOW.tip, pointerEvents: 'none',
         }}>
           Shift = (prob/6) × GP1% × direction
           <br />= ({driver.probability}/6) × {(driver.gp1_pct_affected * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(shift)}
@@ -181,7 +181,7 @@ const ReviewStatusCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: Dri
     const count = driver.proposal_summary.count;
     return (
       <div className="flex justify-end">
-        <span style={{ ...pill, backgroundColor: count > 0 ? 'rgba(107,79,196,0.10)' : S.surfaceLow, color: count > 0 ? EXPERT_COLOR : S.onSurfaceVariant }}>
+        <span style={{ ...pill, backgroundColor: count > 0 ? S.expertSoft : S.surfaceLow, color: count > 0 ? EXPERT_COLOR : S.onSurfaceVariant }}>
           {count > 0 ? `◆ ${count}` : NO_VALUE}
         </span>
       </div>
@@ -217,7 +217,7 @@ export const DriverRow: FC<DriverRowProps> = ({
   return (
     <div style={{ boxShadow: isLast && !expanded ? 'none' : `inset 0 -1px 0 ${S.surfaceLow}` }}>
       {/* The row toggles the expanded panel. It is a div with role=button
-          rather than a <button> because it lays out block content in a grid,
+          rather than a <button type="button"> because it lays out block content in a grid,
           which a button may not contain. */}
       <div
         role="button"

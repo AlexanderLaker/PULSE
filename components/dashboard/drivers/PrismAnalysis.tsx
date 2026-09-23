@@ -40,8 +40,9 @@ export function basisMedian(text: string): { year: string; percent: number } | n
 export const PrismAnalysisReading: FC<{ text: string }> = ({ text }) => {
   const { simulation } = usePrism();
   const paragraphs = splitAnalysis(text);
-  // The figures of a reading belong to the run its basis line names. When the
-  // served run's median differs at the shown precision, the reading says so.
+  // The figures of a reading belong to the run its basis line names: an older
+  // run, or one on other cell weights. When the served run's median differs at
+  // the shown precision, the reading says so.
   const basis = basisMedian(text);
   const served = basis ? simulation?.totals.portfolio[basis.year]?.median : undefined;
   const stale = basis != null && served != null && (served * 100).toFixed(1) !== basis.percent.toFixed(1);
@@ -63,9 +64,8 @@ export const PrismAnalysisReading: FC<{ text: string }> = ({ text }) => {
             {stale && (
               <p role="note" style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: S.onAmberContainer,
                 backgroundColor: S.amberContainer, padding: '6px 10px', borderRadius: 8 }}>
-                The run shown in the Shift Analysis has a {basis!.year} portfolio median of {fmtShift(served)}, so
-                the figures in this reading come from an earlier run. They are brought up to date with the next
-                analysis build.
+                The Shift Analysis shows a run with a {basis!.year} portfolio median of {fmtShift(served)}; the
+                figures in this reading come from the run the line above names.
               </p>
             )}
           </React.Fragment>

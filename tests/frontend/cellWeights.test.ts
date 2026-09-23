@@ -5,14 +5,13 @@
  * shows, and the record's consistency with its own derivation.
  */
 import { describe, it, expect } from 'vitest';
-import { cellMarginals, rowShares, type CellWeights } from '@/lib/cellWeights';
+import { ESTIMATE_SOURCE_PREFIX, cellMarginals, cellWeightsBasis, rowShares, type CellWeights } from '@/lib/cellWeights';
 import {
-  BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATED_CELL_WEIGHTS,
+  BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_SOURCE, ESTIMATED_CELL_WEIGHTS,
   GRADE_LEGEND, MARGIN_INDEX, REGION_MIX,
 } from '@/lib/cellWeightProvenance';
-import { CATEGORIES, REGIONS, categoryDisplay } from '@/lib/format';
+import { CATEGORIES, CATEGORY_NAMES as CATS, REGIONS, categoryDisplay } from '@/lib/format';
 
-const CATS = CATEGORIES.map((c) => c.name);
 const copyOfEstimate = (): CellWeights =>
   Object.fromEntries(Object.entries(ESTIMATED_CELL_WEIGHTS).map(([c, row]) => [c, { ...row }]));
 
@@ -84,6 +83,16 @@ describe('matchesEstimate', () => {
     }
     expect(cellMarginals(renamedRegion, CATS, REGIONS).matchesEstimate).toBe(false);
     expect(cellMarginals({}, CATS, REGIONS).matchesEstimate).toBe(false);
+  });
+});
+
+describe('cellWeightsBasis', () => {
+  it("reads the estimate from its exact label, and any other label as a file's", () => {
+    expect(ESTIMATE_SOURCE.startsWith(ESTIMATE_SOURCE_PREFIX)).toBe(true);
+    expect(cellWeightsBasis(ESTIMATE_SOURCE)).toBe('estimate');
+    expect(cellWeightsBasis('Estimated GP1 mix FY2025 (Finance)')).toBe('file');
+    expect(cellWeightsBasis('HCB finance, gross profit FY2025')).toBe('file');
+    expect(cellWeightsBasis(null)).toBe('file');
   });
 });
 

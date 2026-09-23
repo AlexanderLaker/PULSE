@@ -16,7 +16,9 @@
  *
  * The dashboard keeps visited panes mounted but hidden. An overlay inside a
  * hidden pane (PaneActiveContext false) lets go of the page, the scroll lock
- * and the keys included, and takes them back when its pane shows again.
+ * and the keys included, and takes them back when its pane shows again. The
+ * element that opened it is recorded when it opens, so focus returns there
+ * when it closes, however often its pane was hidden in between.
  */
 
 import { createContext, useContext, useEffect, useRef, type RefObject } from 'react';
@@ -41,11 +43,16 @@ export default function useOverlay(
     onCloseRef.current = onClose;
   });
 
+  // (5) Remember the trigger when the overlay opens and give focus back to it
+  // when the overlay closes or unmounts.
+  useEffect(() => {
+    if (!open) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    return () => { trigger?.focus?.({ preventScroll: true }); };
+  }, [open]);
+
   useEffect(() => {
     if (!active) return;
-
-    // (5) Remember the trigger to restore focus on close.
-    const previouslyFocused = document.activeElement as HTMLElement | null;
 
     // (2) Lock the page scroll without a layout shift from the
     // disappearing scrollbar.
@@ -98,8 +105,6 @@ export default function useOverlay(
       window.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = prevOverflow;
       document.body.style.paddingRight = prevPaddingRight;
-      // (5) Restore focus to the trigger.
-      previouslyFocused?.focus?.({ preventScroll: true });
     };
   }, [active, containerRef]);
 }

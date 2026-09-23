@@ -6,19 +6,9 @@
    PRISM design system: maritime-blue tonal palette, Manrope headlines,
    Inter body. Views style themselves inline from lib/theme.ts; this file
    holds only the shared base layer: reset, scrollbar, focus, selection,
-   inputs and Recharts.
+   inputs, Recharts and the frame of Clerk's forms. Its colours are the same
+   tokens, read through Tailwind's theme() (tailwind.config.ts).
    ═══════════════════════════════════════════════════════════════ */
-
-:root {
-  --bg-app:             #f8f9ff;
-  --surface-high:       #dce9ff;
-  --primary:            #005db5;
-  --on-bg:              #00345e;
-  --on-surface-variant: #26619d;
-  --muted:              #64748b;
-  --border:             rgba(0, 52, 94, 0.10);
-  --ring:               rgba(0, 93, 181, 0.35);
-}
 
 /* ─── Base Reset ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,8 +21,8 @@ html {
 }
 
 body {
-  background: var(--bg-app);
-  color: var(--on-bg);
+  background: theme('colors.theme.bg');
+  color: theme('colors.theme.on-bg');
   font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   line-height: 1.5;
   overflow-x: hidden;
@@ -41,31 +31,31 @@ body {
 /* ─── Scrollbar (minimal, maritime) ─── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface-high); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--on-surface-variant); }
+::-webkit-scrollbar-thumb { background: theme('colors.theme.surface-high'); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.theme.on-surface-variant'); }
 
 /* ─── Selection ─── */
-::selection { background: rgba(0, 93, 181, 0.15); color: var(--on-bg); }
+::selection { background: theme('colors.theme.primary / 15%'); color: theme('colors.theme.on-bg'); }
 
 /* ─── Focus ─── */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid theme('colors.theme.primary');
   outline-offset: 2px;
 }
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible) { outline: none; }
 
 /* ─── Inputs (maritime focus ring) ─── */
-input::placeholder { color: var(--muted); }
+input::placeholder { color: theme('colors.theme.muted-text'); }
 input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px var(--ring);
+  border-color: theme('colors.theme.primary');
+  box-shadow: 0 0 0 4px theme('colors.theme.primary / 35%');
 }
 
 /* ─── Recharts integration ─── */
 .recharts-cartesian-grid-horizontal line,
-.recharts-cartesian-grid-vertical line { stroke: var(--border) !important; }
+.recharts-cartesian-grid-vertical line { stroke: theme('colors.theme.card-border') !important; }
 .recharts-tooltip-wrapper { outline: none !important; }
 
 /* ─── Reduced motion ─── */
@@ -76,4 +66,57 @@ input:focus {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ─── Clerk's sign-in and sign-up forms ───
+   The sign-in and sign-up pages draw the card themselves, so Clerk's own
+   frames, shadows, borders and backgrounds go, and so do its branding footer
+   and the striped watermark it paints with development keys (the "Sign up" /
+   "Sign in" link below the form is a separate node and stays). Clerk's frames
+   also carry masks, clip-paths, filters and pseudo-elements that paint a
+   circular artefact over the form on this background; none are needed. */
+.cl-rootBox,
+.cl-cardBox,
+.cl-card,
+.cl-main,
+.cl-footer,
+.cl-footerAction,
+.cl-footerPages {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+.cl-footerPages,
+.cl-badge,
+[class*="devModeNotice"],
+[data-localization-key*="development"],
+[data-localization-key="footer.pages"] {
+  display: none !important;
+}
+.cl-rootBox,
+.cl-rootBox *,
+.cl-cardBox,
+.cl-cardBox * {
+  mask: none !important;
+  -webkit-mask: none !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+.cl-rootBox::before,
+.cl-rootBox::after,
+.cl-card::before,
+.cl-card::after,
+.cl-main::before,
+.cl-main::after,
+.cl-footer::before,
+.cl-footer::after {
+  content: none !important;
+  display: none !important;
 }

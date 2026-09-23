@@ -1,0 +1,157 @@
+/**
+ * The matrix toolbar's controls: the lens and impact-filter labels, the
+ * segmented control and the year stepper of the attribution lenses.
+ */
+import type { FC } from 'react';
+import {
+  Calendar, Layers, Globe2, Zap, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { YEARS } from '@/lib/format';
+import { S, SHADOW, BODY_FONT } from '@/lib/theme';
+import type { ImpactFilter, ViewMode } from './matrixModel';
+
+export const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
+  time:   { label: 'Time Path',   description: 'MC median shifts 2026→2035, cumulative vs 2025', Icon: Calendar },
+  force:  { label: 'Force attribution',       description: 'Distributes each category shift across forces by exposure: attribution, not an independent simulation', Icon: Zap },
+  vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each driver\'s contribution wholly to the single stage where its impact centres (its epicentre); propagation up or down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },
+  region: { label: 'Region attribution',      description: 'Distributes each category shift across regions by exposure: attribution, not an independent simulation', Icon: Globe2 },
+};
+
+export const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
+  total:       { label: 'Net',                 description: 'Net shift: expansion and contraction drivers combined.', Icon: Activity },
+  expansion:   { label: 'Expansion drivers',   description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingUp },
+  contraction: { label: 'Contraction drivers', description: 'Their share of each year\'s net shift; the year shape follows the net simulation, not a separate run.', Icon: TrendingDown },
+};
+
+// ─── Controls ────────────────────────────────────────────────────────────
+
+/** A connected set of options that reads as one control (the lens, or the
+ *  impact filter). The bordered track and the raised active segment keep it
+ *  distinct from the year stepper and the info button beside it. */
+export const SegControl: FC<{
+  items: Array<{ id: string; label: string; Icon?: LucideIcon }>;
+  activeId: string;
+  onSelect: (id: string) => void;
+  ariaLabel: string;
+  size?: 'md' | 'sm';
+}> = ({ items, activeId, onSelect, ariaLabel, size = 'md' }) => {
+  const sm = size === 'sm';
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex items-center"
+      style={{
+        backgroundColor: S.surfaceLow,
+        border: `1px solid ${S.cardBorder}`,
+        borderRadius: 10,
+        padding: 3,
+        gap: 2,
+        maxWidth: '100%',
+        overflowX: 'auto',
+      }}
+    >
+      {items.map(({ id, label, Icon }) => {
+        const active = id === activeId;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(id)}
+            className={`inline-flex items-center transition-all ${sm
+              ? 'gap-1.5 px-2.5 py-1.5 text-[12px]'
+              : 'gap-2 px-3.5 py-2 text-[13px]'}`}
+            style={{
+              borderRadius: 7,
+              border: 'none',
+              backgroundColor: active ? S.surface : 'transparent',
+              color: active ? S.primary : S.onSurfaceVariant,
+              fontWeight: active ? 700 : 600,
+              boxShadow: active ? SHADOW.raised : 'none',
+              fontFamily: BODY_FONT,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {Icon && <Icon size={sm ? 13 : 14} strokeWidth={2.3} />}
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+/** The measurement year of the attribution lenses: one compact control that
+ *  steps through the path years; the arrows disable at the ends. */
+export const YearStepper: FC<{
+  year: number;
+  onChange: (year: number) => void;
+}> = ({ year, onChange }) => {
+  const idx = YEARS.indexOf(year);
+  const atMin = idx <= 0;
+  const atMax = idx < 0 || idx >= YEARS.length - 1;
+  const step = (dir: -1 | 1) => {
+    const next = YEARS[idx + dir];
+    if (next != null) onChange(next);
+  };
+  const arrow = (dir: -1 | 1, disabled: boolean, Icon: LucideIcon, label: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => step(dir)}
+      className="inline-flex items-center justify-center transition-all"
+      style={{
+        width: 32,
+        height: 32,
+        border: 'none',
+        backgroundColor: 'transparent',
+        color: disabled ? S.mutedText : S.onSurfaceVariant,
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <Icon size={16} strokeWidth={2.3} />
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Measurement year"
+      className="inline-flex items-center"
+      style={{
+        backgroundColor: S.surface,
+        border: `1px solid ${S.cardBorder}`,
+        borderRadius: 9,
+        height: 34,
+        overflow: 'hidden',
+      }}
+    >
+      {arrow(-1, atMin, ChevronLeft, 'Earlier year')}
+      <span
+        aria-live="polite"
+        style={{
+          minWidth: 58,
+          textAlign: 'center',
+          fontWeight: 700,
+          fontSize: 13,
+          fontVariantNumeric: 'tabular-nums',
+          color: S.onSurface,
+          borderLeft: `1px solid ${S.cardBorder}`,
+          borderRight: `1px solid ${S.cardBorder}`,
+          height: '100%',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: BODY_FONT,
+        }}
+      >
+        {year}
+      </span>
+      {arrow(1, atMax, ChevronRight, 'Later year')}
+    </div>
+  );
+};

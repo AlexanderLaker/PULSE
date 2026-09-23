@@ -6,10 +6,10 @@
  * (GET /api/v1/journey; the tiles only, the stage contexts always come from
  * here).
  *
- * Every tile carries its provenance: the author (every tile is
- * strategist-authored), the month of its last revision and an evidence grade:
- * 'verified' (sourced hard data), 'estimate' (a Fermi or consulting estimate)
- * or 'hypothesis' (needs validation).
+ * Every tile is authored by the strategist and carries its provenance: the
+ * month of its last revision and an evidence grade: 'verified' (sourced hard
+ * data), 'estimate' (a Fermi or consulting estimate) or 'hypothesis' (needs
+ * validation).
  *
  * A tile cites the modelled drivers behind it by display code in driverCodes
  * (data/driverCodeMap.ts); driverNote is the short rationale shown with them.
@@ -24,7 +24,6 @@ export type TileType = 'product' | 'tech' | 'service';
 export type ProvenanceGrade = 'verified' | 'estimate' | 'hypothesis';
 
 export interface TileProvenance {
-  author: 'strategist';
   /** Month of the last revision, YYYY-MM. */
   date: string;
   grade: ProvenanceGrade;
@@ -95,7 +94,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -115,7 +113,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -135,7 +132,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (social commerce is the strategist's read; K-04 is modelled for hair only)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -156,7 +152,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity + T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -177,7 +172,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-16 EU Detergents and Surfactants Regulation (digital product passport) + T-01 AI and automation productivity",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -197,7 +191,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-05 ageing consumers",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -219,7 +212,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -239,7 +231,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -259,7 +250,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -286,7 +276,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -306,7 +295,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -326,7 +314,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -347,7 +334,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + C-04 clinical-efficacy premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -367,7 +353,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -388,7 +373,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-04 clinical-efficacy premiumisation + K-02 e-commerce and marketplace share gain (auto-replenishment lock-in)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -408,7 +392,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (refill pouches)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -430,7 +413,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-02 EU microplastics restriction (the EU PFAS restriction is modelled for cosmetics only, G-03)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -448,7 +430,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the EU PFAS restriction is modelled for cosmetics only, G-03)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -466,7 +447,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the EU PFAS restriction is modelled for cosmetics only, G-03)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -486,7 +466,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -507,7 +486,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-04 clinical-efficacy premiumisation + G-05 EU EmpCo greenwashing rules",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -527,7 +505,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-01 private label structural penetration",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -545,7 +522,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (cleaning literacy rests on a single unverifiable statistic)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -571,7 +547,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-02 EU microplastics restriction",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -591,7 +566,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -611,7 +585,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -632,7 +605,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity + T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -653,7 +625,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift + T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -675,7 +646,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -695,7 +665,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -715,7 +684,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -735,7 +703,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -762,7 +729,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift + G-04 packaging regulation and EPR cost stack",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -783,7 +749,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift + G-04 packaging regulation and EPR cost stack",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -805,7 +770,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-04 packaging regulation and EPR cost stack + T-03 compaction and dry-format shift (refill pouches) + C-04 clinical-efficacy premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -826,7 +790,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -846,7 +809,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -867,7 +829,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + G-05 EU EmpCo greenwashing rules",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -888,7 +849,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity + T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -908,7 +868,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -928,7 +887,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-01 discount channel share gain (Aldi, Lidl)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -948,7 +906,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -968,7 +925,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-18 US Hispanic demographic dividend in hair and laundry",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -988,7 +944,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (sheets)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1008,7 +963,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-27 dishwasher penetration catch-up drives auto-dish consumption",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1028,7 +982,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1048,7 +1001,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (specialty care, fibre renewal and refresh occasions)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1068,7 +1020,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-11 AI shopping agents (agentic commerce)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1088,7 +1039,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution (fermentation and synthetic biology long tail)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1109,7 +1059,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-16 EU Detergents and Surfactants Regulation (film biodegradability criteria) + T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1131,7 +1080,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift displaces dilute powders",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1152,7 +1100,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift + G-04 packaging regulation and EPR cost stack (PPWR)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1172,7 +1119,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-02 EU microplastics restriction (the EU PFAS restriction is modelled for cosmetics only, G-03)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1192,7 +1138,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated water treatment in machines)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1212,7 +1157,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules (Green Claims Directive stalled)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1230,7 +1174,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the cosmetics stack, G-03, covers hair and body only)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1251,7 +1194,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze, round two + C-25 sub-replacement fertility and population decline pressure mass-pack economics",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1271,7 +1213,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-01 private label structural penetration and premium own-label tiers",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1292,7 +1233,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze, round two (trading down) + C-01 private label structural penetration",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1313,7 +1253,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-08 US tariff regime after IEEPA + E-01 lauric-oil and palm-derivative surfactant cost squeeze",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1333,7 +1272,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-03 European retailer buyer-power concentration (alliances, M&A, cross-border sourcing) cuts branded assortment",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1354,7 +1292,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "E-03 EU carbon-cost pass-through (ETS, ETS2, CBAM) + E-07 structural European energy-price disadvantage and supply-base erosion",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1374,7 +1311,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-04 packaging regulation and EPR cost stack (eco-modulation) penalises trigger sprays and multi-material packaging",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1394,7 +1330,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-13 retail media and retailer data monetisation (Amazon and Walmart take 89% of the US increment)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1414,7 +1349,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-11 AI shopping agents (retailer-owned agents default to retailer economics)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1434,7 +1368,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-13 retail media and retailer data monetisation (dm App and Clubcard pricing as data toll-booths)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1454,7 +1387,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-11 AI shopping agents (agentic commerce and brand invisibility in low-consideration categories)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1474,7 +1406,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-08 US tariff regime after IEEPA (Section 301/232/122), Henkel US operations exposed on imported inputs and finished goods",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1494,7 +1425,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-06 nature and supply-chain due-diligence stack (EUDR, CSDDD), palm-derived surfactant chains under traceability pressure",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1514,7 +1444,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-16 EU Detergents and Surfactants Regulation 2026/405 (film biodegradability criteria by 2032), unit-dose film chemistry contested",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1534,7 +1463,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in); platform private label itself is not modelled",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1560,7 +1488,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1580,7 +1507,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI advisors for fabric optimization)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1601,7 +1527,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment + T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1621,7 +1546,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity + smart home voice assistants",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1641,7 +1565,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI diagnostics; social commerce is not a modelled laundry driver)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1662,7 +1585,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (formulation) + E-07 structural European energy-price disadvantage",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1684,7 +1606,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances displace manual controls)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1704,7 +1625,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (data-driven dosing replaces generic tables)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1724,7 +1644,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (digital instructions replace paper)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1751,7 +1670,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment + T-01 AI and automation productivity",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1771,7 +1689,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (formulation for cold-water efficiency)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1791,7 +1708,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated water treatment)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1811,7 +1727,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce and marketplace share gain (auto-replenishment lock-in) + post-purchase services",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1831,7 +1746,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances report water and energy use)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1851,7 +1765,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (automation and IoT monitoring)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1871,7 +1784,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-17 incumbent retrenchment and portfolio pruning (Reckitt Essential Home carve-out, now Vestacy) share capture",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1891,7 +1803,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (pulled by water stress)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1913,7 +1824,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment obsoletes legacy hardware",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1933,7 +1843,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (cold-wash formulation) + energy efficiency",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1953,7 +1862,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (integrated machine water treatment)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1973,7 +1881,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (machines auto-detect water hardness)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -1994,7 +1901,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "E-07 structural European energy-price disadvantage + T-03 compaction and dry-format shift (water stress)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2014,7 +1920,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "E-07 structural European energy-price disadvantage (electricity about 2x, gas 3-6x US)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2040,7 +1945,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-04 clinical-efficacy (cleanical) premiumisation wants fresh at source, not masked",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2060,7 +1964,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift enables targeted sprays",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2080,7 +1983,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected appliances send completion alerts)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2100,7 +2002,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-04 clinical-efficacy (cleanical) premiumisation + bio-based solutions",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2120,7 +2021,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-02 EU microplastics restriction creates a new care category",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2140,7 +2040,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2163,7 +2062,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift + T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2183,7 +2081,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers (substitution pressure on heavy rinse aids)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2203,7 +2100,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2229,7 +2125,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "E-07 structural European energy-price disadvantage (headwind working through this moment as a tailwind for efficient drying)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2249,7 +2144,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2269,7 +2163,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-04 packaging regulation and EPR cost stack (headwind on disposables working through this moment as a tailwind for reusables)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2287,7 +2180,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (water stress enters the model only as format-shift context inside T-03)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2307,7 +2199,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (headwind working through this moment as a data tailwind)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2327,7 +2218,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (specialty care, fibre renewal, longevity norms)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2349,7 +2239,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "E-07 structural European energy-price disadvantage",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2367,7 +2256,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (connected appliances are modelled only for auto-dosing and replenishment, T-08; water scarcity enters the model only as format-shift context inside T-03)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2387,7 +2275,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2408,7 +2295,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-16 EU Detergents and Surfactants Regulation (film biodegradability criteria) + G-02 EU microplastics restriction",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2432,7 +2318,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (connected appliances are modelled only for auto-dosing and replenishment, T-08)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2452,7 +2337,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (ultra-concentrates, refill pouches)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2472,7 +2356,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2490,7 +2373,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (connected appliances are modelled only for auto-dosing and replenishment, T-08)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2510,7 +2392,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation, marketing and manufacturing",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2528,7 +2409,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (social commerce is modelled for hair only, K-04)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2549,7 +2429,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-05 ageing consumers + T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2569,7 +2448,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (connected appliances are modelled only for auto-dosing and replenishment, T-08)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2589,7 +2467,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2609,7 +2486,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze, round two",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2629,7 +2505,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (tailwind working through this moment as a headwind for sizing)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2656,7 +2531,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation + T-02 bio-based ingredient substitution",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2676,7 +2550,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2697,7 +2570,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-11 AI shopping agents + T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2717,7 +2589,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (water-stress pull on rewashing)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2737,7 +2608,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2757,7 +2627,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment + home automation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2775,7 +2644,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (climate-driven pest shifts touch one niche category and are immaterial at portfolio level)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2795,7 +2663,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the EU PFAS restriction is modelled for cosmetics only, G-03; conscious consumption is the strategist's read)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2815,7 +2682,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment obsoletes manual systems",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2835,7 +2701,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers (trade-up away from synthetic bars)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2855,7 +2720,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution replaces synthetic treatments",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2881,7 +2745,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze (round two) reduces dry cleaning",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2901,7 +2764,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift enables portable bottles",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2922,7 +2784,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-28 scent-led premiumisation of laundry additives and finishers + T-02 bio-based ingredient substitution",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2942,7 +2803,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (refresh occasions) + convenience premium",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2962,7 +2822,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (connected fabric-care devices)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -2984,7 +2843,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze (round two)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3002,7 +2860,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (conscious consumption is the strategist's read)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3023,7 +2880,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze (round two) + T-03 compaction and dry-format shift (water-stress pull)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3050,7 +2906,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation + T-02 bio-based ingredient substitution",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3071,7 +2926,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity in innovation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3091,7 +2945,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift enables targeted application",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3111,7 +2964,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (longevity norms) + garment lifecycle extension",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3131,7 +2983,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (refresh occasions, longevity norms) extends to fashion services",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3151,7 +3002,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (specialty-care premium) + professional laundry services",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3171,7 +3021,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (longevity norms): care products as longevity enablers",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3194,7 +3043,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (longevity norms) + G-06 EUDR and CSDDD due-diligence stack",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3215,7 +3063,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-04 packaging regulation and EPR cost stack (PPWR) + G-02 EU microplastics restriction",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3235,7 +3082,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules (Green Claims Directive stalled)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3253,7 +3099,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the EU PFAS restriction is modelled for cosmetics only, G-03)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3280,7 +3125,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (concentrates) + C-06 cost-of-living squeeze",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3300,7 +3144,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (portable concentrates) + convenience trend",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3320,7 +3163,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (manufacturing automation enables compact design)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3341,7 +3183,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment + T-01 AI and automation productivity",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3359,7 +3200,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (laundry-room IoT lacks adoption evidence; longevity-driven home-hygiene demand lacks verifiable numbers)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3380,7 +3220,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (concentrates) + C-06 cost-of-living squeeze",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3401,7 +3240,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution (enzymes) + T-01 AI and automation productivity (enzyme development)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3421,7 +3259,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3441,7 +3278,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-29 garment care beyond cleaning (between-wash refresh occasions; Market Gap score 0.82)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3461,7 +3297,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution (bio-based antimicrobial actives)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3484,7 +3319,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze + T-03 compaction and low-water format shift (water stress)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3504,7 +3338,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-08 OEM auto-dosing and platform-mediated replenishment (appliance integration displaces niche gadgets)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3524,7 +3357,6 @@ export const LHC_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3553,7 +3385,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI diagnostics and colour simulation)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3573,7 +3404,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3593,7 +3423,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop becomes a scaled beauty channel)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3613,7 +3442,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3633,7 +3461,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI-driven matching and diagnostics)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3654,7 +3481,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop) + C-03 hair-care premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3674,7 +3500,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (generative-content leg, 40-60% cost reduction)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3695,7 +3520,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-37 growth-market expansion (SEA sub-exposure, 600M consumers) + K-04 social commerce (TikTok Shop)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3713,7 +3537,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (Gen Alpha evidence is sub-threshold in HCB categories)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3733,7 +3556,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop) becomes a scaled beauty channel, live streams a minority format now arriving via TikTok Shop EU",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3755,7 +3577,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in marketing: digital AR replaces static print",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3775,7 +3596,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-11 dupe economy and value-equivalence normalisation (all cohorts) seeks value",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3795,7 +3615,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity: AI look prediction and digital booking reduce walk-in consultations",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3815,7 +3634,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity: AI shade simulation obsoletes static charts",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3835,7 +3653,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-13 generative search and AI answers (GEO) replace search-and-browse product discovery",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3856,7 +3673,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop) + C-11 dupe economy and value-equivalence normalisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3876,7 +3692,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-16 China domestic-brand capture in beauty and hair (Douyin-native competition)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3896,7 +3711,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-13 retail media and retailer data monetisation: sponsored placements colonise the beauty discovery surface",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3917,7 +3731,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-15 scale-leader innovation and A&P escalation + X-16 social-commerce-native challenger brands: acquired indies with big-FMCG distribution",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3944,7 +3757,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI image analysis) + C-07 scalp care as a regimen step (microbiome science)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3964,7 +3776,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI-driven analysis and personalisation)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -3984,7 +3795,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation, science-led tiers outgrow mass (detailed diagnostics)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4004,7 +3814,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx) + clinical validation",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4025,7 +3834,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-05 ageing consumers (scalp care for ageing hair) + C-10 hair-thinning demand medicalises",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4045,7 +3853,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care (skinification of hair) as a regimen step, microbiome science (at-home kits)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4065,7 +3872,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI-driven genetic matching) + premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4086,7 +3892,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (incl. men) + T-01 AI and automation productivity (AI analysis)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4107,7 +3912,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-02 GLP-1 adoption reshapes personal-care demand (GLP-1 hair shedding) + T-01 AI and automation productivity (AI personalisation)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4128,7 +3932,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx, biomarkers) + C-07 scalp care as a regimen step",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4148,7 +3951,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises: tele-derm Rx platforms (Hims/Hers model)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4170,7 +3972,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity: AI cameras obsolete basic kits",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4190,7 +3991,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI personalisation) > generic guides",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4210,7 +4010,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity: personalisation shifts from weather to microbiome",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4230,7 +4029,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (AI diagnostics, personalisation) demands custom diagnostics",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4248,7 +4046,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (the EU AI Act does not classify FMCG tools as high-risk)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4268,7 +4065,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-15 scale-leader innovation and A&P escalation (L'Oréal K-SCAN, Modiface, NVIDIA molecule discovery)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4295,7 +4091,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + C-04 clinical-efficacy (cleanical) premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4315,7 +4110,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (AI-optimised bond science) + premiumisation",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4336,7 +4130,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity in innovation (polymer formulation)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4357,7 +4150,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity in innovation (humidity-adaptive formulas)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4377,7 +4169,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care (skinification of hair) becomes a regimen step",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4397,7 +4188,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in manufacturing (precision dosing)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4417,7 +4207,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (AI colour formulation, pH optimisation)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4437,7 +4226,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care becomes a regimen step (microbiome layer included)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4457,7 +4245,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-37 growth-market expansion (IMEA and India led): sachet-led affordable-premium entry",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4477,7 +4264,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-24 textured and curly hair as a mainstream category: 65% of global population, portfolios designed for straight hair",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4497,7 +4283,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-37 growth-market expansion (Sub-Saharan Africa sub-exposure); AfCFTA harmonisation is a watch item",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4519,7 +4304,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation displaces the commodity tier",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4539,7 +4323,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (AI-guided personalisation) requires new patient education",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4559,7 +4342,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (manufacturing automation + AI-guided precision)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4579,7 +4361,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation demands advanced formulas",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4599,7 +4380,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-03 EU cosmetics ingredient-restriction stack (Omnibus VII/VIII, SCCS restrictions)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4626,7 +4406,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (core driver) + C-05 ageing consumers",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4646,7 +4425,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care becomes a regimen step (emerging category)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4667,7 +4445,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in manufacturing + C-07 scalp care as a regimen step",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4687,7 +4464,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care becomes a regimen step (clinical positioning)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4707,7 +4483,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx channel caveat) + clinical approach",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4727,7 +4502,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in manufacturing + clinical efficacy",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4747,7 +4521,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care as a regimen step (microbiome science layer)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4768,7 +4541,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-05 ageing consumers (scalp care for ageing hair) + C-10 hair-thinning demand medicalises (supplements)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4788,7 +4560,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-18 US Hispanic demographic dividend in hair and laundry (delayed 2025-27); Henkel US portfolio under-indexed",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4808,7 +4579,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (science-led tiers, carrying the peptide and bioactive layer)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4828,7 +4598,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (supplement tier; Unilever/Nutrafol proof)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4848,7 +4617,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (peptide and bioactive science layer)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4868,7 +4636,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-16 social-commerce-native and Asian challenger brands (K-beauty first), treatment-stage entry, headwind for HCB share",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4891,7 +4658,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation + C-07 scalp care as a regimen step",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4909,7 +4675,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (T-08 covers auto-dosing and replenishment in laundry and home care only)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4929,7 +4694,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI personalization and diagnostics) > generic life-phase segments",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4949,7 +4713,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution replaces synthetics",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4969,7 +4732,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-16 social-commerce-native challenger brands fragment hair-care share (K18, Olaplex, Virtue pressure)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -4989,7 +4751,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (tele-derm Rx channel caveat routes demand around the retail shelf)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5015,7 +4776,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (colour, core driver)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5036,7 +4796,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation + K-07 professional brands cross into retail",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5057,7 +4816,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (bond chemistry R&D) + K-07 professional and bond-repair brands cross into retail",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5078,7 +4836,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution (safer formulas) + C-24 textured and curly hair as a mainstream category",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5099,7 +4856,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-07 professional brands cross into retail (premium) + C-03 hair-care premiumisation",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5119,7 +4875,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (manufacturing automation leg) + precision dosing",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5139,7 +4894,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (cosmetic thickening) extends to brows/lashes",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5159,7 +4913,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (AI personalization and diagnostics) for shade match",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5179,7 +4932,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-07 professional and bond-repair hair brands cross into retail and e-commerce",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5199,7 +4951,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-37 growth-market expansion (LatAm-Mexico sub-exposure; Brazil via professional hair)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5221,7 +4972,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation drives permanent investment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5242,7 +4992,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation shifts to treatments + C-35 mass hair unit decline",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5262,7 +5011,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-05 ageing consumers and grey-coverage colour demand (tailwind routed to full coverage, not blending)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5282,7 +5030,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (tailwind routing transformation demand to colour and treatments)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5303,7 +5050,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-11 dupe economy and value-equivalence normalisation, but C-03 hair-care premiumisation wins",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5324,7 +5070,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-01 private label structural penetration and premium own-label tiers + C-06 cost-of-living squeeze",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5344,7 +5089,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "X-15 scale-leader innovation and A&P escalation (Unilever beauty investment, P&G superiority)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5364,7 +5108,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-13 MoCRA and US state ingredient bans: compliance cliff for facility registration, safety substantiation and disclosure",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5390,7 +5133,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (pH science and colour lock)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5411,7 +5153,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation + C-03 hair-care premiumisation (peptide and bond science)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5431,7 +5172,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (colour chemistry, extended fade resistance)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5451,7 +5191,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (prestige scent finishing; neurocosmetics not modelled)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5471,7 +5210,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-07 professional and bond-repair brands cross into retail (premium service)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5492,7 +5230,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + C-03 hair-care premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5512,7 +5249,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in manufacturing (precision sealing tools)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5532,7 +5268,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-24 textured and curly hair as a mainstream category: definition, frizz and hold needs unserved by straight-hair styling stacks",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5554,7 +5289,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation eliminates the low-end tier (tailwind working through this moment as a headwind)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5574,7 +5308,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation outcompetes commodity shine boost (tailwind working through this moment as a headwind)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5594,7 +5327,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-04 packaging regulation and EPR cost stack",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5614,7 +5346,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-35 mass hair unit decline, value migrates to prestige (budget fragrance sprays decline)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5634,7 +5365,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "G-05 EU EmpCo greenwashing rules (applying September 2026; Green Claims Directive stalled)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5654,7 +5384,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-11 dupe economy and value-equivalence normalisation (Shein/Temu price floor and Chinese EU entry not modelled)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5681,7 +5410,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution + T-01 AI and automation productivity in innovation",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5701,7 +5429,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-02 bio-based ingredient substitution (climate volatility itself not modelled)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5722,7 +5449,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in innovation (humidity resistance) + C-03 hair-care premiumisation",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5743,7 +5469,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity in manufacturing + C-07 scalp care as a regimen step (microbiome science)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5764,7 +5489,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (supplements) + C-05 ageing consumers",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5784,7 +5508,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (diagnostics) + smart scheduling",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5805,7 +5528,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce and auto-replenishment lock-in + C-03 hair-care premiumisation",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5825,7 +5547,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (multi-step routines)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5845,7 +5566,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (connected appliances not modelled for hair: T-08 covers only auto-dosing and replenishment in laundry and home care)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5865,7 +5585,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-37 growth-market expansion (IMEA led; AfCFTA a watch note)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5887,7 +5606,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (colour stability integrated in core formulas)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5907,7 +5625,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-35 mass hair unit decline: value migrates to prestige and specialty (undifferentiated boosters lose the shelf)",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5927,7 +5644,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze, round two, pressures accessory buys",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5947,7 +5663,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce auto-replenishment and subscription lock-in displaces single-use",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5967,7 +5682,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-13 retail media and retailer data monetisation as a structural visibility tax",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -5987,7 +5701,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-02 e-commerce and marketplace share gain at lower brand net margin (auto-replenishment lock-in)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6011,7 +5724,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "No modelled driver (between-wash styling treated as immaterial)",
         "intensity": 3,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6032,7 +5744,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (concentrated sprays) + C-06 cost-of-living squeeze",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6052,7 +5763,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (colour-correction formulation) + on-demand",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6072,7 +5782,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation (multi-step routines)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6092,7 +5801,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care becomes a regimen step (new category growth)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6112,7 +5820,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-01 AI and automation productivity (manufacturing leg) enables portability",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6133,7 +5840,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "K-04 social commerce (TikTok Shop) + K-07 professional brands cross into retail",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6154,7 +5860,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (concentrated sprays) + C-05 ageing consumers (grey-coverage demand, shade matching)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6174,7 +5879,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care becomes a regimen step",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6194,7 +5898,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-10 hair-thinning demand medicalises (incl. men; carries male grooming)",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6216,7 +5919,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-03 hair-care premiumisation shifts to permanent investment",
         "intensity": 2,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6236,7 +5938,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-06 cost-of-living squeeze, round two + low engagement trend",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6256,7 +5957,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "C-07 scalp care as a regimen step replaces generic \"freshener\" category",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },
@@ -6276,7 +5976,6 @@ export const HAIR_JOURNEY: JourneyStageDef[] = [
         "driverNote": "T-03 compaction and dry-format shift (concentrated sprays) displaces chalks",
         "intensity": 1,
         "provenance": {
-          "author": "strategist",
           "date": "2026-09",
           "grade": "estimate"
         },

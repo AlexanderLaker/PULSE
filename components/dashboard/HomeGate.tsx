@@ -27,9 +27,12 @@
 import { useEffect, useMemo, type FC, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import usePrism from '@/hooks/usePrism';
-import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import { CATEGORIES, FORCE_COLORS, YEARS, heatFill, heatScaleFor } from '@/lib/format';
+import { S, INK_RGB, PRIMARY_RGB, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import {
+  CATEGORIES, CONTRACTION_RGB, EXPANSION_RGB, FORCE_COLORS, YEARS, heatFill, heatScaleFor,
+} from '@/lib/format';
 import { getYearPercentiles } from '@/lib/shiftMatrix';
+import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import type { ForceName } from '@/types';
 
 /** The tabs the gate opens: the dashboard's production tab ids. */
@@ -46,15 +49,19 @@ interface HomeGateProps {
   onNavigate: (room: GateRoom) => void;
 }
 
-// ─── Door washes (gate-only; base colours come from the theme) ─────
+// ─── The gate's own palette; every other colour comes from the theme ─────
 // Colour is used as light: a white-to-tint gradient per door plus one soft
-// radial glow.
+// radial glow. The journey door's accent is a violet next to the primary blue.
+const JOURNEY_VIOLET = '#6b4fc4';
+const glow = (rgb: string, alpha: number) => `radial-gradient(420px 300px at 50% 34%, rgba(${rgb}, ${alpha}), transparent 70%)`;
 const WASH = {
-  drivers:   { bg: 'linear-gradient(180deg,#ffffff 0%,#f2f7ff 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,93,181,.07), transparent 70%)' },
-  journey:  { bg: 'linear-gradient(180deg,#ffffff 0%,#f5f3fe 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(107,79,196,.07), transparent 70%)' },
-  shift:    { bg: 'linear-gradient(180deg,#ffffff 0%,#eef3fb 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(0,52,94,.06), transparent 70%)' },
-  explorer: { bg: 'linear-gradient(180deg,#ffffff 0%,#f0faf8 100%)', glow: 'radial-gradient(420px 300px at 50% 34%, rgba(15,155,142,.07), transparent 70%)' },
+  drivers:  { bg: 'linear-gradient(180deg,#ffffff 0%,#f2f7ff 100%)', glow: glow(PRIMARY_RGB, 0.07) },
+  journey:  { bg: 'linear-gradient(180deg,#ffffff 0%,#f5f3fe 100%)', glow: glow('107, 79, 196', 0.07) },
+  shift:    { bg: 'linear-gradient(180deg,#ffffff 0%,#eef3fb 100%)', glow: glow(INK_RGB, 0.06) },
+  explorer: { bg: 'linear-gradient(180deg,#ffffff 0%,#f0faf8 100%)', glow: glow('15, 155, 142', 0.07) },
 } as const;
+/** The text navy at a given opacity, for the artworks' line work. */
+const ink = (alpha: number) => `rgba(${INK_RGB}, ${alpha})`;
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -72,12 +79,12 @@ const CLUSTER_SPOTS: Array<Array<[number, number, number]>> = [
   [[170, 150, 6.5], [196, 176, 4.5], [152, 184, 4]],
   [[242, 152, 6.5], [262, 182, 4.5], [224, 168, 4]],
 ];
-/** The seeded driver base per force: the dot counts until the drivers load. */
-const SEED_FORCE_COUNTS: Record<ForceName, number> = {
-  Consumer: 20, Government: 10, Customer: 7, Technology: 6, Competitive: 4, Environmental: 4,
-};
+/** The driver base per force (data/driverCodeMap.ts): the dot counts until the drivers load. */
+const BASE_FORCE_COUNTS = Object.values(DRIVER_CODE_MAP).reduce<Record<string, number>>(
+  (counts, d) => ({ ...counts, [d.force]: (counts[d.force] ?? 0) + 1 }), {}) as Record<ForceName, number>;
 
 const TERMINAL_YEAR = YEARS[YEARS.length - 1];
+const CATEGORY_COLOR: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
 // One cell per category in CATEGORIES order, four to a row; the portfolio
 // band sits under the fourth row, inside the shared 300 x 230 viewBox.
 const CELL_X = [10, 72, 134, 196];
@@ -109,14 +116,14 @@ const DriversArt: FC<{ countsByForce: Record<ForceName, number> }> = ({ countsBy
     })}
     <path
       d="M126 62 L188 40 M222 60 L258 84 M84 92 L80 164 M170 150 L196 176 M126 62 L170 150 M242 152 L262 182"
-      stroke="rgba(0,52,94,.12)" strokeWidth={1.25}
+      stroke={ink(0.12)} strokeWidth={1.25}
     />
     {/* the evidence flows in */}
     <path
       d="M112 192 C 130 208, 148 214, 162 216 M196 176 C 184 196, 172 208, 162 216 M152 184 C 154 196, 158 208, 162 216"
-      stroke="rgba(0,52,94,.22)" strokeWidth={1.25} strokeDasharray="2 5" fill="none"
+      stroke={ink(0.22)} strokeWidth={1.25} strokeDasharray="2 5" fill="none"
     />
-    <circle cx={163} cy={217} r={10} fill="#fff" stroke="rgba(0,52,94,.35)" strokeWidth={1.5} />
+    <circle cx={163} cy={217} r={10} fill={S.surface} stroke={ink(0.35)} strokeWidth={1.5} />
     <path
       d="M159 217 L167 217 M164 214 L167 217 L164 220"
       stroke={S.primary} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" fill="none"
@@ -134,15 +141,15 @@ const JourneyArt: FC = () => {
     <svg width="300" height="230" viewBox="0 0 300 230" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="gate-jg" x1="0" y1="0" x2="300" y2="230" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#005db5" />
-          <stop offset="1" stopColor="#6b4fc4" />
+          <stop offset="0" stopColor={S.primary} />
+          <stop offset="1" stopColor={JOURNEY_VIOLET} />
         </linearGradient>
       </defs>
       <g transform="translate(0,14)">
         {bars.map((b, i) => (
           <rect
             key={i} x={nodes[i][0] - 6} y={nodes[i][1] - 28 - b.h} width={12} height={b.h} rx={6}
-            fill={b.up ? 'rgba(31,122,61,.38)' : 'rgba(159,64,61,.42)'}
+            fill={b.up ? `rgba(${EXPANSION_RGB}, 0.38)` : `rgba(${CONTRACTION_RGB}, 0.42)`}
           />
         ))}
         <path
@@ -154,13 +161,13 @@ const JourneyArt: FC = () => {
             <circle key={i} cx={x} cy={y} r={11} fill="url(#gate-jg)" />
           ) : (
             <circle
-              key={i} cx={x} cy={y} r={7} fill="#fff"
-              stroke={i === 0 ? '#005db5' : i === 4 ? '#6b4fc4' : 'rgba(0,52,94,.30)'}
+              key={i} cx={x} cy={y} r={7} fill={S.surface}
+              stroke={i === 0 ? S.primary : i === 4 ? JOURNEY_VIOLET : ink(0.3)}
               strokeWidth={i === 0 || i === 4 ? 2.25 : 1.75}
             />
           ),
         )}
-        <path d="M284 108 L 292 104 M284 108 L 288 116" stroke="#6b4fc4" strokeWidth={2} strokeLinecap="round" opacity={0.7} />
+        <path d="M284 108 L 292 104 M284 108 L 288 116" stroke={JOURNEY_VIOLET} strokeWidth={2} strokeLinecap="round" opacity={0.7} />
       </g>
     </svg>
   );
@@ -196,12 +203,12 @@ const ShiftArt: FC<{
           />
         );
       })}
-      <rect x={BAND_X0} y={BAND_Y} width={BAND_W} height={5} rx={2.5} fill="rgba(0,52,94,.08)" />
+      <rect x={BAND_X0} y={BAND_Y} width={BAND_W} height={5} rx={2.5} fill={ink(0.08)} />
       {bandGeom && (
         <>
           <rect
             x={bandGeom.x10} y={BAND_Y - 2} width={Math.max(bandGeom.x90 - bandGeom.x10, 6)} height={9} rx={4.5}
-            fill="rgba(159,64,61,.16)"
+            fill={`rgba(${band && band.median >= 0 ? EXPANSION_RGB : CONTRACTION_RGB}, 0.16)`}
           />
           <rect x={bandGeom.xMed - 1.25} y={BAND_Y - 7} width={2.5} height={19} rx={1.25} fill={S.onBg} />
         </>
@@ -213,12 +220,12 @@ const ShiftArt: FC<{
 /** A static mekko in the Explorer page's chart grammar. */
 const ExplorerArt: FC = () => {
   const bars = [
-    { share: 0.29, gp1: 0.75, up: true,  fill: 'rgba(15,155,142,.18)', stroke: '#0f9b8e' },
-    { share: 0.21, gp1: 0.60, up: false, fill: 'rgba(0,93,181,.18)',   stroke: '#005db5' },
-    { share: 0.16, gp1: 0.85, up: true,  fill: 'rgba(47,143,78,.18)',  stroke: '#2f8f4e' },
-    { share: 0.13, gp1: 0.50, up: false, fill: 'rgba(176,125,43,.18)', stroke: '#b07d2b' },
-    { share: 0.10, gp1: 0.375, up: false, fill: 'rgba(176,80,74,.18)', stroke: '#b0504a' },
-  ];
+    { share: 0.29, gp1: 0.75, up: true,  category: 'LHC: FCA' },
+    { share: 0.21, gp1: 0.60, up: false, category: 'LHC: LAD' },
+    { share: 0.16, gp1: 0.85, up: true,  category: 'LHC: FCN' },
+    { share: 0.13, gp1: 0.50, up: false, category: 'Hair: Care' },
+    { share: 0.10, gp1: 0.375, up: false, category: 'Hair: Color' },
+  ].map((b) => ({ ...b, color: CATEGORY_COLOR[b.category] }));
   const total = bars.reduce((s, b) => s + b.share, 0);
   let x = 20;
   const drawn = bars.map((b) => {
@@ -230,11 +237,11 @@ const ExplorerArt: FC = () => {
   });
   return (
     <svg width="300" height="230" viewBox="0 0 300 230" fill="none" aria-hidden="true">
-      <path d="M14 208 L 286 208" stroke="rgba(0,52,94,.18)" strokeWidth={1.5} />
-      <path d="M14 208 L 14 44" stroke="rgba(0,52,94,.10)" strokeWidth={1.5} />
+      <path d="M14 208 L 286 208" stroke={ink(0.18)} strokeWidth={1.5} />
+      <path d="M14 208 L 14 44" stroke={ink(0.1)} strokeWidth={1.5} />
       {drawn.map((b, i) => (
         <g key={i}>
-          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={7} fill={b.fill} stroke={b.stroke} strokeWidth={1.5} opacity={0.9} />
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={7} fill={b.color} fillOpacity={0.18} stroke={b.color} strokeWidth={1.5} opacity={0.9} />
           <path
             fill="none" stroke={b.up ? S.expansion : S.contraction} strokeWidth={2.5}
             strokeLinecap="round" strokeLinejoin="round"
@@ -273,13 +280,11 @@ const Door: FC<{
     animate={{ opacity: 1, y: 0, scale: 1 }}
     transition={{ duration: 0.6, ease: EASE, delay }}
     className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] p-[26px] pb-6 text-left
-               transition-[transform,box-shadow] duration-500
-               [box-shadow:0_1px_2px_rgba(0,52,94,.03),0_24px_48px_-28px_rgba(0,52,94,.12)]
-               hover:-translate-y-1.5 hover:scale-[1.012]
-               hover:[box-shadow:0_2px_4px_rgba(0,52,94,.04),0_40px_80px_-32px_rgba(0,52,94,.22)]
+               transition-[transform,box-shadow] duration-500 shadow-door
+               hover:-translate-y-1.5 hover:scale-[1.012] hover:shadow-door-hover
                focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px]
-               focus-visible:outline-[var(--gate-primary)]"
-    style={{ background: wash.bg, border: '1px solid rgba(0,52,94,.06)', fontFamily: BODY_FONT }}
+               focus-visible:outline-theme-primary"
+    style={{ background: wash.bg, border: `1px solid ${ink(0.06)}`, fontFamily: BODY_FONT }}
   >
     <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: wash.glow }} />
 
@@ -323,7 +328,7 @@ const Door: FC<{
     <span
       aria-hidden="true"
       className="absolute right-[22px] top-6 flex h-[22px] w-[22px] items-center justify-center rounded-[7px]
-                 border bg-[rgba(255,255,255,.85)] text-[11px] opacity-0 transition-opacity duration-300
+                 border bg-white/85 text-[11px] opacity-0 transition-opacity duration-300
                  group-hover:opacity-90 group-focus-visible:opacity-90"
       style={{ fontFamily: MONO_FONT, color: S.onSurfaceVariant, borderColor: S.cardBorderStrong }}
     >
@@ -335,11 +340,11 @@ const Door: FC<{
       aria-hidden="true"
       className="absolute bottom-[22px] right-[22px] flex h-[38px] w-[38px] items-center justify-center
                  rounded-full border text-base opacity-75 backdrop-blur-[6px] transition-all duration-300
-                 bg-[rgba(255,255,255,.85)] text-[var(--gate-ink2)] border-[var(--gate-hairline)]
-                 group-hover:-rotate-45 group-hover:opacity-100 group-hover:bg-[var(--gate-primary)]
-                 group-hover:text-white group-hover:border-[var(--gate-primary)]
-                 group-focus-visible:opacity-100 group-focus-visible:bg-[var(--gate-primary)]
-                 group-focus-visible:text-white group-focus-visible:border-[var(--gate-primary)]"
+                 bg-white/85 text-theme-on-surface-variant border-theme-card-border
+                 group-hover:-rotate-45 group-hover:opacity-100 group-hover:bg-theme-primary
+                 group-hover:text-theme-on-primary group-hover:border-theme-primary
+                 group-focus-visible:opacity-100 group-focus-visible:bg-theme-primary
+                 group-focus-visible:text-theme-on-primary group-focus-visible:border-theme-primary"
     >
       →
     </span>
@@ -361,14 +366,14 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
   const { drivers, simulation } = usePrism();
   const reduced = useReducedMotion() ?? false;
 
-  // Drivers per force, and in all; the seeded base until the drivers load.
+  // Drivers per force, and in all; the driver base until the drivers load.
   const countsByForce = useMemo<Record<ForceName, number>>(() => {
-    if (!drivers.length) return SEED_FORCE_COUNTS;
+    if (!drivers.length) return BASE_FORCE_COUNTS;
     const counts = Object.fromEntries(CLUSTER_ORDER.map((f) => [f, 0])) as Record<ForceName, number>;
     for (const d of drivers) counts[d.force] += 1;
     return counts;
   }, [drivers]);
-  const driverCount = drivers.length || Object.values(SEED_FORCE_COUNTS).reduce((a, b) => a + b, 0);
+  const driverCount = drivers.length || Object.keys(DRIVER_CODE_MAP).length;
 
   const matrixCells = useMemo<Array<number | null>>(
     () => CATEGORIES.map((c) => getYearPercentiles(simulation?.shifts, c.name, TERMINAL_YEAR)?.median ?? null),
@@ -405,10 +410,6 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
       style={{
         minHeight: 'calc(100vh - 64px)',
         fontFamily: BODY_FONT,
-        // Theme values for the Tailwind hover states below.
-        ['--gate-primary' as string]: S.primary,
-        ['--gate-ink2' as string]: S.onSurfaceVariant,
-        ['--gate-hairline' as string]: S.cardBorder,
       }}
     >
       <motion.header
@@ -471,7 +472,7 @@ const HomeGate: FC<HomeGateProps> = ({ active, onNavigate }) => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, ease: EASE, delay: 0.5 }}
             className="pointer-events-none absolute top-[33px] hidden w-[14px] text-center text-[13px] xl:block"
-            style={{ color: 'rgba(0,52,94,.34)', left: `calc((100% - 54px)*${f} + ${2 + i * 18}px)` }}
+            style={{ color: ink(0.34), left: `calc((100% - 54px)*${f} + ${2 + i * 18}px)` }}
           >
             →
           </motion.span>

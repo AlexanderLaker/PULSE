@@ -31,7 +31,7 @@ describe('/api/prism-cookie', () => {
 
   it('mints viewer-only httpOnly SameSite=Lax cookie for signed-in ADMIN', async () => {
     clerk.auth.mockResolvedValue({ userId: 'user_admin' });
-    clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' } });
+    clerk.currentUser.mockResolvedValue({ primaryEmailAddress: { emailAddress: 'a@b.de' }, fullName: 'Ana Admin' });
     db.roleRows = [{ role: 'admin' }]; // even admins get a viewer cookie
     const res = await cookieGET();
     expect(res.status).toBe(200);
@@ -44,6 +44,7 @@ describe('/api/prism-cookie', () => {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
     expect(payload.role).toBe('viewer');
     expect(payload.sub).toBe('user_admin');
+    expect(payload.name).toBe('Ana Admin');   // shown with the user's expert proposals
   });
 
   it('503 when PRISM_JWT_SECRET is missing (configured:false surfaced)', async () => {

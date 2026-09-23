@@ -8,12 +8,9 @@ import type {
   Driver, DriverScores, ForceName, HealthStatus, ModelConfig, PercentileDistribution, ShiftPath, SimulationResult,
 } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
-import { CATEGORIES, FORCES, REGIONS, YEARS } from '@/lib/format';
+import { CATEGORY_NAMES, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { ESTIMATED_CELL_WEIGHTS, ESTIMATE_SOURCE } from '@/lib/cellWeightProvenance';
 import { VC_STEPS, canonicalVcProfile } from '@/lib/valueChain';
-
-export { FORCES, REGIONS };
-export const CATEGORY_NAMES = CATEGORIES.map((c) => c.name);
 
 /** A distribution around a median. */
 export function distribution(median: number, spread = 0.01): PercentileDistribution {

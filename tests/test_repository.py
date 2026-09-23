@@ -6,6 +6,9 @@
   and the migration's tests may name them.
 - No tracked file is executable: the scripts are run as python3 or bash
   scripts/<name>, as the documents show.
+- The dashboard's colours and shadows come from lib/theme.ts (and the shift
+  colours from lib/format.ts): a literal colour anywhere else in its code is
+  either a token that is missing or a copy that will drift.
 """
 import re
 import shutil
@@ -27,6 +30,17 @@ PREVIOUS_NAMES = re.compile("|".join(
     line.strip() for line in _NAMES_FILE.read_text(encoding="utf-8").splitlines()
     if line.strip() and not line.startswith("#")))
 MAY_NAME_THE_PREVIOUS_RELEASE = ("migrations/0001_driver_schema/", "tests/test_migration.py")
+
+#: Where the dashboard's code may write a colour: the theme, the shift colours,
+#: and three palettes that belong to a single view.
+COLOUR_HOMES = {
+    "lib/theme.ts",
+    "lib/format.ts",
+    "components/dashboard/HomeGate.tsx",           # the entry doors' washes
+    "components/dashboard/drivers/cards.tsx",      # the source-grade chips
+    "components/dashboard/explorer/PoolChart.tsx",  # the mekko's bar fills
+}
+LITERAL_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}(?=['\"`;\s])|rgba?\(\s*\d")
 
 
 def text_files() -> list:
@@ -74,3 +88,16 @@ def test_no_tracked_file_is_executable():
     listing = subprocess.run(["git", "ls-files", "-s"], cwd=REPO, capture_output=True, text=True, check=True).stdout
     executable = [line.split("\t", 1)[1] for line in listing.splitlines() if line.startswith("100755")]
     assert not executable, executable
+
+
+def test_colours_come_from_the_theme():
+    hits = []
+    for path in FILES:
+        rel = path.relative_to(REPO).as_posix()
+        if (not rel.startswith(("app/", "components/", "hooks/", "lib/")) or rel in COLOUR_HOMES
+                or path.suffix not in {".ts", ".tsx", ".css"}):
+            continue
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if LITERAL_COLOUR.search(line):
+                hits.append(f"{rel}:{i}: {line.strip()[:100]}")
+    assert not hits, "\n".join(hits[:25])

@@ -127,7 +127,7 @@ export const EpicentreRail: FC<{ stage: number | null; baseline?: number | null 
           <span style={{
             position: 'absolute', top: 11, left: vcPos(stage),
             width: 18, height: 18, borderRadius: 999,
-            backgroundColor: S.primary, border: '3px solid #ffffff',
+            backgroundColor: S.primary, border: `3px solid ${S.surface}`,
             outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
           }} />
         )}
@@ -173,7 +173,7 @@ export const EpicentreSlider: FC<{
       {value != null && (
         <span style={{
           position: 'absolute', top: 12, left: vcPos(value), width: 20, height: 20,
-          borderRadius: 999, backgroundColor: S.primary, border: '3px solid #ffffff',
+          borderRadius: 999, backgroundColor: S.primary, border: `3px solid ${S.surface}`,
           outline: `1px solid ${S.cardBorderStrong}`, transform: 'translateX(-50%)',
           pointerEvents: 'none',
         }} />
@@ -258,7 +258,7 @@ export const UncertaintyPicker: FC<{
               minWidth: 44, padding: '6px 8px', borderRadius: 8,
               border: `1px solid ${baseline === v && !on ? S.primary : 'transparent'}`,
               backgroundColor: on ? S.primary : S.surfaceLow,
-              color: on ? '#fff' : S.onSurface,
+              color: on ? S.onPrimary : S.onSurface,
               fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, cursor: 'pointer',
             }}
           >
@@ -302,7 +302,7 @@ export const DeltaChip: FC<{ value: number; unit?: string; digits?: number }> = 
   return (
     <span style={{
       fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
-      backgroundColor: zero ? S.surfaceLow : 'rgba(176,125,43,0.15)',
+      backgroundColor: zero ? S.surfaceLow : S.deltaSoft,
       color: zero ? S.mutedText : DELTA_COLOR,
     }}>
       {zero ? '=' : `${sign}${Math.abs(value).toFixed(digits)}${unit}`}

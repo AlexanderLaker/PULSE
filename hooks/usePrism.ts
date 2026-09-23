@@ -11,9 +11,11 @@
  * state, so a slow earlier load can never overwrite a later one. Each part
  * (drivers, configuration, run) keeps its last good value when a reload of it
  * fails and reports the failure in its own error field, so a view can tell
- * "nothing there" from "could not be loaded". While the service is
- * unreachable the store checks its health every 30 s (every 60 s while
- * connected) and reloads everything once it answers again.
+ * "nothing there" from "could not be loaded". The store checks the
+ * service's health every 60 s, and every 30 s while the service is
+ * unreachable or its database cannot be used. It loads everything again
+ * when the service answers again, when its database state changes (after a
+ * migration or an outage) and when a newer run appears.
  *
  * A .ts module without JSX: the provider is built with createElement.
  */
@@ -134,23 +136,40 @@ function usePrismStore(): PrismStore {
     return load();
   }, [load]);
 
+  // The poll compares each answer with the last one through a ref, so its
+  // callback can stay stable.
+  const healthRef = useRef<HealthStatus | null>(null);
+  useEffect(() => { healthRef.current = health; }, [health]);
+
   const checkHealth = useCallback(async () => {
     try {
-      await api.getHealth();
+      const h = await api.getHealth();
       if (!mounted.current) return;
       const wasDisconnected = connectionRef.current !== 'connected';
       setConnectionState('connected');
       setError(null);
-      if (wasDisconnected) void reload();   // the data may be stale or missing
+      if (wasDisconnected) {
+        void reload();   // the data may be stale or missing
+        return;
+      }
+      const prev = healthRef.current;
+      setHealth(h);
+      // The database became usable or failed, or a production run wrote a
+      // newer run: load again, without the loading state, so open views keep
+      // their place.
+      if (!prev || prev.status !== h.status || prev.simulation_reason !== h.simulation_reason
+          || prev.latest_run_id !== h.latest_run_id) void load();
     } catch {
       if (mounted.current) setConnectionState('offline');
     }
-  }, [reload]);
+  }, [reload, load]);
 
+  const degraded = health?.status === 'degraded';
   useEffect(() => {
-    const timer = setInterval(() => { void checkHealth(); }, connectionState === 'connected' ? 60_000 : 30_000);
+    const every = connectionState === 'connected' && !degraded ? 60_000 : 30_000;
+    const timer = setInterval(() => { void checkHealth(); }, every);
     return () => clearInterval(timer);
-  }, [connectionState, checkHealth]);
+  }, [connectionState, degraded, checkHealth]);
 
   useEffect(() => {
     mounted.current = true;
@@ -184,7 +203,7 @@ function usePrismStore(): PrismStore {
   }, [loadSimulation]);
 
   const databaseFailure: DatabaseFailure | null = health?.status === 'degraded'
-    && (health.simulation_reason === 'legacy_schema' || health.simulation_reason === 'no_database'
+    && (health.simulation_reason === 'migration_pending' || health.simulation_reason === 'no_database'
       || health.simulation_reason === 'db_error')
     ? health.simulation_reason
     : null;

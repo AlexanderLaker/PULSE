@@ -31,12 +31,9 @@
  * Carlo medians of the persisted run stay the published numbers, and the
  * drill-down scales the drivers of a category to that median.
  */
-import { FORCES, REGIONS, YEARS } from '@/lib/format';
+import { BASE_YEAR, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
-
-/** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
-export const BASE_YEAR = 2025;
 
 /** prism/config.py DEFAULT_PEAK_YEAR_JITTER: the engine-wide width when the configuration names none. */
 const DEFAULT_PEAK_YEAR_JITTER = 1;

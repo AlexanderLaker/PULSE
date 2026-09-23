@@ -71,7 +71,7 @@ export async function forwardAdminWrite(
     const problem = validate?.(body as Record<string, unknown>);
     if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
-    const token = signPrismJwt({ sub: admin.clerkUserId, email: admin.email, role: 'admin' });
+    const token = signPrismJwt({ sub: admin.clerkUserId, email: admin.email, name: admin.name, role: 'admin' });
     if (!token) {
       return NextResponse.json(
         { error: 'PRISM_JWT_SECRET is not set (it needs at least 32 characters), so changes cannot be saved.' },

@@ -11,8 +11,8 @@ import React from 'react';
 import { S, BODY_FONT } from '@/lib/theme';
 
 export type ChipKind =
-  | 'expansion' | 'contraction'   // a driver's direction
-  | 'reported' | 'estimate'       // an evidence grade
+  | 'expansion' | 'contraction'           // a driver's direction
+  | 'reported' | 'derived' | 'estimate'   // an evidence grade
   | 'edited' | 'authored'         // provenance
   | 'neutral';                    // no meaning of its own: the label carries it
 
@@ -22,11 +22,15 @@ const SPECS: Record<ChipKind, ChipSpec> = {
   expansion:   { label: 'Expansion',   bg: S.expansionDim,   ink: S.expansionInk,   glyph: '▲' },
   contraction: { label: 'Contraction', bg: S.contractionDim, ink: S.contractionInk, glyph: '▼' },
   reported:    { label: 'Reported',    bg: S.greenSoft,      ink: S.expansionInk },
+  derived:     { label: 'Derived',     bg: S.blueSoft,       ink: S.primaryDim },
   estimate:    { label: 'Estimate',    bg: S.amberSoft,      ink: S.amber },
   edited:      { label: 'Edited',      bg: S.greenSoft,      ink: S.expansionInk },
   authored:    { label: 'Strategist-authored', bg: S.surfaceContainer, ink: S.onSurfaceVariant },
   neutral:     { label: '',            bg: S.surfaceContainer, ink: S.onSurfaceVariant },
 };
+
+/** The text colour of a kind, for a link or label coloured like its chip. */
+export const chipInk = (kind: ChipKind): string => SPECS[kind].ink;
 
 const Chip: React.FC<{
   kind: ChipKind;

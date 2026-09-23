@@ -36,7 +36,7 @@ export async function GET() {
     }
     // Viewer only, whatever the user's role (see above).
     const token = signPrismJwt(
-      { sub: me.clerkUserId, email: me.email, role: 'viewer' },
+      { sub: me.clerkUserId, email: me.email, name: me.name, role: 'viewer' },
       TTL_SECONDS,
     );
     if (!token) {

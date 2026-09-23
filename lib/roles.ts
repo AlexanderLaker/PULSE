@@ -82,21 +82,22 @@ export async function deleteUserRole(clerkUserId: string): Promise<void> {
   await sql`DELETE FROM user_roles WHERE clerk_user_id = ${clerkUserId}`;
 }
 
-/** The signed-in user with their role (viewer until the webhook has added them). */
-export async function requireAuth(): Promise<{ clerkUserId: string; email: string; role: Role }> {
+/** The signed-in user with their name and role (viewer until the webhook has added them). */
+export async function requireAuth(): Promise<{ clerkUserId: string; email: string; name: string; role: Role }> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError('Not signed in');
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? '';
+  const name = user?.fullName?.trim() ?? '';
   const role = (await getRole(userId)) ?? 'viewer';
-  return { clerkUserId: userId, email, role };
+  return { clerkUserId: userId, email, name, role };
 }
 
 /** The signed-in user if they are an admin; ForbiddenError otherwise. */
-export async function requireAdmin(): Promise<{ clerkUserId: string; email: string }> {
-  const { clerkUserId, email, role } = await requireAuth();
+export async function requireAdmin(): Promise<{ clerkUserId: string; email: string; name: string }> {
+  const { clerkUserId, email, name, role } = await requireAuth();
   if (role !== 'admin') throw new ForbiddenError('Admin role required');
-  return { clerkUserId, email };
+  return { clerkUserId, email, name };
 }
 
 export class UnauthorizedError extends Error {

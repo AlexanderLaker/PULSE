@@ -7,7 +7,8 @@
  *      panes stay mounted, and a listener left on would catch digits typed
  *      in other tabs);
  *   4. the Shift Analysis door draws the served run's category medians and
- *      portfolio band, and the neutral tint when there is no run.
+ *      portfolio band, the band tinted by its median's direction, and the
+ *      neutral tint when there is no run.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
@@ -35,8 +36,8 @@ function runWithAnExpansion() {
 const cellFills = (root: HTMLElement): string[] =>
   Array.from(root.querySelectorAll('rect[width="52"]')).map((r) => r.getAttribute('fill') ?? '');
 
-/** The portfolio band's P10–P90 fill. */
-const bandFill = (root: HTMLElement) => root.querySelector('rect[fill="rgba(159,64,61,.16)"]');
+/** The portfolio band's P10–P90 fill, the only 9-high rect on the gate. */
+const bandFill = (root: HTMLElement) => root.querySelector('rect[height="9"]')?.getAttribute('fill') ?? null;
 
 afterEach(() => cleanup());
 
@@ -92,8 +93,16 @@ describe('HomeGate', () => {
     expect(fills.some((f) => f.includes('159, 64, 61'))).toBe(true);   // contraction tint
     expect(fills.some((f) => f.includes('31, 122, 61'))).toBe(true);   // expansion tint (Insect Control)
     expect(container.querySelectorAll('rect[width="52"][stroke]')).toHaveLength(1);   // the largest shift is outlined
-    expect(bandFill(container)).not.toBeNull();
+    expect(bandFill(container)).toBe('rgba(159, 64, 61, 0.16)');   // the fixture's portfolio contracts
     unmount();
+
+    const run = makeSimulation();
+    const band = run.totals.portfolio['2035'];
+    const growing = { ...band, p10: 0.004, median: 0.01, p90: 0.016 };
+    STATE.store = makeStore({ simulation: { ...run, totals: { ...run.totals, portfolio: { ...run.totals.portfolio, '2035': growing } } } });
+    const { container: up, unmount: unmountUp } = render(<HomeGate active onNavigate={() => {}} />);
+    expect(bandFill(up)).toBe('rgba(31, 122, 61, 0.16)');
+    unmountUp();
 
     STATE.store = makeStore({ simulation: null });
     const { container: empty } = render(<HomeGate active onNavigate={() => {}} />);

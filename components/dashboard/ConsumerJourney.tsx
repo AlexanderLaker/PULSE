@@ -18,54 +18,24 @@
 
 'use client';
 
-import {
-  useCallback, useEffect, useMemo, useRef, useState,
-  type CSSProperties, type FC, type ReactNode,
-} from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  TrendingUp, TrendingDown, ExternalLink, ArrowRight, X, Edit3, Check,
-  Info, PenLine, CircleCheck, Plus, Trash2, Save, ChevronLeft, ChevronRight,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, Edit3, Info, CircleCheck, Plus, Save } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import useOverlay from '@/hooks/useOverlay';
+import useOverlay, { PaneActiveContext } from '@/hooks/useOverlay';
 import { ApiError, getJourneyContent, saveJourneyContent } from '@/lib/apiClient';
 import {
-  LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX,
-  type JourneyContent, type JourneyKey, type JourneyStageDef, type JourneyTile, type TileType,
-  type PoolImpactGrade, type ProvenanceGrade,
+  LHC_JOURNEY, HAIR_JOURNEY, type JourneyContent, type JourneyKey, type JourneyTile, type TileType,
 } from '@/data/consumerJourney';
-import { DRIVER_CODE_MAP, type DriverCodeInfo } from '@/data/driverCodeMap';
-import type { Driver, ForceName } from '@/types';
-import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
-import { FORCE_COLORS, EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
-import Chip, { type ChipKind } from '@/components/dashboard/Chip';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { EXPANSION_RGB, CONTRACTION_RGB } from '@/lib/format';
+import {
+  type ContentOrigin, CURRENT_YYYYMM, displayTileName, type SaveState, type SelectedTile,
+  type Side, sortTilesForDisplay, stageSpan, type TileEdits, TYPE_STYLES,
+} from './journey/shared';
+import { JourneySwitch, StageRollup, TilePill, TypeChip } from './journey/tiles';
+import { PanelBody } from './journey/PanelBody';
 
-/** Force chips use the one force palette of lib/format, so a force has the same colour on every tab. */
-const forceColor = (force: string): string => FORCE_COLORS[force as ForceName] ?? S.primary;
-
-const TYPE_STYLES: Record<TileType, { label: string; bg: string; fg: string }> = {
-  product: { label: 'Product', bg: S.primaryContainer, fg: S.onPrimaryContainer },
-  tech: { label: 'Tech', bg: S.surfaceHigh, fg: S.primaryDim },
-  service: { label: 'Service', bg: S.surfaceContainer, fg: S.onSurfaceVariant },
-};
-
-/** Evidence grade as a shared Chip. 'hypothesis' has no Chip kind of its own and renders neutral; its label carries the meaning. */
-const GRADE_CHIP: Record<ProvenanceGrade, { kind: ChipKind; label: string }> = {
-  verified: { kind: 'reported', label: 'Verified' },
-  estimate: { kind: 'estimate', label: 'Estimate' },
-  hypothesis: { kind: 'neutral', label: 'Hypothesis' },
-};
-
-/** The month an edit stamps on a tile, YYYY-MM. */
-const CURRENT_YYYYMM = (() => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-})();
-
-// ════════════════════════════════════════════════════════════════════════
-// Types
-// ════════════════════════════════════════════════════════════════════════
 interface ConsumerJourneyProps {
   /** Opens the Drivers page searched for this driver name. */
   onNavigateToDriver?: (query: string) => void;
@@ -73,600 +43,6 @@ interface ConsumerJourneyProps {
   isAdmin?: boolean;
 }
 
-/** The side of a stage a tile sits on: tailwind (benefiting) or headwind (negativelyImpacted). */
-type Side = 'benefiting' | 'negativelyImpacted';
-
-interface SelectedTile {
-  tile: JourneyTile;
-  stageId: string;
-  stageLabel: string;
-  side: Side;
-}
-
-/** The fields the admin editor changes. */
-interface TileEdits {
-  name: string;
-  intensity: 1 | 2 | 3;
-  driverNote: string;
-  driverCodes: string[];
-  analysis: string;
-}
-
-type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden' | 'conflict';
-
-/** Where the content on screen came from: the stored version, the bundled copy
- *  (nothing stored yet), or the bundled copy because the stored one could not
- *  be loaded. Saving is possible only once the answer is known. */
-type ContentOrigin = 'loading' | 'stored' | 'bundled' | 'unavailable';
-
-/** A cited driver: its code-map entry and, once the drivers have loaded, the live row. */
-interface CitedDriver {
-  code: string;
-  info: DriverCodeInfo;
-  live: Driver | undefined;
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// Pure helpers
-// ════════════════════════════════════════════════════════════════════════
-
-/** Renders a Strategist Read: **bold** spans and blank-line paragraph breaks. */
-const MarkdownBlock: FC<{ text: string }> = ({ text }) => {
-  // The content stores its breaks escaped ("\\n\\n"); real breaks work too.
-  const paragraphs = text.replace(/\\n/g, '\n').split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-  return (
-    <>
-      {paragraphs.map((para, i) => (
-        <p
-          key={i}
-          style={{
-            fontSize: 12.5, color: S.onSurface, lineHeight: 1.65,
-            margin: i === 0 ? '0 0 10px' : '10px 0 0', fontFamily: BODY_FONT,
-          }}
-        >
-          {para.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-            part.startsWith('**') && part.endsWith('**')
-              ? <strong key={j} style={{ fontWeight: 800, color: S.onBg, fontFamily: HEADLINE_FONT }}>{part.slice(2, -2)}</strong>
-              : <span key={j}>{part.replace(/\n/g, ' ')}</span>,
-          )}
-        </p>
-      ))}
-    </>
-  );
-};
-
-/** A tile's name without a trailing parenthetical; the full name stays in the content and in the tooltip. */
-const displayTileName = (name: string): string => name.replace(/\s*\([^()]*\)\s*$/, '').trim();
-
-/** Pool-impact grade to tile tint: High is notably dark, Low much lighter; `up` picks green (tailwind) or red (headwind). */
-const gradeTint = (up: boolean, grade?: PoolImpactGrade): string => {
-  const a = grade === 'High' ? 0.36 : grade === 'Med' ? 0.17 : 0.06;
-  return `rgba(${up ? EXPANSION_RGB : CONTRACTION_RGB},${a})`;
-};
-
-/** Pool-impact grade to the opacity of the tile's accent bar (High solid, Low faint). */
-const gradeBarOpacity = (grade?: PoolImpactGrade): number =>
-  grade === 'High' ? 1 : grade === 'Med' ? 0.6 : 0.3;
-
-/**
- * Display order on a stage side: pool-impact grade first (the tint, darkest on
- * top), then intensity; ties keep the content order. Sorts a copy, so the
- * saved content keeps its own order.
- */
-const GRADE_RANK: Record<PoolImpactGrade, number> = { High: 3, Med: 2, Low: 1 };
-const impactRank = (t: JourneyTile): number => (t.poolImpact ? GRADE_RANK[t.poolImpact.grade] : 0);
-const sortTilesForDisplay = (tiles: JourneyTile[]): JourneyTile[] =>
-  [...tiles].sort((a, b) => (impactRank(b) - impactRank(a)) || (b.intensity - a.intensity));
-
-/**
- * A Laundry stage with more than ten tiles on a side spans two grid columns,
- * so its tiles wrap less and the rail stays short; Hair stages stay one column
- * wide. The count ignores the type filter, so a stage keeps its width when the
- * filter changes.
- */
-const WIDE_STAGE_TILE_THRESHOLD = 10;
-const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
-  (journeyKey === 'lhc' && Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
-
-/** The drivers a tile cites, each once; a code outside the code map is not a driver. */
-const citedDrivers = (tile: JourneyTile, driversById: Map<string, Driver>): CitedDriver[] =>
-  Array.from(new Set(tile.driverCodes))
-    .filter(code => Object.hasOwn(DRIVER_CODE_MAP, code))
-    .map(code => {
-      const info = DRIVER_CODE_MAP[code];
-      return { code, info, live: driversById.get(info.driverId) };
-    });
-
-// ════════════════════════════════════════════════════════════════════════
-// Small presentational atoms
-// ════════════════════════════════════════════════════════════════════════
-
-const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className="px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200"
-    style={{
-      backgroundColor: active ? S.primary : S.surfaceLow,
-      color: active ? '#fff' : S.onSurfaceVariant,
-      border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
-    }}
-  >
-    {label}
-  </button>
-);
-
-const TypeChip: FC<{ typeKey: TileType; active: boolean; onClick: () => void }> = ({ typeKey, active, onClick }) => {
-  const st = TYPE_STYLES[typeKey];
-  return (
-    <button
-      onClick={onClick}
-      className="px-2.5 py-1 rounded-full text-[11px] font-bold transition-all duration-150"
-      style={{
-        backgroundColor: active ? st.bg : S.surfaceLow,
-        color: active ? st.fg : S.mutedText,
-        opacity: active ? 1 : 0.65,
-        border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
-      }}
-      aria-pressed={active}
-    >
-      {st.label}
-    </button>
-  );
-};
-
-/**
- * Stage header rollup, so the board shows which stage matters most at a
- * glance: a split bar weighted by the tiles' authored intensity (1–3) and the
- * tile count per side. Both follow the type filter, so they match the tiles
- * below. Qualitative arithmetic, not engine output; the tooltip says so.
- */
-const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: JourneyTile[] }> = ({ benefiting, negativelyImpacted }) => {
-  const tw = benefiting.reduce((n, t) => n + t.intensity, 0);
-  const hw = negativelyImpacted.reduce((n, t) => n + t.intensity, 0);
-  const total = tw + hw;
-  return (
-    <div title="Tile count weighted by authored grades: qualitative overlay, not simulated">
-      <div style={{ display: 'flex', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: S.surfaceHigh }} aria-hidden="true">
-        {tw > 0 && <span style={{ display: 'block', width: `${(tw / total) * 100}%`, backgroundColor: S.expansion, opacity: 0.55 }} />}
-        {hw > 0 && <span style={{ display: 'block', width: `${(hw / total) * 100}%`, backgroundColor: S.contraction, opacity: 0.55 }} />}
-      </div>
-      <div className="tabular-nums" style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: S.mutedText, fontFamily: HEADLINE_FONT, lineHeight: 1 }}>
-        {benefiting.length}<span style={{ color: S.expansionInk }}>↗</span>
-        {' · '}
-        {negativelyImpacted.length}<span style={{ color: S.contractionInk }}>↘</span>
-      </div>
-    </div>
-  );
-};
-
-/** Section header card used in the detail panel. */
-const SectionCard: FC<{ title: ReactNode; accent: string; children: ReactNode; subtitle?: ReactNode }> = ({ title, accent, children, subtitle }) => (
-  <div className="rounded-2xl p-4" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
-    <h3
-      className="text-[11px] font-extrabold uppercase tracking-[0.14em] pl-2.5"
-      style={{ color: S.onSurfaceVariant, borderLeft: `3px solid ${accent}`, fontFamily: HEADLINE_FONT, margin: 0 }}
-    >
-      {title}
-    </h3>
-    {subtitle && (
-      <div className="pl-2.5 mt-1 mb-3 text-[11px] italic" style={{ color: S.mutedText, fontFamily: BODY_FONT }}>
-        {subtitle}
-      </div>
-    )}
-    <div style={{ marginTop: subtitle ? 0 : 12 }}>{children}</div>
-  </div>
-);
-
-// ════════════════════════════════════════════════════════════════════════
-// Tile pill (in the stage rail)
-// ════════════════════════════════════════════════════════════════════════
-
-/** A tile in the rail: the pool-impact grade sets its tint depth and the opacity of its accent bar. */
-const TilePill: FC<{
-  tile: JourneyTile;
-  side: Side;
-  selected: boolean;
-  onClick: () => void;
-}> = ({ tile, side, selected, onClick }) => {
-  const isExp = side === 'benefiting';
-  const accent = isExp ? S.expansion : S.error;
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left rounded-lg transition-all duration-150"
-      style={{
-        position: 'relative', display: 'block', padding: '2px 8px 2px 11px', marginBottom: 2,
-        backgroundColor: selected ? S.surface : gradeTint(isExp, tile.poolImpact?.grade),
-        border: `1px solid ${selected ? accent : S.cardBorder}`,
-        boxShadow: selected ? `0 2px 12px -4px ${accent}66` : 'none',
-        cursor: 'pointer', fontFamily: BODY_FONT,
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute', left: 0, top: 2, bottom: 2, width: 3, borderRadius: 3,
-          backgroundColor: accent, opacity: gradeBarOpacity(tile.poolImpact?.grade),
-        }}
-      />
-      <span
-        // The name is never clamped; the tight line height keeps wrapped lines close together.
-        style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: S.onSurface, lineHeight: 1.1, fontFamily: HEADLINE_FONT }}
-        title={tile.name}
-      >
-        {displayTileName(tile.name)}
-      </span>
-    </button>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Driver card (in the detail panel)
-// ════════════════════════════════════════════════════════════════════════
-
-/**
- * A driver behind the moment: the live driver once the drivers have loaded
- * (the code map's name and first sentence until then), read as a tailwind or
- * headwind by its own direction, with a link to the Drivers page.
- */
-const DriverForceCard: FC<{
-  driver: CitedDriver;
-  driversLoaded: boolean;
-  onNavigateToDriver?: (query: string) => void;
-}> = ({ driver: { code, info, live }, driversLoaded, onNavigateToDriver }) => {
-  const c = forceColor(info.force);
-  const name = live?.name ?? info.name;
-  const isExp = (live?.direction ?? info.direction) === 'Expansion';
-  const description = live?.description ?? (driversLoaded ? '' : info.fallbackDescription);
-  const sourceCount = live?.sources.length ?? 0;
-
-  return (
-    <div className="rounded-xl p-3" style={{ backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span
-          className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 10, padding: '1px 7px', backgroundColor: c, color: '#fff', fontFamily: HEADLINE_FONT }}
-        >
-          {code}
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: S.onSurface, fontFamily: HEADLINE_FONT, lineHeight: 1.3, flex: 1, minWidth: 0 }}>{name}</span>
-        <span
-          className="inline-flex items-center rounded-full font-bold"
-          style={{ fontSize: 9.5, padding: '1px 7px', backgroundColor: `${c}14`, color: c, fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap' }}
-        >
-          {info.force}
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
-        <span
-          className="inline-flex items-center gap-1 rounded-full font-bold"
-          style={{
-            fontSize: 10.5, padding: '2px 9px',
-            backgroundColor: isExp ? S.expansionContainer : S.errorContainer,
-            color: isExp ? S.onExpansionContainer : S.onErrorContainer,
-            fontFamily: HEADLINE_FONT, whiteSpace: 'nowrap',
-          }}
-          title={isExp ? 'Expansion driver: a tailwind for this moment' : 'Contraction driver: a headwind for this moment'}
-        >
-          {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
-          {isExp ? 'Tailwind' : 'Headwind'}
-        </span>
-      </div>
-      {description && (
-        <p style={{ fontSize: 11.5, color: S.onSurfaceVariant, lineHeight: 1.5, margin: '9px 0 0' }}>
-          {description}
-          {!live && !driversLoaded && (
-            <span style={{ color: S.mutedText, fontStyle: 'italic' }}> (offline fallback)</span>
-          )}
-        </p>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
-        <button
-          onClick={() => onNavigateToDriver?.(name)}
-          className="inline-flex items-center gap-1.5"
-          style={{
-            fontSize: 11, fontWeight: 700, color: S.primary, background: 'none',
-            border: 'none', cursor: 'pointer', padding: 0, fontFamily: HEADLINE_FONT,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-          onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
-        >
-          <ExternalLink size={11} strokeWidth={2.5} />
-          View in Drivers
-        </button>
-        {sourceCount > 0 && (
-          <span style={{ fontSize: 10, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700 }} className="tabular-nums">
-            {sourceCount} source{sourceCount === 1 ? '' : 's'}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Stage context (always visible), looked up by stage label
-// ════════════════════════════════════════════════════════════════════════
-const StageContextBlock: FC<{ stageLabel: string; journeyKey: JourneyKey }> = ({ stageLabel, journeyKey }) => {
-  const ctx = (journeyKey === 'lhc' ? LHC_CTX : HAIR_CTX)[stageLabel];
-  if (!ctx) return null;
-  const rows: Array<{ label: string; value: string }> = [
-    { label: 'Henkel brands', value: ctx.henkelBrands },
-    { label: 'Competitors', value: ctx.competitors },
-    { label: 'Opportunity', value: ctx.opportunity },
-  ];
-  return (
-    <SectionCard
-      title={`Stage context: ${stageLabel}`}
-      accent={S.primary}
-      subtitle="Authored stage context, same provenance rules as the tile reads"
-    >
-      <div className="flex flex-col gap-2.5">
-        {rows.map(r => (
-          <div key={r.label}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT, marginBottom: 2 }}>
-              {r.label}
-            </div>
-            <p style={{ fontSize: 12, color: S.onSurface, lineHeight: 1.55, margin: 0 }}>{r.value}</p>
-          </div>
-        ))}
-      </div>
-    </SectionCard>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Why-chain: the drivers behind a moment, then the net effect. It shows the
-// reasoning behind the authored classification without claiming that the
-// classification is simulated: the drivers are real, the read is judgment.
-// ════════════════════════════════════════════════════════════════════════
-const StepDot: FC<{ n: number }> = ({ n }) => (
-  <span style={{
-    position: 'absolute', left: 0, top: 0, width: 24, height: 24, borderRadius: 999,
-    backgroundColor: S.primary, color: '#fff', fontFamily: HEADLINE_FONT, fontWeight: 800,
-    fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
-  }}>{n}</span>
-);
-
-const WhyChain: FC<{
-  tile: JourneyTile;
-  side: Side;
-  driversById: Map<string, Driver>;
-  driversLoaded: boolean;
-  onNavigateToDriver?: (query: string) => void;
-}> = ({ tile, side, driversById, driversLoaded, onNavigateToDriver }) => {
-  const isExp = side === 'benefiting';
-  const accent = isExp ? S.expansion : S.error;
-
-  // The net effect counts each cited driver by its own direction, independent of the tile's side.
-  const drivers = citedDrivers(tile, driversById);
-  const up = drivers.filter(d => (d.live?.direction ?? d.info.direction) === 'Expansion').length;
-  const down = drivers.length - up;
-  const forceCounts: Record<string, number> = {};
-  drivers.forEach(d => {
-    const force = d.live?.force ?? d.info.force;
-    forceCounts[force] = (forceCounts[force] ?? 0) + 1;
-  });
-  const dominant = Object.entries(forceCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-
-  const stepWrap: CSSProperties = { position: 'relative', paddingLeft: 38, paddingBottom: 18 };
-  const connector: CSSProperties = {
-    position: 'absolute', left: 11.5, top: 24, bottom: 0, width: 1.5,
-    background: `linear-gradient(${S.outline}, rgba(71,125,187,0.2))`,
-  };
-  const stepLabel: CSSProperties = {
-    fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-    color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT,
-  };
-
-  return (
-    <div className="rounded-2xl p-4" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
-      <h3 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.01em', margin: 0, color: S.onBg }}>
-        {isExp ? 'Why this moment is expanding' : 'Why this moment is under pressure'}
-      </h3>
-
-      <div style={{ marginTop: 14 }}>
-        {/* 1: the drivers behind this moment, each linked to the Drivers page */}
-        <div style={stepWrap}>
-          <StepDot n={1} /><span style={connector} />
-          <div style={stepLabel}>Drivers behind this moment</div>
-          <div style={{ marginTop: 8 }}>
-            {drivers.length === 0 ? (
-              <p style={{ fontSize: 12, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>
-                {tile.driverNote.startsWith('No modelled driver')
-                  ? `${tile.driverNote}. The Strategist Read below stands as authored judgment; nothing here feeds the Shift Matrix.`
-                  : 'No drivers linked to this tile.'}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {drivers.map(d => (
-                  <DriverForceCard
-                    key={d.code} driver={d} driversLoaded={driversLoaded} onNavigateToDriver={onNavigateToDriver}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 2: net effect */}
-        <div style={{ ...stepWrap, paddingBottom: 0 }}>
-          <StepDot n={2} />
-          <div style={stepLabel}>Net effect</div>
-          <div className="rounded-xl" style={{ marginTop: 8, backgroundColor: S.surfaceContainer, padding: '12px 14px' }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.expansion }}>
-                <TrendingUp size={14} strokeWidth={2.5} /> {up} tailwind
-              </span>
-              <span className="inline-flex items-center gap-1" style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: S.error }}>
-                <TrendingDown size={14} strokeWidth={2.5} /> {down} headwind
-              </span>
-            </div>
-            <p style={{ fontSize: 12.5, color: S.onSurface, lineHeight: 1.5, margin: '9px 0 0' }}>
-              {dominant ? <>Dominant force <strong style={{ fontFamily: HEADLINE_FONT }}>{dominant}</strong>. </> : null}
-              The strategist classifies this moment as <strong style={{ fontFamily: HEADLINE_FONT, color: accent }}>{isExp ? 'a tailwind (benefiting)' : 'a headwind (declining)'}</strong>.
-            </p>
-            {tile.poolImpact && (
-              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
-                  Profit-pool impact
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full" style={{ fontSize: 11, fontWeight: 800, padding: '1px 10px', color: '#fff', backgroundColor: accent, fontFamily: HEADLINE_FONT }}>
-                  {isExp ? '▲' : '▼'} {tile.poolImpact.grade}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Admin tile editor, inline in the detail panel
-// ════════════════════════════════════════════════════════════════════════
-const INTENSITY_LABELS: Record<1 | 2 | 3, string> = { 1: 'Mild', 2: 'Moderate', 3: 'Strong' };
-
-const TileEditor: FC<{
-  initial: JourneyTile;
-  onSave: (edits: TileEdits) => void;
-  onCancel: () => void;
-  onRemove: () => void;
-}> = ({ initial, onSave, onCancel, onRemove }) => {
-  const [edits, setEdits] = useState<TileEdits>({
-    name: initial.name,
-    intensity: initial.intensity,
-    driverNote: initial.driverNote,
-    driverCodes: initial.driverCodes.length ? [...initial.driverCodes] : [''],
-    analysis: initial.analysis ?? '',
-  });
-
-  const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);
-  const labelStyle: CSSProperties = {
-    fontSize: 10, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
-    marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT,
-  };
-  const inputStyle: CSSProperties = {
-    width: '100%', padding: '8px 10px', borderRadius: 8, backgroundColor: '#fff',
-    border: `1px solid ${S.cardBorder}`, color: S.onSurface, fontSize: 12, fontFamily: BODY_FONT,
-  };
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <label style={labelStyle}>Tile name</label>
-        <input style={inputStyle} value={edits.name} onChange={e => setEdits(p => ({ ...p, name: e.target.value }))} />
-      </div>
-
-      <div>
-        <label style={labelStyle}>Intensity</label>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {([1, 2, 3] as const).map(n => (
-            <button
-              key={n}
-              onClick={() => setEdits(p => ({ ...p, intensity: n }))}
-              className="flex-1 py-1.5 rounded-lg text-[11px] font-bold"
-              style={{
-                backgroundColor: edits.intensity === n ? S.primaryContainer : S.surfaceLow,
-                color: edits.intensity === n ? S.onPrimaryContainer : S.mutedText,
-                border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
-              }}
-            >
-              {n} · {INTENSITY_LABELS[n]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label style={labelStyle}>Driver note</label>
-        <input style={inputStyle} value={edits.driverNote} onChange={e => setEdits(p => ({ ...p, driverNote: e.target.value }))} />
-      </div>
-
-      <div>
-        <label style={labelStyle}>Linked driver codes</label>
-        {edits.driverCodes.map((code, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <select
-              value={code}
-              onChange={e => setEdits(p => {
-                const next = [...p.driverCodes]; next[idx] = e.target.value; return { ...p, driverCodes: next };
-              })}
-              style={{ ...inputStyle, backgroundColor: S.surfaceLow }}
-            >
-              <option value="">Select driver…</option>
-              {allCodes.map(c => (
-                <option key={c} value={c}>{c}: {DRIVER_CODE_MAP[c].name}</option>
-              ))}
-            </select>
-            {edits.driverCodes.length > 1 && (
-              <button
-                onClick={() => setEdits(p => ({ ...p, driverCodes: p.driverCodes.filter((_, i) => i !== idx) }))}
-                style={{ padding: '0 10px', borderRadius: 8, backgroundColor: S.errorContainer, border: 'none', color: S.onErrorContainer, cursor: 'pointer', flexShrink: 0 }}
-                title="Remove driver"
-                aria-label="Remove driver"
-              >
-                <Trash2 size={13} strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
-        ))}
-        <button
-          onClick={() => setEdits(p => ({ ...p, driverCodes: [...p.driverCodes, ''] }))}
-          className="inline-flex items-center gap-1.5 rounded-full font-bold"
-          style={{ marginTop: 2, padding: '5px 12px', backgroundColor: S.primaryContainer, color: S.onPrimaryContainer, border: 'none', cursor: 'pointer', fontSize: 11, fontFamily: HEADLINE_FONT }}
-        >
-          <Plus size={12} strokeWidth={2.5} /> Add driver
-        </button>
-      </div>
-
-      <div>
-        <label style={labelStyle}>Strategist Read (authored analysis)</label>
-        <textarea
-          value={edits.analysis}
-          onChange={e => setEdits(p => ({ ...p, analysis: e.target.value }))}
-          rows={7}
-          placeholder="**1. Summary.** …  **2. Strategic Evaluation.** …"
-          style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
-        />
-        <p style={{ fontSize: 10, color: S.mutedText, margin: '4px 0 0', fontStyle: 'italic' }}>
-          Supports **bold** and blank-line paragraph breaks. Saving stamps this tile {CURRENT_YYYYMM}.
-        </p>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={() => onSave({ ...edits, driverCodes: edits.driverCodes.filter(Boolean) })}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-full text-sm font-bold"
-          style={{ backgroundColor: S.primary, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-        >
-          <Check size={13} strokeWidth={2.5} /> Apply
-        </button>
-        <button
-          onClick={onCancel}
-          className="flex-1 py-2 rounded-full text-sm font-bold"
-          style={{ backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onRemove}
-          className="px-3 py-2 rounded-full"
-          style={{ backgroundColor: S.errorContainer, color: S.onErrorContainer, border: 'none', cursor: 'pointer' }}
-          title="Remove this tile"
-          aria-label="Remove this tile"
-        >
-          <Trash2 size={14} strokeWidth={2.5} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ════════════════════════════════════════════════════════════════════════
 const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   onNavigateToDriver,
   isAdmin = false,
@@ -758,11 +134,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     setEditing(false);
   }, [selectedIndex, flatTiles]);
 
-  // ← and → step to the neighbouring tiles while the dialog is open, but not
-  // while a tile is being edited or the caret is in a field, where the arrows
-  // move the caret.
+  // ← and → step to the neighbouring tiles while the dialog is open and its
+  // pane is on screen, but not while a tile is being edited or the caret is in
+  // a field, where the arrows move the caret.
+  const paneActive = useContext(PaneActiveContext);
   useEffect(() => {
-    if (!selected || editing) return;
+    if (!selected || editing || !paneActive) return;
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
@@ -771,7 +148,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, editing, stepSelection]);
+  }, [selected, editing, paneActive, stepSelection]);
 
   // ── Admin edits: local until "Save to server" ──
   const mutateTiles = useCallback((stageId: string, side: Side, update: (tiles: JourneyTile[]) => JourneyTile[]) => {
@@ -812,7 +189,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       driverCodes: [],
       driverNote: '',
       intensity: 2,
-      provenance: { author: 'strategist', date: CURRENT_YYYYMM, grade: 'estimate' },
+      provenance: { date: CURRENT_YYYYMM, grade: 'estimate' },
       analysis: '',
     };
     mutateTiles(stageId, side, tiles => [...tiles, tile]);
@@ -885,10 +262,10 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         {/* ─── Tabs and filters ─── */}
         <section className="mb-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <FilterChip label="Laundry" active={tab === 'lhc'} onClick={() => { setTab('lhc'); closePanel(); }} />
-            <FilterChip label="Hair" active={tab === 'hair'} onClick={() => { setTab('hair'); closePanel(); }} />
+            <JourneySwitch label="Laundry" active={tab === 'lhc'} onClick={() => { setTab('lhc'); closePanel(); }} />
+            <JourneySwitch label="Hair" active={tab === 'hair'} onClick={() => { setTab('hair'); closePanel(); }} />
             {isAdmin && (
-              <button
+              <button type="button"
                 onClick={() => { if (editMode) setEditing(false); setEditMode(v => !v); }}
                 // Editing starts once the saved journey is known: an edit made on
                 // the bundled copy while it loads would be replaced when it arrives.
@@ -948,7 +325,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
           className="rounded-2xl overflow-hidden"
-          style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}
+          style={{ backgroundColor: S.surface, boxShadow: SHADOW.card }}
         >
           <div>
             <div
@@ -1012,7 +389,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         <TrendingUp size={10} strokeWidth={2.5} /> Tailwind
                       </span>
                       {isAdmin && editMode && (
-                        <button
+                        <button type="button"
                           onClick={() => addTile(stage.id, 'benefiting')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.expansion, padding: 0, display: 'inline-flex' }}
                           title="Add benefiting tile"
@@ -1053,7 +430,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         <TrendingDown size={10} strokeWidth={2.5} /> Headwind
                       </span>
                       {isAdmin && editMode && (
-                        <button
+                        <button type="button"
                           onClick={() => addTile(stage.id, 'negativelyImpacted')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.error, padding: 0, display: 'inline-flex' }}
                           title="Add declining tile"
@@ -1090,7 +467,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
 
         {/* ─── Admin save bar, shown in edit mode ─── */}
         {isAdmin && editMode && (
-          <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: '0 4px 60px -15px rgba(0,52,94,0.08)' }}>
+          <div className="mt-5 flex items-center justify-between gap-4 flex-wrap rounded-2xl px-5 py-3.5" style={{ backgroundColor: S.surface, boxShadow: SHADOW.card }}>
             <div className="flex items-center gap-2">
               <Edit3 size={14} strokeWidth={2.5} style={{ color: S.onSurfaceVariant }} />
               <span className="text-[12px]" style={{ color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
@@ -1111,7 +488,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 </span>
               )}
               {(saveState === 'conflict' || origin === 'unavailable') && (
-                <button onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
+                <button type="button" onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
                   style={{ backgroundColor: S.surfaceLow, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
                   {origin === 'unavailable' ? 'Try again' : 'Load the saved version'}
                 </button>
@@ -1121,13 +498,13 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   <CircleCheck size={13} strokeWidth={2.5} /> Saved
                 </span>
               )}
-              <button
+              <button type="button"
                 onClick={saveToServer}
                 disabled={saveState === 'saving' || !canSave}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold"
                 style={{
                   backgroundColor: saveState === 'saving' || !canSave ? S.surfaceHigh : S.primary,
-                  color: saveState === 'saving' || !canSave ? S.onSurfaceVariant : '#fff',
+                  color: saveState === 'saving' || !canSave ? S.onSurfaceVariant : S.onPrimary,
                   border: 'none', cursor: saveState === 'saving' || !canSave ? 'default' : 'pointer', fontFamily: HEADLINE_FONT,
                 }}
               >
@@ -1149,7 +526,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               key="cj-scrim"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,52,94,0.55)', backdropFilter: 'blur(2px)', zIndex: 40 }}
+              style={{ position: 'fixed', inset: 0, backgroundColor: S.scrim, backdropFilter: 'blur(2px)', zIndex: 40 }}
             />
             <motion.div
               key="cj-dialog"
@@ -1172,7 +549,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                   width: 'min(1120px, 100%)', margin: 'auto', maxHeight: '92vh',
                   display: 'flex', flexDirection: 'column',
                   backgroundColor: S.bg, borderRadius: 20,
-                  boxShadow: '0 2px 4px rgba(0,52,94,0.05), 0 12px 32px -8px rgba(0,52,94,0.16), 0 28px 60px -14px rgba(0,52,94,0.20)',
+                  boxShadow: SHADOW.dialog,
                   overflow: 'hidden',
                 }}
               >
@@ -1198,143 +575,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
           </>
         )}
       </AnimatePresence>
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════════════
-// Detail panel body
-// ════════════════════════════════════════════════════════════════════════
-const PanelBody: FC<{
-  selected: SelectedTile;
-  journeyKey: JourneyKey;
-  driversById: Map<string, Driver>;
-  driversLoaded: boolean;
-  canEdit: boolean;
-  editing: boolean;
-  position: { index: number; total: number } | null;
-  onPrev: () => void;
-  onNext: () => void;
-  onClose: () => void;
-  onEdit: () => void;
-  onCancelEdit: () => void;
-  onApplyEdits: (edits: TileEdits) => void;
-  onRemove: () => void;
-  onNavigateToDriver?: (query: string) => void;
-}> = ({
-  selected, journeyKey, driversById, driversLoaded,
-  canEdit, editing, position, onPrev, onNext, onClose, onEdit, onCancelEdit, onApplyEdits, onRemove, onNavigateToDriver,
-}) => {
-  const { tile, stageLabel, side } = selected;
-  const isExp = side === 'benefiting';
-  const ts = TYPE_STYLES[tile.type];
-  const canPrev = !!position && position.index > 0;
-  const canNext = !!position && position.index < position.total - 1;
-
-  const iconBtn: CSSProperties = {
-    width: 34, height: 34, borderRadius: 999, border: 'none', backgroundColor: S.surfaceLow,
-    color: S.onSurfaceVariant, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-  };
-  const iconBtnOff: CSSProperties = { ...iconBtn, opacity: 0.4, cursor: 'default' };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, width: '100%', fontFamily: BODY_FONT }}>
-      {/* ── Sticky top bar: breadcrumb, neighbour navigation, close ── */}
-      <div style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 18px', backgroundColor: 'rgba(248,249,255,0.92)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${S.cardBorder}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: HEADLINE_FONT, fontWeight: 700, fontSize: 12, color: S.onSurfaceVariant, minWidth: 0 }}>
-          <span style={{ whiteSpace: 'nowrap' }}>{journeyKey === 'lhc' ? 'Laundry' : 'Hair'}</span>
-          <ChevronRight size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-          <span style={{ color: S.onBg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stageLabel}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <span style={{ fontSize: 10.5, color: S.mutedText, fontFamily: HEADLINE_FONT, fontWeight: 700, marginRight: 2 }}>Esc to close</span>
-          <button onClick={onPrev} disabled={!canPrev} style={canPrev ? iconBtn : iconBtnOff} aria-label="Previous tile" title="Previous tile"><ChevronLeft size={16} strokeWidth={2.5} /></button>
-          <button onClick={onNext} disabled={!canNext} style={canNext ? iconBtn : iconBtnOff} aria-label="Next tile" title="Next tile"><ChevronRight size={16} strokeWidth={2.5} /></button>
-          <button onClick={onClose} style={iconBtn} aria-label="Close" title="Close"><X size={16} strokeWidth={2.5} /></button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        {/* Hero */}
-        <div style={{ padding: '22px 26px 18px', borderBottom: `1px solid ${S.cardBorder}` }}>
-          <span
-            className="inline-flex items-center gap-1 rounded-full font-bold"
-            style={{ fontSize: 11, padding: '3px 11px', backgroundColor: isExp ? S.expansionContainer : S.errorContainer, color: isExp ? S.onExpansionContainer : S.onErrorContainer, fontFamily: HEADLINE_FONT }}
-          >
-            {isExp ? <TrendingUp size={11} strokeWidth={2.5} /> : <TrendingDown size={11} strokeWidth={2.5} />}
-            {isExp ? 'Tailwind' : 'Headwind'}
-          </span>
-          <h2 style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: '1.7rem', lineHeight: 1.12, letterSpacing: '-0.02em', margin: '11px 0 0', color: S.onBg }} title={tile.name}>
-            {displayTileName(tile.name)}
-          </h2>
-          {tile.driverNote && (
-            <p style={{ fontSize: 14.5, color: S.onSurfaceVariant, lineHeight: 1.55, margin: '9px 0 0', maxWidth: '52rem' }}>{tile.driverNote}</p>
-          )}
-          <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 13 }}>
-            <Chip
-              kind={GRADE_CHIP[tile.provenance.grade].kind}
-              label={GRADE_CHIP[tile.provenance.grade].label}
-              title={`Evidence grade: ${tile.provenance.grade}`}
-            />
-            <Chip
-              kind="authored"
-              label={`Strategist-authored · ${tile.provenance.date}`}
-              title={`Strategist-authored (${tile.provenance.date})`}
-            />
-            <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: ts.bg, color: ts.fg, fontFamily: HEADLINE_FONT }}>{ts.label}</span>
-            <span className="inline-flex items-center rounded-full font-bold" style={{ fontSize: 10.5, padding: '2px 9px', backgroundColor: S.surfaceLow, color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>Intensity {tile.intensity}/3</span>
-          </div>
-        </div>
-
-        {/* Two columns: Why-chain on the left, Strategist Read and stage context on the right */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5" style={{ padding: '20px 26px 30px' }}>
-          <div>
-            <WhyChain
-              tile={tile}
-              side={side}
-              driversById={driversById}
-              driversLoaded={driversLoaded}
-              onNavigateToDriver={onNavigateToDriver}
-            />
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <SectionCard
-              title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><PenLine size={12} strokeWidth={2.5} /> Strategist Read</span>}
-              accent={S.primaryDim}
-              subtitle="Authored analysis, not simulated"
-            >
-              <div style={{ padding: '12px 14px', borderRadius: 10, backgroundColor: S.surfaceLow }}>
-                {tile.analysis
-                  ? <MarkdownBlock text={tile.analysis} />
-                  : <p style={{ fontSize: 12.5, color: S.mutedText, fontStyle: 'italic', margin: 0 }}>No authored analysis for this tile yet.</p>}
-              </div>
-            </SectionCard>
-
-            <StageContextBlock stageLabel={stageLabel} journeyKey={journeyKey} />
-
-            {canEdit && !editing && (
-              <button
-                onClick={onEdit}
-                className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-full text-sm font-bold uppercase tracking-[0.08em]"
-                style={{ backgroundColor: S.primaryContainer, color: S.onPrimaryContainer, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}
-              >
-                <Edit3 size={13} strokeWidth={2.5} /> Edit tile
-              </button>
-            )}
-            {canEdit && editing && (
-              <SectionCard title="Edit tile" accent={S.primary}>
-                <TileEditor
-                  initial={tile}
-                  onSave={onApplyEdits}
-                  onCancel={onCancelEdit}
-                  onRemove={onRemove}
-                />
-              </SectionCard>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

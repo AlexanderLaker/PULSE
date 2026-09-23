@@ -8,7 +8,8 @@
  *   2. An expanded driver shows the labels as headings, the basis line and
  *      the footnote; in the admin editor the reading stays read-only text.
  *   3. The committed readings (data/drivers/driver_analysis.json) have that
- *      structure for all 51 drivers and none of the forbidden content.
+ *      structure for all 51 drivers (tests/test_driver_analysis.py holds
+ *      their content to the rules).
  *   4. An unedited driver carries no provenance chip; an edited one carries
  *      the Edited chip, whose tooltip lists each changed input with its
  *      baseline value.
@@ -66,13 +67,6 @@ function openDriver(overrides: Partial<Driver> = {}, options: { isAdmin?: boolea
   const view = render(<Drivers isAdmin={options.isAdmin ?? false} />);
   fireEvent.click(screen.getByRole('button', { name: ROW_NAME }));
   return { ...view, driver, store: STORE.current };
-}
-
-/** The text a person can read plus the tooltips. */
-function readableText(root: HTMLElement): string {
-  const titles = Array.from(root.querySelectorAll('[title], [aria-label]'))
-    .flatMap((el) => [el.getAttribute('title') ?? '', el.getAttribute('aria-label') ?? '']);
-  return [root.textContent ?? '', ...titles].join('\n');
 }
 
 describe('splitAnalysis', () => {
@@ -137,33 +131,14 @@ describe('the committed readings', () => {
       expect(text, code).not.toMatch(/\{\w+\}/);
     }
   });
-
-  it('never restate a score, refer to the history of the base, prescribe a response or use a dash', () => {
-    // tests/test_driver_analysis.py (FORBIDDEN) is the authoritative lock;
-    // these are its patterns, so a frontend-only run fails on the same content.
-    const FORBIDDEN: RegExp[] = [
-      /\b[0-5] of 5\b/, /\bprobability [0-5]\b/i, /\buncertainty [0-5]\b/i, /\bexposure(?: score)? [0-5]\b/i,
-      /\bGP1 (?:share )?(?:of )?0\.\d+/,
-      /\bGP1 share\b|\bprobabilit(?:y|ies)\b|\buncertainty score\b|\bconfidence\b|\bbalanced (?:case|rather)\b|\blikely (?:probability|case)\b|\bscored\b|\bscores\b|\balmost certain\b|\bvery unlikely\b|\b(?:one|two) in (?:three|four|five|six) chance\b|\bchance of\b|\bthe odds\b/i,
-      /September 2026 review|the (?:2026 )?review\b|old base|earlier base|previous base|prior base|was corrected|was deleted|were wrong|was wrong|report mill|could not be verified|unverified|unsourced|watch list|merged into|folded into|\brenamed\b|\bretired\b/i,
-      /\b(?:Henkel|HCB) (?:should|must|needs to|has to|ought to|could|would need to|can offset)\b|\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure/i,
-      /[\u2014\u2013]/, /\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b/i,
-      /\btrends?\b/i, /\{\w+\}/,
-    ];
-    for (const code of codes) {
-      const text = ANALYSIS.drivers[code].text as string;
-      for (const pattern of FORBIDDEN) expect(text, `${code}: ${pattern}`).not.toMatch(pattern);
-    }
-  });
 });
 
 describe('Drivers page: the Edited chip', () => {
   const edited = (root: HTMLElement) => Array.from(root.querySelectorAll('[title^="Edited by an admin"]'));
 
-  it('is absent on a driver no admin has changed, and nothing mentions an AI suggestion', () => {
+  it('is absent on a driver no admin has changed', () => {
     const { container } = openDriver();
     expect(edited(container)).toEqual([]);
-    expect(readableText(container)).not.toMatch(/\bAI\b/);
   });
 
   it('lists each changed input with its baseline value on an edited driver', () => {

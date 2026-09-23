@@ -6,7 +6,7 @@
  * choice to do so; every endorse names the revision it was made on.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, within, act } from '@testing-library/react';
 import type { Driver, DriverProposalsResponse } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
 import { makeDriver, makeStore } from './fixtures/prism';
@@ -24,7 +24,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
   saveMyProposal: vi.fn(async () => PROPOSALS.current),
 }));
 
-import { ApiError } from '@/lib/apiClient';
+import { ApiError, getDriverProposals } from '@/lib/apiClient';
 import Drivers from '@/components/dashboard/Drivers';
 
 // framer-motion restores the scroll position after measuring the expanded
@@ -82,6 +82,26 @@ async function endorse() {
 }
 
 describe('Review & Endorse', () => {
+  it('offers nothing to endorse before the proposals have loaded', async () => {
+    const driver = reviewedDriver();
+    let resolve!: (r: DriverProposalsResponse) => void;
+    vi.mocked(getDriverProposals).mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    await openReview(driver);
+    expect(await screen.findByText('Loading the proposals…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Endorse driver/ })).toBeNull();
+    await act(async () => { resolve(PROPOSALS.current!); });
+    expect(await screen.findByRole('button', { name: /Endorse driver/ })).toBeTruthy();
+  });
+
+  it('clears the Endorsed mark when a choice changes', async () => {
+    await openReview(reviewedDriver());
+    await endorse();
+    expect(await screen.findByText('✓ Endorsed')).toBeTruthy();
+    const gp1 = screen.getByRole('group', { name: 'Impact: GP1 % exposed' });
+    fireEvent.click(within(gp1).getByRole('button', { name: 'Baseline' }));
+    expect(screen.queryByText('✓ Endorsed')).toBeNull();
+  });
+
   it('writes the expert mean where experts scored and keeps every other value as it is now', async () => {
     const driver = reviewedDriver();
     await openReview(driver);

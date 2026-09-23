@@ -1,11 +1,12 @@
 /**
- * The Drivers page's cards and chips: the boxed section card with its help
- * text, the meta and Edited chips, the source item with its credibility tier,
- * and the small labels the panels share.
+ * The Drivers page's chips and labels: the per-field help of the section
+ * cards, the meta and Edited chips, the source item with its credibility
+ * tier, and the small labels the panels share. The section card itself is
+ * shared with the Settings sheet (components/dashboard/SectionCard.tsx).
  */
 import React, { type FC } from 'react';
 import {
-  TrendingUp, FileText, BarChart3, Newspaper, Globe, ExternalLink, AlertTriangle, Info,
+  TrendingUp, FileText, BarChart3, Newspaper, Globe, ExternalLink, AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { CATEGORIES, NO_VALUE, REGIONS, fmtPct } from '@/lib/format';
@@ -43,75 +44,7 @@ const SOURCE_ICON: Record<SourceKind, LucideIcon> = {
   Consulting: FileText, 'Trade Press': Newspaper, Press: Newspaper,
 };
 
-// ─── Section help: an info icon with the field's hint as a native
-// tooltip, like the other hovers on this page. ───
-const SectionInfoTip: FC<{ text: string }> = ({ text }) => (
-  <span
-    title={text}
-    aria-label={text}
-    style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      marginLeft: 1, color: S.onSurfaceVariant, cursor: 'help',
-    }}
-  >
-    <Info size={12} strokeWidth={2.4} />
-  </span>
-);
-
-// ─── Section card: one boxed sub-section of an expanded panel ──────
-interface SectionCardProps {
-  title: string;
-  icon: LucideIcon;
-  accent?: string;
-  footnote?: React.ReactNode;
-  /** Optional "?" help tooltip (plain hover text) shown next to the title. */
-  info?: string;
-  /** Optional right-aligned header slot (live value / status chip). */
-  right?: React.ReactNode;
-  children: React.ReactNode;
-}
-export const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, right, children }) => (
-  <div role="group" aria-label={title} style={{
-    backgroundColor: S.surface,
-    border: `1px solid ${S.cardBorder}`,
-    borderRadius: 12,
-    padding: '14px 16px 16px',
-  }}>
-    <div style={{
-      position: 'relative',
-      display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-    }}>
-      <span style={{
-        width: 26, height: 26, borderRadius: 8,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: S.surfaceLow,
-        color: accent ?? S.onSurfaceVariant,
-      }}>
-        <Icon size={14} strokeWidth={2.25} />
-      </span>
-      <div style={{
-        fontFamily: HEADLINE_FONT,
-        fontSize: 12, fontWeight: 800, letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: S.onSurface,
-      }}>
-        {title}
-      </div>
-      {info && <SectionInfoTip text={info} />}
-      {right != null && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{right}</span>}
-    </div>
-    {children}
-    {footnote && (
-      <div style={{
-        marginTop: 10, fontSize: 11, lineHeight: 1.5, color: S.mutedText,
-      }}>
-        {footnote}
-      </div>
-    )}
-  </div>
-);
-
-// ─── Per-field help, shown by the "?" tooltips on the section cards ─
+// ─── Per-field help, shown by the info tips on the section cards ─
 export const FIELD_HELP = {
   probability: 'Likelihood this driver materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The 1–5 score sets a Beta prior whose MEAN is score/6, deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five in six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (6 for an unscored driver), sampled by the Monte Carlo.',
   uncertainty: `How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (${UNCERTAINTY_KAPPA.join('/')}; the mean stays probability/6) and the peak-year jitter (${UNCERTAINTY_PEAK_JITTER.join('/')} years). Unscored: concentration 6 and the model-wide ±1-year jitter.`,

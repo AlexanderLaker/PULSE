@@ -68,37 +68,37 @@ export default function RootLayout({
         elements: {
           // Primary button: a pill, like the dashboard's primary buttons.
           formButtonPrimary:
-            'rounded-full bg-[#005db5] hover:bg-[#0052a0] text-white font-semibold tracking-tight shadow-[0_6px_18px_-6px_rgba(0,93,181,0.45)] transition-colors normal-case',
+            'rounded-full bg-theme-primary hover:bg-theme-primary-dim text-white font-semibold tracking-tight shadow-primary-button transition-colors normal-case',
           // The sign-in and sign-up pages draw their own card around Clerk's
           // form, so Clerk's card stays invisible; their appearance props
           // refine this further.
           card: 'shadow-none border-none bg-transparent',
           // Header typography matches the editorial h1 treatment.
           headerTitle:
-            'text-[#00345e] font-extrabold tracking-tight',
-          headerSubtitle: 'text-[#26619d]',
+            'text-theme-on-surface font-extrabold tracking-tight',
+          headerSubtitle: 'text-theme-on-surface-variant',
           // Social buttons: tonal pills on surfaceLow.
           socialButtonsBlockButton:
-            'rounded-full border-none bg-[#eff4ff] hover:bg-[#dce9ff] text-[#00345e] font-semibold normal-case',
-          socialButtonsBlockButtonText: 'text-[#00345e] font-semibold',
+            'rounded-full border-none bg-theme-surface-low hover:bg-theme-surface-high text-theme-on-surface font-semibold normal-case',
+          socialButtonsBlockButtonText: 'text-theme-on-surface font-semibold',
           // Dividers
-          dividerLine: 'bg-[#dce9ff]',
-          dividerText: 'text-[#26619d] uppercase tracking-[0.15em] text-[11px] font-bold',
+          dividerLine: 'bg-theme-surface-high',
+          dividerText: 'text-theme-on-surface-variant uppercase tracking-[0.15em] text-[11px] font-bold',
           // Form fields: soft fill, no visible border.
-          formFieldLabel: 'text-[#00345e] font-semibold',
+          formFieldLabel: 'text-theme-on-surface font-semibold',
           formFieldInput:
-            'bg-[#eff4ff] border-none text-[#00345e] focus:ring-2 focus:ring-[#005db5] focus:bg-white',
-          formFieldInputShowPasswordButton: 'text-[#26619d] hover:text-[#005db5]',
-          formFieldHintText: 'text-[#26619d]',
+            'bg-theme-surface-low border-none text-theme-on-surface focus:ring-2 focus:ring-theme-primary focus:bg-white',
+          formFieldInputShowPasswordButton: 'text-theme-on-surface-variant hover:text-theme-primary',
+          formFieldHintText: 'text-theme-on-surface-variant',
           // Links (e.g. "Forgot password?", "Sign up")
           footerActionLink:
-            'text-[#005db5] hover:text-[#00345e] font-semibold underline-offset-4',
-          footerActionText: 'text-[#26619d]',
-          identityPreviewText: 'text-[#00345e]',
-          identityPreviewEditButton: 'text-[#005db5] hover:text-[#00345e]',
+            'text-theme-primary hover:text-theme-on-surface font-semibold underline-offset-4',
+          footerActionText: 'text-theme-on-surface-variant',
+          identityPreviewText: 'text-theme-on-surface',
+          identityPreviewEditButton: 'text-theme-primary hover:text-theme-on-surface',
           // The small "Secured by Clerk" footer, toned down to the palette.
           footer: 'bg-transparent',
-          footerPages: 'text-[#26619d]',
+          footerPages: 'text-theme-on-surface-variant',
         },
         layout: {
           socialButtonsPlacement: 'top',

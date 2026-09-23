@@ -4,7 +4,7 @@
  * while the Explorer tab loads.
  */
 
-import { S } from '@/lib/theme';
+import { S, SHADOW } from '@/lib/theme';
 
 const shimmer = `linear-gradient(90deg, ${S.surfaceLow} 0%, ${S.surfaceHigh} 50%, ${S.surfaceLow} 100%)`;
 
@@ -22,7 +22,7 @@ export function FullPageSkeleton() {
     <div style={{ minHeight: '100vh', backgroundColor: S.bg }}>
       <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
       {/* Top nav */}
-      <div style={{ height: 64, backgroundColor: 'rgba(255,255,255,0.75)', display: 'flex',
+      <div style={{ height: 64, backgroundColor: S.glass, display: 'flex',
         alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           <SkeletonBase width={96} height={24} borderRadius={6} />
@@ -55,7 +55,7 @@ export function FullPageSkeleton() {
         </div>
 
         <div style={{ backgroundColor: S.surface, borderRadius: 16, padding: 24,
-          boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+          boxShadow: SHADOW.card,
           display: 'flex', flexDirection: 'column', gap: 10 }}>
           {Array.from({ length: 10 }).map((_, i) => (
             <SkeletonBase key={i} height={22} borderRadius={6} />

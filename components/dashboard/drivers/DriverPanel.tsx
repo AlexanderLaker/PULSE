@@ -11,21 +11,24 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
 import { ApiError } from '@/lib/apiClient';
-import { evidenceLine, fmtPct } from '@/lib/format';
+import { YEARS, evidenceLine, firstPeakYear, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
 import type { Confidence, Direction, Driver, DriverSource, DriverUpdate, ExposureMap } from '@/types';
+import SectionCard from '@/components/dashboard/SectionCard';
 import { baselineOf, curveLabel, DIFFUSION_LABELS, uncLabel, vcStageLabel } from './shared';
 import {
   CategoryExposureGrid, DiffusionGlyph, DotBar, EditableCategoryGrid, EditableRegionGrid,
   EpicentreRail, EpicentreSlider, RegionExposureGrid, UncertaintyPicker,
 } from './scales';
 import {
-  EditedChip, FIELD_HELP, FieldLabel, MetaChip, SectionCard, SourceItem, TIER_CONFIG, TIER_OPTIONS,
+  EditedChip, FIELD_HELP, FieldLabel, MetaChip, SourceItem, TIER_CONFIG, TIER_OPTIONS,
 } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
+
+const HORIZON = YEARS[YEARS.length - 1]!;
 
 interface ExpandedPanelProps {
   driver: Driver;
@@ -55,9 +58,14 @@ const draftOf = (d: Driver): Draft => ({
   sources: d.sources.map(sourceCopy),
 });
 
-/** Two exposure maps score every cell the same; a missing cell scores 0. */
-const sameExposure = (a: ExposureMap, b: ExposureMap): boolean =>
-  [...new Set([...Object.keys(a), ...Object.keys(b)])].every((k) => (a[k] ?? 0) === (b[k] ?? 0));
+/** The cells the draft scores differently from the stored map (a missing
+ *  cell scores 0); undefined when there are none. The API changes only the
+ *  cells an edit names. */
+const changedCells = (draft: ExposureMap, stored: ExposureMap): ExposureMap | undefined => {
+  const out: ExposureMap = {};
+  for (const [k, v] of Object.entries(draft)) if ((stored[k] ?? 0) !== v) out[k] = v;
+  return Object.keys(out).length ? out : undefined;
+};
 
 const sameSources = (a: DriverSource[], b: DriverSource[]): boolean =>
   a.length === b.length && a.every((s, i) => (
@@ -65,8 +73,9 @@ const sameSources = (a: DriverSource[], b: DriverSource[]): boolean =>
   ));
 
 /** The DriverUpdate of a save: the revision the draft was taken from, and only
- *  the fields the admin changed, within the ranges the API accepts, and only
- *  sources with a title or a link. The PRISM Analysis is never part of it. */
+ *  the fields the admin changed (of an exposure map, only the changed cells),
+ *  within the ranges the API accepts, and only sources with a title or a
+ *  link. The PRISM Analysis is never part of it. */
 function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   const update: DriverUpdate = { revision: d.revision };
   if (draft.description !== d.description) update.description = draft.description;
@@ -74,12 +83,17 @@ function updateFrom(draft: Draft, d: Driver): DriverUpdate {
   if (draft.confidence !== d.confidence) update.confidence = draft.confidence;
   if (draft.probability !== d.probability) update.probability = draft.probability;
   if (draft.gp1_pct_affected !== d.gp1_pct_affected) update.gp1_pct_affected = draft.gp1_pct_affected;
-  if (draft.peak_year !== d.peak_year) update.peak_year = Math.max(2025, Math.min(2035, Math.round(draft.peak_year)));
+  if (draft.peak_year !== d.peak_year) {
+    update.peak_year = Math.max(firstPeakYear(d.start_year), Math.min(HORIZON, Math.round(draft.peak_year)));
+  }
   if (draft.diffusion_curve !== d.diffusion_curve) update.diffusion_curve = draft.diffusion_curve;
   if (draft.uncertainty !== d.uncertainty) update.uncertainty = draft.uncertainty;
-  if (!sameExposure(draft.category_exposure, d.category_exposure)) update.category_exposure = draft.category_exposure;
-  if (!sameExposure(draft.regional_exposure, d.regional_exposure)) update.regional_exposure = draft.regional_exposure;
-  if (!sameExposure(draft.vc_exposure, d.vc_exposure)) update.vc_exposure = draft.vc_exposure;
+  const category = changedCells(draft.category_exposure, d.category_exposure);
+  if (category) update.category_exposure = category;
+  const regional = changedCells(draft.regional_exposure, d.regional_exposure);
+  if (regional) update.regional_exposure = regional;
+  const valueChain = changedCells(draft.vc_exposure, d.vc_exposure);
+  if (valueChain) update.vc_exposure = valueChain;
   const sources = draft.sources.filter((s) => s.title.trim() || s.url.trim());
   if (!sameSources(sources, d.sources)) update.sources = sources;
   return update;
@@ -365,7 +379,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                 {isEditing ? (
                   <input
                     type="number"
-                    min={2025} max={2035} step={1}
+                    min={firstPeakYear(driver.start_year)} max={HORIZON} step={1}
                     value={draft.peak_year}
                     onChange={(e) => edit({ peak_year: parseInt(e.target.value || '2030', 10) })}
                     style={{
@@ -675,7 +689,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   fontSize: 11, fontWeight: 700,
                   letterSpacing: '0.08em', textTransform: 'uppercase',
                   backgroundColor: S.primary,
-                  color: '#ffffff',
+                  color: S.onPrimary,
                   border: 'none',
                   cursor: saving ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.7 : 1,

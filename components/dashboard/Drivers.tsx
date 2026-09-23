@@ -20,7 +20,7 @@ import { motion } from 'framer-motion';
 import { Search, Layers, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Info } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import { CATEGORIES } from '@/lib/format';
-import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import type { Driver, DriverProposal } from '@/types';
 import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './drivers/shared';
 import { DriverRow, ROW_GRID } from './drivers/DriverRow';
@@ -82,14 +82,14 @@ const ModeToggle: FC<{ mode: ScoringMode; onChange: (m: ScoringMode) => void; is
       {opts.map((o) => {
         const active = mode === o.id;
         return (
-          <button key={o.id} role="tab" aria-selected={active} onClick={() => onChange(o.id)}
+          <button type="button" key={o.id} role="tab" aria-selected={active} onClick={() => onChange(o.id)}
             className="inline-flex items-center gap-2 transition-colors"
             style={{
               padding: '9px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
               fontFamily: HEADLINE_FONT, fontSize: 13, fontWeight: 700,
-              backgroundColor: active ? S.primary : 'transparent', color: active ? '#fff' : S.onSurfaceVariant,
+              backgroundColor: active ? S.primary : 'transparent', color: active ? S.onPrimary : S.onSurfaceVariant,
             }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: active ? '#ffffff' : o.dot }} />
+            <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: active ? S.onPrimary : o.dot }} />
             {o.label}
           </button>
         );
@@ -305,7 +305,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
           className="rounded-2xl overflow-hidden"
           style={{
             backgroundColor: S.surface,
-            boxShadow: '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+            boxShadow: SHADOW.card,
           }}
         >
           {/* Column header: every column sorts */}
@@ -373,7 +373,9 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
 // ─── Filter chip ───────────────────────────────────────────────────
 const FilterChip: FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
   <button
+    type="button"
     onClick={onClick}
+    aria-pressed={active}
     className="flex-shrink-0 px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-[0.97]"
     style={{
       backgroundColor: active ? S.primaryContainer : S.surfaceLow,
@@ -437,7 +439,7 @@ const Gp1InfoTip: FC = () => {
         <span role="tooltip" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 40,
           width: 280, padding: '10px 12px', borderRadius: 8, backgroundColor: S.onSurface, color: S.surface,
           fontFamily: BODY_FONT, fontSize: 11.5, lineHeight: 1.5, fontWeight: 500, textTransform: 'none',
-          letterSpacing: 0, textAlign: 'left', boxShadow: '0 10px 24px rgba(0, 52, 94, 0.28)',
+          letterSpacing: 0, textAlign: 'left', boxShadow: SHADOW.tip,
           pointerEvents: 'none', whiteSpace: 'normal' }}>
           <b>GP1 % Affected</b>: the share of a category&apos;s GP1 (gross profit after cost of goods)
           that this driver can realistically move at full materialization. Multiplied by probability and

@@ -15,16 +15,20 @@ import { ESTIMATED_CELL_WEIGHTS } from '@/lib/cellWeightProvenance';
 /** category -> region -> share. */
 export type CellWeights = Record<string, Record<string, number>>;
 
+/** How the estimate's source label opens (prism/config.py ESTIMATE_SOURCE_PREFIX);
+ *  the production run refuses a finance file whose label does. */
+export const ESTIMATE_SOURCE_PREFIX = 'ESTIMATE, not Henkel P&L';
+
 /**
  * What a run's cell weights are, read from the source label the run stored:
- * the estimate, whose label starts with "ESTIMATE" (prism/config.py
- * DEFAULT_CELL_WEIGHTS_SOURCE), or the weights of a file given to the
- * production run, whose label is the file's own.
+ * the estimate, whose label opens with ESTIMATE_SOURCE_PREFIX, or the
+ * weights of a file given to the production run, whose label is the file's
+ * own.
  */
 export type CellWeightsBasis = 'estimate' | 'file';
 
 export function cellWeightsBasis(source: string | null | undefined): CellWeightsBasis {
-  return (source ?? '').trimStart().toUpperCase().startsWith('ESTIMATE') ? 'estimate' : 'file';
+  return (source ?? '').trimStart().startsWith(ESTIMATE_SOURCE_PREFIX) ? 'estimate' : 'file';
 }
 
 export interface CellMarginals {

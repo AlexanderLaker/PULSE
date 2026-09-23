@@ -9,16 +9,21 @@ import {
   Users, Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Check, MessageSquare,
 } from 'lucide-react';
 import { ApiError } from '@/lib/apiClient';
-import { CATEGORIES, NO_VALUE, REGIONS, fmtPct, shortCat } from '@/lib/format';
+import {
+  CATEGORIES, EXPANSION_RGB, NO_VALUE, REGIONS, YEARS, firstPeakYear, fmtPct, shortCat,
+} from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, ProposalAgg } from '@/types';
+import SectionCard from '@/components/dashboard/SectionCard';
 import {
   baselineOf, curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos,
 } from './shared';
 import { BaselineMark, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots } from './scales';
-import { FIELD_HELP, FieldLabel, ProposalsUnavailable, SectionCard, Val } from './cards';
+import { FIELD_HELP, FieldLabel, ProposalsUnavailable, Val } from './cards';
 import { useDriverProposals } from './useDriverProposals';
+
+const HORIZON = YEARS[YEARS.length - 1]!;
 
 // ── Mini 0–100% bar (the GP1 % comparison) ──
 const MiniBar: FC<{ v?: number; color: string }> = ({ v, color }) => (
@@ -108,7 +113,7 @@ const Decide: FC<{
           <button key={k} type="button" disabled={disabled} onClick={() => onPick(k)} aria-pressed={on}
             style={{ border: 'none', borderRight: i < ENDORSE_OPTIONS.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
               cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700,
-              padding: '6px 11px', background: bg, color: on ? '#fff' : (disabled ? S.mutedText : S.onSurfaceVariant), opacity: disabled ? 0.45 : 1 }}>
+              padding: '6px 11px', background: bg, color: on ? S.onPrimary : (disabled ? S.mutedText : S.onSurfaceVariant), opacity: disabled ? 0.45 : 1 }}>
             {lab}
           </button>
         );
@@ -149,7 +154,7 @@ const EpicentreVotePanel: FC<{
     border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: HEADLINE_FONT, fontSize: 11, fontWeight: 700, padding: '6px 12px',
     background: on ? S.onSurface : S.surface,
-    color: on ? '#fff' : disabled ? S.mutedText : S.onSurfaceVariant,
+    color: on ? S.onPrimary : disabled ? S.mutedText : S.onSurfaceVariant,
     opacity: disabled ? 0.45 : 1,
   });
   return (
@@ -195,7 +200,7 @@ const EpicentreVotePanel: FC<{
           <span title={`Baseline · ${VC_STEPS[baseline - 1]}`} style={{ position: 'absolute', top: 64, left: vcPos(baseline), width: 9, height: 9, backgroundColor: S.bg, border: `2px solid ${S.onSurface}`, transform: 'translateX(-50%) rotate(45deg)', cursor: 'help' }} />
         )}
         {endorsed != null && (
-          <span title={`Endorsed · ${VC_STEPS[endorsed - 1]}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: '3px solid #ffffff', outline: '1px solid rgba(31,122,61,0.45)', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+          <span title={`Endorsed · ${VC_STEPS[endorsed - 1]}`} style={{ position: 'absolute', top: 47, left: vcPos(endorsed), width: 20, height: 20, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `3px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)`, transform: 'translateX(-50%)', pointerEvents: 'none' }} />
         )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 2 }}>
@@ -218,7 +223,7 @@ const EpicentreVotePanel: FC<{
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, flexWrap: 'wrap', fontSize: 11, color: S.mutedText }}>
         <span className="inline-flex items-center gap-1.5"><span style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: EXPERT_COLOR, opacity: 0.65 }} /> One dot = one expert vote</span>
         <span className="inline-flex items-center gap-1.5"><BaselineMark size={12} /> Baseline</span>
-        <span className="inline-flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: '2px solid #fff', outline: '1px solid rgba(31,122,61,0.45)' }} /> Endorsed stage</span>
+        <span className="inline-flex items-center gap-1.5"><span style={{ width: 11, height: 11, borderRadius: 999, backgroundColor: REVIEWED_COLOR, border: `2px solid ${S.surface}`, outline: `1px solid rgba(${EXPANSION_RGB}, 0.45)` }} /> Endorsed stage</span>
       </div>
       <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${S.surfaceLow}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
@@ -314,7 +319,6 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   // The stage the driver has now; endorsing it leaves the stored profile as it is.
   const currentVcStage = epicentreOf(driver.vc_exposure);
   const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? currentVcStage;
-  const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
   const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve' | 'uncertainty'): string | undefined => {
@@ -338,9 +342,13 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   const hasCatE = !!(agg?.category_exposure && Object.keys(agg.category_exposure).length);
   const hasRegE = !!(agg?.regional_exposure && Object.keys(agg.regional_exposure).length);
   const srcOf = (key: string, hasExpert: boolean): EndorseSource => src[key] ?? (hasExpert ? 'expert' : 'current');
-  const setS = (key: string, s: EndorseSource) => setSrc((p) => ({ ...p, [key]: s }));
-  const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
+  // Every new choice clears the "Endorsed" mark of the last endorse: what is
+  // on screen now has not been written yet.
+  const setS = (key: string, s: EndorseSource) => { setDone(false); setSrc((p) => ({ ...p, [key]: s })); };
+  const setM = (key: string, v: string) => { setDone(false); setMan((p) => ({ ...p, [key]: v })); };
+  const chooseVc = (stage: number) => { setDone(false); setEndorsedVc(stage); };
   const setAll = (s: EndorseSource) => {
+    setDone(false);
     // "Set all to Manual" seeds the scalar inputs with the expert mean, else
     // the current value, so each field starts from a sensible value; exposure
     // cells default the same way through manCell.
@@ -371,7 +379,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
   };
   const setManCell = (kind: string, key: string, v: number) => {
     setManExpo((p) => ({ ...p, [kind]: { ...(p[kind] ?? {}), [key]: v } }));
-    setS(kind, 'manual');
+    setS(kind, 'manual');   // clears the mark as well
   };
   const catCells = CATEGORIES.map((c) => ({
     key: c.name, label: shortCat(c.name), group: c.group,
@@ -409,16 +417,18 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     else v = s === 'baseline' ? bG : eG;
     return v != null && v > 0 ? Math.min(1, v) : undefined;
   };
-  // A whole year in 2025–2035; anything else (such as the 0 of a driver
-  // without a peak year) is left out, so the driver keeps its timing.
+  // A whole year from the year after the onset to the horizon; anything
+  // else (the 0 of a driver without a peak year, an expert mean at or before
+  // the onset) is left out, so the driver keeps its timing.
+  const firstPeak = firstPeakYear(driver.start_year);
   const resolvePeak = (): number | undefined => {
     const s = srcOf('peak', ePk != null);
     if (s === 'current') return undefined;
     let n: number | undefined;
-    if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(2025, Math.min(2035, m)); }
+    if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(firstPeak, Math.min(HORIZON, m)); }
     else if (s === 'baseline') n = bPk;
     else n = ePk != null ? Math.round(ePk) : undefined;
-    if (n == null || !Number.isFinite(n) || n < 2025 || n > 2035) return undefined;
+    if (n == null || !Number.isFinite(n) || n < firstPeak || n > HORIZON) return undefined;
     return n;
   };
   const resolveCurve = (): string | undefined => {
@@ -502,9 +512,13 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
         </span>
       </div>
 
-      {failed ? (
+      {/* Nothing can be endorsed before the proposals have loaded: the panel
+          would offer the current values as every field's choice. */}
+      {!loaded ? (
+        <div style={{ padding: '26px 0', textAlign: 'center', fontSize: 14, color: S.onSurfaceVariant }}>Loading the proposals…</div>
+      ) : failed ? (
         <ProposalsUnavailable what="there is nothing to endorse right now" onRetry={retry} />
-      ) : loaded && count === 0 ? (
+      ) : count === 0 ? (
         <div style={{ padding: '26px 0', textAlign: 'center', color: S.onSurfaceVariant }}>
           <Users size={20} style={{ color: S.primary }} />
           <div style={{ marginTop: 8, fontSize: 14 }}>No expert proposals yet for this driver.</div>
@@ -548,7 +562,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                       baseline={<Val>{bPk ?? NO_VALUE}</Val>}
                       expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null && bPk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
                     <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} baselineOk={bPk != null} expertOk={ePk != null}
-                      manual={<input type="number" min={2025} max={2035} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
+                      manual={<input type="number" min={firstPeak} max={HORIZON} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
                       result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year || NO_VALUE)} />
                   </div>
                   <div>
@@ -606,7 +620,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                 }
               >
                 <EpicentreVotePanel baseline={baseVcStage} current={currentVcStage} votes={vcVotes} majority={vcMajority}
-                  endorsed={endorsedVcStage} onEndorse={setEndorsedVc} />
+                  endorsed={endorsedVcStage} onEndorse={chooseVc} />
               </SectionCard>
             </div>
           </div>
@@ -670,7 +684,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
               <button type="button" onClick={endorse} disabled={saving}
                 style={{ padding: '9px 20px', borderRadius: 999, border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
                   fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
-                  backgroundColor: S.onSurface, color: '#fff', opacity: saving ? 0.6 : 1 }}>
+                  backgroundColor: S.onSurface, color: S.onPrimary, opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Endorsing…' : done ? 'Endorse again' : 'Endorse driver →'}
               </button>
             </div>

@@ -9,7 +9,9 @@
  *   - The Expert Rating panel cannot be edited before the expert's stored
  *     proposal has loaded (a save from a blank draft would overwrite it); its
  *     saves go out one at a time with the newest draft; a field clicked again
- *     is cleared (sent as null); a half-typed year is never sent.
+ *     is cleared (sent as null); a half-typed year, or one not after the
+ *     driver's onset, is never sent. A panel
+ *     opened again waits for a save still on its way before it loads.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
@@ -28,6 +30,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 }));
 
 import Drivers from '@/components/dashboard/Drivers';
+import { ExpertInputPanel } from '@/components/dashboard/drivers/ExpertRating';
 
 // framer-motion restores the scroll position after measuring an expanded panel.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
@@ -93,6 +96,22 @@ describe('the states around the list', () => {
     expect(screen.getByText('No drivers match the current search and filter.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Clear search and filter' }));
     expect(rows()).toHaveLength(2);
+  });
+});
+
+describe('the admin editor', () => {
+  it('sends the changed exposure cells only, with the revision it started from', async () => {
+    const driver = makeDriver({ revision: 7, category_exposure: { 'Hair: Care': 5, 'Hair: Color': 2 } });
+    STORE.current = makeStore({ drivers: [driver] });
+    render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const color = screen.getByRole('radiogroup', { name: 'Hair: Color exposure: 2 of 5' });
+    fireEvent.click(within(color).getByRole('radio', { name: '4 of 5' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(STORE.current!.updateDriver).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([
+      driver.id, { revision: 7, category_exposure: { 'Hair: Color': 4 } }]);
   });
 });
 
@@ -164,14 +183,38 @@ describe('the Expert Rating panel', () => {
     expect(await screen.findByText('✓ All changes saved')).toBeTruthy();
   });
 
-  it('sends a peak year only once it is a whole year from 2025 to 2035', async () => {
+  it('loads again only after the save sent on closing has landed', async () => {
+    let finishSave!: () => void;
+    API.saveMyProposal.mockImplementationOnce(
+      () => new Promise((r) => { finishSave = () => r(response({ probability: 4 })); }));
+    const first = render(<ExpertInputPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);
+    await screen.findByRole('radiogroup', { name: /^Probability/ });
+    fireEvent.click(probabilityDot(4));
+    first.unmount();   // closed inside the autosave delay: the pending edit is sent, not dropped
+    await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(1));
+    expect(API.saveMyProposal.mock.calls[0]![1]).toMatchObject({ probability: 4 });
+
+    API.getDriverProposals.mockClear().mockResolvedValue(response({ probability: 4 }));
+    render(<ExpertInputPanel driver={PRIVATE_LABEL} onMyChange={() => {}} />);   // opened again at once
+    expect(screen.getByText('Loading your proposal…')).toBeTruthy();
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    expect(API.getDriverProposals).not.toHaveBeenCalled();
+    await act(async () => { finishSave(); });
+    await waitFor(() => expect(probabilityDot(4).getAttribute('aria-checked')).toBe('true'));
+    expect(API.getDriverProposals).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a peak year only once it is a whole year after the onset, up to 2035', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     openExpertRating();
-    const year = await screen.findByRole('textbox', { name: 'Peak year, 2025 to 2035' });
-    fireEvent.change(year, { target: { value: '20' } });
-    await act(async () => { vi.advanceTimersByTime(700); });
-    expect(API.saveMyProposal).not.toHaveBeenCalled();
-    expect(year.getAttribute('aria-invalid')).toBe('true');
+    // The driver's onset is 2025, so its peak can be 2026 at the earliest.
+    const year = await screen.findByRole('textbox', { name: 'Peak year, 2026 to 2035' });
+    for (const typed of ['20', '2025']) {
+      fireEvent.change(year, { target: { value: typed } });
+      await act(async () => { vi.advanceTimersByTime(700); });
+      expect(API.saveMyProposal).not.toHaveBeenCalled();
+      expect(year.getAttribute('aria-invalid')).toBe('true');
+    }
     fireEvent.change(year, { target: { value: '2031' } });
     await act(async () => { vi.advanceTimersByTime(700); });
     await waitFor(() => expect(API.saveMyProposal).toHaveBeenCalledTimes(1));

@@ -4,7 +4,8 @@
  * Body { role: 'admin' | 'viewer' }. An admin cannot demote themselves, so
  * the last admin can never lock everyone out; another admin has to do it. A
  * user the webhook has not added yet gets a viewer row first. The change is
- * written to the audit log. Response: { role }.
+ * written to the audit log where possible: a failed audit write is logged and
+ * the change stands. Response: { role }.
  */
 import { NextResponse } from 'next/server';
 import {

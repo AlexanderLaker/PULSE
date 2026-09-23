@@ -15,9 +15,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   computeDriverAttribution, computeMaterializationSchedule, expectedMaterialisation,
-  peakJitterFor, BASE_YEAR,
+  peakJitterFor,
 } from '@/lib/driverAttribution';
-import { YEARS } from '@/lib/format';
+import { BASE_YEAR, YEARS } from '@/lib/format';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'driverAttribution.fixture.json');
 

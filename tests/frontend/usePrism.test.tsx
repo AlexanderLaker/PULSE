@@ -141,13 +141,52 @@ describe('usePrism', () => {
 
   it('names a database the service cannot use', async () => {
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
-      status: 'degraded', has_simulation: false, simulation_reason: 'legacy_schema', driver_count: 0,
+      status: 'degraded', has_simulation: false, simulation_reason: 'migration_pending', driver_count: 0,
     }));
-    vi.mocked(api.getDrivers).mockRejectedValue(new Error('This database uses the previous schema'));
+    vi.mocked(api.getDrivers).mockRejectedValue(new Error('This database needs migration 0001_driver_schema'));
     mount();
     await loaded();
-    expect(screen.getByTestId('database').textContent).toBe('legacy_schema');
+    expect(screen.getByTestId('database').textContent).toBe('migration_pending');
     expect(screen.getByTestId('available').textContent).toBe('true');
-    expect(screen.getByTestId('drivers-error').textContent).toContain('previous schema');
+    expect(screen.getByTestId('drivers-error').textContent).toContain('needs migration');
+  });
+
+  it('loads again by itself once the database can be used', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
+        status: 'degraded', has_simulation: false, simulation_reason: 'migration_pending', driver_count: 0,
+        latest_run_id: null,
+      }));
+      vi.mocked(api.getDrivers).mockRejectedValue(new Error('This database needs migration 0001_driver_schema'));
+      mount();
+      await loaded();
+      expect(screen.getByTestId('run').textContent).toBe('no');
+      // The migration commits; the next check, 30 s later while degraded, finds the service healthy.
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+      vi.mocked(api.getDrivers).mockResolvedValue([makeDriver()]);
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+      await waitFor(() => expect(screen.getByTestId('run').textContent).toBe('yes'));
+      expect(screen.getByTestId('database').textContent).toBe('');
+      expect(screen.getByTestId('drivers-error').textContent).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('picks up a newer run on its next health check, without a loading state', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
+      mount();
+      await loaded();
+      expect(api.getSimulation).toHaveBeenCalledTimes(1);
+      vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 100 }));
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      await waitFor(() => expect(api.getSimulation).toHaveBeenCalledTimes(2));
+      expect(screen.getByTestId('loading').textContent).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

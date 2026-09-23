@@ -8,35 +8,39 @@ import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
 } from 'lucide-react';
 import { saveMyProposal } from '@/lib/apiClient';
-import { NO_VALUE, fmtPct } from '@/lib/format';
+import { NO_VALUE, YEARS, firstPeakYear, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import type { Driver, DriverProposal } from '@/types';
-import { baselineOf, REVIEWED_COLOR, vcStageLabel } from './shared';
+import SectionCard from '@/components/dashboard/SectionCard';
+import { baselineOf, proposalOnTaxonomy, REVIEWED_COLOR, vcStageLabel } from './shared';
 import {
   DiffusionPicker, DotBar, EditableCategoryGrid, EditableRegionGrid, EpicentreSlider,
   UncertaintyPicker,
 } from './scales';
-import { BaselineRef, FIELD_HELP, FieldLabel, ProposalsUnavailable, SectionCard, SourceItem } from './cards';
+import { BaselineRef, FIELD_HELP, FieldLabel, ProposalsUnavailable, SourceItem } from './cards';
 import { ANALYSIS_FOOTNOTE, PrismAnalysisReading } from './PrismAnalysis';
-import { useDriverProposals } from './useDriverProposals';
+import { queueProposalSave, useDriverProposals } from './useDriverProposals';
+
+const HORIZON = YEARS[YEARS.length - 1]!;
 
 /** A year field for the Expert Rating: the proposal takes the value only while
- *  it is a whole year from 2025 to 2035, so a half-typed year is never sent;
- *  leaving the field with anything else puts the last valid year back. */
-const ProposalYearInput: FC<{ value: number | null | undefined; onChange: (v: number | null) => void; title?: string }> = ({
-  value, onChange, title,
-}) => {
+ *  it is a whole year from `min` (the year after the driver's onset) to the
+ *  horizon, so a half-typed year is never sent; leaving the field with
+ *  anything else puts the last valid year back. */
+const ProposalYearInput: FC<{
+  value: number | null | undefined; min: number; onChange: (v: number | null) => void; title?: string;
+}> = ({ value, min, onChange, title }) => {
   const [text, setText] = useState(value == null ? '' : String(value));
   const [shownFor, setShownFor] = useState(value);
   if (shownFor !== value) {
     setShownFor(value);
     setText(value == null ? '' : String(value));
   }
-  const valid = (t: string) => /^\d{4}$/.test(t) && Number(t) >= 2025 && Number(t) <= 2035;
+  const valid = (t: string) => /^\d{4}$/.test(t) && Number(t) >= min && Number(t) <= HORIZON;
   return (
     <input type="text" inputMode="numeric" value={text} placeholder={NO_VALUE} title={title}
-      aria-label="Peak year, 2025 to 2035" aria-invalid={text !== '' && !valid(text)}
+      aria-label={`Peak year, ${min} to ${HORIZON}`} aria-invalid={text !== '' && !valid(text)}
       onChange={(e) => {
         const t = e.target.value.trim();
         setText(t);
@@ -57,12 +61,13 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const draftRef = useRef<DriverProposal>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Saves go out one at a time, each with the draft as it is when it starts,
-  // so a slow earlier save can never land after a later one.
-  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  // Saves go out one at a time through the driver's queue, each with the
+  // draft as it is when it starts, so a slow earlier save can never land
+  // after a later one; `lastSave` is this panel's newest, for the status.
+  const lastSave = useRef<Promise<unknown> | null>(null);
   const sendNow = useCallback(() => {
-    const next = chain.current.catch(() => undefined).then(() => saveMyProposal(driver.id, draftRef.current));
-    chain.current = next;
+    const next = queueProposalSave(driver.id, () => saveMyProposal(driver.id, draftRef.current));
+    lastSave.current = next;
     return next;
   }, [driver.id]);
 
@@ -72,7 +77,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
   const [hydrated, setHydrated] = useState(false);
   if (loaded && !failed && !hydrated) {
     setHydrated(true);
-    setDraft(data?.my ?? {});
+    setDraft(proposalOnTaxonomy(data?.my ?? {}));
   }
   // `draftRef` is the merge base for `patch` and what the unmount flush
   // saves. `patch` keeps it current while the expert types; refs may not be
@@ -106,8 +111,8 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
       pendingSave.current = false;
       const save = sendNow();
       save.then(
-        () => { if (chain.current === save && !pendingSave.current) setStatus('saved'); },
-        () => { if (chain.current === save) setStatus('error'); },
+        () => { if (lastSave.current === save && !pendingSave.current) setStatus('saved'); },
+        () => { if (lastSave.current === save) setStatus('error'); },
       );
     }, 600);
   }, [sendNow]);
@@ -196,7 +201,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
               <div>
                 <FieldLabel>Peak Year</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <ProposalYearInput value={draft.peak_year} onChange={(v) => patch({ peak_year: v })}
+                  <ProposalYearInput value={draft.peak_year} min={firstPeakYear(driver.start_year)} onChange={(v) => patch({ peak_year: v })}
                     title={base != null ? `Baseline ${base.peak_year}` : undefined} />
                   <BaselineRef value={base != null ? String(base.peak_year) : null} />
                 </div>

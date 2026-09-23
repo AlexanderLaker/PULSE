@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import useOverlay from '@/hooks/useOverlay';
-import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 
 interface WelcomeModalProps {
   open: boolean;
@@ -58,7 +58,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               position: 'fixed',
               inset: 0,
               zIndex: 200,
-              backgroundColor: 'rgba(0, 52, 94, 0.35)',
+              backgroundColor: S.scrim,
               backdropFilter: 'blur(4px)',
             }}
           />
@@ -94,7 +94,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 maxHeight: '90vh',
                 backgroundColor: S.surface,
                 borderRadius: 20,
-                boxShadow: '0 32px 96px -20px rgba(0, 52, 94, 0.45)',
+                boxShadow: SHADOW.dialog,
                 overflow: 'hidden',
                 fontFamily: BODY_FONT,
                 display: 'flex',
@@ -102,7 +102,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                 pointerEvents: 'auto',
               }}
             >
-            <button
+            <button type="button"
               onClick={onClose}
               aria-label="Close"
               style={{
@@ -175,7 +175,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
               }}
             >
               {step === 2 && (
-                <button
+                <button type="button"
                   onClick={() => setStep(1)}
                   style={{
                     background: 'transparent',
@@ -192,7 +192,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                   Back
                 </button>
               )}
-              <button
+              <button type="button"
                 onClick={() => {
                   if (step === 1) setStep(2);
                   else onClose();
@@ -211,7 +211,7 @@ const WelcomeModal: FC<WelcomeModalProps> = ({ open, onClose }) => {
                   fontSize: 14,
                   letterSpacing: '-0.01em',
                   cursor: 'pointer',
-                  boxShadow: '0 6px 18px -6px rgba(0, 93, 181, 0.45)',
+                  boxShadow: SHADOW.primaryButton,
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -296,14 +296,12 @@ const Step1Welcome: FC = () => (
         color: S.onSurface,
       }}
     >
-      This is an{' '}
-      <strong style={{ color: S.onBg }}>MVP (Minimum Viable Product)</strong>.
       The focus right now is on validating the{' '}
       <strong style={{ color: S.onBg }}>logic and functionality</strong> of the
       tool, not on the specific insights or details you&rsquo;ll see in the views.
       Note that the{' '}
       <strong style={{ color: S.onBg }}>underlying data may still change</strong>{' '}
-      as the project progresses and sources are checked.
+      as sources are checked.
     </p>
 
     <p
@@ -315,8 +313,8 @@ const Step1Welcome: FC = () => (
       }}
     >
       Your feedback matters: please share what works, what&rsquo;s confusing, and
-      what&rsquo;s missing directly with{' '}
-      <strong style={{ color: S.primary }}>Alexander Laker</strong>.
+      what&rsquo;s missing with the{' '}
+      <strong style={{ color: S.primary }}>PRISM team</strong>.
     </p>
   </div>
 );
@@ -347,8 +345,9 @@ const Step2Views: FC = () => (
       }}
     >
       Three views, in the order shown in the header.{' '}
-      <strong style={{ color: S.onBg }}>Start with Drivers, the main input page.</strong>{' '}
-      The other two views are built on it.
+      <strong style={{ color: S.onBg }}>Start with Drivers:</strong>{' '}
+      the model computes from their scores and nothing else. The Profit Pool
+      Explorer, a beta, sits apart from the model.
     </p>
 
     <SectionLabel>Input</SectionLabel>
@@ -356,16 +355,18 @@ const Step2Views: FC = () => (
       number="1"
       icon={Activity}
       title="Drivers"
-      body="Lists each Profit Pool Driver with its scores: probability, share of GP1 affected, timing, and exposure by category and region."
+      body="Lists each Profit Pool Driver with its scores: probability, share of GP1 affected, timing, uncertainty, and exposure by category and region."
     />
 
-    <SectionLabel style={{ marginTop: 18 }}>Outputs</SectionLabel>
+    <SectionLabel style={{ marginTop: 18 }}>Context</SectionLabel>
     <ViewCard
       number="2"
       icon={Route}
       title="Consumer Journey"
-      body="Maps how consumers move through the category and translates each stage into its impact on the profit pool shift."
+      body="Maps the moments of the consumer journey and the drivers behind each one. It is authored and explains; it does not feed the model."
     />
+
+    <SectionLabel style={{ marginTop: 18 }}>Output</SectionLabel>
     <ViewCard
       number="3"
       icon={TrendingUp}

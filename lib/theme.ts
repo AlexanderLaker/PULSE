@@ -1,6 +1,8 @@
 /**
- * The dashboard's colour tokens and font stacks, defined once; components
- * import them instead of declaring their own.
+ * The dashboard's colour tokens, shadows and font stacks, defined once;
+ * components import them instead of declaring their own, and Tailwind reads
+ * the colours and shadows from here too (tailwind.config.ts), so a class and
+ * an inline style name the same value.
  *
  * Manrope, Inter and JetBrains Mono are self-hosted with next/font
  * (app/layout.tsx) and exposed as CSS variables; the stacks fall back to
@@ -27,6 +29,9 @@ export const S = {
   /* ─── Brand / text ─── */
   primary:            '#005db5',
   primaryDim:         '#0052a0',
+  primarySoft:        'rgba(0, 93, 181, 0.08)',
+  /** Text and icons on a filled primary, dark or coloured surface. */
+  onPrimary:          '#ffffff',
   primaryContainer:   '#d6e3ff',
   onPrimaryContainer: '#00519e',
   onBg:               '#00345e',
@@ -50,6 +55,14 @@ export const S = {
   cardBorder:       'rgba(0, 52, 94, 0.10)',
   cardBorderStrong: 'rgba(0, 52, 94, 0.16)',
   mutedText:        '#64748b',
+  /** The backdrop behind a dialog or drawer. */
+  scrim:            'rgba(0, 52, 94, 0.35)',
+  /** The translucent top bar. */
+  glass:            'rgba(255, 255, 255, 0.75)',
+  /** The sticky header of a dialog, over the page background. */
+  headerGlass:      'rgba(248, 249, 255, 0.92)',
+  /** A veil over content that is loading. */
+  veil:             'rgba(255, 255, 255, 0.6)',
 
   /* ─── Shift semantics (mirror of lib/format.ts) ─── */
   expansion:            '#1f7a3d',
@@ -73,6 +86,40 @@ export const S = {
   blueSoft:  '#dbeafe',
 
   /* ─── Drivers page: the expert aggregate and the delta chip ─── */
-  expert: '#6b4fc4',
-  delta:  '#b07d2b',
+  expert:     '#6b4fc4',
+  expertSoft: 'rgba(107, 79, 196, 0.10)',
+  delta:      '#b07d2b',
+  deltaSoft:  'rgba(176, 125, 43, 0.15)',
+} as const;
+
+/** RGB channels of the text navy and the primary blue, for tints with their
+ *  own alpha: `rgba(${INK_RGB}, 0.12)`. The shift pair has its own in lib/format.ts. */
+export const INK_RGB = '0, 52, 94';
+export const PRIMARY_RGB = '0, 93, 181';
+
+/** Elevation: one shadow per kind of surface, in the navy of the text. */
+export const SHADOW = {
+  /** A card or panel on the page. */
+  card:          '0 4px 60px -15px rgba(0, 52, 94, 0.08)',
+  /** A popover, hover card, chart tooltip or menu above the page. */
+  popover:       '0 16px 40px -10px rgba(0, 52, 94, 0.22)',
+  /** A dark tooltip: the info tips and the expert tips on the Drivers page. */
+  tip:           '0 10px 24px rgba(0, 52, 94, 0.28)',
+  /** A dialog or drawer over the page. */
+  dialog:        '0 32px 96px -20px rgba(0, 52, 94, 0.35)',
+  /** A sheet that slides in from the right edge. */
+  sheet:         '-32px 0 80px -32px rgba(0, 52, 94, 0.35)',
+  /** The sticky top navigation. */
+  nav:           '0 32px 64px -15px rgba(0, 52, 94, 0.06)',
+  /** The glow under a primary button. */
+  primaryButton: '0 6px 18px -6px rgba(0, 93, 181, 0.45)',
+  /** The card of the sign-in and sign-up pages. */
+  authCard:      '0 24px 80px -24px rgba(0, 52, 94, 0.18)',
+  /** The active segment of a segmented control. */
+  raised:        '0 1px 2px rgba(0, 52, 94, 0.12)',
+  /** A card that lifts under the pointer (a contributing driver in the drill-down). */
+  lift:          '0 6px 20px -8px rgba(0, 93, 181, 0.35)',
+  /** A door of the entry view, at rest and under the pointer. */
+  door:          '0 1px 2px rgba(0, 52, 94, 0.03), 0 24px 48px -28px rgba(0, 52, 94, 0.12)',
+  doorHover:     '0 2px 4px rgba(0, 52, 94, 0.04), 0 40px 80px -32px rgba(0, 52, 94, 0.22)',
 } as const;

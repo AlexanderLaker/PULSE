@@ -26,6 +26,7 @@ vi.mock('@/lib/apiClient', async (importOriginal) => ({
 }));
 
 import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
+import { PaneActiveContext } from '@/hooks/useOverlay';
 
 // The first Sorting tailwind tile cites T-01 (technology_r01).
 const TILE = 'AI stain/fabric recognition apps';
@@ -113,6 +114,14 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     await waitFor(() =>
       expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).not.toBe(first));
   });
+
+  it('leaves the arrow keys alone while its pane is hidden', () => {
+    const { rerender } = render(<PaneActiveContext.Provider value><ConsumerJourney /></PaneActiveContext.Provider>);
+    const first = openTile().getByRole('heading', { level: 2 }).textContent;
+    rerender(<PaneActiveContext.Provider value={false}><ConsumerJourney /></PaneActiveContext.Provider>);
+    fireEvent.keyDown(window, { key: 'ArrowRight' });   // meant for the view on screen
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toBe(first);
+  });
 });
 
 describe('ConsumerJourney: stored content and the admin save', () => {
@@ -124,7 +133,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
       driverCodes: ['T-01'],
       driverNote: 'T-01 AI and automation productivity',
       intensity: 2,
-      provenance: { author: 'strategist', date: '2026-10', grade: 'verified' },
+      provenance: { date: '2026-10', grade: 'verified' },
       analysis: null,
     };
     const stored: JourneyContent = {

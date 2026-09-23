@@ -78,6 +78,9 @@ export const CATEGORIES: CategoryDefinition[] = [
   { name: 'LHC: IC',       label: 'Insect Control',       short: 'IC',  code: 'IC',  group: 'LHC', color: '#b0479e' },
 ];
 
+/** The category keys in the engine's order: the keys of every category-keyed block in a run. */
+export const CATEGORY_NAMES: string[] = CATEGORIES.map((c) => c.name);
+
 const CATEGORY_BY_NAME: Record<string, CategoryDefinition> = Object.fromEntries(CATEGORIES.map((c) => [c.name, c]));
 
 /** The plain-English label of a category key; the key itself if unknown. */
@@ -99,8 +102,17 @@ export function shortCat(cat: string | null | undefined): string {
   return parts.length > 1 ? (parts[1]?.trim() ?? cat) : cat;
 }
 
+/** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
+export const BASE_YEAR = 2025;
+
 /** The path years (prism/config.py DEFAULT_PATH_YEARS): the ten-year horizon. */
 export const YEARS: number[] = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+
+/** The earliest peak year a driver may take: the year after its onset (the
+ *  later of the base year and its start year), as the API requires. */
+export function firstPeakYear(startYear: number | null | undefined): number {
+  return Math.max(BASE_YEAR, startYear ?? BASE_YEAR) + 1;
+}
 
 // ── Numbers ─────────────────────────────────────────────────────────────────
 

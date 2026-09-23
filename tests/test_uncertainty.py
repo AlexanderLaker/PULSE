@@ -41,8 +41,8 @@ class TestPriorMapping:
 
     def test_the_about_section_states_these_tables(self):
         """The dashboard's About this model section describes the prior and the jitter in words."""
-        src = (Path(__file__).resolve().parent.parent / "components" / "dashboard"
-               / "ShiftAnalysis.tsx").read_text(encoding="utf-8")
+        src = (Path(__file__).resolve().parent.parent / "components" / "dashboard" / "shift"
+               / "AboutThisModel.tsx").read_text(encoding="utf-8")
         assert "&plusmn;1yr" not in src
         assert not re.search(r"fixed[^.;]{0,30}(concentration|spread)", src)
         k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER

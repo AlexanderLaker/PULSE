@@ -59,7 +59,7 @@ describe('Shift Analysis without a run', () => {
       [diagnosis({ simulation_reason: 'no_rows' }), 'No simulation persisted yet'],
       [diagnosis({ simulation_reason: 'malformed', latest_run_id: 99 }), 'Latest run cannot be served'],
       [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'Backend cannot reach the database'],
-      [diagnosis({ simulation_reason: 'legacy_schema' }), 'The database awaits migration 0001'],
+      [diagnosis({ simulation_reason: 'migration_pending' }), 'The database awaits a migration'],
       [diagnosis({ simulation_reason: 'no_database', db_reachable: false, db_host: null }), 'No database configured'],
     ];
     for (const [result, title] of cases) {

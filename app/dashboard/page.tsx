@@ -33,7 +33,7 @@ import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
 import { PaneActiveContext } from '@/hooks/useOverlay';
-import { S, HEADLINE_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT } from '@/lib/theme';
 import type { Role } from '@/types';
 
 // The Consumer Journey and the Explorer load on their first visit: their
@@ -191,7 +191,7 @@ export default function DashboardPage() {
     const activeColor = tab.beta ? BETA_ACTIVE : S.primary;
     const inactiveColor = tab.beta ? BETA_INACTIVE : S.onSurfaceVariant;
     return (
-      <button
+      <button type="button"
         key={tab.id}
         onClick={() => openTab(tab.id)}
         className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
@@ -217,7 +217,7 @@ export default function DashboardPage() {
     const activeColor = tab.beta ? BETA_ACTIVE : S.primary;
     const inactiveColor = tab.beta ? BETA_INACTIVE : S.onBg;
     return (
-      <button
+      <button type="button"
         key={tab.id}
         onClick={() => openTab(tab.id)}
         className="w-full text-left px-6 py-3.5 text-[15px] font-semibold"
@@ -247,13 +247,13 @@ export default function DashboardPage() {
       <nav
         className="sticky top-0 z-50 backdrop-blur-xl"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.75)',
-          boxShadow: '0 32px 64px -15px rgba(0, 52, 94, 0.06)',
+          backgroundColor: S.glass,
+          boxShadow: SHADOW.nav,
         }}
       >
         <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-4 md:gap-6">
           <div className="flex items-center gap-4 md:gap-8 min-w-0">
-            <button
+            <button type="button"
               onClick={() => setMobileNavOpen((v) => !v)}
               aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
               aria-expanded={mobileNavOpen}
@@ -263,7 +263,7 @@ export default function DashboardPage() {
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            <button
+            <button type="button"
               onClick={() => openTab('home')}
               aria-label="PRISM home"
               className="text-2xl font-extrabold tracking-tighter uppercase transition-opacity hover:opacity-70"
@@ -284,7 +284,7 @@ export default function DashboardPage() {
             >
               {BETA_TABS.map(renderTabButton)}
             </div>
-            <button
+            <button type="button"
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
               className="p-2 rounded-full transition-colors hover:bg-black/5"
@@ -300,7 +300,7 @@ export default function DashboardPage() {
               <span className="text-xs font-semibold">{userEmail}</span>
             </div>
 
-            <button
+            <button type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
               aria-label="Sign out"
@@ -321,7 +321,7 @@ export default function DashboardPage() {
             style={{
               backgroundColor: S.surface,
               borderColor: S.cardBorder,
-              boxShadow: '0 24px 48px -12px rgba(0, 52, 94, 0.18)',
+              boxShadow: SHADOW.popover,
             }}
           >
             {MAIN_TABS.map(renderMobileTabRow)}

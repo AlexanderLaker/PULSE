@@ -3,7 +3,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, evidenceLine,
+  BASE_YEAR, CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, evidenceLine,
+  firstPeakYear,
   fmtDate, fmtDateTime, fmtDateTimeUtc, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow,
   shiftColor, shortCat,
 } from '@/lib/format';
@@ -114,5 +115,15 @@ describe('taxonomy', () => {
     expect(categoryDisplay('Unknown')).toBe('Unknown');
     expect(groupDisplay('LHC')).toBe('Laundry & Home Care');
     expect(shortCat('Hair: Color')).toBe('Color');
+  });
+});
+
+describe('firstPeakYear', () => {
+  it('is the year after the onset, and never before the year after the base year', () => {
+    expect(BASE_YEAR).toBe(2025);
+    expect(firstPeakYear(undefined)).toBe(2026);
+    expect(firstPeakYear(null)).toBe(2026);
+    expect(firstPeakYear(2024)).toBe(2026);
+    expect(firstPeakYear(2029)).toBe(2030);
   });
 });

@@ -3,11 +3,11 @@
  * and value-chain labels, the uncertainty label, the colours of the scoring
  * modes and a driver's baseline.
  */
-import { EXPANSION } from '@/lib/format';
+import { CATEGORY_NAMES, EXPANSION, REGIONS } from '@/lib/format';
 import { S } from '@/lib/theme';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { VC_STEPS } from '@/lib/valueChain';
-import type { Driver, DriverScores } from '@/types';
+import type { Driver, DriverProposal, DriverScores, ExposureMap } from '@/types';
 
 // ─── Diffusion curves ─────────────────────────────────────────────
 export const DIFFUSION_LABELS: Record<string, { label: string; description: string }> = {
@@ -48,3 +48,23 @@ export const baselineOf = (d: Driver): DriverScores | null => d.baseline ?? (d.s
 // what the engine makes of them (the Beta concentration, the peak-year jitter).
 export const uncLabel = (v: number | null | undefined): string =>
   v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
+
+const TAXONOMY: Record<'category_exposure' | 'regional_exposure' | 'vc_exposure', ReadonlySet<string>> = {
+  category_exposure: new Set(CATEGORY_NAMES),
+  regional_exposure: new Set(REGIONS),
+  vc_exposure: new Set<string>(VC_STEPS),
+};
+
+/** A proposal whose exposure maps keep only the taxonomy's names: the API
+ *  refuses any other name, so a draft taken from a stored proposal that holds
+ *  one could never be saved. */
+export function proposalOnTaxonomy(p: DriverProposal): DriverProposal {
+  const out: DriverProposal = { ...p };
+  for (const field of Object.keys(TAXONOMY) as Array<keyof typeof TAXONOMY>) {
+    const map = p[field];
+    if (map) {
+      out[field] = Object.fromEntries(Object.entries(map).filter(([k]) => TAXONOMY[field].has(k))) as ExposureMap;
+    }
+  }
+  return out;
+}
