@@ -187,7 +187,7 @@ describe('Model configuration: the served run\'s cell weights', () => {
     expect(within(within(cellGrid()).getByRole('row', { name: /^Σ region/ })).getByText('50.02%')).toBeTruthy();
   });
 
-  it('keeps the derivation off a run on an earlier version of the estimate', () => {
+  it('keeps the derivation off a run on another version of the estimate, and says where it is', () => {
     const earlier = Object.fromEntries(Object.entries(ESTIMATED_CELL_WEIGHTS).map(([c, row]) => [c, { ...row }]));
     earlier['Hair: Color'].Europe += 0.001;
     earlier['Hair: Care'].Europe -= 0.001;
@@ -195,7 +195,8 @@ describe('Model configuration: the served run\'s cell weights', () => {
     openModal();
     openSection('Model configuration');
     expect(screen.getByText('Estimated HCB mix')).toBeTruthy();
-    expect(screen.getByText(/an earlier version of the estimate/)).toBeTruthy();
+    expect(screen.getByText(/a version of the estimate other than the one this dashboard documents/)).toBeTruthy();
+    expect(screen.getByText(/the QA workbook of that run holds it/)).toBeTruthy();
     expect(screen.queryByText(/How these 52 shares were built/)).toBeNull();
   });
 });

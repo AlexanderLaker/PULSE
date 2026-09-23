@@ -15,7 +15,7 @@ import { VC_STAGES, VC_SHORT_LABELS, shortStage } from '@/lib/valueChain';
 import type { Driver, DriverUpdate, ExposureMap, MeanAggregate } from '@/types';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { curveLabel, DIFFUSION_LABELS, EXPERT_COLOR, REVIEWED_COLOR, uncLabel, vcPos } from './shared';
-import { BaselineMark, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots } from './scales';
+import { BaselineMark, ChangeChip, ColorDots, DeltaChip, DiffusionGlyph, EditableDots, ReadDots } from './scales';
 import { FIELD_HELP, FieldLabel, ProposalsUnavailable, Val } from './cards';
 import { useDriverProposals } from './useDriverProposals';
 
@@ -537,7 +537,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                     <FieldLabel>Diffusion Curve</FieldLabel>
                     <CompareStack who={whoFor('diffusion_curve')}
                       baseline={<span className="inline-flex items-center gap-2"><DiffusionGlyph curve={bCv} color={S.onSurface} /><Val>{curveLabel(bCv)}</Val></span>}
-                      expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <DeltaChip value={eCv === bCv ? 0 : 1} digits={0} /> : null}</span>} />
+                      expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <ChangeChip changed={eCv !== bCv} /> : null}</span>} />
                     <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} expertOk={!!eCv}
                       manual={<select value={man.curve ?? ''} onChange={(e) => setM('curve', e.target.value)} style={{ ...manInput, width: 'auto' }}><option value="">{NO_VALUE}</option>{Object.entries(DIFFUSION_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
                       result={resultOf('curve', !!eCv, resolved.curve ? curveLabel(resolved.curve) : NO_VALUE,

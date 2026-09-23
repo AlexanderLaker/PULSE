@@ -234,7 +234,7 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
           <>
             <strong>An estimate from public reporting, not Henkel P&amp;L.</strong> A finance file passed
             to <code>scripts/run_production.py --cell-weights</code> replaces it.
-            {!documented && ' This run used an earlier version of the estimate than the one documented below this dashboard version.'}
+            {!documented && ' This run used a version of the estimate other than the one this dashboard documents, so its derivation is not shown here; the QA workbook of that run holds it.'}
           </>
         ) : (
           <>These shares come from the file the production run was given (<code>scripts/run_production.py --cell-weights</code>); the source above says what it holds.</>

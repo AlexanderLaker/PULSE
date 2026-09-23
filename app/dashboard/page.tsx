@@ -31,7 +31,7 @@ import HomeGate from '@/components/dashboard/HomeGate';
 import ServiceNotice from '@/components/dashboard/ServiceNotice';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
-import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
+import { FullPageSkeleton, PaneSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
 import { PaneActiveContext } from '@/hooks/useOverlay';
 import { S, SHADOW, HEADLINE_FONT } from '@/lib/theme';
@@ -42,11 +42,11 @@ import type { Role } from '@/types';
 // the initial bundle.
 const ConsumerJourney = dynamic(
   () => import('@/components/dashboard/ConsumerJourney'),
-  { loading: () => <FullPageSkeleton />, ssr: false },
+  { loading: () => <PaneSkeleton />, ssr: false },
 );
 const ProfitPoolExplorer = dynamic(
   () => import('@/components/dashboard/ProfitPoolExplorer'),
-  { loading: () => <FullPageSkeleton />, ssr: false },
+  { loading: () => <PaneSkeleton />, ssr: false },
 );
 
 type DashboardTab =

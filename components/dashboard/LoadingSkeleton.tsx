@@ -1,7 +1,8 @@
 /**
  * Shimmer placeholders. FullPageSkeleton sketches the dashboard shell (top
- * nav, page header, headline tiles, matrix card) while Clerk starts up and
- * while the Explorer tab loads.
+ * nav and a page) while Clerk starts up; PaneSkeleton sketches a page alone
+ * (header, headline tiles, a card) under the real navigation while the code
+ * of the Consumer Journey or the Explorer loads on its first visit.
  */
 
 import { S, SHADOW } from '@/lib/theme';
@@ -17,11 +18,12 @@ function SkeletonBase({
   );
 }
 
+const SHIMMER_KEYFRAMES = '@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }';
+
 export function FullPageSkeleton() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: S.bg }}>
-      <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-      {/* Top nav */}
+      {/* Top nav (the shimmer's keyframes come with the page below) */}
       <div style={{ height: 64, backgroundColor: S.glass, display: 'flex',
         alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
@@ -38,7 +40,16 @@ export function FullPageSkeleton() {
         </div>
       </div>
 
-      {/* Page header, headline tiles, matrix card */}
+      <PaneSkeleton />
+    </div>
+  );
+}
+
+/** A page being loaded: its header, headline tiles and a card. */
+export function PaneSkeleton() {
+  return (
+    <div role="status" aria-label="Loading" style={{ backgroundColor: S.bg }}>
+      <style>{SHIMMER_KEYFRAMES}</style>
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '40px 32px' }}>
         <div style={{ borderLeft: `4px solid ${S.primaryContainer}`, paddingLeft: 20, marginBottom: 32 }}>
           <SkeletonBase width={220} height={11} />

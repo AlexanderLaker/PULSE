@@ -21,8 +21,7 @@
 
 import { useCallback, useMemo, useState, type FC } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Info, Lightbulb, Loader2 } from 'lucide-react';
-import usePrism from '@/hooks/usePrism';
+import { Info, Lightbulb } from 'lucide-react';
 import {
   PROFIT_POOL_VIEWS, POOL_CAGR_THRESHOLDS, POOL_HORIZON_LABEL, viewPoolSummary, toPoolRating,
   type PoolItem, type PoolViewKind, type PoolGroup,
@@ -36,7 +35,6 @@ import { GroupToggle, KindPills, KINDS } from './explorer/controls';
 import { ExplorerBetaNotice, NOTICE_ACK_KEY, noticeAcked } from './explorer/BetaNotice';
 
 const ProfitPoolExplorer: FC = () => {
-  const { loading } = usePrism();
   const [group, setGroup] = useState<PoolGroup>('LHC');
   const [kind, setKind] = useState<PoolViewKind>('ValueChain');
   const [hover, setHover] = useState<{ item: PoolItem; x: number; y: number } | null>(null);
@@ -176,11 +174,6 @@ const ProfitPoolExplorer: FC = () => {
 
         {/* Chart */}
         <div style={{ position: 'relative', marginTop: 18 }}>
-          {loading && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: S.veil, zIndex: 5, borderRadius: 12 }}>
-              <Loader2 size={24} className="animate-spin" color={S.primary} />
-            </div>
-          )}
           <PoolChart
             view={view}
             selectedId={selectedId}

@@ -88,7 +88,7 @@ export const StageRollup: FC<{ benefiting: JourneyTile[]; negativelyImpacted: Jo
   const hw = negativelyImpacted.reduce((n, t) => n + t.intensity, 0);
   const total = tw + hw;
   return (
-    <div title="Tile count weighted by authored grades: qualitative overlay, not simulated">
+    <div title="Tiles weighted by their authored intensity (1 to 3): qualitative overlay, not simulated">
       <div style={{ display: 'flex', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: S.surfaceHigh }} aria-hidden="true">
         {tw > 0 && <span style={{ display: 'block', width: `${(tw / total) * 100}%`, backgroundColor: S.expansion, opacity: 0.55 }} />}
         {hw > 0 && <span style={{ display: 'block', width: `${(hw / total) * 100}%`, backgroundColor: S.contraction, opacity: 0.55 }} />}

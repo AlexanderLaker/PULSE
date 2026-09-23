@@ -6,7 +6,7 @@
  */
 import { useState, type FC } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
-import { BASE_YEAR, FORCES, YEARS, fmtDate, fmtPct } from '@/lib/format';
+import { BASE_YEAR, FORCES, YEARS, fmtDateUtc, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
@@ -63,7 +63,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
         <span className="flex items-center gap-3">
           {run && (
             <span className="hidden sm:inline" style={{ fontSize: 12, color: S.mutedText }}>
-              Run #{run.run_id} · {fmtDate(run.run_date)}
+              Run #{run.run_id} · {fmtDateUtc(run.run_date)}
             </span>
           )}
           <ChevronDown size={16} style={{ color: S.onSurfaceVariant,

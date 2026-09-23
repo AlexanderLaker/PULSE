@@ -319,6 +319,17 @@ export const DeltaChip: FC<{ value: number; unit?: string; digits?: number }> = 
   );
 };
 
+/** Whether a categorical value (a curve, a stage) differs from its baseline, in DeltaChip's look. */
+export const ChangeChip: FC<{ changed: boolean }> = ({ changed }) => (
+  <span style={{
+    fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
+    backgroundColor: changed ? S.deltaSoft : S.surfaceLow,
+    color: changed ? DELTA_COLOR : S.mutedText,
+  }}>
+    {changed ? 'changed' : '='}
+  </span>
+);
+
 // ── Diffusion-curve glyphs and the curve picker ──
 const CURVE_PATHS: Record<string, string> = {
   s_curve: 'M2,16 C9,15 11,3 26,2',

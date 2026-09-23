@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BASE_YEAR, CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, evidenceLine,
   firstPeakYear,
-  fmtDate, fmtDateTime, fmtDateTimeUtc, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow,
+  fmtDate, fmtDateTime, fmtDateTimeUtc, fmtDateUtc, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow,
   shiftColor, shortCat,
 } from '@/lib/format';
 
@@ -57,6 +57,9 @@ describe('dates', () => {
     expect(fmtDateTimeUtc('2026-09-13T08:05:00+00:00')).toBe('13 Sep 2026, 08:05 UTC');
     expect(fmtDateTimeUtc('2026-09-13T23:30:00-02:00')).toBe('14 Sep 2026, 01:30 UTC');
     expect(fmtDateTimeUtc(undefined)).toBe(NO_VALUE);
+    // the day in UTC, so the run's date is the same day in every footer, wherever the reader is
+    expect(fmtDateUtc('2026-09-13T23:30:00-02:00')).toBe('14 Sep 2026');
+    expect(fmtDateUtc(null)).toBe(NO_VALUE);
   });
 });
 

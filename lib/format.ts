@@ -162,14 +162,21 @@ export function fmtDateTime(d: string | number | Date | null | undefined): strin
   return `${fmtDate(dt)}, ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 }
 
+/** "13 Sep 2026" in UTC: the day of a moment everyone reads the same, as the run's date. */
+export function fmtDateUtc(d: string | number | Date | null | undefined): string {
+  if (d == null) return NO_VALUE;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return NO_VALUE;
+  return `${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+}
+
 /** "13 Sep 2026, 08:12 UTC": a moment everyone reads the same, wherever they are. */
 export function fmtDateTimeUtc(d: string | number | Date | null | undefined): string {
   if (d == null) return NO_VALUE;
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return NO_VALUE;
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}, `
-    + `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} UTC`;
+  return `${fmtDateUtc(dt)}, ${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} UTC`;
 }
 
 // ── Evidence ────────────────────────────────────────────────────────────────
