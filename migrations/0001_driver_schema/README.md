@@ -4,10 +4,10 @@ A database of the previous schema keeps the drivers in a table called
 `trends`, next to tables the driver schema does not have. The API and the
 production run refuse such a database (the API answers 503 with a message
 naming this migration, the production run exits with code 1) and write
-nothing to it. The dashboard's role table,
-`user_roles`, is not part of the migration and keeps working throughout.
-`migrate.py` moves a database onto the current schema in one transaction.
-What it changes is listed in its docstring; in short:
+nothing to it. The dashboard's role table, `user_roles`, is not part of the
+migration and keeps working throughout. `migrate.py` moves a database onto
+the current schema in one transaction. What it changes is listed in its
+docstring; in short:
 
 - every driver is checked first. The driver schema stores only drivers the
   engine can simulate: every score present and on its scale, a peak year
@@ -148,11 +148,12 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
 
    The script prints the same report as the dry run and ends with
    `Migrated. Archive of everything dropped: <path>`. Keep that file: it holds
-   every dropped row and column (it is git-ignored and must never be
-   committed). If the script fails it rolls back by itself, exits with code 2
-   and the database is unchanged; see Rollback. It waits at most ten seconds
-   for its locks: if a long request of the live service holds one, it stops
-   the same way, and running it again is safe.
+   every dropped row and column except password columns, which are not
+   archived (it is git-ignored and must never be committed). If the script
+   fails it rolls back by itself, exits with code 2 and the database is
+   unchanged; see Rollback. It waits at most ten seconds for its locks: if a
+   long request of the live service holds one, it stops the same way, and
+   running it again is safe.
 
 6. **Check.** `https://prism-hcb.vercel.app/api/v1/health` answers
    `"status": "ok"` with `"driver_count": 51` and `"has_simulation": true`.

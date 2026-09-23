@@ -7,7 +7,7 @@ How to develop, test, run, deploy and look after PRISM.
 | | Production | Development |
 |---|---|---|
 | Dashboard and API | Vercel project `prism-profit-pool`, https://prism-hcb.vercel.app | `npm run dev` and uvicorn on your machine |
-| Database | Neon PostgreSQL | a Neon development branch (the dashboard's role table needs Neon); the API and the scripts can also use a local SQLite file |
+| Database | Neon PostgreSQL | a Neon development branch (the dashboard's role table needs Neon); the API, the migration and the production run (with `--allow-sqlite`) can also use a local SQLite file; `scripts/promote_admin.py` needs PostgreSQL |
 | Sign-in | Clerk production instance | Clerk development instance (test keys) |
 | Source | the GitHub repository connected to the Vercel project (Settings, Git), branch `main`; every push deploys | any branch |
 
@@ -45,10 +45,10 @@ Keep the virtual environment active whenever you run Python: `npm run
 test:py` and `npm run verify` call `python3`, and outside the environment that
 is the system Python without pytest.
 
-To keep the API and the scripts on SQLite while the dashboard uses Neon,
-blank both URLs for them only: `POSTGRES_URL= DATABASE_URL= uvicorn ...` (a
-variable set in the shell, even empty, wins over `.env`); the production run
-then also needs `--allow-sqlite`.
+To keep the API and the production run on SQLite while the dashboard uses
+Neon, blank both URLs for them only: `POSTGRES_URL= DATABASE_URL= uvicorn ...`
+(a variable set in the shell, even empty, wins over `.env`); the production
+run then also needs `--allow-sqlite`.
 
 ### Roles on a development machine
 
@@ -222,9 +222,9 @@ true`. Then open the dashboard and check that the Shift Analysis shows the
 expected run. `/api/v1/diagnostics` explains a problem (see Troubleshooting).
 
 A deploy never needs a restart for data to appear: each API instance checks
-the database on every request and reloads the drivers or the run when they
-changed. A deploy also brings the PRISM Analysis texts, which ship with the
-code.
+the database on every request that reads the drivers or the run, and reloads
+them when the drivers' stamp or the newest run's id has changed. A deploy
+also brings the PRISM Analysis texts, which ship with the code.
 
 **Rollback**: in the Vercel dashboard, promote the previous production
 deployment (Deployments, the deployment, Promote to Production), or revert
@@ -303,7 +303,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field names it), `no_database` (no `DATABASE_URL` in this deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field says why) |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field names it), `no_database` (neither `DATABASE_URL` nor `POSTGRES_URL` is set in this Vercel deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |

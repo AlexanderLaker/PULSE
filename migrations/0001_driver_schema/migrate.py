@@ -92,7 +92,8 @@ or the write lock (SQLite), so nothing can write in between.
 
 Before the commit, every dropped row and column is written to a local archive,
 migrations/0001_driver_schema/archive/<database>-<time>.json (readable by the
-owner only, never committed). The audit log is kept as it is.
+owner only, never committed), except password columns, which are not
+archived. The audit log is kept as it is.
 
     python3 migrations/0001_driver_schema/migrate.py --dry-run      report what would change, change nothing
     python3 migrations/0001_driver_schema/migrate.py --postgres     migrate the PostgreSQL database in .env

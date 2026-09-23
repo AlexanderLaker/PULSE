@@ -180,9 +180,11 @@ with the labels the page shows, in lower case, the hair categories in full
 ("fabric clean Europe", "hair colour", "body care"). A headwind is
 stated against the net exposure the dashboard shows and its force's gross
 headwind; a tailwind against the gross headwind it offsets and the gross
-tailwind. The width of a driver's own range follows from its probability and
-uncertainty scores alone, so the "because" in the band paragraph is the
-rationale behind the uncertainty score, not something the model computed.
+tailwind. Relative to its contribution, the width of a driver's own range
+follows from its probability and uncertainty scores (and, for a driver whose
+jittered peak can fall after 2035, from its timing), so the "because" in the
+band paragraph is the rationale behind those scores, not something the model
+computed.
 A reading runs 200 to 600 words whatever the driver's weight, because "why is
 it small" needs as much explanation as "why is it large".
 

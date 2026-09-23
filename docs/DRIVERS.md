@@ -213,9 +213,13 @@ texts. After an edit to `driver_base.json`, in this order:
    Consumer Journey text goes into `journey_edits.json` the same way);
 5. commit the regenerated files; CI checks all of them.
 
-A new database picks up the base when it is seeded. An existing database keeps
-its own drivers: the PRISM Analysis ships with the code and reaches it with
-the next deploy; scores, descriptions and sources are changed on the Drivers
-page. Adding or removing drivers, or making changed scores the new baseline of
-an existing database, is a database migration: a new folder under
-`migrations/`, built like `0001_driver_schema`.
+A new database picks up the base when it is seeded. An existing database
+keeps its own drivers: the PRISM Analysis ships with the code and reaches it
+with the next deploy; scores, descriptions and sources are changed on the
+Drivers page. A driver's name, force and onset are set when a database is
+seeded or migrated, and nothing else writes them: a change to one of them
+reaches an existing database only by SQL (raising the driver's revision by
+one, so the service reloads it) or by a migration. Adding or removing
+drivers, or making changed scores the new baseline of an existing database,
+is a database migration too: a new folder under `migrations/`, built like
+`0001_driver_schema`.

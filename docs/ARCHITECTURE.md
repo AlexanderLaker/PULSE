@@ -141,7 +141,7 @@ The API never sees a Clerk session. It verifies HS256 tokens signed with
 signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
 
 - **Reads and proposals.** On load the dashboard calls `/api/prism-cookie`,
-  which sets an httpOnly cookie scoped to `/api/v1` holding a 12-hour token
+  which sets an httpOnly cookie scoped to `/api/v1` holding a 30-minute token
   with the viewer role, for admins too. The browser's `/api/v1` requests carry
   it. It authorises reads and the user's own expert proposals, nothing else.
   When an `/api/v1` request is answered 401 (the token expired), the client
@@ -245,7 +245,7 @@ evidence.
 | `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |
 | `audit_log` | API, dashboard, scripts | Driver edits (one row per changed field, the field named in `reason`, old and new value as JSON), journey saves, role changes where the entry can be written and migrations, each with the acting identity |
 | `schema_migrations` | API, migrations | The migrations the schema already contains |
-| `user_roles` | dashboard | Clerk user id, email and role |
+| `user_roles` | dashboard, `scripts/promote_admin.py` | Clerk user id, email and role |
 
 A stored driver can always be simulated. The constraints of the schema,
 generated from the taxonomies in `prism/config.py`, require every field the

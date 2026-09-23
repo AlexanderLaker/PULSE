@@ -203,9 +203,9 @@ class MonteCarloEngine:
     def _simulate_samples(self, driver_set: DriverSet, n_iter: int):
         """Draw and compound one chain.
 
-        Returns ``(category_samples, regional_samples)``: the cell shifts as
-        (iterations, categories, regions, years) and their gross-profit-weighted
-        category roll-up as (iterations, categories, years).
+        Returns ``(category_samples, regional_samples)``: the gross-profit-
+        weighted category roll-up as (iterations, categories, years) and the
+        cell shifts as (iterations, categories, regions, years).
         """
         n_cats = len(CATEGORIES)
         n_regions = len(REGIONS)

@@ -59,11 +59,12 @@ Sizes come from the highest source on this ladder that has the figure:
 4. company filings (manufacturer net sales);
 5. other research firms, only where all of the above are silent.
 
-Each cited figure carries its value basis (`denomination`): `RSP` (retail
-selling price), `MSP` (manufacturer net sales), `scanner-POS`, `salon-mfr` or
-`model`. Figures of different bases are never added up in one bar. Retail
-value is roughly 1.8 to 2.2 times manufacturer net sales, which is the value
-chain's "brand-owner net sales are about half of retail value" bridge.
+Each cited market size whose basis matters for the sizing carries its value
+basis (`denomination`): `RSP` (retail selling price), `MSP` (manufacturer net
+sales), `scanner-POS`, `salon-mfr` or `model`. Figures of different bases are
+never added up in one bar. Retail value is roughly 1.8 to 2.2 times
+manufacturer net sales, which is the value chain's "brand-owner net sales are
+about half of retail value" bridge.
 
 Amounts are shown in euros, converted from dollar sources at a planning rate
 of 1.15; the source citations keep the figures exactly as published.
@@ -80,11 +81,11 @@ toilet care, bleach and polishes; home insecticides; air care).
 
 Passport values are licensed and cannot be copied into the tool, so every
 category size is a public triangulation at retail value, graded derived or
-estimate, with its full derivation in the source label and in the hover of
-its source chip; the view's construction note gives the method and its error
-band (about 10 to 15 percent, insecticides about 25 percent). Once the sizes
-are checked against Passport internally, the anchors in
-`lib/profitPoolData.ts` are updated and their grades change to reported.
+estimate, with its full derivation in the source label and in the hover of its
+source chip; the view's construction note gives the method, and its key
+insights the error band (about 10 to 15 percent, insecticides about 25
+percent). Once the sizes are checked against Passport internally, the anchors
+in `lib/profitPoolData.ts` are updated and their grades change to reported.
 
 How the Passport rows relate to PRISM's categories is stated in each view's
 construction note: laundry detergents cover Fabric Clean and Fabric Care
