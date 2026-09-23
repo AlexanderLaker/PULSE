@@ -10,10 +10,13 @@
  *   - no user_roles row for the email (the Clerk webhook adds one when a
  *     user signs up; it has not added this user): 404
  *
- * Set the secret in the Vercel project, call the route with
- * { "email": "..." }, then remove the secret again. scripts/promote_admin.py
- * does the same with direct database access. Every promotion is written to
- * the audit log.
+ * Set the secret in the Vercel project and redeploy (Vercel applies a changed
+ * variable to new deployments only), call the route with { "email": "..." },
+ * then remove the secret and redeploy again. scripts/promote_admin.py
+ * does the same with direct database access. A promotion is written to the
+ * audit log; if that write fails (a database the API has not started on has
+ * no audit log yet) the promotion stands and the failure is logged as a
+ * warning.
  */
 import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';

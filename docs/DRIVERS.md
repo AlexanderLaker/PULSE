@@ -183,17 +183,21 @@ value. Endorsing saves the chosen values as an ordinary edit. The next
 production run reports every change as input drift.
 
 The base file changes when a review changes the reference scores or the
-texts. After an edit to `driver_base.json`:
+texts. After an edit to `driver_base.json`, in this order:
 
-1. run `scripts/generate_seed.py`;
-2. if category exposures changed, or drivers were added or removed (the
+1. if category exposures changed, or drivers were added or removed (the
    correction depends on how many drivers each force has), give
    `scripts/compute_overlap_correction.py` a new `VERSION` and run it;
    it writes the record and `prism/overlap_correction.py`, which
    `prism/config.py` reads. The new correction moves the model's numbers, so
    the same commit carries a new `MODEL_VERSION` and the regenerated golden
-   pins (docs/adr/0014);
-3. regenerate the PRISM Analysis as docs/DRIVER_ANALYSIS.md describes;
+   pins (docs/adr/0014-versioning-and-golden-pins.md);
+2. if a score, an exposure or the set of drivers changed, regenerate the
+   PRISM Analysis as docs/DRIVER_ANALYSIS.md describes; an added driver needs
+   its template in `data/drivers/driver_analysis.json` first;
+3. run `scripts/generate_seed.py`. The seed carries the analysis texts, so it
+   comes after them; a change to texts alone (a name, a description, a
+   source) needs only this step;
 4. until migration 0001 has run on every database, it is what carries a
    changed description to them: the new text becomes the `text` of the
    driver's entry in `migrations/0001_driver_schema/descriptions.json` (an

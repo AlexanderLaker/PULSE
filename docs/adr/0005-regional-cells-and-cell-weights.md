@@ -23,8 +23,9 @@ grid is not neutral either: it asserts a quarter of the pool in every region.
   from public reporting (`scripts/build_cell_weights.py`), each input graded,
   deliberately not separable into a region vector times a category vector.
   It is labelled as an estimate, not Henkel P&L, on the Shift Analysis, in
-  Settings, in the QA workbook and in the basis line of every PRISM Analysis.
-  The finance file replaces it at run time and is never committed.
+  Settings and in the QA workbook, and the basis line of every PRISM Analysis
+  names the estimated mix. The finance file replaces it at run time and is
+  never committed.
 
 ## Consequences
 

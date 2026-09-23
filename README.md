@@ -101,7 +101,8 @@ Four generators keep committed files in step with their inputs; each takes
 ## Configuration
 
 `.env.example` lists every variable; copy it to `.env` (never committed). On
-Vercel the same variables are set in the project settings.
+Vercel the same variables are set in the project settings, and a change takes
+effect with the next deployment.
 
 | Variable | Needed by | Purpose |
 |---|---|---|

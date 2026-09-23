@@ -86,11 +86,11 @@ def compute_materialization_schedule(
 ) -> dict[int, float]:
     """Share of a driver's full effect that has materialised in each path year.
 
-    The effect is zero up to the onset, the later of ``base_year`` and the
-    driver's ``start_year``; it ramps along ``diffusion_curve`` and is complete
-    from ``peak_year`` on, which must come after the onset (simulation_problems
-    refuses a driver whose peak does not, and the engine keeps a jittered peak
-    after it).
+    The effect is zero up to and including the onset, the later of
+    ``base_year`` and the driver's ``start_year``; it ramps along
+    ``diffusion_curve`` and is complete from ``peak_year`` on, which must come
+    after the onset (simulation_problems refuses a driver whose peak does not,
+    and the engine keeps a jittered peak after it).
 
     Curves: ``linear``; ``front_loaded`` (square root, fast then flat);
     ``back_loaded`` (quadratic, slow then fast); ``step_function`` (5 percent

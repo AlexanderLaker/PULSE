@@ -98,10 +98,10 @@ default. The deterministic counterpart, `E[s_j] = (p / 6) x g_j x d_j`, is the
 
 ### 3. Timing
 
-The effect is zero up to the onset, the later of the base year and the
-driver's start year, and complete from the peak year on. In between it
-follows the driver's diffusion curve, with `t` the fraction of the way from
-onset to peak:
+The effect is zero up to and including the onset, the later of the base year
+and the driver's start year, and complete from the peak year on. In between
+it follows the driver's diffusion curve, with `t` the fraction of the way
+from onset to peak:
 
 | Curve | Share materialised at `t` |
 |---|---|
@@ -216,10 +216,11 @@ an integrity event.
   can differ from these lenses.
 - **Monte Carlo standard error.** A bootstrap (200 resamples) of each
   category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it is
-  about 0.001 to 0.002 percentage points, far below the one-decimal display. It
-  measures sampling noise only, never model error. The About this model
-  section of the Shift Analysis shows the largest standard error of a
-  category median next to the seed stability.
+  0.001 to 0.002 percentage points for the medians and P10s and at most about
+  0.003 for the P90s, far below the one-decimal display. It measures sampling
+  noise only, never model error. The About this model section of the Shift
+  Analysis shows the largest standard error of a category median next to the
+  seed stability.
 - **Chains and seed stability.** Production runs three chains with seeds
   `42 + i x 1,000,003` and pools them for every published number. The spread
   of the three chains' terminal-year portfolio medians is reported as seed
@@ -280,8 +281,8 @@ The roll-up weights each of the 52 cells with its share of HCB gross profit.
 Until finance provides the real shares, the engine uses an **estimate built
 from public reporting and category knowledge. It is not Henkel P&L.** The
 Shift Analysis says so under its heading whenever the served run stands on
-it, and so do the run details under About this model, Settings, the QA
-workbook and the basis line of every PRISM Analysis.
+it, and so do the run details under About this model, Settings and the QA
+workbook; the basis line of every PRISM Analysis names the estimated mix.
 
 `scripts/build_cell_weights.py` builds it as
 

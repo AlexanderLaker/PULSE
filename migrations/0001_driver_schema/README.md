@@ -145,8 +145,9 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
    open to reload it: a page loaded before the deploy still runs the
    previous dashboard, whose reads and saves the current service refuses.
 
-7. **Write a fresh run** so the served run carries the current labels (the
-   numbers stay the same, and its input-drift event reports no changes):
+7. **Write a fresh run** so the served run carries the current names and
+   labels. With the drivers unchanged since the last run, the numbers stay
+   the same and its input-drift event reports no changes:
 
    ```bash
    python3 scripts/run_production.py

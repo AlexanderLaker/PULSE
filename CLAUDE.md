@@ -54,22 +54,25 @@ documents in `docs/` explain everything below in full.
   names the three exceptions); the portfolio band is the joint percentile; the
   lenses are labelled attribution; sampling quality is the Monte Carlo
   standard error and seed stability; a shift always carries its sign.
-  docs/adr/0007 has the reasons.
+  `docs/adr/0007-honest-display.md` has the reasons.
 - **Only the drivers feed the Shift Matrix.** The Consumer Journey and the
   Profit Pool Explorer never read or write the simulation.
-- **Parity.** The taxonomies (`prism/config.py` and `lib/format.ts`,
-  `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
-  `lib/uncertainty.ts`) and the per-driver attribution
-  (`prism/attribution.py` and `lib/driverAttribution.ts`) exist twice and are
-  tested against each other; change both or neither.
+- **Parity.** The taxonomies and the source tiers (`prism/config.py`,
+  `prism/drivers.py` and `lib/format.ts`, `lib/valueChain.ts`), the
+  uncertainty tables (`prism/config.py` and `lib/uncertainty.ts`), the
+  per-driver attribution (`prism/attribution.py` and
+  `lib/driverAttribution.ts`) and the PRISM Analysis labels
+  (`prism/readings.py` and `components/dashboard/drivers/PrismAnalysis.tsx`)
+  exist twice and are tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the
   force and category palettes from `lib/format.ts`, which also builds the
   shift colours on the theme's pair); Tailwind reads the same tokens
-  (`tailwind.config.ts`). A literal colour elsewhere in the dashboard's code,
-  a named colour or a class of Tailwind's own palette (`bg-white`,
-  `text-slate-500`) included, fails `tests/test_repository.py`.
+  (`tailwind.config.ts`). A literal colour elsewhere in the dashboard's code
+  (a hex or `rgb()` value, `white` or `black` as a style value, a class of
+  Tailwind's own palette such as `bg-white`) fails `tests/test_repository.py`;
+  three views keep a palette of their own, which that test lists.
   docs/DESIGN.md has the system.
 - **Scripts are entry points.** Code that more than one script, or a script
   and the package, needs lives in `prism/` (the driver base, the attribution,

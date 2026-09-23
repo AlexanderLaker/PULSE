@@ -146,7 +146,7 @@ class TestAuthentication:
 class TestHealthAndDiagnostics:
     def test_a_new_database_is_seeded(self, api):
         body = api.get("/api/v1/health").json()
-        assert body == {"status": "ok", "version": "2.12.0", "driver_count": 51, "categories": 13,
+        assert body == {"status": "ok", "version": "2.12.0", "driver_count": 51,
                         "has_simulation": False, "simulation_reason": "no_rows", "latest_run_id": None}
 
     def test_a_persisted_run_is_reported(self, api, valid_run):

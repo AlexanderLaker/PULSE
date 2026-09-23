@@ -24,8 +24,8 @@ meaningless for independent draws.
 - Sampling quality is shown as the largest bootstrap standard error of a
   category median and as seed stability (the spread of the chains' portfolio
   medians), both framed as Monte Carlo noise only; every run stores the
-  standard errors of each category's median, P10 and P90. No convergence statistic that is
-  meaningless for independent draws is shown.
+  standard errors of each category's median, P10 and P90. No convergence
+  statistic that is meaningless for independent draws is shown.
 - Every run records what it repaired or clipped, and how the driver
   scores changed since the previous run (input drift). The dashboard lists
   these next to the run.

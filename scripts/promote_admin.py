@@ -1,15 +1,17 @@
 """Give a user the admin role (or take it away) directly in the database.
 
 Roles live in the user_roles table (lib/roles.ts); the Clerk webhook adds a
-user's row when they sign up. The in-app route /api/admin/bootstrap does the
-same job when ADMIN_BOOTSTRAP_SECRET is set; this script is the path that
-needs nothing but database access.
+user's row when they sign up. The in-app route /api/admin/bootstrap can make
+a user admin when ADMIN_BOOTSTRAP_SECRET is set; this script needs nothing but
+database access, and can also take the role away.
 
     python3 scripts/promote_admin.py someone@example.com
     python3 scripts/promote_admin.py someone@example.com --role viewer
 
 The database is POSTGRES_URL or DATABASE_URL from the environment or .env,
-or --dsn. The change is written to the audit log.
+or --dsn. The change is written to the audit log when the database has one
+(the API creates it when it first starts); without it the change stands and
+the script says it was not logged.
 """
 from __future__ import annotations
 

@@ -18,13 +18,13 @@ numbers that carry the hierarchy while the chrome stays quiet.
 Components style themselves inline from these tokens and use Tailwind for
 layout and spacing; where a class has to carry a colour or a shadow (Clerk's
 elements take classes, and a hover state is simplest as a class), it uses the
-theme's names. A literal colour anywhere else in the dashboard's code fails
-`tests/test_repository.py`, and so do a named colour (`'white'`) and a class
-of Tailwind's own palette (`bg-white`, `text-slate-500`), which bypass the
-tokens the same way. Three palettes belong to a single view and live
-in it: the source-tier colours on the Drivers page
-(`components/dashboard/drivers/cards.tsx`), the washes of the entry gate's
-doors (`HomeGate.tsx`) and the Explorer's bar fills
+theme's names. A literal colour (a hex or `rgb()` value) anywhere else in
+the dashboard's code fails `tests/test_repository.py`, and so do `white` or
+`black` as a style value and a class of Tailwind's own palette (`bg-white`,
+`text-slate-500`), which bypass the tokens the same way. Three palettes
+belong to a single view and live in it: the source-tier colours on the
+Drivers page (`components/dashboard/drivers/cards.tsx`), the washes of the
+entry gate's doors (`HomeGate.tsx`) and the Explorer's bar fills
 (`components/dashboard/explorer/PoolChart.tsx`).
 
 The pieces several views share are components of their own: `Chip.tsx` (a

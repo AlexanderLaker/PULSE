@@ -1,8 +1,9 @@
 """Render the PRISM Analysis readings from their templates and the attribution record.
 
 Pure functions without an engine import: scripts/build_driver_analysis.py
-renders the readings with them from the record prism/attribution.py computes, scripts/generate_seed.py checks the committed
-texts against them, and the tests hold both to the same renderer.
+renders the readings with them from the record prism/attribution.py
+computes, scripts/generate_seed.py checks the committed texts against them,
+and the tests hold both to the same renderer.
 
 A template is prose with named placeholders in braces; every figure in a
 reading comes from a placeholder, and ``render_fields`` lists them all. The
@@ -21,6 +22,9 @@ import re
 
 from prism.config import ESTIMATE_SOURCE_PREFIX
 
+#: The paragraph labels, in order, and the basis line's; the Drivers page's
+#: card sets each labelled paragraph under its label (PrismAnalysis.tsx holds
+#: the same labels; tests/test_driver_analysis.py keeps them equal).
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
 BASIS_LABEL = "Figures"
 

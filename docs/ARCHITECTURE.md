@@ -218,8 +218,9 @@ PostgreSQL in production; on a development machine the API and the scripts
 fall back to a SQLite file (`PRISM_DB_PATH`, default `data/prism.db`) when no
 database URL is set, and on Vercel they refuse to. All SQL is written once for
 both (`prism/database.py`). The database holds scores, shares and percentage
-shifts, never an HCB financial figure; driver descriptions and sources may
-quote public market figures as evidence.
+shifts, never an HCB financial figure; texts (driver descriptions and
+sources, the Consumer Journey content) may quote public market figures as
+evidence.
 
 | Table | Written by | Content |
 |---|---|---|

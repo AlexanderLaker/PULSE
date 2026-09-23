@@ -7,8 +7,9 @@ would live in one function instance's scratch space and silently vanish. All
 SQL is written once, with ``placeholder()`` / ``ph()`` for the parameter style
 of the active backend.
 
-The database holds relative figures only (scores, shares, percentage shifts);
-no currency amount is ever stored.
+The database holds scores, shares and percentage shifts, never an HCB
+financial figure; texts (driver descriptions and sources, the Consumer
+Journey content) may quote public market figures as evidence.
 """
 
 import json

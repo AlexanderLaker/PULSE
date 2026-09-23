@@ -13,16 +13,17 @@ There is no history of PRISM outputs to validate the method against.
 ## Decision
 
 - The engine outputs relative shifts of gross profit only, and no HCB
-  financial figure is stored (driver descriptions and sources may quote
-  public market figures as evidence). A finance cell-weights file with
-  absolute figures is divided by its total before the engine sees it.
+  financial figure is stored; texts (driver descriptions and sources, the
+  Consumer Journey content) may quote public market figures as evidence. A
+  finance cell-weights file with absolute figures is divided by its total
+  before the engine sees it.
 - The simulation holds strategy constant: no pricing, innovation or
   competitive response by anyone. Every view that shows totals says so, and a
   negative total reads as exposure if nobody acts.
 - PRISM is presented as structured judgment. No text in the product or the
   documentation claims predictive validity.
 - The Profit Pool Explorer, a separate beta view of industry pools, is the
-  one place that shows euro figures (docs/EXPLORER.md).
+  one view built on euro figures (docs/EXPLORER.md).
 
 ## Consequences
 

@@ -263,6 +263,16 @@ describe('About this model', () => {
     const environmental = text.indexOf('Environmental6.3%');
     expect(consumer).toBeGreaterThanOrEqual(0);
     expect(environmental).toBeGreaterThan(consumer);
-    expect(text).toContain('changing it is a code change followed by a new production run');
+    expect(text).toContain('changing them is a code change followed by a new production run');
+  });
+
+  it('states the uncertainty tables the engine uses', () => {
+    STORE.store = makeStore({ config: makeConfig() });
+    const { container } = render(<ShiftAnalysis />);
+    openAbout();
+    const text = container.textContent ?? '';
+    expect(text).toContain('peak-year jitter of up to ±4 years');
+    expect(text).toContain('the prior at uncertainty score 3 (α+β=6)');
+    expect(text).toContain('from α+β=24 at score 0 to 3 at score 5');
   });
 });

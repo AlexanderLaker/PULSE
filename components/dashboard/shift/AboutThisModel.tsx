@@ -8,6 +8,7 @@ import { useState, type FC } from 'react';
 import { ChevronDown, Info } from 'lucide-react';
 import { BASE_YEAR, FORCES, YEARS, fmtDate, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
+import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName, ModelConfig, SimulationResult } from '@/types';
 import { RunDetails } from './RunDetails';
 
@@ -115,7 +116,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               </div>
             )}
             <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-              Shown at the attenuation production runs use; changing it is a code change followed by a new production run. Timing: P10 to P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; per-iteration peak-year jitter of &plusmn;0 to &plusmn;4 years, also set by that score, gives velocity bands their timing spread. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
+              These are the values production runs use; changing them is a code change followed by a new production run. Timing: P10 to P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; a per-iteration peak-year jitter of up to &plusmn;{Math.max(...UNCERTAINTY_PEAK_JITTER)} years, also set by that score, gives velocity bands their timing spread. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
             </div>
           </div>
           {/* What a 1–5 probability score means as a Beta prior: the scale
@@ -146,7 +147,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               </table>
             </div>
             <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-              The scale never reaches 0 or 1: a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The table shows the prior at uncertainty score 3 (&alpha;+&beta;=6). Other uncertainty scores keep the mean and narrow or widen the band, from &alpha;+&beta;=24 at score 0 to 3 at score 5.
+              The scale never reaches 0 or 1: a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The table shows the prior at uncertainty score 3 (&alpha;+&beta;={UNCERTAINTY_KAPPA[3]}). Other uncertainty scores keep the mean and narrow or widen the band, from &alpha;+&beta;={UNCERTAINTY_KAPPA[0]} at score 0 to {UNCERTAINTY_KAPPA[5]} at score 5.
             </div>
           </div>
           <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"

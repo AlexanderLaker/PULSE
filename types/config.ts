@@ -35,7 +35,6 @@ export interface HealthStatus {
   status: 'ok' | 'degraded';
   version: string;
   driver_count: number;
-  categories: number;
   has_simulation: boolean;
   /** 'degraded' comes with migration_pending (the database needs a migration
    *  from migrations/), no_database (no database URL configured) or db_error. */

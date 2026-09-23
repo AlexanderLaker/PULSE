@@ -37,17 +37,9 @@ class TestPriorMapping:
         with pytest.raises(ValueError, match="outside its scale"):
             beta_prior_for(probability, uncertainty)
 
-    def test_the_about_section_states_these_tables(self):
-        """The dashboard's About this model section describes the prior and the jitter in words."""
-        src = (Path(__file__).resolve().parent.parent / "components" / "dashboard" / "shift"
-               / "AboutThisModel.tsx").read_text(encoding="utf-8")
-        k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER
-        assert f"keep the mean and narrow or widen the band, from &alpha;+&beta;={k[0]} at score 0 to {k[5]} at score 5" in src
-        assert f"the prior at uncertainty score 3 (&alpha;+&beta;={k[3]})" in src
-        assert f"peak-year jitter of &plusmn;{min(j.values())} to &plusmn;{max(j.values())} years" in src
-
     def test_the_dashboard_copies_of_the_tables_match(self):
-        """lib/uncertainty.ts carries the two tables for the editor and the drill-down."""
+        """lib/uncertainty.ts carries the two tables for the editor, the drill-down and the About
+        this model section (tests/frontend/shiftAnalysis.test.tsx reads them there)."""
         src = (Path(__file__).resolve().parent.parent / "lib" / "uncertainty.ts").read_text(encoding="utf-8")
 
         def ts_array(name):

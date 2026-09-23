@@ -39,6 +39,7 @@ ATTRIBUTION = ROOT / "data" / "drivers" / "driver_attribution.json"
 SEED_OUT = ROOT / "prism" / "seed_drivers.py"
 CODEMAP_OUT = ROOT / "data" / "driverCodeMap.ts"
 
+
 def q(s) -> str:
     """A double-quoted Python string literal (JSON escapes are valid Python)."""
     return json.dumps("" if s is None else str(s), ensure_ascii=False)

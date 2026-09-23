@@ -106,8 +106,8 @@ A few rules the suite holds:
 
 - **Golden pins** (`tests/test_golden_pipeline.py`) fix the engine's output on
   a small driver set. They change only with a deliberate change of the model
-  (with a new `MODEL_VERSION`, docs/adr/0014) or of those drivers, in the same
-  commit.
+  (with a new `MODEL_VERSION`, docs/adr/0014-versioning-and-golden-pins.md) or
+  of those drivers, in the same commit.
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
   `package.json` must agree.
 - **Generated files** are never edited by hand.
@@ -162,7 +162,7 @@ The cell-weights file is JSON, kept outside the repository:
 `cells` must name every category and region of `prism/config.py`. With
 `"basis": "gp1_share"` the 52 shares must add up to 1 within 0.01; with
 `"gp1_absolute"` the values are divided by their total before the engine sees
-them, and no amount is stored anywhere. The `source` text is stored with the
+them, and none of them is stored. The `source` text is stored with the
 run and shown next to it; a text that opens like the estimate's label
 ("ESTIMATE, not Henkel P&L") is refused, so a finance run can never be
 mistaken for the estimate.
@@ -193,13 +193,15 @@ rewritten templates first (the same document, "On the finance shares").
 Push to `main`: Vercel builds the dashboard and the Python function and
 promotes the build to production in about two minutes. Other branches get
 preview deployments. The environment variables live in the Vercel project
-settings (Production and Preview). `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
-`NEXT_PUBLIC_SIGNUP_CODE` are read at build time, so a change to either needs
-a new deployment; the others are read at run time. `PRISM_API_ORIGIN`, if
-used, belongs to Production only: set for Preview as well, a preview
-deployment's admin writes would go to the production API. A database that
-still needs migration 0001 (the API answers 503 and names it) is moved in the
-order that migration's runbook gives, the deploy first
+settings (Production and Preview). Vercel applies a change to any of them
+only to deployments made after it, so redeploy after every change
+(Deployments, the latest deployment, Redeploy);
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `NEXT_PUBLIC_SIGNUP_CODE` are also
+built into the dashboard's code. `PRISM_API_ORIGIN`, if used, belongs to
+Production only: set for Preview as well, a preview deployment's admin
+writes would go to the production API. A database that still needs
+migration 0001 (the API answers 503 and names it) is moved in the order that
+migration's runbook gives, the deploy first
 (`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
@@ -259,14 +261,15 @@ back as that migration's runbook says.
 A user becomes admin at sign-up when `user_roles` is empty (the first user);
 everyone else starts as viewer. Admins change other users' roles in
 Settings, under User management, never their own. Two ways exist to set a
-role without an admin session, and both can change any role, the last
-admin's included:
+role without an admin session:
 
 - `python3 scripts/promote_admin.py someone@example.com` (or `--role viewer`)
-  with database access;
+  with database access. It can change any role, the last admin's included;
 - `POST /api/admin/bootstrap` with the header `x-bootstrap-secret` equal to
-  `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}`. The route exists
-  only while the variable is set; remove it afterwards.
+  `ADMIN_BOOTSTRAP_SECRET` and the body `{"email": "..."}` makes the user
+  admin; it never takes a role away. The route exists only while the
+  variable is set: set it, redeploy, call the route, then remove it and
+  redeploy again.
 
 Both need the user's row in `user_roles`, which the Clerk webhook adds at
 sign-up.
@@ -313,8 +316,9 @@ Three things travel separately:
 - the credentials, which are not handed over but rotated: the Clerk keys and
   webhook secret, the Neon password, `PRISM_JWT_SECRET` (the old tokens stop
   working, and an open dashboard fetches a new cookie on its next request, so
-  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` (a new deployment,
-  since it is built in) and any `ADMIN_BOOTSTRAP_SECRET`.
+  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` and any
+  `ADMIN_BOOTSTRAP_SECRET`. Each new value takes effect with the next
+  deployment.
 
 The services themselves belong to the owner's accounts today: the GitHub
 repository, the Vercel project `prism-profit-pool`, the Neon project and the

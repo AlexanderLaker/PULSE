@@ -14,6 +14,7 @@ import usePrism from '@/hooks/usePrism';
 import { fmtShift } from '@/lib/format';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
+// The labels prism/readings.py renders (LABELS, BASIS_LABEL; tests/test_driver_analysis.py keeps them equal).
 const ANALYSIS_LABELS = ['Weight in the answer', 'Where it lands', 'When it lands', 'What the band hinges on'];
 const ANALYSIS_BASIS_LABEL = 'Figures';
 export const ANALYSIS_FOOTNOTE =

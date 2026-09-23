@@ -8,8 +8,9 @@
   scripts/<name>, as the documents show.
 - The dashboard's colours and shadows come from lib/theme.ts (and the force
   and category palettes from lib/format.ts): a literal colour anywhere else in
-  its code, a named one or a class of Tailwind's own palette included, is
-  either a token that is missing or a copy that will drift.
+  its code (a hex or rgb() value, white or black as a style value, a class of
+  Tailwind's own palette) is either a token that is missing or a copy that
+  will drift. Three views keep a palette of their own (COLOUR_HOMES).
 - British spelling in the documents and in the drivers' own texts
   (tests/spelling.json lists the American forms and the names that keep their
   own spelling; tests/frontend/interfaceCopy.test.tsx holds the dashboard to

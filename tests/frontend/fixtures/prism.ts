@@ -171,7 +171,7 @@ export function makeConfig(overrides: Partial<ModelConfig> = {}): ModelConfig {
 
 export function makeHealth(overrides: Partial<HealthStatus> = {}): HealthStatus {
   return {
-    status: 'ok', version: '2.12.0', driver_count: 51, categories: 13,
+    status: 'ok', version: '2.12.0', driver_count: 51,
     has_simulation: true, simulation_reason: 'ok', latest_run_id: 99, ...overrides,
   };
 }

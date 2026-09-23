@@ -4,7 +4,6 @@ import logging
 from fastapi import APIRouter
 
 from prism import __version__
-from prism.config import CATEGORIES
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +12,15 @@ router = APIRouter()
 
 @router.get("/api/v1/health")
 def health():
-    """Liveness plus the two facts the dashboard needs: drivers and a run exist.
+    """Liveness, the service version, the driver count and the newest run's id.
 
-    Cheap on purpose (the dashboard polls it): it reads the run's id, never
-    its results. When the database fails, status is "degraded" and
-    simulation_reason says why (migration_pending: it needs a migration from
-    migrations/ first; no_database: no URL is configured; db_error: anything
-    else). A run that exists but cannot be served shows up in
-    /api/v1/diagnostics and /api/v1/simulation.
+    Cheap on purpose (the dashboard polls it and reloads when the run id
+    changes): it reads the run's id, never its results. When the database
+    fails, status is "degraded" and simulation_reason says why
+    (migration_pending: it needs a migration from migrations/ first;
+    no_database: no URL is configured; db_error: anything else). A run that
+    exists but cannot be served shows up in /api/v1/diagnostics and
+    /api/v1/simulation.
     """
     from prism.api import state
     from prism.database import failure_reason, latest_run_summary
@@ -29,14 +29,12 @@ def health():
         latest = latest_run_summary()
     except Exception as e:  # noqa: BLE001 (reported as degraded, never raised)
         logger.warning("health: database unavailable: %s", e)
-        return {"status": "degraded", "version": __version__, "driver_count": 0,
-                "categories": len(CATEGORIES), "has_simulation": False,
+        return {"status": "degraded", "version": __version__, "driver_count": 0, "has_simulation": False,
                 "simulation_reason": failure_reason(e), "latest_run_id": None}
     return {
         "status": "ok",
         "version": __version__,
         "driver_count": drivers.driver_count,
-        "categories": len(CATEGORIES),
         "has_simulation": latest is not None,
         "simulation_reason": "ok" if latest else "no_rows",
         "latest_run_id": latest["id"] if latest else None,

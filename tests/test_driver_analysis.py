@@ -25,7 +25,7 @@ import numpy as np
 import pytest
 
 from prism import attribution, seed_drivers
-from prism.config import CATEGORIES, ESTIMATE_SOURCE_PREFIX, ModelConfig
+from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, ESTIMATE_SOURCE_PREFIX, ModelConfig
 from prism.drivers import DriverSet
 from prism.engine import MonteCarloEngine
 from support import load_module
@@ -272,17 +272,22 @@ class TestCommittedArtefacts:
 
     def test_no_template_types_its_drivers_peak_year(self, analysis, record):
         """The peak year is a score the page shows and a re-score moves it; a
-        template names it only through {peak_year}. The lock reads the
-        timing paragraph for "to / at / until <the driver's peak year>"."""
+        template names it only through {peak_year}. The lock reads every
+        paragraph for "by / to / until / at / towards / peaking in / peaks in
+        <the driver's peak year>", except where the year labels a placeholder
+        ("{by2028} percent by 2028", "in the numbers by 2027") and except the
+        horizon's last year, which is the terminal year whatever the peak."""
         seed = {d.id: d for d in seed_drivers.DRIVERS}
         by_code = {d["code"]: driver_id for driver_id, d in record["drivers"].items()}
+        typed = r"(?<!percent )(?<!numbers )\b(?:by|to|until|at|towards|peaking in|peaks in) {}\b"
         offenders = []
         for code, entry in analysis["drivers"].items():
             peak = seed[by_code[code]].peak_year
-            timing = next((p for p in entry["template"].split("\n\n") if p.startswith("When it lands:")), "")
-            if re.search(rf"\b(?:to|until|at|towards|peaking in|peaks in) {peak}\b", timing):
+            if peak != DEFAULT_PATH_YEARS[-1] and re.search(typed.format(peak), entry["template"]):
                 offenders.append((code, peak))
         assert offenders == []
+        assert re.search(typed.format(2031), "could stay a niche rather than become a regimen step by 2031;")
+        assert not re.search(typed.format(2028), "{by2028} percent by 2028")
         assert sum("{peak_year}" in e["template"] for e in analysis["drivers"].values()) >= 30
 
     def test_inputs_hash_follows_the_scoring_state_and_check_refuses_a_stale_reference(self, build, script, drivers, record,
@@ -344,6 +349,14 @@ class TestCommittedArtefacts:
 # ── (c) the readings follow the rules ────────────────────────────────────────
 
 class TestReadings:
+    def test_the_card_splits_by_the_renderers_labels(self, render):
+        """The Drivers page's card (PrismAnalysis.tsx) sets each labelled
+        paragraph under its label, so it must know the renderer's labels."""
+        card = (REPO / "components" / "dashboard" / "drivers" / "PrismAnalysis.tsx").read_text(encoding="utf-8")
+        labels = re.search(r"const ANALYSIS_LABELS = \[(.*?)\];", card, re.S).group(1)
+        assert tuple(re.findall(r"'([^']+)'", labels)) == render.LABELS == LABELS
+        assert re.search(r"const ANALYSIS_BASIS_LABEL = '([^']+)';", card).group(1) == render.BASIS_LABEL
+
     def test_structure(self, render, analysis, record):
         for code, entry in analysis["drivers"].items():
             parts = split_paragraphs(entry["text"])

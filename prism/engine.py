@@ -607,7 +607,7 @@ class MonteCarloEngine:
         """Bootstrap standard error of the terminal-year median, P10 and P90, in pp.
 
         This is the sampling noise of the published percentiles at the run's
-        iteration count (about 0.001 pp at 3 x 50,000, far below the 0.1 pp
+        iteration count (0.001 to 0.003 pp at 3 x 50,000, far below the 0.1 pp
         display precision). It measures Monte Carlo noise only, never model
         error. A fixed sub-generator keeps the reported value reproducible.
         """
