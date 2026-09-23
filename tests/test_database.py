@@ -106,6 +106,16 @@ class TestDrivers:
         assert loaded.scores_edited is False and loaded.revision == 1
         assert loaded.expected_effect == pytest.approx(expected.expected_effect)
 
+    def test_a_gp1_share_is_stored_at_full_precision(self, db):
+        """The engine multiplies by the share, so the database must return the value entered, not the
+        nearest four-byte float (PostgreSQL's REAL)."""
+        edit = copy.deepcopy(db.load_drivers()[0])
+        edit.gp1_pct_affected = 0.123456789
+        db.save_driver_edit(edit, edit.revision, {"gp1_pct_affected"})
+        assert db.load_drivers()[0].gp1_pct_affected == 0.123456789
+        proposal = db.upsert_driver_proposal("consumer_r01", "expert-c", {"gp1_pct_affected": 0.987654321}, "C")
+        assert proposal["gp1_pct_affected"] == 0.987654321
+
     def test_the_drivers_are_read_from_one_snapshot(self, db, monkeypatch):
         """An edit committed while the drivers are read is seen whole or not at all: here another
         connection raises the probability and clears the exposures between the reads."""
