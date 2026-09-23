@@ -72,7 +72,7 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 | `components/dashboard/` | The views and their shared pieces |
 | `hooks/`, `api/client.ts`, `types/` | The data store, the API client and the types that mirror the API's JSON |
 | `lib/` | Shared logic: formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
-| `data/` | Dashboard content (the Consumer Journey, the driver code map) and the source files of generated artefacts (`drivers/`, `calibration/`) |
+| `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`calibration/`, `drivers/driver_attribution.json`) |
 | `prism/` | The Python package: the engine (`simulation/`), the model configuration, persistence and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |
 | `scripts/` | The production run, the generators and maintenance tools |
@@ -85,7 +85,7 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 | Command | What it does |
 |---|---|
 | `npm run dev` | The dashboard with hot reload (the API runs separately) |
-| `npm run verify` | Every check CI runs: types, lint, both test suites |
+| `npm run verify` | Types, lint and both test suites; CI also builds and runs the generator checks |
 | `npm run typecheck`, `npm run lint`, `npm test` | The dashboard checks one by one |
 | `python3 -m pytest -n auto` | The Python suite |
 | `ruff check .` | The Python lint |
@@ -110,11 +110,13 @@ Vercel the same variables are set in the project settings.
 | `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
 | `NEXT_PUBLIC_SIGNUP_CODE` | dashboard | The access code the sign-up page asks for (without it the page asks for `HCB2026`) |
 | `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set; remove it once an admin exists |
+| `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_BACKEND_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
 | `PRISM_DB_PATH` | API, scripts | The SQLite file used when no database URL is set (default `data/prism.db`) |
 
 Variables set in the shell take precedence over `.env`, so one command can be
-pointed at another database: `DATABASE_URL=... python3 scripts/run_production.py`.
+pointed at another database. Set both URLs, because `POSTGRES_URL` wins when
+`.env` holds it: `POSTGRES_URL=... DATABASE_URL=... python3 scripts/run_production.py`.
 
 ## Documentation
 

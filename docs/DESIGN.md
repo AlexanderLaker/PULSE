@@ -12,13 +12,14 @@ numbers that carry the hierarchy while the chrome stays quiet.
 | `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders and status; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
 | `lib/format.ts` | the shift colours (`EXPANSION`, `CONTRACTION`, `NEUTRAL` and their soft tints), the matrix heat ramp, the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
 | `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion |
-| `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance, built from the same tokens |
+| `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance, which repeats the token values in Tailwind classes (Tailwind reads class names literally, so they cannot be built from `S`) |
 
 Components style themselves inline from these tokens and use Tailwind's
-default utilities for layout and spacing only. A colour that appears in a
-component and in none of these files is a bug, with two deliberate
-exceptions: the source-tier colours on the Drivers page and the tints of the
-entry gate's four tiles.
+default utilities for layout and spacing only. A colour written into a
+component instead of taken from these files is a bug, with two deliberate
+exceptions: the source-tier colours on the Drivers page
+(`components/dashboard/drivers/cards.tsx`) and the washes and illustrations
+of the entry gate's four tiles (`HomeGate.tsx`).
 
 ## Colour
 
@@ -36,6 +37,7 @@ entry gate's four tiles.
 | `cardBorder` | `rgba(0, 52, 94, 0.10)` | card and divider borders |
 | `error` | `#9f403d` | errors |
 | `amber` | `#b45309` | warnings, estimate grades |
+| `expert`, `delta` | `#6b4fc4`, `#b07d2b` | on the Drivers page, the expert aggregate and the chip with its delta to the baseline |
 
 Shadows are navy-based (`rgba(0, 52, 94, ...)`), never black; the card shadow
 is `0 4px 60px -15px rgba(0, 52, 94, 0.08)`.
@@ -75,9 +77,15 @@ value a reader needs.
 
 ## Numbers
 
-- A percentage shows at most one decimal: a Monte Carlo median does not
-  support more. `fmtShift` and `fmtPct` in `lib/format.ts` are the only
-  formatters.
+- A shift or a share shows at most one decimal: a Monte Carlo median does
+  not support more. `fmtShift` and `fmtPct` in `lib/format.ts` format them and
+  never show a second decimal. Two places state more on purpose: the PRISM
+  Analysis gives contributions in points with two decimals, so that close
+  drivers can be told apart (docs/DRIVER_ANALYSIS.md), and the About this
+  model section gives the sampling noise (the Monte Carlo standard error and
+  the seed stability) to three decimals of a point, because it is that small.
+  The Profit Pool Explorer's derivation tooltips show their arithmetic at the
+  precision of its inputs.
 - A shift always shows its sign; below 0.05 percent it counts as flat and
   shows neither sign nor colour.
 - A missing value shows `–`.

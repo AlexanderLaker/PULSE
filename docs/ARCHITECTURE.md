@@ -69,7 +69,7 @@ any of these keys (`prism/api/runs.py`).
 | `mc_standard_error` | Bootstrap standard error of each category's terminal-year median, P10 and P90 |
 | `seed_stability` | The terminal-year portfolio median of each chain and their spread |
 | `integrity_events` | Everything the run repaired, assumed or noticed, including the input drift |
-| `meta` | Seed and chain seeds, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, time of storage, and the drivers' fingerprint for the next run |
+| `meta` | Master seed, chain seeds and chain count, model version, engine, numerics backend (scipy and numpy versions), driver count, overlap-correction source, time of storage, and the drivers' fingerprint for the next run |
 
 docs/MODEL.md explains each quantity.
 
@@ -78,23 +78,30 @@ docs/MODEL.md explains each quantity.
 `prism/api` is a FastAPI application. On Vercel it runs as the Python function
 `api/index.py`, and `vercel.json` rewrites every `/api/v1/*` request to it, so
 the browser reaches it on the dashboard's own origin. Locally it runs under
-uvicorn and the Next.js dev server rewrites `/api/v1` to it
-(`next.config.js`). The function installs only `api/requirements.txt`
+uvicorn, loading the repository's `.env` first (`prism/env_loader.py`;
+variables set in the shell win), and the Next.js dev server rewrites `/api/v1`
+to it (`next.config.js`). The function installs only `api/requirements.txt`
 (FastAPI, pydantic, psycopg2): it has no numpy or scipy and never imports the
 engine.
 
 | Route | Access | Answer |
 |---|---|---|
-| `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id |
+| `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`legacy_schema`, `no_database` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | What this instance sees of the database (host name only) and whether the latest run can be served |
 | `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis, baseline and a summary of the expert proposals |
-| `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent; every changed field goes to the audit log |
+| `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log |
 | `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
-| `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges fields into the caller's own proposal; never changes the driver |
-| `GET /api/v1/simulation` | signed in | The latest run (the bundle above, with `meta` as `run_meta` plus the run's id, date and iteration count); 404 when there is none to serve |
+| `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
+| `GET /api/v1/simulation` | signed in | The latest run (the bundle above, with `meta` as `run_meta` plus the run's id, date and iteration count) and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
 | `GET /api/v1/config` | signed in | The model configuration the production run uses, read-only |
-| `GET /api/v1/journey` | signed in | The newest stored Consumer Journey content; 404 while the dashboard's bundled content applies |
-| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map |
+| `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
+| `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between) |
+
+A body the API cannot accept is answered 422 with the reason, and a write
+made on an outdated revision or version 409; the dashboard shows both
+messages as they come. While the database cannot be used (it still needs
+migration 0001, or no database is configured) the routes that read or write
+it answer 503.
 
 Each instance keeps the drivers and the latest run in memory
 (`prism/api/state.py`) and checks on every request whether the database moved
@@ -105,7 +112,9 @@ instance is therefore visible on the next request.
 
 On an empty database the API creates the tables and seeds the driver base
 (`prism/seed_drivers.py`). On a database of the previous schema it creates
-nothing and answers 503 with a pointer to `migrations/0001_driver_schema`.
+nothing and answers 503 with a pointer to `migrations/0001_driver_schema`; on
+Vercel without a database URL it answers 503 too, rather than writing to a
+SQLite file that would vanish with the instance.
 
 ## Authentication and roles
 
@@ -122,9 +131,12 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   which sets an httpOnly cookie scoped to `/api/v1` holding a 12-hour token
   with the viewer role, for admins too. The browser's `/api/v1` requests carry
   it. It authorises reads and the user's own expert proposals, nothing else.
+  When an `/api/v1` request is answered 401 (the token expired), the client
+  asks for a new cookie once and repeats the request (`api/client.ts`).
 - **Admin writes.** A driver edit or a journey save goes to a dashboard route
   (`/api/drivers/{id}`, `/api/journey`). The route checks the user's role in
-  `user_roles`, then forwards the request to the API on the same origin with a
+  `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`
+  when that is set, else on the origin the request came in on) with a
   five-minute admin token that carries the user's identity
   (`lib/backend.ts`). The API writes that identity to the audit log.
 
@@ -132,6 +144,19 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
 the sign-in and sign-up pages, the webhook (which checks its Svix signature)
 and the admin bootstrap route (which checks a shared secret). `/api/v1` is
 left to the API's own checks.
+
+The dashboard's server routes (`app/api`):
+
+| Route | Access | Does |
+|---|---|---|
+| `GET /api/prism-cookie` | signed in | Sets the viewer cookie for `/api/v1` |
+| `GET /api/me` | signed in | The user's Clerk id, email and role |
+| `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
+| `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
+| `GET /api/users` | admin | Every Clerk user with their role, for the user list in Settings |
+| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log |
+| `POST /api/webhooks/clerk` | Svix signature | Adds, updates or removes a user's row in `user_roles` |
+| `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 
 ## The dashboard
 
@@ -143,7 +168,7 @@ them with every view. The views are in `components/dashboard/`:
 | View | File | What it shows |
 |---|---|---|
 | Entry gate | `HomeGate.tsx` | The four views and what each is for |
-| Drivers | `Drivers.tsx` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the driver's scores |
+| Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the driver's scores. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
 | Consumer Journey | `ConsumerJourney.tsx` | Consumer moments per journey stage with the drivers behind them; admins edit the tiles |
 | Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `CategoryDetailPanel.tsx` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category |
 | Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
@@ -152,9 +177,11 @@ them with every view. The views are in `components/dashboard/`:
 Shared logic lives in `lib/`: `format.ts` (the one way a shift is displayed,
 the taxonomies), `shiftMatrix.ts` (the category-weighted totals; a lint step
 keeps them from being reimplemented in a component), `cellWeights.ts`,
-`valueChain.ts`, `driverAttribution.ts` (the per-driver decomposition the
-drill-down ranks with) and `theme.ts` (the design tokens). The types in
-`types/` mirror the API's JSON.
+`valueChain.ts`, `uncertainty.ts` (what an uncertainty score does in the
+engine), `driverAttribution.ts` (the per-driver decomposition the drill-down
+ranks with) and `theme.ts` (the design tokens); the server side has `db.ts`,
+`roles.ts`, `prismJwt.ts` and `backend.ts`. The types in `types/` mirror the
+API's JSON.
 
 The Consumer Journey content ships with the dashboard (`data/consumerJourney.ts`);
 once an admin saves an edit, the newest stored version replaces the bundled
@@ -163,16 +190,17 @@ tiles. The Profit Pool Explorer's data is `lib/profitPoolData.ts`
 
 ## The database
 
-PostgreSQL in production; the API and the scripts fall back to a SQLite file
-(`PRISM_DB_PATH`, default `data/prism.db`) when no database URL is set. All
-SQL is written once for both (`prism/database.py`). The database holds scores,
-shares and percentage shifts, never an amount of money.
+PostgreSQL in production; on a development machine the API and the scripts
+fall back to a SQLite file (`PRISM_DB_PATH`, default `data/prism.db`) when no
+database URL is set, and on Vercel they refuse to. All SQL is written once for
+both (`prism/database.py`). The database holds scores, shares and percentage
+shifts, never an amount of money.
 
 | Table | Written by | Content |
 |---|---|---|
 | `drivers` | seed, admin edits, `sync_analysis.py` | One row per driver: scores, texts, the baseline it was seeded with, whether an admin changed a model field, a revision counter |
 | `driver_category_exposure`, `driver_regional_exposure`, `driver_vc_exposure` | as above | Exposure scores 0 to 5 per category, region and value-chain stage |
-| `driver_sources` | as above | The evidence behind each driver: title, link, tier, date |
+| `driver_sources` | as above | The evidence behind each driver: title, link, credibility tier and a note |
 | `driver_score_proposals` | experts | One partial proposal per driver and expert |
 | `simulation_runs` | production run | One results bundle per run |
 | `journey_content` | admins | Versions of the Consumer Journey tile map; the newest wins |

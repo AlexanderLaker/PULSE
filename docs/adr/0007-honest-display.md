@@ -11,7 +11,10 @@ meaningless for independent draws.
 
 ## Decision
 
-- Percentages show at most one decimal.
+- Shifts and shares show at most one decimal. The exceptions are stated
+  where they occur: contributions in points with two decimals in the PRISM
+  Analysis, so that close drivers can be told apart, and the sampling noise
+  to three decimals of a point (docs/DESIGN.md).
 - The portfolio band is the joint percentile of the per-iteration portfolio
   shift, never an average of category bands.
 - The force, value-chain and region lenses are labelled attribution: they
@@ -23,6 +26,10 @@ meaningless for independent draws.
 - Every run records what it repaired, assumed or clipped, and how the driver
   scores changed since the previous run (input drift). The dashboard lists
   these next to the run.
+- When the drivers changed after the served run, or the run comes from
+  another model version than the service's, the Shift Analysis says so above
+  the matrix and names the drivers, instead of letting the matrix pass for
+  the current state.
 - Direction never rests on colour alone: a shift carries its sign.
 
 ## Consequences

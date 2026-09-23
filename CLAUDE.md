@@ -43,16 +43,18 @@ documents in `docs/` explain everything below in full.
   Say so wherever a number built on it is quoted.
 - **The model configuration is code** (`prism/config.py`); the dashboard shows
   it read-only.
-- **Honest display.** One decimal for percentages; the portfolio band is the
-  joint percentile; the lenses are labelled attribution; sampling quality is
-  the Monte Carlo standard error and seed stability; a shift always carries
-  its sign. docs/adr/0007 has the reasons.
+- **Honest display.** One decimal for shifts and shares (docs/DESIGN.md
+  names the two exceptions); the portfolio band is the joint percentile; the
+  lenses are labelled attribution; sampling quality is the Monte Carlo
+  standard error and seed stability; a shift always carries its sign.
+  docs/adr/0007 has the reasons.
 - **Only the drivers feed the Shift Matrix.** The Consumer Journey and the
   Profit Pool Explorer never read or write the simulation.
-- **Parity.** The value-chain rule (`prism/config.py` and `lib/valueChain.ts`)
-  and the per-driver attribution (`scripts/build_driver_analysis.py` and
-  `lib/driverAttribution.ts`) exist twice and are tested against shared
-  fixtures; change both or neither.
+- **Parity.** The value-chain rule (`prism/config.py` and `lib/valueChain.ts`),
+  the uncertainty tables (`prism/config.py` and `lib/uncertainty.ts`) and the
+  per-driver attribution (`scripts/build_driver_analysis.py` and
+  `lib/driverAttribution.ts`) exist twice and are tested against each other;
+  change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Database changes are migrations** under `migrations/`, following
@@ -79,7 +81,7 @@ documents in `docs/` explain everything below in full.
 ```bash
 uvicorn prism.api.app:app --reload --port 8000   # the API
 npm run dev                                      # the dashboard
-npm run verify                                   # every check CI runs
+npm run verify                                   # types, lint, both test suites
 python3 -m pytest -n auto                        # the Python suite
 python3 scripts/generate_seed.py --check         # and the other three generators
 python3 scripts/run_production.py                # the production run (database in .env)

@@ -21,5 +21,7 @@ the API and the dashboard also need to agree on which model they describe.
 
 ## Consequences
 
-A failing golden pin means the numbers moved; it is never regenerated just to
-make CI pass. Every run records the model version it was computed with.
+A failing golden pin means the numbers moved; it is never regenerated to make
+CI pass. Every run records the model version it was computed with, and
+the Shift Analysis says so when that differs from the version the service
+runs, until the new production run is written.

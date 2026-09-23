@@ -24,5 +24,6 @@ should sit next to the audit log it is written to.
 ## Consequences
 
 The browser can never hold a token that authorises an admin write. Replacing
-Clerk touches the dashboard's auth helpers, the sign-in pages and the
-webhook, not the API or the roles.
+Clerk touches the dashboard (its auth helpers, the sign-in pages, the
+webhook, the user list and the account and session settings), not the API or
+the roles.

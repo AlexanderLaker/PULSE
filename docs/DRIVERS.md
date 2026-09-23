@@ -25,6 +25,11 @@ and a display code of the force letter and the same number (`C-01`). The
 code map `data/driverCodeMap.ts` is generated from the base; the Consumer
 Journey cites drivers by code.
 
+An id is never given to another driver. Stored runs (their fingerprints),
+expert proposals, the audit log and the journey content refer to drivers by
+id or code, so a driver that leaves the base takes its id with it, and a new
+driver gets the next free number of its force.
+
 ## Fields
 
 The scores feed the model (docs/MODEL.md shows how); the texts and sources
@@ -45,7 +50,7 @@ explain them.
 | `category_exposure` | 0 to 5 per category | How strongly the mechanism acts on each of the 13 categories |
 | `regional_exposure` | 0 to 5 per region | How strongly it acts in each of the four regions |
 | value-chain epicentre | one of eight stages | The stage where the impact centres (below) |
-| `sources` | list | The evidence: title, link, tier, publication month |
+| `sources` | list | The evidence: title, link, tier and a note (in the base, the month of publication) |
 
 The uncertainty score is one number per driver for the dispersion around the
 modelled size and timing, given the direction. It is neither the probability
@@ -116,7 +121,9 @@ Every source has a tier, from S (the most authoritative) to E:
 | E | Social or unverified |
 
 Every driver of the base needs at least one source of tier S, A or B; the
-seed generator refuses a base that lacks one.
+seed generator refuses a base that lacks one. The Drivers page sums up a
+driver's first three sources in one evidence line, each as its publisher
+(the title up to its first colon) with the note, as in "Circana (Apr 2026)".
 
 ## Where the base lives
 
@@ -144,9 +151,16 @@ produces; CI runs it.
 In production the database holds the live scores. An admin changes a driver
 on the Drivers page: the edit is written at once, every changed field goes to
 the audit log, and a changed score marks the driver as Edited against its
-baseline. Experts propose scores under Expert Rating; a proposal never
-changes a driver, and admins see the proposals aggregated under Review &
-Endorse. The next production run reports every change as input drift.
+baseline. Every driver carries a revision number that each save raises; an
+edit names the revision it was made on, so when two admins (or two tabs)
+edit the same driver, the second save is refused with a request to reload
+instead of silently undoing the first. Experts propose scores under Expert Rating; a proposal never
+changes a driver. Admins see the proposals aggregated under Review &
+Endorse and choose per field between keeping the current value, the
+baseline, the expert mean and a manual value: a field an expert scored
+starts on the expert mean, a field nobody scored on its current value.
+Endorsing saves the chosen values as an ordinary edit. The next production
+run reports every change as input drift.
 
 The base file changes when a review changes the reference scores or the
 texts. After an edit to `driver_base.json`:

@@ -46,9 +46,9 @@ test:py` and `npm run verify` call `python3`, and outside the environment that
 is the system Python without pytest.
 
 To keep the API and the scripts on SQLite while the dashboard uses Neon,
-blank the URL for them only: `DATABASE_URL= uvicorn ...` (a variable set in
-the shell, even empty, wins over `.env`); the production run then also needs
-`--allow-sqlite`.
+blank both URLs for them only: `POSTGRES_URL= DATABASE_URL= uvicorn ...` (a
+variable set in the shell, even empty, wins over `.env`); the production run
+then also needs `--allow-sqlite`.
 
 ### Roles on a development machine
 
@@ -69,7 +69,7 @@ The Clerk user id is in the Clerk dashboard under Users.
 
 | Command | Checks |
 |---|---|
-| `npm run verify` | everything below except the generators, in the order CI runs it |
+| `npm run verify` | everything below except the generator checks, in the order CI runs it (CI also runs `npm run build`) |
 | `npm run typecheck` | TypeScript (`tsconfig.check.json`) |
 | `npm run lint` | ESLint with no warnings allowed, then `scripts/check_single_source.sh`, which keeps the Shift Matrix arithmetic in `lib/shiftMatrix.ts` |
 | `npm test` | the dashboard suite (Vitest, `tests/frontend/`) |
@@ -79,8 +79,8 @@ The Clerk user id is in the Clerk dashboard under Users.
 The Python suite runs on a throwaway SQLite file: `tests/conftest.py` blanks
 the database URLs before anything is imported, so a production URL in
 `.env` never reaches a test. Set `PRISM_TEST_POSTGRES_URL` to a PostgreSQL
-database the tests may create and drop schemas in, and the migration and the
-database layer are also tested on PostgreSQL:
+database the tests may create and drop schemas in, and the migration, the
+database layer and the admin script are also tested on PostgreSQL:
 
 ```bash
 PRISM_TEST_POSTGRES_URL="postgresql://prism:prism@localhost:5432/prism_test?sslmode=disable" python3 -m pytest -n auto
@@ -97,9 +97,10 @@ python3 scripts/build_driver_analysis.py --check  # the attribution record, the 
 ```
 
 CI (`.github/workflows/ci.yml`) runs two jobs on every push to `main` and on
-every pull request: the dashboard checks, and the Python lint, suite (with a
-PostgreSQL service) and the four generator checks. It does not run `next
-build`, which needs the Clerk keys; Vercel builds every push.
+every pull request: the dashboard checks and a production build, and the
+Python lint, suite (with a PostgreSQL service) and the four generator checks.
+The build prerenders pages inside ClerkProvider, which needs a publishable
+key of the right form, so CI sets one that names no real Clerk instance.
 
 A few rules the suite holds:
 
@@ -109,8 +110,9 @@ A few rules the suite holds:
 - **One version**: `prism.__version__`, the engine's `MODEL_VERSION` and
   `package.json` must agree.
 - **Generated files** are never edited by hand.
-- **Parity**: the value-chain rule and the per-driver attribution exist in
-  Python and TypeScript; shared fixtures keep them identical.
+- **Parity**: the value-chain rule, the uncertainty tables and the
+  per-driver attribution exist in Python and TypeScript; tests keep each pair
+  identical.
 
 ## The production run
 
@@ -162,10 +164,11 @@ run and shown next to it.
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
 | 5 | the cell-weights file is missing or invalid |
+| 6 | a driver cannot be simulated (an unknown force, direction or diffusion curve, a missing GP1 share, a score outside its scale, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed |
 
 After a run, the Shift Analysis's "About this model" footer shows the new
-run's id, date, seeds, numerics and integrity events, including the input
-drift against the previous run.
+run's id, date, seeds, numerics, Monte Carlo standard error, seed stability
+and integrity events, including the input drift against the previous run.
 
 When the inputs of the PRISM Analysis changed (a re-scored base, a
 recalibration, the finance cell weights), regenerate the readings after the
@@ -177,7 +180,11 @@ Push to `main`: Vercel builds the dashboard and the Python function and
 promotes the build to production in about two minutes. Other branches get
 preview deployments. The environment variables live in the Vercel project
 settings (Production and Preview); `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is
-needed at build time, the others at run time.
+needed at build time, the others at run time. `PRISM_API_ORIGIN`, if used,
+belongs to Production only: set for Preview as well, a preview deployment's
+admin writes would go to the production API. The deploy that brings this
+release to a database of the previous release goes with migration 0001, in
+the order its runbook gives (`migrations/0001_driver_schema/README.md`).
 
 After a deploy:
 
@@ -253,7 +260,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable | Check `/api/v1/diagnostics`: `db_error` means the API cannot reach the database (the `error` field says why); a database of the previous schema answers 503 and needs `migrations/0001_driver_schema` |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `legacy_schema` (the database needs `migrations/0001_driver_schema`), `no_database` (no `DATABASE_URL` in this deployment) or `db_error` (the API cannot reach the database; the `error` field says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
@@ -273,18 +280,31 @@ travel separately:
   webhook secret, the Neon password, `PRISM_JWT_SECRET` (every session then
   signs in again), `NEXT_PUBLIC_SIGNUP_CODE` and any `ADMIN_BOOTSTRAP_SECRET`.
 
+The services themselves belong to the owner's accounts today: the GitHub
+repository `AlexanderLaker/PRISM`, the Vercel project `prism-profit-pool`,
+the Neon project and the Clerk application. Move each into an account the
+receiving organisation controls, through the service's own transfer where it
+offers one, or by creating it anew (a new Clerk application means new keys
+and a new webhook; a new Neon project is restored from the dump). Rotate the
+credentials after the move, and check the deployment against the list under
+Deploying.
+
 ## Hosting elsewhere
 
 PRISM needs four things, which Vercel, Neon and Clerk provide today:
 
 - a Node.js 22 host for the Next.js dashboard;
 - a Python host for the ASGI app `prism.api.app:app`, reachable on the
-  dashboard's origin under `/api/v1` (the dashboard's server routes call it
-  on the same origin). It needs only `api/requirements.txt`;
+  dashboard's origin under `/api/v1`: the browser's reads carry a cookie
+  scoped to that path. The dashboard's admin routes call it on
+  `PRISM_API_ORIGIN` when that is set, else on the same origin. It needs only
+  `api/requirements.txt`;
 - PostgreSQL. The dashboard reaches it through Neon's serverless driver
   (`lib/db.ts`); another PostgreSQL service means replacing that driver;
-- an identity provider. Clerk sits behind `lib/roles.ts`, `proxy.ts`, the
-  sign-in pages and the webhook; the API only verifies PRISM's own tokens.
+- an identity provider. Clerk is used in `lib/roles.ts`, `proxy.ts`,
+  `app/layout.tsx` (the provider), the sign-in and sign-up pages, the webhook,
+  the user list (`app/api/users`), the dashboard's user menu and the account
+  and session parts of Settings; the API only verifies PRISM's own tokens.
 
 The production run needs a machine or a job runner with the full Python
 environment and access to the database. It must keep scipy: there is no

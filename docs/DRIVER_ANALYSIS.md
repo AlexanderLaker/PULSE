@@ -109,9 +109,10 @@ workbook.
 prose in which every figure the model produces is a named placeholder, such
 as `{pp}` for its contribution, `{reach}`, `{peak_year}` or `{pool_europe}`
 (`render_fields` in `scripts/driver_analysis_render.py` lists them all). The
-renderer fills the placeholders from the record and appends the basis line. The rendered text is stored next to the template,
-carried into `prism/seed_drivers.py` by the seed generator, and written into
-existing databases by `scripts/sync_analysis.py`. The Drivers page renders the
+renderer fills the placeholders from the record and appends the basis line.
+The rendered text is stored next to the template, carried into
+`prism/seed_drivers.py` by the seed generator, and written into existing
+databases by `scripts/sync_analysis.py`. The Drivers page renders the
 four labels as small headings, the basis line in small type and a footnote
 under the card: "Attribution at the score means, reconciled to the portfolio
 median in the basis line; a reading authored on those figures." The card is
@@ -120,11 +121,13 @@ read-only for every role.
 The category drill-down of the Shift Analysis ranks its contributing drivers
 with the same arithmetic (`lib/driverAttribution.ts`, a TypeScript port held
 to the Python record by a parity fixture), so a driver's rank there and its
-reading agree. The drill-down scales each category to that category's own
-median, so shares agree exactly with the readings and points can differ by
-the category's factor; its footer says so. When the model configuration does
-not load it falls back to a proxy (Shift value times category exposure / 5)
-and names that basis instead.
+reading agree. The drill-down scales each category's contributions to that
+category's own terminal-year median. Its bars are shares of the category's
+gross movement, headwinds and tailwinds counted by size, and add up to 100
+percent; the readings quote shares of the net shift, which are larger where
+tailwinds offset headwinds. The panel's footer says both. When the model
+configuration does not load, the drill-down falls back to a proxy (Shift
+value times category exposure / 5) and names that basis instead.
 
 ### Rules
 
@@ -176,8 +179,9 @@ weights and the reference run. `python3 scripts/build_driver_analysis.py
 every text and fails when anything differs from the committed files. It also
 fails when the inputs digest no longer matches the reference run, so a
 re-scored base cannot keep readings reconciled to a median the model no
-longer produces, and when the reference run stops reproducing the recorded
-production run. Comparisons admit one unit in the fourth decimal
+longer produces, and when the recorded reference run does not reproduce the
+production run recorded with it. The check does not repeat the reference
+run; `--reference` does. Comparisons admit one unit in the fourth decimal
 (floating-point differences between machines) and nothing more.
 
 When the inputs change (a re-scored base, a recalibration, the finance cell

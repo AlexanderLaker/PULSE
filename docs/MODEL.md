@@ -140,8 +140,8 @@ every region, and the run records an integrity event naming it.
 ### 5. The force sum and the within-force overlap
 
 Drivers of one force often share a mechanism (three retail drivers can
-describe one squeeze on the trade margin), so their effects are not simply
-added. Per force `f`, cell and year:
+describe one squeeze on the trade margin), and adding their effects in full
+would count that mechanism more than once. Per force `f`, cell and year:
 
 ```
 S_fcr(y) = D_fcr x sum over j in f of  s_j x m_j(y) x x_jcr
@@ -213,7 +213,9 @@ an integrity event.
 - **Monte Carlo standard error.** A bootstrap (200 resamples) of each
   category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it is
   about 0.001 percentage points, far below the one-decimal display. It
-  measures sampling noise only, never model error.
+  measures sampling noise only, never model error. The About this model
+  section of the Shift Analysis shows the largest of these standard errors
+  next to the seed stability.
 - **Chains and seed stability.** Production runs three chains with seeds
   `42 + i x 1,000,003` and pools them for every published number. The spread
   of the three chains' terminal-year portfolio medians is reported as seed
