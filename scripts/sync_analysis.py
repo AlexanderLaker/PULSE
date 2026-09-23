@@ -5,17 +5,20 @@ scripts/generate_seed.py) and read-only on the Drivers page. A new database
 is seeded with the current texts; an existing database is brought up to date
 with this script whenever the texts have been regenerated.
 
-    python3 scripts/sync_analysis.py --dry-run    list the drivers whose text would change
-    python3 scripts/sync_analysis.py              write them, in one transaction, with an audit entry each
+    python3 scripts/sync_analysis.py --dry-run     list the drivers whose text would change
+    python3 scripts/sync_analysis.py --postgres    write them, in one transaction, with an audit entry each
+    python3 scripts/sync_analysis.py               the same for the local SQLite file
 
 The target is the database in POSTGRES_URL or DATABASE_URL (.env is loaded),
-otherwise the local SQLite file. It changes the analysis column and raises
-the revision of each driver it changes, so an admin editing one of them at
-that moment is asked to reload before saving. Drivers the seed does not
-contain are left alone and listed.
+otherwise the local SQLite file; writing to PostgreSQL needs --postgres, a dry
+run does not. It changes the analysis column and raises the revision of each
+driver it changes, so an admin editing one of them at that moment is asked
+to reload before saving. Drivers the seed does not contain are left alone and
+listed.
 
-Exit codes: 0 done (or nothing to do); 1 the database still needs a migration
-(the message names it) or has no drivers table yet.
+Exit codes: 0 done (or nothing to do); 1 refused: --postgres missing for a
+PostgreSQL target, the database still needs a migration (the message names
+it) or has no drivers table yet.
 """
 from __future__ import annotations
 
@@ -35,9 +38,13 @@ from prism.seed_drivers import DRIVERS  # noqa: E402
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dry-run", action="store_true", help="report what would change, write nothing")
+    parser.add_argument("--postgres", action="store_true", help="confirm that the PostgreSQL target may be written")
     args = parser.parse_args(argv)
 
     target = f"PostgreSQL at {urlparse(POSTGRES_URL).hostname}" if USE_POSTGRES else f"SQLite at {sqlite_path()}"
+    if USE_POSTGRES and not args.dry_run and not args.postgres:
+        print(f"The target is {target}: pass --postgres to write to it (a dry run needs no flag).")
+        return 1
     seed = {d.id: d.analysis for d in DRIVERS}
     p = placeholder()
     with get_db_connection() as conn:

@@ -10,7 +10,7 @@ database access, and can also take the role away.
 
 The database is POSTGRES_URL or DATABASE_URL from the environment or .env,
 or --dsn. The change is written to the audit log when the database has one
-(the API creates it when it first starts); without it the change stands and
+(the API creates it on first use); without it the change stands and
 the script says it was not logged.
 """
 from __future__ import annotations
@@ -46,7 +46,8 @@ def main(argv: list | None = None) -> int:
     email = args.email.strip().lower()
     print(f"Database: {urlparse(dsn).hostname}")
 
-    conn = psycopg2.connect(dsn)
+    # TLS is required unless the URL says otherwise, as for the API (prism/database.py).
+    conn = psycopg2.connect(dsn, **({} if "sslmode=" in dsn else {"sslmode": "require"}))
     try:
         return _set_role(conn, email, args.role)
     finally:

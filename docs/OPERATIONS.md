@@ -249,10 +249,11 @@ back as that migration's runbook says.
   PRISM Analysis is regenerated after the next production run
   (docs/DRIVER_ANALYSIS.md).
 - **The PRISM Analysis texts** of an existing database follow the generated
-  ones with `scripts/sync_analysis.py` (`--dry-run` first). It changes the
-  analysis column, raises the revision of each driver it changes (an admin
-  editing one of them at that moment is asked to reload before saving) and
-  writes one audit entry per driver.
+  ones with `scripts/sync_analysis.py` (`--dry-run` first; writing to
+  PostgreSQL needs `--postgres`). It changes the analysis column, raises the
+  revision of each driver it changes (an admin editing one of them at that
+  moment is asked to reload before saving) and writes one audit entry per
+  driver.
 - **The audit log** records every driver edit (one row per changed field),
   journey save, analysis sync and migration in the same transaction as the
   change, with the acting identity, and every role change where it can (a

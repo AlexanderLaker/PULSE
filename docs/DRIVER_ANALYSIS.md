@@ -229,8 +229,9 @@ When the scores or the model's parameters change:
    widest range in the base"): the figures inside a comparative regenerate,
    the comparative itself does not;
 4. run `python3 scripts/generate_seed.py` and commit the regenerated files;
-5. run `python3 scripts/sync_analysis.py --dry-run`, then without
-   `--dry-run`, against each database.
+5. run `python3 scripts/sync_analysis.py --dry-run` against each database,
+   then again without `--dry-run` (with `--postgres` for a PostgreSQL
+   database).
 
 ### On the finance shares
 

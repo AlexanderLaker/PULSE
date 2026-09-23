@@ -234,6 +234,15 @@ class TestSyncAnalysis:
         assert sync.main([]) == 0
         assert "0 with an outdated analysis" in capsys.readouterr().out
 
+    def test_writing_postgresql_needs_the_flag(self, monkeypatch, capsys):
+        """Refused before any connection is made; a dry run needs no flag."""
+        sync = load_module("scripts/sync_analysis.py")
+        monkeypatch.setattr(sync, "USE_POSTGRES", True)
+        monkeypatch.setattr(sync, "POSTGRES_URL", "postgresql://user@db.example.org/prism")
+        monkeypatch.setattr(sync, "get_db_connection", lambda: pytest.fail("connected without --postgres"))
+        assert sync.main([]) == 1
+        assert "pass --postgres to write to it" in capsys.readouterr().out
+
     def test_a_database_awaiting_a_migration_is_refused(self, monkeypatch, tmp_path, capsys):
         awaiting = tmp_path / "awaiting.db"
         database_awaiting_a_migration(awaiting)
@@ -273,6 +282,20 @@ class TestEnvFile:
 def test_the_admin_script_imports():
     module = load_module("scripts/promote_admin.py")
     assert callable(module.main)
+
+
+def test_the_admin_script_requires_tls_unless_the_url_says_otherwise(monkeypatch, capsys):
+    module = load_module("scripts/promote_admin.py")
+    calls = []
+
+    def connect(dsn, **kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("not connecting in a test")
+    monkeypatch.setattr(module.psycopg2, "connect", connect)
+    for dsn in ("postgresql://user@db.example.org/prism", "postgresql://user@localhost/prism?sslmode=disable"):
+        with pytest.raises(RuntimeError):
+            module.main(["ana@example.com", "--dsn", dsn])
+    assert calls == [{"sslmode": "require"}, {}]
 
 
 @pytest.mark.skipif(not os.environ.get("PRISM_TEST_POSTGRES_URL"), reason="PRISM_TEST_POSTGRES_URL is not set")
