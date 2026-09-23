@@ -1,7 +1,7 @@
 """Input-drift telemetry: every run compares the driver scores with the previous run's."""
 from prism.config import CATEGORIES, REGIONS, VC_STAGES
 from prism.drivers import Driver
-from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint
+from prism.input_drift import compare_with_run, compute_input_drift_event, driver_fingerprint, incomplete_entries
 
 
 def _driver(id_, probability=3, gp1=0.1, direction="Expansion", force="Consumer", vc_epicentre=VC_STAGES[5], **kw):
@@ -79,9 +79,27 @@ def test_adding_a_driver_is_a_warning():
     assert "1 driver(s) added, 0 removed" in event["message"]
 
 
-def test_the_previous_fingerprint_is_read_from_the_stored_run():
-    assert previous_fingerprint(None) == (None, None, None)
-    fp, run_id, run_date = previous_fingerprint(
-        {"id": 10, "run_date": "2026-09-13 23:04:39.081562",
-         "results": {"meta": {"driver_fingerprint": {"x": {"p": 3}}}}})
-    assert fp == {"x": {"p": 3}} and run_id == 10 and run_date == "2026-09-13 23:04:39"
+def _run(fingerprint, run_id=12):
+    return {"id": run_id, "run_date": "2026-03-02 10:15:00.500000",
+            "results": {"meta": {"driver_fingerprint": fingerprint}}}
+
+
+def test_a_new_run_is_compared_with_the_newest_stored_run():
+    assert compare_with_run(_fp(_driver("a")), None) is None   # the first run
+    event = compare_with_run(_fp(_driver("a", probability=4)), _run(_fp(_driver("a"))))
+    assert event["message"].startswith("Input drift vs run #12, 2026-03-02 10:15:00: 1 driver score(s) changed")
+
+
+def test_a_run_that_cannot_be_compared_with_says_so():
+    """A stored run without a complete fingerprint gives a warning, never the silence of a first run."""
+    complete = _fp(_driver("a"))
+    partial = {"a": {k: v for k, v in complete["a"].items() if k != "u"}}
+    assert incomplete_entries(complete) == [] and incomplete_entries(partial) == ["a"]
+    assert incomplete_entries(["not", "a", "map"]) == ["(not a map)"]
+    for stored, reason in ((None, "it stored no driver fingerprint"),
+                           (["a"], "its driver fingerprint is not a map of drivers"),
+                           (partial, "its driver fingerprint is incomplete for 1 driver")):
+        event = compare_with_run(complete, _run(stored))
+        assert event["severity"] == "warning" and event["detail"] == {
+            "previous_run_id": 12, "compared": False, "reason": reason}
+        assert event["message"] == f"Input drift was not compared with run #12, 2026-03-02 10:15:00: {reason}."

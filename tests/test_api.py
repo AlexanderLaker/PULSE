@@ -1,5 +1,6 @@
 """The API: routes, authentication, the served run, the drivers editor, proposals, config and journey."""
 import base64
+import copy
 import hashlib
 import hmac
 import json
@@ -247,6 +248,17 @@ class TestSimulation:
         response = api.get("/api/v1/simulation", headers=bearer())
         assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
         assert f"meta.{key}" in response.json()["detail"]["error"]
+
+    def test_a_run_with_an_incomplete_fingerprint_is_not_served(self, api, valid_run):
+        """A fingerprint entry without every field could not be compared with; served, it would fail
+        the comparison with the current drivers."""
+        fingerprint = copy.deepcopy(valid_run["meta"]["driver_fingerprint"])
+        del fingerprint[next(iter(fingerprint))]["u"]
+        persist({**valid_run, "meta": {**valid_run["meta"], "driver_fingerprint": fingerprint}})
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
+        assert "a complete meta.driver_fingerprint" in response.json()["detail"]["error"]
+        assert api.get("/api/v1/diagnostics").json()["simulation_reason"] == "malformed"
 
 
 class TestDrivers:

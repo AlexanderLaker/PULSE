@@ -72,6 +72,20 @@ class TestProductionRun:
         assert "invalid run size" in caplog.text
         assert seeded.load_latest_run() is None
 
+    def test_a_previous_run_that_cannot_be_compared_with_is_recorded(self, production, seeded):
+        """A comparison that did not happen is a warning with the run, never the silence of a first run."""
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        first = seeded.load_latest_run()
+        results = first["results"]
+        del results["meta"]["driver_fingerprint"]["consumer_r01"]["u"]
+        with seeded.get_db_connection() as conn:
+            conn.cursor().execute(f"UPDATE simulation_runs SET results = {seeded.placeholder()} WHERE id = "
+                                  f"{seeded.placeholder()}", (json.dumps(results), first["id"]))
+        assert production.main(["--allow-sqlite", "--iterations", "200"]) == 0
+        [event] = seeded.load_latest_run()["results"]["integrity_events"]
+        assert event["severity"] == "warning" and event["detail"]["compared"] is False
+        assert "its driver fingerprint is incomplete for 1 driver" in event["message"]
+
     def test_a_driver_that_cannot_be_simulated_is_exit_6(self, production, seeded, caplog):
         """The database refuses a missing or off-scale score itself; what a change made outside PRISM can
         still leave behind (a missing exposure row, a peak year moved onto the onset) stops the run."""

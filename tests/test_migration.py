@@ -553,16 +553,15 @@ class TestMigration:
         monkeypatch.setenv("PRISM_DB_PATH", str(previous))
         import prism.database as dbm
         from prism.api.runs import run_status, simulation_payload
-        from prism.input_drift import compute_input_drift_event, previous_fingerprint
+        from prism.input_drift import compare_with_run
         run, drivers = dbm.load_latest_run(), dbm.load_drivers()
         assert run_status(run)["has"] is True
         payload = simulation_payload(run, drivers)
         assert payload["inputs_since_run"] == {"changed": [], "added": [], "removed": []}
         assert payload["run_meta"]["driver_count"] == 51
-        stored, run_id, _ = previous_fingerprint(run)
-        event = compute_input_drift_event(driver_fingerprint(drivers), stored, previous_run_id=run_id)
-        assert event["message"] == (f"Input drift vs run #{run_id}: no changes; "
-                                    "the driver inputs are identical to that run's.")
+        event = compare_with_run(driver_fingerprint(drivers), run)
+        assert event["severity"] == "info" and event["message"].startswith(f"Input drift vs run #{run['id']}, ")
+        assert event["message"].endswith(": no changes; the driver inputs are identical to that run's.")
 
     def test_a_source_tier_outside_the_scale_is_stored_unrated(self, migration, previous, capsys, monkeypatch):
         conn = sqlite3.connect(previous)

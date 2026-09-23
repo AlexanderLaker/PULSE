@@ -59,10 +59,10 @@ import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database re
 from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
                           PRODUCTION_SEED, REGIONS, ModelConfig)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
-from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, init_db, load_drivers,  # noqa: E402
-                            load_latest_run, save_simulation_run)
+from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
+                            init_db, load_drivers, load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
-from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
+from prism.input_drift import compare_with_run, driver_fingerprint, not_compared_event  # noqa: E402
 from prism.engine import MonteCarloEngine  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
@@ -232,13 +232,13 @@ def main(argv: list[str] | None = None) -> int:
 
     fingerprint = driver_fingerprint(drivers)
     try:
-        previous = previous_fingerprint(load_latest_run())
-        drift = compute_input_drift_event(fingerprint, *previous)
-        if drift:
-            result["integrity_events"].append(drift)
-            log.info("  %s", drift["message"])
-    except Exception as e:  # noqa: BLE001 (the run is still valid without the comparison)
-        log.warning("Input-drift comparison skipped: %s", e)
+        drift = compare_with_run(fingerprint, load_latest_run())
+    except Exception as e:  # noqa: BLE001 (the run is still valid without the comparison, and says so)
+        log.warning("The previous run could not be read: %s", e)
+        drift = not_compared_event(f"the previous run could not be read ({describe_error(e)})")
+    if drift:
+        result["integrity_events"].append(drift)
+        log.info("  %s", drift["message"])
 
     run_id = None
     try:

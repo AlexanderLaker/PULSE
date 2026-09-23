@@ -20,9 +20,11 @@ from prism.config import VC_STAGES
 #: moved to another force, its exposures, value-chain epicentre, onset, peak
 #: year, curve or uncertainty.
 STRUCTURE_KEYS = ("f", "ce", "ve", "re", "s", "pk", "dc", "u")
+#: Every field of a driver's fingerprint entry.
+FINGERPRINT_KEYS = ("p", "g", "d") + STRUCTURE_KEYS
 
 
-def _exposure_map(m: dict) -> dict:
+def _rounded_map(m: dict) -> dict:
     """JSON-stable, rounded copy of an exposure dict (sorted keys)."""
     return {str(k): round(float(v), 4) for k, v in sorted(m.items())}
 
@@ -41,9 +43,9 @@ def driver_fingerprint(drivers) -> dict:
             "g": round(float(d.gp1_pct_affected), 6),
             "d": str(d.direction),
             "f": str(d.force),
-            "ce": _exposure_map(d.category_exposure),
+            "ce": _rounded_map(d.category_exposure),
             "ve": VC_STAGES.index(d.vc_epicentre) + 1,
-            "re": _exposure_map(d.regional_exposure),
+            "re": _rounded_map(d.regional_exposure),
             "s": int(d.start_year),
             "pk": int(d.peak_year),
             "dc": str(d.diffusion_curve),
@@ -53,9 +55,20 @@ def driver_fingerprint(drivers) -> dict:
     }
 
 
+def incomplete_entries(fp) -> list:
+    """The driver ids whose entry in a stored fingerprint is not a complete
+    entry (every FINGERPRINT_KEYS field); ["(not a map)"] for a fingerprint
+    that is not a dictionary. A run with such a fingerprint cannot be compared
+    with, so it is not served (prism/api/runs.py)."""
+    if not isinstance(fp, dict):
+        return ["(not a map)"]
+    return sorted(str(i) for i, entry in fp.items()
+                  if not isinstance(entry, dict) or not set(FINGERPRINT_KEYS) <= set(entry))
+
+
 def _differs(a: dict, b: dict) -> bool:
     """Whether two drivers' fingerprints differ in anything that moves the simulation."""
-    return any(a[k] != b[k] for k in ("p", "g", "d") + STRUCTURE_KEYS)
+    return any(a[k] != b[k] for k in FINGERPRINT_KEYS)
 
 
 def changed_drivers(current_fp: dict, previous_fp: dict) -> dict:
@@ -115,9 +128,7 @@ def compute_input_drift_event(
         if curr_bal.get(f, 0) - prev_bal.get(f, 0) != 0
     }
 
-    ref = f"run #{previous_run_id}" if previous_run_id is not None else "the previous run"
-    if previous_run_date:
-        ref += f", {previous_run_date}"
+    ref = _run_reference(previous_run_id, previous_run_date)
 
     detail = {
         "previous_run_id": previous_run_id,
@@ -163,10 +174,40 @@ def compute_input_drift_event(
     }
 
 
-def previous_fingerprint(latest_run: Optional[dict]) -> tuple:
-    """(fingerprint, run id, run date) of a persisted run (database.load_latest_run),
-    or (None, None, None) before the first run."""
+def _run_reference(run_id, run_date) -> str:
+    ref = f"run #{run_id}" if run_id is not None else "the previous run"
+    return f"{ref}, {run_date}" if run_date else ref
+
+
+def not_compared_event(reason: str, previous_run_id=None, previous_run_date=None) -> dict:
+    """The warning a run records when it could not be compared with the
+    previous one, so a comparison that did not happen never reads like a
+    first run."""
+    return {
+        "type": "input_drift",
+        "severity": "warning",
+        "message": f"Input drift was not compared with {_run_reference(previous_run_id, previous_run_date)}: "
+                   f"{reason}.",
+        "detail": {"previous_run_id": previous_run_id, "compared": False, "reason": reason},
+    }
+
+
+def compare_with_run(current_fp: dict, latest_run: Optional[dict]) -> Optional[dict]:
+    """The input-drift event of a new run against the newest stored run
+    (database.load_latest_run): None before the first run, a warning when
+    that run's fingerprint is missing or incomplete."""
     if not latest_run:
-        return None, None, None
-    fingerprint = latest_run["results"]["meta"]["driver_fingerprint"]
-    return fingerprint, latest_run["id"], str(latest_run["run_date"])[:19]
+        return None
+    run_id, run_date = latest_run["id"], str(latest_run["run_date"])[:19]
+    results = latest_run["results"]
+    fingerprint = (results.get("meta") or {}).get("driver_fingerprint") if isinstance(results, dict) else None
+    incomplete = len(incomplete_entries(fingerprint)) if isinstance(fingerprint, dict) else 0
+    if fingerprint is None:
+        reason = "it stored no driver fingerprint"
+    elif not isinstance(fingerprint, dict):
+        reason = "its driver fingerprint is not a map of drivers"
+    elif incomplete:
+        reason = f"its driver fingerprint is incomplete for {incomplete} driver{'s' if incomplete != 1 else ''}"
+    else:
+        return compute_input_drift_event(current_fp, fingerprint, run_id, run_date)
+    return not_compared_event(reason, run_id, run_date)

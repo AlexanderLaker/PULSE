@@ -23,11 +23,14 @@ META_KEYS = (
 
 def missing_keys(results: dict) -> list:
     """The parts of the contract a stored results bundle lacks: the parts
-    above, the run metadata and the drivers' fingerprint the next run and
-    inputs_since_run compare with."""
+    above, the run metadata and a complete fingerprint of the drivers, which
+    the next run and inputs_since_run compare with."""
+    from prism.input_drift import incomplete_entries
     missing = [k for k in REQUIRED_KEYS if k not in results]
     meta = results.get("meta") or {}
     missing += [f"meta.{k}" for k in META_KEYS + ("driver_fingerprint",) if k not in meta]
+    if "driver_fingerprint" in meta and incomplete_entries(meta["driver_fingerprint"]):
+        missing.append("a complete meta.driver_fingerprint")
     return missing
 
 
