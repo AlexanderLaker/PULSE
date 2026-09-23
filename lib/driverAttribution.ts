@@ -2,12 +2,12 @@
  * Per-driver attribution of the shift: the engine's own arithmetic evaluated
  * at the score means and taken apart driver by driver.
  *
- * This is the TypeScript port of the decomposition in
- * scripts/build_driver_analysis.py (docs/DRIVER_ANALYSIS.md), which the PRISM
- * Analysis readings on the Drivers page are written on. The category
- * drill-down ranks its contributing drivers with it, so a driver's rank there
- * and its reading state the same numbers. The Python script writes a parity
- * fixture (tests/frontend/fixtures/driverAttribution.fixture.json) that
+ * This is the TypeScript port of the decomposition in prism/attribution.py
+ * (docs/DRIVER_ANALYSIS.md), which the PRISM Analysis readings on the Drivers
+ * page are written on. The category drill-down ranks its contributing drivers
+ * with it, so a driver's rank there and its reading state the same numbers.
+ * scripts/build_driver_analysis.py writes a parity fixture
+ * (tests/frontend/fixtures/driverAttribution.fixture.json) that
  * tests/frontend/driverAttribution.test.ts replays, so the two cannot drift
  * apart.
  *

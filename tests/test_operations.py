@@ -1,5 +1,4 @@
 """The operator's tools: the production run, its QA workbook and the analysis sync."""
-import importlib.util
 import json
 import os
 import sys
@@ -8,17 +7,11 @@ from pathlib import Path
 import pytest
 
 from prism.database import PENDING_MIGRATION_MARKERS
+from support import load_module
 
 REPO = Path(__file__).resolve().parents[1]
 #: The table only a database still awaiting migration 0001 has (prism/database.py).
 AWAITING_0001 = PENDING_MIGRATION_MARKERS["0001_driver_schema"][0]
-
-
-def _load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 @pytest.fixture
@@ -34,7 +27,7 @@ def seeded(monkeypatch, tmp_path):
 
 @pytest.fixture
 def production(monkeypatch, tmp_path):
-    module = _load("run_production", REPO / "scripts" / "run_production.py")
+    module = load_module("scripts/run_production.py")
     monkeypatch.setattr(module, "RUNS_DIR", tmp_path / "runs")
     return module
 
@@ -193,7 +186,7 @@ class TestWorkbook:
 
 class TestSyncAnalysis:
     def test_dry_run_then_sync(self, seeded, capsys):
-        sync = _load("sync_analysis", REPO / "scripts" / "sync_analysis.py")
+        sync = load_module("scripts/sync_analysis.py")
         with seeded.get_db_connection() as conn:
             conn.cursor().execute("UPDATE drivers SET analysis = 'outdated' WHERE id IN ('consumer_r01', 'technology_r01')")
         assert sync.main(["--dry-run"]) == 0
@@ -215,7 +208,7 @@ class TestSyncAnalysis:
         awaiting = tmp_path / "awaiting.db"
         sqlite3.connect(awaiting).execute(f"CREATE TABLE {AWAITING_0001} (id TEXT PRIMARY KEY)").connection.close()
         monkeypatch.setenv("PRISM_DB_PATH", str(awaiting))
-        sync = _load("sync_analysis", REPO / "scripts" / "sync_analysis.py")
+        sync = load_module("scripts/sync_analysis.py")
         assert sync.main(["--dry-run"]) == 1
         assert "migrations/0001_driver_schema" in capsys.readouterr().out
 
@@ -248,7 +241,7 @@ class TestEnvFile:
 
 
 def test_the_admin_script_imports():
-    module = _load("promote_admin", REPO / "scripts" / "promote_admin.py")
+    module = load_module("scripts/promote_admin.py")
     assert callable(module.main)
 
 
@@ -270,7 +263,7 @@ def test_the_admin_script_changes_the_role_with_or_without_an_audit_log(capsys):
                     "updated_at TIMESTAMP)")
         cur.execute(f"INSERT INTO {schema}.user_roles VALUES ('u1', 'Ana@Example.com', 'viewer', NULL)")
         dsn = f"{url}{'&' if '?' in url else '?'}options={quote(f'-c search_path={schema}')}"
-        module = _load("promote_admin", REPO / "scripts" / "promote_admin.py")
+        module = load_module("scripts/promote_admin.py")
         assert module.main(["ana@example.com", "--dsn", dsn]) == 0
         assert "(no audit log yet, so not logged)" in capsys.readouterr().out
         cur.execute(f"SELECT role FROM {schema}.user_roles")

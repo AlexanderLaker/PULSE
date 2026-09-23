@@ -12,7 +12,6 @@ database the tests may create and drop schemas in).
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -27,6 +26,7 @@ import pytest
 
 from prism.config import VC_STEPS
 from prism.seed_drivers import DRIVERS
+from support import load_module
 
 REPO = Path(__file__).resolve().parents[1]
 MIGRATION_DIR = REPO / "migrations" / "0001_driver_schema"
@@ -253,9 +253,7 @@ def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", o
 @pytest.fixture
 def migration(monkeypatch, tmp_path):
     """The migration module, with its archive in tmp and the synthetic edit files."""
-    spec = importlib.util.spec_from_file_location("migrate_0001", MIGRATION_DIR / "migrate.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = load_module("migrations/0001_driver_schema/migrate.py", "migrate_0001")
     descriptions = tmp_path / "descriptions.json"
     descriptions.write_text(json.dumps({"descriptions": DESCRIPTION_EDITS}), encoding="utf-8")
     edits = tmp_path / "journey_edits.json"

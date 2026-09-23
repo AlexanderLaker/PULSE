@@ -54,8 +54,8 @@ documents in `docs/` explain everything below in full.
 - **Parity.** The taxonomies (`prism/config.py` and `lib/format.ts`,
   `lib/valueChain.ts`), the uncertainty tables (`prism/config.py` and
   `lib/uncertainty.ts`) and the per-driver attribution
-  (`scripts/build_driver_analysis.py` and `lib/driverAttribution.ts`) exist
-  twice and are tested against each other; change both or neither.
+  (`prism/attribution.py` and `lib/driverAttribution.ts`) exist twice and are
+  tested against each other; change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
 - **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the
@@ -66,8 +66,8 @@ documents in `docs/` explain everything below in full.
   `text-slate-500`) included, fails `tests/test_repository.py`.
   docs/DESIGN.md has the system.
 - **Scripts are entry points.** Code that more than one script, or a script
-  and the package, needs lives in `prism/` (the driver base, the readings
-  renderer, the workbook reader); no script imports another.
+  and the package, needs lives in `prism/` (the driver base, the attribution,
+  the readings renderer, the workbook reader); no script imports another.
 - **Database changes are migrations** under `migrations/`, following
   `0001_driver_schema`: one transaction, a dry run, `--postgres` to touch
   PostgreSQL, an archive of everything dropped, a runbook, tests on SQLite
@@ -111,7 +111,8 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `prism/config.py` | taxonomies and every model parameter |
 | `prism/drivers.py`, `prism/driver_base.py` | the driver and the checks it must pass; the driver base, read and checked |
 | `prism/database.py` | persistence, PostgreSQL and SQLite |
-| `prism/readings.py`, `prism/workbook.py` | the PRISM Analysis renderer; the QA workbook, written and read back |
+| `prism/attribution.py`, `prism/readings.py` | the per-driver attribution behind the PRISM Analysis; its renderer |
+| `prism/workbook.py` | the QA workbook, written and read back |
 | `prism/api/` | the API: routers, auth, the stored-run contract (`runs.py`) |
 | `scripts/` | production run, generators, `sync_analysis.py`, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |

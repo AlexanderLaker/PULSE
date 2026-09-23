@@ -56,8 +56,9 @@ a_jcry = w_f x a_f x D_fcr x E[p_j] x g_j x d_j x E[m_j(y)] x (category exposure
 Each term is linear in the driver's own probability draw, so the mean of the
 Monte Carlo term is the term at the mean: `E[p_j] = probability / 6`, with the
 materialisation averaged over the driver's peak-jitter grid.
-`scripts/build_driver_analysis.py` evaluates these terms driver by driver and
-cell by cell, compounds them per cell as the engine does, spreads the
+`prism/attribution.py` evaluates these terms driver by driver and cell by
+cell with the engine's own exposure, dampening and schedule functions,
+compounds them per cell as the engine does, spreads the
 cross-terms of the compounding over the drivers of the cell in proportion to
 their terms (so the drivers of a cell add up to the cell's shift), and rolls
 the cells up with the run's gross-profit shares.

@@ -1,6 +1,5 @@
 """The driver base: data/drivers/driver_base.json, the generated seed module and the code map."""
 import copy
-import importlib.util
 import json
 import re
 import subprocess
@@ -13,6 +12,7 @@ from prism import seed_drivers
 from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code
 from prism.driver_base import InvalidBaseError, base_drivers, validate
 from prism.drivers import SCORE_FIELDS
+from support import load_module
 
 REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / "data" / "drivers" / "driver_base.json"
@@ -22,10 +22,7 @@ LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G"
 
 
 def _generator():
-    spec = importlib.util.spec_from_file_location("generate_seed", REPO / "scripts" / "generate_seed.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module("scripts/generate_seed.py")
 
 
 def _codemap() -> dict:

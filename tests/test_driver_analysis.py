@@ -1,7 +1,7 @@
 """The PRISM Analysis of the Drivers page (docs/DRIVER_ANALYSIS.md).
 
-  (a) the decomposition in scripts/build_driver_analysis.py is the engine's
-      own arithmetic: with the draws pinned to the Beta means and the peak
+  (a) the decomposition in prism/attribution.py is the engine's own
+      arithmetic: with the draws pinned to the Beta means and the peak
       jitter off, the engine's cell shifts equal the decomposition's to
       floating-point precision; the drivers of every cell add up to the cell
       shift; the jitter expectation is the engine's schedule table averaged;
@@ -17,7 +17,6 @@ Writing the texts into a database is scripts/sync_analysis.py (test_operations.p
 from __future__ import annotations
 
 import copy
-import importlib.util
 import json
 import re
 from pathlib import Path
@@ -25,10 +24,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from prism import seed_drivers
+from prism import attribution, seed_drivers
 from prism.config import CATEGORIES, ESTIMATE_SOURCE_PREFIX, ModelConfig
 from prism.drivers import DriverSet
 from prism.engine import MonteCarloEngine
+from support import load_module
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "drivers"
@@ -38,16 +38,14 @@ FIXTURE = REPO / "tests" / "frontend" / "fixtures" / "driverAttribution.fixture.
 LABELS = ("Weight in the answer", "Where it lands", "When it lands", "What the band hinges on")
 
 
-def _load_script(name: str):
-    spec = importlib.util.spec_from_file_location(name, REPO / "scripts" / f"{name}.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+@pytest.fixture(scope="module")
+def build():
+    return attribution
 
 
 @pytest.fixture(scope="module")
-def build():
-    return _load_script("build_driver_analysis")
+def script():
+    return load_module("scripts/build_driver_analysis.py")
 
 
 @pytest.fixture(scope="module")
@@ -193,7 +191,7 @@ class TestCommittedArtefacts:
         # platforms is not drift, anything a reader could notice is.
         config = ModelConfig()
         rebuilt = build.build_record(config, drivers, record["reference_run"], record.get("persisted_run"))
-        assert build.records_match(build._strip_volatile(rebuilt), build._strip_volatile(record), build.RECORD_ATOL)
+        assert build.records_match(build.strip_volatile(rebuilt), build.strip_volatile(record), build.RECORD_ATOL)
         fixture = build.build_fixture(config, drivers, build.decompose(config, drivers))
         assert build.records_match(json.loads(FIXTURE.read_text(encoding="utf-8")), json.loads(json.dumps(fixture)),
                                    build.FIXTURE_ATOL, build.FIXTURE_RTOL)
@@ -287,7 +285,8 @@ class TestCommittedArtefacts:
         assert offenders == []
         assert sum("{peak_year}" in e["template"] for e in analysis["drivers"].values()) >= 30
 
-    def test_inputs_hash_follows_the_scoring_state_and_check_refuses_a_stale_reference(self, build, drivers, record, tmp_path, monkeypatch, capsys):
+    def test_inputs_hash_follows_the_scoring_state_and_check_refuses_a_stale_reference(self, build, script, drivers, record,
+                                                                                       tmp_path, monkeypatch, capsys):
         """The reference run is stamped with a digest of the seed's scoring
         state and the configuration; a re-scored seed (or a changed
         configuration) must fail --check and must be refused by a build
@@ -305,12 +304,12 @@ class TestCommittedArtefacts:
         stale["reference_run"]["inputs_hash"] = "0" * 64
         p = tmp_path / "stale.json"
         p.write_text(json.dumps(stale), encoding="utf-8")
-        monkeypatch.setattr(build, "ATTRIBUTION_PATH", str(p))
-        assert build.main(["--check"]) == 1
+        monkeypatch.setattr(script, "ATTRIBUTION_PATH", str(p))
+        assert script.main(["--check"]) == 1
         out = capsys.readouterr().out
         assert "inputs digest differs" in out
         # a build without --reference refuses instead of reconciling to the old median
-        assert build.main([]) == 1
+        assert script.main([]) == 1
         assert "REFUSING" in capsys.readouterr().out
 
     def test_readings_are_rendered_on_the_estimated_mix_only(self, render, record):

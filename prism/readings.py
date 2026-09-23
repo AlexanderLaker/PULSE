@@ -1,7 +1,7 @@
 """Render the PRISM Analysis readings from their templates and the attribution record.
 
 Pure functions without an engine import: scripts/build_driver_analysis.py
-renders the readings with them, scripts/generate_seed.py checks the committed
+renders the readings with them from the record prism/attribution.py computes, scripts/generate_seed.py checks the committed
 texts against them, and the tests hold both to the same renderer.
 
 A template is prose with named placeholders in braces; every figure in a

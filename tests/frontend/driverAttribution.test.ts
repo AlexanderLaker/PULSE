@@ -2,9 +2,9 @@
  * Parity lock for lib/driverAttribution.ts.
  *
  * The PRISM Analysis readings on the Drivers page are written on the Python
- * decomposition in scripts/build_driver_analysis.py; the category drill-down
- * ranks the contributing drivers with this TypeScript port. The two must give
- * the same numbers, so the Python script writes a fixture with its inputs
+ * decomposition in prism/attribution.py; the category drill-down ranks the
+ * contributing drivers with this TypeScript port. The two must give the same
+ * numbers, so scripts/build_driver_analysis.py writes a fixture with the inputs
  * and its unscaled outputs and this test replays it: every driver's
  * contribution to the portfolio and to every category, in every path year,
  * must agree to floating-point precision, and the drivers of a category must
@@ -37,7 +37,7 @@ const close = (a: number, b: number) => {
   return Math.abs(a - b) <= tol;
 };
 
-describe('lib/driverAttribution parity with scripts/build_driver_analysis.py', () => {
+describe('lib/driverAttribution parity with prism/attribution.py', () => {
   const fx = load();
   const result = computeDriverAttribution(fx.inputs);
 

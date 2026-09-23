@@ -71,6 +71,26 @@ def region_presence(driver) -> np.ndarray:
     return vals if vals.sum() > 0 else np.ones(len(REGIONS))
 
 
+def exposure_matrix(drivers: list) -> np.ndarray:
+    """How strongly each driver reaches each composite cell, (drivers, cells).
+
+    Cell (c, r) has index ``c * len(REGIONS) + r``; a driver reaches it with
+    (category exposure / 5) x its presence in the region (region_presence).
+    """
+    n_regions = len(REGIONS)
+    out = np.zeros((len(drivers), len(CATEGORIES) * n_regions))
+    for j, driver in enumerate(drivers):
+        presence = region_presence(driver)
+        for c_idx, cat in enumerate(CATEGORIES):
+            exp = driver.category_exposure.get(cat, 0)
+            ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
+            if ce <= 0:
+                continue
+            for r_idx in range(n_regions):
+                out[j, c_idx * n_regions + r_idx] = ce * presence[r_idx]
+    return out
+
+
 def floor_event(count: int) -> dict:
     """The integrity event for compounding factors floored at -100 percent."""
     return {
@@ -91,10 +111,10 @@ class MonteCarloEngine:
 
     ``run`` and ``run_multichain`` produce a result. The other public members
     (the attenuation by force, the cell-weight matrices, the correlation
-    matrix, the copula sampler and the peak-year schedule and draws) are the
-    engine's own arithmetic, which scripts/build_driver_analysis.py reuses so
-    that its decomposition of a result is exact; the underscored ones are
-    internal.
+    matrix, the copula sampler, the peak-year schedule and draws and the
+    within-force dampening), like the module's exposure_matrix, are the
+    engine's own arithmetic, which prism/attribution.py reuses so that its
+    decomposition of a result is exact; the underscored ones are internal.
     """
 
     #: Version of the model. A change to any number it produces means a new
@@ -398,6 +418,43 @@ class MonteCarloEngine:
             return np.minimum(offset_idx, n_off - 1).astype(np.intp)
         return np.zeros((n_iter, n_drivers), dtype=np.intp)
 
+    def within_force_dampening(self, drivers: list, exposure: np.ndarray) -> tuple:
+        """``(dampening, n_eff)``, each (forces, cells): the within-force overlap
+        correction and the effective number of each force's drivers per cell.
+
+        n_eff = (sum m)^2 / sum m^2 is the participation ratio of the force's
+        deterministic mean contributions m = |normalized_score| x exposure. It
+        equals the count for equal contributions, tends to 1 as one driver
+        dominates, and barely moves when a negligible driver is added, so
+        adding a small driver can never make a force's total smaller. The
+        dampening is 1 - overlap x (n_eff - 1) / n_eff where n_eff > 1, else 1,
+        floored at 0.1. ``exposure`` is exposure_matrix(drivers).
+        """
+        n_forces, n_cells = len(FORCES), exposure.shape[1]
+        driver_force_idx = np.array([FORCES.index(d.force) for d in drivers])
+        abs_score = np.array([abs(float(d.normalized_score)) for d in drivers])
+        contrib = abs_score[:, np.newaxis] * exposure
+        dampening = np.ones((n_forces, n_cells))
+        n_eff_all = np.zeros((n_forces, n_cells))
+        for f_idx, force in enumerate(FORCES):
+            mask = driver_force_idx == f_idx
+            if not mask.any():
+                continue
+            M = contrib[mask, :]
+            s1 = M.sum(axis=0)
+            s2 = (M * M).sum(axis=0)
+            n_eff = np.where(s2 > 0.0, (s1 * s1) / np.where(s2 > 0.0, s2, 1.0), 0.0)
+            n_eff_all[f_idx, :] = n_eff
+            ov = self.config.within_force_overlap[force]
+            if ov <= 0:
+                continue
+            # np.where evaluates both branches; dividing by a floored n_eff keeps
+            # empty cells (n_eff = 0, dampening 1.0) free of division warnings.
+            n_eff_safe = np.maximum(n_eff, 1.0)
+            dampen = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
+            dampening[f_idx, :] = np.clip(dampen, 0.1, 1.0)
+        return dampening, n_eff_all
+
     def _compute_all_paths_vectorized(self, drivers: list, raw_samples: np.ndarray,
                                       n_iter: int, n_cats: int, n_regions: int,
                                       n_years: int) -> np.ndarray:
@@ -410,34 +467,19 @@ class MonteCarloEngine:
         then compound multiplicatively, each factor floored at zero (a cell
         cannot lose more than its whole pool).
         """
-        categories = CATEGORIES
         n_drivers = len(drivers)
         n_cells = n_cats * n_regions
         if n_drivers == 0:
             return np.zeros((n_iter, n_cells, n_years))
 
-        force_list = list(FORCES)
-        n_forces = len(force_list)
-        force_idx_map = {f: i for i, f in enumerate(force_list)}
-        driver_force_idx = np.array([force_idx_map[d.force] for d in drivers])
-        fw = np.array([self.config.force_weights[f] for f in force_list])
+        n_forces = len(FORCES)
+        driver_force_idx = np.array([FORCES.index(d.force) for d in drivers])
+        fw = np.array([self.config.force_weights[f] for f in FORCES])
 
-        # Regional weight per driver (region_presence); drivers without any
-        # regional exposure count as present everywhere and are reported.
-        region_weight = np.array([region_presence(d) for d in drivers])
+        exposure = exposure_matrix(drivers)
+        # Drivers without any regional exposure count as present everywhere
+        # (region_presence) and are reported.
         regionless = [d.id for d in drivers if not any((d.regional_exposure or {}).values())]
-
-        exposure_matrix = np.zeros((n_drivers, n_cells))
-        for j, driver in enumerate(drivers):
-            for c_idx, cat in enumerate(categories):
-                exp = driver.category_exposure.get(cat, 0)
-                ce = min(exp, 5) / 5.0 if exp > 0 else 0.0
-                if ce <= 0:
-                    continue
-                base = c_idx * n_regions
-                for r_idx in range(n_regions):
-                    exposure_matrix[j, base + r_idx] = ce * region_weight[j, r_idx]
-
         if regionless:
             self._integrity_events.append({
                 "type": "regional_exposure_coverage",
@@ -455,34 +497,8 @@ class MonteCarloEngine:
         offset_idx = self.draw_peak_offsets(off_probs_by_driver, n_iter)
         driver_arange = np.arange(n_drivers)
 
-        attenuation = np.array([self.attenuation[f] for f in force_list])
-
-        # Within-force dampening per force and cell: 1 - overlap x (n_eff - 1) / n_eff,
-        # where n_eff = (sum m)^2 / sum m^2 is the participation ratio of the
-        # force's deterministic mean contributions m = |normalized_score| x exposure.
-        # n_eff equals the count for equal contributions, tends to 1 as one driver
-        # dominates, and barely moves when a negligible driver is added, so adding
-        # a small driver can never make a force's total smaller.
-        wf_overlap = self.config.within_force_overlap
-        abs_score = np.array([abs(float(d.normalized_score)) for d in drivers])
-        contrib = abs_score[:, np.newaxis] * exposure_matrix
-        wf_dampen = np.ones((n_forces, n_cells))
-        for f_idx, force in enumerate(force_list):
-            mask = driver_force_idx == f_idx
-            if not mask.any():
-                continue
-            ov = wf_overlap[force]
-            if ov <= 0:
-                continue
-            M = contrib[mask, :]
-            s1 = M.sum(axis=0)
-            s2 = (M * M).sum(axis=0)
-            n_eff = np.where(s2 > 0.0, (s1 * s1) / np.where(s2 > 0.0, s2, 1.0), 0.0)
-            # np.where evaluates both branches; dividing by a floored n_eff keeps
-            # empty cells (n_eff = 0, dampening 1.0) free of division warnings.
-            n_eff_safe = np.maximum(n_eff, 1.0)
-            dampen = np.where(n_eff > 1.0, 1.0 - ov * (n_eff - 1.0) / n_eff_safe, 1.0)
-            wf_dampen[f_idx, :] = np.clip(dampen, 0.1, 1.0)
+        attenuation = np.array([self.attenuation[f] for f in FORCES])
+        wf_dampen = self.within_force_dampening(drivers, exposure)[0]
 
         shift_samples = np.zeros((n_iter, n_cells, n_years))
         for y_idx in range(n_years):
@@ -494,7 +510,7 @@ class MonteCarloEngine:
                 mask = driver_force_idx == f_idx
                 if not mask.any():
                     continue
-                raw_sum = effective[:, mask] @ exposure_matrix[mask, :]
+                raw_sum = effective[:, mask] @ exposure[mask, :]
                 force_contrib[:, f_idx, :] = raw_sum * wf_dampen[f_idx, :][np.newaxis, :]
 
             weighted = force_contrib * fw[:, np.newaxis]

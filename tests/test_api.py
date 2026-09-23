@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import hmac
-import importlib.util
 import json
 import os
 import re
@@ -19,6 +18,7 @@ from prism.api import state
 from prism.api.app import create_app
 from prism.config import CATEGORIES
 from prism.database import PENDING_MIGRATION_MARKERS
+from support import load_module
 
 REPO = Path(__file__).resolve().parents[1]
 SECRET = "pytest-secret-" + "x" * 40
@@ -62,9 +62,7 @@ def valid_run(mock_model_config, mock_drivers_database):
     """A results bundle exactly as the production run persists it."""
     from prism.input_drift import driver_fingerprint
     from prism.engine import MonteCarloEngine
-    spec = importlib.util.spec_from_file_location("run_production", REPO / "scripts" / "run_production.py")
-    production = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(production)
+    production = load_module("scripts/run_production.py")
     result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(
         mock_drivers_database, n_chains=2, iterations=200)
     return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_drivers_database.drivers))
@@ -82,9 +80,7 @@ class TestRoutes:
         }
 
     def test_the_vercel_entry_point_serves_the_same_app(self):
-        spec = importlib.util.spec_from_file_location("vercel_index", REPO / "api" / "index.py")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = load_module("api/index.py", "vercel_index")
         assert module.app.title == "PRISM API"
 
     def test_the_api_needs_neither_numpy_nor_scipy(self, api, valid_run):

@@ -6,7 +6,6 @@ scripts/compute_attenuation.py from the driver base. The correction depends
 on the category exposure space, so a taxonomy or exposure change must be
 followed by a re-run; these tests fail until it is.
 """
-import importlib.util
 import json
 from pathlib import Path
 
@@ -15,6 +14,7 @@ import pytest
 
 from prism import config as C
 from prism.config_validation import validate_model_config
+from support import load_module
 
 REPO = Path(__file__).resolve().parent.parent
 RECORD = REPO / "data" / "calibration" / "attenuation.json"
@@ -26,10 +26,7 @@ def record():
 
 
 def _script():
-    spec = importlib.util.spec_from_file_location("compute_attenuation", REPO / "scripts" / "compute_attenuation.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module("scripts/compute_attenuation.py")
 
 
 class TestConfigEqualsTheRecord:
