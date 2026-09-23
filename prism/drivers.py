@@ -108,7 +108,7 @@ class Driver:
         return {"Expansion": 1, "Contraction": -1}[self.direction]
 
 
-def _score_in_range(value, low: int, high: int) -> bool:
+def whole_in_range(value, low: int, high: int) -> bool:
     """A whole number (int or integral float, never a bool) from low to high."""
     return (not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
             and value == int(value) and low <= value <= high)
@@ -133,18 +133,18 @@ def simulation_problems(drivers) -> list:
             problems.append(f"{where}: unknown force {d.force!r}")
         if d.direction not in DIRECTIONS:
             problems.append(f"{where}: direction {d.direction!r} is neither Expansion nor Contraction")
-        if not _score_in_range(d.probability, 1, 5):
+        if not whole_in_range(d.probability, 1, 5):
             problems.append(f"{where}: probability {d.probability!r} is not a whole number from 1 to 5")
         gp1 = d.gp1_pct_affected
         if isinstance(gp1, bool) or not isinstance(gp1, (int, float)) or not (0 < gp1 <= 1):
             problems.append(f"{where}: gp1_pct_affected {gp1!r} is not a share in (0, 1]")
-        if not _score_in_range(d.uncertainty, 0, 5):
+        if not whole_in_range(d.uncertainty, 0, 5):
             problems.append(f"{where}: uncertainty {d.uncertainty!r} is not a whole number from 0 to 5")
         if d.diffusion_curve not in VALID_DIFFUSION_CURVES:
             problems.append(f"{where}: diffusion curve {d.diffusion_curve!r} is not one of {VALID_DIFFUSION_CURVES}")
-        if not _score_in_range(d.start_year, 2000, 2100):
+        if not whole_in_range(d.start_year, 2000, 2100):
             problems.append(f"{where}: start year {d.start_year!r} is not a year")
-        elif not _score_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
+        elif not whole_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
             problems.append(f"{where}: peak year {d.peak_year!r} is not a year after the onset "
                             f"(from {first_peak_year(d.start_year)})")
         if d.vc_epicentre not in VC_STAGES:
@@ -158,7 +158,7 @@ def simulation_problems(drivers) -> list:
             for key, score in exposure.items():
                 if key not in keys:
                     problems.append(f"{where}: {name} names {key!r}, which is not in the taxonomy")
-                elif not _score_in_range(score, 0, 5):
+                elif not whole_in_range(score, 0, 5):
                     problems.append(f"{where}: {name}[{key!r}] = {score!r} is not a whole number from 0 to 5")
     return problems
 

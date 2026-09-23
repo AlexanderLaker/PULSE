@@ -3,7 +3,7 @@
 Both are loaded on first use and refreshed when the database changes: the
 driver set when database.drivers_stamp() moves (it changes with every saved
 driver row), the run when the newest run's id is no longer the one held (a
-newer run, or the held one removed). A production run, a content sync or an
+newer run, or the held one removed). A production run, a migration or an
 edit made through another server instance therefore reaches every instance
 on its next request that reads them, without a restart.
 

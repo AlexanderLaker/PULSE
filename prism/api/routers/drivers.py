@@ -1,7 +1,6 @@
 """Drivers: the list, the admin editor and the expert proposals."""
 import copy
 import json
-import math
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -12,7 +11,7 @@ from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
 from prism.config import CATEGORIES, REGIONS, first_peak_year
-from prism.drivers import MODEL_FIELDS, InvalidDriversError
+from prism.drivers import MODEL_FIELDS, InvalidDriversError, whole_in_range
 
 #: The names an exposure map may use, per field.
 EXPOSURE_KEYS = {"category_exposure": CATEGORIES, "regional_exposure": REGIONS}
@@ -55,8 +54,7 @@ def _checked_exposure_cells(name: str, value: dict) -> dict:
     for key, score in value.items():
         if key not in EXPOSURE_KEYS[name]:
             raise HTTPException(422, f"{name}: {key!r} is not one of {', '.join(EXPOSURE_KEYS[name])}")
-        if (isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score)
-                or score != int(score) or not 0 <= score <= 5):
+        if not whole_in_range(score, 0, 5):
             raise HTTPException(422, f"{name}['{key}'] must be a whole number from 0 to 5")
         out[str(key)] = int(score)
     return out

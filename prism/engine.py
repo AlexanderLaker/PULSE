@@ -92,12 +92,12 @@ def floor_event(count: int) -> dict:
 class MonteCarloEngine:
     """Simulates the relative shift of every category and cell over the horizon.
 
-    ``run`` produces a result. The other public members
-    (the attenuation by force, the cell-weight matrices, the correlation
-    matrix, the copula sampler, the peak-year schedule and draws and the
-    within-force dampening), like the module's exposure_matrix, are the
-    engine's own arithmetic, which prism/attribution.py reuses so that its
-    decomposition of a result is exact; the underscored ones are internal.
+    ``run`` produces a result. The other public members (the attenuation by
+    force, the cell-weight matrices, the correlation matrix, the copula
+    sampler, the peak-year schedule and draws and the within-force dampening),
+    like the module's exposure_matrix, are the engine's own arithmetic, which
+    prism/attribution.py reuses so that its decomposition of a result is exact;
+    the underscored ones are internal.
     """
 
     #: Version of the model. A change to any number it produces means a new
