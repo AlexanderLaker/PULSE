@@ -8,6 +8,7 @@ import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { S } from '@/lib/theme';
 import { NO_VALUE, fmtDate, fmtDateTime } from '@/lib/format';
+import { clearViewerCookie } from '@/lib/apiClient';
 import type { Role } from '@/types';
 import {
   DESTRUCTIVE_BUTTON, errorText, Field, INPUT_STYLE, Muted, PRIMARY_BUTTON, READONLY_INPUT_STYLE,
@@ -233,7 +234,7 @@ export const SessionsSection: FC = () => {
     try {
       await session.revoke();
       setSessions((list) => list && list.filter((s) => s.id !== session.id));
-      setStatus({ kind: 'success', message: 'Session revoked.' });
+      setStatus({ kind: 'success', message: 'Session revoked. That device loses access to PRISM data within 30 minutes.' });
     } catch (err) {
       setStatus({ kind: 'error', message: errorText(err, 'Failed to revoke session.') });
     } finally {
@@ -247,6 +248,7 @@ export const SessionsSection: FC = () => {
     setStatus(null);
     try {
       await Promise.all(others.map((s) => s.revoke()));
+      await clearViewerCookie();
       await signOut({ redirectUrl: '/sign-in' });
     } catch (err) {
       setStatus({ kind: 'error', message: errorText(err, 'Failed to sign out.') });
@@ -326,7 +328,7 @@ export const SessionsSection: FC = () => {
         title="Sign out everywhere"
         icon={LogOut}
         accent={S.error}
-        description="End every session on every device, this one included. You'll need to sign in again."
+        description="End every session on every device, this one included. You'll need to sign in again. A device signed out this way can still read PRISM data for up to 30 minutes."
       >
         <button type="button"
           onClick={signOutEverywhere}

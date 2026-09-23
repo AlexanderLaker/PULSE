@@ -17,7 +17,7 @@ import { makeConfig, makeSimulation, makeStore } from './fixtures/prism';
 const STATE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 vi.mock('@/hooks/usePrism', () => ({ default: () => STATE.store }));
 
-const API = vi.hoisted(() => ({ getUsers: vi.fn(), setUserRole: vi.fn() }));
+const API = vi.hoisted(() => ({ getUsers: vi.fn(), setUserRole: vi.fn(), clearViewerCookie: vi.fn(async () => {}) }));
 vi.mock('@/lib/apiClient', () => API);
 
 // Every hook returns the same objects on every call: the profile form syncs
@@ -242,13 +242,13 @@ describe('Active sessions', () => {
     expect(screen.getByText('This device')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
-    expect(await screen.findByText('Session revoked.')).toBeTruthy();
+    expect(await screen.findByText(/^Session revoked\. That device loses access to PRISM data within 30 minutes\.$/)).toBeTruthy();
     expect(CLERK.laptop.revoke).toHaveBeenCalledTimes(1);
     expect(CLERK.here.revoke).not.toHaveBeenCalled();
     expect(screen.queryByText('Macintosh · Safari')).toBeNull();
   });
 
-  it('signs out everywhere: the other devices first, then this browser', async () => {
+  it("signs out everywhere: the other devices first, then this browser's API cookie and session", async () => {
     openModal();
     openSection('Active sessions');
     await screen.findByText('Macintosh · Safari');
@@ -257,5 +257,8 @@ describe('Active sessions', () => {
     await waitFor(() => expect(CLERK.clerk.signOut).toHaveBeenCalledWith({ redirectUrl: '/sign-in' }));
     expect(CLERK.laptop.revoke).toHaveBeenCalledTimes(1);
     expect(CLERK.here.revoke).not.toHaveBeenCalled();
+    expect(API.clearViewerCookie).toHaveBeenCalledTimes(1);
+    expect(API.clearViewerCookie.mock.invocationCallOrder[0])
+      .toBeLessThan(CLERK.clerk.signOut.mock.invocationCallOrder[0]);
   });
 });

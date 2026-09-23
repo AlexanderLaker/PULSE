@@ -166,6 +166,8 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
+      // The API cookie first: it is not tied to the Clerk session.
+      await api.clearViewerCookie();
       // Straight to /sign-in: Clerk's default ("/") would only bounce there through proxy.ts.
       await signOut({ redirectUrl: '/sign-in' });
     } catch (error) {

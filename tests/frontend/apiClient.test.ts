@@ -1,6 +1,6 @@
 /**
  * lib/apiClient.ts: every request the dashboard makes. The viewer cookie lasts
- * twelve hours, so a /api/v1 request answered 401 asks /api/prism-cookie for a
+ * thirty minutes, so a /api/v1 request answered 401 asks /api/prism-cookie for a
  * new one and is sent once more; the dashboard's own routes are never retried,
  * and a second 401 is the answer.
  */

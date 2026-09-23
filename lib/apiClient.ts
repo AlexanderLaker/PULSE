@@ -3,9 +3,10 @@
  *
  * Reads and the user's own expert proposals go straight to the PRISM API
  * under /api/v1 and are authenticated by the httpOnly viewer cookie that
- * /api/prism-cookie sets (see hooks/usePrism.ts). The cookie lasts twelve
- * hours; a /api/v1 request answered 401 asks for a new one and is sent once
- * more, so a dashboard left open overnight keeps working. Admin writes go to the
+ * /api/prism-cookie sets (see hooks/usePrism.ts). The cookie lasts thirty
+ * minutes; a /api/v1 request answered 401 asks for a new one and is sent once
+ * more, so a dashboard left open keeps working while the session lasts, and
+ * signing out expires the cookie first (clearViewerCookie). Admin writes go to the
  * dashboard's own routes under /api, which check the signed-in user's role
  * and forward the write with a short-lived admin token (lib/backend.ts): the
  * viewer cookie can never authorise an admin write. User management and the
@@ -65,6 +66,10 @@ export const getDiagnostics = (): Promise<DiagnosticsResult | null> =>
 /** Sets the viewer cookie the /api/v1 reads need. Resolves whether or not it succeeded. */
 export const primeViewerCookie = (): Promise<void> =>
   fetch('/api/prism-cookie').then(() => undefined, () => undefined);
+
+/** Expires the viewer cookie, before signing out. Resolves whether or not it succeeded. */
+export const clearViewerCookie = (): Promise<void> =>
+  fetch('/api/prism-cookie', { method: 'DELETE' }).then(() => undefined, () => undefined);
 
 // ── Drivers ─────────────────────────────────────────────────────────────────
 

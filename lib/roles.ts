@@ -16,19 +16,35 @@ import { getSQL } from './db';
 
 export type { Role };
 
-/** Create the table if it does not exist yet; cheap after the first call. */
-export async function ensureUserRolesTable(): Promise<void> {
+let tableReady: Promise<void> | null = null;
+
+/** Create the table if it does not exist yet: once per server instance, again after a failure. */
+export function ensureUserRolesTable(): Promise<void> {
+  tableReady ??= createUserRolesTable().catch((err: unknown) => {
+    tableReady = null;
+    throw err;
+  });
+  return tableReady;
+}
+
+async function createUserRolesTable(): Promise<void> {
   const sql = getSQL();
-  await sql`
-    CREATE TABLE IF NOT EXISTS user_roles (
-      clerk_user_id TEXT PRIMARY KEY,
-      email         TEXT NOT NULL,
-      role          TEXT NOT NULL DEFAULT 'viewer'
-                    CHECK (role IN ('admin', 'viewer')),
-      created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_roles (
+        clerk_user_id TEXT PRIMARY KEY,
+        email         TEXT NOT NULL,
+        role          TEXT NOT NULL DEFAULT 'viewer'
+                      CHECK (role IN ('admin', 'viewer')),
+        created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+  } catch (err) {
+    // Two instances creating the table at the same moment collide in
+    // PostgreSQL's catalogue (unique_violation); the table then exists.
+    if ((err as { code?: string }).code !== '23505') throw err;
+  }
 }
 
 /** The user's role, or null when the webhook has not added the user yet. */
@@ -82,15 +98,21 @@ export async function deleteUserRole(clerkUserId: string): Promise<void> {
   await sql`DELETE FROM user_roles WHERE clerk_user_id = ${clerkUserId}`;
 }
 
-/** The signed-in user with their name and role (viewer until the webhook has added them). */
-export async function requireAuth(): Promise<{ clerkUserId: string; email: string; name: string; role: Role }> {
+/** The signed-in user from the Clerk session alone; UnauthorizedError without one. */
+export async function requireSignedIn(): Promise<{ clerkUserId: string; email: string; name: string }> {
   const { userId } = await auth();
   if (!userId) throw new UnauthorizedError('Not signed in');
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? '';
   const name = user?.fullName?.trim() ?? '';
-  const role = (await getRole(userId)) ?? 'viewer';
-  return { clerkUserId: userId, email, name, role };
+  return { clerkUserId: userId, email, name };
+}
+
+/** The signed-in user with their role (viewer until the webhook has added them). */
+export async function requireAuth(): Promise<{ clerkUserId: string; email: string; name: string; role: Role }> {
+  const me = await requireSignedIn();
+  const role = (await getRole(me.clerkUserId)) ?? 'viewer';
+  return { ...me, role };
 }
 
 /** The signed-in user if they are an admin; ForbiddenError otherwise. */

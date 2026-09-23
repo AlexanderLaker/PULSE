@@ -15,12 +15,12 @@ should sit next to the audit log it is written to.
   sign-up, as admin when the table is empty (the first user).
 - The API never sees a Clerk session. It verifies HS256 tokens that the
   dashboard's server routes sign for the signed-in user and that expire
-  (after twelve hours for reads, five minutes for admin writes).
+  (after thirty minutes for reads, five minutes for admin writes).
 - Reads and a user's own expert proposals use an httpOnly cookie scoped to
   `/api/v1` that always carries the viewer role. Admin writes go through a
   dashboard route that checks the role and forwards the request with a
   five-minute admin token carrying the user's identity, which the API writes
-  to its audit log.
+  to its audit log. Signing out expires the cookie first.
 
 ## Consequences
 

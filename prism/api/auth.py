@@ -5,7 +5,7 @@ HS256 token signed with ``PRISM_JWT_SECRET`` (lib/prismJwt.ts) and hands it
 to this API in one of two ways:
 
 - the ``prism-token`` cookie, set by /api/prism-cookie with role ``viewer``,
-  valid for twelve hours and scoped to /api/v1, which authorises the
+  valid for thirty minutes and scoped to /api/v1, which authorises the
   dashboard's reads and the user's own expert proposals;
 - an ``Authorization: Bearer`` header with a five-minute token, sent by the
   Next.js proxy routes that forward admin writes with the caller's real role.
