@@ -9,17 +9,26 @@ numbers that carry the hierarchy while the chrome stays quiet.
 
 | File | Holds |
 |---|---|
-| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders and status; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
-| `lib/format.ts` | the shift colours (`EXPANSION`, `CONTRACTION`, `NEUTRAL` and their soft tints), the matrix heat ramp, the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
-| `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion |
-| `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance, which repeats the token values in Tailwind classes (Tailwind reads class names literally, so they cannot be built from `S`) |
+| `lib/theme.ts` | `S`, the colour tokens of surfaces, text, borders, status and overlays; `SHADOW`, one shadow per kind of surface; `INK_RGB` and `PRIMARY_RGB` for tints with their own alpha; the three font stacks (`HEADLINE_FONT`, `BODY_FONT`, `MONO_FONT`) |
+| `lib/format.ts` | the shift colours (`EXPANSION`, `CONTRACTION`, `NEUTRAL`, their soft tints and RGB channels), the matrix heat ramp, the force colours (`FORCE_COLORS`) and the category colours (`CATEGORIES`) |
+| `tailwind.config.ts` | Tailwind's colours and shadows, read from `lib/theme.ts` under kebab-case names: `bg-theme-primary`, `text-theme-on-surface-variant`, `shadow-door` |
+| `app/globals.css` | the base layer: reset, focus ring, selection, scrollbar, input focus, Recharts grid lines, reduced motion and the frame of Clerk's forms; its colours come from the same tokens through Tailwind's `theme()` |
+| `app/layout.tsx` | the fonts (self-hosted with next/font) and Clerk's appearance: its variables from `S`, its element classes in the theme's Tailwind names |
 
-Components style themselves inline from these tokens and use Tailwind's
-default utilities for layout and spacing only. A colour written into a
-component instead of taken from these files is a bug, with two deliberate
-exceptions: the source-tier colours on the Drivers page
-(`components/dashboard/drivers/cards.tsx`) and the washes and illustrations
-of the entry gate's four tiles (`HomeGate.tsx`).
+Components style themselves inline from these tokens and use Tailwind for
+layout and spacing; where a class has to carry a colour or a shadow (Clerk's
+elements take classes, and a hover state is simplest as a class), it uses the
+theme's names. A literal colour anywhere else in the dashboard's code fails
+`tests/test_repository.py`. Three palettes belong to a single view and live
+in it: the source-tier colours on the Drivers page
+(`components/dashboard/drivers/cards.tsx`), the washes of the entry gate's
+doors (`HomeGate.tsx`) and the Explorer's bar fills
+(`components/dashboard/explorer/PoolChart.tsx`).
+
+The pieces several views share are components of their own: `Chip.tsx` (a
+label with its meaning in text), `SectionCard.tsx` (a boxed section with an
+icon, a title and optional help) and `ShiftValue.tsx` (a signed shift with
+its arrow).
 
 ## Colour
 
@@ -34,13 +43,20 @@ of the entry gate's four tiles (`HomeGate.tsx`).
 | `onSurface` | `#00345e` | headlines and body text (the deep navy of the brand) |
 | `onSurfaceVariant` | `#26619d` | secondary text, inactive tabs |
 | `mutedText` | `#64748b` | captions, helper text, beta labels |
+| `onPrimary` | `#ffffff` | text and icons on a filled primary, dark or coloured surface |
 | `cardBorder` | `rgba(0, 52, 94, 0.10)` | card and divider borders |
+| `scrim` | `rgba(0, 52, 94, 0.35)` | the backdrop behind a dialog or drawer |
 | `error` | `#9f403d` | errors |
 | `amber` | `#b45309` | warnings, estimate grades |
 | `expert`, `delta` | `#6b4fc4`, `#b07d2b` | on the Drivers page, the expert aggregate and the chip with its delta to the baseline |
 
-Shadows are navy-based (`rgba(0, 52, 94, ...)`), never black; the card shadow
-is `0 4px 60px -15px rgba(0, 52, 94, 0.08)`.
+Shadows are navy-based (`rgba(0, 52, 94, ...)`), never black, and there is one
+per kind of surface (`SHADOW`): `card` (`0 4px 60px -15px rgba(0, 52, 94,
+0.08)`), `popover` for hover cards, chart tooltips and menus, `tip` for the
+dark tooltips, `dialog`, `sheet` for the Explorer's side panel, `nav`,
+`raised` for the active segment of a segmented control, `lift` for a card
+under the pointer, `primaryButton`, `authCard`, and `door` and `doorHover` for
+the entry gate.
 
 ### Shifts
 
@@ -79,13 +95,15 @@ value a reader needs.
 
 - A shift or a share shows at most one decimal: a Monte Carlo median does
   not support more. `fmtShift` and `fmtPct` in `lib/format.ts` format them and
-  never show a second decimal. Two places state more on purpose: the PRISM
+  never show a second decimal. Three places state more on purpose: the PRISM
   Analysis gives contributions in points with two decimals, so that close
-  drivers can be told apart (docs/DRIVER_ANALYSIS.md), and the About this
-  model section gives the sampling noise (the Monte Carlo standard error and
-  the seed stability) to three decimals of a point, because it is that small.
-  The Profit Pool Explorer's derivation tooltips show their arithmetic at the
-  precision of its inputs.
+  drivers can be told apart (docs/DRIVER_ANALYSIS.md); the Settings sheet
+  gives the cell weights with two decimals, because several cells hold less
+  than 0.1 percent of the pool; and the About this model section gives the
+  sampling noise (the Monte Carlo standard error and the seed stability) to
+  three decimals of a point, because it is that small. The Profit Pool
+  Explorer's derivation tooltips show their arithmetic at the precision of
+  its inputs.
 - A shift always shows its sign; below 0.05 percent it counts as flat and
   shows neither sign nor colour.
 - A missing value shows `–`.
@@ -96,8 +114,9 @@ value a reader needs.
 
 ## Shapes and patterns
 
-- Cards: 16 px radius, white, the card shadow. Controls (buttons, chips, tab
-  pills): fully rounded. Inputs and small nested elements: 8 to 10 px.
+- Cards: 12 to 16 px radius, white, with the card shadow or a hairline
+  border. Controls (buttons, chips, tab pills): fully rounded. Inputs and
+  small nested elements: 8 to 10 px.
 - Top navigation: the wordmark and the production tabs on the left; the beta
   tab, settings and the user on the right. The active tab is primary blue with
   an underline; beta tabs use the muted scale.

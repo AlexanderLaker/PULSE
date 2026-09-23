@@ -13,7 +13,7 @@ naively, such a mechanism counts twice.
 
 - Per force, the summed contribution enters the force's compounding factor
   multiplied by an attenuation derived from the cross-force overlap:
-  `0.5 x (1 - mean overlap of the force's row)`.
+  `0.5 x (1 - the force's mean overlap with the five other forces)`.
 - Within a force, contributions to a cell are dampened by
   `1 - overlap x (n_eff - 1) / n_eff`, where `n_eff` is the magnitude-weighted
   effective number of contributing drivers. Unlike a plain count, it

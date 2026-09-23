@@ -9,7 +9,7 @@ How to develop, test, run, deploy and look after PRISM.
 | Dashboard and API | Vercel project `prism-profit-pool`, https://prism-hcb.vercel.app | `npm run dev` and uvicorn on your machine |
 | Database | Neon PostgreSQL | a Neon development branch (the dashboard's role table needs Neon); the API and the scripts can also use a local SQLite file |
 | Sign-in | Clerk production instance | Clerk development instance (test keys) |
-| Source | GitHub `AlexanderLaker/PRISM`, branch `main`; every push deploys | any branch |
+| Source | the GitHub repository connected to the Vercel project (Settings, Git), branch `main`; every push deploys | any branch |
 
 The production run, the generators and the migrations run on a developer
 machine with the full Python environment. The scripts that touch a database
@@ -113,6 +113,10 @@ A few rules the suite holds:
 - **Parity**: the value-chain rule, the uncertainty tables and the
   per-driver attribution exist in Python and TypeScript; tests keep each pair
   identical.
+- **Colours** come from `lib/theme.ts` (and the shift colours from
+  `lib/format.ts`): a literal colour anywhere else in the dashboard's code
+  fails `tests/test_repository.py`, apart from three palettes that belong to
+  one view each (the entry doors, the source grades, the Explorer's bars).
 
 ## The production run
 
@@ -123,9 +127,10 @@ python3 scripts/run_production.py --cell-weights /path/outside/the/repo/cell_wei
 
 The run reads the database in `DATABASE_URL` (or `POSTGRES_URL`), refuses to
 start without one unless `--allow-sqlite` is given, and takes a few minutes
-at the default 3 x 50,000 iterations. It writes a new row to
-`simulation_runs`; the dashboard serves the newest row from its next request
-on, and earlier rows stay for the drift comparison. It also writes the QA
+at the default 3 x 50,000 iterations (`PRODUCTION_*` in `prism/config.py`). It
+writes a new row to `simulation_runs`; the API serves the newest row from its
+next request on, an open dashboard shows it within about a minute, and
+earlier rows stay for the drift comparison. It also writes the QA
 workbook to `runs/` (git-ignored): the Shift Matrix with its percentiles, the
 regional medians, the cell weights (with the graded derivation when the
 estimate was used), the velocities and the run's metadata.
@@ -154,12 +159,14 @@ The cell-weights file is JSON, kept outside the repository:
 `"basis": "gp1_share"` the 52 shares must add up to 1 within 0.01; with
 `"gp1_absolute"` the values are divided by their total before the engine sees
 them, and no amount is stored anywhere. The `source` text is stored with the
-run and shown next to it.
+run and shown next to it; a text that opens like the estimate's label
+("ESTIMATE, not Henkel P&L") is refused, so a finance run can never be
+mistaken for the estimate.
 
 | Exit code | Meaning |
 |---|---|
 | 0 | the run is persisted (the workbook is best effort) |
-| 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or still on the previous schema |
+| 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or awaiting a migration (the message names it) |
 | 2 | the database holds no drivers |
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
@@ -170,9 +177,11 @@ After a run, the Shift Analysis's "About this model" footer shows the new
 run's id, date, seeds, numerics, Monte Carlo standard error, seed stability
 and integrity events, including the input drift against the previous run.
 
-When the inputs of the PRISM Analysis changed (a re-scored base, a
-recalibration, the finance cell weights), regenerate the readings after the
-run as docs/DRIVER_ANALYSIS.md describes.
+When scores or model parameters changed, regenerate the PRISM Analysis
+readings after the run as docs/DRIVER_ANALYSIS.md describes. A run on the
+finance file leaves the committed readings on the estimate, and every card
+says that its figures come from another run; the same document shows how to
+put readings on the finance shares into the database.
 
 ## Deploying
 
@@ -220,11 +229,15 @@ back as that migration's runbook says.
   PostgreSQL. `prism/database.py` lists the migrations a new database already
   contains (`SCHEMA_MIGRATIONS`).
 - **The PRISM Analysis texts** of an existing database follow the generated
-  ones with `scripts/sync_analysis.py` (`--dry-run` first). It changes only
-  the analysis column and writes one audit entry per driver.
+  ones with `scripts/sync_analysis.py` (`--dry-run` first). It changes the
+  analysis column, raises the revision of each driver it changes (an admin
+  editing one of them at that moment is asked to reload before saving) and
+  writes one audit entry per driver. `--texts FILE` writes another rendering,
+  such as readings on the finance shares.
 - **The audit log** records every driver edit (one row per changed field),
-  journey save, role change, analysis sync and migration, with the acting
-  identity. Nothing deletes from it.
+  journey save, analysis sync and migration in the same transaction as the
+  change, with the acting identity, and every role change where it can (a
+  failed audit write does not undo a role change). Nothing deletes from it.
 
 ## Roles and users
 
@@ -252,7 +265,12 @@ sign-up.
    events `user.created`, `user.updated` and `user.deleted`, and copy its
    signing secret into `CLERK_WEBHOOK_SIGNING_SECRET`. The route rejects any
    request without a valid signature.
-4. Deploy, sign up, and check that `user_roles` holds your row with the
+4. Restrict who may sign up, in the Clerk dashboard: the Restricted sign-up
+   mode (users join by invitation) or an allowlist of email addresses or
+   domains. The access code the sign-up page asks for
+   (`NEXT_PUBLIC_SIGNUP_CODE`) is fixed at build time and readable in the
+   browser, so it only keeps casual visitors out.
+5. Deploy, sign up, and check that `user_roles` holds your row with the
    admin role.
 
 ## Troubleshooting
@@ -260,7 +278,7 @@ sign-up.
 | Symptom | Cause and remedy |
 |---|---|
 | Every data request answers 401 | The dashboard and the API see different `PRISM_JWT_SECRET` values, or the value is shorter than 32 characters. Set the same value everywhere and redeploy |
-| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `legacy_schema` (the database needs `migrations/0001_driver_schema`), `no_database` (no `DATABASE_URL` in this deployment) or `db_error` (the API cannot reach the database; the `error` field says why) |
+| The dashboard says the service is unavailable, or a notice under the navigation says the data cannot be loaded | Check `/api/v1/health` and `/api/v1/diagnostics`. `simulation_reason` names the cause: `migration_pending` (the database needs a migration; the `error` field names it), `no_database` (no `DATABASE_URL` in this deployment) or `db_error` (the API cannot reach the database or a query failed; the `error` field says why) |
 | The Shift Analysis is empty | `simulation_reason` in `/api/v1/diagnostics` is `no_rows` (write a run) or `malformed` (the newest run lacks a key the dashboard needs; write a new run) |
 | Nobody is admin | The webhook did not reach the dashboard: check its deliveries in the Clerk dashboard, then set the role as described under Roles |
 | The production run exits with 4 | The correlation settings are not positive definite on the current driver mix; lower the cross-force correlations in `prism/config.py` |
@@ -277,12 +295,14 @@ travel separately:
 - the database, as a `pg_dump` of the Neon production branch;
 - the finance cell-weights file, if one exists;
 - the credentials, which are not handed over but rotated: the Clerk keys and
-  webhook secret, the Neon password, `PRISM_JWT_SECRET` (every session then
-  signs in again), `NEXT_PUBLIC_SIGNUP_CODE` and any `ADMIN_BOOTSTRAP_SECRET`.
+  webhook secret, the Neon password, `PRISM_JWT_SECRET` (the old tokens stop
+  working, and an open dashboard fetches a new cookie on its next request, so
+  nobody has to sign in again), `NEXT_PUBLIC_SIGNUP_CODE` and any
+  `ADMIN_BOOTSTRAP_SECRET`.
 
 The services themselves belong to the owner's accounts today: the GitHub
-repository `AlexanderLaker/PRISM`, the Vercel project `prism-profit-pool`,
-the Neon project and the Clerk application. Move each into an account the
+repository, the Vercel project `prism-profit-pool`, the Neon project and the
+Clerk application. Move each into an account the
 receiving organisation controls, through the service's own transfer where it
 offers one, or by creating it anew (a new Clerk application means new keys
 and a new webhook; a new Neon project is restored from the dump). Rotate the

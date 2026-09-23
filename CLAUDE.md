@@ -44,7 +44,7 @@ documents in `docs/` explain everything below in full.
 - **The model configuration is code** (`prism/config.py`); the dashboard shows
   it read-only.
 - **Honest display.** One decimal for shifts and shares (docs/DESIGN.md
-  names the two exceptions); the portfolio band is the joint percentile; the
+  names the three exceptions); the portfolio band is the joint percentile; the
   lenses are labelled attribution; sampling quality is the Monte Carlo
   standard error and seed stability; a shift always carries its sign.
   docs/adr/0007 has the reasons.
@@ -57,6 +57,10 @@ documents in `docs/` explain everything below in full.
   change both or neither.
 - **Shift Matrix arithmetic** lives in `lib/shiftMatrix.ts`;
   `scripts/check_single_source.sh` (part of `npm run lint`) fails on a copy.
+- **Design tokens.** Colours, shadows and fonts come from `lib/theme.ts` (the
+  shift colours from `lib/format.ts`); Tailwind reads the same tokens
+  (`tailwind.config.ts`). A literal colour elsewhere in the dashboard's code
+  fails `tests/test_repository.py`. docs/DESIGN.md has the system.
 - **Database changes are migrations** under `migrations/`, following
   `0001_driver_schema`: one transaction, a dry run, `--postgres` to touch
   PostgreSQL, an archive of everything dropped, a runbook, tests on SQLite
@@ -101,6 +105,6 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `prism/api/` | the API: routers, auth, the stored-run contract (`runs.py`) |
 | `scripts/` | production run, generators, `sync_analysis.py`, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |
-| `components/dashboard/` | the views |
+| `components/dashboard/` | the views: each page in one file, its parts in a folder of its own (`drivers/`, `shift/`, `journey/`, `explorer/`, `settings/`), and the pieces several views share |
 | `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client, the store, the types |
 | `docs/` | ARCHITECTURE, MODEL, DRIVERS, DRIVER_ANALYSIS, OPERATIONS, DESIGN, EXPLORER, `adr/` |

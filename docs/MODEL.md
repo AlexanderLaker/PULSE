@@ -214,8 +214,8 @@ an integrity event.
   category's terminal-year median, P10 and P90. At 3 x 50,000 iterations it is
   about 0.001 percentage points, far below the one-decimal display. It
   measures sampling noise only, never model error. The About this model
-  section of the Shift Analysis shows the largest of these standard errors
-  next to the seed stability.
+  section of the Shift Analysis shows the largest standard error of a
+  category median next to the seed stability.
 - **Chains and seed stability.** Production runs three chains with seeds
   `42 + i x 1,000,003` and pools them for every published number. The spread
   of the three chains' terminal-year portfolio medians is reported as seed
@@ -228,7 +228,7 @@ the list next to the run.
 
 | Event | Raised when |
 |---|---|
-| `input_drift` | always (from the production run): how the drivers' scores changed since the previous run, or that nothing changed |
+| `input_drift` | on every production run after the first: how the drivers' scores changed since the previous run, or that nothing changed |
 | `correlation_pd_repair`, `cholesky_repair` | the correlation matrix had to be repaired |
 | `regional_exposure_coverage` | a driver without regional exposure was treated as present everywhere |
 | `compounding_floor` | a compounding factor was floored at -100 percent |
@@ -265,7 +265,8 @@ outcomes. `scripts/compute_attenuation.py` computes it in five steps:
 The result is the within-force overlap `ov_f` of step 5 above and the
 cross-force overlap matrix `O`, where `O[i][j]` is the share of force `i`'s
 signal already carried by force `j` (not symmetric by design). The
-attenuation of a force is `0.5 x (1 - mean of its row in O)`. The record is
+attenuation of a force is `0.5 x (1 - m)`, where `m` is the mean of its row
+in `O` over the five other forces. The record is
 `data/calibration/attenuation.json`. The correction is computed from the
 driver base, not from the live database: it is recomputed whenever the
 categories or the base's exposure scores change (`--check` fails until it
@@ -315,8 +316,7 @@ records its seeds and the scipy and numpy versions it computed with. scipy is
 a hard requirement: the engine refuses to import without it, and there is no
 approximate fallback. `tests/test_golden_pipeline.py` pins the engine's
 output on a fixed set of drivers; the pins change only with a deliberate
-model change, in the same commit, together with a new `MODEL_VERSION`
-(currently 2.12.0).
+model change, in the same commit, together with a new `MODEL_VERSION`.
 
 ## The reference result
 

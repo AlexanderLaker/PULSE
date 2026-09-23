@@ -64,7 +64,7 @@ any of these keys (`prism/api/runs.py`).
 | `shift_matrix` | Per category: `path` (per year the P10, P25, median, P75, P90, mean and standard deviation of the shift) and `velocity` (the distribution of the year-on-year change) |
 | `regional_shift_matrix` | The same per category and region |
 | `decompositions` | The force, value-chain and region attribution of every category's median, per year |
-| `totals` | Row and column totals of the lenses and `portfolio`, the joint percentile path of the portfolio shift |
+| `totals` | `category_path`, each category's median per year (the row total of every lens), and `portfolio`, the joint percentile path of the portfolio shift; the dashboard computes the column totals from the run's category shares |
 | `cell_weights_used`, `category_weights_used`, `region_weights_used`, `cell_weights_source` | The gross-profit shares the run applied and where they came from |
 | `mc_standard_error` | Bootstrap standard error of each category's terminal-year median, P10 and P90 |
 | `seed_stability` | The terminal-year portfolio median of each chain and their spread |
@@ -86,10 +86,10 @@ engine.
 
 | Route | Access | Answer |
 |---|---|---|
-| `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`legacy_schema`, `no_database` or `db_error`) |
+| `GET /api/v1/health` | anonymous | Status, version, driver count, whether a run exists and its id; when the database cannot be used, status `degraded` and the reason (`migration_pending`, `no_database` or `db_error`) |
 | `GET /api/v1/diagnostics` | anonymous | What this instance sees of the database (host name only) and whether the latest run can be served |
 | `GET /api/v1/drivers` | signed in | Every driver with its scores, sources, PRISM Analysis, baseline and a summary of the expert proposals |
-| `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log |
+| `PUT /api/v1/drivers/{id}` | admin | An edit of the fields sent, made on the driver revision the request names (409 when the driver changed since); an exposure map changes only the cells it names; every changed field goes to the audit log. Name, force and onset are not edited here, and a peak year must fall after the onset |
 | `GET /api/v1/drivers/{id}/proposals` | signed in | The caller's own proposal, the aggregate across experts and who scored what |
 | `PUT /api/v1/drivers/{id}/proposals` | signed in | Merges the fields sent into the caller's own proposal (a field sent as null is cleared); never changes the driver |
 | `GET /api/v1/simulation` | signed in | The latest run (the bundle above, with `meta` as `run_meta` plus the run's id, date and iteration count) and `inputs_since_run`, the drivers changed, added or removed since the run; 404 when there is none to serve |
@@ -99,9 +99,11 @@ engine.
 
 A body the API cannot accept is answered 422 with the reason, and a write
 made on an outdated revision or version 409; the dashboard shows both
-messages as they come. While the database cannot be used (it still needs
-migration 0001, or no database is configured) the routes that read or write
-it answer 503.
+messages as they come. While the database cannot be used the routes that read
+or write it answer 503: with the migration to run when the schema is older
+than the code, with the missing setting when no database is configured, and
+with "try again in a moment" when the database cannot be reached after three
+attempts (the details go to the log, never to the browser).
 
 Each instance keeps the drivers and the latest run in memory
 (`prism/api/state.py`) and checks on every request whether the database moved
@@ -111,8 +113,9 @@ newer id appears. A production run, a script or an edit made through another
 instance is therefore visible on the next request.
 
 On an empty database the API creates the tables and seeds the driver base
-(`prism/seed_drivers.py`). On a database of the previous schema it creates
-nothing and answers 503 with a pointer to `migrations/0001_driver_schema`; on
+(`prism/seed_drivers.py`). On a database that still needs a migration it
+creates nothing and answers 503 naming the migration
+(`migrations/0001_driver_schema`, run with its README as the runbook); on
 Vercel without a database URL it answers 503 too, rather than writing to a
 SQLite file that would vanish with the instance.
 
@@ -140,6 +143,10 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   five-minute admin token that carries the user's identity
   (`lib/backend.ts`). The API writes that identity to the audit log.
 
+Both tokens carry the user's Clerk id, email, role and, when Clerk has one,
+their full name, which the proposals list shows next to each expert's scores
+(the email's local part when there is no name).
+
 `proxy.ts` requires a Clerk session for every page and dashboard route except
 the sign-in and sign-up pages, the webhook (which checks its Svix signature)
 and the admin bootstrap route (which checks a shared secret). `/api/v1` is
@@ -154,7 +161,7 @@ The dashboard's server routes (`app/api`):
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |
 | `GET /api/users` | admin | Every Clerk user with their role, for the user list in Settings |
-| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log |
+| `PATCH /api/users/{userId}/role` | admin | Changes a role (never the caller's own) and writes it to the audit log where possible; a failed audit write does not undo the change |
 | `POST /api/webhooks/clerk` | Svix signature | Adds, updates or removes a user's row in `user_roles` |
 | `POST /api/admin/bootstrap` | shared secret | Makes a signed-up user admin; exists only while `ADMIN_BOOTSTRAP_SECRET` is set |
 
@@ -162,26 +169,34 @@ The dashboard's server routes (`app/api`):
 
 Next.js with the App Router, React and TypeScript. `app/dashboard/page.tsx`
 holds the top navigation and mounts `PrismProvider` (`hooks/usePrism.ts`),
-which loads the drivers, the configuration and the latest run once and shares
-them with every view. The views are in `components/dashboard/`:
+which loads the drivers, the configuration and the latest run and shares them
+with every view. It asks `/api/v1/health` every minute (every 30 seconds while
+the service is unreachable or degraded) and reloads when the service recovers
+or a newer run appears, so an open dashboard shows a new production run
+within about a minute. The views are in `components/dashboard/`, each page in
+one file and its parts in a folder of its own:
 
 | View | File | What it shows |
 |---|---|---|
 | Entry gate | `HomeGate.tsx` | The four views and what each is for |
 | Drivers | `Drivers.tsx`, `drivers/` | The drivers with their scores, sources and PRISM Analysis; Expert Rating, where every signed-in user can propose scores; for admins the editor and Review & Endorse, which sets the expert aggregate against the driver's scores. `Drivers.tsx` is the table; `drivers/` holds the row, the three panels, the PRISM Analysis card and the scales and cards they share |
-| Consumer Journey | `ConsumerJourney.tsx` | Consumer moments per journey stage with the drivers behind them; admins edit the tiles |
-| Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `CategoryDetailPanel.tsx` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category |
-| Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
-| Settings | `SettingsModal.tsx` | The model configuration the run used, sessions, and the user list for admins |
+| Consumer Journey | `ConsumerJourney.tsx`, `journey/` | Consumer moments per journey stage with the drivers behind them; admins edit the tiles. `journey/` holds the tile parts, the tile dialog, its why-chain and the tile editor |
+| Profit Pool Shift Analysis | `ShiftAnalysis.tsx`, `shift/` | The Shift Matrix through the four lenses, the portfolio band and the drill-down per category (`shift/CategoryDetailPanel.tsx`); `shift/` also holds the matrix model, the toolbar, the state without a run and the "About this model" footer |
+| Profit Pool Explorer (beta) | `ProfitPoolExplorer.tsx`, `explorer/` | Sourced profit pool views of the Hair and Laundry & Home Care industries |
+| Settings | `SettingsModal.tsx`, `settings/` | Profile, password and sessions (from Clerk); the model configuration, read-only: the code's parameters and the cell weights the served run used; the user list for admins |
 
-Shared logic lives in `lib/`: `format.ts` (the one way a shift is displayed,
-the taxonomies), `shiftMatrix.ts` (the category-weighted totals; a lint step
-keeps them from being reimplemented in a component), `cellWeights.ts`,
-`valueChain.ts`, `uncertainty.ts` (what an uncertainty score does in the
-engine), `driverAttribution.ts` (the per-driver decomposition the drill-down
-ranks with) and `theme.ts` (the design tokens); the server side has `db.ts`,
-`roles.ts`, `prismJwt.ts` and `backend.ts`. The types in `types/` mirror the
-API's JSON.
+`Chip.tsx`, `SectionCard.tsx` and `ShiftValue.tsx` are the pieces several
+views share: one look for a label, for a boxed section and for a signed shift.
+
+Shared logic lives in `lib/`: `apiClient.ts` (every request the dashboard
+makes), `format.ts` (the one way a shift is displayed, the taxonomies),
+`shiftMatrix.ts` (the category-weighted totals; a lint step keeps them from
+being reimplemented in a component), `cellWeights.ts`, `valueChain.ts`,
+`uncertainty.ts` (what an uncertainty score does in the engine),
+`driverAttribution.ts` (the per-driver decomposition the drill-down ranks
+with) and `theme.ts` (the design tokens, which Tailwind reads too); the server
+side has `db.ts`, `roles.ts`, `prismJwt.ts` and `backend.ts`. The types in
+`types/` mirror the API's JSON.
 
 The Consumer Journey content ships with the dashboard (`data/consumerJourney.ts`);
 once an admin saves an edit, the newest stored version replaces the bundled

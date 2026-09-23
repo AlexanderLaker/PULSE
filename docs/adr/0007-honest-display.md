@@ -13,8 +13,9 @@ meaningless for independent draws.
 
 - Shifts and shares show at most one decimal. The exceptions are stated
   where they occur: contributions in points with two decimals in the PRISM
-  Analysis, so that close drivers can be told apart, and the sampling noise
-  to three decimals of a point (docs/DESIGN.md).
+  Analysis, so that close drivers can be told apart; the cell weights with
+  two decimals in Settings, because several cells hold less than 0.1 percent;
+  and the sampling noise to three decimals of a point (docs/DESIGN.md).
 - The portfolio band is the joint percentile of the per-iteration portfolio
   shift, never an average of category bands.
 - The force, value-chain and region lenses are labelled attribution: they

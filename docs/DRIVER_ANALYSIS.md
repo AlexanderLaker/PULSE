@@ -37,8 +37,8 @@ The reading answers one question per driver, in four labelled paragraphs:
 A basis line closes the reading: "Figures: model attribution on the estimated
 HCB gross-profit mix, reconciled to a 2035 portfolio median of -5.6 percent
 (3 x 50,000 iterations, seed 42). Read as exposure if nobody acts, not as a
-forecast." A dashboard showing a different headline is the signal that the
-readings have aged.
+forecast." When the run the dashboard shows has another median, the card says
+under the basis line that its figures come from the run the line names.
 
 The reading interprets the model's arithmetic. It does not restate scores,
 forecast or recommend: under the ceteris-paribus design every contribution is
@@ -184,21 +184,46 @@ production run recorded with it. The check does not repeat the reference
 run; `--reference` does. Comparisons admit one unit in the fourth decimal
 (floating-point differences between machines) and nothing more.
 
-When the inputs change (a re-scored base, a recalibration, the finance cell
-weights):
+The build reads the driver base (`data/drivers/driver_base.json`); the
+production run reads the database. The reference run reproduces a
+production run only when both hold the same scores, and the check fails
+otherwise. No tool carries scores between the two: a score changed on the
+Drivers page is copied into the base by hand, and a score changed in the base
+is entered on the Drivers page.
 
-1. run the production run: `python3 scripts/run_production.py` (with the same
-   `--cell-weights FILE` if one is used);
-2. rebuild the record against it:
-   `python3 scripts/build_driver_analysis.py --reference --workbook runs/<its workbook>`
-   (again with `--cell-weights FILE` if one is used). The reference run takes
-   about as long as the production run;
+When the scores or the model's parameters change:
+
+1. make sure the base and every database hold the same scores;
+2. run the production run, `python3 scripts/run_production.py`, and rebuild
+   the record against it:
+   `python3 scripts/build_driver_analysis.py --reference --workbook runs/<its workbook>`.
+   The reference run takes about as long as the production run;
 3. read the re-rendered texts, in particular every comparative claim ("the
    widest range in the base"): the figures inside a comparative regenerate,
    the comparative itself does not;
 4. run `python3 scripts/generate_seed.py` and commit the regenerated files;
 5. run `python3 scripts/sync_analysis.py --dry-run`, then without
    `--dry-run`, against each database.
+
+### On the finance shares
+
+The committed readings are built on the estimated gross-profit mix, and stay
+on it: the finance shares are kept out of the repository, and the CI check
+recomputes without them. When the production run uses the finance file, the
+dashboard's headline moves away from the median the basis line names, and
+every card says so. To show readings on the finance shares, build them
+outside the repository and write them into the database:
+
+```bash
+python3 scripts/build_driver_analysis.py --reference --workbook runs/<the finance run's workbook> --cell-weights FILE
+python3 scripts/sync_analysis.py --dry-run --texts runs/driver_analysis/driver_analysis.json
+python3 scripts/sync_analysis.py --texts runs/driver_analysis/driver_analysis.json
+```
+
+The build writes its record and texts to `runs/driver_analysis/`
+(git-ignored), never over the committed files, and their basis line names the
+finance cell weights. A database seeded later, or synced without `--texts`,
+gets the committed readings on the estimate again.
 
 ## Limits
 
@@ -209,10 +234,10 @@ weights):
   at both ends. It is quoted only where it is material.
 - Comparative claims are the author's reading of the record on the day of the
   basis line, which is why every regeneration ends with a read of the texts.
-- The readings are written on the estimated HCB gross-profit mix, not on
-  Henkel P&L. Where a reading says a cell holds a share of the pool, that is
-  the estimate's share; the finance shares replace it and the readings are
-  regenerated with them.
+- The committed readings are written on the estimated HCB gross-profit mix,
+  not on Henkel P&L. Where a reading says a cell holds a share of the pool,
+  that is the estimate's share; readings on the finance shares live only in
+  the databases they are synced to (see "On the finance shares").
 - A reading describes the driver base, not the live database. An admin edit
   on the Drivers page changes the drill-down at once and the reading only
   when the base carries the edit and the readings are regenerated.

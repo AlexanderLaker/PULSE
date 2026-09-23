@@ -13,8 +13,10 @@ them drifts silently from its source.
 
 - Four generators write these files: `generate_seed.py`,
   `compute_attenuation.py`, `build_cell_weights.py` and
-  `build_driver_analysis.py`. The generated files say so in their header and
-  are never edited by hand.
+  `build_driver_analysis.py`. A generated source file says so in its header,
+  a generated JSON record in its `generated_by` field (the PRISM Analysis file,
+  which holds the hand-written templates next to the rendered texts, in its
+  `about` field), and none is edited by hand.
 - Each generator has `--check`, which regenerates in memory and fails on any
   difference; CI runs all four.
 - Constants in `prism/config.py` that come from a generator are held to the

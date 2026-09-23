@@ -42,8 +42,8 @@ explain them.
 | `direction` | Expansion, Contraction | Whether the driver grows or shrinks the pool |
 | `probability` | 1 to 5 | How likely the effect is to materialise as described. The prior's mean is probability / 6: a 5 means five in six, not certainty |
 | `gp1_pct_affected` | (0, 1] | The share of a category's gross profit the driver can move at full materialisation |
-| `start_year` | 2025 to 2035 | The onset: no effect up to and including this year |
-| `peak_year` | onset to 2035 | The year by which the full effect has materialised |
+| `start_year` | 2025 to 2034 | The onset: no effect up to and including this year |
+| `peak_year` | after the onset, at most 2035 | The year by which the full effect has materialised |
 | `diffusion_curve` | `s_curve`, `linear`, `front_loaded`, `back_loaded`, `step_function` | The shape of the ramp from onset to peak |
 | `uncertainty` | 0 to 5 | How far the size and timing of the effect could differ from the modelled values (scale below) |
 | `confidence` | High, Medium, Low | How well the present state is evidenced. Shown on the page; not a model input |
@@ -133,8 +133,8 @@ foresight tier, scope, megatrend, the year first observed, the mechanism);
 the model and the dashboard do not use it.
 
 `scripts/generate_seed.py` validates the base (known forces and taxonomy
-keys, scores in range, an onset no later than the peak, a known epicentre, an
-S, A or B source behind every driver) and writes two files that are never
+keys, scores in range, an onset before the peak, a known epicentre, an S, A
+or B source behind every driver) and writes two files that are never
 edited by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with,
@@ -148,19 +148,25 @@ produces; CI runs it.
 
 ## Changing a driver
 
-In production the database holds the live scores. An admin changes a driver
-on the Drivers page: the edit is written at once, every changed field goes to
-the audit log, and a changed score marks the driver as Edited against its
-baseline. Every driver carries a revision number that each save raises; an
-edit names the revision it was made on, so when two admins (or two tabs)
-edit the same driver, the second save is refused with a request to reload
-instead of silently undoing the first. Experts propose scores under Expert Rating; a proposal never
-changes a driver. Admins see the proposals aggregated under Review &
-Endorse and choose per field between keeping the current value, the
-baseline, the expert mean and a manual value: a field an expert scored
-starts on the expert mean, a field nobody scored on its current value.
-Endorsing saves the chosen values as an ordinary edit. The next production
-run reports every change as input drift.
+In production the database holds the live scores. An admin changes a driver on
+the Drivers page: the edit is written at once, every changed field goes to the
+audit log in the same transaction, and a changed score marks the driver as
+Edited against its baseline. The name, the force and the onset come from the
+base and are not edited on the page, and a peak year must fall after the
+onset. An exposure edit sends only the cells that changed. Every driver
+carries a revision number that each save raises; an edit names the revision it
+was made on, so when two admins (or two tabs) edit the same driver, the second
+save is refused with a request to reload instead of silently undoing the
+first.
+
+Experts propose scores under Expert Rating; a proposal never changes a
+driver. The proposal saves as it is edited, one request at a time per driver
+with the newest draft, and a cell outside the current taxonomy is left out of
+it. Admins see the proposals aggregated under Review & Endorse and choose per
+field between keeping the current value, the baseline, the expert mean and a
+manual value: a field an expert scored starts on the expert mean, a field
+nobody scored on its current value. Endorsing saves the chosen values as an
+ordinary edit. The next production run reports every change as input drift.
 
 The base file changes when a review changes the reference scores or the
 texts. After an edit to `driver_base.json`:

@@ -4,7 +4,8 @@ PRISM (Profit Pool Risk & Intelligence Simulation Model) estimates how the
 external drivers of Henkel Consumer Brands' business shift the gross profit
 (GP1) of its categories between 2026 and 2035. Experts score 51 Profit Pool
 Drivers; a Monte Carlo engine turns the scores into relative shifts per
-category, region, force and year, each with a P10 to P90 band; a dashboard
+category, region and year, each with a P10 to P90 band, and attributes every
+shift to the forces, value-chain stages and regions behind it; a dashboard
 shows the latest production run next to the drivers behind it.
 
 The numbers are relative shifts, never amounts: a reader applies them to their
@@ -108,7 +109,7 @@ Vercel the same variables are set in the project settings.
 | `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that adds new users to `user_roles` |
 | `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database. The API and the scripts also accept `POSTGRES_URL`, which wins when both are set; the dashboard reads `DATABASE_URL` only |
 | `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
-| `NEXT_PUBLIC_SIGNUP_CODE` | dashboard | The access code the sign-up page asks for (without it the page asks for `HCB2026`) |
+| `NEXT_PUBLIC_SIGNUP_CODE` | dashboard (at build time) | The access code the sign-up page asks for (without it the page asks for `HCB2026`). It is readable in the browser, so who may sign up is restricted in Clerk (docs/OPERATIONS.md) |
 | `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set; remove it once an admin exists |
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_BACKEND_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
