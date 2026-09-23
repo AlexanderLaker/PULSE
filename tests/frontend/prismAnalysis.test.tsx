@@ -36,7 +36,8 @@ vi.mock('@/api/client', async (importOriginal) => ({
 }));
 
 import { ApiError } from '@/api/client';
-import Drivers, { basisMedian, splitAnalysis } from '@/components/dashboard/Drivers';
+import Drivers from '@/components/dashboard/Drivers';
+import { basisMedian, splitAnalysis } from '@/components/dashboard/drivers/PrismAnalysis';
 
 // framer-motion restores the scroll position after it measures the expanded
 // panel's height; jsdom has no window.scrollTo, and scrolling is not under test.
