@@ -169,20 +169,17 @@ def render_fields(rec: dict, drv: dict) -> dict:
     # Structural constants of the base: the pass-through of every force and
     # the regional shares of the pool, so a reading can compare without a
     # hand-typed figure.
-    basis = rec.get("basis", {})
-    fw, att = basis.get("force_weights", {}), basis.get("per_force_attenuation", {})
+    fw, att = rec["basis"]["force_weights"], rec["basis"]["per_force_attenuation"]
     for name in fw:
-        f[f"pt_{name.lower()}"] = pct(fw[name] * att.get(name, 0.0), 1)
-    pool = rec.get("totals", {}).get("pool_region_shares", {})
+        f[f"pt_{name.lower()}"] = pct(fw[name] * att[name], 1)
+    pool = tot["pool_region_shares"]
     for region, share in pool.items():
         f[f"pool_{region.lower().replace(' ', '_')}"] = pct(share)
-    if pool:
-        f["pool_eu_na"] = pct(pool.get("Europe", 0) + pool.get("North America", 0))
-        f["pool_asia_hg"] = pct(pool.get("Asia", 0) + pool.get("High Growth", 0))
-    cat_pool = rec.get("totals", {}).get("pool_category_shares", {})
-    if cat_pool:
-        f["pool_lhc"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("LHC")))
-        f["pool_hair"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("Hair")))
+    f["pool_eu_na"] = pct(pool["Europe"] + pool["North America"])
+    f["pool_asia_hg"] = pct(pool["Asia"] + pool["High Growth"])
+    cat_pool = tot["pool_category_shares"]
+    f["pool_lhc"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("LHC")))
+    f["pool_hair"] = pct(sum(v for k, v in cat_pool.items() if k.startswith("Hair")))
     for i, c in enumerate(cells, start=1):   # the record's largest cells, in order
         f[f"cell{i}"] = cell_label(c["category"], c["region"])
         f[f"cell{i}_pp"] = fmt_pp(c["pp"])
@@ -193,14 +190,10 @@ def render_fields(rec: dict, drv: dict) -> dict:
         f[f"cell{i}_partners"] = ", ".join(p["code"] for p in c["same_force_partners"])
     # The timing scores: the peak year and onset are numbers the reader sees
     # on the page and a template names them only through these, never typed.
-    sc = drv.get("scoring") or {}
-    if sc.get("peak_year"):
-        f["peak_year"] = str(sc["peak_year"])
-    if sc.get("start_year"):
-        f["onset_year"] = str(sc["start_year"])
-    curve = str(sc.get("diffusion_curve") or "")
-    if curve:
-        f["curve"] = CURVE_NAMES.get(curve, curve.replace("_", " "))
+    sc = drv["scoring"]
+    f["peak_year"] = str(sc["peak_year"])
+    f["onset_year"] = str(sc["start_year"])
+    f["curve"] = CURVE_NAMES[sc["diffusion_curve"]]
     # The cell, over all 52, where the driver is the largest share of the
     # cell's own shift (the six cells above are the largest by points).
     m = drv.get("max_share_cell")
@@ -230,7 +223,7 @@ _SENTENCE_START = re.compile(r"(^|[.!?]\s+|^[^\n:]{1,40}:\s+)([a-z])", re.M)
 
 
 def _capitalise(text: str) -> str:
-    """A cell label such as "laundry detergents Europe" is lower case; when a
+    """A cell label such as "fabric clean Europe" is lower case; when a
     placeholder opens a sentence (or follows the paragraph label) the first
     letter is set upper case, as a writer would."""
     return _SENTENCE_START.sub(lambda m: m.group(1) + m.group(2).upper(), text)

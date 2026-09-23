@@ -57,7 +57,7 @@ sys.path.insert(0, str(REPO))
 
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
 from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
-                          PRODUCTION_SEED, REGIONS, ModelConfig)
+                          PRODUCTION_SEED, REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, describe_error,  # noqa: E402
                             init_db, load_drivers, load_latest_run, save_simulation_run)
@@ -212,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
         log.error("%s", e)
         return 5
     log.info("Cell weights: %s", config.cell_weights_source)
-    log.info("  regions: %s", ", ".join(f"{r} {config.region_weights[r] * 100:.1f}%" for r in REGIONS))
+    region_shares, _ = cell_weight_marginals(config.cell_weights)
+    log.info("  regions: %s", ", ".join(f"{r} {region_shares[r] * 100:.1f}%" for r in REGIONS))
 
     lam_min = correlation_lambda_min(config.force_correlation_matrix, config.within_force_rho,
                                      [d.force for d in drivers])

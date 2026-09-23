@@ -294,9 +294,9 @@ ESTIMATE_SOURCE_PREFIX = "ESTIMATE, not Henkel P&L"
 
 
 def cell_weight_marginals(cell_weights: dict) -> tuple:
-    """(region_weights, category_weights): column and row sums of a cell matrix."""
-    rw = {r: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for c in CATEGORIES)) for r in REGIONS}
-    cw = {c: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for r in REGIONS)) for c in CATEGORIES}
+    """(region shares, category shares): the column and row sums of a complete cell matrix."""
+    rw = {r: float(sum(float(cell_weights[c][r]) for c in CATEGORIES)) for r in REGIONS}
+    cw = {c: float(sum(float(cell_weights[c][r]) for r in REGIONS)) for c in CATEGORIES}
     return rw, cw
 
 
@@ -311,8 +311,8 @@ class ModelConfig:
     """The complete, immutable parameter set of one simulation.
 
     Instances never change after construction; derive a variant with
-    ``copy_with(**overrides)``. ``region_weights`` and ``category_weights`` are
-    derived from ``cell_weights`` (column and row sums) and cannot be passed in.
+    ``copy_with(**overrides)``. The region and category shares are the column
+    and row sums of ``cell_weights`` (cell_weight_marginals).
     """
     per_force_attenuation: dict = field(default_factory=lambda: dict(DEFAULT_PER_FORCE_ATTENUATION))
     attenuation_source: str = DEFAULT_ATTENUATION_SOURCE
@@ -327,27 +327,15 @@ class ModelConfig:
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     force_correlation_matrix: dict = field(default_factory=lambda: copy.deepcopy(DEFAULT_FORCE_CORRELATIONS))
     within_force_overlap: dict = field(default_factory=lambda: dict(DEFAULT_WITHIN_FORCE_OVERLAP))
-    region_weights: dict = field(init=False)
-    category_weights: dict = field(init=False)
 
     def __post_init__(self):
-        cw = {str(c): {str(r): float(v) for r, v in (row or {}).items()}
-              for c, row in (self.cell_weights or {}).items()}
-        rw, catw = cell_weight_marginals(cw)
-        object.__setattr__(self, "cell_weights", cw)
-        object.__setattr__(self, "region_weights", rw)
-        object.__setattr__(self, "category_weights", catw)
+        object.__setattr__(self, "cell_weights", {str(c): {str(r): float(v) for r, v in row.items()}
+                                                  for c, row in self.cell_weights.items()})
 
     def copy_with(self, **overrides) -> "ModelConfig":
         """A new ModelConfig with the given fields replaced (others deep-copied)."""
-        values = {}
-        for f in fields(self):
-            if not f.init:
-                continue
-            if f.name in overrides:
-                values[f.name] = overrides.pop(f.name)
-            else:
-                values[f.name] = copy.deepcopy(getattr(self, f.name))
-        if overrides:
-            raise TypeError(f"copy_with: unknown or derived fields {sorted(overrides)}")
-        return ModelConfig(**values)
+        names = [f.name for f in fields(self)]
+        unknown = sorted(set(overrides) - set(names))
+        if unknown:
+            raise TypeError(f"copy_with: unknown fields {unknown}")
+        return ModelConfig(**{n: overrides[n] if n in overrides else copy.deepcopy(getattr(self, n)) for n in names})

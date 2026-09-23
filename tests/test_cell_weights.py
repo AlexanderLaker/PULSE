@@ -38,9 +38,10 @@ def _equal_matrix():
     return {c: {r: 1.0 / 52 for r in REGIONS} for c in CATEGORIES}
 
 
-def _outer(category_weights: dict, region_weights: dict) -> dict:
-    total = sum(category_weights.values()) * sum(region_weights.values())
-    return {c: {r: category_weights[c] * region_weights[r] / total for r in REGIONS} for c in CATEGORIES}
+def _outer(category_shares: dict, region_shares: dict) -> dict:
+    """The separable matrix of two share vectors, normalised to 1."""
+    total = sum(category_shares.values()) * sum(region_shares.values())
+    return {c: {r: category_shares[c] * region_shares[r] / total for r in REGIONS} for c in CATEGORIES}
 
 
 def _europe_driver(**overrides) -> DriverSet:
@@ -131,24 +132,23 @@ class TestModelConfig:
     def test_the_default_is_the_estimate(self):
         cfg = ModelConfig()
         assert cfg.cell_weights == DEFAULT_CELL_WEIGHTS
+        region_shares, category_shares = cell_weight_marginals(cfg.cell_weights)
         for region in REGIONS:
-            assert cfg.region_weights[region] == pytest.approx(RECORD["marginals"]["region"][region])
+            assert region_shares[region] == pytest.approx(RECORD["marginals"]["region"][region])
         for cat in CATEGORIES:
-            assert cfg.category_weights[cat] == pytest.approx(RECORD["marginals"]["category"][cat])
+            assert category_shares[cat] == pytest.approx(RECORD["marginals"]["category"][cat])
 
     def test_marginals_follow_a_new_matrix(self):
         W = _equal_matrix()
         W["LHC: FCN"].update({"Europe": 5.0 / 52, "Asia": 0.0, "High Growth": 0.0})
         W["Hair: Color"].update({"Europe": 0.0, "Asia": 0.0})
-        cfg = ModelConfig().copy_with(cell_weights=W)
-        assert cfg.category_weights["LHC: FCN"] == pytest.approx(6.0 / 52)
-        assert cfg.region_weights["Europe"] == pytest.approx(sum(W[c]["Europe"] for c in CATEGORIES))
+        region_shares, category_shares = cell_weight_marginals(ModelConfig().copy_with(cell_weights=W).cell_weights)
+        assert category_shares["LHC: FCN"] == pytest.approx(6.0 / 52)
+        assert region_shares["Europe"] == pytest.approx(sum(W[c]["Europe"] for c in CATEGORIES))
 
-    def test_marginals_cannot_be_set_directly(self):
-        with pytest.raises(TypeError):
-            ModelConfig(region_weights={"Europe": 1.0})
-        with pytest.raises(TypeError):
-            ModelConfig().copy_with(category_weights={})
+    def test_copy_with_refuses_an_unknown_field(self):
+        with pytest.raises(TypeError, match="unknown fields \\['horizon'\\]"):
+            ModelConfig().copy_with(horizon=2040)
 
     def test_the_validator_rejects_bad_grids(self):
         validate_model_config(ModelConfig())

@@ -221,7 +221,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
         "within_force_rho": round(float(config.within_force_rho), 6),
         "cell_weights": {c: {r: round(float(v), 8) for r, v in row.items()} for c, row in config.cell_weights.items()},
         "base_year": int(config.base_year), "path_years": list(config.path_years),
-        "peak_year_jitter": int(config.peak_year_jitter),
+        "peak_year_jitter": bool(config.peak_year_jitter),
         "model_version": MonteCarloEngine.MODEL_VERSION,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
