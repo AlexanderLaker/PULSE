@@ -74,10 +74,9 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
   const rows: Array<[string, string]> = [
     ['Iterations', `${(m.iterations / 1000).toFixed(0)}k × ${m.chains} chains`],
     ['Seed', String(m.seed)],
-    // Both measure Monte Carlo sampling noise only, never model error: the
-    // largest standard error of a terminal-year category median, and the
+    // The largest standard error of a terminal-year category median, and the
     // spread of the terminal-year portfolio median across the independently
-    // seeded chains.
+    // seeded chains; the note under the rows says what neither measures.
     ['MC standard error', `at most ${maxSe.toFixed(3)} pp (${ss.terminal_year} category medians)`],
     ['Seed stability', `${ss.spread_pp.toFixed(3)} pp spread across ${ss.n_chains} seeds (${ss.terminal_year} portfolio median)`],
     ['Numerics', m.numerics_backend],
@@ -119,6 +118,10 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
           </span>
         ))}
       </div>
+      <p style={{ margin: '8px 0 0', fontSize: 11.5, lineHeight: 1.5, color: S.mutedText }}>
+        The MC standard error and the seed stability measure Monte Carlo sampling noise only, never the model&apos;s
+        own error.
+      </p>
       {events.length > 0 && (
         <div className="mt-3">
           <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-1.5"

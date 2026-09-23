@@ -294,6 +294,7 @@ describe('About this model', () => {
     expect(screen.getByText('estimated HCB mix, not Henkel P&L (52 cells)')).toBeTruthy();
     expect(screen.getByText('0.010 pp spread across 3 seeds (2035 portfolio median)')).toBeTruthy();
     expect(screen.getByText('at most 0.001 pp (2035 category medians)')).toBeTruthy();
+    expect(screen.getByText(/measure Monte Carlo sampling noise only, never the model's own error/)).toBeTruthy();
     // and the page says it next to the numbers, not only in the footer
     expect(screen.getByTestId('estimate-note').textContent).toContain('estimated HCB gross-profit mix');
     expect(screen.getByTestId('estimate-note').textContent).toContain('not Henkel P&L');
