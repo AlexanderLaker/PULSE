@@ -13,7 +13,7 @@ from hypothesis import given, settings, strategies as st, HealthCheck
 from prism.config import ModelConfig
 from prism.drivers import DriverSet
 from prism.seed_drivers import get_seed_drivers
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 
 @pytest.fixture(scope="module")

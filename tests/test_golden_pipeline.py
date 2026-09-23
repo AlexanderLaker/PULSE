@@ -13,7 +13,7 @@ import pytest
 
 import prism
 from prism.drivers import DriverSet
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 ITER = 500
 SEED = 42

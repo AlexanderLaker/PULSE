@@ -101,8 +101,10 @@ import numpy as np  # noqa: E402
 from prism.config import (CATEGORIES, DEFAULT_PATH_YEARS, FORCES, PRODUCTION_CHAINS,  # noqa: E402
                           PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS, ModelConfig, display_code)
 from prism.drivers import DriverSet  # noqa: E402
-from prism.simulation.engine import MonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
-from scripts.driver_analysis_render import render_all  # noqa: E402
+from prism.engine import MonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
+from prism.driver_base import base_drivers  # noqa: E402
+from prism.readings import render_all  # noqa: E402
+from prism.workbook import read_workbook  # noqa: E402
 
 DATA_DIR = os.path.join(REPO, "data", "drivers")
 ATTRIBUTION_PATH = os.path.join(DATA_DIR, "driver_attribution.json")
@@ -122,14 +124,6 @@ TOP_CELLS = 6
 TOP_PARTNERS = 3
 
 
-# ── drivers ─────────────────────────────────────────────────────────────
-
-def load_drivers() -> list:
-    """The drivers of the base, ordered by id as the production run loads them."""
-    from scripts.generate_seed import base_drivers
-    return base_drivers()
-
-
 # ── the decomposition ──────────────────────────────────────────────────
 
 def decompose(config: ModelConfig, drivers: list) -> dict:
@@ -142,8 +136,8 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
     forces = list(FORCES)
     nf = len(forces)
 
-    fw = np.array([config.force_weights.get(f, 1.0 / nf) for f in forces])
-    att = np.array([eng.effective_attenuation[f] for f in forces])
+    fw = np.array([config.force_weights[f] for f in forces])
+    att = np.array([eng.attenuation[f] for f in forces])
     fidx = np.array([forces.index(drv.force) for drv in drivers])
 
     # Composite cell exposure, exactly as the engine builds it.
@@ -176,7 +170,7 @@ def decompose(config: ModelConfig, drivers: list) -> dict:
         mask = fidx == f
         if not mask.any():
             continue
-        ov = wf_overlap.get(force, 0.0)
+        ov = wf_overlap[force]
         M = contrib[mask, :]
         s1 = M.sum(axis=0)
         s2 = (M * M).sum(axis=0)
@@ -304,7 +298,7 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
         "drivers": driver_fingerprint(drivers),
         "force_weights": {f: round(float(config.force_weights[f]), 6) for f in FORCES},
         "per_force_attenuation": {f: round(float(config.per_force_attenuation[f]), 6) for f in FORCES},
-        "within_force_overlap": {f: round(float(config.within_force_overlap.get(f, 0.0)), 6) for f in FORCES},
+        "within_force_overlap": {f: round(float(config.within_force_overlap[f]), 6) for f in FORCES},
         "force_correlation_matrix": {a: {b: round(float(v), 6) for b, v in row.items()}
                                      for a, row in config.force_correlation_matrix.items()},
         "within_force_rho": round(float(config.within_force_rho), 6),
@@ -337,39 +331,6 @@ def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: i
         "categories_terminal": cats,
         "inputs_hash": inputs_hash(config, drivers),
         "run_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
-    }
-
-
-def read_workbook(path: str) -> dict:
-    """The production run as its QA workbook records it (prism/workbook.py).
-
-    Run id, generation time, pooled iterations, model version and the 13
-    terminal-year category quantiles. The record keeps them, so that `--check`
-    proves the reference run reproduces the run the dashboard serves, and a
-    reader of the record knows which run that is.
-    """
-    import openpyxl
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    meta = {}
-    for row in wb["Metadata"].iter_rows(values_only=True):
-        if row and row[0] is not None and len(row) > 1:
-            meta[str(row[0]).strip()] = row[1]
-    rows = list(wb["Shift Matrix"].iter_rows(values_only=True))
-    header, sub = rows[0], rows[1]
-    start = next(i for i, v in enumerate(header) if str(v) == str(TERMINAL_YEAR))
-    assert tuple(str(x) for x in sub[start:start + 5]) == ("p10", "p25", "median", "p75", "p90"), sub[start:start + 5]
-    cats = {}
-    for r in rows[2:]:
-        if r and r[0] is not None and r[start] is not None:
-            p10, _, med, _, p90 = r[start:start + 5]
-            cats[str(r[0])] = {"p10": round(float(p10), 6), "median": round(float(med), 6), "p90": round(float(p90), 6)}
-    return {
-        "id": int(meta["Run id"]) if meta.get("Run id") is not None else None,
-        "generated": str(meta.get("Generated") or ""),
-        "model_version": str(meta.get("Model version") or ""),
-        "pooled_iterations": int(meta["Iterations"]) if meta.get("Iterations") is not None else None,
-        "workbook": os.path.basename(path),
-        "categories_terminal": cats,
     }
 
 
@@ -537,7 +498,7 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
             "attenuation_source": config.attenuation_source,
             "force_weights": {f: r4(config.force_weights[f]) for f in forces},
             "per_force_attenuation": {f: r4(config.per_force_attenuation[f]) for f in forces},
-            "within_force_overlap": {f: r4(config.within_force_overlap.get(f, 0.0)) for f in forces},
+            "within_force_overlap": {f: r4(config.within_force_overlap[f]) for f in forces},
             "regionless_drivers": dec["regionless"],
         },
         "reference_run": reference,
@@ -672,7 +633,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="the QA workbook of the production run the reference should reproduce")
     args = ap.parse_args(argv)
 
-    drivers = load_drivers()
+    drivers = base_drivers()   # ordered by id, as the production run loads them
     config = ModelConfig()
 
     committed = _load_json(ATTRIBUTION_PATH) if os.path.exists(ATTRIBUTION_PATH) else None
@@ -690,7 +651,7 @@ def main(argv: list[str] | None = None) -> int:
                   "the production run.")
             return 1
 
-    persisted = read_workbook(args.workbook) if args.workbook else (committed or {}).get("persisted_run")
+    persisted = read_workbook(args.workbook, TERMINAL_YEAR) if args.workbook else (committed or {}).get("persisted_run")
     record = build_record(config, drivers, reference, persisted)
     fixture = build_fixture(config, drivers, decompose(config, drivers))
     analysis = _load_json(ANALYSIS_PATH) if os.path.exists(ANALYSIS_PATH) else {"drivers": {}}

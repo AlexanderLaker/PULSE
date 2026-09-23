@@ -258,7 +258,6 @@ DEFAULT_FORCE_OVERLAP_MATRIX = {
 # loaded driver mix before every run.
 
 DEFAULT_WITHIN_FORCE_RHO = 0.3
-DEFAULT_RESIDUAL_CROSS_RHO = 0.05
 
 DEFAULT_FORCE_CORRELATIONS = {
     "Consumer":      {"Consumer": 1.0,  "Customer": 0.18, "Technology": 0.11, "Government": 0.04, "Environmental": 0.15, "Competitive": 0.15},
@@ -274,26 +273,21 @@ def build_driver_correlation_matrix(driver_forces, within_force_rho, force_corre
     """Driver-level N x N correlation matrix, without any repair.
 
     ``driver_forces`` lists the force of each driver. Same-force pairs take
-    ``within_force_rho``; cross-force pairs take the configured force-pair
-    value, or DEFAULT_RESIDUAL_CROSS_RHO for a pair the matrix does not name.
-    The engine and the spectral check in config_validation both build the
-    matrix here, so they cannot disagree.
+    ``within_force_rho``; cross-force pairs take the force-pair value of
+    ``force_correlation_matrix``, which names every pair of forces. The engine
+    and the spectral check in config_validation both build the matrix here, so
+    they cannot disagree.
     """
     import numpy as np
     n = len(driver_forces)
     if n == 0:
         return np.eye(0)
     R = np.eye(n)
-    fcm = force_correlation_matrix or {}
     for i in range(n):
         fi = driver_forces[i]
-        row = fcm.get(fi, {})
         for j in range(i + 1, n):
-            if fi == driver_forces[j]:
-                rho = within_force_rho
-            else:
-                rho = row.get(driver_forces[j], DEFAULT_RESIDUAL_CROSS_RHO)
-            R[i, j] = R[j, i] = rho
+            fj = driver_forces[j]
+            R[i, j] = R[j, i] = within_force_rho if fi == fj else force_correlation_matrix[fi][fj]
     return R
 
 

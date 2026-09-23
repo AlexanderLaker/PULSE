@@ -43,7 +43,7 @@ sys.path.insert(0, str(REPO))
 
 from prism.config import (FORCES, CATEGORIES, build_driver_correlation_matrix,  # noqa: E402
                           DEFAULT_FORCE_CORRELATIONS, DEFAULT_WITHIN_FORCE_RHO)
-from scripts.generate_seed import base_drivers  # noqa: E402
+from prism.driver_base import base_drivers  # noqa: E402
 
 CALIBRATION_VERSION = "overlap-correction-2026-09"
 OUT_JSON = REPO / "data" / "calibration" / "attenuation.json"

@@ -14,7 +14,7 @@ import pytest
 from prism.config import UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER, beta_prior_for, peak_jitter_for
 from prism.drivers import Driver, DriverSet, simulation_problems
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 
 class TestPriorMapping:

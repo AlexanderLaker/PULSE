@@ -532,7 +532,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                   result={resultOf('probability', eP != null, resolved.probability ?? NO_VALUE, driver.probability)} />
               </SectionCard>
 
-              <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialization.">
+              <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialisation.">
                 <CompareStack who={whoFor('gp1_pct_affected')}
                   baseline={<MiniBar v={bG} color={S.onSurface} />}
                   expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && bG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
@@ -541,7 +541,7 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
                   result={resultOf('gp1', eG != null, fmtPct(resolved.gp1, 0), fmtPct(driver.gp1_pct_affected, 0))} />
               </SectionCard>
 
-              <SectionCard title="Materialization timing" icon={Clock}>
+              <SectionCard title="Materialisation timing" icon={Clock}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <FieldLabel>Peak Year</FieldLabel>

@@ -282,7 +282,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
             footnote={
               <>
                 What fraction of a category&apos;s GP1 can this driver realistically affect at full
-                materialization?
+                materialisation?
               </>
             }
           >
@@ -364,7 +364,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
           </SectionCard>
 
           <SectionCard
-            title="Materialization Timing"
+            title="Materialisation Timing"
             icon={Clock}
             footnote="When does this driver reach full impact, and how does it build over time?"
           >
@@ -395,7 +395,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: S.mutedText, marginTop: 4 }}>
-                  Year when 100% of impact materializes
+                  Year when 100% of impact materialises
                 </div>
               </div>
               <div>

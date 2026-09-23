@@ -93,7 +93,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
             (&divide;6 averaging) and each force is attenuated (~0.4&ndash;0.5) so overlapping
             drivers aren&rsquo;t double-counted. Net <strong>structural pass-through &asymp; 7%</strong>.
             So a near-certain driver that could touch 20% of a category&rsquo;s GP1 moves that
-            category <strong>&asymp;1.4%</strong> at full materialization, not 20%. Read cells as a
+            category <strong>&asymp;1.4%</strong> at full materialisation, not 20%. Read cells as a
             conservative, comparable index and apply them with the formula
             (GP1<sub>projected</sub> = GP1<sub>actual</sub> &times; (1 + shift)); don&rsquo;t read one cell
             as the raw elicited magnitude. The impact is applied per <strong>category &times; region</strong>:
@@ -102,7 +102,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           </p>
           <div className="rounded-xl px-4 py-3 mb-5" style={{ backgroundColor: S.surfaceLow }}>
             <div className="text-[11px] font-bold mb-1.5" style={{ color: S.onSurface, fontFamily: HEADLINE_FONT }}>
-              Structural pass-through per force <span style={{ fontWeight: 400, color: S.mutedText }}>(force weight &times; attenuation; before probability, materialization, exposure &amp; overlap)</span>
+              Structural pass-through per force <span style={{ fontWeight: 400, color: S.mutedText }}>(force weight &times; attenuation; before probability, materialisation, exposure &amp; overlap)</span>
             </div>
             {config && (
               <div className="flex flex-wrap gap-x-5 gap-y-1">

@@ -56,7 +56,7 @@ from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, i
                             load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
 from prism.input_drift import compute_input_drift_event, driver_fingerprint, previous_fingerprint  # noqa: E402
-from prism.simulation.engine import MonteCarloEngine  # noqa: E402
+from prism.engine import MonteCarloEngine  # noqa: E402
 from prism.workbook import write_workbook  # noqa: E402
 
 log = logging.getLogger("run_production")

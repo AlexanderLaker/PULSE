@@ -261,7 +261,7 @@ export const SessionsSection: FC = () => {
       <SectionCard size="regular"
         title={`Active sessions (${sorted.length})`}
         icon={Monitor}
-        description="Each device or browser where you are signed in appears here. Revoke any you don't recognize."
+        description="Each device or browser where you are signed in appears here. Revoke any you don't recognise."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sorted.length === 0 && <Muted>No active sessions.</Muted>}

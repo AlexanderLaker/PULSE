@@ -371,7 +371,7 @@ const Step2Views: FC = () => (
       number="3"
       icon={TrendingUp}
       title="Profit Pool Shift Analysis"
-      body="Visualizes where value is migrating, sliced by time path, force, region, and value chain step."
+      body="Shows where value is migrating, sliced by time path, force, region and value-chain stage."
       note="Values reflect the isolated driver impact on HCB's current business, excluding price moves, innovations or competitor actions."
     />
   </div>

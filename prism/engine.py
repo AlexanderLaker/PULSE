@@ -90,7 +90,7 @@ class MonteCarloEngine:
     """Simulates the relative shift of every category and cell over the horizon.
 
     ``run`` and ``run_multichain`` produce a result. The other public members
-    (the effective attenuation, the cell-weight matrices, the correlation
+    (the attenuation by force, the cell-weight matrices, the correlation
     matrix, the copula sampler and the peak-year schedule and draws) are the
     engine's own arithmetic, which scripts/build_driver_analysis.py reuses so
     that its decomposition of a result is exact; the underscored ones are
@@ -112,9 +112,9 @@ class MonteCarloEngine:
         # with the result and shown next to the run.
         self._integrity_events: list[dict] = []
         self._floored_factor_cells: int = 0
-        self.effective_attenuation = self._compute_effective_attenuation()
+        self.attenuation = self._attenuation_by_force()
 
-    def _compute_effective_attenuation(self) -> dict:
+    def _attenuation_by_force(self) -> dict:
         """Per-force attenuation from the configuration; all six forces required."""
         per_force = dict(self.config.per_force_attenuation)
         missing = [f for f in FORCES if f not in per_force]
@@ -420,7 +420,7 @@ class MonteCarloEngine:
         n_forces = len(force_list)
         force_idx_map = {f: i for i, f in enumerate(force_list)}
         driver_force_idx = np.array([force_idx_map[d.force] for d in drivers])
-        fw = np.array([self.config.force_weights.get(f, 1.0 / n_forces) for f in force_list])
+        fw = np.array([self.config.force_weights[f] for f in force_list])
 
         # Regional weight per driver (region_presence); drivers without any
         # regional exposure count as present everywhere and are reported.
@@ -455,7 +455,7 @@ class MonteCarloEngine:
         offset_idx = self.draw_peak_offsets(off_probs_by_driver, n_iter)
         driver_arange = np.arange(n_drivers)
 
-        eff_att = np.array([self.effective_attenuation[f] for f in force_list])
+        attenuation = np.array([self.attenuation[f] for f in force_list])
 
         # Within-force dampening per force and cell: 1 - overlap x (n_eff - 1) / n_eff,
         # where n_eff = (sum m)^2 / sum m^2 is the participation ratio of the
@@ -471,7 +471,7 @@ class MonteCarloEngine:
             mask = driver_force_idx == f_idx
             if not mask.any():
                 continue
-            ov = wf_overlap.get(force, 0.0)
+            ov = wf_overlap[force]
             if ov <= 0:
                 continue
             M = contrib[mask, :]
@@ -498,7 +498,7 @@ class MonteCarloEngine:
                 force_contrib[:, f_idx, :] = raw_sum * wf_dampen[f_idx, :][np.newaxis, :]
 
             weighted = force_contrib * fw[:, np.newaxis]
-            attenuated = weighted * eff_att[:, np.newaxis]
+            attenuated = weighted * attenuation[:, np.newaxis]
             factors = 1.0 + attenuated
             n_floored = int((factors <= 0.0).sum())
             if n_floored > 0:
@@ -585,7 +585,7 @@ class MonteCarloEngine:
             for driver in drivers:
                 cat_exp = driver.category_exposure.get(cat, 0)
                 if cat_exp > 0:
-                    fw = self.config.force_weights.get(driver.force, 1.0 / len(FORCES))
+                    fw = self.config.force_weights[driver.force]
                     fsum[driver.force] += abs(driver.normalized_score) * (cat_exp / 5.0) * fw
             ftot = sum(fsum.values())
             if ftot > 0:

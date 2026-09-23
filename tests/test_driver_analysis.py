@@ -28,7 +28,7 @@ import pytest
 from prism import seed_drivers
 from prism.config import CATEGORIES, ESTIMATE_SOURCE_PREFIX, ModelConfig
 from prism.drivers import DriverSet
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "drivers"
@@ -52,7 +52,17 @@ def build():
 
 @pytest.fixture(scope="module")
 def render():
-    return _load_script("driver_analysis_render")
+    import prism.readings
+    return prism.readings
+
+
+def split_paragraphs(text: str) -> list:
+    """[(label or None, body)], the paragraphs as the Drivers page splits them."""
+    out = []
+    for para in re.split(r"\n\s*\n", (text or "").strip()):
+        m = re.match(r"^(%s):\s*(.*)$" % "|".join(re.escape(label) for label in (*LABELS, "Figures")), para, re.S)
+        out.append((m.group(1), m.group(2).strip()) if m else (None, para.strip()))
+    return out
 
 
 @pytest.fixture(scope="module")
@@ -66,8 +76,9 @@ def analysis() -> dict:
 
 
 @pytest.fixture(scope="module")
-def drivers(build):
-    return build.load_drivers()
+def drivers():
+    from prism.driver_base import base_drivers
+    return base_drivers()
 
 
 # ── (a) the decomposition is the engine ───────────────────────────────────────
@@ -336,7 +347,7 @@ class TestCommittedArtefacts:
 class TestReadings:
     def test_structure(self, render, analysis, record):
         for code, entry in analysis["drivers"].items():
-            parts = render.split_paragraphs(entry["text"])
+            parts = split_paragraphs(entry["text"])
             assert [p[0] for p in parts] == [*LABELS, render.BASIS_LABEL], code
             words = len(entry["text"].split())
             assert 200 <= words <= 600, (code, words)

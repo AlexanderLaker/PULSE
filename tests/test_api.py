@@ -61,7 +61,7 @@ def api(monkeypatch, tmp_path):
 def valid_run(mock_model_config, mock_drivers_database):
     """A results bundle exactly as the production run persists it."""
     from prism.input_drift import driver_fingerprint
-    from prism.simulation.engine import MonteCarloEngine
+    from prism.engine import MonteCarloEngine
     spec = importlib.util.spec_from_file_location("run_production", REPO / "scripts" / "run_production.py")
     production = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(production)

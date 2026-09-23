@@ -1,7 +1,8 @@
 """Render the PRISM Analysis readings from their templates and the attribution record.
 
-Pure functions without an engine import, so the seed generator, the build
-script and the tests share one renderer.
+Pure functions without an engine import: scripts/build_driver_analysis.py
+renders the readings with them, scripts/generate_seed.py checks the committed
+texts against them, and the tests hold both to the same renderer.
 
 A template is prose with named placeholders in braces; every figure in a
 reading comes from a placeholder, and ``render_fields`` lists them all. The
@@ -252,17 +253,3 @@ def render_all(rec: dict, analysis: dict) -> dict:
     return {driver_id: render_text(rec, drv, templates[code]["template"])
             for code, (driver_id, drv) in by_code.items()}
 
-
-def split_paragraphs(text: str) -> list:
-    """[(label or None, body)] as the Drivers page renders it."""
-    out = []
-    for para in re.split(r"\n\s*\n", (text or "").strip()):
-        para = para.strip()
-        if not para:
-            continue
-        m = re.match(r"^(%s|%s):\s*(.*)$" % ("|".join(re.escape(l) for l in LABELS), BASIS_LABEL), para, re.S)
-        if m:
-            out.append((m.group(1), m.group(2).strip()))
-        else:
-            out.append((None, para))
-    return out

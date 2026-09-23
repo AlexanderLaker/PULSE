@@ -4,7 +4,7 @@ import pytest
 
 from prism.config import CATEGORIES, REGIONS
 from prism.drivers import Driver, DriverSet
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 
 def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, direction="Contraction",

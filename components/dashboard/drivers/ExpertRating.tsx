@@ -175,7 +175,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
             </div>
           </SectionCard>
 
-          <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialization.">
+          <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} info={FIELD_HELP.gp1} footnote="Share of category GP1 this driver can move at full materialisation.">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="range" min={0} max={100} step={1} value={gp1Int ?? 0}
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
@@ -193,7 +193,7 @@ export const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: strin
             </div>
           </SectionCard>
 
-          <SectionCard title="Materialization timing" icon={Clock} info={FIELD_HELP.timing}>
+          <SectionCard title="Materialisation timing" icon={Clock} info={FIELD_HELP.timing}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <FieldLabel>Peak Year</FieldLabel>

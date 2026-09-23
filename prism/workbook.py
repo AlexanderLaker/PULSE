@@ -8,8 +8,9 @@ Sheets: Shift Matrix (category paths with percentiles), Regional Shift
 (median per category and region), Cell Weights (the roll-up shares and, for
 the estimated mix, its graded derivation), Velocity, and Metadata (the run's
 identity and the notes a reader needs to interpret the numbers).
-scripts/build_driver_analysis.py reads the Shift Matrix and Metadata sheets
-back, so their layout is a contract.
+read_workbook reads the run back from the Shift Matrix and Metadata sheets
+for scripts/build_driver_analysis.py, so those two layouts are a contract
+between the two functions below.
 """
 import json
 import logging
@@ -37,15 +38,21 @@ ESTIMATE_RECORD = Path(__file__).resolve().parents[1] / "data" / "calibration" /
 
 PERCENTILES = ("p10", "p25", "median", "p75", "p90")
 
-HEADER_FILL = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-HEADER_FONT = Font(name="Inter", color="F8FAFC", bold=True, size=10)
-DATA_FONT = Font(name="Inter", color="1E293B", size=10)
+# The dashboard's colours (lib/theme.ts) as solid fills, since a workbook has
+# no transparency: the navy ink, the surface tint, and the shift pair at 12
+# percent over white.
+INK, ON_INK, SURFACE_LOW = "00345E", "FFFFFF", "EFF4FF"
+EXPANSION_TINT, CONTRACTION_TINT, RULE = "E4EFE8", "F3E8E8", "E6EBEF"
+
+HEADER_FILL = PatternFill(start_color=INK, end_color=INK, fill_type="solid")
+HEADER_FONT = Font(name="Inter", color=ON_INK, bold=True, size=10)
+DATA_FONT = Font(name="Inter", color=INK, size=10)
 LABEL_FONT = Font(name="Inter", size=9)
 BOLD_FONT = Font(name="Inter", size=9, bold=True)
-EXPANSION_FILL = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
-CONTRACTION_FILL = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
-NEUTRAL_FILL = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
-BORDER = Border(*(Side(style="thin", color="CBD5E1") for _ in range(4)))
+EXPANSION_FILL = PatternFill(start_color=EXPANSION_TINT, end_color=EXPANSION_TINT, fill_type="solid")
+CONTRACTION_FILL = PatternFill(start_color=CONTRACTION_TINT, end_color=CONTRACTION_TINT, fill_type="solid")
+NEUTRAL_FILL = PatternFill(start_color=SURFACE_LOW, end_color=SURFACE_LOW, fill_type="solid")
+BORDER = Border(*(Side(style="thin", color=RULE) for _ in range(4)))
 
 #: Notes printed on the Metadata sheet, in this order.
 READING_NOTES = (
@@ -119,11 +126,6 @@ def _shift_cell(ws, row: int, col: int, value: float) -> None:
     cell.fill = EXPANSION_FILL if value > 0.005 else CONTRACTION_FILL if value < -0.005 else NEUTRAL_FILL
 
 
-def _by_year(mapping: dict, year: int) -> dict:
-    """A year's entry whether the keys are ints (engine) or strings (JSON)."""
-    return mapping.get(year) or mapping.get(str(year)) or {}
-
-
 @lru_cache(maxsize=1)
 def _estimate_record() -> dict:
     return json.loads(ESTIMATE_RECORD.read_text(encoding="utf-8"))
@@ -148,7 +150,7 @@ def _shift_matrix(ws, result: dict, config: ModelConfig) -> None:
         path = (result["shift_matrix"].get(cat) or {}).get("path", {})
         col = 2
         for year in config.path_years:
-            q = _by_year(path, year)
+            q = path.get(year, {})
             for p in PERCENTILES:
                 _shift_cell(ws, row, col, q.get(p, 0.0))
                 col += 1
@@ -172,7 +174,7 @@ def _regional_shift(ws, result: dict, config: ModelConfig) -> None:
             ws.cell(row=row, column=2, value=f"{region} ({share * 100:.1f}%)").font = LABEL_FONT
             path = ((result["regional_shift_matrix"].get(cat) or {}).get(region) or {}).get("path", {})
             for j, year in enumerate(config.path_years, 3):
-                _shift_cell(ws, row, j, _by_year(path, year).get("median", 0.0))
+                _shift_cell(ws, row, j, path.get(year, {}).get("median", 0.0))
             row += 1
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 24
@@ -295,7 +297,7 @@ def _velocity(ws, result: dict, config: ModelConfig) -> None:
         _header(ws, 1, j, head)
     for row, cat in enumerate(CATEGORIES, 2):
         velocity = (result["shift_matrix"].get(cat) or {}).get("velocity", {})
-        values = [float(_by_year(velocity, y).get("median", 0.0)) for y in years]
+        values = [float(velocity.get(y, {}).get("median", 0.0)) for y in years]
         if all(abs(v) < 0.001 for v in values):
             shape = "flat"
         elif abs(values[-1]) > abs(values[0]) * 1.5:
@@ -342,3 +344,36 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
         ws.cell(row=row, column=2, value=value).alignment = wrap
     ws.column_dimensions["A"].width = 24
     ws.column_dimensions["B"].width = 100
+
+
+# ── Reading a workbook back ─────────────────────────────────────────────────
+
+def read_workbook(path: str, terminal_year: int) -> dict:
+    """The run a QA workbook records: its identity and, for every category, the
+    P10, median and P90 of ``terminal_year``.
+
+    scripts/build_driver_analysis.py keeps this in the attribution record, so
+    that its check proves the reference run reproduces the run the dashboard
+    serves, and a reader of the record knows which run that is.
+    """
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    meta = {str(row[0]).strip(): row[1] for row in wb["Metadata"].iter_rows(values_only=True)
+            if row and row[0] is not None and len(row) > 1}
+    rows = list(wb["Shift Matrix"].iter_rows(values_only=True))
+    header, sub = rows[0], rows[1]
+    start = next((i for i, v in enumerate(header) if str(v) == str(terminal_year)), None)
+    if start is None or tuple(str(x) for x in sub[start:start + len(PERCENTILES)]) != PERCENTILES:
+        raise ValueError(f"{path}: no {terminal_year} percentiles in the Shift Matrix sheet")
+    categories = {}
+    for r in rows[2:]:
+        if r and r[0] is not None and r[start] is not None:
+            q = dict(zip(PERCENTILES, r[start:start + len(PERCENTILES)]))
+            categories[str(r[0])] = {k: round(float(q[k]), 6) for k in ("p10", "median", "p90")}
+    return {
+        "id": int(meta["Run id"]) if meta.get("Run id") is not None else None,
+        "generated": str(meta.get("Generated") or ""),
+        "model_version": str(meta.get("Model version") or ""),
+        "pooled_iterations": int(meta["Iterations"]) if meta.get("Iterations") is not None else None,
+        "workbook": Path(path).name,
+        "categories_terminal": categories,
+    }

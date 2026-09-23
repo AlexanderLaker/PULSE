@@ -442,7 +442,7 @@ const Gp1InfoTip: FC = () => {
           letterSpacing: 0, textAlign: 'left', boxShadow: SHADOW.tip,
           pointerEvents: 'none', whiteSpace: 'normal' }}>
           <b>GP1 % Affected</b>: the share of a category&apos;s GP1 (gross profit after cost of goods)
-          that this driver can realistically move at full materialization. Multiplied by probability and
+          that this driver can realistically move at full materialisation. Multiplied by probability and
           direction, it produces the Shift column.
         </span>
       )}

@@ -11,6 +11,7 @@ import pytest
 
 from prism import seed_drivers
 from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, display_code
+from prism.driver_base import InvalidBaseError, base_drivers, validate
 from prism.drivers import SCORE_FIELDS
 
 REPO = Path(__file__).resolve().parent.parent
@@ -65,7 +66,7 @@ class TestSeed:
 
     def test_the_seed_equals_the_driver_base(self):
         """The generated module builds the same drivers the attribution build reads from the JSON."""
-        from_base = {d.id: d for d in _generator().base_drivers()}
+        from_base = {d.id: d for d in base_drivers()}
         assert set(from_base) == {d.id for d in seed_drivers.DRIVERS}
         for d in seed_drivers.DRIVERS:
             b = from_base[d.id]
@@ -81,7 +82,7 @@ class TestSeed:
 
 
 class TestBaseValidation:
-    """The generator refuses a base the engine or the dashboard could not use."""
+    """A base the engine or the dashboard could not use is refused before anything is generated from it."""
 
     @pytest.mark.parametrize("change", [
         {"probability": 6},
@@ -92,19 +93,18 @@ class TestBaseValidation:
         {"sources": [{"title": "Blog", "url": "https://example.com", "tier": "E", "published": ""}]},
     ])
     def test_a_bad_entry_is_refused(self, change):
-        gen = _generator()
         drivers = json.loads(BASE.read_text(encoding="utf-8"))["drivers"]
+        validate(drivers)
         bad = copy.deepcopy(drivers)
         bad[0].update(change)
-        with pytest.raises(SystemExit):
-            gen.validate(bad)
+        with pytest.raises(InvalidBaseError):
+            validate(bad)
 
     def test_a_missing_category_is_refused(self):
-        gen = _generator()
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         del bad[0]["category_exposure"]["LHC: TOI"]
-        with pytest.raises(SystemExit):
-            gen.validate(bad)
+        with pytest.raises(InvalidBaseError, match="category or regional exposure keys"):
+            validate(bad)
 
 
 class TestCodeMap:

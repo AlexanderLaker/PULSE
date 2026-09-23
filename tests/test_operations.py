@@ -144,12 +144,12 @@ class TestCellWeightsFile:
 
 class TestWorkbook:
     def _result(self, config, db):
-        from prism.simulation.engine import MonteCarloEngine
+        from prism.engine import MonteCarloEngine
         return MonteCarloEngine(config, seed=42).run_multichain(db, n_chains=2, iterations=200)
 
     def test_sheets_and_read_back(self, tmp_path, mock_model_config, mock_drivers_database):
         import openpyxl
-        from prism.workbook import write_workbook
+        from prism.workbook import read_workbook, write_workbook
         result = self._result(mock_model_config, mock_drivers_database)
         path = tmp_path / "run.xlsx"
         write_workbook(str(path), result, mock_model_config, run_id=7, driver_count=5)
@@ -160,12 +160,12 @@ class TestWorkbook:
         assert meta["Model version"] == result["model_version"]
         assert "Reading note" in meta and "Confidentiality" in meta
 
-        build = _load("build_driver_analysis", REPO / "scripts" / "build_driver_analysis.py")
-        build.TERMINAL_YEAR = mock_model_config.path_years[-1]
-        read = build.read_workbook(str(path))
-        assert read["id"] == 7 and read["pooled_iterations"] == 400
+        read = read_workbook(str(path), mock_model_config.path_years[-1])
+        assert read["id"] == 7 and read["pooled_iterations"] == 400 and read["workbook"] == "run.xlsx"
         assert read["categories_terminal"]["LHC: FCN"]["median"] == pytest.approx(
             result["shift_matrix"]["LHC: FCN"]["path"][2030]["median"], abs=1e-6)
+        with pytest.raises(ValueError, match="no 2035 percentiles"):
+            read_workbook(str(path), 2035)
 
     def test_the_estimate_carries_its_derivation(self, tmp_path, mock_model_config, mock_drivers_database):
         import openpyxl

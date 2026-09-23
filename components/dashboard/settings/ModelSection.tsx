@@ -133,7 +133,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
           </div>
           <SubBlock
             label="Force correlation matrix"
-            hint="Correlation between drivers of two forces; positive definite as entered on the current drivers. A force pair the matrix does not name takes 0.05."
+            hint="Correlation between drivers of two forces; positive definite as entered on the current drivers."
           >
             <ForceMatrixTable matrix={config.force_correlation_matrix} digits={2} label="Force correlation matrix" />
           </SubBlock>

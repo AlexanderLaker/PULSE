@@ -22,7 +22,7 @@ from prism.config import (CATEGORIES, DEFAULT_CELL_WEIGHTS, DEFAULT_CELL_WEIGHTS
                           REGIONS, ModelConfig, cell_weight_marginals)
 from prism.config_validation import validate_model_config
 from prism.drivers import Driver, DriverSet
-from prism.simulation.engine import MonteCarloEngine
+from prism.engine import MonteCarloEngine
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RECORD = json.loads((REPO / "data" / "calibration" / "cell_weights_estimate.json").read_text(encoding="utf-8"))
