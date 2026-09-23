@@ -116,6 +116,33 @@ def test_no_tracked_file_is_executable():
     assert not executable, executable
 
 
+def test_the_deployment_leaves_out_exactly_what_it_does_not_run(tmp_path):
+    """.vercelignore follows .gitignore's rules, where a pattern without a
+    leading slash matches at every depth (a bare `_*` would drop
+    prism/__init__.py). Git applies the rules here, in an empty repository
+    that holds nothing else: of the tracked files only the folders the
+    deployment does not run and the environment template (.env.*) are left
+    out, and so are secrets and outputs."""
+    if shutil.which("git") is None or not (REPO / ".git").exists():
+        pytest.skip("not a git checkout")
+    tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True, text=True,
+                             check=True).stdout.split("\0")
+    tracked = [p for p in tracked if p]
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text((REPO / ".vercelignore").read_text(encoding="utf-8"), encoding="utf-8")
+
+    def ignored(paths: list) -> set:
+        out = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--stdin"], cwd=tmp_path,
+                             input="\0".join(paths), capture_output=True, text=True).stdout
+        return {p for p in out.split("\0") if p}
+
+    left_out = ("tests/", "docs/", "migrations/", "scripts/", "data/drivers/", "data/parameters/")
+    assert ignored(tracked) == {p for p in tracked if p.startswith(left_out)} | {".env.example"}
+    secrets_and_outputs = [".env", ".env.production.local", "data/prism.db", "runs/prism_run_1.xlsx",
+                           "_NOT_FOR_HANDOVER/notes.md", "prism/__pycache__/config.cpython-312.pyc"]
+    assert ignored(secrets_and_outputs) == set(secrets_and_outputs)
+
+
 def test_colours_come_from_the_theme():
     hits = []
     for path in FILES:

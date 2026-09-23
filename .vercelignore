@@ -2,6 +2,8 @@
 # components/, hooks/, lib/, types/ and data/*.ts; the Python function needs
 # api/index.py, api/requirements.txt and prism/. Secrets never leave the
 # machine, whether the deployment comes from git or the Vercel CLI.
+# A pattern without a leading slash matches at every depth, so the folders
+# are anchored to the root (tests/test_repository.py checks what is left out).
 .env
 .env.*
 .venv
@@ -9,11 +11,11 @@ __pycache__
 *.pyc
 *.db
 *.xlsx
-runs/
-tests/
-docs/
-migrations/
-scripts/
-data/drivers/
-data/parameters/
-_*
+/runs/
+/tests/
+/docs/
+/migrations/
+/scripts/
+/data/drivers/
+/data/parameters/
+/_*
