@@ -112,15 +112,18 @@ A few rules the suite holds:
   `package.json` must agree.
 - **Generated files** are never edited by hand.
 - **Parity**: the taxonomies (the names of forces, categories, regions and
-  value-chain stages), the uncertainty tables and the per-driver attribution
-  exist in Python and TypeScript; tests keep each pair identical.
+  value-chain stages), the source tiers and a source's link and length rules,
+  the uncertainty tables, the per-driver attribution and the PRISM Analysis
+  labels exist in Python and TypeScript; tests keep each pair identical.
 - **Colours** come from `lib/theme.ts` (the force and category palettes
   from `lib/format.ts`): a literal colour anywhere else in the dashboard's
   code, a named one or a class of Tailwind's own palette included, fails
   `tests/test_repository.py`, apart from three palettes that belong to one
   view each (the entry doors, the source grades, the Explorer's bars).
 - **Scripts are entry points**: code two scripts share lives in `prism/`, and
-  no script imports another.
+  no script or migration imports a script.
+- **Configuration**: the table in README.md and `.env.example` name the same
+  variables, and every variable the code reads is one of them.
 
 ## The production run
 

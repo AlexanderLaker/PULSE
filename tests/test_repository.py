@@ -15,7 +15,11 @@
   (tests/spelling.json lists the American forms and the names that keep their
   own spelling; tests/frontend/interfaceCopy.test.tsx holds the dashboard to
   the same list).
+- Scripts are entry points: no script or migration imports another script.
+- README.md's configuration table and .env.example name the same variables,
+  and every variable the code reads is one of them.
 """
+import ast
 import json
 import re
 import shutil
@@ -182,3 +186,49 @@ def test_the_spelling_check_spares_names_links_and_the_size_family():
         "odor", "toward", "programs", "Optimized"]
     assert american_forms("Keratin Color, Colorado, one-size-fits-all, downsizing, a prize, "
                           "https://example.org/hair-color") == []
+
+
+def test_no_script_imports_another():
+    """Code that two scripts, or a script and the package, need lives in
+    prism/; a script that imported another would run that one's module code
+    and tie two entry points together."""
+    scripts = {p.stem for p in (REPO / "scripts").glob("*.py")}
+    entry_points = sorted((REPO / "scripts").glob("*.py")) + sorted((REPO / "migrations").glob("*/*.py"))
+    hits = []
+    for path in entry_points:
+        rel = path.relative_to(REPO).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                     else [node.module] if isinstance(node, ast.ImportFrom) and node.module else [])
+            hits += [f"{rel}: imports {n}" for n in names if n.split(".")[0] in scripts | {"scripts"}]
+        if re.search(r"\b(?:spec_from_file_location|run_path|import_module)\b", text):
+            hits.append(f"{rel}: loads a module by its name or path")
+    assert len(entry_points) >= 7 and hits == []
+
+
+#: Set by the platform, not by the operator: Vercel marks its deployments,
+#: Node its mode.
+PLATFORM_VARIABLES = {"VERCEL", "VERCEL_ENV", "NODE_ENV"}
+#: Read by the Clerk library itself rather than by PRISM's own code.
+LIBRARY_VARIABLES = {"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY"}
+
+
+def test_the_configuration_names_every_variable_the_code_reads():
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    table = readme.split("\n## Configuration\n", 1)[1].split("\n## ", 1)[0]
+    documented = set(re.findall(r"^\| `([A-Z][A-Z0-9_]+)` \|", table, re.M))
+    example = set(re.findall(r"^([A-Z][A-Z0-9_]+)=", (REPO / ".env.example").read_text(encoding="utf-8"), re.M))
+    assert documented == example
+    read = set()
+    for path in FILES:
+        if path.relative_to(REPO).parts[0] == "tests":
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if path.suffix == ".py":
+            read |= set(re.findall(r"os\.(?:environ\.get\(|environ\[|getenv\()\s*['\"]([A-Z][A-Z0-9_]+)['\"]", text))
+        elif path.suffix in {".ts", ".tsx", ".js", ".mjs", ".cjs"}:
+            read |= set(re.findall(r"process\.env(?:\.|\[['\"])([A-Z][A-Z0-9_]+)", text))
+    assert {"DATABASE_URL", "POSTGRES_URL", "PRISM_JWT_SECRET"} <= read
+    assert read - documented - PLATFORM_VARIABLES == set(), "read by the code but not documented"
+    assert documented - read - LIBRARY_VARIABLES == set(), "documented but read nowhere"

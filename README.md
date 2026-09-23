@@ -109,13 +109,14 @@ effect with the next deployment.
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | dashboard (also at build time) | Clerk publishable key |
 | `CLERK_SECRET_KEY` | dashboard | Clerk secret key |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | dashboard | Verifies the Clerk webhook that adds new users to `user_roles` |
-| `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database. Every part also accepts `POSTGRES_URL`, which wins when both are set |
+| `DATABASE_URL` | dashboard, API, scripts | The PostgreSQL database |
+| `POSTGRES_URL` | dashboard, API, scripts | The same, under the name some Vercel integrations set; wins when both are set |
 | `PRISM_JWT_SECRET` | dashboard, API | Signs the tokens between the dashboard and the API; at least 32 characters, the same value on both sides |
 | `NEXT_PUBLIC_SIGNUP_CODE` | dashboard (at build time) | The access code the sign-up page asks for (without it the page asks for `HCB2026`). It is readable in the browser, so who may sign up is restricted in Clerk (docs/OPERATIONS.md) |
 | `ADMIN_BOOTSTRAP_SECRET` | dashboard | Enables `/api/admin/bootstrap` while set (at least 32 characters); remove it once an admin exists |
 | `PRISM_API_ORIGIN` | dashboard (optional) | The origin the admin routes call the API on; without it, the host the request came in on. On Vercel set it for Production only, so a preview deployment never writes to the production API |
 | `PRISM_BACKEND_URL` | local dashboard | Where the dev server sends `/api/v1` (default `http://127.0.0.1:8000`) |
-| `PRISM_DB_PATH` | API, scripts | The SQLite file used when no database URL is set (default `data/prism.db`) |
+| `PRISM_DB_PATH` | API, scripts | The SQLite file used when neither database URL is set (default `data/prism.db`); the production run uses it only with `--allow-sqlite` |
 
 Variables set in the shell take precedence over `.env`, so one command can be
 pointed at another database. Set both URLs, because `POSTGRES_URL` wins when
