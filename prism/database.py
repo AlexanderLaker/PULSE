@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Collection, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
 from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES
@@ -176,10 +176,6 @@ def ph(count: int = 1) -> str:
 
 def _row(row) -> dict:
     return row if isinstance(row, dict) else dict(row)
-
-
-def _int_or_none(val):
-    return None if val is None or val == "" else int(val)
 
 
 # ── Schema ──────────────────────────────────────────────────────────────────
@@ -488,20 +484,33 @@ def _require_simulatable(drivers: Sequence[Driver]) -> None:
         raise InvalidDriversError(problems)
 
 
-def _write_driver_children(cursor, d: Driver) -> None:
-    """Rewrite a driver's exposure and source rows from the object."""
-    p = placeholder()
-    for table in ("driver_category_exposure", "driver_regional_exposure", "driver_sources"):
-        cursor.execute(f"DELETE FROM {table} WHERE driver_id = {p}", (d.id,))
+def _write_category_exposure(cursor, d: Driver) -> None:
+    cursor.execute(f"DELETE FROM driver_category_exposure WHERE driver_id = {placeholder()}", (d.id,))
     for category, score in d.category_exposure.items():
         cursor.execute(f"INSERT INTO driver_category_exposure (driver_id, category, exposure_score) VALUES ({ph(3)})",
                        (d.id, category, score))
+
+
+def _write_regional_exposure(cursor, d: Driver) -> None:
+    cursor.execute(f"DELETE FROM driver_regional_exposure WHERE driver_id = {placeholder()}", (d.id,))
     for region, score in d.regional_exposure.items():
         cursor.execute(f"INSERT INTO driver_regional_exposure (driver_id, region, exposure_score) VALUES ({ph(3)})",
                        (d.id, region, score))
+
+
+def _write_sources(cursor, d: Driver) -> None:
+    cursor.execute(f"DELETE FROM driver_sources WHERE driver_id = {placeholder()}", (d.id,))
     for src in d.sources:
         cursor.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, published) VALUES ({ph(5)})",
                        (d.id, src["title"], src["url"], src["tier"], src["published"]))
+
+
+#: The driver fields kept in tables of their own, and the function that rewrites each.
+_CHILD_WRITERS = {
+    "category_exposure": _write_category_exposure,
+    "regional_exposure": _write_regional_exposure,
+    "sources": _write_sources,
+}
 
 
 def insert_drivers(drivers: List[Driver]) -> None:
@@ -516,37 +525,62 @@ def insert_drivers(drivers: List[Driver]) -> None:
         cursor = conn.cursor()
         for d in drivers:
             cursor.execute(f"INSERT INTO drivers ({cols}) VALUES ({ph(len(_DRIVER_COLUMNS))})", _driver_values(d))
-            _write_driver_children(cursor, d)
+            for write in _CHILD_WRITERS.values():
+                write(cursor, d)
     logger.info("Seeded %d drivers", len(drivers))
 
 
-def save_driver_edit(driver: Driver, expected_revision: int, audit: Sequence[AuditEntry] = ()) -> int:
+#: The fields an admin edit can change (prism/api/schemas.py DriverUpdate).
+EDITABLE_FIELDS = frozenset({
+    "description", "direction", "probability", "gp1_pct_affected", "peak_year", "diffusion_curve",
+    "uncertainty", "confidence", "vc_epicentre", *_CHILD_WRITERS,
+})
+
+
+def save_driver_edit(driver: Driver, expected_revision: int, changed: Collection[str],
+                     audit: Sequence[AuditEntry] = ()) -> int:
     """Write an admin edit of one stored driver and its audit entries; returns its new revision.
 
-    The row is written only if it is still at ``expected_revision`` (the
-    revision the editor loaded), in the same statement that raises it, so of
-    two edits made from the same state only the first lands. The second
-    raises StaleRevisionError and changes nothing. The audit entries are
-    written in the same transaction: an edit is never stored without them.
-    An edit that leaves a driver the engine could not simulate raises
-    InvalidDriversError and changes nothing.
+    Only the ``changed`` fields are written (and whether the driver's scores
+    have been edited), so a column the edit did not touch keeps what the
+    database holds. The row is written only if it is still at
+    ``expected_revision`` (the revision the editor loaded), in the same
+    statement that raises it, so of two edits made from the same state only
+    the first lands. The second raises StaleRevisionError and changes
+    nothing. The audit entries are written in the same transaction: an edit
+    is never stored without them. An edit that leaves a driver the engine
+    could not simulate raises InvalidDriversError and changes nothing.
     """
+    if not set(changed) <= EDITABLE_FIELDS:
+        raise ValueError(f"not editable: {sorted(set(changed) - EDITABLE_FIELDS)}")
     _require_simulatable([driver])
     p = placeholder()
-    columns = [c for c in _DRIVER_COLUMNS if c != "id"]
+    columns = [c for c in _DRIVER_COLUMNS if c in changed] + ["scores_edited"]
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             f"UPDATE drivers SET {', '.join(f'{c} = {p}' for c in columns)}, revision = revision + 1, "
             f"updated_at = CURRENT_TIMESTAMP WHERE id = {p} AND revision = {p}",
-            _driver_values(driver)[1:] + (driver.id, int(expected_revision)))
+            tuple(getattr(driver, c) for c in columns) + (driver.id, int(expected_revision)))
         if cursor.rowcount != 1:
             cursor.execute(f"SELECT revision FROM drivers WHERE id = {p}", (driver.id,))
             row = cursor.fetchone()
             raise StaleRevisionError(driver.id, int(expected_revision), int(_row(row)["revision"]) if row else None)
-        _write_driver_children(cursor, driver)
+        for field, write in _CHILD_WRITERS.items():
+            if field in changed:
+                write(cursor, driver)
         insert_audit(cursor, audit)
     return int(expected_revision) + 1
+
+
+def _begin_snapshot(cursor) -> None:
+    """Make the reads that follow in this transaction one consistent snapshot.
+
+    PostgreSQL reads each statement's own snapshot at READ COMMITTED, so the
+    transaction asks for REPEATABLE READ; SQLite reads in autocommit mode
+    unless a transaction is open, so one is opened.
+    """
+    cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY" if USE_POSTGRES else "BEGIN")
 
 
 def load_drivers() -> List[Driver]:
@@ -554,10 +588,13 @@ def load_drivers() -> List[Driver]:
 
     The order is part of the reproducibility contract: the copula pairs draws
     with drivers by position, so the same inputs and seed give the same result
-    only if the drivers always arrive in the same order.
+    only if the drivers always arrive in the same order. The four reads see
+    one snapshot of the database, so an edit saved meanwhile is read whole or
+    not at all.
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        _begin_snapshot(cursor)
         cursor.execute("SELECT * FROM drivers ORDER BY id")
         rows = [_row(r) for r in cursor.fetchall()]
         exposures: Dict[str, Dict[str, dict]] = {r["id"]: {"category": {}, "region": {}} for r in rows}
@@ -732,20 +769,15 @@ _PROPOSAL_COLUMNS = ("user_id, user_name, probability, gp1_pct_affected, peak_ye
 
 
 def _proposal(raw) -> dict:
+    """One proposal row (the _PROPOSAL_COLUMNS) as a dict, the maps decoded."""
     r = _row(raw)
     return {
-        "user_id": r.get("user_id"),
-        "user_name": r.get("user_name"),
-        "probability": r.get("probability"),
-        "gp1_pct_affected": r.get("gp1_pct_affected"),
-        "peak_year": r.get("peak_year"),
-        "diffusion_curve": r.get("diffusion_curve"),
-        "uncertainty": _int_or_none(r.get("uncertainty")),
-        "vc_epicentre": r.get("vc_epicentre"),
-        "category_exposure": _loads(r.get("category_exposure")),
-        "regional_exposure": _loads(r.get("regional_exposure")),
-        "comment": r.get("comment"),
-        "updated_at": r.get("updated_at"),
+        "user_id": r["user_id"],
+        "user_name": r["user_name"],
+        **{k: r[k] for k in _PROPOSAL_SCALAR_FIELDS},
+        **{k: _loads(r[k]) for k in _PROPOSAL_MAP_FIELDS},
+        "comment": r["comment"],
+        "updated_at": r["updated_at"],
     }
 
 
@@ -776,44 +808,21 @@ def upsert_driver_proposal(driver_id: str, user_id: str, fields: Dict[str, Any],
     """Merge a partial proposal into this expert's row and return the merged row.
 
     Only the keys present in ``fields`` change; everything else on an existing
-    row is left as it was.
+    row is left as it was. One statement inserts the row or updates it, so
+    two saves by the same expert at the same moment neither collide on the
+    key nor lose each other's fields.
     """
+    names = [k for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS if k in fields]
+    values = [dumps(fields[k]) if k in _PROPOSAL_MAP_FIELDS and fields[k] is not None else fields[k]
+              for k in names]
+    columns = ["driver_id", "user_id", "user_name", *names]
+    updates = ", ".join([f"{c} = excluded.{c}" for c in ("user_name", *names)] + ["updated_at = CURRENT_TIMESTAMP"])
     p = placeholder()
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute(f"INSERT INTO driver_score_proposals ({', '.join(columns)}) VALUES ({ph(len(columns))}) "
+                       f"ON CONFLICT (driver_id, user_id) DO UPDATE SET {updates}",
+                       (driver_id, user_id, user_name or "", *values))
         cursor.execute(f"SELECT {_PROPOSAL_COLUMNS} FROM driver_score_proposals "
                        f"WHERE driver_id = {p} AND user_id = {p}", (driver_id, user_id))
-        existing = cursor.fetchone()
-        merged = _proposal(existing) if existing else {
-            k: None for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS}
-        for k in _PROPOSAL_SCALAR_FIELDS + _PROPOSAL_MAP_FIELDS + _PROPOSAL_TEXT_FIELDS:
-            if k in fields:
-                merged[k] = fields[k]
-
-        def enc(v):
-            return dumps(v) if v is not None else None
-
-        values = (user_name or "",
-                  merged.get("probability"), merged.get("gp1_pct_affected"), merged.get("peak_year"),
-                  merged.get("diffusion_curve"), merged.get("uncertainty"), merged.get("vc_epicentre"),
-                  enc(merged.get("category_exposure")), enc(merged.get("regional_exposure")),
-                  merged.get("comment"))
-        if existing:
-            cursor.execute(
-                f"""UPDATE driver_score_proposals
-                    SET user_name = {p}, probability = {p}, gp1_pct_affected = {p},
-                        peak_year = {p}, diffusion_curve = {p}, uncertainty = {p}, vc_epicentre = {p},
-                        category_exposure = {p}, regional_exposure = {p},
-                        comment = {p}, updated_at = CURRENT_TIMESTAMP
-                    WHERE driver_id = {p} AND user_id = {p}""",
-                values + (driver_id, user_id))
-        else:
-            cursor.execute(
-                f"""INSERT INTO driver_score_proposals (driver_id, user_id, user_name, probability,
-                        gp1_pct_affected, peak_year, diffusion_curve, uncertainty, vc_epicentre,
-                        category_exposure, regional_exposure, comment)
-                    VALUES ({ph(12)})""",
-                (driver_id, user_id) + values)
-
-    merged.update(user_id=user_id, user_name=user_name or "")
-    return merged
+        return _proposal(cursor.fetchone())

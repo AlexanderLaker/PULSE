@@ -5,6 +5,7 @@ this whole module again in a fresh interpreter against an empty PostgreSQL
 schema (prism.database fixes its backend when it is imported), so the SQL is
 checked on both backends.
 """
+import copy
 import json
 import os
 import subprocess
@@ -105,6 +106,57 @@ class TestDrivers:
         assert loaded.scores_edited is False and loaded.revision == 1
         assert loaded.expected_effect == pytest.approx(expected.expected_effect)
 
+    def test_the_drivers_are_read_from_one_snapshot(self, db, monkeypatch):
+        """An edit committed while the drivers are read is seen whole or not at all: here another
+        connection raises the probability and clears the exposures between the reads."""
+        import sqlite3
+        import threading
+        connect = db._connect
+
+        def concurrent_edit():
+            other = (psycopg2_connect() if db.USE_POSTGRES else sqlite3.connect(str(db.sqlite_path()), timeout=0.2))
+            try:
+                cursor = other.cursor()
+                cursor.execute("UPDATE drivers SET probability = 5, revision = revision + 1")
+                cursor.execute("UPDATE driver_category_exposure SET exposure_score = 0")
+                other.commit()
+            except Exception:   # noqa: BLE001 (SQLite: the open read keeps the writer out until it ends)
+                other.rollback()
+            finally:
+                other.close()
+
+        def psycopg2_connect():
+            import psycopg2
+            return psycopg2.connect(db.POSTGRES_URL)
+
+        class Cursor:
+            def __init__(self, cursor):
+                self._cursor = cursor
+
+            def execute(self, sql, params=()):
+                if "FROM driver_category_exposure" in sql:   # the driver rows have been read
+                    writer = threading.Thread(target=concurrent_edit)
+                    writer.start()
+                    writer.join(10)
+                return self._cursor.execute(sql, params)
+
+            def __getattr__(self, name):
+                return getattr(self._cursor, name)
+
+        class Connection:
+            def __init__(self, conn):
+                self._conn = conn
+
+            def cursor(self, *args, **kwargs):
+                return Cursor(self._conn.cursor(*args, **kwargs))
+
+            def __getattr__(self, name):
+                return getattr(self._conn, name)
+
+        monkeypatch.setattr(db, "_connect", lambda: Connection(connect()))
+        [read] = db.load_drivers()
+        assert (read.probability, sum(read.category_exposure.values())) == (3, len(CATEGORIES))
+
     def test_drivers_come_back_ordered_by_id(self, db):
         others = [_driver("technology_r01", force="Technology"), _driver("competitive_r15", force="Competitive")]
         for d in others:
@@ -112,29 +164,44 @@ class TestDrivers:
         db.insert_drivers(others)
         assert [d.id for d in db.load_drivers()] == ["competitive_r15", "consumer_r01", "technology_r01"]
 
-    def test_an_edit_is_saved_in_full(self, db):
-        edited = _driver(name="edited name", description="edited description", direction="Expansion",
-                         probability=5, gp1_pct_affected=0.42, start_year=2027, peak_year=2033,
-                         diffusion_curve="front_loaded", confidence="High", uncertainty=5, scores_edited=True,
+    def test_an_edit_saves_every_field_it_changes(self, db):
+        edited = _driver(description="edited description", direction="Expansion", probability=5,
+                         gp1_pct_affected=0.42, peak_year=2033, diffusion_curve="front_loaded", confidence="High",
+                         uncertainty=5, scores_edited=True,
                          category_exposure={c: (5 if c == "Hair: Care" else 0) for c in CATEGORIES},
                          sources=[{"title": "new source", "url": "https://example.org/b", "tier": "S",
                                    "published": ""}])
         edited.baseline = _driver().scores()
-        db.save_driver_edit(edited, db.load_drivers()[0].revision)
+        db.save_driver_edit(edited, db.load_drivers()[0].revision, db.EDITABLE_FIELDS - {"regional_exposure"})
         loaded = db.load_drivers()[0]
-        assert (loaded.name, loaded.direction, loaded.probability, loaded.peak_year) == (
-            "edited name", "Expansion", 5, 2033)
+        assert (loaded.description, loaded.direction, loaded.probability, loaded.peak_year) == (
+            "edited description", "Expansion", 5, 2033)
         assert loaded.scores_edited is True and loaded.uncertainty == 5
         assert loaded.category_exposure["Hair: Care"] == 5 and loaded.category_exposure["LHC: FCN"] == 0
         assert loaded.sources == [{"title": "new source", "url": "https://example.org/b", "tier": "S", "published": ""}]
         assert loaded.baseline == _driver().scores()
+
+    def test_an_edit_leaves_the_fields_it_does_not_change_as_stored(self, db):
+        """A copy of the driver loaded before a correction made directly in the database (a start year,
+        a force) must not write the old values back with an unrelated edit."""
+        loaded = db.load_drivers()[0]
+        with db.get_db_connection() as conn:
+            conn.cursor().execute("UPDATE drivers SET start_year = start_year + 1, name = 'corrected'")
+        edit = copy.deepcopy(loaded)
+        edit.description = "a new description"
+        db.save_driver_edit(edit, loaded.revision, {"description"})
+        after = db.load_drivers()[0]
+        assert (after.start_year, after.name) == (loaded.start_year + 1, "corrected")
+        assert after.description == "a new description" and after.revision == loaded.revision + 1
+        with pytest.raises(ValueError, match="not editable: \\['name', 'start_year'\\]"):
+            db.save_driver_edit(edit, after.revision, {"description", "name", "start_year"})
 
     def test_an_edit_keeps_the_expert_proposals(self, db):
         """An edit updates the row in place; proposals reference it with ON DELETE CASCADE."""
         for probability in (1, 4, 5):
             edit = _driver(probability=probability)
             edit.baseline = edit.scores()
-            db.save_driver_edit(edit, db.load_drivers()[0].revision)
+            db.save_driver_edit(edit, db.load_drivers()[0].revision, {"probability"})
         rows = {r["user_id"]: r for r in db.load_driver_proposals("consumer_r01")}
         assert set(rows) == {"expert-a", "expert-b"}
         assert rows["expert-a"]["comment"] == "keep me" and rows["expert-a"]["uncertainty"] == 4
@@ -146,7 +213,7 @@ class TestDrivers:
         before = db.drivers_stamp()
         edit = _driver(probability=4)
         edit.baseline = edit.scores()
-        db.save_driver_edit(edit, db.load_drivers()[0].revision)
+        db.save_driver_edit(edit, db.load_drivers()[0].revision, {"probability"})
         with db.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT created_at, updated_at FROM drivers")
@@ -160,7 +227,7 @@ class TestDrivers:
         for probability in (4, 5, 4):
             edit = _driver(probability=probability)
             edit.baseline = edit.scores()
-            db.save_driver_edit(edit, db.load_drivers()[0].revision)
+            db.save_driver_edit(edit, db.load_drivers()[0].revision, {"probability"})
             stamps.append(db.drivers_stamp())
         assert len(set(stamps)) == 4 and stamps[-1] == (1, 4)
 
@@ -169,9 +236,9 @@ class TestDrivers:
         loaded = db.load_drivers()[0]
         first, second = _driver(probability=5, baseline=loaded.baseline), _driver(probability=1, name="stale edit",
                                                                                   baseline=loaded.baseline)
-        assert db.save_driver_edit(first, loaded.revision) == loaded.revision + 1
+        assert db.save_driver_edit(first, loaded.revision, {"probability"}) == loaded.revision + 1
         with pytest.raises(db.StaleRevisionError) as refused:
-            db.save_driver_edit(second, loaded.revision)
+            db.save_driver_edit(second, loaded.revision, {"probability", "description"})
         assert (refused.value.expected, refused.value.current) == (loaded.revision, loaded.revision + 1)
         now = db.load_drivers()[0]
         assert (now.probability, now.name, now.revision) == (5, "original name", loaded.revision + 1)
@@ -181,7 +248,7 @@ class TestDrivers:
         loaded = db.load_drivers()[0]
         edit = _driver(category_exposure={c: (4 if c == "Hair: Care" else 0) for c in CATEGORIES}, sources=[],
                        baseline=loaded.baseline)
-        db.save_driver_edit(edit, loaded.revision)
+        db.save_driver_edit(edit, loaded.revision, {"category_exposure", "sources"})
         assert _count(db, "SELECT SUM(exposure_score) FROM driver_category_exposure") == 4
         assert _count(db, "SELECT COUNT(*) FROM driver_sources") == 0
 
@@ -198,13 +265,13 @@ class TestDrivers:
         loaded = db.load_drivers()[0]
         edit = _driver(category_exposure={"Hair: Care": 5}, baseline=loaded.baseline)
         with pytest.raises(db.InvalidDriversError, match="category_exposure has no score for"):
-            db.save_driver_edit(edit, loaded.revision)
+            db.save_driver_edit(edit, loaded.revision, {"category_exposure"})
         after = db.load_drivers()[0]
         assert after.revision == loaded.revision and after.category_exposure == loaded.category_exposure
 
     def test_an_edit_of_a_missing_driver_is_refused(self, db):
         with pytest.raises(db.StaleRevisionError) as refused:
-            db.save_driver_edit(_driver("technology_r99", force="Technology", baseline={}), 1)
+            db.save_driver_edit(_driver("technology_r99", force="Technology", baseline={}), 1, {"probability"})
         assert refused.value.current is None
 
     def test_deleting_a_driver_removes_its_proposals(self, db):
@@ -298,14 +365,15 @@ class TestRunsJourneyAudit:
         entry = db.AuditEntry("driver_updated", "driver", "consumer_r01", "admin-1", old_value="3", new_value="5",
                               reason="probability")
         loaded = db.load_drivers()[0]
-        db.save_driver_edit(_driver(probability=5, baseline=loaded.baseline), loaded.revision, [entry])
+        db.save_driver_edit(_driver(probability=5, baseline=loaded.baseline), loaded.revision, {"probability"}, [entry])
         with db.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT action, entity_id, old_value, new_value, reason, user_id FROM audit_log")
             assert [_values(r) for r in cursor.fetchall()] == [
                 ("driver_updated", "consumer_r01", "3", "5", "probability", "admin-1")]
         with pytest.raises(db.StaleRevisionError):
-            db.save_driver_edit(_driver(probability=1, baseline=loaded.baseline), loaded.revision, [entry])
+            db.save_driver_edit(_driver(probability=1, baseline=loaded.baseline), loaded.revision, {"probability"},
+                                [entry])
         assert _count(db, "SELECT COUNT(*) FROM audit_log") == 1
 
     def test_an_edit_whose_audit_entry_fails_is_not_stored(self, db, monkeypatch):
@@ -317,7 +385,8 @@ class TestRunsJourneyAudit:
         monkeypatch.setattr(db, "insert_audit", failing)
         entry = db.AuditEntry("driver_updated", "driver", "consumer_r01", "admin-1", reason="probability")
         with pytest.raises(RuntimeError, match="audit write failed"):
-            db.save_driver_edit(_driver(probability=5, baseline=loaded.baseline), loaded.revision, [entry])
+            db.save_driver_edit(_driver(probability=5, baseline=loaded.baseline), loaded.revision, {"probability"},
+                                [entry])
         after = db.load_drivers()[0]
         assert (after.probability, after.revision) == (loaded.probability, loaded.revision)
         assert _count(db, "SELECT COUNT(*) FROM audit_log") == 0

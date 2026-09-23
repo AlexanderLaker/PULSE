@@ -150,6 +150,18 @@ class TestHealthAndDiagnostics:
         assert body == {"status": "ok", "version": "2.12.0", "driver_count": 51,
                         "has_simulation": False, "simulation_reason": "no_rows", "latest_run_id": None}
 
+    def test_two_instances_seeding_a_new_database_at_once(self, api, monkeypatch):
+        """The instance that loses the race keeps the drivers the other stored."""
+        import prism.database as dbm
+        store = dbm.insert_drivers
+
+        def the_other_instance_first(drivers):
+            store(drivers)   # the other instance
+            store(drivers)   # this one: refused as a whole on the duplicate ids
+        monkeypatch.setattr(dbm, "insert_drivers", the_other_instance_first)
+        state.reset()
+        assert state.driver_set().driver_count == 51 and len(dbm.load_drivers()) == 51
+
     def test_a_persisted_run_is_reported(self, api, valid_run):
         run_id = persist(valid_run)
         body = api.get("/api/v1/health").json()
@@ -333,17 +345,17 @@ class TestDrivers:
         import prism.database as dbm
         original = dbm.save_driver_edit
 
-        def someone_else_first(driver, expected, audit):
+        def someone_else_first(driver, expected, changed, audit):
             other = next(d for d in load_drivers() if d.id == "consumer_r01")
-            other.name = "saved in between"
-            original(other, other.revision)
-            return original(driver, expected, audit)
+            other.description = "saved in between"
+            original(other, other.revision, {"description"})
+            return original(driver, expected, changed, audit)
         monkeypatch.setattr(dbm, "save_driver_edit", someone_else_first)
         response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
                            json={"revision": 1, "probability": 4})
         assert response.status_code == 409
         driver = next(d for d in load_drivers() if d.id == "consumer_r01")
-        assert (driver.name, driver.probability) == ("saved in between", 5)
+        assert (driver.description, driver.probability) == ("saved in between", 5)
         with dbm.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'driver_updated'")
@@ -399,10 +411,10 @@ class TestDrivers:
         from prism.database import load_drivers, save_driver_edit
         api.get("/api/v1/drivers", headers=bearer())
         driver = next(d for d in load_drivers() if d.id == "technology_r01")
-        driver.name = "Renamed by a script"
-        save_driver_edit(driver, driver.revision)
-        names = {d["id"]: d["name"] for d in api.get("/api/v1/drivers", headers=bearer()).json()}
-        assert names["technology_r01"] == "Renamed by a script"
+        driver.description = "Described by a script"
+        save_driver_edit(driver, driver.revision, {"description"})
+        texts = {d["id"]: d["description"] for d in api.get("/api/v1/drivers", headers=bearer()).json()}
+        assert texts["technology_r01"] == "Described by a script"
 
 
 class TestProposals:

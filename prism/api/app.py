@@ -4,8 +4,9 @@ The API serves what the production job and the editors wrote to the
 database: the latest persisted simulation run, the drivers, the model
 configuration and the Consumer Journey content. The only writes it accepts
 are an admin's driver edit, an expert's score proposal and an admin's
-journey content save. It never runs the simulation; runs come from
-scripts/run_production.py.
+journey content save; on a new, empty database it also creates the tables
+and seeds the driver base on first use. It never runs the simulation; runs
+come from scripts/run_production.py.
 
 The dashboard reaches the API on its own origin (a Vercel rewrite in
 production, the Next.js dev server's rewrite locally), so no CORS policy is

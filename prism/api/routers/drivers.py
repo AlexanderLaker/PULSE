@@ -45,8 +45,9 @@ def _driver_json(d, proposals: list, user_id: str) -> dict:
     }
 
 
-def _exposure_map(name: str, value: dict) -> dict:
-    """An exposure map on the taxonomy's names with whole-number scores 0-5; 422 otherwise."""
+def _checked_exposure_cells(name: str, value: dict) -> dict:
+    """The cells of an exposure map as sent, each a name of the taxonomy with a whole-number score
+    from 0 to 5; 422 otherwise. The map may name only some cells."""
     out = {}
     for key, score in value.items():
         if key not in EXPOSURE_KEYS[name]:
@@ -112,7 +113,7 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
         if name == "sources":
             new = [s.model_dump() for s in new]
         elif name in EXPOSURE_KEYS:
-            new = {**getattr(driver, name), **_exposure_map(name, new)}
+            new = {**getattr(driver, name), **_checked_exposure_cells(name, new)}
         if new != getattr(driver, name):
             changes[name] = (getattr(driver, name), new)
             setattr(driver, name, new)
@@ -127,7 +128,7 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
                         new_value=json.dumps(new, default=str), reason=name)
              for name, (old, new) in changes.items()]
     try:
-        revision = save_driver_edit(driver, update.revision, audit)
+        revision = save_driver_edit(driver, update.revision, set(changes), audit)
     except StaleRevisionError:
         raise HTTPException(409, _STALE) from None
     except InvalidDriversError as e:
@@ -176,7 +177,7 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
         if name in sent:
             value = getattr(proposal, name)
             # An empty map means "not scored", the same as null.
-            fields[name] = _exposure_map(name, value) if value else None
+            fields[name] = _checked_exposure_cells(name, value) if value else None
     if "comment" in sent:
         text = (proposal.comment or "").strip()
         fields["comment"] = text[:2000] or None
