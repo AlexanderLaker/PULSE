@@ -103,9 +103,9 @@ def mock_driver_set() -> DriverSet:
 
 @pytest.fixture
 def mock_model_config() -> ModelConfig:
-    """The default configuration on a five-year path and 1,000 iterations.
+    """The default configuration on a five-year path.
 
     Peak-year jitter is off, so the golden pins are the deterministic-schedule
     result and stay stable across numpy versions; the jitter has its own tests.
     """
-    return ModelConfig(path_years=[2026, 2027, 2028, 2029, 2030], iterations=1000, peak_year_jitter=False)
+    return ModelConfig(path_years=[2026, 2027, 2028, 2029, 2030], peak_year_jitter=False)

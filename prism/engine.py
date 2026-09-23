@@ -27,12 +27,9 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig, build_driver_correlation_matrix,
-                          compute_materialization_schedule, peak_jitter_for)
+from prism.config import (CATEGORIES, FORCES, PRODUCTION_CHAINS, REGIONS, VC_STAGES, ModelConfig,
+                          build_driver_correlation_matrix, compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
-
-beta_ppf = _beta_dist.ppf
-norm_cdf = _norm_dist.cdf
 
 #: The exact numerics behind a result, recorded with every run for the audit trail.
 NUMERICS_BACKEND = f"scipy {_scipy.__version__} · numpy {np.__version__}"
@@ -130,7 +127,7 @@ class MonteCarloEngine:
                     ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
 
-    def run(self, driver_set: DriverSet, iterations: Optional[int] = None) -> dict:
+    def run(self, driver_set: DriverSet, iterations: int) -> dict:
         """Run one chain and compile the result.
 
         The result carries ``shift_matrix`` (per category: percentile ``path``
@@ -139,12 +136,13 @@ class MonteCarloEngine:
         force, value-chain and region attribution lenses and the joint portfolio
         band), ``mc_standard_error``, the weights actually applied
         (``cell_weights_used``, ``category_weights_used``,
-        ``region_weights_used``, ``cell_weights_source``), ``integrity_events``,
-        ``raw_samples`` (iterations x categories x years) and the run's
-        identity (``model_version``, ``engine_name``, ``numerics_backend``,
-        ``seed``, ``iterations`` and ``chains``, here 1).
+        ``region_weights_used``, ``cell_weights_source``), ``integrity_events``
+        and the run's identity (``model_version``, ``engine_name``,
+        ``numerics_backend``, ``seed``, ``iterations`` and ``chains``, here 1).
         """
-        n_iter = iterations or self.config.iterations
+        n_iter = int(iterations)
+        self._integrity_events = []
+        self._floored_factor_cells = 0
         logger.info("Running Monte Carlo: %d iterations, %d drivers, %d categories, %d regions, %d years",
                     n_iter, len(driver_set.drivers), len(CATEGORIES), len(REGIONS),
                     len(self.config.path_years))
@@ -182,32 +180,36 @@ class MonteCarloEngine:
         """Each row of W divided by its sum: a category's regional weights.
 
         A category with no gross profit in any region is averaged with equal
-        weights and reported; it carries weight 0 in the portfolio anyway.
+        weights (the run reports it, see _zero_share_event); it carries weight
+        0 in the portfolio anyway.
         """
         W = self.cell_weight_matrix()
         rows = W.sum(axis=1)
-        Wn = np.zeros_like(W)
-        zero_rows = []
-        for c_idx in range(W.shape[0]):
-            if rows[c_idx] > 0:
-                Wn[c_idx, :] = W[c_idx, :] / rows[c_idx]
-            else:
-                Wn[c_idx, :] = 1.0 / W.shape[1]
-                zero_rows.append(CATEGORIES[c_idx])
-        if zero_rows and not any(e.get("type") == "cell_weight_zero_row" for e in self._integrity_events):
-            one = len(zero_rows) == 1
-            self._integrity_events.append({
-                "type": "cell_weight_zero_row",
-                "severity": "warning",
-                "message": (
-                    f"{len(zero_rows)} categor{'y' if one else 'ies'} carr{'ies' if one else 'y'} a zero "
-                    f"gross-profit share in every region: the category shift shown is the equal-weight "
-                    f"average of its cells and the category has weight 0 in the portfolio: "
-                    + ", ".join(zero_rows)
-                ),
-                "detail": {"categories": list(zero_rows)},
-            })
+        Wn = np.full_like(W, 1.0 / W.shape[1])
+        present = rows > 0
+        Wn[present, :] = W[present, :] / rows[present, np.newaxis]
         return Wn
+
+    def _zero_share_event(self) -> Optional[dict]:
+        """The warning for the categories with no gross-profit share in any
+        region, whose shift is then the equal-weight average of their cells;
+        None when there are none."""
+        rows = self.cell_weight_matrix().sum(axis=1)
+        zero_rows = [cat for cat, total in zip(CATEGORIES, rows) if total <= 0]
+        if not zero_rows:
+            return None
+        one = len(zero_rows) == 1
+        return {
+            "type": "cell_weight_zero_row",
+            "severity": "warning",
+            "message": (
+                f"{len(zero_rows)} categor{'y' if one else 'ies'} carr{'ies' if one else 'y'} a zero "
+                f"gross-profit share in every region: the category shift shown is the equal-weight "
+                f"average of its cells and the category has weight 0 in the portfolio: "
+                + ", ".join(zero_rows)
+            ),
+            "detail": {"categories": zero_rows},
+        }
 
     def _category_weight_vector(self) -> np.ndarray:
         """Portfolio weight of each category: the row sums of W."""
@@ -245,13 +247,14 @@ class MonteCarloEngine:
             raise InvalidDriversError(problems)
 
         corr_matrix = self.build_correlation_matrix(drivers)
-        raw_samples = self.generate_copula_samples(drivers, corr_matrix, n_iter)
-        cell_samples = self._compute_all_paths_vectorized(
-            drivers, raw_samples, n_iter, n_cats, n_regions, n_years
-        )
+        scores = self.generate_copula_samples(drivers, corr_matrix, n_iter)
+        cell_samples = self._cell_shift_samples(drivers, scores, n_iter, n_cats, n_regions, n_years)
         # Cell index is c * n_regions + r, so the reshape splits cleanly.
         regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
         Wn = self.row_normalized_cell_weights()
+        zero_share = self._zero_share_event()
+        if zero_share:
+            self._integrity_events.append(zero_share)
         category_samples = np.einsum("icry,cr->icy", regional_samples, Wn)
         return category_samples, regional_samples
 
@@ -304,8 +307,8 @@ class MonteCarloEngine:
         """Correlated signed scores, (iterations, drivers).
 
         Z ~ N(0, R), U = Phi(Z), probability = BetaInv(U; alpha, beta), and the
-        score is probability x gp1_pct_affected x direction. Uniforms are
-        clipped only at float safety, so the Beta tails are not truncated.
+        score is probability x gp1_pct_affected x direction. U is clipped to
+        [1e-12, 1 - 1e-12] so that BetaInv never sees exactly 0 or 1.
         """
         n_drivers = len(drivers)
         if n_drivers == 0:
@@ -328,13 +331,13 @@ class MonteCarloEngine:
 
         Z = self.rng.standard_normal((n_iter, n_drivers))
         Z_correlated = Z @ L.T
-        U = norm_cdf(Z_correlated)
+        U = _norm_dist.cdf(Z_correlated)
         U = np.clip(U, 1e-12, 1.0 - 1e-12)
 
         samples = np.zeros((n_iter, n_drivers))
         for j, driver in enumerate(drivers):
             a_p, b_p = driver.probability_prior
-            prob_01 = beta_ppf(U[:, j], a_p, b_p)
+            prob_01 = _beta_dist.ppf(U[:, j], a_p, b_p)
             samples[:, j] = prob_01 * driver.gp1_pct_affected * driver.direction_sign
         return samples
 
@@ -378,9 +381,7 @@ class MonteCarloEngine:
         """Peak-year offset index per (iteration, driver), by inverse-CDF sampling.
 
         One uniform per (iteration, driver) against the driver's own CDF row.
-        For drivers that share one distribution this is the same draw as
-        ``rng.choice(n_off, size, p)``. No randomness is consumed when there is
-        a single offset.
+        No randomness is consumed when there is a single offset.
         """
         n_drivers, n_off = off_probs_by_driver.shape
         if n_off > 1:
@@ -428,10 +429,10 @@ class MonteCarloEngine:
             dampening[f_idx, :] = np.clip(dampen, 0.1, 1.0)
         return dampening, n_eff_all
 
-    def _compute_all_paths_vectorized(self, drivers: list, raw_samples: np.ndarray,
-                                      n_iter: int, n_cats: int, n_regions: int,
-                                      n_years: int) -> np.ndarray:
-        """Shift of every composite cell, (iterations, cells, years).
+    def _cell_shift_samples(self, drivers: list, scores: np.ndarray, n_iter: int, n_cats: int,
+                            n_regions: int, n_years: int) -> np.ndarray:
+        """Shift of every composite cell, (iterations, cells, years), from the
+        drivers' signed score draws (generate_copula_samples).
 
         Cell (c, r) has index ``c * n_regions + r``. A driver reaches it with
         exposure ``(category exposure / 5) x (regional exposure / 5)``. Per year
@@ -460,7 +461,7 @@ class MonteCarloEngine:
         shift_samples = np.zeros((n_iter, n_cells, n_years))
         for y_idx in range(n_years):
             mat_y = sched_table[driver_arange[np.newaxis, :], offset_idx, y_idx]
-            effective = raw_samples * mat_y
+            effective = scores * mat_y
 
             force_contrib = np.zeros((n_iter, n_forces, n_cells))
             for f_idx in range(n_forces):
@@ -595,7 +596,6 @@ class MonteCarloEngine:
             "mc_standard_error": mc_standard_error,
             "decompositions": decompositions,
             "totals": totals,
-            "raw_samples": samples,
             "model_version": self.MODEL_VERSION,
             "engine_name": self.ENGINE_NAME,
             "numerics_backend": NUMERICS_BACKEND,
@@ -636,8 +636,8 @@ class MonteCarloEngine:
             }
         return out
 
-    def run_multichain(self, driver_set: DriverSet, n_chains: int = 3,
-                       iterations: Optional[int] = None, seeds: Optional[list] = None) -> dict:
+    def run_multichain(self, driver_set: DriverSet, iterations: int, n_chains: int = PRODUCTION_CHAINS,
+                       seeds: Optional[list] = None) -> dict:
         """Run ``n_chains`` independently seeded chains of ``iterations`` each and pool them.
 
         The result has run()'s parts, compiled from the pooled sample: the
@@ -664,7 +664,7 @@ class MonteCarloEngine:
         chain_engines = []
         for s in seeds:
             engine = MonteCarloEngine(self.config, seed=s)
-            cat_s, reg_s = engine._simulate_samples(driver_set, iterations or self.config.iterations)
+            cat_s, reg_s = engine._simulate_samples(driver_set, int(iterations))
             per_chain_cat.append(cat_s)
             per_chain_reg.append(reg_s)
             chain_engines.append(engine)
@@ -687,19 +687,12 @@ class MonteCarloEngine:
 
         # The input-driven events (a correlation repair, a zero cell-weight row)
         # are the same in every chain: report chain 0's once. Floored factors
-        # depend on the draws, so their count is summed over the chains. The
-        # pooled compilation adds its own zero-row event only where chain 0 has
-        # not already reported one.
-        merged = list(chain_engines[0]._integrity_events)
+        # depend on the draws, so their count is summed over the chains.
+        events = list(chain_engines[0]._integrity_events)
         floored = sum(engine._floored_factor_cells for engine in chain_engines)
         if floored:
-            merged.append(floor_event(floored))
-        seen = {e.get("type") for e in merged}
-        for e in result.get("integrity_events", []):
-            if e.get("type") == "cell_weight_zero_row" and e.get("type") in seen:
-                continue
-            merged.append(e)
-        result["integrity_events"] = merged
+            events.append(floor_event(floored))
+        result["integrity_events"] = events
 
         result["iterations"] = int(per_chain_cat[0].shape[0])
         result["chains"] = n_chains

@@ -27,15 +27,20 @@ Exit codes
     0  the run is persisted (the QA workbook is best effort)
     1  no usable database: none configured (and no --allow-sqlite), unreachable,
        or still awaiting a migration (the message names it)
-    2  the database holds no drivers
+    2  the database holds no drivers; also argparse's code for a command line
+       it cannot read
     3  the simulation ran but persisting it failed; the dashboard keeps the previous run
     4  the correlation matrix is not positive definite on this driver mix (--allow-nonpsd overrides)
-    5  the --cell-weights file is missing or invalid
+    5  the run size or the configuration is invalid: --iterations or --chains
+       outside their range (prism.config RUN_*_RANGE), or the --cell-weights
+       file missing or invalid
     6  a driver cannot be simulated (prism.drivers.simulation_problems: a score
        missing or off its scale, a peak year not after the onset, an exposure
        map without a score for every category and region); every problem is
        listed. PRISM stores no such driver, so this points at a change made to
-       the database outside PRISM
+       the database outside PRISM; a start year or a force corrected there
+       needs its revision raised as well, so the service reloads the driver
+Any other error stops the run with a traceback and Python's exit code 1.
 """
 from __future__ import annotations
 
@@ -53,7 +58,7 @@ sys.path.insert(0, str(REPO))
 import prism.env_loader  # noqa: E402,F401  (loads .env before prism.database reads the URL)
 from prism.config import (CATEGORIES, ESTIMATE_SOURCE_PREFIX, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
                           PRODUCTION_SEED, REGIONS, ModelConfig)
-from prism.config_validation import correlation_lambda_min, validate_model_config  # noqa: E402
+from prism.config_validation import correlation_lambda_min, validate_model_config, validate_run_size  # noqa: E402
 from prism.database import (POSTGRES_URL, USE_POSTGRES, MigrationPendingError, init_db, load_drivers,  # noqa: E402
                             load_latest_run, save_simulation_run)
 from prism.drivers import DriverSet, simulation_problems  # noqa: E402
@@ -152,6 +157,11 @@ def main(argv: list[str] | None = None) -> int:
                              "the engine then repairs it and records an integrity event")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    try:
+        validate_run_size(args.iterations, args.chains)
+    except ValueError as e:
+        log.error("%s", e)
+        return 5
 
     if not USE_POSTGRES and not args.allow_sqlite:
         log.error("No POSTGRES_URL or DATABASE_URL is set; put the database URL in .env "
@@ -179,7 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         for line in problems:
             log.error("  %s", line)
         log.error("Scores, timing and exposures can be corrected on the Drivers page; a start year or a force "
-                  "needs a fix in the database.")
+                  "needs a fix in the database, with the driver's revision raised by one so the service "
+                  "reloads it.")
         return 6
     from prism.seed_drivers import DRIVERS as SEED
     if len(drivers) != len(SEED):
@@ -187,15 +198,19 @@ def main(argv: list[str] | None = None) -> int:
                     "difference.", len(drivers), len(SEED))
     driver_set = DriverSet(drivers=drivers)
 
-    config = ModelConfig().copy_with(iterations=args.iterations)
+    config = ModelConfig()
     if args.cell_weights:
         try:
             shares, source = load_cell_weights_file(Path(args.cell_weights))
             config = config.copy_with(cell_weights=shares, cell_weights_source=source)
-            validate_model_config(config)
         except (OSError, ValueError) as e:
             log.error("--cell-weights rejected: %s", e)
             return 5
+    try:
+        validate_model_config(config)
+    except ValueError as e:
+        log.error("%s", e)
+        return 5
     log.info("Cell weights: %s", config.cell_weights_source)
     log.info("  regions: %s", ", ".join(f"{r} {config.region_weights[r] * 100:.1f}%" for r in REGIONS))
 
@@ -208,10 +223,10 @@ def main(argv: list[str] | None = None) -> int:
                   "Lower the cross-force correlations in prism/config.py, or pass --allow-nonpsd.")
         return 4
 
-    log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * config.iterations >= 100_000 else "")
+    log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * args.iterations >= 100_000 else "")
     started = datetime.now()
     result = MonteCarloEngine(config, seed=PRODUCTION_SEED).run_multichain(
-        driver_set, n_chains=args.chains, iterations=config.iterations)
+        driver_set, iterations=args.iterations, n_chains=args.chains)
     log.info("  done in %.0f s; seed stability %.4f pp across %d chains",
              (datetime.now() - started).total_seconds(), result["seed_stability"]["spread_pp"], args.chains)
 
@@ -227,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
 
     run_id = None
     try:
-        run_id = save_simulation_run(config.iterations, results_bundle(result, config, len(drivers), fingerprint))
+        run_id = save_simulation_run(args.iterations, results_bundle(result, config, len(drivers), fingerprint))
         log.info("Persisted as simulation run %s", run_id)
     except Exception as e:  # noqa: BLE001 (reported with exit code 3 after the workbook)
         log.error("PERSIST FAILED: %s", e)

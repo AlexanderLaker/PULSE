@@ -65,6 +65,13 @@ class TestProductionRun:
         assert [e["type"] for e in events] == ["input_drift"]
         assert f"vs run #{run['id']}" in events[0]["message"] and "no changes" in events[0]["message"]
 
+    @pytest.mark.parametrize("size", [["--iterations", "50"], ["--iterations", "0"], ["--chains", "0"],
+                                      ["--chains", "11"]])
+    def test_a_run_size_out_of_range_is_exit_5(self, production, seeded, size, caplog):
+        assert production.main(["--allow-sqlite", *size]) == 5
+        assert "invalid run size" in caplog.text
+        assert seeded.load_latest_run() is None
+
     def test_a_driver_that_cannot_be_simulated_is_exit_6(self, production, seeded, caplog):
         """The database refuses a missing or off-scale score itself; what a change made outside PRISM can
         still leave behind (a missing exposure row, a peak year moved onto the onset) stops the run."""

@@ -29,40 +29,31 @@ def _global_driver(id_, direction, gp1, probability, exposure=5):
 
 class TestResultShape:
     def test_every_category_year_and_percentile(self, mock_model_config, mock_driver_set):
-        cfg = mock_model_config.copy_with(iterations=200)
-        sm = MonteCarloEngine(cfg).run(mock_driver_set)["shift_matrix"]
+        sm = MonteCarloEngine(mock_model_config).run(mock_driver_set, iterations=200)["shift_matrix"]
         assert list(sm) == list(CATEGORIES)
         for cat in CATEGORIES:
-            for year in cfg.path_years:
+            for year in mock_model_config.path_years:
                 cell = sm[cat]["path"][year]
                 assert set(cell) == {"p10", "p25", "median", "p75", "p90", "mean", "std"}, (cat, year)
 
     def test_percentiles_are_ordered(self, mock_model_config, mock_driver_set):
-        cfg = mock_model_config.copy_with(iterations=500)
-        sm = MonteCarloEngine(cfg).run(mock_driver_set)["shift_matrix"]
+        sm = MonteCarloEngine(mock_model_config).run(mock_driver_set, iterations=500)["shift_matrix"]
         for cat in CATEGORIES:
-            for year in cfg.path_years:
+            for year in mock_model_config.path_years:
                 c = sm[cat]["path"][year]
                 assert c["p10"] <= c["p25"] <= c["median"] <= c["p75"] <= c["p90"], (cat, year)
                 assert c["std"] >= 0
 
-    def test_raw_samples(self, mock_model_config, mock_driver_set):
-        cfg = mock_model_config.copy_with(iterations=100)
-        r = MonteCarloEngine(cfg).run(mock_driver_set)
-        assert r["raw_samples"].shape == (100, len(CATEGORIES), len(cfg.path_years))
-
-    def test_iterations_override(self, mock_model_config, mock_driver_set):
-        engine = MonteCarloEngine(mock_model_config.copy_with(iterations=100))
+    def test_the_run_reports_its_size(self, mock_model_config, mock_driver_set):
+        engine = MonteCarloEngine(mock_model_config)
         single = engine.run(mock_driver_set, iterations=50)
         assert single["iterations"] == 50 and single["chains"] == 1
         assert engine.run(mock_driver_set, iterations=200)["iterations"] == 200
 
     def test_empty_and_single_driver_sets(self, mock_model_config, mock_driver):
-        cfg = mock_model_config.copy_with(iterations=100)
-        empty = MonteCarloEngine(cfg).run(DriverSet())
+        empty = MonteCarloEngine(mock_model_config).run(DriverSet(), iterations=100)
         assert all(empty["shift_matrix"][c]["path"][2030]["median"] == 0.0 for c in CATEGORIES)
-        single = MonteCarloEngine(cfg).run(
-            DriverSet(drivers=[mock_driver]))
+        single = MonteCarloEngine(mock_model_config).run(DriverSet(drivers=[mock_driver]), iterations=100)
         assert set(single["shift_matrix"]) == set(CATEGORIES)
 
 
@@ -70,16 +61,16 @@ class TestSampling:
     def test_band_is_a_population_quantity(self, mock_model_config, mock_driver_set):
         """More iterations estimate the P10-P90 band more precisely; they do not
         narrow it. Two estimates must agree loosely and neither may be degenerate."""
-        c100 = MonteCarloEngine(mock_model_config.copy_with(iterations=100)).run(
-            mock_driver_set)["shift_matrix"]["Hair: Color"]["path"][2030]
-        c500 = MonteCarloEngine(mock_model_config.copy_with(iterations=500)).run(
-            mock_driver_set)["shift_matrix"]["Hair: Color"]["path"][2030]
+        c100 = MonteCarloEngine(mock_model_config).run(
+            mock_driver_set, iterations=100)["shift_matrix"]["Hair: Color"]["path"][2030]
+        c500 = MonteCarloEngine(mock_model_config).run(
+            mock_driver_set, iterations=500)["shift_matrix"]["Hair: Color"]["path"][2030]
         w100, w500 = c100["p90"] - c100["p10"], c500["p90"] - c500["p10"]
         assert w100 > 0 and w500 > 0
         assert 0.5 < w500 / w100 < 2.0
 
     def test_monte_carlo_standard_error(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(mock_model_config.copy_with(iterations=500)).run(mock_driver_set)
+        r = MonteCarloEngine(mock_model_config).run(mock_driver_set, iterations=500)
         for cat in CATEGORIES:
             se = r["mc_standard_error"][cat]
             assert min(se["median_se_pp"], se["p10_se_pp"], se["p90_se_pp"]) >= 0.0
@@ -101,11 +92,11 @@ class TestSampling:
 class TestRegionalShift:
     """The shift is solved per (category, region) cell and rolled up with the cell weights."""
 
-    def _cfg(self, mock_model_config):
-        return mock_model_config.copy_with(iterations=4000, peak_year_jitter=False)
+    def _run(self, mock_model_config, driver_set):
+        return MonteCarloEngine(mock_model_config.copy_with(peak_year_jitter=False)).run(driver_set, iterations=4000)
 
     def test_weights_used(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(mock_driver_set)
+        r = self._run(mock_model_config, mock_driver_set)
         assert set(r["region_weights_used"]) == set(REGIONS)
         assert sum(r["region_weights_used"].values()) == pytest.approx(1.0, abs=1e-9)
         for cat in CATEGORIES:
@@ -115,7 +106,7 @@ class TestRegionalShift:
     def test_a_global_driver_moves_every_region_alike(self, mock_model_config):
         """Full regional exposure everywhere gives identical cells, so the
         category roll-up equals that common value whatever the weights."""
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_set([5, 5, 5, 5]))
+        r = self._run(mock_model_config, _single_driver_set([5, 5, 5, 5]))
         rsm = r["regional_shift_matrix"]["Hair: Color"]
         europe = rsm["Europe"]["path"][2030]["median"]
         for region in REGIONS:
@@ -126,7 +117,7 @@ class TestRegionalShift:
         """A Europe-only driver moves only Europe's cell, and the category moves by
         Europe's share of that category's row (not the portfolio-wide Europe share:
         each category has its own regional mix)."""
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_set([5, 0, 0, 0]))
+        r = self._run(mock_model_config, _single_driver_set([5, 0, 0, 0]))
         rsm = r["regional_shift_matrix"]["Hair: Color"]
         assert rsm["Asia"]["path"][2030]["median"] == pytest.approx(0.0, abs=1e-12)
         row = r["cell_weights_used"]["Hair: Color"]
@@ -135,7 +126,7 @@ class TestRegionalShift:
             share * rsm["Europe"]["path"][2030]["median"], rel=1e-9)
 
     def test_only_the_scored_category_moves(self, mock_model_config):
-        sm = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_set([5, 3, 2, 2]))["shift_matrix"]
+        sm = self._run(mock_model_config, _single_driver_set([5, 3, 2, 2]))["shift_matrix"]
         assert sm["Hair: Color"]["path"][2030]["median"] != 0.0
         for cat in CATEGORIES:
             if cat != "Hair: Color":
@@ -144,7 +135,7 @@ class TestRegionalShift:
     def test_a_driver_without_regional_exposure_reaches_no_cell(self, mock_model_config):
         """Exposure 0 in every region is exposure 0 everywhere, as a category score of 0 is: the
         driver moves nothing, and every lens of the untouched category is zero."""
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_set([0, 0, 0, 0]))
+        r = self._run(mock_model_config, _single_driver_set([0, 0, 0, 0]))
         assert r["shift_matrix"]["Hair: Color"]["path"][2030]["median"] == 0.0
         for lens in ("force", "vc", "region"):
             assert set(r["decompositions"][lens][2030]["Hair: Color"].values()) == {0.0}, lens
@@ -153,7 +144,7 @@ class TestRegionalShift:
     def test_the_region_lens_splits_by_presence_and_the_row_mix(self, mock_model_config):
         """A driver present everywhere splits its category's attribution by the category's own
         regional gross-profit mix."""
-        r = MonteCarloEngine(self._cfg(mock_model_config)).run(_single_driver_set([5, 5, 5, 5]))
+        r = self._run(mock_model_config, _single_driver_set([5, 5, 5, 5]))
         row = r["cell_weights_used"]["Hair: Color"]
         lens = r["decompositions"]["region"][2030]["Hair: Color"]
         median = r["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
@@ -194,7 +185,7 @@ class TestDriverChecks:
         for name, value in change.items():
             setattr(driver_set.drivers[0], name, value)
         with pytest.raises(InvalidDriversError, match=words):
-            MonteCarloEngine(mock_model_config).run(driver_set)
+            MonteCarloEngine(mock_model_config).run(driver_set, iterations=100)
 
     def test_every_problem_is_listed(self):
         """No score has a default, so a driver built from its id alone lists every missing one."""
@@ -222,13 +213,11 @@ class TestOverlapDampening:
     def test_a_small_tailwind_never_worsens_the_outlook(self, mock_model_config):
         """The within-force dampening uses the magnitude-weighted effective number
         of drivers, so adding a negligible favourable driver cannot lower the shift."""
-        cfg = mock_model_config.copy_with(iterations=20000, peak_year_jitter=False)
+        cfg = mock_model_config.copy_with(peak_year_jitter=False)
         big = _global_driver("big", "Expansion", 0.20, 4)
         tiny = _global_driver("tiny", "Expansion", 0.005, 5, exposure=1)
-        alone = MonteCarloEngine(cfg, seed=42).run(
-            DriverSet(drivers=[big]))
-        both = MonteCarloEngine(cfg, seed=42).run(
-            DriverSet(drivers=[big, tiny]))
+        alone = MonteCarloEngine(cfg, seed=42).run(DriverSet(drivers=[big]), iterations=20000)
+        both = MonteCarloEngine(cfg, seed=42).run(DriverSet(drivers=[big, tiny]), iterations=20000)
         m1 = alone["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         m2 = both["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
         assert m2 >= m1 - 1e-9, (m1, m2)
@@ -239,9 +228,10 @@ class TestTiming:
         return DriverSet(drivers=[_global_driver("j", "Contraction", 0.20, 4)])
 
     def test_peak_year_jitter_widens_the_velocity_band(self, mock_model_config):
-        base = mock_model_config.copy_with(iterations=20000)
-        off = MonteCarloEngine(base.copy_with(peak_year_jitter=False), seed=7).run(self._db())
-        on = MonteCarloEngine(base.copy_with(peak_year_jitter=True), seed=7).run(self._db())
+        off = MonteCarloEngine(mock_model_config.copy_with(peak_year_jitter=False), seed=7).run(
+            self._db(), iterations=20000)
+        on = MonteCarloEngine(mock_model_config.copy_with(peak_year_jitter=True), seed=7).run(
+            self._db(), iterations=20000)
 
         def width(r):
             v = r["shift_matrix"]["Hair: Color"]["velocity"][2029]
@@ -249,15 +239,15 @@ class TestTiming:
         assert width(on) > width(off)
 
     def test_jitter_is_reproducible_under_seed(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=True)
-        r1 = MonteCarloEngine(cfg, seed=11).run(self._db())
-        r2 = MonteCarloEngine(cfg, seed=11).run(self._db())
+        cfg = mock_model_config.copy_with(peak_year_jitter=True)
+        r1 = MonteCarloEngine(cfg, seed=11).run(self._db(), iterations=3000)
+        r2 = MonteCarloEngine(cfg, seed=11).run(self._db(), iterations=3000)
         assert r1["shift_matrix"] == r2["shift_matrix"]
 
     def test_nothing_materialises_before_the_start_year(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=False)
+        cfg = mock_model_config.copy_with(peak_year_jitter=False)
         driver_set = _single_driver_set([5, 5, 5, 5], prob=5, gp1=0.20, peak_year=2030, start_year=2028)
-        path = MonteCarloEngine(cfg, seed=1).run(driver_set)["shift_matrix"]["Hair: Color"]["path"]
+        path = MonteCarloEngine(cfg, seed=1).run(driver_set, iterations=2000)["shift_matrix"]["Hair: Color"]["path"]
         for year in (2026, 2027, 2028):
             assert path[year]["median"] == pytest.approx(0.0, abs=1e-12)
         assert path[2030]["median"] < 0.0
@@ -284,9 +274,14 @@ class TestMultichainPooling:
         pooled = MonteCarloEngine(cfg, seed=7).run_multichain(driver_set, n_chains=3, iterations=300, seeds=seeds)
         [event] = [e for e in pooled["integrity_events"] if e["type"] == "compounding_floor"]
         assert event["detail"]["count"] == sum(counts)
-        single = MonteCarloEngine(cfg, seed=7).run(driver_set, iterations=300)
+        engine = MonteCarloEngine(cfg, seed=7)
+        single = engine.run(driver_set, iterations=300)
         [event] = [e for e in single["integrity_events"] if e["type"] == "compounding_floor"]
         assert event["detail"]["count"] == counts[0]
+        # a second run on the same engine reports its own count, not the sum of both runs
+        again = engine.run(driver_set, iterations=300)
+        [event] = [e for e in again["integrity_events"] if e["type"] == "compounding_floor"]
+        assert 0 < event["detail"]["count"] < 2 * max(counts)
 
     def test_chains_are_pooled(self, mock_model_config, mock_driver_set):
         r = MonteCarloEngine(mock_model_config, seed=42).run_multichain(

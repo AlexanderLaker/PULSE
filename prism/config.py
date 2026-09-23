@@ -56,7 +56,6 @@ REGIONS = ["Europe", "North America", "Asia", "High Growth"]
 
 # ── Horizon and materialisation ─────────────────────────────────────────────
 
-DEFAULT_ITERATIONS = 10_000
 DEFAULT_BASE_YEAR = 2025
 
 
@@ -68,9 +67,15 @@ def first_peak_year(start_year: int) -> int:
 
 #: The production recipe: every published run (scripts/run_production.py) and
 #: the reference run of the PRISM Analysis (scripts/build_driver_analysis.py).
+#: The size of a run is a parameter of the run, not of the model.
 PRODUCTION_SEED = 42
 PRODUCTION_CHAINS = 3
 PRODUCTION_ITERATIONS = 50_000
+#: The run sizes the production run accepts, lowest and highest: at least
+#: enough draws for a percentile to mean something; a value outside is a typo.
+RUN_ITERATIONS_RANGE = (100, 1_000_000)
+RUN_CHAINS_RANGE = (1, 10)
+
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
 
 # Diffusion curves: the shape of the ramp from onset to peak.
@@ -316,7 +321,6 @@ class ModelConfig:
     force_weights: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_WEIGHTS))
     cell_weights: dict = field(default_factory=_default_cell_weights)
     cell_weights_source: str = DEFAULT_CELL_WEIGHTS_SOURCE
-    iterations: int = DEFAULT_ITERATIONS
     #: The per-iteration peak-year jitter; off, every driver peaks in its own
     #: peak year (the golden pins run that way).
     peak_year_jitter: bool = True

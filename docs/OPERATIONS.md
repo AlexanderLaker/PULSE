@@ -142,7 +142,7 @@ estimate was used), the velocities and the run's metadata.
 | Option | Effect |
 |---|---|
 | `--cell-weights FILE` | the finance cell weights instead of the estimate |
-| `--iterations N`, `--chains N` | iterations per chain (default 50,000) and chains (default 3) |
+| `--iterations N`, `--chains N` | iterations per chain (default 50,000; 100 to 1,000,000) and chains (default 3; 1 to 10) |
 | `--allow-sqlite` | use the local SQLite file when no database URL is set |
 | `--allow-nonpsd` | run although the correlation matrix is not positive definite on this driver mix; the engine repairs it and records an integrity event |
 
@@ -171,11 +171,13 @@ mistaken for the estimate.
 |---|---|
 | 0 | the run is persisted (the workbook is best effort) |
 | 1 | no usable database: none configured (without `--allow-sqlite`), unreachable, or awaiting a migration (the message names it) |
-| 2 | the database holds no drivers |
+| 2 | the database holds no drivers (2 is also the code for a command line the script cannot read) |
 | 3 | the simulation ran but storing it failed; the dashboard keeps serving the previous run |
 | 4 | the correlation matrix is not positive definite on this driver mix |
-| 5 | the cell-weights file is missing or invalid |
-| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM |
+| 5 | the run size is outside its range, the configuration in `prism/config.py` is invalid, or the cell-weights file is missing or invalid |
+| 6 | a driver cannot be simulated (an unknown force, direction, curve or value-chain stage, a missing score, a score outside its scale, a peak year not after the onset, a category or region without an exposure score, an exposure on a name outside the taxonomy, a duplicate id); every problem is listed. PRISM stores no such driver, so this points at a change made to the database outside PRISM; a start year or a force corrected there needs the driver's revision raised by one as well, so the service reloads it |
+
+Any other error stops the run with a traceback and exit code 1.
 
 After a run, the Shift Analysis's "About this model" footer shows the new
 run's id, date, master seed, numerics, Monte Carlo standard error, seed

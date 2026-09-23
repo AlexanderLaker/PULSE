@@ -1,10 +1,10 @@
-"""Validation of a ModelConfig before it drives a production run.
+"""Validation of a production run's model configuration and size.
 
 ``validate_model_config`` checks every parameter the engine consumes: complete
 force and category coverage, weights and shares that sum to one, attenuation
 and overlap values inside their bounds, and a symmetric, unit-diagonal,
-positive-semidefinite force correlation matrix. ``correlation_lambda_min`` adds
-the check that only
+positive-semidefinite force correlation matrix. ``validate_run_size`` checks
+the iterations and chains. ``correlation_lambda_min`` adds the check that only
 the loaded driver mix can answer: whether the driver-level correlation matrix
 built from the settings is positive semidefinite, so the engine never has to
 weaken the configured correlations to repair it.
@@ -15,7 +15,8 @@ from typing import Dict, List
 import numpy as np
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
-from prism.config import CATEGORIES, FORCES, REGIONS, ModelConfig, build_driver_correlation_matrix
+from prism.config import (CATEGORIES, FORCES, REGIONS, RUN_CHAINS_RANGE, RUN_ITERATIONS_RANGE, ModelConfig,
+                          build_driver_correlation_matrix)
 
 SUM_TOLERANCE = 0.01
 
@@ -36,7 +37,6 @@ class ModelConfigValidator(BaseModel):
     force_weights: Dict[str, float]
     cell_weights: Dict[str, Dict[str, float]]
     cell_weights_source: str
-    iterations: int
     peak_year_jitter: bool
     within_force_rho: float
     force_correlation_matrix: Dict[str, Dict[str, float]]
@@ -81,13 +81,6 @@ class ModelConfigValidator(BaseModel):
         total = sum(v.values())
         if abs(total - 1.0) > SUM_TOLERANCE:
             raise ValueError(f"force_weights must sum to 1.0 (got {total:.4f})")
-        return v
-
-    @field_validator("iterations")
-    @classmethod
-    def _iterations(cls, v):
-        if not 100 <= v <= 1_000_000:
-            raise ValueError(f"iterations must be between 100 and 1,000,000 (got {v})")
         return v
 
     @field_validator("within_force_rho")
@@ -156,7 +149,6 @@ def validate_model_config(config: ModelConfig) -> None:
             force_weights=dict(config.force_weights),
             cell_weights={c: dict(r) for c, r in config.cell_weights.items()},
             cell_weights_source=config.cell_weights_source,
-            iterations=config.iterations,
             peak_year_jitter=config.peak_year_jitter,
             within_force_rho=config.within_force_rho,
             force_correlation_matrix=dict(config.force_correlation_matrix),
@@ -165,6 +157,18 @@ def validate_model_config(config: ModelConfig) -> None:
     except ValidationError as err:
         problems = "; ".join(e["msg"] for e in err.errors(include_url=False))
         raise ValueError(f"invalid model configuration: {problems}") from None
+
+
+def validate_run_size(iterations: int, chains: int) -> None:
+    """Raise ValueError unless the iterations per chain and the chains lie in
+    RUN_ITERATIONS_RANGE and RUN_CHAINS_RANGE."""
+    problems = []
+    for name, value, (low, high) in (("iterations", iterations, RUN_ITERATIONS_RANGE),
+                                     ("chains", chains, RUN_CHAINS_RANGE)):
+        if not low <= value <= high:
+            problems.append(f"{name} must be between {low:,} and {high:,} (got {value:,})")
+    if problems:
+        raise ValueError(f"invalid run size: {'; '.join(problems)}")
 
 
 def correlation_lambda_min(force_correlation_matrix: dict,

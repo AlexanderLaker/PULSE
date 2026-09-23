@@ -89,7 +89,7 @@ class TestDecomposition:
         # the engine's vectorised core, fed the Beta means as its "draws"
         eng = MonteCarloEngine(config, seed=1)
         n_cats, n_reg, n_years = len(CATEGORIES), 4, len(config.path_years)
-        cells = eng._compute_all_paths_vectorized(drivers, np.tile(means, (3, 1)), 3, n_cats, n_reg, n_years)
+        cells = eng._cell_shift_samples(drivers, np.tile(means, (3, 1)), 3, n_cats, n_reg, n_years)
         assert cells.shape == (3, n_cats * n_reg, n_years)
         np.testing.assert_allclose(cells[0], dec["cell_shift"], rtol=0, atol=1e-12)
         np.testing.assert_allclose(cells[2], dec["cell_shift"], rtol=0, atol=1e-12)

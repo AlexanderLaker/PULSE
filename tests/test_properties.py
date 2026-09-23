@@ -71,19 +71,19 @@ def test_seed_reproducibility(seed_driver_set, seed):
 
 @settings(deadline=None, max_examples=20)
 @given(att=st.floats(min_value=0.1, max_value=0.9, allow_nan=False),
-       iters=st.integers(min_value=100, max_value=50_000))
-def test_copy_with_is_pure(att, iters):
+       rho=st.floats(min_value=0.0, max_value=0.5, allow_nan=False))
+def test_copy_with_is_pure(att, rho):
     from prism.config import FORCES
     base = ModelConfig()
     original_pfa = dict(base.per_force_attenuation)
-    original_iters = base.iterations
+    original_rho = base.within_force_rho
     new_pfa = {f: att for f in FORCES}
-    clone = base.copy_with(per_force_attenuation=new_pfa, iterations=iters)
+    clone = base.copy_with(per_force_attenuation=new_pfa, within_force_rho=rho)
     assert clone.per_force_attenuation == new_pfa
-    assert clone.iterations == iters
+    assert clone.within_force_rho == rho
     # Base is untouched
     assert base.per_force_attenuation == original_pfa
-    assert base.iterations == original_iters
+    assert base.within_force_rho == original_rho
     # Frozen: cannot mutate
     with pytest.raises(dataclasses.FrozenInstanceError):
         base.per_force_attenuation = {f: 0.1 for f in FORCES}  # type: ignore[misc]
