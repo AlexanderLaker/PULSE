@@ -25,6 +25,9 @@ interface MatrixProps {
   grandTotal: number | null;
   /** Header of the total column; it names the lens year, e.g. "Total 2035". */
   rowTotalLabel: string;
+  /** What a cell's value is, as the hover card names it: "Median" only where
+   *  the cell is the simulated median (the unfiltered Time Path). */
+  valueLabel: string;
   /** Per-cell distributions; with them the hover shows the P10 and P90 band. */
   cellDetails?: Record<string, Record<string, PercentileDistribution | null>>;
   /** Opens the drill-down of a row; any cell of the row does. */
@@ -38,7 +41,7 @@ interface MatrixProps {
 export const Matrix: FC<MatrixProps> = ({
   columns, rows, data, subtitle,
   rowTotals, colTotals, grandTotal, rowTotalLabel,
-  cellDetails, onRowClick, noBandsNote, toolbar,
+  valueLabel, cellDetails, onRowClick, noBandsNote, toolbar,
 }) => {
   const grouped = useMemo(() => {
     const map: Record<string, MatrixRow[]> = {};
@@ -77,6 +80,8 @@ export const Matrix: FC<MatrixProps> = ({
   );
 
   const showTotalCol = !!rowTotals && Object.values(rowTotals).some((v) => v != null);
+  /** The value's name inside a sentence, for the cells' accessible labels. */
+  const valueName = valueLabel.charAt(0).toLowerCase() + valueLabel.slice(1);
   const totalColSpan = columns.length + (showTotalCol ? 1 : 0) + 1;
 
   return (
@@ -246,9 +251,8 @@ export const Matrix: FC<MatrixProps> = ({
                       // keyboard users reach the same band in the drill-down.
                       const band = cellDetails?.[row.id]?.[col] ?? null;
                       const cellLabel = v == null ? undefined
-                        : band
-                          ? `${row.label}, ${col}: median ${fmtShift(v, 1)}, P10 ${fmtShift(band.p10, 1)}, P90 ${fmtShift(band.p90, 1)}`
-                          : `${row.label}, ${col}: ${fmtShift(v, 1)}`;
+                        : `${row.label}, ${col}: ${valueName} ${fmtShift(v, 1)}`
+                          + (band ? `, P10 ${fmtShift(band.p10, 1)}, P90 ${fmtShift(band.p90, 1)}` : '');
                       return (
                         <td
                           key={col}
@@ -350,7 +354,7 @@ export const Matrix: FC<MatrixProps> = ({
         style={{ backgroundColor: S.surfaceLow, color: S.mutedText, fontSize: 11 }}
       >
         <span style={{ fontFamily: BODY_FONT }}>
-          Signed % vs 2025 · positive = expansion · negative = contraction · totals are
+          Signed % vs {BASE_YEAR} · positive = expansion · negative = contraction · totals are
           category-weighted averages (labelled, not shaded)
         </span>
         <div className="flex items-center gap-3">
@@ -368,9 +372,9 @@ export const Matrix: FC<MatrixProps> = ({
         </div>
       </div>
 
-      {/* The cell tooltip: the median, and the P10 and P90 band where the cell
-          has one (the unfiltered Time Path); the attribution lenses carry one
-          number per cell. */}
+      {/* The cell tooltip: the cell's value under its own name, and the P10
+          and P90 band where the cell has one (the unfiltered Time Path); the
+          attribution lenses and the filters carry one number per cell. */}
       {hover && (() => {
         const v = data[hover.rowId]?.[hover.colId];
         if (v == null) return null;
@@ -414,7 +418,7 @@ export const Matrix: FC<MatrixProps> = ({
                 alignItems: 'baseline',
               }}
             >
-              <span style={{ opacity: 0.7, fontSize: 11 }}>Median</span>
+              <span style={{ opacity: 0.7, fontSize: 11 }}>{valueLabel}</span>
               <span
                 style={{
                   fontFamily: MONO_FONT,

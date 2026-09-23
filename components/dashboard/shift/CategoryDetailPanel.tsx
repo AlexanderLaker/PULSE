@@ -1,8 +1,8 @@
 /**
  * The drill-down of one category, opened from a Shift Matrix row or a KPI
  * tile: its shift path with the P10–P90 band, the force attribution and the
- * regional shifts at the selected year, and the drivers behind its
- * terminal-year shift, ranked by their share of it.
+ * regional shifts in the year it is opened on (named in both section titles),
+ * and the drivers behind its terminal-year shift, ranked by their share of it.
  *
  * The contributing drivers are attributed at the score means with
  * lib/driverAttribution.ts, the decomposition the PRISM Analysis on the
@@ -19,7 +19,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Activity, Zap, Layers, LineChart, Globe } from 'lucide-react';
 import {
-  CATEGORIES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay,
+  BASE_YEAR, CATEGORIES, FIRST_YEAR, FLAT_EPS, HORIZON, fmtShift, fmtPct, categoryDisplay, groupDisplay, heatText,
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
@@ -35,7 +35,8 @@ import { DriverCard, rankContributors } from './contributors';
 interface CategoryDetailPanelProps {
   /** The category's API key, e.g. "LHC: FCN". */
   category: string;
-  /** The year the force and regional sections show. */
+  /** The year the force and regional sections show: the matrix's year on an
+   *  attribution lens, the horizon on the Time Path. */
   year: number;
   simulation: SimulationResult;
   drivers: Driver[];
@@ -87,6 +88,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     () => drivers.filter((d) => d.category_exposure[category] > 0).length,
     [category, drivers],
   );
+  // Drivers edited, added or removed since the run: the ranking uses the
+  // drivers as they are now, the run's figures the drivers as they were.
+  const since = simulation.inputs_since_run;
+  const changedSinceRun = since.changed.length + since.added.length + since.removed.length;
 
   // Share of the category's movement carried by its five largest drivers.
   const topShare = useMemo(() => {
@@ -102,7 +107,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   // easing in calm navy, accelerating in expansion ink, slowing in amber. The
   // value is in percentage points: a difference of two percentages.
   const momentum = useMemo(() => {
-    const pts = `${velocity >= FLAT_EPS ? '+' : ''}${(velocity * 100).toFixed(1)} pt`;
+    const pts = pt(velocity);
     if (shiftEnd < -FLAT_EPS && velocity > FLAT_EPS)
       return { msg: 'Contraction easing', pts, color: S.onSurface };
     if (shiftEnd < -FLAT_EPS && velocity < -FLAT_EPS)
@@ -294,7 +299,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   fontSize: 19,
                   fontWeight: 800,
                   fontFamily: MONO_FONT,
-                  color: shiftEnd > 0 ? S.expansionInk : shiftEnd < 0 ? S.contractionInk : S.onSurface,
+                  color: heatText(shiftEnd),
                   lineHeight: 1,
                 }}
               >
@@ -426,11 +431,11 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               <MiniPathChart path={path} />
             </Section>
 
-            <Section title="Force Decomposition" icon={Zap}>
+            <Section title={`Force attribution · ${year}`} icon={Zap}>
               <ForceDecomposition decomposition={forceDecomposition} />
             </Section>
 
-            <Section title="Regional Shift" icon={Globe}>
+            <Section title={`Regional shift · ${year}`} icon={Globe}>
               <RegionalDecomposition rows={regionalShift} />
             </Section>
           </div>
@@ -463,6 +468,19 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
                   </span>
                 }
               >
+                {changedSinceRun > 0 && (
+                  <p
+                    role="note"
+                    style={{
+                      margin: '0 0 12px', padding: '8px 12px', borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+                      backgroundColor: S.amberContainer, color: S.onAmberContainer, fontFamily: BODY_FONT,
+                    }}
+                  >
+                    {changedSinceRun === 1 ? 'One driver has' : `${changedSinceRun} drivers have`} changed since
+                    this run. The parts below use the drivers as they are now, scaled to this run&rsquo;s median;
+                    the run&rsquo;s own figures show the drivers as they were until the next production run.
+                  </p>
+                )}
                 {/* Concentration: the share of movement the top five carry */}
                 {topShare > 0 && (
                   <div
@@ -542,8 +560,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
               size={10}
               style={{ display: 'inline', verticalAlign: -1, marginRight: 4 }}
             />
-            Shifts are cumulative vs 2025 from the Monte Carlo engine. Force shares sum to
-            the row&rsquo;s MC median at the selected year.
+            Shifts are cumulative against {BASE_YEAR}, from the Monte Carlo engine. The force
+            attribution adds up to the row&rsquo;s median in {year}.
             {contributors.length > 0
               && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), scaled here so they add up to the row’s terminal-year median (where that would reverse them or more than double them, they stay at the means); the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
           </footer>

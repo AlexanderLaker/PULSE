@@ -101,8 +101,8 @@ function openFabricClean(container: HTMLElement): HTMLElement {
 /** The driver cards in rank order, by driver id. */
 function cardOrder(aside: HTMLElement): string[] {
   return within(aside)
-    .getAllByRole('button', { name: /on the Drivers page$/ })
-    .map((card) => /^Open "(.+)" on the Drivers page$/.exec(card.getAttribute('aria-label') ?? '')?.[1] ?? '');
+    .getAllByRole('button', { name: /Opens it on the Drivers page$/ })
+    .map((card) => /^\d+\. ([^:]+): /.exec(card.getAttribute('aria-label') ?? '')?.[1] ?? '');
 }
 
 afterEach(() => cleanup());
@@ -128,7 +128,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
     // The growth-market currency driver sits well below the large European headwinds.
     expect(order.indexOf('consumer_r36')).toBeGreaterThan(10);
 
-    fireEvent.click(within(aside).getAllByRole('button', { name: /on the Drivers page$/ })[0]);
+    fireEvent.click(within(aside).getAllByRole('button', { name: /Opens it on the Drivers page$/ })[0]);
     expect(openDriver).toHaveBeenCalledWith('competitive_r15');
   });
 
@@ -139,7 +139,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
 
     expect(aside.textContent).toContain('attributed with the model configuration, which did not load');
     expect(aside.textContent).not.toContain('the same decomposition as the PRISM Analysis');
-    expect(within(aside).queryAllByRole('button', { name: /on the Drivers page$/ })).toHaveLength(0);
+    expect(within(aside).queryAllByRole('button', { name: /Opens it on the Drivers page$/ })).toHaveLength(0);
   });
 
   it('says so when the drivers did not load', () => {
@@ -147,7 +147,7 @@ describe('category drill-down: contributing drivers at the score means', () => {
     const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
     const aside = openFabricClean(container);
     expect(aside.textContent).toContain('attributed with the drivers, which did not load');
-    expect(within(aside).queryAllByRole('button', { name: /on the Drivers page$/ })).toHaveLength(0);
+    expect(within(aside).queryAllByRole('button', { name: /Opens it on the Drivers page$/ })).toHaveLength(0);
   });
 });
 

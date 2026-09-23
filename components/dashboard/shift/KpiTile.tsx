@@ -67,7 +67,9 @@ export const KpiTile: FC<{
     border: `1px solid ${S.cardBorder}`,
     fontFamily: BODY_FONT,
   };
-  const bandLabel = `, P10 ${fmtShift(band.p10, 1)} to P90 ${fmtShift(band.p90, 1)}, ${bandNote}`;
+  // The accessible name carries everything the tile shows: its label, the
+  // category, the median and the band.
+  const figures = `median ${fmtShift(band.median, 1)}, P10 ${fmtShift(band.p10, 1)} to P90 ${fmtShift(band.p90, 1)}, ${bandNote}`;
   return onOpen ? (
     <button
       type="button"
@@ -76,7 +78,7 @@ export const KpiTile: FC<{
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
-      aria-label={`Open ${name ?? label} drill-down: fan chart and contributing drivers${bandLabel}`}
+      aria-label={`${label}: ${name ?? ''}, ${figures}. Opens the drill-down`}
       className="relative rounded-2xl px-5 py-3.5 text-left"
       style={{ ...surface, cursor: 'pointer' }}
     >
@@ -91,7 +93,7 @@ export const KpiTile: FC<{
       onClick={() => setHovered((h) => !h)}
       tabIndex={0}
       role="group"
-      aria-label={`${label}${bandLabel}`}
+      aria-label={`${label}: ${figures}`}
       className="relative rounded-2xl px-5 py-3.5"
       style={surface}
     >

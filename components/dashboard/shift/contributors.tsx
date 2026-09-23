@@ -98,7 +98,10 @@ export const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOp
       onMouseLeave={interactive ? () => setHovered(false) : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={interactive ? `Open "${driver.name}" on the Drivers page` : undefined}
+      aria-label={interactive
+        ? `${rank}. ${driver.name}: ${shareLabel} of the movement, contribution ${contribLabel}, `
+          + `${isExpansion ? 'expansion' : 'contraction'}. Opens it on the Drivers page`
+        : undefined}
       onKeyDown={interactive ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(); }
       } : undefined}

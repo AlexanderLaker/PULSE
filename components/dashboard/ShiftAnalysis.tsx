@@ -337,6 +337,8 @@ const ShiftAnalysis: FC<{
               colTotals={matrix.colTotals}
               grandTotal={matrix.grandTotal}
               rowTotalLabel={`Total ${selectedYear}`}
+              valueLabel={view !== 'time' ? meta.label
+                : filter === 'total' ? 'Median' : `${IMPACT_META[filter].label}’ part`}
               cellDetails={matrix.cellDetails}
               onRowClick={setSelectedCategory}
               noBandsNote={
@@ -354,7 +356,7 @@ const ShiftAnalysis: FC<{
           {selectedCategory && simulation && attribution && (
             <CategoryDetailPanel
               category={selectedCategory}
-              year={selectedYear}
+              year={view === 'time' ? HORIZON : selectedYear}
               simulation={simulation}
               drivers={drivers}
               attribution={attribution}

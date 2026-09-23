@@ -9,7 +9,7 @@
  * cell-weight basis and the pass-through of the served configuration.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import type { DiagnosticsResult } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
 import { ESTIMATED_CELL_WEIGHTS } from '@/lib/cellWeightProvenance';
@@ -115,6 +115,39 @@ describe('Shift Matrix lenses', () => {
     }
   });
 
+  it('names what a cell holds: the median on the Time Path, the attribution or the filtered part elsewhere', () => {
+    STORE.store = makeStore();
+    const { container } = render(<ShiftAnalysis />);
+    const hoverCard = (cell: HTMLElement) => {
+      fireEvent.mouseEnter(cell);
+      const card = container.querySelector('div.fixed') as HTMLElement;
+      const text = card.textContent ?? '';
+      fireEvent.mouseLeave(cell);
+      return text;
+    };
+    const median = screen.getByLabelText(/^Toilet Care, 2035: median [+-]?\d+\.\d%, P10 /);
+    expect(hoverCard(median)).toMatch(/Median[+-]?\d+\.\d%P10/);
+    fireEvent.click(screen.getByRole('button', { name: 'Contraction drivers' }));
+    const part = screen.getByLabelText(/^Toilet Care, 2035: contraction drivers’ part [+-]?\d+\.\d%$/);
+    expect(hoverCard(part)).toContain('Contraction drivers’ part');
+    fireEvent.click(screen.getByRole('button', { name: 'Force attribution' }));
+    const force = screen.getByLabelText(/^Toilet Care, Consumer: force attribution [+-]?\d+\.\d%$/);
+    const text = hoverCard(force);
+    expect(text).toContain('Force attribution');
+    expect(text).not.toContain('Median');
+  });
+
+  it('names every figure of the KPI tiles to a screen reader', () => {
+    STORE.store = makeStore();
+    render(<ShiftAnalysis />);
+    const portfolio = screen.getByRole('group', { name: /^Portfolio exposure/ });
+    expect(portfolio.getAttribute('aria-label')).toMatch(
+      /^Portfolio exposure \(if no action\) · by 2035: median -\d+\.\d%, P10 -\d+\.\d% to P90 [+-]?\d+\.\d%, 80% of outcomes \(joint portfolio\)$/);
+    const exposed = screen.getByRole('button', { name: /^Most exposed category: / });
+    expect(exposed.getAttribute('aria-label')).toMatch(
+      /^Most exposed category: [A-Z][\w ]+, median -\d+\.\d%, P10 .+ to P90 .+, 80% of outcomes\. Opens the drill-down$/);
+  });
+
   it('opens the drill-down at the lens year chosen with the stepper', () => {
     STORE.store = makeStore();
     const { container } = render(<ShiftAnalysis />);
@@ -124,8 +157,32 @@ describe('Shift Matrix lenses', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open Toilet Care detail/ }));
     const aside = container.querySelector('aside') as HTMLElement;
     expect(aside.getAttribute('aria-label')).toBe('Toilet Care drill-down');
-    expect(aside.textContent).toContain('Regional Shift');
+    expect(aside.textContent).toContain('Force attribution · 2034');
+    expect(aside.textContent).toContain('Regional shift · 2034');
     expect(aside.textContent).toContain('North America');
+    expect(aside.textContent).toContain('adds up to the row’s median in 2034');
+  });
+
+  it('opens the drill-down at the horizon on the Time Path, whatever year the stepper was left on', () => {
+    STORE.store = makeStore();
+    const { container } = render(<ShiftAnalysis />);
+    fireEvent.click(screen.getByRole('button', { name: 'Force attribution' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier year' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Time Path' }));
+    fireEvent.click(screen.getByRole('button', { name: /Open Toilet Care detail/ }));
+    const aside = container.querySelector('aside') as HTMLElement;
+    expect(aside.textContent).toContain('Force attribution · 2035');
+    expect(aside.textContent).toContain('Regional shift · 2035');
+  });
+
+  it('says in the drill-down when drivers changed since the run', () => {
+    STORE.store = makeStore({
+      simulation: makeSimulation({ inputs_since_run: { changed: ['consumer_r01'], added: [], removed: [] } }),
+    });
+    const { container } = render(<ShiftAnalysis />);
+    fireEvent.click(screen.getByRole('button', { name: /Open Toilet Care detail/ }));
+    const aside = container.querySelector('aside') as HTMLElement;
+    expect(within(aside).getByRole('note').textContent).toContain('One driver has changed since this run');
   });
 });
 

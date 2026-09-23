@@ -1,7 +1,7 @@
 /**
  * The drill-down's sections: the card they sit in, the category's shift path
- * with its P10 to P90 band, the force attribution and the regional shifts at
- * the selected year.
+ * with its P10 to P90 band, the force attribution and the regional shifts in
+ * the year the panel names.
  */
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -9,7 +9,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Area, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { FORCE_COLORS, YEARS, fmtShift, fmtPct } from '@/lib/format';
+import { FLAT_EPS, FORCE_COLORS, YEARS, fmtShift, fmtPct, heatText, shiftColor } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import type { ForceName, ShiftPath } from '@/types';
 
@@ -79,7 +79,7 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
   // contracting category reads red and an expanding one green, like the
   // matrix cell the drill-down was opened from.
   const termMedian = chartData[chartData.length - 1].median;
-  const fanTint = termMedian < 0 ? S.contraction : termMedian > 0 ? S.expansion : S.primary;
+  const fanTint = Math.abs(termMedian) < FLAT_EPS ? S.primary : shiftColor(termMedian);
 
   return (
     <div style={{ height: 280 }}>
@@ -109,15 +109,15 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
             tick={{ fontSize: 11, fill: S.onSurfaceVariant, fontFamily: MONO_FONT }}
             axisLine={{ stroke: S.cardBorder }}
             tickLine={false}
-            tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-            width={38}
+            tickFormatter={(v: number) => fmtShift(v, 1)}
+            width={48}
           />
           <Tooltip
             cursor={{ stroke: S.primary, strokeDasharray: '2 3', strokeOpacity: 0.5 }}
             content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const d = payload[0]?.payload as ChartDataPoint;
-              const medColor = d.median > 0 ? S.expansion : d.median < 0 ? S.contraction : S.onSurfaceVariant;
+              const medColor = heatText(d.median);
               return (
                 <div
                   style={{
@@ -213,7 +213,7 @@ export const MiniPathChart: React.FC<{ path: ShiftPath }> = ({ path }) => {
 
 // ─── ForceDecomposition ────────────────────────────────────────────────────
 
-/** The category's median at the selected year split by force, largest part first. */
+/** The category's median in one year split by force, largest part first. */
 export const ForceDecomposition: React.FC<{ decomposition: Record<string, number> }> = ({ decomposition }) => {
   const forces = Object.keys(decomposition)
     .filter((f) => decomposition[f] !== 0)
@@ -234,9 +234,8 @@ export const ForceDecomposition: React.FC<{ decomposition: Record<string, number
       {forces.map((force) => {
         const value = decomposition[force];
         const pct = maxAbs > 0 ? Math.abs(value) / maxAbs : 0;
-        const isPositive = value > 0;
-        const barColor = isPositive ? S.expansion : S.contraction;
-        const valueInk = isPositive ? S.expansionInk : S.contractionInk;
+        const barColor = shiftColor(value);
+        const valueInk = heatText(value);
 
         return (
           <div
@@ -311,7 +310,7 @@ export const ForceDecomposition: React.FC<{ decomposition: Record<string, number
 };
 
 // ─── RegionalDecomposition ─────────────────────────────────────────────────
-// The category's own shift in each region at the selected year. Unlike the
+// The category's own shift in each region in one year. Unlike the
 // attribution lenses, which split the category median, these are the
 // regional shifts the engine computes; the category number is their roll-up
 // with the category's row of the cell weights (the percentages shown).
@@ -329,9 +328,8 @@ export const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {rows.map((r) => {
         const pct = Math.abs(r.median) / maxAbs;
-        const isPositive = r.median > 0;
-        const barColor = isPositive ? S.expansion : S.contraction;
-        const valueInk = isPositive ? S.expansionInk : S.contractionInk;
+        const barColor = shiftColor(r.median);
+        const valueInk = heatText(r.median);
         return (
           <div key={r.region} style={{ display: 'grid', gridTemplateColumns: '132px 1fr 62px', alignItems: 'center', columnGap: 10 }}>
             <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, fontSize: 12, fontWeight: 600, color: S.onSurface, fontFamily: BODY_FONT }}>
@@ -354,7 +352,7 @@ export const RegionalDecomposition: React.FC<{ rows: RegionalRow[] }> = ({ rows 
         );
       })}
       <div style={{ fontSize: 10.5, color: S.mutedText, fontFamily: BODY_FONT, lineHeight: 1.5, marginTop: 2 }}>
-        % = the region&rsquo;s share of this category&rsquo;s gross profit (its row of the run&rsquo;s cell weights). The category shift above is the share-weighted average of these regional shifts.
+        % = the region&rsquo;s share of this category&rsquo;s gross profit (its row of the run&rsquo;s cell weights). In every draw the category&rsquo;s shift is the share-weighted average of its regional shifts; the medians shown need not average exactly to the category&rsquo;s median.
       </div>
     </div>
   );
