@@ -7,7 +7,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, type FC } fr
 import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Info, PenLine, MessageSquare,
 } from 'lucide-react';
-import { saveMyProposal } from '@/api/client';
+import { saveMyProposal } from '@/lib/apiClient';
 import { NO_VALUE, fmtPct } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { canonicalVcProfile, epicentreOf } from '@/lib/valueChain';

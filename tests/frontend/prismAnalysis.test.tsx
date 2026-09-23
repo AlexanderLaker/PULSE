@@ -29,13 +29,13 @@ import { linearPath, makeDriver, makeSimulation, makeStore } from './fixtures/pr
 const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
-vi.mock('@/api/client', async (importOriginal) => ({
-  ApiError: (await importOriginal<typeof import('@/api/client')>()).ApiError,
+vi.mock('@/lib/apiClient', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('@/lib/apiClient')>()).ApiError,
   getDriverProposals: vi.fn(async () => { throw new Error('not used in these tests'); }),
   saveMyProposal: vi.fn(async () => { throw new Error('not used in these tests'); }),
 }));
 
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/apiClient';
 import Drivers from '@/components/dashboard/Drivers';
 import { basisMedian, splitAnalysis } from '@/components/dashboard/drivers/PrismAnalysis';
 

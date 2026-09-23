@@ -1,7 +1,7 @@
 /**
  * The persisted run as GET /api/v1/simulation serves it (prism/api/runs.py).
  *
- * `SimulationPayload` is the JSON as it arrives; api/client.ts lifts each
+ * `SimulationPayload` is the JSON as it arrives; lib/apiClient.ts lifts each
  * category's percentile path into `shifts`, which is the `SimulationResult`
  * every view reads. Keys are strings: "2035", "Hair: Color", "Europe".
  */

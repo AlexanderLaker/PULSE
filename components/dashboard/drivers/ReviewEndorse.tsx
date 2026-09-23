@@ -8,7 +8,7 @@ import React, { useMemo, useState, type FC } from 'react';
 import {
   Users, Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Check, MessageSquare,
 } from 'lucide-react';
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/apiClient';
 import { CATEGORIES, NO_VALUE, REGIONS, fmtPct, shortCat } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';

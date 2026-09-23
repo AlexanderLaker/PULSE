@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
 import useOverlay from '@/hooks/useOverlay';
-import { ApiError, getJourneyContent, saveJourneyContent } from '@/api/client';
+import { ApiError, getJourneyContent, saveJourneyContent } from '@/lib/apiClient';
 import {
   LHC_JOURNEY, HAIR_JOURNEY, LHC_CTX, HAIR_CTX,
   type JourneyContent, type JourneyKey, type JourneyStageDef, type JourneyTile, type TileType,

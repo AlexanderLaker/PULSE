@@ -10,7 +10,7 @@ import { useState, type FC } from 'react';
 import {
   Cpu, FileText, BarChart3, Clock, Zap, MapPin, Layers, Newspaper, Plus, Trash2, Lock,
 } from 'lucide-react';
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/apiClient';
 import { evidenceLine, fmtPct } from '@/lib/format';
 import { UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';

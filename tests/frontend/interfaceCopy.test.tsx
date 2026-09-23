@@ -113,7 +113,7 @@ vi.mock('@/hooks/usePrism', () => ({
   default: () => STORE.store,
   PrismProvider: ({ children }: { children: unknown }) => children,
 }));
-vi.mock('@/api/client', () => ({
+vi.mock('@/lib/apiClient', () => ({
   getDriverProposals: vi.fn(async () => null),
   saveMyProposal: vi.fn(async () => null),
 }));

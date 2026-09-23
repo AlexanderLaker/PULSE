@@ -1,10 +1,10 @@
 /**
- * normalizeSimulation (api/client.ts): the served run with each category's
+ * normalizeSimulation (lib/apiClient.ts): the served run with each category's
  * percentile path lifted into `shifts` and its change bands into `velocity`,
  * everything else passed through.
  */
 import { describe, it, expect } from 'vitest';
-import { normalizeSimulation } from '@/api/client';
+import { normalizeSimulation } from '@/lib/apiClient';
 import type { SimulationPayload } from '@/types';
 import { linearPath, makeSimulation } from './fixtures/prism';
 

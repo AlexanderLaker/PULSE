@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
-vi.mock('@/api/client', () => ({
+vi.mock('@/lib/apiClient', () => ({
   primeViewerCookie: vi.fn(async () => undefined),
   getHealth: vi.fn(),
   getDrivers: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/api/client', () => ({
   updateDriver: vi.fn(),
 }));
 
-import * as api from '@/api/client';
+import * as api from '@/lib/apiClient';
 import usePrism, { PrismProvider } from '@/hooks/usePrism';
 import { makeConfig, makeDriver, makeHealth, makeSimulation } from './fixtures/prism';
 

@@ -70,8 +70,8 @@ its own; docs/OPERATIONS.md (Roles) shows how to work as an admin locally.
 |---|---|
 | `app/` | Next.js pages and the dashboard's server routes (roles, admin writes, the viewer cookie, the Clerk webhook) |
 | `components/dashboard/` | The views and their shared pieces |
-| `hooks/`, `api/client.ts`, `types/` | The data store, the API client and the types that mirror the API's JSON |
-| `lib/` | Shared logic: formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
+| `hooks/`, `types/` | The data store and the types that mirror the API's JSON |
+| `lib/` | Shared logic: the API client, formatting, the Shift Matrix arithmetic, cell weights, the per-driver attribution, tokens, auth helpers |
 | `data/` | Dashboard content (the Consumer Journey, the generated driver code map), the driver base and the PRISM Analysis templates (`drivers/`), and the generated records of the overlap correction, the cell-weight estimate and the attribution (`calibration/`, `drivers/driver_attribution.json`) |
 | `prism/` | The Python package: the engine (`simulation/`), the model configuration, persistence and the API (`api/`) |
 | `api/index.py` | The Vercel entry point of the API |

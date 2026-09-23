@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
 import type { PrismStore } from '@/hooks/usePrism';
 import type { JourneyContent, JourneyTile } from '@/data/consumerJourney';
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/apiClient';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
 import { makeDriver, makeStore } from './fixtures/prism';
 
@@ -19,8 +19,8 @@ const API = vi.hoisted(() => ({
 }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
-vi.mock('@/api/client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/api/client')>()),
+vi.mock('@/lib/apiClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/apiClient')>()),
   getJourneyContent: API.getJourneyContent,
   saveJourneyContent: API.saveJourneyContent,
 }));

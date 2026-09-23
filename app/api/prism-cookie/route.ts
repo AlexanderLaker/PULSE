@@ -10,7 +10,7 @@
  *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
  *     cannot read it and it is sent to the API only.
  *   - It lasts 12 hours. The dashboard asks for a fresh one whenever it
- *     loads, and api/client.ts asks again when an /api/v1 request is answered
+ *     loads, and lib/apiClient.ts asks again when an /api/v1 request is answered
  *     401, then repeats the request once.
  */
 import { NextResponse } from 'next/server';

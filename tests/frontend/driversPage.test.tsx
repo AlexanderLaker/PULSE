@@ -21,8 +21,8 @@ const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 const API = vi.hoisted(() => ({ getDriverProposals: vi.fn(), saveMyProposal: vi.fn() }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
-vi.mock('@/api/client', async (importOriginal) => ({
-  ApiError: (await importOriginal<typeof import('@/api/client')>()).ApiError,
+vi.mock('@/lib/apiClient', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('@/lib/apiClient')>()).ApiError,
   getDriverProposals: API.getDriverProposals,
   saveMyProposal: API.saveMyProposal,
 }));

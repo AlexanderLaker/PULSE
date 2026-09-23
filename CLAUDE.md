@@ -102,5 +102,5 @@ also tested on PostgreSQL. The Python suite never touches the database in
 | `scripts/` | production run, generators, `sync_analysis.py`, `promote_admin.py`, handover packaging |
 | `data/drivers/` | the driver base and the PRISM Analysis sources |
 | `components/dashboard/` | the views |
-| `lib/`, `hooks/`, `api/client.ts`, `types/` | shared dashboard logic, the store, the client, the types |
+| `lib/`, `hooks/`, `types/` | shared dashboard logic and the API client, the store, the types |
 | `docs/` | ARCHITECTURE, MODEL, DRIVERS, DRIVER_ANALYSIS, OPERATIONS, DESIGN, EXPLORER, `adr/` |

@@ -23,7 +23,7 @@ import { distribution, makeConfig, makeDriver, makeSimulation, makeStore } from 
 const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.store }));
-vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(async () => null) }));
+vi.mock('@/lib/apiClient', () => ({ getDiagnostics: vi.fn(async () => null) }));
 
 // The fan chart renders in a Recharts ResponsiveContainer, which needs a
 // ResizeObserver; jsdom has none, and the chart is not under test.

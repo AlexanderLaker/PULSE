@@ -22,7 +22,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 import dynamic from 'next/dynamic';
 import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
-import * as api from '@/api/client';
+import * as api from '@/lib/apiClient';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
 import Drivers, { type DriverSearch } from '@/components/dashboard/Drivers';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';

@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import { getDiagnostics } from '@/api/client';
+import { getDiagnostics } from '@/lib/apiClient';
 import {
   CATEGORIES, FORCES, NO_VALUE, REGIONS, YEARS, fmtShift, fmtPct, shiftArrow, shiftColor,
   heatFill, heatText, heatScaleFor, fmtDate, fmtDateTimeUtc,

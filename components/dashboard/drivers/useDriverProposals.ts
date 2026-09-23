@@ -5,7 +5,7 @@
  * them when a driver's panel opens.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { getDriverProposals } from '@/api/client';
+import { getDriverProposals } from '@/lib/apiClient';
 import type { DriverProposalsResponse } from '@/types';
 
 /** A driver's proposals, loaded when its panel opens. `failed` is set when the

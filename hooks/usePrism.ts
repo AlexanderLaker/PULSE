@@ -23,7 +23,7 @@ import {
   createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type FC, type ReactNode,
 } from 'react';
-import * as api from '@/api/client';
+import * as api from '@/lib/apiClient';
 import type { DatabaseFailure, Driver, DriverUpdate, HealthStatus, ModelConfig, SimulationResult } from '@/types';
 
 type ConnectionState = 'connected' | 'reconnecting' | 'offline';

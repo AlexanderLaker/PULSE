@@ -18,7 +18,7 @@ const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 const DIAGNOSIS = vi.hoisted(() => ({ result: null as DiagnosticsResult | null }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.store }));
-vi.mock('@/api/client', () => ({ getDiagnostics: vi.fn(async () => DIAGNOSIS.result) }));
+vi.mock('@/lib/apiClient', () => ({ getDiagnostics: vi.fn(async () => DIAGNOSIS.result) }));
 
 // The drill-down's fan chart renders in a Recharts ResponsiveContainer, which
 // needs a ResizeObserver; jsdom has none, and the chart is not under test.

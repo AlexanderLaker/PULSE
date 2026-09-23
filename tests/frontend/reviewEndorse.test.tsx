@@ -15,8 +15,8 @@ const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 const PROPOSALS = vi.hoisted(() => ({ current: null as DriverProposalsResponse | null, fail: false }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
-vi.mock('@/api/client', async (importOriginal) => ({
-  ApiError: (await importOriginal<typeof import('@/api/client')>()).ApiError,
+vi.mock('@/lib/apiClient', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('@/lib/apiClient')>()).ApiError,
   getDriverProposals: vi.fn(async () => {
     if (PROPOSALS.fail) throw new Error('offline');
     return PROPOSALS.current;
@@ -24,7 +24,7 @@ vi.mock('@/api/client', async (importOriginal) => ({
   saveMyProposal: vi.fn(async () => PROPOSALS.current),
 }));
 
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/apiClient';
 import Drivers from '@/components/dashboard/Drivers';
 
 // framer-motion restores the scroll position after measuring the expanded

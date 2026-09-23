@@ -132,7 +132,7 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   with the viewer role, for admins too. The browser's `/api/v1` requests carry
   it. It authorises reads and the user's own expert proposals, nothing else.
   When an `/api/v1` request is answered 401 (the token expired), the client
-  asks for a new cookie once and repeats the request (`api/client.ts`).
+  asks for a new cookie once and repeats the request (`lib/apiClient.ts`).
 - **Admin writes.** A driver edit or a journey save goes to a dashboard route
   (`/api/drivers/{id}`, `/api/journey`). The route checks the user's role in
   `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`

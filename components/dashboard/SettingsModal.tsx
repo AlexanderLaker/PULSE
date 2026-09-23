@@ -26,8 +26,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
-import * as api from '@/api/client';
-import type { ManagedUser } from '@/api/client';
+import * as api from '@/lib/apiClient';
+import type { ManagedUser } from '@/lib/apiClient';
 import usePrism from '@/hooks/usePrism';
 import useOverlay from '@/hooks/useOverlay';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';

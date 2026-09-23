@@ -5,7 +5,7 @@
  *   - Model configuration is a read-only view of what the model uses: the
  *     parameters from the store's config and the served run's cell weights,
  *     with their marginals and basis. It has no inputs and asks for nothing.
- *   - User management is for admins only and goes through api/client.
+ *   - User management is for admins only and goes through lib/apiClient.
  *   - Active sessions lists the user's sessions on every device.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -18,7 +18,7 @@ const STATE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 vi.mock('@/hooks/usePrism', () => ({ default: () => STATE.store }));
 
 const API = vi.hoisted(() => ({ getUsers: vi.fn(), setUserRole: vi.fn() }));
-vi.mock('@/api/client', () => API);
+vi.mock('@/lib/apiClient', () => API);
 
 // Every hook returns the same objects on every call: the profile form syncs
 // from the user object and the sessions list reloads when it changes.
