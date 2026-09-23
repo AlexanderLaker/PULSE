@@ -27,7 +27,11 @@ or the write lock (SQLite), so nothing can write in between.
                                                   publication date where the old
                                                   value read "<kind> (<date>)",
                                                   else the old text; a tier outside
-                                                  the scale becomes unrated)
+                                                  the scale becomes unrated; a link
+                                                  that is not an http(s) address
+                                                  becomes the title where there is
+                                                  none; a source with neither a
+                                                  title nor a link is skipped)
      trend_score_proposals     -> driver_score_proposals (without user_role, which
                                                          held "viewer" for everyone)
    The previous schema stored a value chain as eight 0-5 scores, the editor's
@@ -62,10 +66,11 @@ or the write lock (SQLite), so nothing can write in between.
    meta.driver_count, meta.trend_fingerprint -> meta.driver_fingerprint,
    decompositions.dimensions.vc_steps -> vc_stages, and trend_ids /
    unscored_trend_ids -> driver_ids / unscored_driver_ids in the integrity
-   events. Each driver fingerprint gains the onset years, which
-   the previous one did not record, and its exposure maps move onto the
-   taxonomy's names as the drivers' do, so the next production run compares
-   like with like. No number changes.
+   events. Each driver fingerprint gains every field the previous one did
+   not record: the onset years, and None (compares as changed) for a field
+   that cannot be known; its exposure maps move onto the taxonomy's names as
+   the drivers' do, so the next production run compares like with like. No
+   number changes.
 5. The content is brought up to date:
      - every driver of the seed gets its current PRISM Analysis text;
      - a description that still holds a previously shipped text gets the current
@@ -114,6 +119,7 @@ import prism.env_loader  # noqa: E402,F401  (loads .env; shell variables win)
 from prism.config import (CATEGORIES, DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, FORCES, REGIONS,  # noqa: E402
                           VALID_DIFFUSION_CURVES, VC_STAGES, display_code)
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SCORE_FIELDS, SOURCE_TIERS  # noqa: E402
+from prism.input_drift import FINGERPRINT_KEYS  # noqa: E402
 
 MIGRATION = "0001_driver_schema"
 ARCHIVE_DIR = HERE / "archive"
@@ -146,6 +152,8 @@ RUN_META_RENAMES = {"trend_count": "driver_count", "trend_fingerprint": "driver_
 EVENT_DETAIL_RENAMES = {"trend_ids": "driver_ids", "unscored_trend_ids": "unscored_driver_ids"}
 DIMENSION_RENAMES = {"vc_steps": "vc_stages"}
 SOURCE_KINDS = ("primary source", "analyst report", "trade press", "primary_source", "analyst_report", "trade_press")
+#: A source link as the API accepts it (prism/api/schemas.py, SourceRef.url).
+WEB_ADDRESS = re.compile(r"https?://\S+")
 
 
 def one_of(values) -> str:
@@ -264,22 +272,31 @@ def published_from(old: str) -> str:
     return "" if text.lower() in SOURCE_KINDS else text
 
 
+def _stage_key(name) -> str:
+    """A stage name as the previous rule compared it: lower case, spaces as underscores."""
+    return str(name).lower().replace(" ", "_")
+
+
 def epicentre_of(profile):
     """The value-chain stage a stored eight-step profile centres on, or None.
 
-    The stage is the highest score; a tie goes to the stage nearest the
-    score-weighted centre of the profile, and an exact tie in distance to the
-    earlier stage. A profile that scores nothing (none stored, all zero, or
-    only names outside VC_STAGES) has no stage.
+    The previous engine and dashboard read a profile this way, so every driver
+    keeps the stage it was shown with. Names are compared in lower case with
+    spaces as underscores ("supply_chain" is Supply Chain). The stage is the
+    highest score; a tie goes to the stage nearest the score-weighted centre
+    of the profile, and an exact tie in distance to the earlier stage. A
+    profile that scores nothing (none stored, all zero, or only names outside
+    VC_STAGES) has no stage; a value that is not a number counts as 0.
     """
     if not isinstance(profile, dict):
         return None
-    scores = []
-    for stage in VC_STAGES:
+    by_key = {}
+    for name, value in profile.items():
         try:
-            scores.append(float(profile.get(stage) or 0))
+            by_key[_stage_key(name)] = float(value or 0)
         except (TypeError, ValueError):
-            scores.append(0.0)
+            by_key[_stage_key(name)] = 0.0
+    scores = [by_key.get(_stage_key(stage), 0.0) for stage in VC_STAGES]
     total = sum(scores)
     if total <= 0:
         return None
@@ -348,11 +365,13 @@ def rename_run_keys(results: dict) -> bool:
 def complete_fingerprint(results: dict, start_years: dict) -> bool:
     """Bring a stored run's driver fingerprint to what a run records now; True if it changed.
 
-    The next production run compares its drivers with every field of the
-    stored fingerprint, so each driver still in the database gets what the
-    previous fingerprint lacked. Its onset year ("s"): the one the run was
-    computed on, since the previous release could not edit it. And its
-    exposure maps ("ce", "re") on the taxonomy's names, as the migration puts
+    The next production run and the served run's comparison with the current
+    drivers read every field of the stored fingerprint (prism/input_drift.py,
+    FINGERPRINT_KEYS), so every entry gets each field it lacks. The onset
+    year ("s") of a driver still in the database is the one the run was
+    computed on, since the previous release could not edit it; any other
+    missing field is None, which compares as changed. A driver's exposure
+    maps ("ce", "re") move onto the taxonomy's names, as the migration puts
     the drivers' own: a missing name 0, the value the previous engine read
     for it, and a name outside the taxonomy dropped.
     """
@@ -361,11 +380,14 @@ def complete_fingerprint(results: dict, start_years: dict) -> bool:
     if not isinstance(fingerprint, dict):
         return changed
     for driver_id, entry in fingerprint.items():
-        if not isinstance(entry, dict) or driver_id not in start_years:
+        if not isinstance(entry, dict):
             continue
-        if "s" not in entry:
-            entry["s"] = int(start_years[driver_id])
-            changed = True
+        for key in FINGERPRINT_KEYS:
+            if key not in entry:
+                entry[key] = int(start_years[driver_id]) if key == "s" and driver_id in start_years else None
+                changed = True
+        if driver_id not in start_years:
+            continue
         for key, names in (("ce", CATEGORIES), ("re", REGIONS)):
             stored = entry.get(key)
             if isinstance(stored, dict):
@@ -471,7 +493,7 @@ def whole(value, low: int, high: int) -> bool:
             and value == int(value) and low <= value <= high)
 
 
-def exposure_map(stored, names) -> tuple:
+def exposure_on_taxonomy(stored, names) -> tuple:
     """``(map, dropped, filled)``: a stored exposure map on the taxonomy's names.
 
     A name outside the taxonomy is dropped and a missing name gets 0. The
@@ -509,7 +531,7 @@ def baseline_of(ai_suggestion, scores: dict) -> tuple:
             baseline[name] = scores[name]
             filled.append(name)
         elif name in ("category_exposure", "regional_exposure"):
-            baseline[name] = exposure_map(value, CATEGORIES if name == "category_exposure" else REGIONS)[0]
+            baseline[name] = exposure_on_taxonomy(value, CATEGORIES if name == "category_exposure" else REGIONS)[0]
         else:
             baseline[name] = value
     return baseline, "suggestion", filled
@@ -535,8 +557,9 @@ def read_previous_drivers(db: "Database", tables: set) -> list:
     out = []
     for r in db.rows("SELECT * FROM trends ORDER BY id"):
         stage = epicentre_of(children["trend_vc_exposure"].get(r["id"]))
-        category, dropped_c, filled_c = exposure_map(children["trend_category_exposure"].get(r["id"]), CATEGORIES)
-        region, dropped_r, filled_r = exposure_map(children["trend_regional_exposure"].get(r["id"]), REGIONS)
+        category, dropped_c, filled_c = exposure_on_taxonomy(
+            children["trend_category_exposure"].get(r["id"]), CATEGORIES)
+        region, dropped_r, filled_r = exposure_on_taxonomy(children["trend_regional_exposure"].get(r["id"]), REGIONS)
         driver = Driver(id=r["id"], force=r["force"], name=r["name"], direction=r.get("direction"),
                         probability=r.get("probability"), start_year=r.get("start_year"),
                         gp1_pct_affected=r.get("gp1_pct_affected"), peak_year=r.get("peak_year"),
@@ -597,10 +620,26 @@ def proposal_scores(r: dict, start_year: int) -> tuple:
             cleared.append(name if not kept else f"{name} ({len(stored) - len(kept)} of {len(stored)} cells)")
         values[name] = kept or None
     try:
-        values["vc_epicentre"] = epicentre_of(json_value(r.get("vc_exposure")))
+        profile = json_value(r.get("vc_exposure"))
     except ValueError:
-        values["vc_epicentre"] = None
+        profile = "unreadable"
+    values["vc_epicentre"] = epicentre_of(profile)
+    if values["vc_epicentre"] is None and profile not in (None, {}) and not _scores_nothing(profile):
+        cleared.append("vc_epicentre")   # a stored vote that names no stage of the chain
     return values, cleared
+
+
+def _scores_nothing(profile) -> bool:
+    """True for a value-chain profile that holds no positive score (the expert left it unscored)."""
+    if not isinstance(profile, dict):
+        return False
+    for value in profile.values():
+        try:
+            if float(value or 0) > 0:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
 
 
 def migrate(db: Database) -> dict:
@@ -683,7 +722,7 @@ def migrate(db: Database) -> dict:
             table_sources.setdefault(r["trend_id"], []).append(
                 {"title": r["title"], "url": r["url"], "tier": r.get("tier") or "",
                  "published": published_from(r.get("source_type"))})
-    source_count, unrated = 0, {}
+    source_count, unrated, unlinked, empty = 0, {}, {}, {}
     for driver_id in sorted(set(table_sources) | set(from_editor)):
         for src in from_editor.get(driver_id, table_sources.get(driver_id, [])):
             tier = src["tier"].strip()
@@ -691,14 +730,25 @@ def migrate(db: Database) -> dict:
                 if tier:
                     unrated.setdefault(driver_id, []).append(tier)
                 tier = ""
+            # A link is an http(s) address, as the API accepts it; any other text
+            # is kept as the title where the source has none.
+            title, url = src["title"], src["url"].strip()
+            if url and not WEB_ADDRESS.fullmatch(url):
+                unlinked.setdefault(driver_id, []).append(url)
+                title, url = title if title.strip() else url, ""
+            if not (title.strip() or url):
+                empty[driver_id] = empty.get(driver_id, 0) + 1
+                continue
             db.execute(f"INSERT INTO driver_sources (driver_id, title, url, tier, published) "
                        f"VALUES ({p}, {p}, {p}, {p}, {p})",
-                       (driver_id, src["title"], src["url"], tier, src["published"]))
+                       (driver_id, title, url, tier, src["published"]))
             source_count += 1
     report["sources_from_editor"] = {
         driver_id: {"saved_in_editor": len(saved), "table_rows": len(table_sources.get(driver_id, []))}
         for driver_id, saved in sorted(from_editor.items())}
     report["source_tiers_outside_the_scale"] = unrated
+    report["source_links_that_are_not_web_addresses"] = unlinked
+    report["sources_without_title_or_link_skipped"] = empty
 
     proposals, cleared = [], {}
     if "trend_score_proposals" in tables:

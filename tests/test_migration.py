@@ -26,7 +26,7 @@ from urllib.parse import quote
 import pytest
 
 from prism.config import CATEGORIES, VC_STAGES
-from prism.input_drift import driver_fingerprint
+from prism.input_drift import FINGERPRINT_KEYS, driver_fingerprint
 from prism.seed_drivers import DRIVERS
 from support import load_module
 
@@ -415,6 +415,8 @@ class TestMigration:
             "consumer_r02": {"saved_in_editor": len(SEED["consumer_r02"].sources) + 1,
                              "table_rows": len(SEED["consumer_r02"].sources)}}
         assert report["orphans_skipped"] == {} and report["source_tiers_outside_the_scale"] == {}
+        assert report["source_links_that_are_not_web_addresses"] == {}
+        assert report["sources_without_title_or_link_skipped"] == {}
         assert report["exposures"] == {"names_outside_the_taxonomy_dropped": {}, "missing_names_set_to_0": {}}
         # technology_r01 was stored without a baseline, so it takes its current scores
         assert report["baselines"] == {"from_the_current_scores": ["technology_r01"],
@@ -525,13 +527,15 @@ class TestMigration:
         rows = query(previous, "SELECT * FROM simulation_runs ORDER BY id")
         assert [set(r) for r in rows] == [{"id", "run_date", "iterations", "results"}] * 3
         first = json.loads(rows[0]["results"])
-        # each driver's fingerprint gains its onset year, which the previous one did not record, and its
-        # exposure maps move onto the taxonomy's names as the driver's own do; a driver no longer in the
-        # database is left as it was
+        # each fingerprint entry gains the fields the previous one did not record: the onset year of a
+        # driver still in the database, None (compares as changed) for anything else; the exposure maps
+        # of a driver in the database move onto the taxonomy's names as the driver's own do
+        unknown = {key: None for key in FINGERPRINT_KEYS}
         assert first["meta"] == {"driver_count": 51, "model_version": "2.12.0", "driver_fingerprint": {
-            "consumer_r01": {"p": 5, "s": 2025, "ce": {c: (3.0 if c == "Hair: Color" else 0.0) for c in CATEGORIES},
+            "consumer_r01": {**unknown, "p": 5, "s": 2025,
+                             "ce": {c: (3.0 if c == "Hair: Color" else 0.0) for c in CATEGORIES},
                              "re": {"Asia": 0.0, "Europe": 5.0, "High Growth": 0.0, "North America": 0.0}},
-            "retired_r99": {"p": 2, "ce": {"Hair: Care": 1}}}}
+            "retired_r99": {**unknown, "p": 2, "ce": {"Hair: Care": 1}}}}
         assert [e["detail"] for e in first["integrity_events"]] == [
             {"driver_ids": ["consumer_r01"]}, {"unscored_driver_ids": ["technology_r01"]}, None]
         assert first["decompositions"] == {
@@ -576,6 +580,31 @@ class TestMigration:
         import prism.database as dbm
         first = next(d for d in dbm.load_drivers() if d.id == "consumer_r01").sources[0]
         assert first["tier"] == "" and first["title"] == SEED["consumer_r01"].sources[0]["title"]
+
+    def test_every_source_is_stored_as_the_api_accepts_it(self, migration, previous, capsys, monkeypatch):
+        """A link that is not an http(s) address (the API's rule: no scheme, a space) is kept as the title
+        where there is none; a source with neither is skipped. Both are reported."""
+        conn = sqlite3.connect(previous)
+        rows = [r[0] for r in conn.execute("SELECT id FROM trend_sources WHERE trend_id = 'consumer_r03' ORDER BY id")]
+        conn.execute("UPDATE trend_sources SET url = 'www.example.org/report', title = '' WHERE id = ?", (rows[0],))
+        conn.execute("UPDATE trend_sources SET url = 'https://example.org/a report.pdf' WHERE id = ?", (rows[1],))
+        conn.execute("UPDATE trend_sources SET url = '', title = ' ' WHERE id = ?", (rows[2],))
+        conn.commit()
+        conn.close()
+        assert migration.main(["--sqlite", str(previous)]) == 0
+        report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
+        assert report["source_links_that_are_not_web_addresses"] == {
+            "consumer_r03": ["www.example.org/report", "https://example.org/a report.pdf"]}
+        assert report["sources_without_title_or_link_skipped"] == {"consumer_r03": 1}
+        monkeypatch.setenv("PRISM_DB_PATH", str(previous))
+        import prism.database as dbm
+        sources = next(d for d in dbm.load_drivers() if d.id == "consumer_r03").sources
+        assert len(sources) == len(rows) - 1
+        assert (sources[0]["title"], sources[0]["url"]) == ("www.example.org/report", "")
+        assert sources[1]["url"] == "" and sources[1]["title"] == SEED["consumer_r03"].sources[1]["title"]
+        from prism.api.schemas import SourceRef
+        for source in sources:
+            SourceRef(**source)
 
     def test_the_journey_content_is_saved_as_a_new_version(self, migration, previous, capsys):
         assert migration.main(["--sqlite", str(previous)]) == 0
@@ -757,6 +786,16 @@ class TestHelpers:
         assert migration.rename_run_keys({"decompositions": {"dimensions": {"vc_steps": [], "vc_stages": []}}}) is False
         assert migration.rename_run_keys({"decompositions": ["not a dict"]}) is False
 
+    def test_a_proposal_vote_that_names_no_stage_is_reported(self, migration):
+        values, cleared = migration.proposal_scores({"vc_exposure": json.dumps({"supply_chain": 5})}, 2025)
+        assert values["vc_epicentre"] == "Supply Chain" and cleared == []
+        for unreadable in (json.dumps({"Retail": 5}), "{not json"):
+            values, cleared = migration.proposal_scores({"vc_exposure": unreadable}, 2025)
+            assert values["vc_epicentre"] is None and cleared == ["vc_epicentre"], unreadable
+        for unscored in (None, "{}", json.dumps({"Marketing": 0})):
+            values, cleared = migration.proposal_scores({"vc_exposure": unscored}, 2025)
+            assert values["vc_epicentre"] is None and cleared == [], unscored
+
     def test_editor_sources(self, migration):
         saved = [{"title": "A", "url": "https://a", "data": "analyst report (Aug 2026)", "tier": "A"},
                  {"title": "B", "url": "", "source_type": "trade press"},
@@ -780,8 +819,11 @@ class TestHelpers:
         assert migration.epicentre_of({"Raw Materials": 3, "Commercial": 2, "Consumer": 3}) == "Consumer"
         # a flat profile centres at 4.5; of the two equally near stages the earlier wins
         assert migration.epicentre_of({stage: 2 for stage in VC_STAGES}) == "Packaging"
+        # names compare in lower case with spaces as underscores, as the previous rule read them
+        assert migration.epicentre_of({"supply_chain": 5, "manufacturing": 2}) == "Supply Chain"
+        assert migration.epicentre_of({"RAW MATERIALS": 1, "packaging": 4}) == "Packaging"
         # names outside the chain, and values that are not numbers, count as 0
-        assert migration.epicentre_of({"supply_chain": 5, "Manufacturing": 2}) == "Manufacturing"
+        assert migration.epicentre_of({"Retail": 9, "Manufacturing": 2}) == "Manufacturing"
         assert migration.epicentre_of({"Marketing": "high", "Consumer": 1}) == "Consumer"
         for nothing in (None, {}, {"Marketing": 0, "Consumer": 0}, {"Retail": 5}, [5, 3, 1], "Marketing"):
             assert migration.epicentre_of(nothing) is None, nothing

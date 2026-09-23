@@ -31,9 +31,10 @@ What it changes is listed in its docstring; in short:
   one it drops, it stops and changes nothing;
 - the stored runs get the current key names (`meta.driver_count`,
   `meta.driver_fingerprint`, `decompositions.dimensions.vc_stages`), and each
-  driver fingerprint gains the onset years and the exposure maps on the
-  taxonomy's names, so the next production run compares like with like; no
-  number changes;
+  driver fingerprint gains the fields it lacks (the onset years; None, which
+  compares as changed, for anything that cannot be known) and the exposure
+  maps on the taxonomy's names, so the next production run compares like
+  with like; no number changes;
 - each driver gets its current PRISM Analysis text, and descriptions,
   Consumer Journey tile texts and stage labels that still hold a previously
   shipped text get the current one. A text an admin has edited is left alone
@@ -104,6 +105,11 @@ environment from `requirements-dev.txt` and a `.env` whose `DATABASE_URL` (or
      how many rows it has and how many rows the old sources table held;
    - `source_tiers_outside_the_scale`: per driver, the source tiers that are
      not on the scale; those sources are stored unrated;
+   - `source_links_that_are_not_web_addresses`: per driver, the source links
+     that are not http(s) addresses (the API accepts no other); each is
+     stored without a link, as the title where the source had none;
+   - `sources_without_title_or_link_skipped`: per driver, how many sources
+     had neither a title nor a link and were not copied;
    - `proposals`: how many proposals got a value-chain stage, and per
      proposal the scores cleared because the API would refuse them now (the
      expert can score them again);
