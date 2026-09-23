@@ -48,18 +48,24 @@ export interface Driver extends DriverScores {
   normalized_score: number;
   /** The generated PRISM Analysis text; read-only everywhere. */
   analysis: string;
-  /** One-line evidence summary. */
-  data_source: string;
   sources: DriverSource[];
   /** The scores the driver was seeded with; null for a driver added without them. */
   baseline: DriverScores | null;
   /** True once an admin has changed a model input. */
   scores_edited: boolean;
+  /** Goes up with every stored change; an admin edit names the revision it was made on. */
+  revision: number;
   proposal_summary: ProposalSummary;
 }
 
-/** Body of an admin edit (PUT /api/drivers/{id}); only the fields sent change. */
+/**
+ * Body of an admin edit (PUT /api/drivers/{id}). `revision` is the revision the
+ * edit was made on: if the driver has changed since, the edit is refused (409).
+ * Only the other fields sent change; an exposure map may name only the cells
+ * that change.
+ */
 export interface DriverUpdate {
+  revision: number;
   name?: string;
   description?: string;
   direction?: Direction;
@@ -80,7 +86,9 @@ export interface DriverUpdate {
 // Any signed-in expert may propose scores for a driver. A proposal never
 // changes the driver; an admin endorses it by editing the driver.
 
-/** The caller's own proposal: any subset of the scores, plus a comment. */
+/** The caller's own proposal: any subset of the scores, plus a comment. Sent as
+ *  an update, a field set to null is cleared and an exposure map replaces the
+ *  caller's whole map for that field. */
 export interface DriverProposal {
   probability?: number | null;
   gp1_pct_affected?: number | null;
@@ -111,7 +119,6 @@ export interface ProposalAgg {
 export interface ProposalScorer {
   user_id: string;
   name: string;
-  role: string;
   probability: number | null;
   gp1_pct_affected: number | null;
   peak_year: number | null;

@@ -47,12 +47,13 @@ import usePrism from '@/hooks/usePrism';
 import { getDiagnostics } from '@/api/client';
 import {
   CATEGORIES, FORCES, NO_VALUE, REGIONS, YEARS, fmtShift, fmtPct, shiftArrow, shiftColor,
-  heatFill, heatText, heatScaleFor, fmtDate, fmtDateTime,
+  heatFill, heatText, heatScaleFor, fmtDate, fmtDateTimeUtc,
   categoryDisplay, groupDisplay,
   EXPANSION_RGB, CONTRACTION_RGB,
 } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import { cellMarginals } from '@/lib/cellWeights';
+import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
+import { codeForDriverId } from '@/data/driverCodeMap';
 import { VC_STEPS } from '@/lib/valueChain';
 import { categoryShares, computeImpactFractions, getYearPercentiles, weightedAvg } from '@/lib/shiftMatrix';
 import ShiftValue from '@/components/dashboard/ShiftValue';
@@ -382,6 +383,7 @@ const KpiTile: FC<{
       onBlur={() => setHovered(false)}
       onClick={() => setHovered((h) => !h)}
       tabIndex={0}
+      role="group"
       aria-label={`${label}${bandLabel}`}
       className="relative rounded-2xl px-5 py-3.5"
       style={surface}
@@ -937,7 +939,7 @@ const PeakStressTooltip: FC = () => {
 // ─── Without a run ───────────────────────────────────────────────────────
 
 /** Why the page has no run to show. */
-type NoRunReason = 'unreachable' | 'no_database' | 'unservable' | 'no_run';
+type NoRunReason = 'unreachable' | 'migrating' | 'not_configured' | 'no_database' | 'unservable' | 'no_run';
 
 /** The reason from the service's diagnosis; undefined while the diagnosis is still loading. */
 function noRunReason(
@@ -945,6 +947,8 @@ function noRunReason(
 ): NoRunReason | undefined {
   if (!backendAvailable || diagnostics === null) return 'unreachable';
   if (diagnostics === undefined) return undefined;
+  if (diagnostics.simulation_reason === 'legacy_schema') return 'migrating';
+  if (diagnostics.simulation_reason === 'no_database') return 'not_configured';
   if (!diagnostics.db_reachable || diagnostics.simulation_reason === 'db_error') return 'no_database';
   if (diagnostics.simulation_reason === 'malformed') return 'unservable';
   if (diagnostics.simulation_reason === 'no_rows') return 'no_run';
@@ -954,10 +958,12 @@ function noRunReason(
 
 /** Viewers get plain titles; admins, who can act on it, the operational one. */
 const NO_RUN_TITLE: Record<NoRunReason, { viewer: string; admin: string }> = {
-  unreachable: { viewer: 'Results unavailable right now', admin: 'The run cannot be loaded' },
-  no_database: { viewer: 'Data connection issue', admin: 'Backend cannot reach the database' },
-  unservable:  { viewer: 'Latest run needs a refresh', admin: 'Latest run cannot be served' },
-  no_run:      { viewer: 'No simulation available yet', admin: 'No simulation persisted yet' },
+  unreachable:    { viewer: 'Results unavailable right now', admin: 'The run cannot be loaded' },
+  migrating:      { viewer: 'PRISM is being updated', admin: 'The database awaits migration 0001' },
+  not_configured: { viewer: 'Data connection issue', admin: 'No database configured' },
+  no_database:    { viewer: 'Data connection issue', admin: 'Backend cannot reach the database' },
+  unservable:     { viewer: 'Latest run needs a refresh', admin: 'Latest run cannot be served' },
+  no_run:         { viewer: 'No simulation available yet', admin: 'No simulation persisted yet' },
 };
 
 const CODE: React.CSSProperties = { fontFamily: 'monospace', fontSize: '0.92em' };
@@ -966,7 +972,9 @@ const NoRunState: FC<{
   reason: NoRunReason;
   isAdmin: boolean;
   diagnostics: DiagnosticsResult | null | undefined;
-}> = ({ reason, isAdmin, diagnostics }) => {
+  /** Why the dashboard's own request for the run failed, when it did. */
+  requestError: string | null;
+}> = ({ reason, isAdmin, diagnostics, requestError }) => {
   const problem = reason !== 'no_run';
   const Icon = problem ? AlertTriangle : Info;
   return (
@@ -997,14 +1005,35 @@ const NoRunState: FC<{
           <p>
             {reason === 'no_run'
               ? 'No simulation run has been published yet. Results appear here automatically as soon as the PRISM team publishes the first run.'
-              : 'The simulation engine isn’t serving results right now. Please check back shortly; if this persists, contact the PRISM team (Alexander Laker).'}
+              : reason === 'migrating'
+                ? 'PRISM’s database is moving to the current schema. The results return here as soon as the update has finished.'
+                : 'The simulation engine isn’t serving results right now. Please check back shortly; if this persists, contact the PRISM team (Alexander Laker).'}
+          </p>
+        ) : reason === 'migrating' ? (
+          <p>
+            The database still has the previous schema, so the API serves nothing and writes nothing. Run{' '}
+            <code style={CODE}>python3 migrations/0001_driver_schema/migrate.py --postgres</code>{' '}
+            (its README is the runbook); the run shows here once the migration has committed.
+          </p>
+        ) : reason === 'not_configured' ? (
+          <p>
+            This deployment has no <code style={CODE}>DATABASE_URL</code> (or{' '}
+            <code style={CODE}>POSTGRES_URL</code>). Set it in the Vercel project settings to the Neon database
+            the production runs write to, then redeploy.
           </p>
         ) : reason === 'unreachable' ? (
-          <p>
-            The dashboard gets no run from the PRISM API under{' '}
-            <code style={CODE}>/api/v1</code>. Check that the Python service is deployed
-            and answering, then reload the page.
-          </p>
+          <>
+            <p>
+              The dashboard gets no run from the PRISM API under{' '}
+              <code style={CODE}>/api/v1</code>. Check that the Python service is deployed
+              and answering, then reload the page.
+            </p>
+            {requestError && (
+              <p style={{ fontFamily: 'monospace', fontSize: '12px', color: S.error }}>
+                {requestError}
+              </p>
+            )}
+          </>
         ) : reason === 'no_database' ? (
           <>
             <p>
@@ -1069,6 +1098,40 @@ const NoRunState: FC<{
   );
 };
 
+// ─── What the served run does not show yet ──────────────────────────────
+
+/**
+ * Notes above the matrix when the served run no longer matches the drivers or
+ * the engine: drivers edited since the run (their effect shows after the next
+ * production run) and a run computed by another engine version.
+ */
+const RunNotices: FC<{ simulation: SimulationResult; serviceVersion: string | null }> = ({
+  simulation, serviceVersion,
+}) => {
+  const since = simulation.inputs_since_run;
+  const touched = since ? [...since.changed, ...since.added, ...since.removed] : [];
+  const version = simulation.run_meta.model_version;
+  const notes: string[] = [];
+  if (touched.length) {
+    const codes = touched.map((id) => codeForDriverId(id) ?? id);
+    const shown = codes.slice(0, 8).join(', ') + (codes.length > 8 ? ` and ${codes.length - 8} more` : '');
+    notes.push(`${touched.length === 1 ? 'One driver has' : `${touched.length} drivers have`} changed since this run `
+      + `(${shown}). The numbers below show the drivers as they were; the next production run takes the changes in.`);
+  }
+  if (serviceVersion && version && serviceVersion !== version) {
+    notes.push(`This run was computed by engine ${version}; the service runs ${serviceVersion}. `
+      + 'The numbers follow the current engine after the next production run.');
+  }
+  if (!notes.length) return null;
+  return (
+    <div role="status" className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3"
+      style={{ backgroundColor: S.amberContainer, color: S.onAmberContainer, fontSize: 13, lineHeight: 1.5 }}>
+      <Info size={15} strokeWidth={2.4} style={{ flexShrink: 0, marginTop: 2 }} />
+      <div>{notes.map((n) => <p key={n} style={{ margin: 0 }}>{n}</p>)}</div>
+    </div>
+  );
+};
+
 // ─── About this model ────────────────────────────────────────────────────
 
 /** The served run's provenance and audit metadata, and the integrity events recorded with it. */
@@ -1077,18 +1140,23 @@ const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation }) => {
   const ss = simulation.seed_stability;
   const events = simulation.integrity_events;
   const cells = cellMarginals(simulation.cell_weights_used);
+  // The largest bootstrap standard error of a terminal-year category median.
+  const maxSe = Math.max(0, ...Object.values(simulation.mc_standard_error).map((e) => e.median_se_pp));
   const rows: Array<[string, string]> = [
     ['Iterations', `${(m.iterations / 1000).toFixed(0)}k × ${m.chains} chains`],
     ['Seed', String(m.seed)],
-    // The spread of the terminal-year portfolio median across the
-    // independently seeded chains: Monte Carlo sampling noise only.
-    ['Seed stability', `±${ss.spread_pp.toFixed(2)} pp across ${ss.n_chains} seeds (${ss.terminal_year} portfolio median)`],
+    // Both measure Monte Carlo sampling noise only, never model error: the
+    // largest standard error of a terminal-year category median, and the
+    // spread of the terminal-year portfolio median across the independently
+    // seeded chains.
+    ['MC standard error', `at most ${maxSe.toFixed(3)} pp (${ss.terminal_year} category medians)`],
+    ['Seed stability', `${ss.spread_pp.toFixed(3)} pp spread across ${ss.n_chains} seeds (${ss.terminal_year} portfolio median)`],
     ['Numerics', m.numerics_backend],
-    // A run stands on the estimated HCB mix or on a finance file; the source
-    // label says which file.
-    ['Cell weights', cells.matchesEstimate
+    // The run's own label says whether it stands on the estimated HCB mix or
+    // on a file given to the production run.
+    ['Cell weights', cellWeightsBasis(simulation.cell_weights_source) === 'estimate'
       ? `estimated HCB mix, not Henkel P&L (${cells.cellCount} cells)`
-      : `finance figures (${cells.cellCount} cells)`],
+      : `from the file given to the run (${cells.cellCount} cells)`],
     ['Weights source', simulation.cell_weights_source],
     ['Region shares', Object.entries(simulation.region_weights_used)
       .map(([r, w]) => `${r} ${fmtPct(w, 0)}`).join(' · ')],
@@ -1110,7 +1178,7 @@ const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation }) => {
           <span>Run #{m.run_id}</span>
         </span>
         <span style={{ color: S.mutedText, fontSize: 11.5 }}>
-          {fmtDateTime(m.run_date)}
+          {fmtDateTimeUtc(m.run_date)}
         </span>
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1.5">
@@ -1161,7 +1229,7 @@ const ShiftAnalysis: FC<{
   onNavigateToDriver?: (query: string) => void;
 }> = ({ isAdmin = false, onNavigateToDriver }) => {
   const {
-    simulation, config, drivers,
+    simulation, simulationError, config, drivers, health,
     loading, error, backendAvailable,
     reload,
   } = usePrism();
@@ -1380,8 +1448,11 @@ const ShiftAnalysis: FC<{
           </div>
         )}
 
+        {simulation && <RunNotices simulation={simulation} serviceVersion={health?.version ?? null} />}
+
+        {/* Not keyed on the lens or the year: remounting on a switch would
+            drop the keyboard focus from the toolbar that made it. */}
         <motion.section
-          key={view + ':' + selectedYear}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
@@ -1412,7 +1483,7 @@ const ShiftAnalysis: FC<{
               }
             />
           ) : noRun ? (
-            <NoRunState reason={noRun} isAdmin={isAdmin} diagnostics={diagnostics} />
+            <NoRunState reason={noRun} isAdmin={isAdmin} diagnostics={diagnostics} requestError={simulationError} />
           ) : loadingState}
         </motion.section>
 

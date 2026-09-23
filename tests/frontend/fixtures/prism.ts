@@ -57,11 +57,11 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     confidence: 'Medium',
     normalized_score: -(5 / 6) * 0.22,
     analysis: ANALYSIS,
-    data_source: 'Circana (Apr 2026)',
     sources: [{ title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', note: 'Apr 2026' }],
     ...scores,
     baseline: { ...scores },
     scores_edited: false,
+    revision: 1,
     proposal_summary: {
       count: 0, probability: null, gp1_pct_affected: null, peak_year: null, diffusion_curve: null, uncertainty: null, my: null,
     },
@@ -86,6 +86,9 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
   const portfolioTerminal = CATEGORY_NAMES.reduce((a, c, i) => a + categoryWeights[c] * terminal(i), 0);
   return {
     shifts,
+    velocity: Object.fromEntries(CATEGORY_NAMES.map((c, i) => [c, Object.fromEntries(YEARS.slice(1).map((y) => [
+      String(y), { median: terminal(i) / YEARS.length, p10: (terminal(i) * 1.5) / YEARS.length, p90: (terminal(i) * 0.5) / YEARS.length },
+    ]))])),
     regional_shift_matrix: Object.fromEntries(CATEGORY_NAMES.map((c, i) => [c, Object.fromEntries(REGIONS.map((r, k) => [
       r, { path: linearPath(terminal(i) * (1.2 - 0.15 * k)), velocity: {} },
     ]))])),
@@ -116,10 +119,11 @@ export function makeSimulation(overrides: Partial<SimulationResult> = {}): Simul
       spread_pp: 0.01, n_chains: 3, iterations_per_chain: 50000, pooled_iterations: 150000,
     },
     run_meta: {
-      run_id: 99, run_date: '2026-09-13T23:04:39', iterations: 50000, seed: 42, chain_seeds: [42, 1000045, 2000048],
+      run_id: 99, run_date: '2026-09-13T23:04:39+00:00', iterations: 50000, seed: 42, chain_seeds: [42, 1000045, 2000048],
       chains: 3, model_version: '2.12.0', engine_name: 'bayesian_copula', numerics_backend: 'scipy 1.17.1 · numpy 2.4.6',
       driver_count: 51, attenuation_source: 'overlap-correction-2026-09', persisted_at_utc: '2026-09-13T23:04:39+00:00',
     },
+    inputs_since_run: { changed: [], added: [], removed: [] },
     ...overrides,
   };
 }
@@ -159,7 +163,6 @@ export function makeConfig(overrides: Partial<ModelConfig> = {}): ModelConfig {
     peak_year_jitter: 1,
     base_year: 2025,
     path_years: YEARS,
-    iterations: 10000,
     cell_weights: ESTIMATED_CELL_WEIGHTS,
     cell_weights_source: ESTIMATE_SOURCE,
     ...overrides,
@@ -180,9 +183,12 @@ export function makeStore(overrides: Partial<PrismStore> = {}): PrismStore {
     drivers: [makeDriver()],
     simulation: makeSimulation(),
     config: makeConfig(),
+    driversError: null,
+    configError: null,
+    simulationError: null,
+    databaseFailure: null,
     loading: false,
     error: null,
-    connectionState: 'connected',
     backendAvailable: true,
     updateDriver: vi.fn(async () => {}),
     reload: vi.fn(async () => {}),

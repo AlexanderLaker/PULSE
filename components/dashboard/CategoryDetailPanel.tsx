@@ -685,6 +685,9 @@ const DriverCard: React.FC<DriverCardProps> = ({ contributor, index, onOpen }) =
 
 // ─── CategoryDetailPanel ───────────────────────────────────────────────────
 
+/** A difference of two shifts in percentage points, signed like fmtShift: 0.0012 -> "+0.1 pt". */
+const pt = (v: number): string => `${v >= FLAT_EPS ? '+' : ''}${(Math.abs(v) < FLAT_EPS ? 0 : v * 100).toFixed(1)} pt`;
+
 const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   category, year, simulation, drivers, config, onClose, onOpenDriver,
 }) => {
@@ -716,6 +719,8 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const shiftEnd = path[String(HORIZON_END)].median;
   const shiftStart = path[String(HORIZON_START)].median;
   const velocity = shiftEnd - shiftStart;
+  // The change in the final year, per iteration (the run's velocity band).
+  const lastYearChange = simulation.velocity[category]?.[String(HORIZON_END)];
 
   const contributors = useMemo(
     () => rankContributors(category, drivers, attribution, shiftEnd),
@@ -1174,7 +1179,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             Shifts are cumulative vs 2025 from the Bayesian MC engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
             {contributors.length > 0 && (attribution
-              ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median where the readings are reconciled to the portfolio median, so shares agree and points can differ by the row’s own factor.'
+              ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'
               : ' Contributing drivers: exposure proxy (Shift × category exposure), because the model configuration did not load; the PRISM Analysis on the Drivers page is attributed at the score means.')}
             {approximateCount > 0 && (approximateCount === 1
               ? ' 1 driver without a peak year or curve is taken at full materialisation.'
@@ -1222,6 +1227,12 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             </span>
             of the MC median path.
           </div>
+          {lastYearChange && (
+            <div style={{ marginTop: 6, lineHeight: 1.5, opacity: 0.92 }}>
+              Change in {HORIZON_END} alone: median {pt(lastYearChange.median)}, 80% of iterations between{' '}
+              {pt(lastYearChange.p10)} and {pt(lastYearChange.p90)}.
+            </div>
+          )}
           <div style={{ marginTop: 6, opacity: 0.65, fontSize: 11 }}>
             Contraction easing / deepening · Expansion accelerating / slowing: the label names the direction of travel
           </div>

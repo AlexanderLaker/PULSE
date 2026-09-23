@@ -91,6 +91,7 @@ export interface SeedStability {
 /** Which run this is and how it was computed. */
 export interface RunMeta {
   run_id: number;
+  /** When the run was stored, ISO 8601 with its UTC offset. */
   run_date: string;
   /** Iterations per chain. */
   iterations: number;
@@ -125,9 +126,20 @@ export interface SimulationPayload {
   integrity_events: IntegrityEvent[];
   seed_stability: SeedStability;
   run_meta: RunMeta;
+  /** The drivers edited since the run was computed; null for a run without a fingerprint. */
+  inputs_since_run: InputsSinceRun | null;
 }
 
-/** The run as the views read it: `shifts[category]` is that category's path. */
+/** How the current drivers differ from the ones the run was computed on (driver ids). */
+export interface InputsSinceRun {
+  changed: string[];
+  added: string[];
+  removed: string[];
+}
+
+/** The run as the views read it: `shifts[category]` is that category's path,
+ *  `velocity[category]` its year-on-year change bands. */
 export interface SimulationResult extends Omit<SimulationPayload, 'shift_matrix'> {
   shifts: Record<string, ShiftPath>;
+  velocity: Record<string, Record<string, VelocityBand>>;
 }

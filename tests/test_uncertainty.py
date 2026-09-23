@@ -52,6 +52,18 @@ class TestPriorMapping:
         assert f"peak-year jitter of &plusmn;{min(j.values())} to &plusmn;{max(j.values())} years" in src
         assert f"(&plusmn;{DEFAULT_PEAK_YEAR_JITTER} year by default for an unscored driver)" in src
 
+    def test_the_dashboard_copies_of_the_tables_match(self):
+        """lib/uncertainty.ts carries the two tables for the editor and the drill-down."""
+        src = (Path(__file__).resolve().parent.parent / "lib" / "uncertainty.ts").read_text(encoding="utf-8")
+
+        def ts_array(name):
+            match = re.search(rf"export const {name}: readonly number\[\] = \[([^\]]*)\];", src)
+            assert match, name
+            return [int(v) for v in match.group(1).split(",")]
+
+        assert ts_array("UNCERTAINTY_KAPPA") == [UNCERTAINTY_KAPPA[u] for u in range(6)]
+        assert ts_array("UNCERTAINTY_PEAK_JITTER") == [UNCERTAINTY_PEAK_JITTER[u] for u in range(6)]
+
     def test_jitter_table(self):
         assert [peak_jitter_for(u, 1) for u in range(6)] == [0, 1, 1, 2, 3, 4]
         assert peak_jitter_for(None, 1) == 1

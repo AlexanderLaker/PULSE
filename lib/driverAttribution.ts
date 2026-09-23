@@ -32,13 +32,11 @@
  * drill-down scales the drivers of a category to that median.
  */
 import { FORCES, REGIONS, YEARS } from '@/lib/format';
+import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
 
 /** prism/config.py DEFAULT_BASE_YEAR: the year every shift is measured against. */
 export const BASE_YEAR = 2025;
-
-/** prism/config.py UNCERTAINTY_PEAK_JITTER: a scored driver's peak-year jitter width in years. */
-const UNCERTAINTY_PEAK_JITTER: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 };
 
 /** prism/config.py DEFAULT_PEAK_YEAR_JITTER: the engine-wide width when the configuration names none. */
 const DEFAULT_PEAK_YEAR_JITTER = 1;

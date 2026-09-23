@@ -13,8 +13,9 @@
  * Users land on the entry gate, a pane outside the top nav that the PRISM
  * wordmark returns to. A pane mounts on its first visit and then stays
  * mounted, hidden while another shows, so its lens, year, filters, open
- * drill-down and scroll survive a tab switch and nothing reloads. Below md
- * the tabs sit behind a menu button.
+ * drill-down and scroll survive a tab switch and nothing reloads; an overlay
+ * in a hidden pane lets go of the page (PaneActiveContext, hooks/useOverlay).
+ * Below md the tabs sit behind a menu button.
  */
 
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -23,19 +24,25 @@ import { LogOut, Settings, Menu, X } from 'lucide-react';
 import { useUser, useClerk, useSession } from '@clerk/nextjs';
 import * as api from '@/api/client';
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
-import Drivers from '@/components/dashboard/Drivers';
-import ConsumerJourney from '@/components/dashboard/ConsumerJourney';
+import Drivers, { type DriverSearch } from '@/components/dashboard/Drivers';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import HomeGate from '@/components/dashboard/HomeGate';
+import ServiceNotice from '@/components/dashboard/ServiceNotice';
 import SettingsModal from '@/components/dashboard/SettingsModal';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import { FullPageSkeleton } from '@/components/dashboard/LoadingSkeleton';
 import { PrismProvider } from '@/hooks/usePrism';
+import { PaneActiveContext } from '@/hooks/useOverlay';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 import type { Role } from '@/types';
 
-// The Explorer loads on its first visit: lib/profitPoolData does not belong
-// in the initial bundle.
+// The Consumer Journey and the Explorer load on their first visit: their
+// content (data/consumerJourney.ts, lib/profitPoolData.ts) does not belong in
+// the initial bundle.
+const ConsumerJourney = dynamic(
+  () => import('@/components/dashboard/ConsumerJourney'),
+  { loading: () => <FullPageSkeleton />, ssr: false },
+);
 const ProfitPoolExplorer = dynamic(
   () => import('@/components/dashboard/ProfitPoolExplorer'),
   { loading: () => <FullPageSkeleton />, ssr: false },
@@ -95,8 +102,9 @@ export default function DashboardPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // The search the Drivers tab applies when another view opens it on a driver.
-  const [driversSearch, setDriversSearch] = useState<string | null>(null);
+  // The search the Drivers tab applies when another view opens it on a driver;
+  // each opening counts, even for the same driver twice.
+  const [driversSearch, setDriversSearch] = useState<DriverSearch | null>(null);
 
   // Admin controls stay hidden until /api/me says otherwise, and after any failure.
   const [role, setRole] = useState<Role>('viewer');
@@ -150,7 +158,7 @@ export default function DashboardPage() {
   };
 
   const openDriver = (query: string) => {
-    setDriversSearch(query);
+    setDriversSearch((prev) => ({ query, seq: (prev?.seq ?? 0) + 1 }));
     openTab('drivers');
   };
 
@@ -227,7 +235,9 @@ export default function DashboardPage() {
   // Mounted once visited, hidden while inactive.
   const tabPane = (id: DashboardTab, node: ReactNode) => (
     <div style={{ display: activeTab === id ? undefined : 'none' }}>
-      {visitedTabs.includes(id) && <ErrorBoundary>{node}</ErrorBoundary>}
+      <PaneActiveContext.Provider value={activeTab === id}>
+        {visitedTabs.includes(id) && <ErrorBoundary>{node}</ErrorBoundary>}
+      </PaneActiveContext.Provider>
     </div>
   );
 
@@ -293,7 +303,7 @@ export default function DashboardPage() {
             <button
               onClick={handleLogout}
               disabled={isLoggingOut}
-              aria-label="Logout"
+              aria-label="Sign out"
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-50"
               style={{ backgroundColor: S.surfaceLow, color: S.primary }}
             >
@@ -327,10 +337,12 @@ export default function DashboardPage() {
         )}
       </nav>
 
+      <ServiceNotice />
+
       <div className="relative">
         {tabPane('home', <HomeGate active={activeTab === 'home'} onNavigate={openTab} />)}
         {tabPane('shift-analysis', <ShiftAnalysis isAdmin={isAdmin} onNavigateToDriver={openDriver} />)}
-        {tabPane('drivers', <Drivers initialSearch={driversSearch} isAdmin={isAdmin} />)}
+        {tabPane('drivers', <Drivers search={driversSearch} isAdmin={isAdmin} />)}
         {tabPane('consumer-journey', <ConsumerJourney onNavigateToDriver={openDriver} isAdmin={isAdmin} />)}
         {tabPane('profit-pool-explorer', <ProfitPoolExplorer />)}
       </div>

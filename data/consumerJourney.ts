@@ -81,8 +81,6 @@ export interface StageContext {
   opportunity: string;
 }
 
-export const JOURNEY_CONTENT_VERSION = '2026-09-23';
-
 export const LHC_JOURNEY: JourneyStageDef[] = [
   {
     "id": "sorting",

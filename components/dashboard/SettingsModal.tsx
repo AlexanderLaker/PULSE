@@ -32,7 +32,7 @@ import usePrism from '@/hooks/usePrism';
 import useOverlay from '@/hooks/useOverlay';
 import { S, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { CATEGORIES, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, fmtDate, fmtDateTime, fmtPct } from '@/lib/format';
-import { cellMarginals } from '@/lib/cellWeights';
+import { cellMarginals, cellWeightsBasis } from '@/lib/cellWeights';
 import {
   BLOCK_SPLIT, CATEGORY_MIX, ESTIMATE_MARGINALS, ESTIMATE_VERSION, GRADE_LEGEND,
   MARGIN_INDEX, MARGIN_INDEX_NOTE, REGION_MIX, REGION_MIX_NOTE, type Grade,
@@ -670,9 +670,6 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
         description="The engine's defaults, as the code sets them."
       >
         <div style={PARAM_GRID}>
-          <SubBlock label="Default iterations" hint="Per chain. The production run uses 3 chains of 50,000.">
-            <div style={VALUE_STYLE}>{config.iterations.toLocaleString('en-US')}</div>
-          </SubBlock>
           <SubBlock label="Path horizon" hint="Relative-shift paths over these years.">
             <div style={VALUE_STYLE}>{horizon}</div>
           </SubBlock>
@@ -725,7 +722,7 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
           />
           <SubBlock
             label="Between-force overlap matrix"
-            hint="Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is covered by a broad one more than the other way round), bounded 0–0.45. The within-force overlap above covers the diagonal."
+            hint="The input the attenuation is derived from; the engine reads the attenuation. Read row → column: the share of the row force's signal already captured by the column force. Asymmetric by design (a narrow force is covered by a broad one more than the other way round), bounded 0–0.45. The within-force overlap above covers the diagonal."
           >
             <ForceMatrixTable matrix={config.force_overlap_matrix} digits={3} hideDiagonal label="Between-force overlap matrix" />
           </SubBlock>
@@ -944,23 +941,27 @@ const CellWeightProvenance: FC = () => (
 const BasisBadge: FC<{ estimate: boolean }> = ({ estimate }) => (
   <span
     title={estimate
-      ? `The estimated HCB gross-profit mix, version ${ESTIMATE_VERSION}`
-      : 'The shares from the finance file the production run was given'}
+      ? 'An estimate of the HCB gross-profit mix from public reporting, not Henkel P&L'
+      : 'The shares of the file the production run was given; its label says where they come from'}
     style={{
       fontFamily: MONO_FONT, fontSize: 10.5, fontWeight: 700,
       padding: '2px 8px', borderRadius: 999,
-      backgroundColor: estimate ? S.amberContainer : S.successContainer,
-      color: estimate ? S.onAmberContainer : S.success,
+      backgroundColor: estimate ? S.amberContainer : S.surfaceLow,
+      color: estimate ? S.onAmberContainer : S.onSurfaceVariant,
     }}
   >
-    {estimate ? 'Estimated HCB mix' : 'Finance figures'}
+    {estimate ? 'Estimated HCB mix' : 'From a weights file'}
   </span>
 );
 
 /** The served run's cell weights with their marginals and where they come from. */
 const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
   const m = cellMarginals(run.cell_weights_used, CATEGORY_NAMES, run.decompositions.dimensions.regions);
-  const estimate = m.matchesEstimate;
+  // The run's own label says what the weights are; the graded derivation
+  // below documents the current estimate, so it shows only when the run's
+  // shares are that estimate.
+  const estimate = cellWeightsBasis(run.cell_weights_source) === 'estimate';
+  const documented = estimate && m.matchesEstimate;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1006,20 +1007,21 @@ const RunCellWeights: FC<{ run: SimulationResult }> = ({ run }) => {
           <>
             <strong>An estimate from public reporting, not Henkel P&amp;L.</strong> A finance file passed
             to <code>scripts/run_production.py --cell-weights</code> replaces it.
+            {!documented && ' This run used an earlier version of the estimate than the one documented below this dashboard version.'}
           </>
         ) : (
-          <>These shares come from the finance file the production run was given (<code>scripts/run_production.py --cell-weights</code>).</>
+          <>These shares come from the file the production run was given (<code>scripts/run_production.py --cell-weights</code>); the source above says what it holds.</>
         )}{' '}
         Only shares enter PRISM, never euro figures. A cell with share 0 contributes nothing to the roll-up
         however exposed its drivers are: HCB's presence in a region enters here, not through the exposures.
       </div>
-      {estimate && <CellWeightProvenance />}
+      {documented && <CellWeightProvenance />}
     </div>
   );
 };
 
 const ModelSection: FC = () => {
-  const { config, simulation, loading } = usePrism();
+  const { config, configError, simulation, simulationError, loading } = usePrism();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <StatusBanner kind="info">
@@ -1028,7 +1030,11 @@ const ModelSection: FC = () => {
 
       {config ? <ParameterCards config={config} /> : (
         <SectionCard title="Simulation parameters" icon={SlidersHorizontal}>
-          <Muted>{loading ? 'Loading the configuration…' : 'No model configuration is available yet.'}</Muted>
+          <Muted>
+            {loading ? 'Loading the configuration…'
+              : configError ? `The model configuration could not be loaded: ${configError}`
+                : 'No model configuration is available yet.'}
+          </Muted>
         </SectionCard>
       )}
 
@@ -1044,7 +1050,11 @@ const ModelSection: FC = () => {
             </SubBlock>
           )}
           {simulation ? <RunCellWeights run={simulation} /> : (
-            <Muted>{loading ? 'Loading the run…' : 'There is no run yet, so there are no cell weights to show.'}</Muted>
+            <Muted>
+              {loading ? 'Loading the run…'
+                : simulationError ? `The run could not be loaded, so its cell weights cannot be shown: ${simulationError}`
+                  : 'There is no run yet, so there are no cell weights to show.'}
+            </Muted>
           )}
         </div>
       </SectionCard>

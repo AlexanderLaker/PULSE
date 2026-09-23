@@ -18,7 +18,7 @@ vi.mock('@/api/client', () => ({
   getDiagnostics: vi.fn(async () => null),
   getDriverProposals: vi.fn(async () => null),
   saveMyProposal: vi.fn(async () => null),
-  getJourneyContent: vi.fn(async () => null),
+  getJourneyContent: vi.fn(async () => ({ version: 0, content: null })),
   saveJourneyContent: vi.fn(),
 }));
 
@@ -51,7 +51,8 @@ describe('every tab mounts on a complete store', () => {
 
   it('Consumer Journey', () => {
     const { container } = render(<ConsumerJourney />);
-    expect(container.textContent!.length).toBeGreaterThan(100);
+    expect(container.textContent).toContain('Where Profit Pools Shift Along the Journey');
+    expect(container.textContent).toContain('AI stain/fabric recognition apps');
   });
 
   it('the entry gate', () => {

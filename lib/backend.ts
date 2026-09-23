@@ -4,11 +4,12 @@
  * The browser's viewer cookie carries the viewer role, so it can never
  * authorise an admin write: every admin write goes through a dashboard route.
  * The route checks the signed-in user's role (lib/roles.ts) and calls the API
- * on its own origin with a five-minute admin token that carries the user's
- * identity; the API verifies the token and writes that identity to its audit
- * log. On Vercel the /api/v1 path is
- * rewritten to the Python function (vercel.json); in local development
- * next.config.js rewrites it to the API server at PRISM_BACKEND_URL.
+ * with a five-minute admin token that carries the user's identity; the API
+ * verifies the token and writes that identity to its audit log. The call goes
+ * to PRISM_API_ORIGIN when that is set, else to the host the request came in
+ * on. On Vercel the /api/v1 path is rewritten to the Python function
+ * (vercel.json); in local development next.config.js rewrites it to the API
+ * server at PRISM_BACKEND_URL.
  *
  * Server-side only: it signs with PRISM_JWT_SECRET.
  */
@@ -17,8 +18,11 @@ import { NextResponse } from 'next/server';
 import { signPrismJwt } from './prismJwt';
 import { ForbiddenError, UnauthorizedError, requireAdmin } from './roles';
 
-/** An absolute URL for an API path on this deployment's own origin. */
-async function sameOriginUrl(path: string): Promise<string> {
+/** An absolute URL for an API path: on PRISM_API_ORIGIN when set, else on the
+ *  origin this request came in on. */
+async function apiUrl(path: string): Promise<string> {
+  const origin = process.env.PRISM_API_ORIGIN?.trim().replace(/\/+$/, '');
+  if (origin) return `${origin}${path}`;
   const h = await headers();
   const host = h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? 'http';
@@ -27,7 +31,7 @@ async function sameOriginUrl(path: string): Promise<string> {
 
 /** One readable line from an API error body. FastAPI validation errors arrive
  *  as a list of {loc, msg}, which would otherwise render as "[object Object]". */
-export function formatApiError(body: string, status: number): string {
+function formatApiError(body: string, status: number): string {
   try {
     const parsed = JSON.parse(body) as { detail?: unknown; error?: unknown };
     const detail = parsed?.detail ?? parsed?.error;
@@ -74,7 +78,7 @@ export async function forwardAdminWrite(
         { status: 503 },
       );
     }
-    const res = await fetch(await sameOriginUrl(path), {
+    const res = await fetch(await apiUrl(path), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),

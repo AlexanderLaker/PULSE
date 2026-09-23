@@ -15,7 +15,7 @@
 
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef, useCallback, FC } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef, useCallback, FC } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, TrendingUp, Users, Store, Cpu, Landmark,
@@ -27,8 +27,11 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import usePrism from '@/hooks/usePrism';
-import { getDriverProposals, saveMyProposal } from '@/api/client';
-import { CATEGORIES, EXPANSION, EXPANSION_SOFT, NO_VALUE, REGIONS, fmtPct, fmtShift, shiftColor, shortCat } from '@/lib/format';
+import { ApiError, getDriverProposals, saveMyProposal } from '@/api/client';
+import {
+  CATEGORIES, EXPANSION, EXPANSION_SOFT, NO_VALUE, REGIONS, evidenceLine, fmtPct, fmtShift, shiftColor, shortCat,
+} from '@/lib/format';
+import { UNCERTAINTY_KAPPA, UNCERTAINTY_LABELS, UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { VC_STEPS, VC_SHORT_LABELS, canonicalVcProfile, epicentreOf } from '@/lib/valueChain';
 import Chip from '@/components/dashboard/Chip';
@@ -342,8 +345,20 @@ export function splitAnalysis(text: string): { label: string | null; body: strin
     });
 }
 
+/** The portfolio median a reading's basis line was reconciled to: {year, percent}; null without one. */
+export function basisMedian(text: string): { year: string; percent: number } | null {
+  const m = /(\d{4}) portfolio median of (-?\d+(?:\.\d+)?) percent/.exec(text);
+  return m ? { year: m[1]!, percent: Number(m[2]) } : null;
+}
+
 const PrismAnalysisReading: FC<{ text: string }> = ({ text }) => {
+  const { simulation } = usePrism();
   const paragraphs = splitAnalysis(text);
+  // The figures of a reading belong to the run its basis line names. When the
+  // served run's median differs at the shown precision, the reading says so.
+  const basis = basisMedian(text);
+  const served = basis ? simulation?.totals.portfolio[basis.year]?.median : undefined;
+  const stale = basis != null && served != null && (served * 100).toFixed(1) !== basis.percent.toFixed(1);
   if (paragraphs.length === 0) {
     return (
       <span style={{ color: S.mutedText, fontWeight: 400, fontStyle: 'italic' }}>
@@ -355,9 +370,19 @@ const PrismAnalysisReading: FC<{ text: string }> = ({ text }) => {
     <div data-testid="prism-analysis" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {paragraphs.map(({ label, body }, i) => (
         label === ANALYSIS_BASIS_LABEL ? (
-          <p key={i} style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: S.mutedText, fontWeight: 500 }}>
-            <span style={{ fontWeight: 700 }}>{ANALYSIS_BASIS_LABEL}:</span> {body}
-          </p>
+          <React.Fragment key={i}>
+            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: S.mutedText, fontWeight: 500 }}>
+              <span style={{ fontWeight: 700 }}>{ANALYSIS_BASIS_LABEL}:</span> {body}
+            </p>
+            {stale && (
+              <p role="note" style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: S.onAmberContainer,
+                backgroundColor: S.amberContainer, padding: '6px 10px', borderRadius: 8 }}>
+                The run shown in the Shift Analysis has a {basis!.year} portfolio median of {fmtShift(served)}, so
+                the figures in this reading come from an earlier run. They are brought up to date with the next
+                analysis build.
+              </p>
+            )}
+          </React.Fragment>
         ) : (
           <div key={i}>
             {label && (
@@ -391,7 +416,7 @@ interface SectionCardProps {
   children: React.ReactNode;
 }
 const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote, info, right, children }) => (
-  <div style={{
+  <div role="group" aria-label={title} style={{
     backgroundColor: S.surface,
     border: `1px solid ${S.cardBorder}`,
     borderRadius: 12,
@@ -434,7 +459,7 @@ const SectionCard: FC<SectionCardProps> = ({ title, icon: Icon, accent, footnote
 // ─── Per-field help, shown by the "?" tooltips on the section cards ─
 const FIELD_HELP = {
   probability: 'Likelihood this driver materialises at the stated severity. Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain. The 1–5 score sets a Beta prior whose MEAN is score/6, deliberately shrunk against overconfidence: 1→0.17, 2→0.33, 3→0.50, 4→0.67, 5→0.83 (a "5" means five in six, not certainty). The band width comes from the Beta concentration α+β, which the Uncertainty score sets (6 for an unscored driver), sampled by the Monte Carlo.',
-  uncertainty: 'How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (24/16/10/6/4/3; the mean stays probability/6) and the peak-year jitter (0/1/1/2/3/4 years). Unscored: concentration 6 and the model-wide ±1-year jitter.',
+  uncertainty: `How much the SIZE and TIMING of the effect could differ from the modelled values, given its direction: one score per driver. It is not probability (how likely the effect is at all) and not Confidence (how well the present state is evidenced). 0 = fixed by law or contract; 1 = size within about ±25 %, timing dated; 2 = well-evidenced mechanism, size within about ±50 %, timing 1–2 years; 3 = size could be half or double, or the onset depends on an undated trigger; 4 = size could be near zero or more than double; 5 = the sign could differ across scenarios or the effect may not materialise inside the horizon. The engine turns it into the Beta-prior concentration (${UNCERTAINTY_KAPPA.join('/')}; the mean stays probability/6) and the peak-year jitter (${UNCERTAINTY_PEAK_JITTER.join('/')} years). Unscored: concentration 6 and the model-wide ±1-year jitter.`,
   gp1: 'The share of a category’s GP1 (gross profit after cost of goods) this driver can realistically move at full materialization. Multiplied by probability and direction, it produces the Shift.',
   timing: 'When the driver reaches full impact (Peak Year) and the shape of how it builds toward that peak over 2026–2035 (Diffusion Curve).',
   category: 'How hard this driver hits each Hair and Laundry & Home Care category, on a 0–5 scale. Grey = unscored: a cell you leave blank is not part of your proposal.',
@@ -617,13 +642,10 @@ const pctI = (v: number | null | undefined): string =>
  *  while no admin has edited it. Null for an edited driver without a baseline. */
 const baselineOf = (d: Driver): DriverScores | null => d.baseline ?? (d.scores_edited ? null : d);
 
-// Uncertainty: the labels of the six scores and what the engine makes of
-// them (prism/config.py): the Beta concentration and the peak-year jitter.
-const UNC_LABELS = ['Fixed', 'Tight', 'Evidenced', 'Half–double', 'Near zero–2×', 'Sign open'];
-const UNC_CONCENTRATION = [24, 16, 10, 6, 4, 3];
-const UNC_PEAK_JITTER = [0, 1, 1, 2, 3, 4];
+// Uncertainty: the labels of the six scores; lib/uncertainty.ts also holds
+// what the engine makes of them (the Beta concentration, the peak-year jitter).
 const uncLabel = (v: number | null | undefined): string =>
-  v == null ? 'unscored' : `${v} · ${UNC_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
+  v == null ? 'unscored' : `${v} · ${UNCERTAINTY_LABELS[Math.max(0, Math.min(5, Math.round(v)))]}`;
 
 /** Uncertainty picker: six labelled buttons, 0 to 5 (0 is a real score,
  *  unlike probability), with the baseline score outlined. */
@@ -631,10 +653,12 @@ const UncertaintyPicker: FC<{
   value: number | null | undefined;
   baseline?: number | null;
   onChange: (v: number) => void;
-}> = ({ value, baseline, onChange }) => (
+  /** Clicking the selected score again clears it (Expert Rating). */
+  onClear?: () => void;
+}> = ({ value, baseline, onChange, onClear }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     <div role="radiogroup" aria-label="Uncertainty score" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
-      title={baseline != null ? `Baseline ${baseline} / 5 (${UNC_LABELS[baseline]})` : undefined}>
+      title={baseline != null ? `Baseline ${baseline} / 5 (${UNCERTAINTY_LABELS[baseline]})` : undefined}>
       {[0, 1, 2, 3, 4, 5].map((v) => {
         const on = value != null && Math.round(value) === v;
         return (
@@ -643,8 +667,8 @@ const UncertaintyPicker: FC<{
             type="button"
             role="radio"
             aria-checked={on}
-            onClick={() => onChange(v)}
-            title={`${v}: ${UNC_LABELS[v]}${baseline === v ? ' (baseline)' : ''}`}
+            onClick={() => (on && onClear ? onClear() : onChange(v))}
+            title={`${v}: ${UNCERTAINTY_LABELS[v]}${baseline === v ? ' (baseline)' : ''}${on && onClear ? ', click again to clear' : ''}`}
             style={{
               minWidth: 44, padding: '6px 8px', borderRadius: 8,
               border: `1px solid ${baseline === v && !on ? S.primary : 'transparent'}`,
@@ -953,14 +977,16 @@ const DiffusionPicker: FC<{
   baseline?: string;
   distribution?: Record<string, number>;
   onChange: (curve: string) => void;
-}> = ({ value, baseline, distribution, onChange }) => (
+  /** Clicking the selected curve again clears it (Expert Rating). */
+  onClear?: () => void;
+}> = ({ value, baseline, distribution, onChange, onClear }) => (
   <div className="flex flex-wrap gap-2">
     {Object.entries(DIFFUSION_LABELS).map(([key, meta]) => {
       const selected = value === key;
       const n = distribution?.[key];
       return (
-        <button key={key} type="button" onClick={() => onChange(key)}
-          title={baseline === key ? `${meta.label} (baseline): ${meta.description}` : meta.description}
+        <button key={key} type="button" onClick={() => (selected && onClear ? onClear() : onChange(key))}
+          title={`${baseline === key ? `${meta.label} (baseline): ` : ''}${meta.description}${selected && onClear ? ' (click again to clear)' : ''}`}
           aria-pressed={selected} style={{
             position: 'relative', minWidth: 78, textAlign: 'center', padding: '8px 10px 6px', borderRadius: 9, cursor: 'pointer',
             backgroundColor: S.surface, border: `1px solid ${selected ? S.primary : S.cardBorder}`,
@@ -988,11 +1014,15 @@ const BaselineRef: FC<{ value: string | null }> = ({ value }) => (
   </span>
 );
 
-/** A driver's proposals, loaded when its panel opens; null when the request
- *  fails, and the panel then shows its empty states. */
-function useDriverProposals(driverId: string): { data: DriverProposalsResponse | null; loaded: boolean } {
+/** A driver's proposals, loaded when its panel opens. `failed` is set when the
+ *  request failed; `retry` asks again. */
+function useDriverProposals(driverId: string): {
+  data: DriverProposalsResponse | null; loaded: boolean; failed: boolean; retry: () => void;
+} {
   const [data, setData] = useState<DriverProposalsResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   // A new driver id invalidates the previous payload: `loaded` resets during
   // render (the documented React pattern), so no pass reports the old
   // proposals as loaded for the new driver. The fetch stays in the effect and
@@ -1001,39 +1031,91 @@ function useDriverProposals(driverId: string): { data: DriverProposalsResponse |
   if (fetchingFor !== driverId) {
     setFetchingFor(driverId);
     setLoaded(false);
+    setFailed(false);
   }
   useEffect(() => {
     let cancelled = false;
     getDriverProposals(driverId)
-      .then((r) => { if (!cancelled) { setData(r); setLoaded(true); } })
-      .catch(() => { if (!cancelled) { setData(null); setLoaded(true); } });
+      .then((r) => { if (!cancelled) { setData(r); setFailed(false); setLoaded(true); } })
+      .catch(() => { if (!cancelled) { setData(null); setFailed(true); setLoaded(true); } });
     return () => { cancelled = true; };
-  }, [driverId]);
-  return { data, loaded };
+  }, [driverId, attempt]);
+  const retry = useCallback(() => { setLoaded(false); setAttempt((n) => n + 1); }, []);
+  return { data, loaded, failed, retry };
 }
+
+/** Shown in place of a panel whose proposals could not be loaded. */
+const ProposalsUnavailable: FC<{ what: string; onRetry: () => void }> = ({ what, onRetry }) => (
+  <div role="alert" style={{ padding: '26px 0', textAlign: 'center', color: S.onSurfaceVariant }}>
+    <AlertTriangle size={20} style={{ color: S.error }} />
+    <div style={{ marginTop: 8, fontSize: 14 }}>The proposals for this driver could not be loaded, so {what}.</div>
+    <button type="button" onClick={onRetry} style={{
+      marginTop: 12, padding: '7px 16px', borderRadius: 999, border: `1px solid ${S.cardBorder}`,
+      background: S.surface, color: S.primary, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    }}>
+      Try again
+    </button>
+  </div>
+);
+
+/** A year field for the Expert Rating: the proposal takes the value only while
+ *  it is a whole year from 2025 to 2035, so a half-typed year is never sent;
+ *  leaving the field with anything else puts the last valid year back. */
+const ProposalYearInput: FC<{ value: number | null | undefined; onChange: (v: number | null) => void; title?: string }> = ({
+  value, onChange, title,
+}) => {
+  const [text, setText] = useState(value == null ? '' : String(value));
+  const [shownFor, setShownFor] = useState(value);
+  if (shownFor !== value) {
+    setShownFor(value);
+    setText(value == null ? '' : String(value));
+  }
+  const valid = (t: string) => /^\d{4}$/.test(t) && Number(t) >= 2025 && Number(t) <= 2035;
+  return (
+    <input type="text" inputMode="numeric" value={text} placeholder={NO_VALUE} title={title}
+      aria-label="Peak year, 2025 to 2035" aria-invalid={text !== '' && !valid(text)}
+      onChange={(e) => {
+        const t = e.target.value.trim();
+        setText(t);
+        if (t === '') onChange(null);
+        else if (valid(t)) onChange(Number(t));
+      }}
+      onBlur={() => { if (text !== '' && !valid(text)) setText(value == null ? '' : String(value)); }}
+      style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${text !== '' && !valid(text) ? S.error : S.cardBorder}`,
+        backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
+  );
+};
 
 // ── Expert Rating panel: the expert's own proposal, scored from a blank
 //    slate and saved automatically, with the baseline on hover ──
 const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: DriverProposal) => void }> = ({ driver, onMyChange }) => {
-  const { data, loaded } = useDriverProposals(driver.id);
+  const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [draft, setDraft] = useState<DriverProposal>({});
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const draftRef = useRef<DriverProposal>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Saves go out one at a time, each with the draft as it is when it starts,
+  // so a slow earlier save can never land after a later one.
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const sendNow = useCallback(() => {
+    const next = chain.current.catch(() => undefined).then(() => saveMyProposal(driver.id, draftRef.current));
+    chain.current = next;
+    return next;
+  }, [driver.id]);
 
   // The draft takes the stored proposal once, in the first render after it
   // has loaded. Adjusting during render means the panel's first visible frame
   // already shows the stored proposal rather than a blank draft.
   const [hydrated, setHydrated] = useState(false);
-  if (loaded && !hydrated) {
+  if (loaded && !failed && !hydrated) {
     setHydrated(true);
     setDraft(data?.my ?? {});
   }
   // `draftRef` is the merge base for `patch` and what the unmount flush
   // saves. `patch` keeps it current while the expert types; refs may not be
-  // written during render, so the stored proposal above reaches it here,
-  // still before any edit can.
-  useEffect(() => { draftRef.current = draft; }, [draft]);
+  // written during render, so the stored proposal above reaches it here, in
+  // a layout effect: it runs right after the commit, before any click can.
+  useLayoutEffect(() => { draftRef.current = draft; }, [draft]);
   // The row's copy of "my proposal" is the parent's state, so it is seeded
   // from an effect once the draft holds the stored proposal.
   useEffect(() => {
@@ -1049,9 +1131,9 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
     if (pendingSave.current) {
       pendingSave.current = false;
       // The panel is gone, but the write must still land.
-      void saveMyProposal(driver.id, draftRef.current).catch(() => undefined);
+      void sendNow().catch(() => undefined);
     }
-  }, [driver.id]);
+  }, [sendNow]);
 
   const flush = useCallback(() => {
     setStatus('saving');
@@ -1059,9 +1141,13 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       pendingSave.current = false;
-      saveMyProposal(driver.id, draftRef.current).then(() => setStatus('saved')).catch(() => setStatus('error'));
+      const save = sendNow();
+      save.then(
+        () => { if (chain.current === save && !pendingSave.current) setStatus('saved'); },
+        () => { if (chain.current === save) setStatus('error'); },
+      );
     }, 600);
-  }, [driver.id]);
+  }, [sendNow]);
   const patch = useCallback((p: Partial<DriverProposal>) => {
     const next = { ...draftRef.current, ...p };
     draftRef.current = next;
@@ -1079,6 +1165,18 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
     : status === 'saved' ? '✓ All changes saved'
     : status === 'error' ? '⚠ Save failed; it retries on your next change'
     : 'Changes auto-save';
+
+  // Until the stored proposal has loaded nothing can be edited: a save made
+  // from a blank draft would overwrite what the expert entered before.
+  if (!hydrated) {
+    return (
+      <div onClick={(e) => e.stopPropagation()} style={{ padding: '0 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
+        {failed
+          ? <ProposalsUnavailable what="your proposal cannot be edited right now" onRetry={retry} />
+          : <div style={{ padding: '26px 0', textAlign: 'center', fontSize: 14, color: S.onSurfaceVariant }}>Loading your proposal…</div>}
+      </div>
+    );
+  }
 
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 32px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
@@ -1103,10 +1201,10 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
             </div>
           </SectionCard>
 
-          <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the baseline.">
+          <SectionCard title="Probability" icon={Zap} info={FIELD_HELP.probability} footnote="1 = Very Unlikely · 3 = Possible · 5 = Almost Certain. Hover the dots for the baseline; click the selected dot again to clear your score.">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <span title={base != null ? `Baseline ${base.probability} / 5` : undefined} style={{ cursor: base != null ? 'help' : undefined }}>
-                <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v })} />
+                <DotBar value={draft.probability ?? 0} editable onChange={(v) => patch({ probability: v === draft.probability ? null : v })} />
               </span>
               <BaselineRef value={base != null ? `${base.probability}/5` : null} />
             </div>
@@ -1118,7 +1216,11 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
                 onChange={(e) => patch({ gp1_pct_affected: parseInt(e.target.value, 10) / 100 })}
                 title={base != null ? `Baseline ${pctI(base.gp1_pct_affected)}` : undefined} style={{ flex: 1, cursor: base != null ? 'help' : undefined }} />
               <input type="number" min={0} max={100} step={1} value={gp1Int ?? ''} placeholder={NO_VALUE}
-                onChange={(e) => { const n = e.target.value === '' ? undefined : Math.max(0, Math.min(100, parseInt(e.target.value, 10))); patch({ gp1_pct_affected: n == null ? undefined : n / 100 }); }}
+                aria-label="GP1 percent exposed"
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  patch({ gp1_pct_affected: Number.isNaN(n) ? null : Math.max(0, Math.min(100, n)) / 100 });
+                }}
                 title={base != null ? `Baseline ${pctI(base.gp1_pct_affected)}` : undefined}
                 style={{ width: 70, padding: '6px 8px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 15, textAlign: 'right' }} />
               <span style={{ color: S.mutedText, fontSize: 12 }}>%</span>
@@ -1131,23 +1233,23 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
               <div>
                 <FieldLabel>Peak Year</FieldLabel>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input type="number" min={2026} max={2035} step={1} value={draft.peak_year ?? ''} placeholder={NO_VALUE}
-                    onChange={(e) => patch({ peak_year: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
-                    title={base != null ? `Baseline ${base.peak_year}` : undefined}
-                    style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: `1px solid ${S.cardBorder}`, backgroundColor: S.surfaceLow, color: S.onSurface, fontSize: 13, fontWeight: 700 }} />
+                  <ProposalYearInput value={draft.peak_year} onChange={(v) => patch({ peak_year: v })}
+                    title={base != null ? `Baseline ${base.peak_year}` : undefined} />
                   <BaselineRef value={base != null ? String(base.peak_year) : null} />
                 </div>
               </div>
               <div>
                 <FieldLabel>Diffusion Curve</FieldLabel>
-                <DiffusionPicker value={draft.diffusion_curve} baseline={base?.diffusion_curve} distribution={dist} onChange={(c) => patch({ diffusion_curve: c })} />
+                <DiffusionPicker value={draft.diffusion_curve} baseline={base?.diffusion_curve} distribution={dist}
+                  onChange={(c) => patch({ diffusion_curve: c })} onClear={() => patch({ diffusion_curve: null })} />
               </div>
             </div>
           </SectionCard>
 
           <SectionCard title="Uncertainty" icon={Zap} info={FIELD_HELP.uncertainty} footnote="0 = fixed · 3 = half or double · 5 = sign open. Sets the band width and the timing jitter of this driver; the mean stays where probability puts it.">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-              <UncertaintyPicker value={draft.uncertainty} baseline={base?.uncertainty} onChange={(v) => patch({ uncertainty: v })} />
+              <UncertaintyPicker value={draft.uncertainty} baseline={base?.uncertainty}
+                onChange={(v) => patch({ uncertainty: v })} onClear={() => patch({ uncertainty: null })} />
               <BaselineRef value={base?.uncertainty != null ? `${base.uncertainty}/5` : null} />
             </div>
           </SectionCard>
@@ -1162,17 +1264,27 @@ const ExpertInputPanel: FC<{ driver: Driver; onMyChange: (driverId: string, my: 
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal.">
-            <EditableCategoryGrid exposures={draft.category_exposure ?? {}} onChange={(e) => patch({ category_exposure: e })} baseline={base?.category_exposure} />
+          <SectionCard title="Category Exposure" icon={Layers} info={FIELD_HELP.category} footnote="Grey = unscored. A cell you leave blank is not part of your proposal; click a selected dot again to clear it.">
+            <EditableCategoryGrid clearable exposures={draft.category_exposure ?? {}}
+              onChange={(e) => patch({ category_exposure: Object.keys(e).length ? e : null })} baseline={base?.category_exposure} />
           </SectionCard>
           <SectionCard title="Regional Exposure" icon={MapPin} accent={S.onSecondaryContainer} info={FIELD_HELP.regional}>
-            <EditableRegionGrid exposures={draft.regional_exposure ?? {}} onChange={(e) => patch({ regional_exposure: e })} baseline={base?.regional_exposure} />
+            <EditableRegionGrid clearable exposures={draft.regional_exposure ?? {}}
+              onChange={(e) => patch({ regional_exposure: Object.keys(e).length ? e : null })} baseline={base?.regional_exposure} />
           </SectionCard>
           <SectionCard
             title="Value Chain Epicentre" icon={Cpu} accent={S.onTertiaryContainer} info={FIELD_HELP.vc}
             right={
-              <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: myVcStage != null ? S.primary : S.mutedText }}>
-                {vcStageLabel(myVcStage)}
+              <span className="inline-flex items-center gap-2">
+                <span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 13, color: myVcStage != null ? S.primary : S.mutedText }}>
+                  {vcStageLabel(myVcStage)}
+                </span>
+                {myVcStage != null && (
+                  <button type="button" onClick={() => patch({ vc_exposure: null })}
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: S.onSurfaceVariant, textDecoration: 'underline' }}>
+                    Clear
+                  </button>
+                )}
               </span>
             }
             footnote="One choice: the stage where this driver’s impact centres. The value-chain attribution assigns the driver’s whole contribution to this stage; leave it unscored and it is not part of your proposal."
@@ -1253,7 +1365,7 @@ const CompareStack: FC<{ baseline: React.ReactNode; expert: React.ReactNode; who
 //    mean (green), and the manual override ──
 /** An exposure cell of the Review panel: its key and label, the baseline
  *  score and the experts' aggregate. */
-interface ExposureRow { key: string; label: string; baseV?: number; expert?: ProposalAgg }
+interface ExposureRow { key: string; label: string; baseV?: number; curV: number; expert?: ProposalAgg }
 
 const ExposureCompareCell: FC<{ label: string; baseVal?: number; expert?: ProposalAgg; manualVal?: number; onManual: (v: number) => void }> = ({ label, baseVal, expert, manualVal, onManual }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px', border: `1px solid ${S.cardBorder}`, borderRadius: 9, backgroundColor: S.surface }}>
@@ -1272,16 +1384,21 @@ const ExposureCompareCell: FC<{ label: string; baseVal?: number; expert?: Propos
     <div className="flex items-center gap-2" style={{ paddingTop: 5, borderTop: `1px solid ${S.surfaceLow}` }}>
       {/* Tightened tracking so "Manual" fits the 38px label gutter at 11px. */}
       <span style={{ fontSize: 11, letterSpacing: '-0.02em', fontWeight: 800, color: S.primary, width: 38, flexShrink: 0, textAlign: 'right' }} title="Manual override: click a dot to set">Manual</span>
-      <EditableDots value={manualVal ?? 0} onChange={onManual} />
+      <EditableDots value={manualVal} onChange={(v) => { if (v != null) onManual(v); }} label={`${label} manual score`} />
     </div>
   </div>
 );
 
-// ── Per-field endorse choice: the baseline, the expert mean or a manual value ──
-type EndorseSource = 'baseline' | 'expert' | 'manual';
-const ENDORSE_OPTIONS: Array<[EndorseSource, string]> = [['baseline', 'Baseline'], ['expert', 'Expert ø'], ['manual', 'Manual']];
+// ── Per-field endorse choice: keep the current value, the baseline, the expert mean or a manual value ──
+type EndorseSource = 'current' | 'baseline' | 'expert' | 'manual';
+const ENDORSE_OPTIONS: Array<[EndorseSource, string]> = [
+  ['current', 'Keep'], ['baseline', 'Baseline'], ['expert', 'Expert ø'], ['manual', 'Manual'],
+];
 /** What an exposure grid endorses, by its choice. */
-const EXPOSURE_RESULT: Record<EndorseSource, string> = { baseline: 'Baseline', expert: 'Expert ø', manual: 'Manual (custom)' };
+const EXPOSURE_RESULT: Record<EndorseSource, string> = {
+  current: 'Keep the current scores', baseline: 'Baseline', expert: 'Expert ø where scored, current elsewhere',
+  manual: 'Manual (custom)',
+};
 
 const manInput: React.CSSProperties = {
   width: 66, padding: '5px 8px', borderRadius: 7, border: `1px solid ${S.primary}`,
@@ -1300,7 +1417,9 @@ const Decide: FC<{
       {ENDORSE_OPTIONS.map(([k, lab], i) => {
         const on = cur === k;
         const disabled = (k === 'baseline' && !baselineOk) || (k === 'expert' && !expertOk);
-        const bg = on ? (k === 'baseline' ? S.onSurface : k === 'expert' ? REVIEWED_COLOR : S.primary) : S.surface;
+        const bg = on
+          ? (k === 'current' ? S.onSurfaceVariant : k === 'baseline' ? S.onSurface : k === 'expert' ? REVIEWED_COLOR : S.primary)
+          : S.surface;
         return (
           <button key={k} type="button" disabled={disabled} onClick={() => onPick(k)} aria-pressed={on}
             style={{ border: 'none', borderRight: i < ENDORSE_OPTIONS.length - 1 ? `1px solid ${S.cardBorder}` : 'none',
@@ -1319,23 +1438,26 @@ const Decide: FC<{
 // ── Value-chain epicentre votes (Review & Endorse) ──
 // Stages are categories: each expert's pick is a stacked dot on its stage,
 // counted and never averaged (a Supply Chain vote and two Commercial votes
-// must not blend into Marketing). The admin endorses the majority, the
-// baseline stage, or any stage clicked on the rail; a tie leaves no majority
-// and stays visible.
+// must not blend into Marketing). The admin keeps the current stage, endorses
+// the majority or the baseline stage, or clicks any stage on the rail; a tie
+// leaves no majority and stays visible.
 const EpicentreVotePanel: FC<{
   baseline: number | null;
-  votes: Array<{ name: string; role: string; stage: number }>;
+  /** The driver's stage now. */
+  current: number | null;
+  votes: Array<{ name: string; stage: number }>;
   majority: { stage: number; n: number } | null;
   endorsed: number | null;
   onEndorse: (stage: number) => void;
-}> = ({ baseline, votes, majority, endorsed, onEndorse }) => {
-  const byStage = new Map<number, Array<{ name: string; role: string }>>();
+}> = ({ baseline, current, votes, majority, endorsed, onEndorse }) => {
+  const byStage = new Map<number, Array<{ name: string }>>();
   for (const v of votes) {
     const l = byStage.get(v.stage) ?? [];
     l.push(v);
     byStage.set(v.stage, l);
   }
   const srcText = endorsed == null ? null
+    : endorsed === current ? 'kept as it is'
     : majority != null && endorsed === majority.stage ? `Expert majority (${majority.n} of ${votes.length})`
     : baseline != null && endorsed === baseline ? 'Baseline'
     : 'Manual pick';
@@ -1362,14 +1484,14 @@ const EpicentreVotePanel: FC<{
           />
         ))}
         {[...byStage.entries()].map(([stage, list]) => {
-          const who = list.map((v) => `${v.name}${v.role ? ` (${v.role})` : ''}`).join('\n');
+          const who = list.map((v) => v.name).join('\n');
           return (
             <React.Fragment key={stage}>
               <span title={who} style={{ position: 'absolute', top: 48, left: vcPos(stage), width: 2, height: 5, backgroundColor: EXPERT_COLOR, opacity: 0.35, transform: 'translateX(-50%)', cursor: 'help' }} />
               {list.slice(0, 3).map((v, j) => (
                 <span
                   key={`${stage}-${j}`}
-                  title={j === 2 && list.length > 3 ? who : `${v.name}${v.role ? ` (${v.role})` : ''} → ${VC_STEPS[stage - 1]}`}
+                  title={j === 2 && list.length > 3 ? who : `${v.name} → ${VC_STEPS[stage - 1]}`}
                   style={{
                     position: 'absolute', top: 36 - 13 * j, left: vcPos(stage), width: 10, height: 10,
                     borderRadius: 999, backgroundColor: EXPERT_COLOR, opacity: 0.65,
@@ -1418,6 +1540,14 @@ const EpicentreVotePanel: FC<{
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: S.mutedText }}>Endorse</span>
         <div style={{ display: 'inline-flex', border: `1px solid ${S.cardBorder}`, borderRadius: 999, overflow: 'hidden' }}>
           <button
+            type="button" disabled={current == null}
+            onClick={() => { if (current != null) onEndorse(current); }}
+            aria-pressed={current != null && endorsed === current}
+            style={{ ...pillStyle(current != null && endorsed === current, current == null), borderRight: `1px solid ${S.cardBorder}` }}
+          >
+            {current != null ? `Keep · ${VC_STEPS[current - 1]}` : `Keep ${NO_VALUE}`}
+          </button>
+          <button
             type="button" disabled={baseline == null}
             onClick={() => { if (baseline != null) onEndorse(baseline); }}
             aria-pressed={baseline != null && endorsed === baseline}
@@ -1449,7 +1579,7 @@ const EpicentreVotePanel: FC<{
 
 // ── Review & Endorse panel (admins) ──
 const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update: DriverUpdate) => Promise<void> }> = ({ driver, updateDriver }) => {
-  const { data, loaded } = useDriverProposals(driver.id);
+  const { data, loaded, failed, retry } = useDriverProposals(driver.id);
   const [src, setSrc] = useState<Record<string, EndorseSource>>({});
   const [man, setMan] = useState<Record<string, string>>({});
   const [manExpo, setManExpo] = useState<Record<string, ExposureMap>>({});
@@ -1482,8 +1612,8 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   // One value-chain vote per expert: the epicentre of the expert's profile.
   const vcVotes = useMemo(
     () => scorers
-      .map((s) => ({ name: s.name, role: s.role, stage: epicentreOf(s.vc_exposure) }))
-      .filter((v): v is { name: string; role: string; stage: number } => v.stage != null),
+      .map((s) => ({ name: s.name, stage: epicentreOf(s.vc_exposure) }))
+      .filter((v): v is { name: string; stage: number } => v.stage != null),
     [scorers],
   );
   const vcMajority = useMemo(() => {
@@ -1497,60 +1627,63 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
     }
     return tied ? null : best;
   }, [vcVotes]);
-  const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? baseVcStage;
+  // The stage the driver has now; endorsing it leaves the stored profile as it is.
+  const currentVcStage = epicentreOf(driver.vc_exposure);
+  const endorsedVcStage = endorsedVc ?? vcMajority?.stage ?? currentVcStage;
   const grouped = { Hair: CATEGORIES.filter((c) => c.group === 'Hair'), LHC: CATEGORIES.filter((c) => c.group === 'LHC') };
   const grpLabel: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: S.onSurfaceVariant, margin: '2px 0 8px' };
 
   const whoFor = (field: 'probability' | 'gp1_pct_affected' | 'peak_year' | 'diffusion_curve' | 'uncertainty'): string | undefined => {
     const rows = scorers.filter((s) => s[field] != null);
     if (rows.length === 0) return undefined;
-    return rows.map((s) => `${s.name}${s.role ? ` (${s.role})` : ''}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
+    return rows.map((s) => `${s.name}: ${field === 'gp1_pct_affected' ? pctI(s[field] as number) : s[field]}`).join('\n');
   };
-  // The expert mean of every cell an expert scored, else the baseline, so a
-  // cell nobody scored keeps its value instead of dropping out of the map.
+  // The expert mean of every cell an expert scored. The API changes only the
+  // cells an edit names, so a cell nobody scored keeps its current value.
   const expertMap = (cells: ExposureRow[]): ExposureMap | undefined => {
     const out: ExposureMap = {};
     for (const c of cells) {
-      const v = c.expert?.avg != null ? Math.round(c.expert.avg) : c.baseV;
-      if (v != null) out[c.key] = v;
+      if (c.expert?.avg != null) out[c.key] = Math.round(c.expert.avg);
     }
     return Object.keys(out).length ? out : undefined;
   };
   // Per-field endorse choice. A field defaults to the expert mean when an
-  // expert scored it, else the baseline; the admin can switch each field or
-  // enter a manual value.
+  // expert scored it; a field nobody scored keeps its current value (an
+  // admin's earlier edit stands). The admin can switch each field to the
+  // baseline or enter a manual value.
   const hasCatE = !!(agg?.category_exposure && Object.keys(agg.category_exposure).length);
   const hasRegE = !!(agg?.regional_exposure && Object.keys(agg.regional_exposure).length);
-  const srcOf = (key: string, hasExpert: boolean): EndorseSource => src[key] ?? (hasExpert ? 'expert' : 'baseline');
+  const srcOf = (key: string, hasExpert: boolean): EndorseSource => src[key] ?? (hasExpert ? 'expert' : 'current');
   const setS = (key: string, s: EndorseSource) => setSrc((p) => ({ ...p, [key]: s }));
   const setM = (key: string, v: string) => setMan((p) => ({ ...p, [key]: v }));
   const setAll = (s: EndorseSource) => {
     // "Set all to Manual" seeds the scalar inputs with the expert mean, else
-    // the baseline, so each field starts from a sensible value; exposure
+    // the current value, so each field starts from a sensible value; exposure
     // cells default the same way through manCell.
     if (s === 'manual') {
       const numStr = (v: number | null | undefined) => (v == null ? '' : String(v));
       setMan({
-        probability: numStr(eP != null ? Math.round(eP) : bP),
-        gp1: numStr(eG != null ? Math.round(eG * 100) : bG != null ? Math.round(bG * 100) : undefined),
-        peak: numStr(ePk != null ? Math.round(ePk) : bPk),
-        curve: eCv || bCv || '',
-        uncertainty: numStr(eU != null ? Math.round(eU) : bU),
+        probability: numStr(eP != null ? Math.round(eP) : driver.probability),
+        gp1: numStr(Math.round((eG ?? driver.gp1_pct_affected) * 100)),
+        peak: numStr(ePk != null ? Math.round(ePk) : driver.peak_year || undefined),
+        curve: eCv || driver.diffusion_curve || '',
+        uncertainty: numStr(eU != null ? Math.round(eU) : driver.uncertainty),
       });
     }
     setSrc({ probability: s, gp1: s, peak: s, curve: s, uncertainty: s, category: s, region: s });
     // The value chain follows where a value exists; its manual choice is a
     // click on the rail, so "manual" leaves it alone.
-    if (s === 'baseline') setEndorsedVc(baseVcStage);
+    if (s === 'current') setEndorsedVc(currentVcStage);
+    else if (s === 'baseline') setEndorsedVc(baseVcStage);
     else if (s === 'expert' && vcMajority != null) setEndorsedVc(vcMajority.stage);
   };
   // Manual exposure cells default to the expert mean (rounded) where scored,
-  // else the baseline; editing a cell switches its grid to Manual.
-  const manCell = (kind: string, key: string, baseV: number | undefined, expAvg: number | undefined): number | undefined => {
+  // else the current score; editing a cell switches its grid to Manual.
+  const manCell = (kind: string, key: string, curV: number | undefined, expAvg: number | undefined): number | undefined => {
     const ex = manExpo[kind]?.[key];
     if (ex != null) return ex;
     if (expAvg != null) return Math.round(expAvg);
-    return baseV;
+    return curV;
   };
   const setManCell = (kind: string, key: string, v: number) => {
     setManExpo((p) => ({ ...p, [kind]: { ...(p[kind] ?? {}), [key]: v } }));
@@ -1559,16 +1692,18 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   const catCells = CATEGORIES.map((c) => ({
     key: c.name, label: shortCat(c.name), group: c.group,
     baseV: baseCat == null ? undefined : (baseCat[c.name] ?? 0),
+    curV: driver.category_exposure[c.name] ?? 0,
     expert: agg?.category_exposure[c.name],
   }));
   const regCells = REGIONS.map((r) => ({
     key: r, label: r,
     baseV: baseReg == null ? undefined : (baseReg[r] ?? 0),
+    curV: driver.regional_exposure[r] ?? 0,
     expert: agg?.regional_exposure[r],
   }));
   const buildManualMap = (kind: string, cells: ExposureRow[]): ExposureMap | undefined => {
     const out: ExposureMap = {};
-    for (const c of cells) { const v = manCell(kind, c.key, c.baseV, c.expert?.avg); if (v != null) out[c.key] = v; }
+    for (const c of cells) { const v = manCell(kind, c.key, c.curV, c.expert?.avg); if (v != null) out[c.key] = v; }
     return Object.keys(out).length ? out : undefined;
   };
 
@@ -1576,6 +1711,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   // that resolves to nothing is left out and keeps its value.
   const resolveProb = (): number | undefined => {
     const s = srcOf('probability', eP != null);
+    if (s === 'current') return undefined;
     if (s === 'manual') { const n = parseInt(man.probability ?? '', 10); return isNaN(n) ? undefined : Math.max(1, Math.min(5, n)); }
     if (s === 'baseline') return bP;
     return eP != null ? Math.round(eP) : undefined;
@@ -1583,6 +1719,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   // A GP1 share in (0, 1]: a zero share is left out.
   const resolveGp1 = (): number | undefined => {
     const s = srcOf('gp1', eG != null);
+    if (s === 'current') return undefined;
     let v: number | undefined;
     if (s === 'manual') { const n = parseInt(man.gp1 ?? '', 10); v = isNaN(n) ? undefined : Math.min(100, n) / 100; }
     else v = s === 'baseline' ? bG : eG;
@@ -1592,6 +1729,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   // without a peak year) is left out, so the driver keeps its timing.
   const resolvePeak = (): number | undefined => {
     const s = srcOf('peak', ePk != null);
+    if (s === 'current') return undefined;
     let n: number | undefined;
     if (s === 'manual') { const m = parseInt(man.peak ?? '', 10); n = isNaN(m) ? undefined : Math.max(2026, Math.min(2035, m)); }
     else if (s === 'baseline') n = bPk;
@@ -1601,6 +1739,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   };
   const resolveCurve = (): string | undefined => {
     const s = srcOf('curve', !!eCv);
+    if (s === 'current') return undefined;
     if (s === 'manual') return man.curve || undefined;
     if (s === 'baseline') return bCv;
     return eCv;
@@ -1609,6 +1748,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
   // stays unscored.
   const resolveUnc = (): number | undefined => {
     const s = srcOf('uncertainty', eU != null);
+    if (s === 'current') return undefined;
     let n: number | null | undefined;
     if (s === 'manual') { const m = parseInt(man.uncertainty ?? '', 10); n = isNaN(m) ? undefined : m; }
     else if (s === 'baseline') n = bU;
@@ -1626,7 +1766,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
 
   const endorse = async () => {
     setErr(null); setSaving(true);
-    const u: DriverUpdate = {};
+    const u: DriverUpdate = { revision: driver.revision };
     if (resolved.probability != null) u.probability = resolved.probability;
     if (resolved.gp1 != null) u.gp1_pct_affected = resolved.gp1;
     if (resolved.peak != null) u.peak_year = resolved.peak;
@@ -1635,28 +1775,36 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
     const sc = srcOf('category', hasCatE);
     if (sc === 'manual') { const m = buildManualMap('category', catCells); if (m) u.category_exposure = m; }
     else if (sc === 'baseline') { if (baseCat) u.category_exposure = baseCat; }
-    else { const c = expertMap(catCells); if (c) u.category_exposure = c; }
+    else if (sc === 'expert') { const c = expertMap(catCells); if (c) u.category_exposure = c; }
     const sr = srcOf('region', hasRegE);
     if (sr === 'manual') { const m = buildManualMap('region', regCells); if (m) u.regional_exposure = m; }
     else if (sr === 'baseline') { if (baseReg) u.regional_exposure = baseReg; }
-    else { const r = expertMap(regCells); if (r) u.regional_exposure = r; }
-    // The endorsed stage writes its canonical profile; the baseline stage
-    // writes the baseline profile itself, so a stage that does not move leaves
-    // the stored profile as it is.
-    if (endorsedVcStage != null) {
+    else if (sr === 'expert') { const r = expertMap(regCells); if (r) u.regional_exposure = r; }
+    // A stage that does not move leaves the stored profile as it is; the
+    // baseline stage writes the baseline profile itself, any other stage its
+    // canonical profile.
+    if (endorsedVcStage != null && endorsedVcStage !== currentVcStage) {
       u.vc_exposure = baseVcStage != null && endorsedVcStage === baseVcStage && baseVc
         ? baseVc
         : canonicalVcProfile(endorsedVcStage);
     }
     try { await updateDriver(driver.id, u); setDone(true); }
-    catch (e) { setErr((e as Error)?.message ?? 'Endorse failed'); }
+    catch (e) {
+      setErr(e instanceof ApiError && e.status === 409
+        ? 'The driver changed after this panel loaded; it now shows the current version. Check it and endorse again.'
+        : (e as Error)?.message ?? 'Endorse failed');
+    }
     finally { setSaving(false); }
   };
 
   const exposureCell = (kind: 'category' | 'region', c: ExposureRow) => (
     <ExposureCompareCell key={c.key} label={c.label} baseVal={c.baseV} expert={c.expert}
-      manualVal={manCell(kind, c.key, c.baseV, c.expert?.avg)} onManual={(v) => setManCell(kind, c.key, v)} />
+      manualVal={manCell(kind, c.key, c.curV, c.expert?.avg)} onManual={(v) => setManCell(kind, c.key, v)} />
   );
+  // What "Keep" writes for a scalar field: nothing; shown as the current value.
+  const keep = (v: React.ReactNode) => `keep ${v}`;
+  const resultOf = (key: string, hasExpert: boolean, resolvedText: React.ReactNode, currentText: React.ReactNode) =>
+    srcOf(key, hasExpert) === 'current' ? keep(currentText) : resolvedText;
 
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ padding: '24px 32px 30px', backgroundColor: S.surface, borderTop: `1px solid ${S.cardBorder}` }}>
@@ -1670,7 +1818,9 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
         </span>
       </div>
 
-      {loaded && count === 0 ? (
+      {failed ? (
+        <ProposalsUnavailable what="there is nothing to endorse right now" onRetry={retry} />
+      ) : loaded && count === 0 ? (
         <div style={{ padding: '26px 0', textAlign: 'center', color: S.onSurfaceVariant }}>
           <Users size={20} style={{ color: S.primary }} />
           <div style={{ marginTop: 8, fontSize: 14 }}>No expert proposals yet for this driver.</div>
@@ -1694,7 +1844,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                   expert={<><ColorDots value={eP != null ? Math.round(eP) : 0} color={REVIEWED_COLOR} /><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 12, color: REVIEWED_COLOR }}>{eP != null ? eP.toFixed(1) : NO_VALUE}</span>{eP != null && bP != null ? <DeltaChip value={eP - bP} /> : null}</>} />
                 <Decide cur={srcOf('probability', eP != null)} onPick={(s) => setS('probability', s)} baselineOk={bP != null} expertOk={eP != null}
                   manual={<input type="number" min={1} max={5} value={man.probability ?? ''} onChange={(e) => setM('probability', e.target.value)} placeholder="1–5" style={manInput} />}
-                  result={resolved.probability ?? NO_VALUE} />
+                  result={resultOf('probability', eP != null, resolved.probability ?? NO_VALUE, driver.probability)} />
               </SectionCard>
 
               <SectionCard title="Impact: GP1 % exposed" icon={BarChart3} footnote="Share of category GP1 this driver can move at full materialization.">
@@ -1703,7 +1853,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                   expert={<><MiniBar v={eG} color={REVIEWED_COLOR} />{eG != null && bG != null ? <DeltaChip value={(eG - bG) * 100} unit="pp" digits={0} /> : null}</>} />
                 <Decide cur={srcOf('gp1', eG != null)} onPick={(s) => setS('gp1', s)} baselineOk={bG != null} expertOk={eG != null}
                   manual={<span className="inline-flex items-center gap-1"><input type="number" min={1} max={100} value={man.gp1 ?? ''} onChange={(e) => setM('gp1', e.target.value)} placeholder="%" style={manInput} /><span style={{ fontSize: 12, color: S.mutedText }}>%</span></span>}
-                  result={pctI(resolved.gp1)} />
+                  result={resultOf('gp1', eG != null, pctI(resolved.gp1), pctI(driver.gp1_pct_affected))} />
               </SectionCard>
 
               <SectionCard title="Materialization timing" icon={Clock}>
@@ -1715,7 +1865,7 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                       expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{ePk != null ? Math.round(ePk) : NO_VALUE}</span>{ePk != null && bPk != null ? <DeltaChip value={ePk - bPk} unit="y" digits={0} /> : null}</>} />
                     <Decide cur={srcOf('peak', ePk != null)} onPick={(s) => setS('peak', s)} baselineOk={bPk != null} expertOk={ePk != null}
                       manual={<input type="number" min={2026} max={2035} value={man.peak ?? ''} onChange={(e) => setM('peak', e.target.value)} placeholder="year" style={{ ...manInput, width: 80 }} />}
-                      result={resolved.peak ?? NO_VALUE} />
+                      result={resultOf('peak', ePk != null, resolved.peak ?? NO_VALUE, driver.peak_year || NO_VALUE)} />
                   </div>
                   <div>
                     <FieldLabel>Diffusion Curve</FieldLabel>
@@ -1724,7 +1874,8 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                       expert={<span className="inline-flex items-center gap-2">{eCv ? <DiffusionGlyph curve={eCv} color={REVIEWED_COLOR} /> : null}<span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eCv ? curveLabel(eCv) : NO_VALUE}</span>{eCv ? <DeltaChip value={eCv === bCv ? 0 : 1} digits={0} /> : null}</span>} />
                     <Decide cur={srcOf('curve', !!eCv)} onPick={(s) => setS('curve', s)} baselineOk={!!bCv} expertOk={!!eCv}
                       manual={<select value={man.curve ?? ''} onChange={(e) => setM('curve', e.target.value)} style={{ ...manInput, width: 'auto' }}><option value="">{NO_VALUE}</option>{Object.entries(DIFFUSION_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>}
-                      result={resolved.curve ? curveLabel(resolved.curve) : NO_VALUE} />
+                      result={resultOf('curve', !!eCv, resolved.curve ? curveLabel(resolved.curve) : NO_VALUE,
+                        driver.diffusion_curve ? curveLabel(driver.diffusion_curve) : NO_VALUE)} />
                   </div>
                 </div>
               </SectionCard>
@@ -1735,7 +1886,8 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                   expert={<><span style={{ fontFamily: HEADLINE_FONT, fontWeight: 800, fontSize: 14, color: REVIEWED_COLOR }}>{eU != null ? uncLabel(Math.round(eU)) : NO_VALUE}</span>{eU != null && bU != null ? <DeltaChip value={Math.round(eU) - bU} digits={0} /> : null}</>} />
                 <Decide cur={srcOf('uncertainty', eU != null)} onPick={(s) => setS('uncertainty', s)} baselineOk={bU != null} expertOk={eU != null}
                   manual={<input type="number" min={0} max={5} value={man.uncertainty ?? ''} onChange={(e) => setM('uncertainty', e.target.value)} placeholder="0–5" style={manInput} />}
-                  result={resolved.uncertainty != null ? uncLabel(resolved.uncertainty) : NO_VALUE} />
+                  result={resultOf('uncertainty', eU != null, resolved.uncertainty != null ? uncLabel(resolved.uncertainty) : NO_VALUE,
+                    driver.uncertainty != null ? uncLabel(driver.uncertainty) : NO_VALUE)} />
               </SectionCard>
             </div>
 
@@ -1769,7 +1921,8 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                   </span>
                 }
               >
-                <EpicentreVotePanel baseline={baseVcStage} votes={vcVotes} majority={vcMajority} endorsed={endorsedVcStage} onEndorse={setEndorsedVc} />
+                <EpicentreVotePanel baseline={baseVcStage} current={currentVcStage} votes={vcVotes} majority={vcMajority}
+                  endorsed={endorsedVcStage} onEndorse={setEndorsedVc} />
               </SectionCard>
             </div>
           </div>
@@ -1794,19 +1947,8 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
                       padding: '10px 12px', borderRadius: 10,
                       backgroundColor: S.surfaceLow, border: `1px solid ${S.cardBorder}`,
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: HEADLINE_FONT, fontSize: 12.5, fontWeight: 800, color: S.onSurface }}>
-                          {s.name}
-                        </span>
-                        {s.role ? (
-                          <span style={{
-                            fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
-                            padding: '2px 8px', borderRadius: 999,
-                            backgroundColor: S.surface, color: S.onSurfaceVariant, border: `1px solid ${S.cardBorder}`,
-                          }}>
-                            {s.role}
-                          </span>
-                        ) : null}
+                      <div style={{ fontFamily: HEADLINE_FONT, fontSize: 12.5, fontWeight: 800, color: S.onSurface, marginBottom: 5 }}>
+                        {s.name}
                       </div>
                       <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: S.onSurface, whiteSpace: 'pre-wrap' }}>
                         {s.comment}
@@ -1821,6 +1963,10 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
             <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: S.mutedText }}>Set all to:</span>
+              <button type="button" onClick={() => setAll('current')}
+                style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: S.onSurfaceVariant }}>
+                Keep current
+              </button>
               <button type="button" onClick={() => setAll('expert')}
                 style={{ border: `1px solid ${S.cardBorder}`, cursor: 'pointer', fontFamily: HEADLINE_FONT, fontSize: 11.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, background: S.surface, color: REVIEWED_COLOR }}>
                 Experts ø
@@ -1857,29 +2003,37 @@ const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, update:
 };
 
 // ─── The page ──────────────────────────────────────────────────────
+/** A search another view opens the page with; `seq` goes up with every
+ *  opening, so opening the same driver twice counts twice. */
+export interface DriverSearch {
+  query: string;
+  seq: number;
+}
+
 interface DriversProps {
-  /** A search to apply on arrival: the Consumer Journey's drill-through hands
-   *  down a driver name. */
-  initialSearch?: string | null;
+  /** A search to apply on arrival: the drill-through from the Consumer
+   *  Journey and the Shift Analysis hands down a driver name. */
+  search?: DriverSearch | null;
   /** Admins get the driver editor and the Review & Endorse mode. */
   isAdmin?: boolean;
 }
 
-const Drivers: FC<DriversProps> = ({ initialSearch, isAdmin = false }) => {
-  const { drivers, loading, backendAvailable, updateDriver } = usePrism();
+const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
+  const { drivers, driversError, loading, backendAvailable, updateDriver, reload } = usePrism();
   // The category a driver must be exposed to, by its API name; null shows all.
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [search, setSearch] = useState(initialSearch ?? '');
+  const [search, setSearch] = useState(opened?.query ?? '');
 
-  // Adopt a drill-through search from the Consumer Journey whenever the parent
-  // hands down a new value (the page resets it between navigations, so a
-  // repeat visit to the same driver counts). Adjusted during render against
-  // the last value adopted, so the list is already filtered in the pass that
+  // Adopt a drill-through whenever a new one arrives: its query replaces the
+  // search and the category filter is cleared, so the driver is never hidden
+  // by a filter left from an earlier visit. Adjusted during render against
+  // the last one adopted, so the list is already filtered in the pass that
   // follows the navigation.
-  const [adoptedSearch, setAdoptedSearch] = useState(initialSearch);
-  if (adoptedSearch !== initialSearch) {
-    setAdoptedSearch(initialSearch);
-    if (initialSearch != null && initialSearch !== '') setSearch(initialSearch);
+  const [adoptedSeq, setAdoptedSeq] = useState(opened?.seq ?? 0);
+  if (opened && opened.seq !== adoptedSeq) {
+    setAdoptedSeq(opened.seq);
+    setSearch(opened.query);
+    setCategoryFilter(null);
   }
   // The driver whose row is expanded.
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -2082,14 +2236,19 @@ const Drivers: FC<DriversProps> = ({ initialSearch, isAdmin = false }) => {
 
           {/* Rows */}
           <div>
-            {loading && (
+            {loading && drivers.length === 0 && (
               <EmptyRow text="Loading drivers…" icon={<Layers size={20} />} />
             )}
-            {!loading && !backendAvailable && (
-              <EmptyRow text="Backend unavailable: reconnect to view live driver data." icon={<AlertTriangle size={20} />} />
+            {!loading && !backendAvailable && drivers.length === 0 && (
+              <EmptyRow text="The PRISM service cannot be reached; the drivers show once it answers." icon={<AlertTriangle size={20} />} />
             )}
-            {!loading && backendAvailable && sorted.length === 0 && (
-              <EmptyRow text="No drivers match the current filter." icon={<Search size={20} />} />
+            {!loading && backendAvailable && driversError && drivers.length === 0 && (
+              <EmptyRow text={`The drivers could not be loaded: ${driversError}`} icon={<AlertTriangle size={20} />}
+                action={{ label: 'Try again', onClick: () => { void reload(); } }} />
+            )}
+            {!loading && drivers.length > 0 && sorted.length === 0 && (
+              <EmptyRow text="No drivers match the current search and filter." icon={<Search size={20} />}
+                action={{ label: 'Clear search and filter', onClick: () => { setSearch(''); setCategoryFilter(null); } }} />
             )}
             {sorted.map((d, idx) => {
               const expanded = expandedId === d.id;
@@ -2331,15 +2490,23 @@ const FieldLabel: FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 // Editable 0–5 dot scale for the category, regional and manual exposure cells.
+// An unscored cell (value undefined) shows no dot at all, never a 0.
 const EditableDots: FC<{
-  value: number;
-  onChange: (next: number) => void;
+  value: number | undefined;
+  /** The value chosen; undefined when a clearable cell's selected dot is clicked again. */
+  onChange: (next: number | undefined) => void;
+  /** What the cell scores, for screen readers ("Hair: Care exposure"). */
+  label: string;
+  /** Clicking the selected dot again clears the cell (Expert Rating). */
+  clearable?: boolean;
   /** When set (e.g. "Baseline 3 / 5"), hovering the dots shows it, the same
    *  plain hover the Probability and GP1 % fields use, instead of the
    *  per-dot "N / 5" label. */
   hint?: string;
-}> = ({ value, onChange, hint }) => (
-  <div className="flex gap-1" role="radiogroup" aria-label={`Exposure ${value} of 5`} title={hint} style={{ cursor: hint ? 'help' : undefined }}>
+}> = ({ value, onChange, label, clearable = false, hint }) => (
+  <div className="flex gap-1" role="radiogroup"
+    aria-label={`${label}: ${value == null ? 'not scored' : `${value} of 5`}`}
+    title={hint} style={{ cursor: hint ? 'help' : undefined }}>
     {/* A 24px hit area per dot: padding and background-clip keep the painted
         dot at 14px, the negative margin keeps the 4px gap, and the global
         :focus-visible ring marks keyboard focus. */}
@@ -2347,19 +2514,21 @@ const EditableDots: FC<{
       <button
         key={d}
         type="button"
-        onClick={() => onChange(d)}
+        onClick={() => onChange(clearable && d === value ? undefined : d)}
         aria-checked={d === value}
         aria-label={`${d} of 5`}
         role="radio"
-        title={hint ?? `${d} / 5`}
+        title={hint ?? (clearable && d === value ? `${d} / 5, click again to clear` : `${d} / 5`)}
         style={{
           width: 24, height: 24, borderRadius: 999,
           border: 'none', padding: 5, margin: -5,
           boxSizing: 'border-box', backgroundClip: 'content-box',
           cursor: hint ? 'help' : 'pointer',
-          backgroundColor: d === 0
-            ? (value === 0 ? S.primary : S.surfaceHigh)
-            : (d <= value ? S.primary : S.surfaceHigh),
+          backgroundColor: value == null
+            ? S.surfaceHigh
+            : d === 0
+              ? (value === 0 ? S.primary : S.surfaceHigh)
+              : (d <= value ? S.primary : S.surfaceHigh),
           opacity: d === 0 ? 0.35 : 1,
           transition: 'background-color 120ms',
         }}
@@ -2399,11 +2568,11 @@ const sameSources = (a: DriverSource[], b: DriverSource[]): boolean =>
     s.title === b[i].title && s.url === b[i].url && s.tier === b[i].tier && s.note === b[i].note
   ));
 
-/** The DriverUpdate of a save: only the fields the admin changed, within the
- *  ranges the API accepts, and only sources with a title or a link. The PRISM
- *  Analysis is never part of it. */
+/** The DriverUpdate of a save: the revision the draft was taken from, and only
+ *  the fields the admin changed, within the ranges the API accepts, and only
+ *  sources with a title or a link. The PRISM Analysis is never part of it. */
 function updateFrom(draft: Draft, d: Driver): DriverUpdate {
-  const update: DriverUpdate = {};
+  const update: DriverUpdate = { revision: d.revision };
   if (draft.description !== d.description) update.description = draft.description;
   if (draft.direction !== d.direction) update.direction = draft.direction;
   if (draft.confidence !== d.confidence) update.confidence = draft.confidence;
@@ -2431,26 +2600,35 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
   const [draft, setDraft] = useState(() => draftOf(driver));
   const edit = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
 
-  // A new driver object (after a save the store reloads the drivers) resets
-  // the draft. Adjusted during render against the object the draft was last
-  // taken from; the initial draft above already comes from the current one.
-  const [draftSource, setDraftSource] = useState(driver);
-  if (draftSource !== driver) {
-    setDraftSource(driver);
+  // The driver the draft was taken from. Outside editing it follows every new
+  // driver object (after a save the store reloads the drivers); while editing
+  // it stays put, so a save names the revision the admin started from and a
+  // change made meanwhile is refused instead of overwritten.
+  const [draftBase, setDraftBase] = useState(driver);
+  if (!isEditing && draftBase !== driver) {
+    setDraftBase(driver);
     setDraft(draftOf(driver));
   }
+  const changedMeanwhile = isEditing && draftBase.revision !== driver.revision;
+
+  const startEditing = () => {
+    setDraftBase(driver);
+    setDraft(draftOf(driver));
+    setSaveError(null);
+    setIsEditing(true);
+  };
 
   const handleCancel = () => {
+    setDraftBase(driver);
     setDraft(draftOf(driver));
     setSaveError(null);
     setIsEditing(false);
   };
 
   const handleSave = async () => {
-    const update = updateFrom(draft, driver);
-    if (Object.keys(update).length === 0) {
-      setSaveError(null);
-      setIsEditing(false);
+    const update = updateFrom(draft, draftBase);
+    if (Object.keys(update).length === 1) {   // the revision alone: nothing changed
+      handleCancel();
       return;
     }
     setSaving(true);
@@ -2459,7 +2637,10 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
       await updateDriver(driver.id, update);
       setIsEditing(false);
     } catch (e) {
-      setSaveError((e as Error)?.message ?? 'Save failed');
+      setSaveError(e instanceof ApiError && e.status === 409
+        ? 'This driver was changed by someone else while you were editing. Your edits are still here; '
+          + 'discard them to see the current version, then make your change again.'
+        : (e as Error)?.message ?? 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -2532,7 +2713,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
           </>
         )}
         <EditedChip driver={driver} />
-        {!isEditing && driver.data_source && <MetaChip label={driver.data_source} />}
+        {!isEditing && driver.sources.length > 0 && <MetaChip label={evidenceLine(driver.sources)} />}
       </div>
 
       {/* Two columns: the editorial detail on the left, the exposure grids on
@@ -2770,7 +2951,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
                 <span style={{ fontSize: 11, color: S.mutedText }}>
                   {driver.uncertainty == null
                     ? 'Unscored: concentration 6 and the model-wide ±1-year jitter.'
-                    : `Beta concentration ${UNC_CONCENTRATION[Math.max(0, Math.min(5, driver.uncertainty))]} · peak-year jitter ±${UNC_PEAK_JITTER[Math.max(0, Math.min(5, driver.uncertainty))]} y`}
+                    : `Beta concentration ${UNCERTAINTY_KAPPA[Math.max(0, Math.min(5, driver.uncertainty))]} · peak-year jitter ±${UNCERTAINTY_PEAK_JITTER[Math.max(0, Math.min(5, driver.uncertainty))]} y`}
                 </span>
               </div>
             )}
@@ -2942,15 +3123,16 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           gap: 10, marginTop: 24,
         }}>
-          {saveError && isEditing && (
-            <span style={{ color: S.error, fontSize: 12, marginRight: 4 }}>
-              {saveError}
+          {isEditing && (saveError || changedMeanwhile) && (
+            <span role="alert" style={{ color: S.error, fontSize: 12, marginRight: 4, maxWidth: 520 }}>
+              {saveError ?? 'This driver was changed by someone else while you were editing; saving would be refused. '
+                + 'Discard your edits to see the current version.'}
             </span>
           )}
           {!isEditing && (
             <button
               type="button"
-              onClick={() => setIsEditing(true)}
+              onClick={startEditing}
               style={{
                 padding: '8px 20px',
                 borderRadius: 999,
@@ -2984,7 +3166,7 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
                   opacity: saving ? 0.5 : 1,
                 }}
               >
-                Cancel
+                {changedMeanwhile ? 'Discard edits' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -3014,16 +3196,24 @@ const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateDriver }
 };
 
 // ─── Editable exposure grids (the admin editor and Expert Rating) ──
+/** The map with one cell set, or removed when `val` is undefined. */
+const withCell = (exposures: ExposureMap, key: string, val: number | undefined): ExposureMap => {
+  const next = { ...exposures };
+  if (val == null) delete next[key]; else next[key] = val;
+  return next;
+};
+
 const EditableCategoryGrid: FC<{
   exposures: ExposureMap;
   onChange: (next: ExposureMap) => void;
   baseline?: ExposureMap;
-}> = ({ exposures, onChange, baseline }) => {
+  /** Cells may be left unscored and cleared again (Expert Rating). */
+  clearable?: boolean;
+}> = ({ exposures, onChange, baseline, clearable = false }) => {
   const grouped = {
     Hair: CATEGORIES.filter((c) => c.group === 'Hair'),
     LHC:  CATEGORIES.filter((c) => c.group === 'LHC'),
   };
-  const set = (key: string, val: number) => onChange({ ...exposures, [key]: val });
   return (
     <div className="space-y-4">
       {Object.entries(grouped).map(([group, cats]) => (
@@ -3038,8 +3228,10 @@ const EditableCategoryGrid: FC<{
             {cats.map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-1.5">
                 <EditableDots
-                  value={exposures[cat.name] ?? 0}
-                  onChange={(v) => set(cat.name, v)}
+                  value={clearable ? exposures[cat.name] : (exposures[cat.name] ?? 0)}
+                  onChange={(v) => onChange(withCell(exposures, cat.name, v))}
+                  label={`${cat.name} exposure`}
+                  clearable={clearable}
                   hint={baselineHint(baseline == null ? undefined : (baseline[cat.name] ?? 0))}
                 />
                 <div
@@ -3061,7 +3253,9 @@ const EditableRegionGrid: FC<{
   exposures: ExposureMap;
   onChange: (next: ExposureMap) => void;
   baseline?: ExposureMap;
-}> = ({ exposures, onChange, baseline }) => (
+  /** Cells may be left unscored and cleared again (Expert Rating). */
+  clearable?: boolean;
+}> = ({ exposures, onChange, baseline, clearable = false }) => (
   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
     {REGIONS.map((region) => (
       <div key={region} className="flex flex-col gap-1.5">
@@ -3069,8 +3263,10 @@ const EditableRegionGrid: FC<{
           {region}
         </div>
         <EditableDots
-          value={exposures[region] ?? 0}
-          onChange={(v) => onChange({ ...exposures, [region]: v })}
+          value={clearable ? exposures[region] : (exposures[region] ?? 0)}
+          onChange={(v) => onChange(withCell(exposures, region, v))}
+          label={`${region} exposure`}
+          clearable={clearable}
           hint={baselineHint(baseline == null ? undefined : (baseline[region] ?? 0))}
         />
       </div>
@@ -3079,13 +3275,23 @@ const EditableRegionGrid: FC<{
 );
 
 // ─── Empty and loading row ─────────────────────────────────────────
-const EmptyRow: FC<{ text: string; icon: React.ReactNode }> = ({ text, icon }) => (
+const EmptyRow: FC<{ text: string; icon: React.ReactNode; action?: { label: string; onClick: () => void } }> = ({
+  text, icon, action,
+}) => (
   <div
     className="px-8 py-16 flex flex-col items-center justify-center gap-3"
     style={{ color: S.onSurfaceVariant }}
   >
     <div style={{ color: S.primary }}>{icon}</div>
     <div className="text-sm">{text}</div>
+    {action && (
+      <button type="button" onClick={action.onClick} style={{
+        padding: '7px 16px', borderRadius: 999, border: `1px solid ${S.cardBorder}`, background: S.surface,
+        color: S.primary, fontFamily: HEADLINE_FONT, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+      }}>
+        {action.label}
+      </button>
+    )}
   </div>
 );
 

@@ -93,12 +93,12 @@ const cellGrid = () => region('Cell weights: share of HCB gross profit per categ
 describe('Model configuration: the parameters', () => {
   it("shows the code's parameters from the store's config", () => {
     STATE.store = makeStore({
-      config: makeConfig({ iterations: 12345, within_force_rho: 0.27, attenuation_source: 'overlap-correction-test', peak_year_jitter: 0 }),
+      config: makeConfig({ within_force_rho: 0.27, attenuation_source: 'overlap-correction-test', peak_year_jitter: 0 }),
     });
     openModal();
     openSection('Model configuration');
 
-    expect(parameter('Default iterations').getByText('12,345')).toBeTruthy();
+    expect(screen.queryByText('Default iterations')).toBeNull();   // a production run sets its own
     expect(parameter('Path horizon').getByText('2026–2035 · 10 years')).toBeTruthy();
     expect(parameter('Base year').getByText('2025')).toBeTruthy();
     expect(parameter('Peak-year jitter').getByText('Off')).toBeTruthy();
@@ -119,6 +119,16 @@ describe('Model configuration: the parameters', () => {
     openSection('Model configuration');
     expect(screen.getByText('No model configuration is available yet.')).toBeTruthy();
     expect(screen.getByText('There is no run yet, so there are no cell weights to show.')).toBeTruthy();
+  });
+
+  it('says why the configuration or the run could not be loaded', () => {
+    STATE.store = makeStore({
+      config: null, configError: 'Internal Server Error', simulation: null, simulationError: 'Invalid or expired token',
+    });
+    openModal();
+    openSection('Model configuration');
+    expect(screen.getByText('The model configuration could not be loaded: Internal Server Error')).toBeTruthy();
+    expect(screen.getByText('The run could not be loaded, so its cell weights cannot be shown: Invalid or expired token')).toBeTruthy();
   });
 
   it('has no editable control and makes no request', () => {
@@ -152,13 +162,13 @@ describe('Model configuration: the served run\'s cell weights', () => {
     openModal();
     openSection('Model configuration');
     expect(screen.getByText('Estimated HCB mix')).toBeTruthy();
-    expect(screen.queryByText('Finance figures')).toBeNull();
+    expect(screen.queryByText('From a weights file')).toBeNull();
     expect(screen.getByText('An estimate from public reporting, not Henkel P&L.')).toBeTruthy();
     expect(screen.getByText(/How these 52 shares were built/)).toBeTruthy();
     expect(screen.getByRole('region', { name: /Block split/ })).toBeTruthy();
   });
 
-  it("marks other weights as finance figures, with the run's source label", () => {
+  it("marks other weights as coming from a file, with the run's source label", () => {
     const finance = Object.fromEntries(Object.entries(ESTIMATED_CELL_WEIGHTS).map(([c, row]) => [c, { ...row }]));
     finance['Hair: Color'].Europe = 0.08;
     finance['Hair: Color']['North America'] = 0.03969658;
@@ -168,13 +178,25 @@ describe('Model configuration: the served run\'s cell weights', () => {
     openModal();
     openSection('Model configuration');
 
-    expect(screen.getByText('Finance figures')).toBeTruthy();
+    expect(screen.getByText('From a weights file')).toBeTruthy();
     expect(screen.getByText('Source: Finance: HCB gross-profit shares FY2025')).toBeTruthy();
     expect(screen.queryByText('Estimated HCB mix')).toBeNull();
     expect(screen.queryByText(/How these 52 shares were built/)).toBeNull();
     const colour = within(cellGrid()).getByRole('row', { name: /^Hair: Color/ });
     expect(within(colour).getByText('8.00')).toBeTruthy();
     expect(within(within(cellGrid()).getByRole('row', { name: /^Σ region/ })).getByText('50.02%')).toBeTruthy();
+  });
+
+  it('keeps the derivation off a run on an earlier version of the estimate', () => {
+    const earlier = Object.fromEntries(Object.entries(ESTIMATED_CELL_WEIGHTS).map(([c, row]) => [c, { ...row }]));
+    earlier['Hair: Color'].Europe += 0.001;
+    earlier['Hair: Care'].Europe -= 0.001;
+    STATE.store = makeStore({ simulation: makeSimulation({ cell_weights_used: earlier }) });
+    openModal();
+    openSection('Model configuration');
+    expect(screen.getByText('Estimated HCB mix')).toBeTruthy();
+    expect(screen.getByText(/an earlier version of the estimate/)).toBeTruthy();
+    expect(screen.queryByText(/How these 52 shares were built/)).toBeNull();
   });
 });
 

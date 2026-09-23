@@ -3,9 +3,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryCode, categoryDisplay,
-  fmtDate, fmtDateTime, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow, shiftColor,
-  shortCat,
+  CONTRACTION, EXPANSION, FORCES, FORCE_COLORS, NO_VALUE, REGIONS, categoryDisplay, evidenceLine,
+  fmtDate, fmtDateTime, fmtDateTimeUtc, fmtPct, fmtShift, groupDisplay, heatFill, heatScaleFor, heatText, shiftArrow,
+  shiftColor, shortCat,
 } from '@/lib/format';
 
 describe('fmtShift', () => {
@@ -51,6 +51,29 @@ describe('dates', () => {
     expect(fmtDate('not a date')).toBe(NO_VALUE);
     expect(fmtDateTime(null)).toBe(NO_VALUE);
   });
+
+  it('shows a stored moment in UTC, named as such', () => {
+    expect(fmtDateTimeUtc('2026-09-13T08:05:00+00:00')).toBe('13 Sep 2026, 08:05 UTC');
+    expect(fmtDateTimeUtc('2026-09-13T23:30:00-02:00')).toBe('14 Sep 2026, 01:30 UTC');
+    expect(fmtDateTimeUtc(undefined)).toBe(NO_VALUE);
+  });
+});
+
+describe('evidenceLine', () => {
+  it('names the publishers of the first three sources with their dates', () => {
+    expect(evidenceLine([
+      { title: 'Circana: private label reaches record 50% unit share', note: 'Apr 2026' },
+      { title: 'YouGov Germany: nur Eigenmarken gewinnen hinzu', note: 'Jul 2026' },
+      { title: 'BCG: European consumers are still cutting back', note: '' },
+      { title: 'NIQ: Premium has a new price', note: 'Jun 2026' },
+    ])).toBe('Circana (Apr 2026); YouGov Germany (Jul 2026); BCG');
+  });
+
+  it('shortens a long publisher and leaves out a source without a title', () => {
+    const long = 'A'.repeat(60);
+    expect(evidenceLine([{ title: '', note: '2026' }, { title: long, note: '' }])).toBe(`${'A'.repeat(47)}…`);
+    expect(evidenceLine([])).toBe('');
+  });
 });
 
 describe('direction and colour', () => {
@@ -88,8 +111,6 @@ describe('taxonomy', () => {
 
   it('labels categories in plain English', () => {
     expect(categoryDisplay('LHC: FCN')).toBe('Fabric Clean');
-    expect(categoryCode('LHC: FCN')).toBe('FCN');
-    expect(categoryCode('Hair: Care')).toBeUndefined();
     expect(categoryDisplay('Unknown')).toBe('Unknown');
     expect(groupDisplay('LHC')).toBe('Laundry & Home Care');
     expect(shortCat('Hair: Color')).toBe('Color');

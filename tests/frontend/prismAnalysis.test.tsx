@@ -12,8 +12,11 @@
  *   4. An unedited driver carries no provenance chip; an edited one carries
  *      the Edited chip, whose tooltip lists each changed input with its
  *      baseline value.
- *   5. The admin save sends only the fields that changed, never the PRISM
- *      Analysis, and shows the error when the store rejects the write.
+ *   5. The admin save sends the revision it started from and only the
+ *      fields that changed, never the PRISM Analysis; it shows the error when
+ *      the store rejects the write and says so when the driver changed
+ *      meanwhile.
+ *   6. A reading whose basis median differs from the served run's says so.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
@@ -21,17 +24,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Driver } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
-import { makeDriver, makeStore } from './fixtures/prism';
+import { linearPath, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ current: null as PrismStore | null }));
 
 vi.mock('@/hooks/usePrism', () => ({ default: () => STORE.current }));
-vi.mock('@/api/client', () => ({
+vi.mock('@/api/client', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('@/api/client')>()).ApiError,
   getDriverProposals: vi.fn(async () => { throw new Error('not used in these tests'); }),
   saveMyProposal: vi.fn(async () => { throw new Error('not used in these tests'); }),
 }));
 
-import Drivers, { splitAnalysis } from '@/components/dashboard/Drivers';
+import { ApiError } from '@/api/client';
+import Drivers, { basisMedian, splitAnalysis } from '@/components/dashboard/Drivers';
 
 // framer-motion restores the scroll position after it measures the expanded
 // panel's height; jsdom has no window.scrollTo, and scrolling is not under test.
@@ -211,6 +216,7 @@ describe('Drivers page: the admin editor', () => {
 
     await waitFor(() => expect(store.updateDriver).toHaveBeenCalledTimes(1));
     expect(store.updateDriver).toHaveBeenCalledWith('consumer_r01', {
+      revision: 1,
       description: 'Private label keeps gaining share across European grocery.',
       sources: [{
         title: 'Circana: private label reaches a record share', url: 'https://example.org/circana', tier: 'A', note: 'May 2026',
@@ -236,7 +242,34 @@ describe('Drivers page: the admin editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(screen.getByText('Driver consumer_r01 not found')).toBeTruthy());
-    expect(updateDriver).toHaveBeenCalledWith('consumer_r01', { probability: 3 });
+    expect(updateDriver).toHaveBeenCalledWith('consumer_r01', { revision: 1, probability: 3 });
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+
+  it('says so when the driver changed meanwhile, and keeps the edits until they are discarded', async () => {
+    const updateDriver = vi.fn<PrismStore['updateDriver']>(async () => {
+      throw new ApiError(409, 'This driver was changed after you opened it.');
+    });
+    const { driver } = openDriver({}, { isAdmin: true, store: { updateDriver } });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/changed by someone else while you were editing/)).toBeTruthy();
+    expect(screen.getByDisplayValue('My wording.')).toBeTruthy();
+  });
+});
+
+describe('the basis line against the served run', () => {
+  it('reads the median a reading was reconciled to', () => {
+    expect(basisMedian(READING)).toEqual({ year: '2035', percent: Number(HEADLINE) });
+    expect(basisMedian('no basis here')).toBeNull();
+  });
+
+  it('adds a note only when the served run has moved away from it', () => {
+    openDriver({}, { store: { simulation: makeSimulation({ totals: { ...makeSimulation().totals, portfolio: linearPath(-0.061) } }) } });
+    expect(screen.getByRole('note').textContent).toContain('portfolio median of -6.1%');
+    cleanup();
+    openDriver({}, { store: { simulation: makeSimulation({ totals: { ...makeSimulation().totals, portfolio: linearPath(Number(HEADLINE) / 100) } }) } });
+    expect(screen.queryByRole('note')).toBeNull();
   });
 });

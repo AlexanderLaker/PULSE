@@ -2,8 +2,10 @@
 /**
  * The Shift Analysis page without a run says why, from the service's own
  * diagnosis (unreachable, no run yet, a run that cannot be served, no
- * database), and its "About this model" footer names the run's cell-weight
- * basis and the pass-through of the served configuration.
+ * database, a database awaiting the migration, none configured); above the
+ * matrix it says when the drivers or the engine have moved on since the run;
+ * its "About this model" footer names the run's cell-weight basis and the
+ * pass-through of the served configuration.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
@@ -51,12 +53,14 @@ describe('Shift Analysis without a run', () => {
     expect(await screen.findByText('Results unavailable right now')).toBeTruthy();
   });
 
-  it('tells an admin which of the four reasons applies', async () => {
+  it('tells an admin which of the reasons applies', async () => {
     const cases: Array<[DiagnosticsResult | null, string]> = [
       [null, 'The run cannot be loaded'],
       [diagnosis({ simulation_reason: 'no_rows' }), 'No simulation persisted yet'],
       [diagnosis({ simulation_reason: 'malformed', latest_run_id: 99 }), 'Latest run cannot be served'],
       [diagnosis({ simulation_reason: 'db_error', db_reachable: false }), 'Backend cannot reach the database'],
+      [diagnosis({ simulation_reason: 'legacy_schema' }), 'The database awaits migration 0001'],
+      [diagnosis({ simulation_reason: 'no_database', db_reachable: false, db_host: null }), 'No database configured'],
     ];
     for (const [result, title] of cases) {
       STORE.store = makeStore({ simulation: null });
@@ -78,8 +82,16 @@ describe('Shift Analysis without a run', () => {
     expect(screen.getByText('#99')).toBeTruthy();
   });
 
+  it("shows an admin why the dashboard's request for a stored run failed", async () => {
+    STORE.store = makeStore({ simulation: null, simulationError: 'Invalid or expired token' });
+    DIAGNOSIS.result = diagnosis({ simulation_reason: 'ok', latest_run_id: 99 });
+    render(<ShiftAnalysis isAdmin />);
+    expect(await screen.findByText('The run cannot be loaded')).toBeTruthy();
+    expect(screen.getByText('Invalid or expired token')).toBeTruthy();
+  });
+
   it('treats a store that lost the service as unreachable without asking it', () => {
-    STORE.store = makeStore({ simulation: null, backendAvailable: false, connectionState: 'offline' });
+    STORE.store = makeStore({ simulation: null, backendAvailable: false });
     DIAGNOSIS.result = diagnosis({ simulation_reason: 'no_rows' });
     render(<ShiftAnalysis />);
     expect(screen.getByText('Results unavailable right now')).toBeTruthy();
@@ -115,17 +127,52 @@ describe('Shift Matrix lenses', () => {
   });
 });
 
+describe('what the served run does not show yet', () => {
+  it('names the drivers edited since the run', () => {
+    STORE.store = makeStore({
+      simulation: makeSimulation({ inputs_since_run: { changed: ['consumer_r01', 'technology_r01'], added: [], removed: [] } }),
+    });
+    render(<ShiftAnalysis />);
+    expect(screen.getByRole('status').textContent).toContain('2 drivers have changed since this run (C-01, T-01)');
+  });
+
+  it('says when the run comes from another engine version', () => {
+    STORE.store = makeStore({ health: { ...makeStore().health!, version: '2.13.0' } });
+    render(<ShiftAnalysis />);
+    expect(screen.getByRole('status').textContent).toContain('computed by engine 2.12.0; the service runs 2.13.0');
+  });
+
+  it('says nothing while the run matches the drivers and the engine', () => {
+    STORE.store = makeStore();
+    render(<ShiftAnalysis />);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('the lens toolbar', () => {
+  it('keeps the keyboard focus on the lens control when the lens changes', () => {
+    STORE.store = makeStore();
+    render(<ShiftAnalysis />);
+    const force = screen.getByRole('button', { name: 'Force attribution' });
+    force.focus();
+    fireEvent.click(force);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Force attribution' }));
+  });
+});
+
 describe('About this model', () => {
   it('names the estimated HCB mix as the basis of a run on the estimate', () => {
     STORE.store = makeStore();
     render(<ShiftAnalysis />);
     openAbout();
     expect(screen.getByText('Run #99')).toBeTruthy();
+    expect(screen.getByText('13 Sep 2026, 23:04 UTC')).toBeTruthy();
     expect(screen.getByText('estimated HCB mix, not Henkel P&L (52 cells)')).toBeTruthy();
-    expect(screen.getByText('±0.01 pp across 3 seeds (2035 portfolio median)')).toBeTruthy();
+    expect(screen.getByText('0.010 pp spread across 3 seeds (2035 portfolio median)')).toBeTruthy();
+    expect(screen.getByText('at most 0.001 pp (2035 category medians)')).toBeTruthy();
   });
 
-  it('names a finance file by its own label', () => {
+  it("names a weights file by its own label, whatever its numbers", () => {
     const finance = JSON.parse(JSON.stringify(ESTIMATED_CELL_WEIGHTS)) as Record<string, Record<string, number>>;
     finance['LHC: FCN'].Europe += 0.01;
     finance['Hair: Color'].Europe -= 0.01;
@@ -134,9 +181,18 @@ describe('About this model', () => {
     });
     render(<ShiftAnalysis />);
     openAbout();
-    expect(screen.getByText('finance figures (52 cells)')).toBeTruthy();
+    expect(screen.getByText('from the file given to the run (52 cells)')).toBeTruthy();
     expect(screen.getByText('Finance GP1 shares FY2025')).toBeTruthy();
     expect(screen.queryByText(/estimated HCB mix/)).toBeNull();
+  });
+
+  it('reads the basis from the label the run stored, not from matching numbers', () => {
+    STORE.store = makeStore({
+      simulation: makeSimulation({ cell_weights_source: 'Test grid: equal shares' }),   // the estimate's numbers
+    });
+    render(<ShiftAnalysis />);
+    openAbout();
+    expect(screen.getByText('from the file given to the run (52 cells)')).toBeTruthy();
   });
 
   it('shows the pass-through per force of the served configuration, largest first', () => {

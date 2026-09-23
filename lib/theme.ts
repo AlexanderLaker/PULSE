@@ -72,5 +72,3 @@ export const S = {
   greenSoft: '#d1fae5',
   blueSoft:  '#dbeafe',
 } as const;
-
-export type ThemeTokens = typeof S;

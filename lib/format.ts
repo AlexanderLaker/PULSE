@@ -1,7 +1,8 @@
 /**
  * How the dashboard shows a shift: colour, sign, arrow and rounding, the
- * force, region and category lists, and the date format. Every view formats through
- * here, so a shift reads the same everywhere.
+ * force, region and category lists, the date format and a driver's one-line
+ * evidence. Every view formats through here, so a shift reads the same
+ * everywhere.
  *
  *   - One colour pair: green for expansion, red for contraction. A shift also
  *     carries a sign and an arrow, so its direction never depends on colour.
@@ -17,9 +18,8 @@ export const EXPANSION = '#1f7a3d';
 export const CONTRACTION = '#9f403d';
 export const NEUTRAL = '#64748b';
 
+/** A light expansion tint for badges (the Reviewed pill). */
 export const EXPANSION_SOFT = 'rgba(31, 122, 61, 0.10)';
-export const CONTRACTION_SOFT = 'rgba(159, 64, 61, 0.10)';
-export const NEUTRAL_SOFT = 'rgba(100, 116, 139, 0.10)';
 
 /** RGB channels of the pair, for tints with their own alpha: `rgba(${EXPANSION_RGB}, 0.2)`. */
 export const EXPANSION_RGB = '31, 122, 61';
@@ -86,11 +86,6 @@ export function categoryDisplay(name: string | null | undefined): string {
   return CATEGORY_BY_NAME[name]?.label ?? name;
 }
 
-/** The acronym chip of a Laundry & Home Care category; undefined for Hair. */
-export function categoryCode(name: string | null | undefined): string | undefined {
-  return name ? CATEGORY_BY_NAME[name]?.code : undefined;
-}
-
 /** A group's heading: "LHC" reads "Laundry & Home Care". */
 export function groupDisplay(group: string | null | undefined): string {
   if (!group) return '';
@@ -141,7 +136,7 @@ export function fmtDate(d: string | number | Date | null | undefined): string {
   return `${dt.getDate()} ${MONTHS[dt.getMonth()]} ${dt.getFullYear()}`;
 }
 
-/** "26 Jun 2026, 08:38". */
+/** "26 Jun 2026, 08:38" in the browser's time zone. */
 export function fmtDateTime(d: string | number | Date | null | undefined): string {
   if (d == null) return NO_VALUE;
   const dt = new Date(d);
@@ -149,16 +144,40 @@ export function fmtDateTime(d: string | number | Date | null | undefined): strin
   return `${fmtDate(dt)}, ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 }
 
+/** "13 Sep 2026, 08:12 UTC": a moment everyone reads the same, wherever they are. */
+export function fmtDateTimeUtc(d: string | number | Date | null | undefined): string {
+  if (d == null) return NO_VALUE;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return NO_VALUE;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}, `
+    + `${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())} UTC`;
+}
+
+// ── Evidence ────────────────────────────────────────────────────────────────
+
+/**
+ * A driver's evidence in one line: the publisher of each of its first three
+ * sources with the note (usually the date), as in "Circana (Apr 2026); YouGov
+ * Germany (Jul 2026)". The publisher is the title before its first colon,
+ * shortened to 48 characters; a source without a title is left out.
+ */
+export function evidenceLine(sources: ReadonlyArray<{ title: string; note: string }>): string {
+  return sources.slice(0, 3)
+    .map((s) => {
+      const title = s.title.split(':')[0]!.trim();
+      const publisher = title.length <= 48 ? title : `${title.slice(0, 47).trimEnd()}…`;
+      return publisher && s.note.trim() ? `${publisher} (${s.note.trim()})` : publisher;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
 // ── Shift colour and direction ──────────────────────────────────────────────
 
 export function shiftColor(v: number | null | undefined): string {
   if (v == null || Math.abs(v) < FLAT_EPS) return NEUTRAL;
   return v > 0 ? EXPANSION : CONTRACTION;
-}
-
-export function shiftSoft(v: number | null | undefined): string {
-  if (v == null || Math.abs(v) < FLAT_EPS) return NEUTRAL_SOFT;
-  return v > 0 ? EXPANSION_SOFT : CONTRACTION_SOFT;
 }
 
 /** "▲" up, "▼" down, "" when flat. */

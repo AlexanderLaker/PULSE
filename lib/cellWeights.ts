@@ -15,6 +15,18 @@ import { ESTIMATED_CELL_WEIGHTS } from '@/lib/cellWeightProvenance';
 /** category -> region -> share. */
 export type CellWeights = Record<string, Record<string, number>>;
 
+/**
+ * What a run's cell weights are, read from the source label the run stored:
+ * the estimate, whose label starts with "ESTIMATE" (prism/config.py
+ * DEFAULT_CELL_WEIGHTS_SOURCE), or the weights of a file given to the
+ * production run, whose label is the file's own.
+ */
+export type CellWeightsBasis = 'estimate' | 'file';
+
+export function cellWeightsBasis(source: string | null | undefined): CellWeightsBasis {
+  return (source ?? '').trimStart().toUpperCase().startsWith('ESTIMATE') ? 'estimate' : 'file';
+}
+
 export interface CellMarginals {
   categories: string[];
   regions: string[];

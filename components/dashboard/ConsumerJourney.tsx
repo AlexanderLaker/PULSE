@@ -92,7 +92,12 @@ interface TileEdits {
   analysis: string;
 }
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden';
+type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden' | 'conflict';
+
+/** Where the content on screen came from: the stored version, the bundled copy
+ *  (nothing stored yet), or the bundled copy because the stored one could not
+ *  be loaded. Saving is possible only once the answer is known. */
+type ContentOrigin = 'loading' | 'stored' | 'bundled' | 'unavailable';
 
 /** A cited driver: its code-map entry and, once the drivers have loaded, the live row. */
 interface CitedDriver {
@@ -668,18 +673,6 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
 }) => {
   const { drivers } = usePrism();
 
-  // The bundled content, replaced by the newest saved version once it arrives.
-  const [content, setContent] = useState<JourneyContent>({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
-  useEffect(() => {
-    let cancelled = false;
-    getJourneyContent()
-      .then((stored) => {
-        if (stored && !cancelled) setContent({ lhc: stored.lhc, hair: stored.hair });
-      })
-      .catch(() => { /* the bundled content stays */ });
-    return () => { cancelled = true; };
-  }, []);
-
   const [tab, setTab] = useState<JourneyKey>('lhc');
   const [typeFilter, setTypeFilter] = useState<Set<TileType>>(() => new Set(['product', 'tech', 'service']));
   const [selected, setSelected] = useState<SelectedTile | null>(null);
@@ -688,6 +681,37 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+  // The bundled content, replaced by the newest saved version once it arrives.
+  // `version` is the stored version the content on screen started from (0 for
+  // the bundled copy); a save names it, so a save made by someone else in the
+  // meantime is never overwritten unseen.
+  const [content, setContent] = useState<JourneyContent>({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
+  const [version, setVersion] = useState(0);
+  const [origin, setOrigin] = useState<ContentOrigin>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    getJourneyContent()
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored.content) setContent({ lhc: stored.content.lhc, hair: stored.content.hair });
+        else setContent({ lhc: LHC_JOURNEY, hair: HAIR_JOURNEY });
+        setVersion(stored.version);
+        setOrigin(stored.content ? 'stored' : 'bundled');
+      })
+      .catch(() => { if (!cancelled) setOrigin('unavailable'); });
+    return () => { cancelled = true; };
+  }, [loadAttempt]);
+  /** Load the stored content again, dropping unsaved edits (after a conflict or a failed load). */
+  const loadStored = useCallback(() => {
+    setSelected(null);
+    setEditing(false);
+    setSaveState('idle');
+    setSaveMsg(null);
+    setOrigin('loading');
+    setLoadAttempt((n) => n + 1);
+  }, []);
 
   const stages = content[tab];
 
@@ -734,16 +758,20 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     setEditing(false);
   }, [selectedIndex, flatTiles]);
 
-  // ← and → step to the neighbouring tiles while the dialog is open.
+  // ← and → step to the neighbouring tiles while the dialog is open, but not
+  // while a tile is being edited or the caret is in a field, where the arrows
+  // move the caret.
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || editing) return;
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
       if (e.key === 'ArrowLeft') stepSelection(-1);
       else if (e.key === 'ArrowRight') stepSelection(1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, stepSelection]);
+  }, [selected, editing, stepSelection]);
 
   // ── Admin edits: local until "Save to server" ──
   const mutateTiles = useCallback((stageId: string, side: Side, update: (tiles: JourneyTile[]) => JourneyTile[]) => {
@@ -793,12 +821,16 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
     setEditing(true);
   }, [mutateTiles, tab, stages]);
 
-  /** Saves the whole tile map for every user; the route answers 403 unless the caller is an admin. */
+  /** Saves the whole tile map for every user; the route answers 403 unless the
+   *  caller is an admin, and 409 when someone saved after this content loaded. */
   const saveToServer = useCallback(async () => {
+    if (origin !== 'stored' && origin !== 'bundled') return;
     setSaveState('saving');
     setSaveMsg(null);
     try {
-      await saveJourneyContent(content);
+      const saved = await saveJourneyContent(content, version);
+      setVersion(saved.version);
+      setOrigin('stored');
       setSaveState('saved');
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
@@ -806,11 +838,18 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         setSaveMsg('Admin required: your account cannot save journey content.');
         return;
       }
+      if (e instanceof ApiError && e.status === 409) {
+        setSaveState('conflict');
+        setSaveMsg('Someone else saved the journey after you opened it, so this save was refused. '
+          + 'Load their version (your unsaved edits here are dropped) and make your changes again.');
+        return;
+      }
       const status = e instanceof ApiError && e.status > 0 ? ` (${e.status})` : '';
       setSaveState('error');
       setSaveMsg(`Save failed${status}. ${(e as Error).message.slice(0, 160)}`);
     }
-  }, [content]);
+  }, [content, version, origin]);
+  const canSave = origin === 'stored' || origin === 'bundled';
 
   // ════════════════════════════════════════════════════════════════════
   // RENDER
@@ -851,16 +890,21 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
             {isAdmin && (
               <button
                 onClick={() => { if (editMode) setEditing(false); setEditMode(v => !v); }}
+                // Editing starts once the saved journey is known: an edit made on
+                // the bundled copy while it loads would be replaced when it arrives.
+                disabled={!editMode && origin === 'loading'}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-200"
                 style={{
                   backgroundColor: editMode ? S.primaryContainer : S.surfaceLow,
                   color: editMode ? S.onPrimaryContainer : S.onSurfaceVariant,
-                  border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT,
+                  border: 'none', cursor: !editMode && origin === 'loading' ? 'wait' : 'pointer', fontFamily: HEADLINE_FONT,
                 }}
                 aria-pressed={editMode}
                 title={editMode
                   ? 'Editing is on: click to hide the add / edit / save controls'
-                  : 'Show the editing controls (add tiles, edit tiles, save to server)'}
+                  : origin === 'loading'
+                    ? 'Loading the saved journey…'
+                    : 'Show the editing controls (add tiles, edit tiles, save to server)'}
               >
                 <Edit3 size={11} strokeWidth={2.5} /> Edit board
               </button>
@@ -1054,10 +1098,23 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-3">
+              {!canSave && (
+                <span className="text-[11.5px] font-bold" style={{ color: origin === 'unavailable' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                  {origin === 'loading'
+                    ? 'Loading the saved journey…'
+                    : 'The saved journey could not be loaded; saving is off so it cannot be overwritten.'}
+                </span>
+              )}
               {saveMsg && (
-                <span className="text-[11.5px] font-bold" style={{ color: saveState === 'error' || saveState === 'forbidden' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                <span className="text-[11.5px] font-bold" style={{ color: saveState === 'error' || saveState === 'forbidden' || saveState === 'conflict' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                   {saveMsg}
                 </span>
+              )}
+              {(saveState === 'conflict' || origin === 'unavailable') && (
+                <button onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
+                  style={{ backgroundColor: S.surfaceLow, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
+                  {origin === 'unavailable' ? 'Try again' : 'Load the saved version'}
+                </button>
               )}
               {saveState === 'saved' && !saveMsg && (
                 <span className="inline-flex items-center gap-1 text-[11.5px] font-bold" style={{ color: S.expansion, fontFamily: HEADLINE_FONT }}>
@@ -1066,12 +1123,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               )}
               <button
                 onClick={saveToServer}
-                disabled={saveState === 'saving'}
+                disabled={saveState === 'saving' || !canSave}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold"
                 style={{
-                  backgroundColor: saveState === 'saving' ? S.surfaceHigh : S.primary,
-                  color: saveState === 'saving' ? S.onSurfaceVariant : '#fff',
-                  border: 'none', cursor: saveState === 'saving' ? 'default' : 'pointer', fontFamily: HEADLINE_FONT,
+                  backgroundColor: saveState === 'saving' || !canSave ? S.surfaceHigh : S.primary,
+                  color: saveState === 'saving' || !canSave ? S.onSurfaceVariant : '#fff',
+                  border: 'none', cursor: saveState === 'saving' || !canSave ? 'default' : 'pointer', fontFamily: HEADLINE_FONT,
                 }}
               >
                 <Save size={13} strokeWidth={2.5} />

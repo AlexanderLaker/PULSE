@@ -1,6 +1,6 @@
 /**
- * The Clerk session check on every request except static assets (Next.js
- * calls this file proxy.ts; it was middleware.ts before Next 16).
+ * The Clerk session check on every request except static assets. Next.js 16
+ * runs proxy.ts before the routes (the file older versions call middleware.ts).
  *
  * A page without a session redirects to /sign-in; an /api/* route answers
  * 401 JSON instead, so fetch() gets an error rather than a redirect to HTML.
@@ -40,6 +40,6 @@ export const config = {
     // Everything except Next.js internals and static files (unless named in the query string).
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // API routes always.
-    '/(api|trpc)(.*)',
+    '/api/(.*)',
   ],
 };

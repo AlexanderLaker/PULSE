@@ -12,7 +12,8 @@ export interface ModelConfig {
   per_force_attenuation: Record<ForceName, number>;
   /** Overlap correction among the drivers of one force. */
   within_force_overlap: Record<ForceName, number>;
-  /** [i][j]: share of force i's signal already carried by force j. */
+  /** [i][j]: share of force i's signal already carried by force j; the
+   *  derivation input of the attenuation, which the engine reads instead. */
   force_overlap_matrix: Record<ForceName, Record<ForceName, number>>;
   /** Copula correlation between forces (latent scale). */
   force_correlation_matrix: Record<ForceName, Record<ForceName, number>>;
@@ -24,8 +25,6 @@ export interface ModelConfig {
   peak_year_jitter: number;
   base_year: number;
   path_years: number[];
-  /** Default iterations per chain. */
-  iterations: number;
   /** The default cell weights (the estimated HCB mix); a run records the weights it used. */
   cell_weights: Record<string, Record<string, number>>;
   cell_weights_source: string;
@@ -38,23 +37,29 @@ export interface HealthStatus {
   driver_count: number;
   categories: number;
   has_simulation: boolean;
-  simulation_reason: 'ok' | 'no_rows' | 'db_error';
+  /** 'degraded' comes with legacy_schema (the database awaits migration 0001),
+   *  no_database (no database URL configured) or db_error. */
+  simulation_reason: 'ok' | 'no_rows' | DatabaseFailure;
   latest_run_id: number | null;
 }
 
-/** Why a run cannot be shown: no run yet, a run missing part of its contract, or no database. */
-export type SimulationReason = 'ok' | 'no_rows' | 'malformed' | 'db_error';
+/** Why the database cannot be used: it awaits migration 0001, none is configured, or anything else. */
+export type DatabaseFailure = 'legacy_schema' | 'no_database' | 'db_error';
+
+/** Why a run cannot be shown: no run yet, a run missing part of its contract, or a database failure. */
+export type SimulationReason = 'ok' | 'no_rows' | 'malformed' | DatabaseFailure;
 
 /** GET /api/v1/diagnostics: what the service sees of its database. No credentials. */
 export interface DiagnosticsResult {
   db_mode: 'postgres' | 'sqlite';
-  /** Host name only, never a credential. */
-  db_host: string;
+  /** Host name only, never a credential; null when it cannot be read. */
+  db_host: string | null;
   db_url_env: 'POSTGRES_URL' | 'DATABASE_URL' | null;
   db_reachable: boolean;
   simulation_run_count: number;
   latest_run_id: number | null;
   latest_run_date: string | null;
+  /** The failure in words that name no host, user or password. */
   error: string | null;
   simulation_reason: SimulationReason;
   version: string;

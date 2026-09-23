@@ -15,6 +15,7 @@
  * does the same with direct database access. Every promotion is written to
  * the audit log.
  */
+import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSQL } from '@/lib/db';
 import { ensureUserRolesTable } from '@/lib/roles';
@@ -26,6 +27,12 @@ interface BootstrapBody {
   email?: unknown;
 }
 
+/** Compares the secrets in constant time: both are hashed to the same length first. */
+function sameSecret(provided: string, expected: string): boolean {
+  const digest = (s: string) => createHash('sha256').update(s).digest();
+  return timingSafeEqual(digest(provided), digest(expected));
+}
+
 export async function POST(req: Request) {
   const expected = process.env.ADMIN_BOOTSTRAP_SECRET;
   if (!expected) {
@@ -34,7 +41,7 @@ export async function POST(req: Request) {
   }
 
   const provided = req.headers.get('x-bootstrap-secret');
-  if (!provided || provided !== expected) {
+  if (!provided || !sameSecret(provided, expected)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

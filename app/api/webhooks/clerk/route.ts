@@ -79,7 +79,7 @@ export async function POST(req: Request) {
           break;
         }
         const role = await upsertUserRole(id, email);
-        console.log(`[clerk-webhook] ${event.type}: ${email} → ${role}`);
+        console.log(`[clerk-webhook] ${event.type}: ${id} is ${role}`);
         break;
       }
 

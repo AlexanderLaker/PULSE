@@ -13,9 +13,16 @@
  *   const ref = useRef<HTMLElement | null>(null);
  *   useOverlay(open, onClose, ref);
  *   <aside ref={ref} role="dialog" aria-modal="true">...</aside>
+ *
+ * The dashboard keeps visited panes mounted but hidden. An overlay inside a
+ * hidden pane (PaneActiveContext false) lets go of the page, the scroll lock
+ * and the keys included, and takes them back when its pane shows again.
  */
 
-import { useEffect, useRef, type RefObject } from 'react';
+import { createContext, useContext, useEffect, useRef, type RefObject } from 'react';
+
+/** Whether the dashboard pane around an overlay is on screen (true outside the panes). */
+export const PaneActiveContext = createContext(true);
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -25,6 +32,8 @@ export default function useOverlay(
   onClose: () => void,
   containerRef: RefObject<HTMLElement | null>,
 ) {
+  const paneActive = useContext(PaneActiveContext);
+  const active = open && paneActive;
   // Keep the latest onClose without re-binding listeners every render
   // (assigned in an effect: refs must not be written during render).
   const onCloseRef = useRef(onClose);
@@ -33,7 +42,7 @@ export default function useOverlay(
   });
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
 
     // (5) Remember the trigger to restore focus on close.
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -92,5 +101,5 @@ export default function useOverlay(
       // (5) Restore focus to the trigger.
       previouslyFocused?.focus?.({ preventScroll: true });
     };
-  }, [open, containerRef]);
+  }, [active, containerRef]);
 }

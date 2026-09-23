@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
  * The shared store (hooks/usePrism.ts): what it loads, how it reports an
- * unreachable service, how it recovers, and that an admin edit fails loudly.
+ * unreachable service and a part that failed to load, how it recovers, and
+ * what an admin edit does to the drivers and the run.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
@@ -26,11 +27,13 @@ function Probe() {
   lastStore = store;
   return (
     <div>
-      <span data-testid="connection">{store.connectionState}</span>
       <span data-testid="available">{String(store.backendAvailable)}</span>
       <span data-testid="drivers">{store.drivers.length}</span>
       <span data-testid="run">{store.simulation ? 'yes' : 'no'}</span>
       <span data-testid="error">{store.error ?? ''}</span>
+      <span data-testid="drivers-error">{store.driversError ?? ''}</span>
+      <span data-testid="run-error">{store.simulationError ?? ''}</span>
+      <span data-testid="database">{store.databaseFailure ?? ''}</span>
       <span data-testid="loading">{String(store.loading)}</span>
       <button data-testid="reload" onClick={() => void store.reload()}>reload</button>
     </div>
@@ -56,7 +59,6 @@ describe('usePrism', () => {
     mount();
     await loaded();
     expect(api.primeViewerCookie).toHaveBeenCalledBefore(vi.mocked(api.getHealth));
-    expect(screen.getByTestId('connection').textContent).toBe('connected');
     expect(screen.getByTestId('available').textContent).toBe('true');
     expect(screen.getByTestId('drivers').textContent).toBe('1');
     expect(screen.getByTestId('run').textContent).toBe('yes');
@@ -75,7 +77,6 @@ describe('usePrism', () => {
     vi.mocked(api.getHealth).mockRejectedValue(new Error('boom'));
     mount();
     await loaded();
-    expect(screen.getByTestId('connection').textContent).toBe('offline');
     expect(screen.getByTestId('available').textContent).toBe('false');
     expect(screen.getByTestId('error').textContent).toBe('The PRISM service is unavailable: boom');
     expect(screen.getByTestId('run').textContent).toBe('no');
@@ -84,28 +85,69 @@ describe('usePrism', () => {
   it('loads everything again on reload once the service answers', async () => {
     vi.mocked(api.getHealth).mockRejectedValueOnce(new Error('cold start'));
     mount();
-    await waitFor(() => expect(screen.getByTestId('connection').textContent).toBe('offline'));
+    await waitFor(() => expect(screen.getByTestId('available').textContent).toBe('false'));
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
     act(() => { screen.getByTestId('reload').click(); });
-    await waitFor(() => expect(screen.getByTestId('connection').textContent).toBe('connected'));
+    await waitFor(() => expect(screen.getByTestId('run').textContent).toBe('yes'));
+    expect(screen.getByTestId('available').textContent).toBe('true');
     expect(screen.getByTestId('run').textContent).toBe('yes');
     expect(screen.getByTestId('error').textContent).toBe('');
   });
 
-  it('refreshes the drivers after an admin edit and rejects a failed one', async () => {
+  it('refreshes the drivers and the run after an admin edit', async () => {
     vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
     mount();
     await loaded();
-    vi.mocked(api.updateDriver).mockResolvedValue({ status: 'updated', driver_id: 'consumer_r01', changed: ['probability'] });
-    vi.mocked(api.getDrivers).mockResolvedValue([makeDriver({ probability: 4 }), makeDriver({ id: 'consumer_r02' })]);
-    await act(async () => { await lastStore!.updateDriver('consumer_r01', { probability: 4 }); });
-    expect(api.updateDriver).toHaveBeenCalledWith('consumer_r01', { probability: 4 });
-    expect(screen.getByTestId('drivers').textContent).toBe('2');
-
-    vi.mocked(api.updateDriver).mockRejectedValue(new Error('Admin role required'));
-    await act(async () => {
-      await expect(lastStore!.updateDriver('consumer_r01', { probability: 3 })).rejects.toThrow('Admin role required');
+    expect(api.getSimulation).toHaveBeenCalledTimes(1);
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
     });
-    expect(screen.getByTestId('error').textContent).toBe('Admin role required');
+    vi.mocked(api.getDrivers).mockResolvedValue([makeDriver({ probability: 4 }), makeDriver({ id: 'consumer_r02' })]);
+    await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
+    expect(api.updateDriver).toHaveBeenCalledWith('consumer_r01', { revision: 1, probability: 4 });
+    expect(screen.getByTestId('drivers').textContent).toBe('2');
+    await waitFor(() => expect(api.getSimulation).toHaveBeenCalledTimes(2));   // the "edited since the run" notice follows
+  });
+
+  it('rejects a refused edit, shows the drivers as they now are, and keeps the store error clear', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    mount();
+    await loaded();
+    vi.mocked(api.updateDriver).mockRejectedValue(new Error('This driver was changed after you opened it'));
+    vi.mocked(api.getDrivers).mockResolvedValue([makeDriver({ revision: 3 })]);
+    await act(async () => {
+      await expect(lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 3 }))
+        .rejects.toThrow('changed after you opened it');
+    });
+    expect(lastStore!.drivers[0]!.revision).toBe(3);
+    expect(screen.getByTestId('error').textContent).toBe('');   // the editor shows the message, not the whole page
+    expect(api.getSimulation).toHaveBeenCalledTimes(1);          // nothing was saved, so the run is not reloaded
+  });
+
+  it('reports a part that failed to load and keeps what loaded before', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    mount();
+    await loaded();
+    vi.mocked(api.getDrivers).mockRejectedValue(new Error('Invalid or expired token'));
+    vi.mocked(api.getSimulation).mockRejectedValue(new Error('timed out'));
+    act(() => { screen.getByTestId('reload').click(); });
+    await loaded();
+    expect(screen.getByTestId('drivers-error').textContent).toBe('Invalid or expired token');
+    expect(screen.getByTestId('run-error').textContent).toBe('timed out');
+    expect(screen.getByTestId('drivers').textContent).toBe('1');   // the last good list stays
+    expect(screen.getByTestId('run').textContent).toBe('yes');     // and so does the last good run
+    expect(screen.getByTestId('error').textContent).toBe('');
+  });
+
+  it('names a database the service cannot use', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth({
+      status: 'degraded', has_simulation: false, simulation_reason: 'legacy_schema', driver_count: 0,
+    }));
+    vi.mocked(api.getDrivers).mockRejectedValue(new Error('This database uses the previous schema'));
+    mount();
+    await loaded();
+    expect(screen.getByTestId('database').textContent).toBe('legacy_schema');
+    expect(screen.getByTestId('available').textContent).toBe('true');
+    expect(screen.getByTestId('drivers-error').textContent).toContain('previous schema');
   });
 });

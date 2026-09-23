@@ -2,7 +2,7 @@
 /**
  * The Consumer Journey page: the rail, the tile dialog with its Why-chain and
  * the link to the Drivers page, the stored content that replaces the bundled
- * tiles, and the admin save.
+ * tiles, and the admin save with its version check.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
@@ -39,8 +39,8 @@ const T01 = makeDriver({
 
 beforeEach(() => {
   STORE.current = makeStore({ drivers: [T01] });
-  API.getJourneyContent.mockReset().mockResolvedValue(null);
-  API.saveJourneyContent.mockReset().mockResolvedValue({ status: 'saved', tiles: 300 });
+  API.getJourneyContent.mockReset().mockResolvedValue({ version: 0, content: null });
+  API.saveJourneyContent.mockReset().mockResolvedValue({ status: 'saved', version: 1, tiles: 300 });
 });
 
 afterEach(() => cleanup());
@@ -101,6 +101,18 @@ describe('ConsumerJourney: rail and tile dialog', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
+
+  it('steps to the next tile with the arrow keys, but not while the caret is in a field', async () => {
+    render(<ConsumerJourney />);
+    const first = openTile().getByRole('heading', { level: 2 }).textContent;
+    const field = document.createElement('input');
+    screen.getByRole('dialog').appendChild(field);
+    fireEvent.keyDown(field, { key: 'ArrowRight' });
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).toBe(first);
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    await waitFor(() =>
+      expect(within(screen.getByRole('dialog')).getByRole('heading', { level: 2 }).textContent).not.toBe(first));
+  });
 });
 
 describe('ConsumerJourney: stored content and the admin save', () => {
@@ -119,7 +131,7 @@ describe('ConsumerJourney: stored content and the admin save', () => {
       lhc: [{ id: 'sorting', label: 'Sorting', benefiting: [tile], negativelyImpacted: [] }],
       hair: [],
     };
-    API.getJourneyContent.mockResolvedValue(stored);
+    API.getJourneyContent.mockResolvedValue({ version: 7, content: stored });
     render(<ConsumerJourney />);
     expect(await screen.findByText('Stored tile')).toBeTruthy();
     expect(screen.queryByText(TILE)).toBeNull();
@@ -130,23 +142,54 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     expect(screen.queryByRole('button', { name: 'Edit board' })).toBeNull();
   });
 
-  it('saves the whole tile map for an admin', async () => {
+  /** The editing controls, once the stored content has answered. */
+  async function startEditing() {
+    const edit = screen.getByRole('button', { name: 'Edit board' });
+    await waitFor(() => expect((edit as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(edit);
+  }
+
+  it('saves the whole tile map for an admin, naming the version it was edited from', async () => {
     render(<ConsumerJourney isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit board' }));
+    await startEditing();
     fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
     expect(await screen.findByText('Saved')).toBeTruthy();
     expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
-    const sent = API.saveJourneyContent.mock.calls[0]![0] as JourneyContent;
+    const [sent, baseVersion] = API.saveJourneyContent.mock.calls[0]! as [JourneyContent, number];
     expect(Object.keys(sent).sort()).toEqual(['hair', 'lhc']);
     expect(sent.lhc.length).toBeGreaterThan(0);
     expect(sent.hair.length).toBeGreaterThan(0);
+    expect(baseVersion).toBe(0);   // the bundled content
+    // the next save starts from the version this one created
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    await waitFor(() => expect(API.saveJourneyContent).toHaveBeenCalledTimes(2));
+    expect(API.saveJourneyContent.mock.calls[1]![1]).toBe(1);
   });
 
   it('says so when the save route refuses the account', async () => {
     API.saveJourneyContent.mockRejectedValue(new ApiError(403, 'Admin role required'));
     render(<ConsumerJourney isAdmin />);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit board' }));
+    await startEditing();
     fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
     expect(await screen.findByText('Admin required: your account cannot save journey content.')).toBeTruthy();
+  });
+
+  it('refuses to overwrite a save made in the meantime and offers the saved version', async () => {
+    API.saveJourneyContent.mockRejectedValue(new ApiError(409, 'saved by someone else'));
+    render(<ConsumerJourney isAdmin />);
+    await startEditing();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    expect(await screen.findByText(/Someone else saved the journey after you opened it/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Load the saved version' }));
+    await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
+  });
+
+  it('turns saving off while the saved journey cannot be loaded', async () => {
+    API.getJourneyContent.mockRejectedValue(new ApiError(500, 'database down'));
+    render(<ConsumerJourney isAdmin />);
+    await startEditing();
+    expect(await screen.findByText(/saving is off so it cannot be overwritten/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 });

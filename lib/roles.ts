@@ -42,23 +42,26 @@ export async function getRole(clerkUserId: string): Promise<Role | null> {
 }
 
 /**
- * Add a user (or refresh the email of a known one) and return the role. The
- * first user becomes admin. Two sign-ups in the same instant could both see an
- * empty table; the worst case is two admins, which an admin can undo.
+ * Add a user, or refresh the email of a known one, and return the role the
+ * table holds for them. A new user becomes admin when the table is empty and
+ * viewer otherwise; a known user keeps their role. Two sign-ups in the same
+ * instant could both see an empty table; the worst case is two admins, which
+ * an admin can undo.
  */
 export async function upsertUserRole(clerkUserId: string, email: string): Promise<Role> {
   await ensureUserRolesTable();
   const sql = getSQL();
   const existing = (await sql`SELECT COUNT(*)::int AS n FROM user_roles`) as Array<{ n: number }>;
-  const role: Role = existing[0].n === 0 ? 'admin' : 'viewer';
-  await sql`
+  const roleIfNew: Role = existing[0].n === 0 ? 'admin' : 'viewer';
+  const rows = (await sql`
     INSERT INTO user_roles (clerk_user_id, email, role)
-    VALUES (${clerkUserId}, ${email.toLowerCase()}, ${role})
+    VALUES (${clerkUserId}, ${email.toLowerCase()}, ${roleIfNew})
     ON CONFLICT (clerk_user_id) DO UPDATE
       SET email = EXCLUDED.email,
           updated_at = NOW()
-  `;
-  return role;
+    RETURNING role
+  `) as Array<{ role: Role }>;
+  return rows[0].role;
 }
 
 /** Change a user's role. The caller must already have checked that it is an admin. */

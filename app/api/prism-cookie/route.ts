@@ -9,7 +9,9 @@
  *     admin token (lib/backend.ts).
  *   - httpOnly, Secure in production, SameSite=Lax and Path=/api/v1: script
  *     cannot read it and it is sent to the API only.
- *   - It lasts 12 hours; the dashboard asks for a fresh one whenever it loads.
+ *   - It lasts 12 hours. The dashboard asks for a fresh one whenever it
+ *     loads, and api/client.ts asks again when an /api/v1 request is answered
+ *     401, then repeats the request once.
  */
 import { NextResponse } from 'next/server';
 import { requireAuth, UnauthorizedError } from '@/lib/roles';
@@ -39,7 +41,7 @@ export async function GET() {
     );
     if (!token) {
       return NextResponse.json(
-        { ok: false, configured, error: 'token mint failed' },
+        { ok: false, configured, error: 'The API token could not be signed' },
         { status: 503 },
       );
     }
@@ -57,6 +59,6 @@ export async function GET() {
       return NextResponse.json({ error: err.message, configured }, { status: 401 });
     }
     console.error('[/api/prism-cookie] error:', err);
-    return NextResponse.json({ error: 'Failed to mint engine token', configured }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to sign the API token', configured }, { status: 500 });
   }
 }

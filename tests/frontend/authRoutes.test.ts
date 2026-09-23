@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.roleRows = [];
   process.env.PRISM_JWT_SECRET = 'x'.repeat(48);
-  answer(200, { status: 'updated', driver_id: 'consumer_r01', changed: ['probability'] });
+  answer(200, { status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2 });
 });
 
 describe('/api/me', () => {
@@ -73,7 +73,7 @@ describe('/api/me', () => {
 
 describe('/api/drivers/{id}', () => {
   const params = { params: Promise.resolve({ id: 'consumer_r01' }) };
-  const edit = (body: unknown = { probability: 4 }) =>
+  const edit = (body: unknown = { revision: 1, probability: 4 }) =>
     new Request('https://prism.test/api/drivers/consumer_r01', { method: 'PUT', body: JSON.stringify(body) });
 
   it('answers 401 without a session and 403 for a viewer, forwarding nothing', async () => {
@@ -88,13 +88,32 @@ describe('/api/drivers/{id}', () => {
     signedIn('admin');
     const res = await driverPUT(edit(), params);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'updated', driver_id: 'consumer_r01', changed: ['probability'] });
+    expect(await res.json()).toEqual({ status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2 });
     const call = forwarded();
     expect(call.url).toBe('https://prism.test/api/v1/drivers/consumer_r01');
     expect(call.method).toBe('PUT');
-    expect(call.body).toEqual({ probability: 4 });
+    expect(call.body).toEqual({ revision: 1, probability: 4 });
     expect(call.claims).toMatchObject({ sub: 'user_1', email: 'a@b.de', role: 'admin' });
     expect(call.claims.exp - Date.now() / 1000).toBeLessThanOrEqual(300);
+  });
+
+  it('calls the API on PRISM_API_ORIGIN when that is set', async () => {
+    signedIn('admin');
+    process.env.PRISM_API_ORIGIN = 'https://prism-hcb.vercel.app/';
+    try {
+      await driverPUT(edit(), params);
+      expect(forwarded().url).toBe('https://prism-hcb.vercel.app/api/v1/drivers/consumer_r01');
+    } finally {
+      delete process.env.PRISM_API_ORIGIN;
+    }
+  });
+
+  it('passes a refusal of a stale edit through as 409', async () => {
+    signedIn('admin');
+    answer(409, { detail: 'This driver was changed after you opened it.' });
+    const res = await driverPUT(edit(), params);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('This driver was changed after you opened it.');
   });
 
   it('refuses a body that is not a JSON object', async () => {
@@ -125,26 +144,40 @@ describe('/api/drivers/{id}', () => {
 describe('/api/journey', () => {
   const save = (body: unknown) =>
     new Request('https://prism.test/api/journey', { method: 'PUT', body: JSON.stringify(body) });
+  const empty = { lhc: [], hair: [] };
 
   it('answers 403 for a viewer', async () => {
     signedIn('viewer');
-    expect((await journeyPUT(save({ lhc: [], hair: [] }))).status).toBe(403);
+    expect((await journeyPUT(save({ base_version: 0, content: empty }))).status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('refuses content without both journeys', async () => {
+  it('refuses a body without the version it was edited from, or without both journeys', async () => {
     signedIn('admin');
-    const res = await journeyPUT(save({ lhc: [] }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe('The body must hold the lhc and hair journeys as arrays');
+    const noVersion = await journeyPUT(save({ content: empty }));
+    expect(noVersion.status).toBe(400);
+    expect((await noVersion.json()).error).toMatch(/^base_version must be/);
+    const oneJourney = await journeyPUT(save({ base_version: 3, content: { lhc: [] } }));
+    expect(oneJourney.status).toBe(400);
+    expect((await oneJourney.json()).error).toBe('content must hold the lhc and hair journeys as arrays');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("forwards an admin's save to PUT /api/v1/journey", async () => {
     signedIn('admin');
-    answer(200, { status: 'saved', tiles: 0 });
-    const res = await journeyPUT(save({ lhc: [], hair: [] }));
+    answer(200, { status: 'saved', version: 4, tiles: 0 });
+    const res = await journeyPUT(save({ base_version: 3, content: empty }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'saved', tiles: 0 });
+    expect(await res.json()).toEqual({ status: 'saved', version: 4, tiles: 0 });
     expect(forwarded().url).toBe('https://prism.test/api/v1/journey');
+    expect(forwarded().body).toEqual({ base_version: 3, content: empty });
+  });
+
+  it('passes a conflict through as 409 with its message', async () => {
+    signedIn('admin');
+    answer(409, { detail: 'The journey content was saved by someone else after you opened it.' });
+    const res = await journeyPUT(save({ base_version: 3, content: empty }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('The journey content was saved by someone else after you opened it.');
   });
 });

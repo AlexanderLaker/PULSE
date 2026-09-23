@@ -3,7 +3,9 @@
  *
  * Reads and the user's own expert proposals go straight to the PRISM API
  * under /api/v1 and are authenticated by the httpOnly viewer cookie that
- * /api/prism-cookie sets (see hooks/usePrism.ts). Admin writes go to the
+ * /api/prism-cookie sets (see hooks/usePrism.ts). The cookie lasts twelve
+ * hours; a /api/v1 request answered 401 asks for a new one and is sent once
+ * more, so a dashboard left open overnight keeps working. Admin writes go to the
  * dashboard's own routes under /api, which check the signed-in user's role
  * and forward the write with a short-lived admin token (lib/backend.ts): the
  * viewer cookie can never authorise an admin write. User management and the
@@ -36,7 +38,7 @@ function errorMessage(body: unknown, status: number): string {
   return detail != null ? JSON.stringify(detail) : `Request failed (${status})`;
 }
 
-async function send<T>(url: string, init: RequestInit = {}): Promise<T> {
+async function send<T>(url: string, init: RequestInit = {}, retried = false): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, {
@@ -49,6 +51,10 @@ async function send<T>(url: string, init: RequestInit = {}): Promise<T> {
       throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`);
     }
     throw new ApiError(0, 'The PRISM service could not be reached');
+  }
+  if (res.status === 401 && !retried && url.startsWith('/api/v1/')) {
+    await primeViewerCookie();
+    return send<T>(url, init, true);
   }
   if (!res.ok) {
     throw new ApiError(res.status, errorMessage(await res.json().catch(() => null), res.status));
@@ -79,9 +85,12 @@ export interface DriverUpdateResult {
   driver_id: string;
   /** The fields that changed; absent when nothing did. */
   changed?: string[];
+  /** The driver's revision after the edit. */
+  revision: number;
 }
 
-/** Admin edit, through the dashboard route that checks the role. */
+/** Admin edit, through the dashboard route that checks the role. Rejects with
+ *  an ApiError of status 409 when the driver changed after `update.revision`. */
 export const updateDriver = (id: string, update: DriverUpdate): Promise<DriverUpdateResult> =>
   send(`/api/drivers/${encodeURIComponent(id)}`, put(update));
 
@@ -95,11 +104,13 @@ export const saveMyProposal = (id: string, proposal: DriverProposal): Promise<Dr
 
 // ── The run and the configuration ───────────────────────────────────────────
 
-/** The served run with each category's percentile path lifted into `shifts`. */
+/** The served run with each category's percentile path lifted into `shifts`
+ *  and its year-on-year change bands into `velocity`. */
 export function normalizeSimulation(payload: SimulationPayload): SimulationResult {
   const { shift_matrix, ...rest } = payload;
   const shifts = Object.fromEntries(Object.entries(shift_matrix).map(([cat, cell]) => [cat, cell.path]));
-  return { ...rest, shifts };
+  const velocity = Object.fromEntries(Object.entries(shift_matrix).map(([cat, cell]) => [cat, cell.velocity]));
+  return { ...rest, shifts, velocity };
 }
 
 export const getSimulation = async (): Promise<SimulationResult> =>
@@ -109,16 +120,22 @@ export const getConfig = (): Promise<ModelConfig> => send('/api/v1/config');
 
 // ── Consumer Journey content ────────────────────────────────────────────────
 
-/** The newest content an admin saved; null while the bundled content applies. */
-export const getJourneyContent = (): Promise<JourneyContent | null> =>
-  send<JourneyContent>('/api/v1/journey').catch((e: unknown) => {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  });
+/** The stored journey content and its version; content null and version 0
+ *  while the bundled content applies. */
+export interface StoredJourney {
+  version: number;
+  content: JourneyContent | null;
+}
 
-/** Admin save of the whole tile map, through the dashboard route that checks the role. */
-export const saveJourneyContent = (content: JourneyContent): Promise<{ status: 'saved'; tiles: number }> =>
-  send('/api/journey', put(content));
+export const getJourneyContent = (): Promise<StoredJourney> => send('/api/v1/journey');
+
+/** Admin save of the whole tile map, through the dashboard route that checks
+ *  the role. `baseVersion` is the version the edit started from; the save is
+ *  refused with 409 if someone saved in the meantime. */
+export const saveJourneyContent = (
+  content: JourneyContent, baseVersion: number,
+): Promise<{ status: 'saved'; version: number; tiles: number }> =>
+  send('/api/journey', put({ base_version: baseVersion, content }));
 
 // ── Identity and users (dashboard routes) ───────────────────────────────────
 
