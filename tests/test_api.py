@@ -528,13 +528,12 @@ class TestProposals:
 
 class TestConfig:
     def test_the_configuration_is_read_only(self, api):
-        from prism.config import (DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_FORCE_OVERLAP_MATRIX,
-                                  DEFAULT_PER_FORCE_ATTENUATION)
+        from prism.config import DEFAULT_FORCE_OVERLAP_MATRIX, DEFAULT_PER_FORCE_ATTENUATION
         body = api.get("/api/v1/config", headers=bearer()).json()
         assert body["per_force_attenuation"] == DEFAULT_PER_FORCE_ATTENUATION
         assert body["force_overlap_matrix"] == DEFAULT_FORCE_OVERLAP_MATRIX
-        assert "iterations" not in body   # a production run sets its own; the served run reports it
-        assert body["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
+        # a run's size and its cell weights belong to the run, which reports them
+        assert not {"iterations", "cell_weights", "cell_weights_source"} & set(body)
         assert body["path_years"] == list(range(2026, 2036)) and body["base_year"] == 2025
         assert api.put("/api/v1/config", headers=bearer("admin"), json={}).status_code == 405
 

@@ -25,9 +25,6 @@ export interface ModelConfig {
   peak_year_jitter: boolean;
   base_year: number;
   path_years: number[];
-  /** The default cell weights (the estimated HCB mix); a run records the weights it used. */
-  cell_weights: Record<string, Record<string, number>>;
-  cell_weights_source: string;
 }
 
 /** GET /api/v1/health: cheap liveness and the two facts the dashboard needs. */

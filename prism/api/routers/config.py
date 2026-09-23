@@ -1,8 +1,9 @@
 """The model configuration production runs use, read-only.
 
 Changing a parameter is a reviewed code change (prism/config.py and its
-generators) followed by a production run; the finance cell weights enter at
-run time. The weights a particular run applied travel with that run.
+generators) followed by a production run. The cell weights are not served
+here: the finance weights enter at run time, and the weights a run applied
+travel with that run.
 """
 from fastapi import APIRouter, Depends
 
@@ -15,11 +16,7 @@ router = APIRouter()
 
 @router.get("/api/v1/config")
 def get_config(user: dict = Depends(require_auth)):
-    """The parameters of the model, plus the overlap matrix the attenuation is derived from.
-
-    The iteration count is left out: a production run sets its own (3 x
-    50,000) and the served run reports what it used.
-    """
+    """The parameters of the model, plus the overlap matrix the attenuation is derived from."""
     c = state.model_config()
     return {
         "force_weights": dict(c.force_weights),
@@ -32,6 +29,4 @@ def get_config(user: dict = Depends(require_auth)):
         "peak_year_jitter": c.peak_year_jitter,
         "base_year": c.base_year,
         "path_years": list(c.path_years),
-        "cell_weights": c.cell_weights,
-        "cell_weights_source": c.cell_weights_source,
     }

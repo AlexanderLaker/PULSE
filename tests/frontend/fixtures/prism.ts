@@ -163,8 +163,6 @@ export function makeConfig(overrides: Partial<ModelConfig> = {}): ModelConfig {
     peak_year_jitter: true,
     base_year: 2025,
     path_years: YEARS,
-    cell_weights: ESTIMATED_CELL_WEIGHTS,
-    cell_weights_source: ESTIMATE_SOURCE,
     ...overrides,
   };
 }
