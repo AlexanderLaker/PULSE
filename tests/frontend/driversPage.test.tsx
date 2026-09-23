@@ -174,6 +174,17 @@ describe('the admin editor checks what the API would refuse', () => {
     expect(vi.mocked(STORE.current!.updateDriver).mock.calls[0]).toEqual([driver.id, { revision: 7, peak_year: 2033 }]);
   });
 
+  it('after a save that timed out, asks for the stored driver before another save', async () => {
+    const { ApiError } = await import('@/lib/apiClient');
+    await openEditor();
+    vi.mocked(STORE.current!.updateDriver).mockRejectedValueOnce(new ApiError(0, 'The request timed out after 20 s', true));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Peak year, 2026 to 2035' }), { target: { value: '2033' } });
+    fireEvent.click(save());
+    expect(await screen.findByText(/did not answer in time and may still have been stored/)).toBeTruthy();
+    expect(save().disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Discard edits' })).toBeTruthy();
+  });
+
   it('holds Save while a source link is not an http(s) address', async () => {
     const driver = await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Add source' }));

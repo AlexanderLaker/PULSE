@@ -55,7 +55,9 @@ export interface TileEdits {
   analysis: string;
 }
 
-export type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden' | 'conflict';
+/** `uncertain`: the save did not answer in time and may have been stored; the
+ *  saved version must be loaded before the next save. */
+export type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'forbidden' | 'conflict' | 'uncertain';
 
 /** Where the content on screen came from: the stored version, the bundled copy
  *  (nothing stored yet), or the bundled copy because the stored one could not

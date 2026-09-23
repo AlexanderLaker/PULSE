@@ -217,6 +217,12 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         setSaveMsg('Admin required: your account cannot save journey content.');
         return;
       }
+      if (e instanceof ApiError && e.timedOut) {
+        setSaveState('uncertain');
+        setSaveMsg('The save did not answer in time and may still have been stored. Load the saved version '
+          + 'to see what the server holds (your unsaved edits here are dropped).');
+        return;
+      }
       if (e instanceof ApiError && e.status === 409) {
         setSaveState('conflict');
         setSaveMsg('Someone else saved the journey after you opened it, so this save was refused. '
@@ -228,7 +234,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       setSaveMsg(`Save failed${status}. ${(e as Error).message.slice(0, 160)}`);
     }
   }, [content, version, origin]);
-  const canSave = origin === 'stored' || origin === 'bundled';
+  const canSave = (origin === 'stored' || origin === 'bundled') && saveState !== 'uncertain';
 
   // ════════════════════════════════════════════════════════════════════
   // RENDER
@@ -500,7 +506,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-3">
-              {!canSave && (
+              {!canSave && saveState !== 'uncertain' && (
                 <span className="text-[11.5px] font-bold" style={{ color: origin === 'unavailable' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                   {origin === 'loading'
                     ? 'Loading the saved journey…'
@@ -508,11 +514,11 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                 </span>
               )}
               {saveMsg && (
-                <span className="text-[11.5px] font-bold" style={{ color: saveState === 'error' || saveState === 'forbidden' || saveState === 'conflict' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
+                <span className="text-[11.5px] font-bold" style={{ color: saveState === 'error' || saveState === 'forbidden' || saveState === 'conflict' || saveState === 'uncertain' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                   {saveMsg}
                 </span>
               )}
-              {(saveState === 'conflict' || origin === 'unavailable') && (
+              {(saveState === 'conflict' || saveState === 'uncertain' || origin === 'unavailable') && (
                 <button type="button" onClick={loadStored} className="px-3 py-1.5 rounded-full text-[12px] font-bold"
                   style={{ backgroundColor: S.surfaceLow, color: S.primary, border: 'none', cursor: 'pointer', fontFamily: HEADLINE_FONT }}>
                   {origin === 'unavailable' ? 'Try again' : 'Load the saved version'}

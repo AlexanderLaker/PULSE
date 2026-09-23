@@ -208,6 +208,19 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
   });
 
+  it('after a save that timed out, asks for the saved version before another save', async () => {
+    API.saveJourneyContent.mockRejectedValue(new ApiError(0, 'The request timed out after 20 s', true));
+    render(<ConsumerJourney isAdmin />);
+    await startEditing();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    expect(await screen.findByText(/did not answer in time and may still have been stored/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Load the saved version' }));
+    await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
   it('turns saving off while the saved journey cannot be loaded', async () => {
     API.getJourneyContent.mockRejectedValue(new ApiError(500, 'database down'));
     render(<ConsumerJourney isAdmin />);

@@ -23,7 +23,9 @@ import { errorDetail } from '@/lib/apiError';
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** `timedOut`: no answer came in time. The request may still have been
+   *  carried out, so a write that timed out has an unknown outcome. */
+  constructor(public status: number, message: string, public timedOut = false) {
     super(message);
     this.name = 'ApiError';
   }
@@ -39,7 +41,7 @@ async function send<T>(url: string, init: RequestInit = {}, retried = false): Pr
     });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'TimeoutError') {
-      throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`);
+      throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`, true);
     }
     throw new ApiError(0, 'The PRISM service could not be reached');
   }

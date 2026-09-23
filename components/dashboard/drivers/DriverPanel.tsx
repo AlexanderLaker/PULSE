@@ -108,6 +108,9 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // A save that timed out may have been stored: no second save before the
+  // admin has seen the driver as it is stored now.
+  const [uncertain, setUncertain] = useState(false);
   const [draft, setDraft] = useState(() => draftOf(driver));
   const edit = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
   // The peak year as typed: the draft takes it only while it is a year the
@@ -135,6 +138,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
     setDraft(draftOf(driver));
     setPeakText(String(driver.peak_year));
     setSaveError(null);
+    setUncertain(false);
     setIsEditing(true);
   };
 
@@ -143,6 +147,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
     setDraft(draftOf(driver));
     setPeakText(String(driver.peak_year));
     setSaveError(null);
+    setUncertain(false);
     setIsEditing(false);
   };
 
@@ -159,10 +164,14 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
       await updateDriver(driver.id, update);
       setIsEditing(false);
     } catch (e) {
-      setSaveError(e instanceof ApiError && e.status === 409
-        ? 'This driver was changed by someone else while you were editing. Your edits are still here; '
-          + 'discard them to see the current version, then make your change again.'
-        : (e as Error)?.message ?? 'Save failed');
+      if (e instanceof ApiError && e.timedOut) setUncertain(true);
+      setSaveError(e instanceof ApiError && e.timedOut
+        ? 'The save did not answer in time and may still have been stored. Discard your edits to see the '
+          + 'driver as it is stored now, and make the change again if it is missing.'
+        : e instanceof ApiError && e.status === 409
+          ? 'This driver was changed by someone else while you were editing. Your edits are still here; '
+            + 'discard them to see the current version, then make your change again.'
+          : (e as Error)?.message ?? 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -716,12 +725,12 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   opacity: saving ? 0.5 : 1,
                 }}
               >
-                {changedMeanwhile ? 'Discard edits' : 'Cancel'}
+                {changedMeanwhile || uncertain ? 'Discard edits' : 'Cancel'}
               </button>
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !formOk}
+                disabled={saving || !formOk || uncertain}
                 style={{
                   padding: '8px 20px',
                   borderRadius: 999,
@@ -731,8 +740,8 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                   backgroundColor: S.primary,
                   color: S.onPrimary,
                   border: 'none',
-                  cursor: saving || !formOk ? 'not-allowed' : 'pointer',
-                  opacity: saving || !formOk ? 0.5 : 1,
+                  cursor: saving || !formOk || uncertain ? 'not-allowed' : 'pointer',
+                  opacity: saving || !formOk || uncertain ? 0.5 : 1,
                 }}
               >
                 {saving ? 'Saving…' : 'Save'}
