@@ -10,11 +10,11 @@ import type { PercentileDistribution, SimulationResult } from '@/types';
 
 // ─── Lenses ──────────────────────────────────────────────────────────────
 
-export type ViewMode = 'time' | 'force' | 'vc' | 'region';
-type Lens = Exclude<ViewMode, 'time'>;
+export type Lens = 'time' | 'force' | 'vc' | 'region';
+type AttributionLens = Exclude<Lens, 'time'>;
 
 /** The columns of each attribution lens, in the engine's order. */
-const LENS_COLUMNS: Record<Lens, string[]> = {
+const LENS_COLUMNS: Record<AttributionLens, string[]> = {
   force: FORCES,
   vc: [...VC_STAGES],
   region: REGIONS,
@@ -62,8 +62,8 @@ export function columnTotals(data: CellMap, columns: string[], weights: number[]
   return Object.fromEntries(columns.map((col) => [col, weightedAvg(CATEGORY_NAMES.map((c) => data[c][col]), weights)]));
 }
 
-export function buildMatrix(simulation: SimulationResult, view: ViewMode, year: number, weights: number[]): MatrixModel {
-  if (view === 'time') {
+export function buildMatrix(simulation: SimulationResult, lens: Lens, year: number, weights: number[]): MatrixModel {
+  if (lens === 'time') {
     const columns = YEARS.map(String);
     const data: CellMap = {};
     const cellDetails: Record<string, Record<string, PercentileDistribution | null>> = {};
@@ -80,8 +80,8 @@ export function buildMatrix(simulation: SimulationResult, view: ViewMode, year: 
   }
 
   const yearKey = String(year);
-  const columns = LENS_COLUMNS[view];
-  const decomposition = simulation.decompositions[view][yearKey];
+  const columns = LENS_COLUMNS[lens];
+  const decomposition = simulation.decompositions[lens][yearKey];
   const data: CellMap = {};
   const rowTotals: Record<string, number | null> = {};
   for (const c of CATEGORY_NAMES) {

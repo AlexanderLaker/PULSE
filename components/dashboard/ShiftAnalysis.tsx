@@ -57,10 +57,9 @@ import { cellWeightsBasis } from '@/lib/cellWeights';
 import CategoryDetailPanel from './shift/CategoryDetailPanel';
 import type { DiagnosticsResult } from '@/types';
 import {
-  buildMatrix, type CellMap, columnTotals, type ImpactFilter, type MatrixModel, ROWS,
-  type ViewMode,
+  buildMatrix, type CellMap, columnTotals, type ImpactFilter, type Lens, type MatrixModel, ROWS,
 } from './shift/matrixModel';
-import { IMPACT_META, SegControl, VIEW_META, YearStepper } from './shift/controls';
+import { IMPACT_META, LENS_META, SegControl, YearStepper } from './shift/controls';
 import { KpiTile } from './shift/KpiTile';
 import { Matrix, PeakStressTooltip } from './shift/Matrix';
 import { noRunReason, NoRunState } from './shift/NoRunState';
@@ -79,7 +78,7 @@ const ShiftAnalysis: FC<{
     reload,
   } = usePrism();
 
-  const [view, setView] = useState<ViewMode>('time');
+  const [lens, setLens] = useState<Lens>('time');
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>('total');
   const [selectedYear, setSelectedYear] = useState<number>(HORIZON);
   /** The category whose drill-down is open, by its API key. */
@@ -115,8 +114,8 @@ const ShiftAnalysis: FC<{
 
   const matrix = useMemo<MatrixModel | null>(() => {
     if (!simulation) return null;
-    const model = buildMatrix(simulation, view, selectedYear, categoryWeights);
-    if (view !== 'time' || filter === 'total' || !attributionResult) return model;
+    const model = buildMatrix(simulation, lens, selectedYear, categoryWeights);
+    if (lens !== 'time' || filter === 'total' || !attributionResult) return model;
     // The filter shows each cell's expansion or contraction part. The P10–P90
     // bands describe the unfiltered distribution, so they are dropped.
     const data: CellMap = Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(model.columns.map((col) => {
@@ -124,7 +123,7 @@ const ShiftAnalysis: FC<{
       return [col, v == null || !isFinite(v) ? null : signParts(attributionResult, c, Number(col), v)[filter]];
     }))]));
     return { ...model, data, colTotals: columnTotals(data, model.columns, categoryWeights), cellDetails: undefined };
-  }, [simulation, view, selectedYear, categoryWeights, filter, attributionResult]);
+  }, [simulation, lens, selectedYear, categoryWeights, filter, attributionResult]);
 
   // The KPI strip: the joint portfolio band at the horizon, and the most
   // resilient and most exposed categories with their own bands.
@@ -141,7 +140,7 @@ const ShiftAnalysis: FC<{
     return { portfolio: simulation.totals.portfolio[String(HORIZON)], categoryTiles };
   }, [simulation]);
 
-  const meta = VIEW_META[view];
+  const meta = LENS_META[lens];
   const noRun = simulation ? undefined : noRunReason(backendAvailable, diagnostics);
   const onEstimate = simulation != null && cellWeightsBasis(simulation.cell_weights_source) === 'estimate';
   const showOffline = !loading && !backendAvailable;
@@ -154,14 +153,14 @@ const ShiftAnalysis: FC<{
   const matrixToolbar = (
     <>
       <SegControl
-        ariaLabel="Matrix view lens"
-        items={(Object.keys(VIEW_META) as ViewMode[]).map((v) => ({
+        ariaLabel="Matrix lens"
+        items={(Object.keys(LENS_META) as Lens[]).map((v) => ({
           id: v,
-          label: VIEW_META[v].label,
-          Icon: VIEW_META[v].Icon,
+          label: LENS_META[v].label,
+          Icon: LENS_META[v].Icon,
         }))}
-        activeId={view}
-        onSelect={(id) => setView(id as ViewMode)}
+        activeId={lens}
+        onSelect={(id) => setLens(id as Lens)}
       />
       <div className="flex flex-wrap items-center justify-end gap-3">
         <span
@@ -174,9 +173,9 @@ const ShiftAnalysis: FC<{
             color: S.mutedText,
           }}
         >
-          {view === 'time' ? 'Show' : 'Year'}
+          {lens === 'time' ? 'Show' : 'Year'}
         </span>
-        {view === 'time' ? (
+        {lens === 'time' ? (
           <SegControl
             size="sm"
             ariaLabel="Driver-impact filter"
@@ -327,7 +326,7 @@ const ShiftAnalysis: FC<{
               rows={ROWS}
               data={matrix.data}
               subtitle={
-                view === 'time'
+                lens === 'time'
                   ? (filter !== 'total'
                       ? `${meta.label} · ${IMPACT_META[filter].label}: ${IMPACT_META[filter].description}`
                       : `${meta.label} · ${meta.description}`)
@@ -337,12 +336,12 @@ const ShiftAnalysis: FC<{
               colTotals={matrix.colTotals}
               grandTotal={matrix.grandTotal}
               rowTotalLabel={`Total ${selectedYear}`}
-              valueLabel={view !== 'time' ? meta.label
+              valueLabel={lens !== 'time' ? meta.label
                 : filter === 'total' ? 'Median' : `${IMPACT_META[filter].label}’ part`}
               cellDetails={matrix.cellDetails}
               onRowClick={setSelectedCategory}
               noBandsNote={
-                view !== 'time'
+                lens !== 'time'
                   ? 'Switch to Time Path for P10 to P90 bands'
                   : 'Ranges unavailable when filtered to expansion or contraction drivers; bands describe the unfiltered distribution'
               }
@@ -357,7 +356,7 @@ const ShiftAnalysis: FC<{
           {selectedCategory && simulation && attribution && (
             <CategoryDetailPanel
               category={selectedCategory}
-              year={view === 'time' ? HORIZON : selectedYear}
+              year={lens === 'time' ? HORIZON : selectedYear}
               simulation={simulation}
               drivers={drivers}
               attribution={attribution}

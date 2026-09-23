@@ -152,7 +152,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
           </div>
           <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"
             style={{ color: S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>What the model holds constant</div>
-          {/* The model's ceteris-paribus framing, in its agreed wording. */}
+          {/* The ceteris-paribus design of docs/adr/0002-relative-shifts-ceteris-paribus.md. */}
           <p className="text-[12px] mb-4" style={{ color: S.mutedText, lineHeight: 1.6, fontFamily: BODY_FONT }}>
             PRISM holds strategy constant. The simulation propagates external drivers only and
             deliberately excludes management response: price increases, innovation launches,

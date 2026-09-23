@@ -9,9 +9,9 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { BASE_YEAR, FIRST_YEAR, HORIZON, YEARS } from '@/lib/format';
 import { S, SHADOW, BODY_FONT } from '@/lib/theme';
-import type { ImpactFilter, ViewMode } from './matrixModel';
+import type { ImpactFilter, Lens } from './matrixModel';
 
-export const VIEW_META: Record<ViewMode, { label: string; description: string; Icon: LucideIcon }> = {
+export const LENS_META: Record<Lens, { label: string; description: string; Icon: LucideIcon }> = {
   time:   { label: 'Time Path',   description: `MC median shifts ${FIRST_YEAR}→${HORIZON}, cumulative vs ${BASE_YEAR}`, Icon: Calendar },
   force:  { label: 'Force attribution',       description: 'Distributes each category shift across forces by exposure: attribution, not an independent simulation', Icon: Zap },
   vc:     { label: 'Value chain epicentre attribution', description: 'Assigns each driver\'s contribution wholly to the single stage where its impact centres (its epicentre); propagation up or down the chain is not modelled. Attribution, not an independent simulation', Icon: Layers },

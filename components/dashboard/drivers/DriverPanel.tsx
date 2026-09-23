@@ -370,7 +370,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
             title="Probability"
             icon={Zap}
             footnote={
-              <>Likelihood this driver materialises at the stated severity.
+              <>Likelihood that this driver materialises as described.
               Scale: 1 = Very Unlikely, 3 = Possible, 5 = Almost Certain.</>
             }
           >
