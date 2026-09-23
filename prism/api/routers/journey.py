@@ -25,6 +25,12 @@ SIDES = ("benefiting", "negativelyImpacted")
 #: The display codes a tile may cite: the drivers of the driver base, the
 #: codes data/driverCodeMap.ts resolves on the dashboard.
 DRIVER_CODES = frozenset(display_code(d.id, d.force) for d in DRIVERS)
+#: The values of a tile's fields the dashboard renders by (data/consumerJourney.ts).
+TILE_TYPES = ("product", "tech", "service")
+INTENSITIES = (1, 2, 3)
+PROVENANCE_GRADES = ("verified", "estimate", "hypothesis")
+POOL_IMPACT_GRADES = ("Low", "Med", "High")
+POOL_IMPACT_DIRECTIONS = ("tailwind", "headwind")
 
 
 class JourneySave(BaseModel):
@@ -35,13 +41,36 @@ class JourneySave(BaseModel):
     content: dict
 
 
+def tile_problem(tile: dict) -> Optional[str]:
+    """What in a tile the dashboard could not render, or None: its type,
+    intensity, provenance, driver note, Strategist Read and pool impact."""
+    intensity = tile.get("intensity")
+    if tile.get("type") not in TILE_TYPES:
+        return f"type must be one of {', '.join(TILE_TYPES)}"
+    if isinstance(intensity, bool) or intensity not in INTENSITIES:
+        return "intensity must be 1, 2 or 3"
+    provenance = tile.get("provenance")
+    if not isinstance(provenance, dict) or not isinstance(provenance.get("date"), str) \
+            or provenance.get("grade") not in PROVENANCE_GRADES:
+        return f"provenance must hold a date and a grade ({', '.join(PROVENANCE_GRADES)})"
+    if not isinstance(tile.get("driverNote"), str):
+        return "driverNote must be text"
+    if tile.get("analysis") is not None and not isinstance(tile["analysis"], str):
+        return "analysis must be text or null"
+    pool = tile.get("poolImpact")
+    if pool is not None and (not isinstance(pool, dict) or pool.get("grade") not in POOL_IMPACT_GRADES
+                             or pool.get("direction") not in POOL_IMPACT_DIRECTIONS):
+        return "poolImpact must hold a grade (Low, Med, High) and a direction (tailwind, headwind)"
+    return None
+
+
 def content_problem(content: dict) -> Optional[str]:
     """Why a tile map cannot be stored, or None.
 
     The shape is what the dashboard renders: exactly the two journeys, each a
     list of stages with an id, a label and two lists of tiles, every tile an
-    object with a unique string id, a name and the list of driver codes it
-    cites, each the code of a driver of the base.
+    object with a unique string id, a name, the list of driver codes it cites
+    (each the code of a driver of the base) and the fields tile_problem checks.
     """
     if set(content) != set(JOURNEYS):
         return "content must hold exactly the journeys lhc and hair"
@@ -74,6 +103,9 @@ def content_problem(content: dict) -> Optional[str]:
                     unknown = sorted(set(codes) - DRIVER_CODES)
                     if unknown:
                         return f"tile {tile['id']!r} cites {', '.join(unknown)}, which are not drivers"
+                    problem = tile_problem(tile)
+                    if problem:
+                        return f"tile {tile['id']!r}: {problem}"
     return None
 
 

@@ -539,12 +539,22 @@ class TestConfig:
         assert api.put("/api/v1/config", headers=bearer("admin"), json={}).status_code == 405
 
 
+#: A tile the dashboard can render.
+JOURNEY_TILE = {"id": "lhc.sorting.exp.test", "name": "AI stain recognition", "type": "tech", "driverCodes": ["T-01"],
+                "driverNote": "T-01", "intensity": 2, "analysis": None,
+                "provenance": {"date": "2026-09", "grade": "estimate"}}
+
+
+def journey_with(*changes) -> dict:
+    """A tile map of one Laundry stage holding one tile per change: JOURNEY_TILE with the change
+    applied (a field set to ... is left out)."""
+    tiles = [{k: v for k, v in {**JOURNEY_TILE, **change}.items() if v is not ...} for change in changes]
+    return {"lhc": [{"id": "s", "label": "S", "benefiting": tiles, "negativelyImpacted": []}], "hair": []}
+
+
 class TestJourney:
-    CONTENT = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [{
-        "id": "lhc.sorting.exp.test", "name": "AI stain recognition", "type": "tech", "driverCodes": ["T-01"],
-        "driverNote": "T-01", "intensity": 2, "analysis": None,
-        "provenance": {"date": "2026-09", "grade": "estimate"}}],
-        "negativelyImpacted": []}], "hair": []}
+    CONTENT = {"lhc": [{"id": "sorting", "label": "Sorting", "benefiting": [JOURNEY_TILE], "negativelyImpacted": []}],
+               "hair": []}
 
     def test_the_bundled_content_applies_until_an_admin_saves(self, api):
         assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": 0, "content": None}
@@ -569,28 +579,40 @@ class TestJourney:
                         json={"base_version": first.json()["version"], "content": {"lhc": [], "hair": []}})
         assert third.status_code == 200
 
-    @pytest.mark.parametrize("content", [
-        {"lhc": "x", "hair": []}, {"lhc": []}, {"lhc": [], "hair": [], "extra": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"name": "no id"}], "negativelyImpacted": []}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [], "negativelyImpacted": "none"}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a", "driverCodes": []},
-                                                            {"id": "t", "name": "b", "driverCodes": []}],
-                  "negativelyImpacted": []}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "x" * 2_100_000, "driverCodes": []}],
-                  "negativelyImpacted": []}], "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a"}], "negativelyImpacted": []}],
-         "hair": []},
-        {"lhc": [{"id": "s", "label": "S", "benefiting": [{"id": "t", "name": "a", "driverCodes": ["C-99"]}],
-                  "negativelyImpacted": []}], "hair": []},
-    ], ids=["not-a-list", "missing-journey", "extra-key", "tile-without-id", "side-not-a-list", "duplicate-tile",
-            "too-large", "tile-without-codes", "unknown-code"])
-    def test_a_malformed_body_is_refused(self, api, content, request):
+    @pytest.mark.parametrize("content, reason", [
+        ({"lhc": "x", "hair": []}, "must be a list of stages"),
+        ({"lhc": []}, "exactly the journeys"),
+        ({"lhc": [], "hair": [], "extra": []}, "exactly the journeys"),
+        ({"lhc": [{"id": "s", "label": "S", "benefiting": [{"name": "no id"}], "negativelyImpacted": []}], "hair": []},
+         "string id and name"),
+        ({"lhc": [{"id": "s", "label": "S", "benefiting": [], "negativelyImpacted": "none"}], "hair": []},
+         "must be a list of tiles"),
+        (journey_with({"id": "t"}, {"id": "t", "name": "b"}), "appears twice"),
+        (journey_with({"name": "x" * 2_100_000}), "larger than"),
+        (journey_with({"driverCodes": ...}), "driver codes"),
+        (journey_with({"driverCodes": ["C-99"]}), "C-99, which are not drivers"),
+        (journey_with({"type": "gadget"}), "type must be one of product, tech, service"),
+        (journey_with({"intensity": 4}), "intensity must be 1, 2 or 3"),
+        (journey_with({"intensity": True}), "intensity must be 1, 2 or 3"),
+        (journey_with({"provenance": {"date": "2026-09", "grade": "Verified"}}), "provenance must hold"),
+        (journey_with({"provenance": ...}), "provenance must hold"),
+        (journey_with({"driverNote": None}), "driverNote must be text"),
+        (journey_with({"analysis": ["not", "text"]}), "analysis must be text or null"),
+        (journey_with({"poolImpact": {"grade": "Huge", "direction": "tailwind"}}), "poolImpact must hold"),
+    ])
+    def test_a_malformed_body_is_refused(self, api, content, reason):
+        """The shape the dashboard renders; a tile it could not render is refused with its id and the reason."""
         response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
         assert response.status_code == 422
-        reason = {"duplicate-tile": "appears twice", "tile-without-codes": "driver codes",
-                  "unknown-code": "C-99, which are not drivers"}.get(request.node.callspec.id)
-        if reason:
-            assert reason in response.json()["detail"]
+        assert reason in response.json()["detail"]
+
+    def test_the_previous_tiles_extra_provenance_is_kept(self, api):
+        """Tiles saved by the previous release carry an author in their provenance; they are stored as they are."""
+        content = journey_with({"provenance": {"author": "strategist", "date": "2026-09", "grade": "estimate"},
+                              "poolImpact": {"grade": "Med", "direction": "tailwind"}})
+        response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": content})
+        assert response.status_code == 200
+        assert api.get("/api/v1/journey", headers=bearer()).json()["content"] == content
 
     def test_the_body_needs_the_base_version(self, api):
         assert api.put("/api/v1/journey", headers=bearer("admin"), json={"content": self.CONTENT}).status_code == 422

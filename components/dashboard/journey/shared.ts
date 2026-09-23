@@ -104,12 +104,13 @@ const WIDE_STAGE_TILE_THRESHOLD = 10;
 export const stageSpan = (s: JourneyStageDef, journeyKey: JourneyKey): 1 | 2 =>
   (journeyKey === 'lhc' && Math.max(s.benefiting.length, s.negativelyImpacted.length) > WIDE_STAGE_TILE_THRESHOLD ? 2 : 1);
 
-/** The drivers a tile cites, each once. Every code is a driver of the base:
- *  the API refuses to store any other (prism/api/routers/journey.py). */
+/** The drivers a tile cites, each once. The API stores no code outside the
+ *  driver base (prism/api/routers/journey.py); a code a later base no longer
+ *  has is left out rather than drawn as a driver. */
 export const citedDrivers = (tile: JourneyTile, driversById: Map<string, Driver>): CitedDriver[] =>
-  Array.from(new Set(tile.driverCodes)).map(code => {
+  Array.from(new Set(tile.driverCodes)).flatMap(code => {
     const info = DRIVER_CODE_MAP[code];
-    return { code, info, live: driversById.get(info.driverId) };
+    return info ? [{ code, info, live: driversById.get(info.driverId) }] : [];
   });
 
 /** The words for a tile's intensity, 1 to 3. */
