@@ -28,10 +28,11 @@ Journey cites drivers by code.
 An id is never given to another driver. Stored runs (their fingerprints),
 expert proposals, the audit log and the journey content refer to drivers by
 id or code, so a driver that leaves the base takes its id with it. The base
-lists, per force, the numbers of drivers that left (`retired_numbers`), and
-`prism/driver_base.py` holds every number up to a force's highest to be a
-driver's or retired, never both: a new driver takes the next number, and a
-driver that leaves moves its number to the list in the same change.
+records, per force, the highest number given and the numbers of drivers that
+left (`numbering`), and `prism/driver_base.py` holds every number up to the
+highest to be a driver's or retired, never both, and none to be above it: a
+new driver takes the next number and raises the highest to it, and a driver
+that leaves moves its number to the retired list in the same change.
 
 ## Fields
 
@@ -144,12 +145,12 @@ dashboard do not use it.
 `prism/driver_base.py` reads and validates the base for everything built
 from it (the seed, the overlap correction and the PRISM Analysis): every
 model input by the engine's own rules, as the database and the API apply
-them, and on top of those the id and code pattern, a number that is neither
-retired nor past a gap, an onset and a peak inside the horizon, a known
-confidence, and sources the editor can save again (a title, an http(s) link,
-a tier on the scale or none, within the API's lengths), at least one of them
-of tier S, A or B. `scripts/generate_seed.py` writes three files from it
-that are never edited by hand:
+them, and on top of those the id and code pattern, the numbering above, an
+onset and a peak inside the horizon, a known confidence, and sources the
+editor can save again (a title, an http(s) link, a tier on the scale or
+none, within the API's lengths), at least one of them of tier S, A or B.
+`scripts/generate_seed.py` writes three files from it that are never edited
+by hand:
 
 - `prism/seed_drivers.py`: the drivers a new database is seeded with, each
   with its baseline, the scores the Edited chip compares against;

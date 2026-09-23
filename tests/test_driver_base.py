@@ -17,7 +17,7 @@ from support import load_module
 REPO = Path(__file__).resolve().parent.parent
 BASE = REPO / "data" / "drivers" / "driver_base.json"
 CODEMAP = REPO / "data" / "driverCodeMap.ts"
-RETIRED = json.loads(BASE.read_text(encoding="utf-8"))["retired_numbers"]
+NUMBERING = json.loads(BASE.read_text(encoding="utf-8"))["numbering"]
 LETTER = {"Consumer": "C", "Customer": "K", "Technology": "T", "Government": "G",
           "Environmental": "E", "Competitive": "X"}
 
@@ -93,17 +93,17 @@ class TestBaseValidation:
     ])
     def test_a_bad_entry_is_refused(self, change):
         drivers = json.loads(BASE.read_text(encoding="utf-8"))["drivers"]
-        validate(drivers, RETIRED)
+        validate(drivers, NUMBERING)
         bad = copy.deepcopy(drivers)
         bad[0].update(change)
         with pytest.raises(InvalidBaseError):
-            validate(bad, RETIRED)
+            validate(bad, NUMBERING)
 
     def test_a_missing_category_is_refused(self):
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         del bad[0]["category_exposure"]["LHC: TOI"]
         with pytest.raises(InvalidBaseError, match="category_exposure has no score for LHC: TOI"):
-            validate(bad, RETIRED)
+            validate(bad, NUMBERING)
 
     @pytest.mark.parametrize("change, words", [
         ({"probability": 3.5}, "probability 3.5 is not a whole number from 1 to 5"),
@@ -116,13 +116,13 @@ class TestBaseValidation:
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         bad[0].update(change)
         with pytest.raises(InvalidBaseError, match=words):
-            validate(bad, RETIRED)
+            validate(bad, NUMBERING)
 
     def test_an_exposure_that_is_not_a_whole_score_is_refused(self):
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         bad[0]["regional_exposure"]["Asia"] = 2.5
         with pytest.raises(InvalidBaseError, match="is not a whole number from 0 to 5"):
-            validate(bad, RETIRED)
+            validate(bad, NUMBERING)
 
     @pytest.mark.parametrize("change, words", [
         ({"url": "www.example.org/report"}, "its link is not an http\\(s\\) address"),
@@ -138,11 +138,12 @@ class TestBaseValidation:
         bad = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         bad[0]["sources"][0].update(change)
         with pytest.raises(InvalidBaseError, match=words):
-            validate(bad, RETIRED)
+            validate(bad, NUMBERING)
 
     def test_a_number_is_never_given_to_a_second_driver(self):
-        """Every number up to a force's highest is a driver's or retired: a new driver can take only the
-        next one, and a driver that leaves must retire its number."""
+        """Every number up to a force's highest is a driver's or retired, and none is above it: a new driver
+        can take only the next number and raises the highest, and a driver that leaves must retire its number,
+        the driver with the highest number too."""
         drivers = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         technology = next(d for d in drivers if d["force"] == "Technology")
 
@@ -150,27 +151,42 @@ class TestBaseValidation:
             new = copy.deepcopy(technology)
             new.update(id=f"technology_r{number}", code=f"T-{number}")
             return drivers + [new]
+
+        def numbering(force: str, **record) -> dict:
+            return {**NUMBERING, force: {**NUMBERING[force], **record}}
+        assert NUMBERING["Technology"]["highest"] == 19
         with pytest.raises(InvalidBaseError, match="Technology number 14 belongs to a driver that left the base; "
                                                    "a new driver takes 20"):
-            validate(added(14), RETIRED)
+            validate(added(14), NUMBERING)
+        with pytest.raises(InvalidBaseError, match="Technology number 20 is above the highest number given, 19"):
+            validate(added(20), NUMBERING)
         with pytest.raises(InvalidBaseError, match="Technology number 20 is neither a driver's nor retired"):
-            validate(added(21), RETIRED)
-        validate(added(20), RETIRED)
+            validate(added(21), numbering("Technology", highest=21))
+        validate(added(20), numbering("Technology", highest=20))
         leaving = [d for d in drivers if d is not technology]
         number = int(technology["id"][-2:])
         with pytest.raises(InvalidBaseError, match=f"Technology number {number} is neither a driver's nor retired"):
-            validate(leaving, RETIRED)
-        validate(leaving, {**RETIRED, "Technology": sorted(RETIRED["Technology"] + [number])})
-        with pytest.raises(InvalidBaseError, match="retired_numbers has no list of whole numbers for Technology"):
-            validate(drivers, {f: n for f, n in RETIRED.items() if f != "Technology"})
+            validate(leaving, NUMBERING)
+        validate(leaving, numbering("Technology", retired=sorted(NUMBERING["Technology"]["retired"] + [number])))
+        # The driver with a force's highest number leaves: without the recorded highest, nothing would show it.
+        top = max((d for d in drivers if d["force"] == "Consumer"), key=lambda d: d["id"])
+        assert top["id"] == f"consumer_r{NUMBERING['Consumer']['highest']}"
+        with pytest.raises(InvalidBaseError, match=f"Consumer number {NUMBERING['Consumer']['highest']} is neither"):
+            validate([d for d in drivers if d is not top], NUMBERING)
+        with pytest.raises(InvalidBaseError, match="numbering has no highest number and list of retired numbers "
+                                                   "for Technology"):
+            validate(drivers, {f: n for f, n in NUMBERING.items() if f != "Technology"})
+        with pytest.raises(InvalidBaseError, match="numbering has no highest number and list of retired numbers "
+                                                   "for Technology"):
+            validate(drivers, numbering("Technology", highest=None))
 
     def test_an_unrated_source_is_accepted_beside_a_graded_one(self):
         drivers = copy.deepcopy(json.loads(BASE.read_text(encoding="utf-8"))["drivers"])
         drivers[0]["sources"].append({"title": "Trade note", "url": "", "tier": "", "published": ""})
         with pytest.raises(InvalidBaseError, match="its link is not an http"):
-            validate(drivers, RETIRED)
+            validate(drivers, NUMBERING)
         drivers[0]["sources"][-1]["url"] = "https://example.org/note"
-        validate(drivers, RETIRED)
+        validate(drivers, NUMBERING)
 
 
 class TestCodeMap:
