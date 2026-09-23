@@ -5,7 +5,9 @@ module checks that the newest run carries every part of that contract and
 shapes it for GET /api/v1/simulation.
 """
 from datetime import timezone
-from typing import Optional
+from typing import Iterable, Optional
+
+from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, REGIONS
 
 #: Parts of a results bundle the dashboard reads.
 REQUIRED_KEYS = (
@@ -21,12 +23,64 @@ META_KEYS = (
 )
 
 
+#: The years the dashboard lays out (lib/format.ts YEARS), as stored run keys.
+YEARS = tuple(str(y) for y in DEFAULT_PATH_YEARS)
+QUANTILES = ("p10", "median", "p90")
+
+
+def _bands_complete(bands) -> bool:
+    """Whether a year -> distribution map holds P10, median and P90 in every path year."""
+    return isinstance(bands, dict) and all(
+        isinstance(bands.get(y), dict) and all(q in bands[y] for q in QUANTILES) for y in YEARS)
+
+
+def _paths_complete(cells: Iterable) -> bool:
+    """Whether every cell carries a path with P10, median and P90 in every path year."""
+    return all(isinstance(cell, dict) and _bands_complete(cell.get("path")) for cell in cells)
+
+
+def _grid(value, rows, columns) -> Iterable:
+    """value[row][column] for every row and column, None where one is missing."""
+    for row in rows:
+        inner = value.get(row) if isinstance(value, dict) else None
+        for column in columns:
+            yield inner.get(column) if isinstance(inner, dict) else None
+
+
+def incomplete_parts(results: dict) -> list:
+    """The parts of the run the dashboard indexes by category, region and year
+    that do not cover all of them: a run on another horizon or taxonomy (made
+    before a deploy that changed either) is not served until the next
+    production run."""
+    out = []
+    span = f"{YEARS[0]} to {YEARS[-1]}"
+    shift = results.get("shift_matrix")
+    if not _paths_complete(shift.get(c) if isinstance(shift, dict) else None for c in CATEGORIES):
+        out.append(f"a shift path of every category over {span}")
+    regional = results.get("regional_shift_matrix")
+    if not _paths_complete(_grid(regional, CATEGORIES, REGIONS)):
+        out.append(f"a shift path of every category and region over {span}")
+    decompositions = results.get("decompositions")
+    for lens in ("force", "vc", "region"):
+        grid = decompositions.get(lens) if isinstance(decompositions, dict) else None
+        if not all(isinstance(part, dict) for part in _grid(grid, YEARS, CATEGORIES)):
+            out.append(f"the {lens} attribution of every category over {span}")
+    totals = results.get("totals")
+    if not (isinstance(totals, dict) and _bands_complete(totals.get("portfolio"))
+            and all(v is not None for v in _grid(totals.get("category_path"), CATEGORIES, YEARS))):
+        out.append(f"the portfolio band and every category's total over {span}")
+    return out
+
+
 def missing_keys(results: dict) -> list:
     """The parts of the contract a stored results bundle lacks: the parts
-    above, the run metadata and a complete fingerprint of the drivers, which
-    the next run and inputs_since_run compare with."""
+    above, each over every category, region and path year (incomplete_parts),
+    the run metadata and a complete fingerprint of the drivers, which the
+    next run and inputs_since_run compare with."""
     from prism.input_drift import incomplete_entries
     missing = [k for k in REQUIRED_KEYS if k not in results]
+    if not missing:
+        missing += incomplete_parts(results)
     meta = results.get("meta") or {}
     missing += [f"meta.{k}" for k in META_KEYS + ("driver_fingerprint",) if k not in meta]
     if "driver_fingerprint" in meta and incomplete_entries(meta["driver_fingerprint"]):

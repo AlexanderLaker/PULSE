@@ -56,13 +56,14 @@ def api(monkeypatch, tmp_path):
 
 @pytest.fixture
 def valid_run(mock_model_config, mock_driver_set):
-    """A results bundle exactly as the production run persists it."""
+    """A results bundle exactly as the production run persists it, over the model's horizon."""
+    from prism.config import DEFAULT_PATH_YEARS
     from prism.input_drift import driver_fingerprint
     from prism.engine import MonteCarloEngine
     production = load_module("scripts/run_production.py")
-    result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(
-        mock_driver_set, n_chains=2, iterations=200)
-    return production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_driver_set.drivers))
+    config = mock_model_config.copy_with(path_years=list(DEFAULT_PATH_YEARS))
+    result = MonteCarloEngine(config, seed=42).run_multichain(mock_driver_set, n_chains=2, iterations=200)
+    return production.results_bundle(result, config, 5, driver_fingerprint(mock_driver_set.drivers))
 
 
 class TestRoutes:
@@ -260,6 +261,34 @@ class TestSimulation:
         response = api.get("/api/v1/simulation", headers=bearer())
         assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
         assert f"meta.{key}" in response.json()["detail"]["error"]
+
+    @pytest.mark.parametrize("remove, part", [
+        (lambda r: r["shift_matrix"]["LHC: TOI"]["path"].pop("2035"), "a shift path of every category"),
+        (lambda r: r["regional_shift_matrix"]["Hair: Care"].pop("Asia"), "every category and region"),
+        (lambda r: r["decompositions"]["region"].pop("2031"), "the region attribution of every category"),
+        (lambda r: r["totals"]["portfolio"]["2035"].pop("p90"), "the portfolio band"),
+    ])
+    def test_a_run_that_does_not_cover_every_category_region_and_year_is_not_served(
+            self, api, valid_run, remove, part):
+        """The dashboard indexes the run by category, region and year; a run with a gap is refused, never
+        half drawn."""
+        run = json.loads(json.dumps(valid_run, default=float))
+        remove(run)
+        persist(run)
+        response = api.get("/api/v1/simulation", headers=bearer())
+        assert response.status_code == 404 and response.json()["detail"]["reason"] == "malformed"
+        assert part in response.json()["detail"]["error"]
+
+    def test_a_run_on_another_horizon_is_not_served(self, api, mock_model_config, mock_driver_set):
+        """A run made before a deploy that changed the horizon waits for the next production run."""
+        from prism.engine import MonteCarloEngine
+        from prism.input_drift import driver_fingerprint
+        production = load_module("scripts/run_production.py")
+        result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(mock_driver_set, n_chains=1,
+                                                                             iterations=100)
+        persist(production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_driver_set.drivers)))
+        detail = api.get("/api/v1/simulation", headers=bearer()).json()["detail"]
+        assert detail["reason"] == "malformed" and "over 2026 to 2035" in detail["error"]
 
     def test_a_run_with_an_incomplete_fingerprint_is_not_served(self, api, valid_run):
         """A fingerprint entry without every field could not be compared with; served, it would fail

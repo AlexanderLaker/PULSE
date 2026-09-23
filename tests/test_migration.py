@@ -193,27 +193,33 @@ FIRST_RUN = {
 
 
 def previous_release_run() -> dict:
-    """A results bundle with every part the previous release's production run
-    stored, over the drivers fill_previous_database stores (consumer_r02 with
-    the admin's probability), fingerprinted as that release did: without the
-    onset years."""
+    """A results bundle as the previous release's production run stored it:
+    every part over every category, region and year (a small engine run of
+    the same recipe), under that release's key names, over the drivers
+    fill_previous_database stores (consumer_r02 with the admin's probability)
+    and fingerprinted as that release did: without the onset years."""
+    from prism.config import ModelConfig
+    from prism.drivers import DriverSet
+    from prism.engine import MonteCarloEngine
     drivers = copy.deepcopy(DRIVERS)
     for d in drivers:
         if d.id == "consumer_r02":
             d.probability = 4
-    fingerprint = {driver_id: {k: v for k, v in entry.items() if k != "s"}
-                   for driver_id, entry in driver_fingerprint(drivers).items()}
-    parts = ("shift_matrix", "regional_shift_matrix", "region_weights_used", "cell_weights_used",
-             "category_weights_used", "decompositions", "totals", "vc_decomposition", "mc_standard_error",
-             "seed_stability")
-    return {**{k: {} for k in parts}, "cell_weights_source": "ESTIMATE, not Henkel P&L", "integrity_events": [],
-            "meta": {"engine_fidelity": "scipy", "numerics_backend": "scipy 1.14.1, numpy 2.1.3", "seed": 42,
-                     "chain_seeds": [42, 1000045, 2000048], "chains": 3, "model_version": "2.12.0",
-                     "engine_name": "bayesian_copula", "vc_attribution_basis": "epicentre",
-                     "region_weights_used": {}, "cell_weights_used": {}, "category_weights_used": {},
-                     "cell_weights_source": "ESTIMATE, not Henkel P&L", "trend_count": 51,
-                     "attenuation_source": "calibrated_v3.12_september2026",
-                     "persisted_at_utc": "2026-09-13T23:04:39+00:00", "trend_fingerprint": fingerprint}}
+            d.recompute()
+    config = ModelConfig()
+    result = MonteCarloEngine(config, seed=42).run_multichain(DriverSet(drivers=drivers), iterations=100, n_chains=1)
+    production = load_module("scripts/run_production.py")
+    bundle = json.loads(json.dumps(production.results_bundle(result, config, len(drivers), driver_fingerprint(drivers)),
+                                   default=float))
+    meta, dimensions = bundle["meta"], bundle["decompositions"]["dimensions"]
+    meta["trend_count"] = meta.pop("driver_count")
+    meta["trend_fingerprint"] = {driver_id: {k: v for k, v in entry.items() if k != "s"}
+                                 for driver_id, entry in meta.pop("driver_fingerprint").items()}
+    dimensions["vc_steps"] = dimensions.pop("vc_stages")
+    # parts the previous release stored besides
+    meta.update(engine_fidelity="scipy", vc_attribution_basis="epicentre")
+    bundle["vc_decomposition"] = {}
+    return bundle
 
 
 def fill_previous_database(conn, p: str, serial: str, json_type: str = "TEXT", older: bool = False) -> None:
