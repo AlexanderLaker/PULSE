@@ -23,6 +23,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      # The build prerenders pages inside ClerkProvider, which needs a
+      # publishable key of the right form; this one names no real instance.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+          NEXT_TELEMETRY_DISABLED: "1"
 
   python:
     runs-on: ubuntu-latest

@@ -5,8 +5,12 @@
   the renamed modules and components, the trend-named keys and columns. Only
   the migration that moves a database of that release, and its tests, may
   name them.
+- No tracked file is executable: the scripts are run as python3 or bash
+  scripts/<name>, as the documents show.
 """
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -63,3 +67,11 @@ def test_no_names_of_the_previous_release():
             if m:
                 hits.append(f"{rel}:{i}: {m.group(0)}")
     assert not hits, "\n".join(hits[:25])
+
+
+def test_no_tracked_file_is_executable():
+    if shutil.which("git") is None or not (REPO / ".git").exists():
+        pytest.skip("not a git checkout")
+    listing = subprocess.run(["git", "ls-files", "-s"], cwd=REPO, capture_output=True, text=True, check=True).stdout
+    executable = [line.split("\t", 1)[1] for line in listing.splitlines() if line.startswith("100755")]
+    assert not executable, executable

@@ -1,6 +1,9 @@
 # What a Vercel deployment leaves out. The Next.js build needs app/,
 # components/, hooks/, lib/, types/, api/client.ts and data/*.ts; the Python
-# function needs api/index.py, api/requirements.txt and prism/.
+# function needs api/index.py, api/requirements.txt and prism/. Secrets never
+# leave the machine, whether the deployment comes from git or the Vercel CLI.
+.env
+.env.*
 .venv
 __pycache__
 *.pyc
