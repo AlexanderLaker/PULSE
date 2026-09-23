@@ -62,7 +62,7 @@ def valid_run(mock_model_config, mock_driver_set):
     from prism.engine import MonteCarloEngine
     production = load_module("scripts/run_production.py")
     config = mock_model_config.copy_with(path_years=list(DEFAULT_PATH_YEARS))
-    result = MonteCarloEngine(config, seed=42).run_multichain(mock_driver_set, n_chains=2, iterations=200)
+    result = MonteCarloEngine(config, seed=42).run(mock_driver_set, chains=2, iterations=200)
     return production.results_bundle(result, config, 5, driver_fingerprint(mock_driver_set.drivers))
 
 
@@ -267,6 +267,8 @@ class TestSimulation:
         (lambda r: r["regional_shift_matrix"]["Hair: Care"].pop("Asia"), "every category and region"),
         (lambda r: r["decompositions"]["region"].pop("2031"), "the region attribution of every category"),
         (lambda r: r["totals"]["portfolio"]["2035"].pop("p90"), "the portfolio band"),
+        (lambda r: r["cell_weights_used"]["LHC: IC"].pop("Asia"), "the gross-profit share of every category"),
+        (lambda r: r["category_weights_used"].pop("Hair: Body"), "the gross-profit share of every category"),
     ])
     def test_a_run_that_does_not_cover_every_category_region_and_year_is_not_served(
             self, api, valid_run, remove, part):
@@ -284,8 +286,7 @@ class TestSimulation:
         from prism.engine import MonteCarloEngine
         from prism.input_drift import driver_fingerprint
         production = load_module("scripts/run_production.py")
-        result = MonteCarloEngine(mock_model_config, seed=42).run_multichain(mock_driver_set, n_chains=1,
-                                                                             iterations=100)
+        result = MonteCarloEngine(mock_model_config, seed=42).run(mock_driver_set, chains=1, iterations=100)
         persist(production.results_bundle(result, mock_model_config, 5, driver_fingerprint(mock_driver_set.drivers)))
         detail = api.get("/api/v1/simulation", headers=bearer()).json()["detail"]
         assert detail["reason"] == "malformed" and "over 2026 to 2035" in detail["error"]

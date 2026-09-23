@@ -15,8 +15,10 @@ import logging
 import threading
 from typing import Optional
 
+from prism import database
 from prism.config import ModelConfig
 from prism.drivers import DriverSet
+from prism.seed_drivers import get_seed_drivers
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +34,7 @@ def model_config() -> ModelConfig:
 def ensure_schema() -> None:
     """Create the tables on a new database (once per process)."""
     if not _cache["db_ready"]:
-        from prism.database import init_db
-        init_db()
+        database.init_db()
         _cache["db_ready"] = True
 
 
@@ -45,36 +46,33 @@ def driver_set() -> DriverSet:
     database at the same moment may both try: the second insert fails as a
     whole (one transaction), and the drivers the first stored are used.
     """
-    from prism.database import drivers_stamp, insert_drivers, load_drivers
     with _lock:
         ensure_schema()
-        stamp = drivers_stamp()
+        stamp = database.drivers_stamp()
         if stamp[0] == 0:
-            from prism.seed_drivers import get_seed_drivers
             logger.warning("The drivers table is empty; seeding it with the driver base")
             try:
-                insert_drivers(get_seed_drivers())
+                database.insert_drivers(get_seed_drivers())
             except Exception:
-                if drivers_stamp()[0] == 0:
+                if database.drivers_stamp()[0] == 0:
                     raise
                 logger.info("Another instance seeded the drivers first")
-            stamp = drivers_stamp()
+            stamp = database.drivers_stamp()
         if _cache["drivers"] is None or _cache["drivers_stamp"] != stamp:
-            _cache["drivers"] = DriverSet(drivers=load_drivers())
+            _cache["drivers"] = DriverSet(drivers=database.load_drivers())
             _cache["drivers_stamp"] = stamp
         return _cache["drivers"]
 
 
 def latest_run() -> Optional[dict]:
     """The newest persisted run ({id, run_date, iterations, results}), or None."""
-    from prism.database import latest_run_summary, load_latest_run
     with _lock:
         ensure_schema()
-        summary = latest_run_summary()
+        summary = database.latest_run_summary()
         if summary is None:
             _cache["run"] = None
         elif _cache["run"] is None or _cache["run"]["id"] != summary["id"]:
-            _cache["run"] = load_latest_run()
+            _cache["run"] = database.load_latest_run()
         return _cache["run"]
 
 

@@ -3,7 +3,9 @@ import logging
 
 from fastapi import APIRouter
 
-from prism import __version__
+from prism import __version__, database
+from prism.api import state
+from prism.api.runs import run_status
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +24,13 @@ def health():
     exists but cannot be served shows up in /api/v1/diagnostics and
     /api/v1/simulation.
     """
-    from prism.api import state
-    from prism.database import failure_reason, latest_run_summary
     try:
         drivers = state.driver_set()
-        latest = latest_run_summary()
+        latest = database.latest_run_summary()
     except Exception as e:  # noqa: BLE001 (reported as degraded, never raised)
         logger.warning("health: database unavailable: %s", e)
         return {"status": "degraded", "version": __version__, "driver_count": 0, "has_simulation": False,
-                "simulation_reason": failure_reason(e), "latest_run_id": None}
+                "simulation_reason": database.failure_reason(e), "latest_run_id": None}
     return {
         "status": "ok",
         "version": __version__,
@@ -50,10 +50,7 @@ def diagnostics():
     errors are described in words that name no host, user or password
     (database.describe_error) and nothing else about the database is shown.
     """
-    from prism.api import state
-    from prism.api.runs import run_status
-    from prism.database import describe_error, diagnose_connection, failure_reason
-    diag = diagnose_connection()
+    diag = database.diagnose_connection()
     reason = diag.pop("reason")
     if reason is not None:
         return {**diag, "simulation_reason": reason, "version": __version__}
@@ -61,7 +58,7 @@ def diagnostics():
         status = run_status(state.latest_run())
     except Exception as e:  # noqa: BLE001 (reported, never raised)
         logger.warning("diagnostics: the latest run cannot be read: %s", e)
-        return {**diag, "simulation_reason": failure_reason(e), "error": describe_error(e),
+        return {**diag, "simulation_reason": database.failure_reason(e), "error": database.describe_error(e),
                 "version": __version__}
     return {**diag, "simulation_reason": status["reason"],
             "error": diag["error"] or status["error"], "version": __version__}

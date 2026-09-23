@@ -8,6 +8,7 @@ from datetime import timezone
 from typing import Iterable, Optional
 
 from prism.config import CATEGORIES, DEFAULT_PATH_YEARS, REGIONS
+from prism.input_drift import changed_drivers, driver_fingerprint, incomplete_entries
 
 #: Parts of a results bundle the dashboard reads.
 REQUIRED_KEYS = (
@@ -37,6 +38,11 @@ def _bands_complete(bands) -> bool:
 def _paths_complete(cells: Iterable) -> bool:
     """Whether every cell carries a path with P10, median and P90 in every path year."""
     return all(isinstance(cell, dict) and _bands_complete(cell.get("path")) for cell in cells)
+
+
+def _share(value) -> bool:
+    """A share as the run stores it: a number, never a bool."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _grid(value, rows, columns) -> Iterable:
@@ -69,6 +75,10 @@ def incomplete_parts(results: dict) -> list:
     if not (isinstance(totals, dict) and _bands_complete(totals.get("portfolio"))
             and all(v is not None for v in _grid(totals.get("category_path"), CATEGORIES, YEARS))):
         out.append(f"the portfolio band and every category's total over {span}")
+    categories = results.get("category_weights_used")
+    if not (all(_share(w) for w in _grid(results.get("cell_weights_used"), CATEGORIES, REGIONS))
+            and isinstance(categories, dict) and all(_share(categories.get(c)) for c in CATEGORIES)):
+        out.append("the gross-profit share of every category and region")
     return out
 
 
@@ -77,7 +87,6 @@ def missing_keys(results: dict) -> list:
     above, each over every category, region and path year (incomplete_parts),
     the run metadata and a complete fingerprint of the drivers, which the
     next run and inputs_since_run compare with."""
-    from prism.input_drift import incomplete_entries
     missing = [k for k in REQUIRED_KEYS if k not in results]
     if not missing:
         missing += incomplete_parts(results)
@@ -106,7 +115,6 @@ def inputs_since_run(run: dict, drivers) -> dict:
     the run still reflects the drivers. The dashboard uses it to say that an
     edit made since the run shows only after the next production run.
     """
-    from prism.input_drift import changed_drivers, driver_fingerprint
     return changed_drivers(driver_fingerprint(drivers), run["results"]["meta"]["driver_fingerprint"])
 
 

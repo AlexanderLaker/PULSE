@@ -1,10 +1,9 @@
 """Request bodies of the write endpoints."""
-import re
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictInt, model_validator
 
-from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS
+from prism.config import DEFAULT_BASE_YEAR, DEFAULT_PATH_YEARS, VALID_DIFFUSION_CURVES, VC_STAGES
 from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SOURCE_TIERS, SOURCE_URL_PATTERN
 
 #: The years a peak year can take: after the base year, within the horizon.
@@ -12,9 +11,16 @@ from prism.drivers import CONFIDENCE_LEVELS, DIRECTIONS, SOURCE_FIELD_LIMITS, SO
 FIRST_PEAK, LAST_PEAK = DEFAULT_BASE_YEAR + 1, DEFAULT_PATH_YEARS[-1]
 
 
-def pattern_one_of(values) -> str:
-    """A regular expression that matches exactly one of the values."""
-    return "^(" + "|".join(re.escape(v) for v in values) + ")$"
+def one_of(values):
+    """The type of a field that takes exactly one of the values; a refusal names them all."""
+    return Literal[tuple(values)]
+
+
+Direction = one_of(DIRECTIONS)
+Confidence = one_of(CONFIDENCE_LEVELS)
+Curve = one_of(VALID_DIFFUSION_CURVES)
+Stage = one_of(VC_STAGES)
+Tier = one_of(("",) + SOURCE_TIERS)
 
 
 def _not_a_bool(value):
@@ -36,7 +42,7 @@ class SourceRef(BaseModel):
 
     title: str = Field("", max_length=SOURCE_FIELD_LIMITS["title"])
     url: str = Field("", max_length=SOURCE_FIELD_LIMITS["url"], pattern=f"^({SOURCE_URL_PATTERN})?$")
-    tier: str = Field("", pattern=pattern_one_of(("",) + SOURCE_TIERS))
+    tier: Tier = ""
     published: str = Field("", max_length=SOURCE_FIELD_LIMITS["published"])
 
     @model_validator(mode="after")
@@ -61,16 +67,16 @@ class DriverUpdate(BaseModel):
 
     revision: StrictInt = Field(..., ge=1)
     description: Optional[str] = Field(None, max_length=20000)
-    direction: Optional[str] = Field(None, pattern=pattern_one_of(DIRECTIONS))
+    direction: Optional[Direction] = None
     probability: Optional[StrictInt] = Field(None, ge=1, le=5)
     gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
     peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
-    diffusion_curve: Optional[str] = None
+    diffusion_curve: Optional[Curve] = None
     uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
-    confidence: Optional[str] = Field(None, pattern=pattern_one_of(CONFIDENCE_LEVELS))
+    confidence: Optional[Confidence] = None
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
-    vc_epicentre: Optional[str] = None
+    vc_epicentre: Optional[Stage] = None
     sources: Optional[list[SourceRef]] = None
 
 
@@ -86,9 +92,9 @@ class ProposalUpdate(BaseModel):
     probability: Optional[StrictInt] = Field(None, ge=1, le=5)
     gp1_pct_affected: Optional[Share] = Field(None, gt=0.0, le=1.0)
     peak_year: Optional[StrictInt] = Field(None, ge=FIRST_PEAK, le=LAST_PEAK)
-    diffusion_curve: Optional[str] = None
+    diffusion_curve: Optional[Curve] = None
     uncertainty: Optional[StrictInt] = Field(None, ge=0, le=5)
     category_exposure: Optional[dict] = None
     regional_exposure: Optional[dict] = None
-    vc_epicentre: Optional[str] = None
+    vc_epicentre: Optional[Stage] = None
     comment: Optional[str] = None

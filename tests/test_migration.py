@@ -222,7 +222,7 @@ def previous_release_run() -> dict:
             d.probability = 4
             d.recompute()
     config = ModelConfig()
-    result = MonteCarloEngine(config, seed=42).run_multichain(DriverSet(drivers=drivers), iterations=100, n_chains=1)
+    result = MonteCarloEngine(config, seed=42).run(DriverSet(drivers=drivers), iterations=100, chains=1)
     production = load_module("scripts/run_production.py")
     bundle = json.loads(json.dumps(production.results_bundle(result, config, len(drivers), driver_fingerprint(drivers)),
                                    default=float))

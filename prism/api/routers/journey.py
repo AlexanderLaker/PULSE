@@ -9,6 +9,7 @@ made in the meantime without seeing it.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from prism import database
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.journey import JOURNEYS, SIDES, content_problem
@@ -28,9 +29,8 @@ class JourneySave(BaseModel):
 def get_journey_content(user: dict = Depends(require_auth)):
     """{"version", "content"}: the newest stored version, or version 0 and
     content null while the dashboard's bundled content applies."""
-    from prism.database import load_journey_content
     state.ensure_schema()
-    return load_journey_content()
+    return database.load_journey_content()
 
 
 @router.put("/api/v1/journey")
@@ -40,20 +40,19 @@ def put_journey_content(body: JourneySave, user: dict = Depends(require_admin)):
     problem = content_problem(body.content)
     if problem:
         raise HTTPException(422, problem)
-    from prism.database import AuditEntry, StaleVersionError, save_journey_content
     state.ensure_schema()
     user_id = identity_from_user(user)[0]
     n_tiles = sum(len(stage[side]) for j in JOURNEYS for stage in body.content[j] for side in SIDES)
 
-    def audit(version: int) -> AuditEntry:
-        return AuditEntry("journey_content_updated", "journey", "default", user_id,
-                          new_value=f"version {version}, {n_tiles} tiles",
-                          reason="Journey content saved in the editor")
+    def audit(version: int) -> database.AuditEntry:
+        return database.AuditEntry("journey_content_updated", "journey", "default", user_id,
+                                   new_value=f"version {version}, {n_tiles} tiles",
+                                   reason="Journey content saved in the editor")
 
     try:
-        version = save_journey_content(body.content, updated_by=str(user.get("email") or user_id),
-                                       base_version=body.base_version, audit=audit)
-    except StaleVersionError:
+        version = database.save_journey_content(body.content, updated_by=str(user.get("email") or user_id),
+                                                base_version=body.base_version, audit=audit)
+    except database.StaleVersionError:
         raise HTTPException(409, "The journey content was saved by someone else after you opened it. "
                                  "Reload the page to see that version, then make your edit again.") from None
     return {"status": "saved", "version": version, "tiles": n_tiles}

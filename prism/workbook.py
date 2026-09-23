@@ -99,7 +99,7 @@ READING_NOTES = (
 
 def write_workbook(output_path: str, result: dict, config: ModelConfig, *,
                    run_id: Optional[int] = None, driver_count: Optional[int] = None) -> None:
-    """Write the QA workbook for an engine result (``run_multichain`` output)."""
+    """Write the QA workbook for an engine result (MonteCarloEngine.run)."""
     wb = openpyxl.Workbook()
     _shift_matrix(wb.active, result, config)
     _regional_shift(wb.create_sheet("Regional Shift"), result, config)
@@ -331,8 +331,7 @@ def _metadata(ws, result: dict, config: ModelConfig, run_id: Optional[int],
         ("Seed", result["seed"]),
         ("Drivers", driver_count),
         ("Path years", ", ".join(str(y) for y in config.path_years)),
-        ("Attenuation source", f"{config.attenuation_source} (structured-judgment overlap correction, "
-                               "not fitted to outcomes)"),
+        ("Overlap correction", f"{config.attenuation_source} (structured judgment, not fitted to outcomes)"),
         ("Per-force attenuation", attenuation),
         ("Cell weights", str(result["cell_weights_source"])),
         ("Region shares", regions),

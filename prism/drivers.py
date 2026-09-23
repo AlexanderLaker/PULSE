@@ -69,8 +69,8 @@ class Driver:
     # The stored row's revision when the driver was loaded (0 before it is
     # stored); an admin edit must name it, so a concurrent edit is refused.
     revision: int = 0
-    probability_prior: tuple = field(init=False, default=(3, 3))
-    expected_effect: float = field(init=False, default=0.0)
+    probability_prior: Optional[tuple] = field(init=False, default=None)
+    expected_effect: Optional[float] = field(init=False, default=None)
 
     def __post_init__(self):
         self.recompute()
@@ -80,19 +80,23 @@ class Driver:
 
         expected_effect = E[p] x gp1_pct_affected x direction, the
         deterministic counterpart of what the engine samples per iteration.
-        A score simulation_problems() refuses (a missing probability, say)
-        gives neutral values here instead of an exception, so such a driver
-        can still be built and checked.
+        While a score they need is missing or off its scale (the probability
+        and uncertainty for the prior; those, the GP1 share and the direction
+        for the effect), they are None: such a driver can still be built and
+        checked (simulation_problems), but it has no prior and no effect.
         """
         from prism.config import beta_prior_for
         try:
             self.probability_prior = beta_prior_for(self.probability, self.uncertainty)
         except (TypeError, ValueError):
-            self.probability_prior = (3, 3)
-        a, b = self.probability_prior
+            self.probability_prior = None
         gp1 = self.gp1_pct_affected
-        gp1 = float(gp1) if isinstance(gp1, (int, float)) and math.isfinite(gp1) else 0.0
-        self.expected_effect = a / (a + b) * gp1 * self.direction_sign
+        share = isinstance(gp1, (int, float)) and not isinstance(gp1, bool) and math.isfinite(gp1) and 0 < gp1 <= 1
+        if self.probability_prior is None or not share or self.direction not in DIRECTIONS:
+            self.expected_effect = None
+            return
+        a, b = self.probability_prior
+        self.expected_effect = a / (a + b) * float(gp1) * self.direction_sign
 
     def scores(self) -> dict:
         """A copy of the driver's SCORE_FIELDS."""
@@ -100,7 +104,8 @@ class Driver:
 
     @property
     def direction_sign(self) -> int:
-        return 1 if self.direction == "Expansion" else -1
+        """+1 for an expansion, -1 for a contraction; a driver with neither has no sign (KeyError)."""
+        return {"Expansion": 1, "Contraction": -1}[self.direction]
 
 
 def _score_in_range(value, low: int, high: int) -> bool:

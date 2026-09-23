@@ -71,13 +71,16 @@ class TestDriverModel:
         d.uncertainty = 7
         d.recompute()
         assert d.uncertainty == 7                              # never rewritten silently
-        assert d.probability_prior == (3, 3)                   # neutral, so the driver can be built and checked
+        assert d.probability_prior is None and d.expected_effect is None   # nothing to derive, nothing guessed
         assert any("uncertainty 7" in line for line in simulation_problems([d]))   # and a run refuses it
 
     def test_a_driver_without_a_score_cannot_be_simulated(self):
         d = Driver(id="u2", force="Consumer", probability=4, gp1_pct_affected=0.2)
-        assert d.uncertainty is None and d.probability_prior == (3, 3)
+        assert d.uncertainty is None and d.probability_prior is None and d.expected_effect is None
         assert any("uncertainty None" in line for line in simulation_problems([d]))
+        d.uncertainty, d.direction = 3, "Sideways"
+        d.recompute()
+        assert d.probability_prior == pytest.approx((4, 2)) and d.expected_effect is None
 
     def test_fingerprint_carries_score_and_diffs_it(self):
         base = Driver(id="u1", force="Consumer", direction="Expansion", probability=4, gp1_pct_affected=0.1,
@@ -258,6 +261,6 @@ class TestMultichainEvents:
         W[gone] = {r: 0.0 for r in REGIONS}
         W[CATS[1]] = {r: v + freed / len(REGIONS) for r, v in W[CATS[1]].items()}
         cfg = mock_model_config.copy_with(cell_weights=W)
-        r = MonteCarloEngine(cfg, seed=1).run_multichain(mock_driver_set, n_chains=2, iterations=200)
+        r = MonteCarloEngine(cfg, seed=1).run(mock_driver_set, chains=2, iterations=200)
         zero = [e for e in r["integrity_events"] if e.get("type") == "cell_weight_zero_row"]
         assert len(zero) == 1

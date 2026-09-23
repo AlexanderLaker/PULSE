@@ -272,7 +272,7 @@ class TestMultichainPooling:
             engine._simulate_samples(driver_set, 300)
             counts.append(engine._floored_factor_cells)
         assert min(counts) > 0 and len(set(counts)) > 1
-        pooled = MonteCarloEngine(cfg, seed=7).run_multichain(driver_set, n_chains=3, iterations=300, seeds=seeds)
+        pooled = MonteCarloEngine(cfg, seed=7).run(driver_set, chains=3, iterations=300, seeds=seeds)
         [event] = [e for e in pooled["integrity_events"] if e["type"] == "compounding_floor"]
         assert event["detail"]["count"] == sum(counts)
         engine = MonteCarloEngine(cfg, seed=7)
@@ -285,8 +285,7 @@ class TestMultichainPooling:
         assert 0 < event["detail"]["count"] < 2 * max(counts)
 
     def test_chains_are_pooled(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(mock_model_config, seed=42).run_multichain(
-            mock_driver_set, n_chains=3, iterations=400)
+        r = MonteCarloEngine(mock_model_config, seed=42).run(mock_driver_set, chains=3, iterations=400)
         assert r["seed_stability"]["pooled_iterations"] == 1200
         assert r["iterations"] == 400 and r["chains"] == 3
         assert r["mc_standard_error"]["Hair: Color"]["n"] == 1200

@@ -5,12 +5,13 @@ import math
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from prism import database
 from prism.analysis_texts import TEXTS as ANALYSIS_TEXTS
 from prism.api import state
 from prism.api.auth import identity_from_user, require_admin, require_auth
 from prism.api.proposals import build_proposal_summary, build_proposals_response
 from prism.api.schemas import DriverUpdate, ProposalUpdate
-from prism.config import CATEGORIES, REGIONS, VALID_DIFFUSION_CURVES, VC_STAGES, first_peak_year
+from prism.config import CATEGORIES, REGIONS, first_peak_year
 from prism.drivers import MODEL_FIELDS, InvalidDriversError
 
 #: The names an exposure map may use, per field.
@@ -78,9 +79,8 @@ def _require_driver(driver_id: str):
 
 @router.get("/api/v1/drivers")
 def list_drivers(user: dict = Depends(require_auth)):
-    from prism.database import load_all_driver_proposals
     drivers = state.driver_set().drivers
-    proposals = load_all_driver_proposals()
+    proposals = database.load_all_driver_proposals()
     user_id = identity_from_user(user)[0]
     return [_driver_json(d, proposals.get(d.id, []), user_id) for d in drivers]
 
@@ -94,16 +94,11 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
     answer is 409. An exposure map may name only some cells: those cells
     change and the others keep their scores.
     """
-    from prism.database import AuditEntry, StaleRevisionError, save_driver_edit
     driver = copy.deepcopy(_require_driver(driver_id))
     sent = update.model_fields_set - {"revision"}
     for name in sent:
         if getattr(update, name) is None:
             raise HTTPException(422, f"{name} cannot be null")
-    if "diffusion_curve" in sent and update.diffusion_curve not in VALID_DIFFUSION_CURVES:
-        raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
-    if "vc_epicentre" in sent and update.vc_epicentre not in VC_STAGES:
-        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STAGES}")
     if "peak_year" in sent:
         _check_peak_year(driver, update.peak_year)
     if update.revision != driver.revision:
@@ -126,12 +121,13 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
         driver.scores_edited = True
     driver.recompute()
     actor = identity_from_user(user)[0]
-    audit = [AuditEntry("driver_updated", "driver", driver_id, actor, old_value=json.dumps(old, default=str),
-                        new_value=json.dumps(new, default=str), reason=name)
+    audit = [database.AuditEntry("driver_updated", "driver", driver_id, actor,
+                                 old_value=json.dumps(old, default=str), new_value=json.dumps(new, default=str),
+                                 reason=name)
              for name, (old, new) in changes.items()]
     try:
-        revision = save_driver_edit(driver, update.revision, set(changes), audit)
-    except StaleRevisionError:
+        revision = database.save_driver_edit(driver, update.revision, set(changes), audit)
+    except database.StaleRevisionError:
         raise HTTPException(409, _STALE) from None
     except InvalidDriversError as e:
         raise HTTPException(422, str(e)) from None
@@ -147,9 +143,9 @@ _STALE = ("This driver was changed after you opened it (by another admin or in a
 @router.get("/api/v1/drivers/{driver_id}/proposals")
 def get_driver_proposals(driver_id: str, user: dict = Depends(require_auth)):
     """The caller's own proposal, the aggregate across experts and who scored what."""
-    from prism.database import load_driver_proposals
     _require_driver(driver_id)
-    return build_proposals_response(driver_id, load_driver_proposals(driver_id), identity_from_user(user)[0])
+    proposals = database.load_driver_proposals(driver_id)
+    return build_proposals_response(driver_id, proposals, identity_from_user(user)[0])
 
 
 @router.put("/api/v1/drivers/{driver_id}/proposals")
@@ -160,14 +156,8 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
     map replaces the caller's whole map for that field. A proposal never
     changes the driver; an admin endorses it by editing the driver.
     """
-    from prism.database import load_driver_proposals, upsert_driver_proposal
     driver = _require_driver(driver_id)
     sent = proposal.model_fields_set
-    if "diffusion_curve" in sent and proposal.diffusion_curve is not None \
-            and proposal.diffusion_curve not in VALID_DIFFUSION_CURVES:
-        raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")
-    if "vc_epicentre" in sent and proposal.vc_epicentre is not None and proposal.vc_epicentre not in VC_STAGES:
-        raise HTTPException(422, f"Invalid vc_epicentre. Must be one of {VC_STAGES}")
     if "peak_year" in sent:
         _check_peak_year(driver, proposal.peak_year)
 
@@ -185,5 +175,5 @@ def put_driver_proposal(driver_id: str, proposal: ProposalUpdate, user: dict = D
         fields["comment"] = text[:2000] or None
 
     user_id, user_name, _ = identity_from_user(user)
-    upsert_driver_proposal(driver_id, user_id, fields, user_name=user_name)
-    return build_proposals_response(driver_id, load_driver_proposals(driver_id), user_id)
+    database.upsert_driver_proposal(driver_id, user_id, fields, user_name=user_name)
+    return build_proposals_response(driver_id, database.load_driver_proposals(driver_id), user_id)

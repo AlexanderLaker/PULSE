@@ -1,162 +1,121 @@
-"""Validation of a production run's model configuration and size.
+"""Checks of a production run's model configuration and size.
 
 ``validate_model_config`` checks every parameter the engine consumes: complete
-force and category coverage, weights and shares that sum to one, attenuation
-and overlap values inside their bounds, and a symmetric, unit-diagonal,
-positive-semidefinite force correlation matrix. ``validate_run_size`` checks
-the iterations and chains. ``correlation_lambda_min`` adds the check that only
-the loaded driver mix can answer: whether the driver-level correlation matrix
-built from the settings is positive semidefinite, so the engine never has to
-weaken the configured correlations to repair it.
+force, category and region coverage, weights and shares that sum to one,
+attenuation and overlap values inside their bounds, and a symmetric,
+unit-diagonal, positive-semidefinite force correlation matrix.
+``validate_run_size`` checks the iterations and chains.
+``correlation_lambda_min`` adds the check that only the loaded driver mix can
+answer: whether the driver-level correlation matrix built from the settings
+is positive semidefinite, so the engine never has to weaken the configured
+correlations to repair it.
 """
-
-from typing import Dict, List
+import math
 
 import numpy as np
-from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
 from prism.config import (CATEGORIES, FORCES, REGIONS, RUN_CHAINS_RANGE, RUN_ITERATIONS_RANGE, ModelConfig,
                           build_driver_correlation_matrix)
 
 SUM_TOLERANCE = 0.01
+#: The base years a configuration may name.
+BASE_YEAR_RANGE = (2020, 2030)
 
 
-def _require_keys(name: str, provided, required) -> None:
+def _number(value) -> bool:
+    """A finite real number, never a bool."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _key_problems(name: str, provided, required) -> list:
+    """The missing and the unknown entries of a map that must name exactly ``required``."""
     provided, required = set(provided), set(required)
+    out = []
     if required - provided:
-        raise ValueError(f"{name} is missing {sorted(required - provided)}")
+        out.append(f"{name} is missing {sorted(required - provided)}")
     if provided - required:
-        raise ValueError(f"{name} has unknown entries {sorted(provided - required)}")
+        out.append(f"{name} has unknown entries {sorted(provided - required)}")
+    return out
 
 
-class ModelConfigValidator(BaseModel):
-    per_force_attenuation: Dict[str, float]
-    attenuation_source: str
-    base_year: int
-    path_years: List[int]
-    force_weights: Dict[str, float]
-    cell_weights: Dict[str, Dict[str, float]]
-    cell_weights_source: str
-    peak_year_jitter: bool
-    within_force_rho: float
-    force_correlation_matrix: Dict[str, Dict[str, float]]
-    within_force_overlap: Dict[str, float]
+def _bounded_map_problems(name: str, values: dict, required, low: float, high: float) -> list:
+    out = _key_problems(name, values, required)
+    out += [f"{name}['{key}'] = {value} is outside [{low}, {high}]" for key, value in values.items()
+            if not _number(value) or not low <= value <= high]
+    return out
 
-    @field_validator("per_force_attenuation")
-    @classmethod
-    def _attenuation(cls, v):
-        _require_keys("per_force_attenuation", v, FORCES)
-        for force, val in v.items():
-            if not 0.0 <= float(val) <= 1.0:
-                raise ValueError(f"per_force_attenuation['{force}'] = {val} is outside [0, 1]")
-        return v
 
-    @field_validator("attenuation_source", "cell_weights_source")
-    @classmethod
-    def _provenance_label(cls, v):
-        if not v.strip():
-            raise ValueError("provenance labels must not be empty")
-        return v
+def _correlation_problems(matrix: dict) -> list:
+    out = _key_problems("force_correlation_matrix", matrix, FORCES)
+    for f, row in matrix.items():
+        out += _key_problems(f"force_correlation_matrix['{f}']", row, FORCES)
+    if out:
+        return out
+    out += [f"force_correlation_matrix ({f},{g}) = {matrix[f][g]} is outside [0, 1]" for f in FORCES for g in FORCES
+            if not _number(matrix[f][g]) or not 0.0 <= matrix[f][g] <= 1.0]
+    if out:
+        return out
+    for i, f in enumerate(FORCES):
+        if abs(matrix[f][f] - 1.0) > 0.01:
+            out.append(f"force_correlation_matrix diagonal ({f},{f}) must be 1.0")
+        out += [f"force_correlation_matrix is not symmetric at ({f},{g})" for g in FORCES[i + 1:]
+                if abs(matrix[f][g] - matrix[g][f]) > 0.001]
+    if out:
+        return out
+    lam_min = float(np.linalg.eigvalsh(np.array([[matrix[f][g] for g in FORCES] for f in FORCES])).min())
+    if lam_min < -1e-9:
+        out.append(f"force_correlation_matrix is not positive semidefinite (minimum eigenvalue {lam_min:.4f}); "
+                   "lower the cross-force correlations")
+    return out
 
-    @field_validator("base_year")
-    @classmethod
-    def _base_year(cls, v):
-        if not 2020 <= v <= 2030:
-            raise ValueError(f"base_year must be between 2020 and 2030 (got {v})")
-        return v
 
-    @field_validator("path_years")
-    @classmethod
-    def _path_years(cls, v):
-        if len(v) < 2 or v != sorted(v) or len(set(v)) != len(v):
-            raise ValueError(f"path_years must be at least two ascending, distinct years (got {v})")
-        return v
+def _cell_weight_problems(weights: dict) -> list:
+    out = _key_problems("cell_weights", weights, CATEGORIES)
+    total = 0.0
+    for cat, row in weights.items():
+        out += _key_problems(f"cell_weights['{cat}']", row, REGIONS)
+        for region, w in row.items():
+            if not _number(w) or w < 0:
+                out.append(f"cell_weights['{cat}']['{region}'] must be a non-negative number")
+            else:
+                total += w
+    if not out and abs(total - 1.0) > SUM_TOLERANCE:
+        out.append(f"cell_weights must sum to 1.0 over all cells (got {total:.4f})")
+    return out
 
-    @field_validator("force_weights")
-    @classmethod
-    def _force_weights(cls, v):
-        _require_keys("force_weights", v, FORCES)
-        if any(w < 0 for w in v.values()):
-            raise ValueError("force_weights must be non-negative")
-        total = sum(v.values())
-        if abs(total - 1.0) > SUM_TOLERANCE:
-            raise ValueError(f"force_weights must sum to 1.0 (got {total:.4f})")
-        return v
 
-    @field_validator("within_force_rho")
-    @classmethod
-    def _within_force_rho(cls, v):
-        if not 0.0 <= v <= 1.0:
-            raise ValueError(f"within_force_rho must be in [0, 1] (got {v})")
-        return v
-
-    @field_validator("within_force_overlap")
-    @classmethod
-    def _within_force_overlap(cls, v):
-        _require_keys("within_force_overlap", v, FORCES)
-        for force, val in v.items():
-            if not 0.0 <= float(val) <= 0.5:
-                raise ValueError(f"within_force_overlap['{force}'] = {val} is outside [0, 0.5]")
-        return v
-
-    @field_validator("force_correlation_matrix")
-    @classmethod
-    def _force_correlation_matrix(cls, v):
-        _require_keys("force_correlation_matrix", v, FORCES)
-        for f, row in v.items():
-            _require_keys(f"force_correlation_matrix['{f}']", row, FORCES)
-            if abs(float(row[f]) - 1.0) > 0.01:
-                raise ValueError(f"force_correlation_matrix diagonal ({f},{f}) must be 1.0")
-            for g, val in row.items():
-                if not 0.0 <= float(val) <= 1.0:
-                    raise ValueError(f"force_correlation_matrix ({f},{g}) = {val} is outside [0, 1]")
-        for f in FORCES:
-            for g in FORCES:
-                if abs(float(v[f][g]) - float(v[g][f])) > 0.001:
-                    raise ValueError(f"force_correlation_matrix is not symmetric at ({f},{g})")
-        m = np.array([[float(v[f][g]) for g in FORCES] for f in FORCES])
-        lam_min = float(np.linalg.eigvalsh(m).min())
-        if lam_min < -1e-9:
-            raise ValueError(
-                f"force_correlation_matrix is not positive semidefinite (minimum eigenvalue "
-                f"{lam_min:.4f}); lower the cross-force correlations")
-        return v
-
-    @model_validator(mode="after")
-    def _cell_weights(self):
-        v = self.cell_weights
-        _require_keys("cell_weights", v, CATEGORIES)
-        total = 0.0
-        for cat, row in v.items():
-            _require_keys(f"cell_weights['{cat}']", row, REGIONS)
-            for region, w in row.items():
-                if w != w or w < 0:
-                    raise ValueError(f"cell_weights['{cat}']['{region}'] must be a non-negative number")
-                total += float(w)
-        if total <= 0 or abs(total - 1.0) > SUM_TOLERANCE:
-            raise ValueError(f"cell_weights must sum to 1.0 over all cells (got {total:.4f})")
-        return self
+def model_config_problems(config: ModelConfig) -> list:
+    """Every problem with the parameters the engine consumes; empty when there is none."""
+    problems = _bounded_map_problems("per_force_attenuation", config.per_force_attenuation, FORCES, 0.0, 1.0)
+    problems += _bounded_map_problems("within_force_overlap", config.within_force_overlap, FORCES, 0.0, 0.5)
+    problems += [f"{name} must not be empty" for name in ("attenuation_source", "cell_weights_source")
+                 if not str(getattr(config, name)).strip()]
+    low, high = BASE_YEAR_RANGE
+    if not isinstance(config.base_year, int) or not low <= config.base_year <= high:
+        problems.append(f"base_year must be between {low} and {high} (got {config.base_year})")
+    years = list(config.path_years)
+    if len(years) < 2 or years != sorted(years) or len(set(years)) != len(years):
+        problems.append(f"path_years must be at least two ascending, distinct years (got {years})")
+    if not isinstance(config.peak_year_jitter, bool):
+        problems.append("peak_year_jitter must be true or false")
+    weights = config.force_weights
+    problems += _key_problems("force_weights", weights, FORCES)
+    if not all(_number(w) and w >= 0 for w in weights.values()):
+        problems.append("force_weights must be non-negative numbers")
+    elif abs(sum(weights.values()) - 1.0) > SUM_TOLERANCE:
+        problems.append(f"force_weights must sum to 1.0 (got {sum(weights.values()):.4f})")
+    if not _number(config.within_force_rho) or not 0.0 <= config.within_force_rho <= 1.0:
+        problems.append(f"within_force_rho must be in [0, 1] (got {config.within_force_rho})")
+    problems += _correlation_problems(config.force_correlation_matrix)
+    problems += _cell_weight_problems(config.cell_weights)
+    return problems
 
 
 def validate_model_config(config: ModelConfig) -> None:
-    """Raise ValueError with a readable list of problems if ``config`` is invalid."""
-    try:
-        ModelConfigValidator(
-            per_force_attenuation=dict(config.per_force_attenuation),
-            attenuation_source=config.attenuation_source,
-            base_year=config.base_year,
-            path_years=list(config.path_years),
-            force_weights=dict(config.force_weights),
-            cell_weights={c: dict(r) for c, r in config.cell_weights.items()},
-            cell_weights_source=config.cell_weights_source,
-            peak_year_jitter=config.peak_year_jitter,
-            within_force_rho=config.within_force_rho,
-            force_correlation_matrix=dict(config.force_correlation_matrix),
-            within_force_overlap=dict(config.within_force_overlap),
-        )
-    except ValidationError as err:
-        problems = "; ".join(e["msg"] for e in err.errors(include_url=False))
-        raise ValueError(f"invalid model configuration: {problems}") from None
+    """Raise ValueError listing every problem if ``config`` is invalid."""
+    problems = model_config_problems(config)
+    if problems:
+        raise ValueError(f"invalid model configuration: {'; '.join(problems)}")
 
 
 def validate_run_size(iterations: int, chains: int) -> None:

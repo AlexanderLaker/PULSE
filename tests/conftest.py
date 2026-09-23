@@ -27,7 +27,7 @@ def regions(europe: int, north_america: int, asia: int, high_growth: int) -> dic
 def mock_driver() -> Driver:
     """One fully scored driver."""
     driver = Driver(
-        id="test_driver_01", force="Consumer", name="Test natural movement",
+        id="consumer_r02", force="Consumer", name="Test natural movement",
         description="A test driver about natural products", direction="Expansion",
         gp1_pct_affected=0.15, probability=4, start_year=2025, peak_year=2029, diffusion_curve="linear",
         uncertainty=2, confidence="High", vc_epicentre="Packaging",
@@ -54,7 +54,7 @@ def mock_driver_set() -> DriverSet:
       which share Commercial, so the attribution lens groups a stage. The value
       chain feeds only that lens, never the shift.
     """
-    consumer = Driver(id="consumer_01", force="Consumer", name="Natural/Clean Beauty",
+    consumer = Driver(id="consumer_r01", force="Consumer", name="Natural/Clean Beauty",
                       description="Growing demand for natural products", direction="Expansion",
                       gp1_pct_affected=0.20, probability=4, start_year=2025, peak_year=2029,
                       diffusion_curve="front_loaded", uncertainty=2)
@@ -62,7 +62,7 @@ def mock_driver_set() -> DriverSet:
     consumer.vc_epicentre = "Marketing"
     consumer.regional_exposure = regions(5, 3, 2, 2)  # Europe-heavy
 
-    government = Driver(id="government_01", force="Government", name="Microplastics Ban",
+    government = Driver(id="government_r01", force="Government", name="Microplastics Ban",
                         description="Regulatory restrictions on microplastics", direction="Contraction",
                         gp1_pct_affected=0.25, probability=4, start_year=2026, peak_year=2028,
                         diffusion_curve="s_curve", uncertainty=1)
@@ -70,7 +70,7 @@ def mock_driver_set() -> DriverSet:
     government.vc_epicentre = "Formulation"
     government.regional_exposure = regions(5, 4, 1, 2)  # EU regulation, low Asia
 
-    technology = Driver(id="technology_01", force="Technology", name="AI Personalization",
+    technology = Driver(id="technology_r01", force="Technology", name="AI Personalization",
                         description="AI-driven personalised beauty recommendations", direction="Expansion",
                         gp1_pct_affected=0.12, probability=3, start_year=2026, peak_year=2030,
                         diffusion_curve="back_loaded", uncertainty=3)
@@ -78,7 +78,7 @@ def mock_driver_set() -> DriverSet:
     technology.vc_epicentre = "Commercial"
     technology.regional_exposure = regions(3, 5, 4, 2)  # North America and Asia led
 
-    environmental = Driver(id="environmental_01", force="Environmental", name="Water Scarcity",
+    environmental = Driver(id="environmental_r01", force="Environmental", name="Water Scarcity",
                            description="Water stress affects manufacturing", direction="Contraction",
                            gp1_pct_affected=0.08, probability=3, start_year=2027, peak_year=2030,
                            diffusion_curve="linear", uncertainty=4)
@@ -86,7 +86,7 @@ def mock_driver_set() -> DriverSet:
     environmental.vc_epicentre = "Manufacturing"
     environmental.regional_exposure = regions(4, 3, 3, 4)  # broad, High Growth tilt
 
-    competitive = Driver(id="competitive_01", force="Competitive", name="Private Label Growth",
+    competitive = Driver(id="competitive_r01", force="Competitive", name="Private Label Growth",
                          description="Rising private label competition", direction="Contraction",
                          gp1_pct_affected=0.15, probability=4, start_year=2025, peak_year=2027,
                          diffusion_curve="step_function", uncertainty=2)

@@ -228,10 +228,10 @@ def inputs_hash(config: ModelConfig, drivers: list) -> str:
 
 
 def reference_run(config: ModelConfig, drivers: list, chains: int, iterations: int) -> dict:
-    """The production recipe (prism.config PRODUCTION_*): run_multichain with the master seed."""
+    """The production recipe (prism.config PRODUCTION_*): the engine run with the master seed."""
     driver_set = DriverSet(drivers=list(drivers))
     eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
-    res = eng.run_multichain(driver_set, n_chains=chains, iterations=iterations)
+    res = eng.run(driver_set, chains=chains, iterations=iterations)
     term = res["totals"]["portfolio"][TERMINAL_YEAR]
     cats = {cat: {k: round(float(block["path"][TERMINAL_YEAR][k]), 6) for k in ("p10", "median", "p90")}
             for cat, block in res["shift_matrix"].items()}

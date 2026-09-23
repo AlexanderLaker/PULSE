@@ -2,7 +2,7 @@
 
 Each iteration draws every driver's materialisation probability from its Beta
 prior, correlated across drivers through a Gaussian copula, and turns it into
-a signed score (probability x GP1 share x direction). The scores are spread
+a signed effect (probability x GP1 share x direction). The effects are spread
 over the 52 composite cells (13 categories x 4 regions) by category and
 regional exposure, materialised year by year along each driver's schedule,
 summed per force with the within-force overlap correction, weighted,
@@ -27,7 +27,7 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (CATEGORIES, FORCES, PRODUCTION_CHAINS, REGIONS, VC_STAGES, ModelConfig,
+from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STAGES, ModelConfig,
                           build_driver_correlation_matrix, compute_materialization_schedule, peak_jitter_for)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
@@ -92,7 +92,7 @@ def floor_event(count: int) -> dict:
 class MonteCarloEngine:
     """Simulates the relative shift of every category and cell over the horizon.
 
-    ``run`` and ``run_multichain`` produce a result. The other public members
+    ``run`` produces a result. The other public members
     (the attenuation by force, the cell-weight matrices, the correlation
     matrix, the copula sampler, the peak-year schedule and draws and the
     within-force dampening), like the module's exposure_matrix, are the
@@ -128,39 +128,6 @@ class MonteCarloEngine:
         logger.debug("Per-force attenuation (source=%s): %s", self.config.attenuation_source,
                     ", ".join(f"{f}={per_force[f]:.3f}" for f in FORCES))
         return per_force
-
-    def run(self, driver_set: DriverSet, iterations: int) -> dict:
-        """Run one chain and compile the result.
-
-        The result carries ``shift_matrix`` (per category: percentile ``path``
-        by year and per-iteration ``velocity`` bands), ``regional_shift_matrix``
-        (the same per category x region), ``decompositions`` and ``totals`` (the
-        force, value-chain and region attribution lenses and the joint portfolio
-        band), ``mc_standard_error``, the weights actually applied
-        (``cell_weights_used``, ``category_weights_used``,
-        ``region_weights_used``, ``cell_weights_source``), ``integrity_events``
-        and the run's identity (``model_version``, ``engine_name``,
-        ``numerics_backend``, ``seed``, ``iterations`` and ``chains``, here 1).
-        """
-        n_iter = int(iterations)
-        self._integrity_events = []
-        self._floored_factor_cells = 0
-        logger.info("Running Monte Carlo: %d iterations, %d drivers, %d categories, %d regions, %d years",
-                    n_iter, len(driver_set.drivers), len(CATEGORIES), len(REGIONS),
-                    len(self.config.path_years))
-
-        category_samples, regional_samples = self._simulate_samples(driver_set, n_iter)
-        if self._floored_factor_cells:
-            self._integrity_events.append(floor_event(self._floored_factor_cells))
-        result = self._compile_results(category_samples, driver_set)
-        result["regional_shift_matrix"] = self._build_regional_matrix(regional_samples)
-        result.update(self._weights_used())
-        result["iterations"] = n_iter
-        result["chains"] = 1
-
-        terminal = int(self.config.path_years[-1])
-        logger.info("Median portfolio shift at %d: %.4f", terminal, result["totals"]["portfolio"][terminal]["median"])
-        return result
 
     # ── Cell weights ────────────────────────────────────────────────────────
 
@@ -249,8 +216,8 @@ class MonteCarloEngine:
             raise InvalidDriversError(problems)
 
         corr_matrix = self.build_correlation_matrix(drivers)
-        scores = self.generate_copula_samples(drivers, corr_matrix, n_iter)
-        cell_samples = self._cell_shift_samples(drivers, scores, n_iter, n_cats, n_regions, n_years)
+        effects = self.generate_copula_samples(drivers, corr_matrix, n_iter)
+        cell_samples = self._cell_shift_samples(drivers, effects, n_iter, n_cats, n_regions, n_years)
         # Cell index is c * n_regions + r, so the reshape splits cleanly.
         regional_samples = cell_samples.reshape(n_iter, n_cats, n_regions, n_years)
         Wn = self.row_normalized_cell_weights()
@@ -306,10 +273,10 @@ class MonteCarloEngine:
         return R
 
     def generate_copula_samples(self, drivers: list, R: np.ndarray, n_iter: int) -> np.ndarray:
-        """Correlated signed scores, (iterations, drivers).
+        """Correlated signed effects, (iterations, drivers).
 
         Z ~ N(0, R), U = Phi(Z), probability = BetaInv(U; alpha, beta), and the
-        score is probability x gp1_pct_affected x direction. U is clipped to
+        effect is probability x gp1_pct_affected x direction. U is clipped to
         [1e-12, 1 - 1e-12] so that BetaInv never sees exactly 0 or 1.
         """
         n_drivers = len(drivers)
@@ -431,14 +398,14 @@ class MonteCarloEngine:
             dampening[f_idx, :] = np.clip(dampen, 0.1, 1.0)
         return dampening, n_eff_all
 
-    def _cell_shift_samples(self, drivers: list, scores: np.ndarray, n_iter: int, n_cats: int,
+    def _cell_shift_samples(self, drivers: list, effects: np.ndarray, n_iter: int, n_cats: int,
                             n_regions: int, n_years: int) -> np.ndarray:
         """Shift of every composite cell, (iterations, cells, years), from the
-        drivers' signed score draws (generate_copula_samples).
+        drivers' signed effect draws (generate_copula_samples).
 
         Cell (c, r) has index ``c * n_regions + r``. A driver reaches it with
         exposure ``(category exposure / 5) x (regional exposure / 5)``. Per year
-        and force: the materialised scores are summed over the force's drivers,
+        and force: the materialised effects are summed over the force's drivers,
         dampened for within-force overlap, weighted and attenuated; the forces
         then compound multiplicatively, each factor floored at zero (a cell
         cannot lose more than its whole pool).
@@ -463,7 +430,7 @@ class MonteCarloEngine:
         shift_samples = np.zeros((n_iter, n_cells, n_years))
         for y_idx in range(n_years):
             mat_y = sched_table[driver_arange[np.newaxis, :], offset_idx, y_idx]
-            effective = scores * mat_y
+            effective = effects * mat_y
 
             force_contrib = np.zeros((n_iter, n_forces, n_cells))
             for f_idx in range(n_forces):
@@ -598,11 +565,6 @@ class MonteCarloEngine:
             "mc_standard_error": mc_standard_error,
             "decompositions": decompositions,
             "totals": totals,
-            "model_version": self.MODEL_VERSION,
-            "engine_name": self.ENGINE_NAME,
-            "numerics_backend": NUMERICS_BACKEND,
-            "seed": self.seed,
-            "integrity_events": list(self._integrity_events),
         }
 
     def _mc_standard_error(self, samples: np.ndarray, n_boot: int = 200) -> dict:
@@ -638,35 +600,41 @@ class MonteCarloEngine:
             }
         return out
 
-    def run_multichain(self, driver_set: DriverSet, iterations: int, n_chains: int = PRODUCTION_CHAINS,
-                       seeds: Optional[list] = None) -> dict:
-        """Run ``n_chains`` independently seeded chains of ``iterations`` each and pool them.
+    def run(self, driver_set: DriverSet, iterations: int, chains: int = 1, seeds: Optional[list] = None) -> dict:
+        """Run ``chains`` independently seeded chains of ``iterations`` each and pool them.
 
-        The result has run()'s parts, compiled from the pooled sample: the
-        published percentiles, lenses and standard errors all come from it.
-        ``iterations`` is per chain and ``chains`` the number of chains;
-        ``seed_stability`` reports the spread of the per-chain terminal-year
-        portfolio medians, which is Monte Carlo noise only. Chain seeds derive
-        from the master seed, so the master seed alone reproduces the run.
+        The result carries ``shift_matrix`` (per category: percentile ``path``
+        by year and per-iteration ``velocity`` bands), ``regional_shift_matrix``
+        (the same per category x region), ``decompositions`` and ``totals`` (the
+        force, value-chain and region attribution lenses and the joint portfolio
+        band), ``mc_standard_error``, the weights actually applied
+        (``cell_weights_used``, ``category_weights_used``,
+        ``region_weights_used``, ``cell_weights_source``), ``integrity_events``,
+        ``seed_stability`` (the spread of the chains' terminal-year portfolio
+        medians, which is Monte Carlo noise only) and the run's identity
+        (``model_version``, ``engine_name``, ``numerics_backend``, ``seed``,
+        ``chain_seeds``, ``iterations`` per chain and ``chains``). Everything
+        published is computed from the pooled sample. Chain seeds derive from
+        the master seed unless given, so the master seed alone reproduces the
+        run. The production run uses PRODUCTION_CHAINS chains.
         """
-        if n_chains < 1:
-            raise ValueError("n_chains must be >= 1")
+        if chains < 1:
+            raise ValueError("chains must be >= 1")
         if seeds is None:
-            seeds = [int(self.seed) + i * 1000003 for i in range(n_chains)]
-        if len(seeds) != n_chains:
-            raise ValueError("len(seeds) must equal n_chains")
-
-        # The pooled result is compiled on this instance; start from a clean
-        # event list so a reused engine cannot report an event twice.
-        self._integrity_events = []
-        self._floored_factor_cells = 0
+            seeds = [int(self.seed) + i * 1000003 for i in range(chains)]
+        if len(seeds) != chains:
+            raise ValueError("len(seeds) must equal chains")
+        n_iter = int(iterations)
+        logger.info("Running Monte Carlo: %d chain(s) x %d iterations, %d drivers, %d categories, %d regions, "
+                    "%d years", chains, n_iter, len(driver_set.drivers), len(CATEGORIES), len(REGIONS),
+                    len(self.config.path_years))
 
         per_chain_cat = []
         per_chain_reg = []
         chain_engines = []
         for s in seeds:
             engine = MonteCarloEngine(self.config, seed=s)
-            cat_s, reg_s = engine._simulate_samples(driver_set, int(iterations))
+            cat_s, reg_s = engine._simulate_samples(driver_set, n_iter)
             per_chain_cat.append(cat_s)
             per_chain_reg.append(reg_s)
             chain_engines.append(engine)
@@ -678,14 +646,11 @@ class MonteCarloEngine:
         w = self._category_weight_vector()
         w = w / w.sum()
         per_chain_portfolio_medians = [
-            float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(n_chains)
+            float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(chains)
         ]
 
         pooled_cat = np.concatenate(per_chain_cat, axis=0)
         pooled_reg = np.concatenate(per_chain_reg, axis=0)
-        result = self._compile_results(pooled_cat, driver_set)
-        result["regional_shift_matrix"] = self._build_regional_matrix(pooled_reg)
-        result.update(self._weights_used())
 
         # The input-driven events (a correlation repair, a zero cell-weight row)
         # are the same in every chain: report chain 0's once. Floored factors
@@ -694,20 +659,30 @@ class MonteCarloEngine:
         floored = sum(engine._floored_factor_cells for engine in chain_engines)
         if floored:
             events.append(floor_event(floored))
-        result["integrity_events"] = events
 
-        result["iterations"] = int(per_chain_cat[0].shape[0])
-        result["chains"] = n_chains
-        result["seed"] = int(self.seed)
-        result["chain_seeds"] = [int(s) for s in seeds]
         spread_pp = (max(per_chain_portfolio_medians) - min(per_chain_portfolio_medians)) * 100.0
-        result["seed_stability"] = {
-            "metric": "terminal_year_portfolio_median",
-            "terminal_year": terminal_year,
-            "per_chain_medians": per_chain_portfolio_medians,
-            "spread_pp": float(spread_pp),
-            "n_chains": n_chains,
-            "iterations_per_chain": int(per_chain_cat[0].shape[0]),
-            "pooled_iterations": int(pooled_cat.shape[0]),
+        result = {
+            **self._compile_results(pooled_cat, driver_set),
+            "regional_shift_matrix": self._build_regional_matrix(pooled_reg),
+            **self._weights_used(),
+            "integrity_events": events,
+            "seed_stability": {
+                "metric": "terminal_year_portfolio_median",
+                "terminal_year": terminal_year,
+                "per_chain_medians": per_chain_portfolio_medians,
+                "spread_pp": float(spread_pp),
+                "n_chains": chains,
+                "iterations_per_chain": n_iter,
+                "pooled_iterations": int(pooled_cat.shape[0]),
+            },
+            "model_version": self.MODEL_VERSION,
+            "engine_name": self.ENGINE_NAME,
+            "numerics_backend": NUMERICS_BACKEND,
+            "seed": int(self.seed),
+            "chain_seeds": [int(s) for s in seeds],
+            "iterations": n_iter,
+            "chains": chains,
         }
+        logger.info("Median portfolio shift at %d: %.4f", terminal_year,
+                    result["totals"]["portfolio"][terminal_year]["median"])
         return result

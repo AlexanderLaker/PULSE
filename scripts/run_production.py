@@ -226,8 +226,8 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info("Simulating%s...", " (a few minutes at this size)" if args.chains * args.iterations >= 100_000 else "")
     started = datetime.now()
-    result = MonteCarloEngine(config, seed=PRODUCTION_SEED).run_multichain(
-        driver_set, iterations=args.iterations, n_chains=args.chains)
+    result = MonteCarloEngine(config, seed=PRODUCTION_SEED).run(
+        driver_set, iterations=args.iterations, chains=args.chains)
     log.info("  done in %.0f s; seed stability %.4f pp across %d chains",
              (datetime.now() - started).total_seconds(), result["seed_stability"]["spread_pp"], args.chains)
 

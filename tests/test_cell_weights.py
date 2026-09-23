@@ -121,8 +121,7 @@ class TestContract:
         assert r["cell_weights_source"] == DEFAULT_CELL_WEIGHTS_SOURCE
 
     def test_multichain_carries_them_too(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_driver_set, n_chains=2, iterations=150)
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run(mock_driver_set, chains=2, iterations=150)
         used, recorded = r["cell_weights_used"]["LHC: IC"], RECORD["cells"]["LHC: IC"]
         assert used["High Growth"] == pytest.approx(recorded["High Growth"])
         assert r["category_weights_used"]["LHC: IC"] == pytest.approx(RECORD["marginals"]["category"]["LHC: IC"])
@@ -161,6 +160,18 @@ class TestModelConfig:
         for grid in bad_grids:
             with pytest.raises(ValueError):
                 validate_model_config(ModelConfig().copy_with(cell_weights=grid))
+
+    def test_the_validator_lists_every_problem(self):
+        config = ModelConfig().copy_with(
+            per_force_attenuation={**ModelConfig().per_force_attenuation, "Consumer": 1.5},
+            force_weights={**ModelConfig().force_weights, "Customer": 0.9},
+            within_force_rho=float("nan"))
+        with pytest.raises(ValueError) as refused:
+            validate_model_config(config)
+        message = str(refused.value)
+        for problem in ("per_force_attenuation['Consumer'] = 1.5 is outside [0.0, 1.0]",
+                        "force_weights must sum to 1.0", "within_force_rho must be in [0, 1] (got nan)"):
+            assert problem in message, problem
 
 
 class TestEstimatedMix:

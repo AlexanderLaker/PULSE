@@ -158,7 +158,7 @@ class TestCellWeightsFile:
 class TestWorkbook:
     def _result(self, config, driver_set):
         from prism.engine import MonteCarloEngine
-        return MonteCarloEngine(config, seed=42).run_multichain(driver_set, n_chains=2, iterations=200)
+        return MonteCarloEngine(config, seed=42).run(driver_set, chains=2, iterations=200)
 
     def test_sheets_and_read_back(self, tmp_path, mock_model_config, mock_driver_set):
         import openpyxl

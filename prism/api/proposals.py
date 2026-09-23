@@ -70,8 +70,9 @@ def _mode_distribution(values: List[Any]) -> Optional[Dict[str, Any]]:
 def _aggregate_exposure(rows: List[Dict[str, Any]], field: str) -> Dict[str, Dict[str, Any]]:
     """Per-cell aggregate across users for one exposure map field.
 
-    Returns {display_key: {"avg": <2dp>, "count": <n>}} for every cell any
-    user scored (non-null). Cells nobody scored are omitted.
+    Returns {cell: {"avg": <2dp>, "count": <n>}}, the cell a category or a
+    region, for every cell any user scored (non-null). Cells nobody scored are
+    omitted.
     """
     sums: Dict[str, float] = {}
     counts: Dict[str, int] = {}

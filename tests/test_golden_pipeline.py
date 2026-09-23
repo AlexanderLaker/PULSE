@@ -48,10 +48,8 @@ class TestDeterminism:
             r2["shift_matrix"]["Hair: Color"]["path"][2030]["median"]
 
     def test_multichain_same_seed_reproduces(self, mock_model_config, mock_driver_set):
-        r1 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_driver_set, n_chains=2, iterations=200)
-        r2 = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_driver_set, n_chains=2, iterations=200)
+        r1 = MonteCarloEngine(mock_model_config, seed=SEED).run(mock_driver_set, chains=2, iterations=200)
+        r2 = MonteCarloEngine(mock_model_config, seed=SEED).run(mock_driver_set, chains=2, iterations=200)
         assert r1["chain_seeds"] == r2["chain_seeds"]
         assert r1["shift_matrix"] == r2["shift_matrix"]
 
@@ -112,15 +110,13 @@ class TestGoldenValues:
 
 class TestMultichain:
     def test_seeds(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_driver_set, n_chains=3, iterations=200)
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run(mock_driver_set, chains=3, iterations=200)
         assert r["seed"] == SEED
         assert r["chains"] == 3 and r["iterations"] == 200
         assert len(r["chain_seeds"]) == 3 and r["chain_seeds"][0] == SEED
 
     def test_seed_stability(self, mock_model_config, mock_driver_set):
-        r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
-            mock_driver_set, n_chains=3, iterations=200)
+        r = MonteCarloEngine(mock_model_config, seed=SEED).run(mock_driver_set, chains=3, iterations=200)
         ss = r["seed_stability"]
         assert ss["metric"] == "terminal_year_portfolio_median"
         assert ss["n_chains"] == 3 and ss["iterations_per_chain"] == 200 and ss["pooled_iterations"] == 600
