@@ -4,7 +4,7 @@
  * and slider, and the category and regional exposure grids, read-only and
  * editable.
  */
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { CATEGORIES, REGIONS, shortCat } from '@/lib/format';
 import { UNCERTAINTY_LABELS } from '@/lib/uncertainty';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
@@ -144,15 +144,22 @@ export const EpicentreRail: FC<{ stage: string; baseline: string }> = ({ stage, 
 };
 
 /** Editable epicentre slider (Expert Rating and the admin editor): drag the
- *  pin or click a stage; the value snaps to one of the eight stages. An
- *  expert's proposal may name no stage yet (value null). */
+ *  pin, click a stage or use the arrow keys; the value snaps to one of the
+ *  eight stages. The range input under the drawing is invisible, so the
+ *  drawing shows its keyboard focus. An expert's proposal may name no stage
+ *  yet (value null). */
 export const EpicentreSlider: FC<{
   value: string | null;
   baseline: string;
   onChange: (stage: VcStage) => void;
-}> = ({ value, baseline, onChange }) => (
+}> = ({ value, baseline, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  return (
   <div>
-    <div style={{ position: 'relative', height: 44 }}>
+    <div style={{
+      position: 'relative', height: 44, borderRadius: 8,
+      outline: focused ? `2px solid ${S.primary}` : 'none', outlineOffset: 2,
+    }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 19, height: 6, borderRadius: 6, backgroundColor: S.surfaceHigh }} />
       {VC_STAGES.map((name) => (
         <span key={name} style={{
@@ -179,6 +186,8 @@ export const EpicentreSlider: FC<{
         type="range" min={0} max={VC_STAGES.length - 1} step={1}
         value={stageIndex(value ?? baseline)}
         onChange={(e) => onChange(VC_STAGES[parseInt(e.target.value, 10)])}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         aria-label="Value chain epicentre"
         aria-valuetext={vcStageLabel(value)}
         style={{ position: 'absolute', left: 0, right: 0, top: 8, width: '100%', height: 28, opacity: 0, cursor: 'grab', margin: 0 }}
@@ -213,7 +222,8 @@ export const EpicentreSlider: FC<{
       <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.neutral, fontWeight: 700 }}>Downstream</span>
     </div>
   </div>
-);
+  );
+};
 
 // ─── Regional exposure grid (read-only) ───────────────────────────
 export const RegionExposureGrid: FC<{ exposures: ExposureMap }> = ({ exposures }) => (
@@ -286,7 +296,8 @@ const dotFill = (frac: number, color: string): string => {
 
 /** A read-only 1–5 dot scale in any colour, with DotBar's geometry. */
 export const ColorDots: FC<{ value: number; color: string; title?: string; muted?: boolean }> = ({ value, color, title, muted }) => (
-  <div className="flex gap-1.5" title={title} aria-label={`${value} of 5`} style={{ cursor: title ? 'help' : undefined }}>
+  <div className="flex gap-1.5" title={title} role="img" aria-label={`${Math.round(value * 10) / 10} of 5`}
+    style={{ cursor: title ? 'help' : undefined }}>
     {[1, 2, 3, 4, 5].map((d) => (
       <span key={d} className="inline-block w-2.5 h-2.5 rounded-full"
         style={{ background: dotFill(Math.max(0, Math.min(1, value - (d - 1))), color), opacity: muted ? 0.5 : 1 }} />
@@ -355,7 +366,7 @@ export const DiffusionPicker: FC<{
 
 // ── Read-only 0–5 dot scale: six dots including the 0 dot, like EditableDots ──
 export const ReadDots: FC<{ value?: number; color: string }> = ({ value, color }) => (
-  <div className="flex gap-1" aria-label={value != null ? `${value} of 5` : 'unscored'}>
+  <div className="flex gap-1" role="img" aria-label={value != null ? `${value} of 5` : 'unscored'}>
     {[0, 1, 2, 3, 4, 5].map((d) => {
       const bg = d === 0
         ? (value === 0 ? color : S.surfaceHigh)

@@ -253,6 +253,8 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
               style={{ color: S.onSurfaceVariant }}
             />
             <input
+              type="search"
+              aria-label="Search drivers"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search drivers…"

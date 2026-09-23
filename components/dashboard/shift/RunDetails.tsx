@@ -111,9 +111,12 @@ export const RunDetails: FC<{ simulation: SimulationResult }> = ({ simulation })
           <ul style={{ display: 'grid', rowGap: 6, margin: 0, padding: 0, listStyle: 'none' }}>
             {events.map((e, i) => (
               <li key={`${e.type}-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
-                  backgroundColor: e.severity === 'warning' || e.severity === 'error' ? S.amber : S.primary }} />
-                <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>{e.message}</span>
+                <span aria-hidden style={{ marginTop: 4, width: 6, height: 6, flexShrink: 0, borderRadius: 9999,
+                  backgroundColor: e.severity === 'warning' ? S.amber : S.primary }} />
+                <span style={{ fontSize: 11.5, lineHeight: 1.5, color: S.onSurface }}>
+                  <span className="sr-only">{e.severity === 'warning' ? 'Warning: ' : 'Note: '}</span>
+                  {e.message}
+                </span>
               </li>
             ))}
           </ul>

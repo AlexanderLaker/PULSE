@@ -100,14 +100,15 @@ export const StatusBanner: FC<{ kind: Status['kind']; children: ReactNode }> = (
     : kind === 'error'
       ? { bg: S.errorContainer, fg: S.onErrorContainer, Icon: AlertCircle }
       : { bg: S.surfaceLow, fg: S.primary, Icon: Info };
+  // Announced when it appears: an error at once, anything else when the reader is free.
   return (
-    <div style={{
+    <div role={kind === 'error' ? 'alert' : 'status'} style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '10px 14px', borderRadius: 10,
       backgroundColor: bg, color: fg,
       fontSize: 12.5, fontWeight: 500,
     }}>
-      <Icon size={14} strokeWidth={2.25} />
+      <Icon size={14} strokeWidth={2.25} aria-hidden />
       <span>{children}</span>
     </div>
   );

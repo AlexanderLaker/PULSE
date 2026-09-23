@@ -71,7 +71,7 @@ export interface McStandardError {
 /** Something the engine repaired, assumed or measured, recorded with the run (input drift among them). */
 export interface IntegrityEvent {
   type: string;
-  severity: 'info' | 'warning' | 'error';
+  severity: 'info' | 'warning';
   message: string;
   detail?: Record<string, unknown> | null;
 }

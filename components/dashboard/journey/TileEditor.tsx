@@ -3,7 +3,7 @@
  * driver note, linked driver codes and Strategist Read. The edits go into the
  * board's draft; the board saves the whole tile map.
  */
-import { useMemo, useState, type CSSProperties, type FC } from 'react';
+import { useId, useMemo, useState, type CSSProperties, type FC } from 'react';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import type { JourneyTile } from '@/data/consumerJourney';
 import { DRIVER_CODE_MAP } from '@/data/driverCodeMap';
@@ -25,6 +25,7 @@ export const TileEditor: FC<{
   });
 
   const allCodes = useMemo(() => Object.keys(DRIVER_CODE_MAP).sort((a, b) => a.localeCompare(b)), []);
+  const id = useId();
   const labelStyle: CSSProperties = {
     fontSize: 10, fontWeight: 700, color: S.onSurfaceVariant, display: 'block',
     marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: HEADLINE_FONT,
@@ -37,16 +38,18 @@ export const TileEditor: FC<{
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <label style={labelStyle}>Tile name</label>
-        <input style={inputStyle} value={edits.name} onChange={e => setEdits(p => ({ ...p, name: e.target.value }))} />
+        <label htmlFor={`${id}-name`} style={labelStyle}>Tile name</label>
+        <input id={`${id}-name`} style={inputStyle} value={edits.name}
+          onChange={e => setEdits(p => ({ ...p, name: e.target.value }))} />
       </div>
 
       <div>
-        <label style={labelStyle}>Intensity</label>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <span id={`${id}-intensity`} style={labelStyle}>Intensity</span>
+        <div role="group" aria-labelledby={`${id}-intensity`} style={{ display: 'flex', gap: 6 }}>
           {([1, 2, 3] as const).map(n => (
             <button type="button"
               key={n}
+              aria-pressed={edits.intensity === n}
               onClick={() => setEdits(p => ({ ...p, intensity: n }))}
               className="flex-1 py-1.5 rounded-lg text-[11px] font-bold"
               style={{
@@ -62,15 +65,17 @@ export const TileEditor: FC<{
       </div>
 
       <div>
-        <label style={labelStyle}>Driver note</label>
-        <input style={inputStyle} value={edits.driverNote} onChange={e => setEdits(p => ({ ...p, driverNote: e.target.value }))} />
+        <label htmlFor={`${id}-note`} style={labelStyle}>Driver note</label>
+        <input id={`${id}-note`} style={inputStyle} value={edits.driverNote}
+          onChange={e => setEdits(p => ({ ...p, driverNote: e.target.value }))} />
       </div>
 
       <div>
-        <label style={labelStyle}>Linked driver codes</label>
+        <span style={labelStyle}>Linked driver codes</span>
         {edits.driverCodes.map((code, idx) => (
           <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <select
+              aria-label={`Linked driver ${idx + 1}`}
               value={code}
               onChange={e => setEdits(p => {
                 const next = [...p.driverCodes]; next[idx] = e.target.value; return { ...p, driverCodes: next };
@@ -104,8 +109,9 @@ export const TileEditor: FC<{
       </div>
 
       <div>
-        <label style={labelStyle}>Strategist Read (authored analysis)</label>
+        <label htmlFor={`${id}-analysis`} style={labelStyle}>Strategist Read (authored analysis)</label>
         <textarea
+          id={`${id}-analysis`}
           value={edits.analysis}
           onChange={e => setEdits(p => ({ ...p, analysis: e.target.value }))}
           rows={7}

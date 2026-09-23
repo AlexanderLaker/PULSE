@@ -197,6 +197,7 @@ export default function DashboardPage() {
       <button type="button"
         key={tab.id}
         onClick={() => openTab(tab.id)}
+        aria-current={isActive ? 'page' : undefined}
         className="relative pb-1 text-sm font-semibold tracking-tight transition-colors"
         style={{
           fontFamily: HEADLINE_FONT,
@@ -223,6 +224,7 @@ export default function DashboardPage() {
       <button type="button"
         key={tab.id}
         onClick={() => openTab(tab.id)}
+        aria-current={isActive ? 'page' : undefined}
         className="w-full text-left px-6 py-3.5 text-[15px] font-semibold"
         style={{
           fontFamily: HEADLINE_FONT,

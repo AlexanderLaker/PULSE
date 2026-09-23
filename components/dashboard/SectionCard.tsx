@@ -1,10 +1,11 @@
 /**
  * SectionCard: one boxed section of a panel or sheet. An icon and an
- * uppercase title head it, with optional help on hover and a slot on the
- * right; a description can follow the title and a footnote the content. The
- * Drivers panels use the compact size, the Settings sheet the regular one.
+ * uppercase title head it, with optional help behind an info button and a
+ * slot on the right; a description can follow the title and a footnote the
+ * content. The Drivers panels use the compact size, the Settings sheet the
+ * regular one.
  */
-import type { FC, ReactNode } from 'react';
+import { useState, type FC, type ReactNode } from 'react';
 import { Info, type LucideIcon } from 'lucide-react';
 import { S, HEADLINE_FONT } from '@/lib/theme';
 
@@ -17,7 +18,8 @@ interface SectionCardProps {
   description?: ReactNode;
   /** A note under the content. */
   footnote?: ReactNode;
-  /** Help text, shown on hover over an info icon next to the title. */
+  /** Help text behind an info button next to the title: its tooltip, and
+   *  shown under the title when the button is pressed (keyboard included). */
   info?: string;
   /** A slot at the right of the header (a live value, a status chip). */
   right?: ReactNode;
@@ -40,6 +42,7 @@ const SectionCard: FC<SectionCardProps> = ({
   title, icon: Icon, accent, description, footnote, info, right, size = 'compact', children,
 }) => {
   const z = SIZES[size];
+  const [showInfo, setShowInfo] = useState(false);
   return (
     <div role="group" aria-label={title} style={{
       backgroundColor: S.surface,
@@ -65,15 +68,23 @@ const SectionCard: FC<SectionCardProps> = ({
           {title}
         </div>
         {info && (
-          <span title={info} aria-label={info} style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginLeft: 1, color: S.onSurfaceVariant, cursor: 'help',
-          }}>
+          <button type="button" title={info} aria-label={`About ${title}`} aria-expanded={showInfo}
+            onClick={() => setShowInfo((v) => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              marginLeft: 1, padding: 2, border: 'none', borderRadius: 999, background: 'none',
+              color: S.onSurfaceVariant, cursor: 'help',
+            }}>
             <Info size={12} strokeWidth={2.4} />
-          </span>
+          </button>
         )}
         {right != null && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{right}</span>}
       </div>
+      {info && showInfo && (
+        <div style={{ marginBottom: 12, fontSize: 12, lineHeight: 1.55, color: S.onSurfaceVariant }}>
+          {info}
+        </div>
+      )}
       {description && (
         <div style={{ marginBottom: 14, fontSize: 12.5, lineHeight: 1.55, color: S.mutedText }}>
           {description}
