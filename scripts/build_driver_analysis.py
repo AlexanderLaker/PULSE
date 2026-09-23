@@ -98,8 +98,8 @@ os.environ["POSTGRES_URL"] = ""
 
 import numpy as np  # noqa: E402
 
-from prism.config import (DEFAULT_PATH_YEARS, FORCES, PRODUCTION_CHAINS, PRODUCTION_ITERATIONS,  # noqa: E402
-                          PRODUCTION_SEED, REGIONS, ModelConfig, display_code)
+from prism.config import (CATEGORIES, DEFAULT_PATH_YEARS, FORCES, PRODUCTION_CHAINS,  # noqa: E402
+                          PRODUCTION_ITERATIONS, PRODUCTION_SEED, REGIONS, ModelConfig, display_code)
 from prism.drivers import DriverSet  # noqa: E402
 from prism.simulation.engine import MonteCarloEngine, NUMERICS_BACKEND  # noqa: E402
 from scripts.driver_analysis_render import render_all  # noqa: E402
@@ -135,7 +135,7 @@ def load_drivers() -> list:
 def decompose(config: ModelConfig, drivers: list) -> dict:
     """Evaluate the engine's arithmetic at the score means, per driver."""
     eng = MonteCarloEngine(config, seed=PRODUCTION_SEED)
-    cats = list(config.category_names)
+    cats = list(CATEGORIES)
     years = [int(y) for y in config.path_years]
     n, nc, nr, ny = len(drivers), len(cats), len(REGIONS), len(years)
     ncell = nc * nr
@@ -595,7 +595,7 @@ def build_fixture(config: ModelConfig, drivers: list, dec: dict) -> dict:
             "per_force_attenuation": {f: float(config.per_force_attenuation[f]) for f in FORCES},
             "within_force_overlap": {f: float(config.within_force_overlap.get(f, 0.0)) for f in FORCES},
             "base_year": int(config.base_year), "path_years": list(years),
-            "peak_year_jitter": int(config.peak_year_jitter),
+            "peak_year_jitter": bool(config.peak_year_jitter),
         },
         "cellWeights": {cat: {r: float(W[c, ri]) for ri, r in enumerate(REGIONS)} for c, cat in enumerate(cats)},
     }

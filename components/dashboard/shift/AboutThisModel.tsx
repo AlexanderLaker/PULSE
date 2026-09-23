@@ -21,7 +21,7 @@ const GLOSSARY: Array<[string, string]> = [
   ['Cumulative shift', 'Each cell is the compounded level vs 2025 at that year, not a year-over-year change.'],
 ];
 
-/** Score k as the Beta(k, 6 - k) prior of an unscored driver: its mean and
+/** Score k as the Beta(k, 6 - k) prior at uncertainty score 3: its mean and
  *  its 10th and 90th percentiles (scipy.stats.beta). */
 const BETA_PRIORS: string[][] = [
   ['1', '(1,5)', '0.167', '0.021', '0.369'],
@@ -115,7 +115,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               </div>
             )}
             <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-              Shown at the attenuation production runs use; changing it is a code change followed by a new production run. Timing: P10&ndash;P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; per-iteration peak-year jitter of &plusmn;0 to &plusmn;4 years, also set by that score (&plusmn;1 year by default for an unscored driver), gives velocity bands their timing spread. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
+              Shown at the attenuation production runs use; changing it is a code change followed by a new production run. Timing: P10 to P90 bands are magnitude uncertainty from the Monte&nbsp;Carlo, with each driver&rsquo;s spread set by its uncertainty score; per-iteration peak-year jitter of &plusmn;0 to &plusmn;4 years, also set by that score, gives velocity bands their timing spread. Confidence describes the evidence and is shown with the driver; it does not drive the bands.
             </div>
           </div>
           {/* What a 1–5 probability score means as a Beta prior: the scale
@@ -146,7 +146,7 @@ export const AboutThisModel: FC<{ simulation: SimulationResult | null; config: M
               </table>
             </div>
             <div className="text-[11px] mt-1.5" style={{ color: S.mutedText, lineHeight: 1.5 }}>
-              The scale never reaches 0 or 1: a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The table shows the prior at uncertainty score 3, the same as for an unscored driver (&alpha;+&beta;=6). Other uncertainty scores keep the mean and narrow or widen the band, from &alpha;+&beta;=24 at score 0 to 3 at score 5.
+              The scale never reaches 0 or 1: a deliberate shrinkage against overconfidence (a &ldquo;5&rdquo; materialises at mean 0.83, not certainty). The table shows the prior at uncertainty score 3 (&alpha;+&beta;=6). Other uncertainty scores keep the mean and narrow or widen the band, from &alpha;+&beta;=24 at score 0 to 3 at score 5.
             </div>
           </div>
           <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2"

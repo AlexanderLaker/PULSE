@@ -111,11 +111,11 @@ const ParameterCards: FC<{ config: ModelConfig }> = ({ config }) => {
           </SubBlock>
           <SubBlock
             label="Peak-year jitter"
-            hint={jitter > 0
-              ? `Each iteration moves every driver's peak year by up to the width its uncertainty score sets, 0 to 4 years (±${jitter} for a driver without a score).`
+            hint={jitter
+              ? "Each iteration moves every driver's peak year by up to the width its uncertainty score sets, 0 to 4 years."
               : 'Every driver peaks in its scored year in every iteration.'}
           >
-            <div style={VALUE_STYLE}>{jitter > 0 ? 'On' : 'Off'}</div>
+            <div style={VALUE_STYLE}>{jitter ? 'On' : 'Off'}</div>
           </SubBlock>
         </div>
       </SectionCard>

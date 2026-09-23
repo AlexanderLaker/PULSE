@@ -332,7 +332,8 @@ class TestDrivers:
         assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4}).status_code == 422
 
     @pytest.mark.parametrize("body", [
-        {"probability": 9}, {"uncertainty": 6}, {"gp1_pct_affected": 0}, {"direction": "Sideways"},
+        {"probability": 9}, {"uncertainty": 6}, {"uncertainty": None}, {"peak_year": None},
+        {"gp1_pct_affected": 0}, {"direction": "Sideways"},
         {"diffusion_curve": "exponential"}, {"description": None}, {"analysis": "typed by hand"},
         {"name": "Renamed"}, {"force": "Customer"}, {"start_year": 2026}, {"peak_year": 2025},
         {"category_exposure": {"Hair: Care": "high"}}, {"category_exposure": {"Hair: Colour": 3}},

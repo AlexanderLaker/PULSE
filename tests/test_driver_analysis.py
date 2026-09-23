@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 
 from prism import seed_drivers
-from prism.config import ESTIMATE_SOURCE_PREFIX, ModelConfig
+from prism.config import CATEGORIES, ESTIMATE_SOURCE_PREFIX, ModelConfig
 from prism.drivers import DriverSet
 from prism.simulation.engine import MonteCarloEngine
 
@@ -74,12 +74,12 @@ def drivers(build):
 
 class TestDecomposition:
     def test_cell_shifts_equal_the_engine_at_the_means_with_jitter_off(self, build, drivers):
-        config = ModelConfig().copy_with(peak_year_jitter=0)
+        config = ModelConfig().copy_with(peak_year_jitter=False)
         dec = build.decompose(config, drivers)
         means = np.array([d.normalized_score for d in drivers])
         # the engine's vectorised core, fed the Beta means as its "draws"
         eng = MonteCarloEngine(config, seed=1)
-        n_cats, n_reg, n_years = len(config.category_names), 4, len(config.path_years)
+        n_cats, n_reg, n_years = len(CATEGORIES), 4, len(config.path_years)
         cells = eng._compute_all_paths_vectorized(drivers, np.tile(means, (3, 1)), 3, n_cats, n_reg, n_years)
         assert cells.shape == (3, n_cats * n_reg, n_years)
         np.testing.assert_allclose(cells[0], dec["cell_shift"], rtol=0, atol=1e-12)

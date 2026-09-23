@@ -21,8 +21,8 @@ export interface ModelConfig {
   within_force_rho: number;
   /** Label of the overlap-correction record the attenuation comes from. */
   attenuation_source: string;
-  /** Engine-wide switch for the per-driver peak-year jitter (0 switches it off). */
-  peak_year_jitter: number;
+  /** The per-iteration peak-year jitter, each driver within the width its uncertainty score sets; off, every driver peaks in its own year. */
+  peak_year_jitter: boolean;
   base_year: number;
   path_years: number[];
   /** The default cell weights (the estimated HCB mix); a run records the weights it used. */

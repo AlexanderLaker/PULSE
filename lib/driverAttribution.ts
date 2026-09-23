@@ -35,9 +35,7 @@ import { BASE_YEAR, FORCES, REGIONS, YEARS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
 import type { ForceName } from '@/types';
 
-/** prism/config.py DEFAULT_PEAK_YEAR_JITTER: the engine-wide width when the configuration names none. */
-const DEFAULT_PEAK_YEAR_JITTER = 1;
-
+/** A driver as the decomposition reads it: every score present, as the engine requires. */
 export interface AttributionDriver {
   id: string;
   force: ForceName;
@@ -45,10 +43,21 @@ export interface AttributionDriver {
   normalized_score: number;
   category_exposure: Record<string, number>;
   regional_exposure?: Record<string, number>;
-  uncertainty?: number | null;
-  peak_year?: number | null;
-  diffusion_curve?: string | null;
+  uncertainty: number;
+  peak_year: number;
+  diffusion_curve: string;
+  /** Null: the base year. */
   start_year?: number | null;
+}
+
+/** The drivers as the decomposition reads them, or null when one of them misses
+ *  a score: the production run refuses such a driver, so there is nothing to
+ *  attribute to it, and the drill-down falls back to the exposure proxy. */
+export function scoredDrivers<
+  D extends { uncertainty: number | null; peak_year: number | null; diffusion_curve: string | null },
+>(drivers: D[]): Array<D & AttributionDriver> | null {
+  const complete = drivers.every((d) => d.uncertainty != null && d.peak_year != null && !!d.diffusion_curve);
+  return complete ? (drivers as Array<D & AttributionDriver>) : null;
 }
 
 export interface AttributionConfig {
@@ -57,7 +66,8 @@ export interface AttributionConfig {
   within_force_overlap: Record<string, number>;
   base_year?: number;
   path_years?: number[];
-  peak_year_jitter?: number;
+  /** The per-iteration peak-year jitter (on unless the configuration says otherwise). */
+  peak_year_jitter?: boolean;
 }
 
 export interface AttributionInputs {
@@ -73,8 +83,6 @@ export interface DriverAttribution {
   portfolio: Record<number, number>;
   /** Contribution to each category's shift by year (fraction, signed). */
   category: Record<string, Record<number, number>>;
-  /** True when the driver has no peak year or curve and full materialisation is assumed. */
-  approximate: boolean;
 }
 
 export interface AttributionResult {
@@ -135,11 +143,9 @@ export function computeMaterializationSchedule(
   return schedule;
 }
 
-/** The port of prism/config.py peak_jitter_for: the driver's own width, else the global one; 0 switches jitter off. */
-export function peakJitterFor(uncertainty: number | null | undefined, globalJitter: number): number {
-  const g = Math.trunc(globalJitter || 0);
-  if (g <= 0) return 0;
-  if (uncertainty == null) return g;
+/** The port of prism/config.py peak_jitter_for: the width the uncertainty score sets, 0 with the jitter off. */
+export function peakJitterFor(uncertainty: number, jitterOn: boolean): number {
+  if (!jitterOn) return 0;
   const u = Math.max(0, Math.min(5, Math.trunc(uncertainty)));
   return UNCERTAINTY_PEAK_JITTER[u];
 }
@@ -150,36 +156,24 @@ export function peakJitterFor(uncertainty: number | null | undefined, globalJitt
  * peak clamped at onset + 1 exactly as the engine's peak_schedule_table does.
  */
 export function expectedMaterialization(
-  d: AttributionDriver, years: number[], baseYear: number, globalJitter: number,
-): { byYear: number[]; approximate: boolean } {
-  const jt = peakJitterFor(d.uncertainty, globalJitter);
+  d: AttributionDriver, years: number[], baseYear: number, jitterOn: boolean,
+): number[] {
+  const jt = peakJitterFor(d.uncertainty, jitterOn);
   const offsets: number[] = [];
   for (let o = -jt; o <= jt; o++) offsets.push(o);
   const weights = offsets.map((o) => (jt <= 0 ? 1 : Math.max(0, jt + 1 - Math.abs(o))));
   const wsum = weights.reduce((a, b) => a + b, 0);
   const sy = d.start_year == null ? null : Math.trunc(d.start_year);
   const onset = sy == null ? baseYear : Math.max(baseYear, sy);
-  const basePk = d.peak_year ?? 0;
-  const dc = d.diffusion_curve ?? '';
   const byYear = years.map(() => 0);
-  let approximate = false;
   offsets.forEach((off, k) => {
     const w = weights[k] / wsum;
     if (w === 0) return;
-    let sched: Record<number, number>;
-    if (basePk > 0 && dc) {
-      const pk = Math.max(basePk + off, onset + 1);
-      sched = computeMaterializationSchedule(pk, dc, years, baseYear, sy);
-    } else {
-      // The engine gives such a driver its force's default schedule; here it
-      // is taken at full materialisation after the onset and flagged.
-      approximate = true;
-      sched = {};
-      years.forEach((yr) => { sched[yr] = yr > onset ? 1.0 : 0.0; });
-    }
-    years.forEach((yr, i) => { byYear[i] += w * (sched[yr] ?? 1.0); });
+    const pk = Math.max(d.peak_year + off, onset + 1);
+    const sched = computeMaterializationSchedule(pk, d.diffusion_curve, years, baseYear, sy);
+    years.forEach((yr, i) => { byYear[i] += w * sched[yr]; });
   });
-  return { byYear, approximate };
+  return byYear;
 }
 
 /** An exposure score as the engine reads it: min(x, 5) / 5, a missing or
@@ -199,7 +193,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   const { drivers, categories, config, cellWeights } = inputs;
   const years = config.path_years?.length ? config.path_years.map(Number) : YEARS;
   const baseYear = config.base_year ?? BASE_YEAR;
-  const globalJitter = config.peak_year_jitter ?? DEFAULT_PEAK_YEAR_JITTER;
+  const jitterOn = config.peak_year_jitter ?? true;
   const nCat = categories.length, nReg = REGIONS.length, nCell = nCat * nReg, nYear = years.length;
   const n = drivers.length;
 
@@ -243,7 +237,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
   });
 
   // Expected materialisation per driver and year (onset, curve, peak jitter).
-  const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, globalJitter));
+  const mats = drivers.map((d) => expectedMaterialization(d, years, baseYear, jitterOn));
 
   // Additive terms, force sums, compounding and the proportional spread.
   const score = drivers.map((d) => Number(d.normalized_score ?? 0));
@@ -251,7 +245,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
     const f = fidx[j];
     const k = fw[f] * att[f] * score[j];
     return Array.from({ length: nCell }, (__, cell) =>
-      years.map((___, y) => k * damp[f][cell] * E[j][cell] * mats[j].byYear[y]));
+      years.map((___, y) => k * damp[f][cell] * E[j][cell] * mats[j][y]));
   });
   const cellShift: number[][] = Array.from({ length: nCell }, () => new Array<number>(nYear).fill(0));
   const spread: number[][] = Array.from({ length: nCell }, () => new Array<number>(nYear).fill(1));
@@ -301,7 +295,7 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
       });
       category[cat] = row;
     });
-    byDriver[d.id] = { portfolio, category, approximate: mats[j].approximate };
+    byDriver[d.id] = { portfolio, category };
   });
 
   const categoryShift: Record<string, Record<number, number>> = {};

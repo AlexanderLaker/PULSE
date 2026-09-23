@@ -2,9 +2,9 @@
 
 ``validate_model_config`` checks every parameter the engine consumes: complete
 force and category coverage, weights and shares that sum to one, attenuation
-and overlap values inside their bounds, a symmetric, unit-diagonal,
-positive-semidefinite force correlation matrix, and a monotonic default
-materialisation schedule. ``correlation_lambda_min`` adds the check that only
+and overlap values inside their bounds, and a symmetric, unit-diagonal,
+positive-semidefinite force correlation matrix. ``correlation_lambda_min`` adds
+the check that only
 the loaded driver mix can answer: whether the driver-level correlation matrix
 built from the settings is positive semidefinite, so the engine never has to
 weaken the configured correlations to repair it.
@@ -15,7 +15,7 @@ from typing import Dict, List
 import numpy as np
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
-from prism.config import FORCES, REGIONS, ModelConfig, build_driver_correlation_matrix
+from prism.config import CATEGORIES, FORCES, REGIONS, ModelConfig, build_driver_correlation_matrix
 
 SUM_TOLERANCE = 0.01
 
@@ -33,13 +33,11 @@ class ModelConfigValidator(BaseModel):
     attenuation_source: str
     base_year: int
     path_years: List[int]
-    materialization: Dict[int, float]
     force_weights: Dict[str, float]
     cell_weights: Dict[str, Dict[str, float]]
     cell_weights_source: str
-    category_names: List[str]
     iterations: int
-    peak_year_jitter: int
+    peak_year_jitter: bool
     within_force_rho: float
     force_correlation_matrix: Dict[str, Dict[str, float]]
     within_force_overlap: Dict[str, float]
@@ -85,25 +83,11 @@ class ModelConfigValidator(BaseModel):
             raise ValueError(f"force_weights must sum to 1.0 (got {total:.4f})")
         return v
 
-    @field_validator("category_names")
-    @classmethod
-    def _category_names(cls, v):
-        if not v or any(not isinstance(n, str) or not n.strip() for n in v):
-            raise ValueError("category_names must be a non-empty list of names")
-        return v
-
     @field_validator("iterations")
     @classmethod
     def _iterations(cls, v):
         if not 100 <= v <= 1_000_000:
             raise ValueError(f"iterations must be between 100 and 1,000,000 (got {v})")
-        return v
-
-    @field_validator("peak_year_jitter")
-    @classmethod
-    def _peak_year_jitter(cls, v):
-        if not 0 <= v <= 5:
-            raise ValueError(f"peak_year_jitter must be between 0 and 5 years (got {v})")
         return v
 
     @field_validator("within_force_rho")
@@ -148,7 +132,7 @@ class ModelConfigValidator(BaseModel):
     @model_validator(mode="after")
     def _cell_weights(self):
         v = self.cell_weights
-        _require_keys("cell_weights", v, self.category_names)
+        _require_keys("cell_weights", v, CATEGORIES)
         total = 0.0
         for cat, row in v.items():
             _require_keys(f"cell_weights['{cat}']", row, REGIONS)
@@ -160,16 +144,6 @@ class ModelConfigValidator(BaseModel):
             raise ValueError(f"cell_weights must sum to 1.0 over all cells (got {total:.4f})")
         return self
 
-    @model_validator(mode="after")
-    def _materialization(self):
-        years = sorted(self.materialization)
-        values = [self.materialization[y] for y in years]
-        if not values or any(not 0.0 <= x <= 1.0 for x in values):
-            raise ValueError("materialization values must lie in [0, 1]")
-        if any(b < a for a, b in zip(values, values[1:])):
-            raise ValueError("materialization must not decrease from one year to the next")
-        return self
-
 
 def validate_model_config(config: ModelConfig) -> None:
     """Raise ValueError with a readable list of problems if ``config`` is invalid."""
@@ -179,11 +153,9 @@ def validate_model_config(config: ModelConfig) -> None:
             attenuation_source=config.attenuation_source,
             base_year=config.base_year,
             path_years=list(config.path_years),
-            materialization=dict(config.materialization),
             force_weights=dict(config.force_weights),
             cell_weights={c: dict(r) for c, r in config.cell_weights.items()},
             cell_weights_source=config.cell_weights_source,
-            category_names=list(config.category_names),
             iterations=config.iterations,
             peak_year_jitter=config.peak_year_jitter,
             within_force_rho=config.within_force_rho,

@@ -1586,7 +1586,7 @@
     2034,
     2035
    ],
-   "peak_year_jitter": 1
+   "peak_year_jitter": true
   },
   "cellWeights": {
    "Hair: Color": {

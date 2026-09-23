@@ -1,8 +1,9 @@
 """End-to-end locks on the engine: determinism, golden values and the identities the dashboard relies on.
 
 The golden values are the engine's output for seed 42 and 500 iterations on
-the conftest drivers. They change only with a deliberate model change; then
-regenerate them, bump MODEL_VERSION and commit both together.
+the conftest drivers. They change only with a deliberate change to the model
+(then MODEL_VERSION goes up with them) or to those fixture drivers, and the new
+values are committed together with that change.
 """
 import copy
 import json
@@ -61,12 +62,12 @@ class TestGoldenValues:
 
     PINS = {
         # category:    (median,          p10,             p90)
-        "Hair: Color": (-0.004382824607, -0.006560453979, -0.001985604025),
-        "Hair: Care":  (-0.004954295760, -0.006740405373, -0.002756923533),
-        "LHC: FCN":    (-0.006774214440, -0.008688186306, -0.004155012017),
+        "Hair: Color": (-0.003827122339, -0.005863915896, -0.001850712454),
+        "Hair: Care":  (-0.004869676012, -0.006488172273, -0.003198774599),
+        "LHC: FCN":    (-0.007031953073, -0.008618985362, -0.005290401870),
     }
     #: The joint portfolio band, the number the dashboard headline shows.
-    PORTFOLIO_PIN = (-0.005718585254, -0.007619757232, -0.003235896735)
+    PORTFOLIO_PIN = (-0.005762680071, -0.007472267097, -0.004048590652)
 
     def test_engine_identity(self, mock_model_config, mock_drivers_database):
         r = _run(mock_model_config, mock_drivers_database)

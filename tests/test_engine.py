@@ -10,7 +10,7 @@ from prism.simulation.engine import MonteCarloEngine
 def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, direction="Contraction",
                       peak_year=2026, curve="linear", start_year=2025):
     d = Driver(id="d1", force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=prob,
-               peak_year=peak_year, diffusion_curve=curve, start_year=start_year)
+               peak_year=peak_year, diffusion_curve=curve, start_year=start_year, uncertainty=3)
     d.category_exposure = {cat: cat_exp}
     d.regional_exposure = dict(zip(REGIONS, regional))
     return DriverSet(drivers=[d])
@@ -18,7 +18,7 @@ def _single_driver_db(regional, cat="Hair: Color", cat_exp=5, prob=4, gp1=0.10, 
 
 def _global_driver(id_, direction, gp1, probability, exposure=5):
     d = Driver(id=id_, force="Consumer", direction=direction, gp1_pct_affected=gp1, probability=probability,
-               peak_year=2028, diffusion_curve="s_curve", start_year=2025)
+               peak_year=2028, diffusion_curve="s_curve", start_year=2025, uncertainty=3)
     d.category_exposure = {"Hair: Color": exposure}
     d.regional_exposure = dict(zip(REGIONS, [5, 5, 5, 5]))
     return d
@@ -98,7 +98,7 @@ class TestRegionalShift:
     """The shift is solved per (category, region) cell and rolled up with the cell weights."""
 
     def _cfg(self, mock_model_config):
-        return mock_model_config.copy_with(iterations=4000, peak_year_jitter=0)
+        return mock_model_config.copy_with(iterations=4000, peak_year_jitter=False)
 
     def test_weights_used(self, mock_model_config, mock_drivers_database):
         r = MonteCarloEngine(self._cfg(mock_model_config)).run(mock_drivers_database)
@@ -166,7 +166,13 @@ class TestDriverChecks:
         ({"probability": 6}, "probability 6"),
         ({"probability": None}, "probability None"),
         ({"uncertainty": 9}, "uncertainty 9"),
-        ({"diffusion_curve": "exponential"}, "unknown diffusion curve"),
+        ({"uncertainty": None}, "uncertainty None"),
+        ({"diffusion_curve": "exponential"}, "diffusion curve 'exponential' is not one of"),
+        ({"diffusion_curve": None}, "diffusion curve None is not one of"),
+        ({"peak_year": None}, "peak year None is not a year after the onset"),
+        ({"peak_year": 2025}, r"peak year 2025 is not a year after the onset \(from 2026\)"),
+        ({"start_year": 2027, "peak_year": 2027}, r"peak year 2027 is not a year after the onset \(from 2028\)"),
+        ({"start_year": "soon"}, "start year 'soon' is not a year"),
         ({"category_exposure": {"Hair: Colour": 3}}, "not in the taxonomy"),
         ({"regional_exposure": {"Europe": 7}}, "is not a whole number from 0 to 5"),
     ])
@@ -179,11 +185,19 @@ class TestDriverChecks:
             MonteCarloEngine(mock_model_config).run(db)
 
     def test_every_problem_is_listed(self):
+        """No score has a default, so a driver built from its id alone lists every missing one."""
         from prism.drivers import simulation_problems
         a = Driver(id="a", force="Weather", direction="Up", probability=0, gp1_pct_affected=0)
-        b = Driver(id="a", force="Consumer", gp1_pct_affected=0.1)
+        b = Driver(id="a", force="Consumer")
         problems = simulation_problems([a, b])
-        assert problems[0] == "driver id 'a' appears 2 times" and len(problems) == 5
+        assert problems[0] == "driver id 'a' appears 2 times"
+        for words in ("unknown force 'Weather'", "direction 'Up'", "probability 0", "gp1_pct_affected 0"):
+            assert sum(words in p for p in problems) == 1, words
+        for words in ("direction None", "probability None", "gp1_pct_affected None"):
+            assert sum(words in p for p in problems) == 1, words
+        for words in ("uncertainty None", "diffusion curve None", "peak year None"):
+            assert sum(words in p for p in problems) == 2, words
+        assert len(problems) == 1 + 4 + 3 + 3 * 2
 
     def test_the_driver_base_passes(self):
         from prism.drivers import simulation_problems
@@ -195,7 +209,7 @@ class TestOverlapDampening:
     def test_a_small_tailwind_never_worsens_the_outlook(self, mock_model_config):
         """The within-force dampening uses the magnitude-weighted effective number
         of drivers, so adding a negligible favourable driver cannot lower the shift."""
-        cfg = mock_model_config.copy_with(iterations=20000, peak_year_jitter=0)
+        cfg = mock_model_config.copy_with(iterations=20000, peak_year_jitter=False)
         big = _global_driver("big", "Expansion", 0.20, 4)
         tiny = _global_driver("tiny", "Expansion", 0.005, 5, exposure=1)
         alone = MonteCarloEngine(cfg, seed=42).run(
@@ -213,8 +227,8 @@ class TestTiming:
 
     def test_peak_year_jitter_widens_the_velocity_band(self, mock_model_config):
         base = mock_model_config.copy_with(iterations=20000)
-        off = MonteCarloEngine(base.copy_with(peak_year_jitter=0), seed=7).run(self._db())
-        on = MonteCarloEngine(base.copy_with(peak_year_jitter=1), seed=7).run(self._db())
+        off = MonteCarloEngine(base.copy_with(peak_year_jitter=False), seed=7).run(self._db())
+        on = MonteCarloEngine(base.copy_with(peak_year_jitter=True), seed=7).run(self._db())
 
         def width(r):
             v = r["shift_matrix"]["Hair: Color"]["velocity"][2029]
@@ -222,13 +236,13 @@ class TestTiming:
         assert width(on) > width(off)
 
     def test_jitter_is_reproducible_under_seed(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=1)
+        cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=True)
         r1 = MonteCarloEngine(cfg, seed=11).run(self._db())
         r2 = MonteCarloEngine(cfg, seed=11).run(self._db())
         assert r1["shift_matrix"] == r2["shift_matrix"]
 
     def test_nothing_materialises_before_the_start_year(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=0)
+        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=False)
         db = _single_driver_db([5, 5, 5, 5], prob=5, gp1=0.20, peak_year=2030, start_year=2028)
         path = MonteCarloEngine(cfg, seed=1).run(db)["shift_matrix"]["Hair: Color"]["path"]
         for year in (2026, 2027, 2028):

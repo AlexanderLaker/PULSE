@@ -157,7 +157,7 @@ export function makeConfig(overrides: Partial<ModelConfig> = {}): ModelConfig {
     force_correlation_matrix: FORCE_CORRELATION,
     within_force_rho: 0.3,
     attenuation_source: 'overlap-correction-2026-09',
-    peak_year_jitter: 1,
+    peak_year_jitter: true,
     base_year: 2025,
     path_years: YEARS,
     cell_weights: ESTIMATED_CELL_WEIGHTS,

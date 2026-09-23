@@ -109,7 +109,7 @@ def update_driver(driver_id: str, update: DriverUpdate, user: dict = Depends(req
     driver = copy.deepcopy(_require_driver(driver_id))
     sent = update.model_fields_set - {"revision"}
     for name in sent:
-        if getattr(update, name) is None and name != "uncertainty":
+        if getattr(update, name) is None:
             raise HTTPException(422, f"{name} cannot be null")
     if "diffusion_curve" in sent and update.diffusion_curve not in VALID_DIFFUSION_CURVES:
         raise HTTPException(422, f"Invalid diffusion_curve. Must be one of {VALID_DIFFUSION_CURVES}")

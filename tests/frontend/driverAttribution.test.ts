@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
-  peakJitterFor,
+  peakJitterFor, scoredDrivers,
 } from '@/lib/driverAttribution';
 import { BASE_YEAR, YEARS } from '@/lib/format';
 
@@ -49,7 +49,6 @@ describe('lib/driverAttribution parity with scripts/build_driver_analysis.py', (
       const exp = fx.expected.byDriver[id];
       const got = result.byDriver[id];
       expect(got, id).toBeDefined();
-      expect(got.approximate).toBe(false);
       for (const [year, v] of Object.entries(exp.portfolio)) {
         expect(close(got.portfolio[Number(year)], v), `${id} portfolio ${year}: ${got.portfolio[Number(year)]} vs ${v}`).toBe(true);
         compared++;
@@ -122,34 +121,28 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
     expect(late[2034]).toBe(0.8571);
     const m = expectedMaterialization(
       { id: 'x', force: 'Consumer', normalized_score: 0.1, category_exposure: {}, uncertainty: 5, peak_year: 2026, diffusion_curve: 'linear', start_year: 2025 },
-      YEARS, BASE_YEAR, 1,
+      YEARS, BASE_YEAR, true,
     );
     // width 4: offsets -4..+4 all clamp at onset + 1 = 2026 or later; 2026 is
     // fully materialised only for the clamped draws, so the expectation lies
     // strictly between 0 and 1 and reaches 1 by 2030.
-    expect(m.byYear[0]).toBeGreaterThan(0);
-    expect(m.byYear[0]).toBeLessThan(1);
-    expect(m.byYear[4]).toBe(1);
-    expect(m.approximate).toBe(false);
+    expect(m[0]).toBeGreaterThan(0);
+    expect(m[0]).toBeLessThan(1);
+    expect(m[4]).toBe(1);
   });
 
-  it('reads the jitter width from the uncertainty score and honours the global switch', () => {
-    expect(peakJitterFor(null, 1)).toBe(1);
-    expect(peakJitterFor(0, 1)).toBe(0);
-    expect(peakJitterFor(3, 1)).toBe(2);
-    expect(peakJitterFor(5, 1)).toBe(4);
-    expect(peakJitterFor(5, 0)).toBe(0);
-    expect(peakJitterFor(null, 0)).toBe(0);
+  it('reads the jitter width from the uncertainty score and honours the switch', () => {
+    expect(peakJitterFor(0, true)).toBe(0);
+    expect(peakJitterFor(2, true)).toBe(1);
+    expect(peakJitterFor(3, true)).toBe(2);
+    expect(peakJitterFor(5, true)).toBe(4);
+    expect(peakJitterFor(5, false)).toBe(0);
   });
 
-  it('flags a driver without peak year or curve as approximate instead of failing', () => {
-    const r = computeDriverAttribution({
-      drivers: [{ id: 'a', force: 'Consumer', normalized_score: -0.1, category_exposure: { 'Hair: Color': 5 }, regional_exposure: { Europe: 5 } }],
-      categories: ['Hair: Color'],
-      config: { force_weights: { Consumer: 1 / 6 }, per_force_attenuation: { Consumer: 0.5 }, within_force_overlap: { Consumer: 0.1 } },
-      cellWeights: { 'Hair: Color': { Europe: 1 } },
-    });
-    expect(r.byDriver.a.approximate).toBe(true);
-    expect(r.byDriver.a.portfolio[2035]).toBeCloseTo(-0.1 / 6 * 0.5, 12);
+  it('attributes only when every driver carries the scores the engine needs', () => {
+    const full = { id: 'a', force: 'Consumer' as const, normalized_score: -0.1, category_exposure: {},
+      regional_exposure: {}, uncertainty: 2, peak_year: 2029, diffusion_curve: 'linear' };
+    expect(scoredDrivers([full])).toEqual([full]);
+    expect(scoredDrivers([full, { ...full, id: 'b', uncertainty: null }])).toBeNull();
   });
 });

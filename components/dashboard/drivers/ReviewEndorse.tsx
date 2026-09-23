@@ -415,8 +415,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     return v != null && v > 0 ? Math.min(1, v) : undefined;
   };
   // A whole year from the year after the onset to the horizon; anything
-  // else (the 0 of a driver without a peak year, an expert mean at or before
-  // the onset) is left out, so the driver keeps its timing.
+  // else (an expert mean at or before the onset) is left out, so the driver
+  // keeps its timing.
   const firstPeak = firstPeakYear(driver.start_year);
   const resolvePeak = (): number | undefined => {
     const s = srcOf('peak', ePk != null);
@@ -435,8 +435,8 @@ export const ReviewPanel: FC<{ driver: Driver; updateDriver: (driverId: string, 
     if (s === 'baseline') return bCv;
     return eCv;
   };
-  // A whole score 0–5; left out when nothing resolves, so an unscored driver
-  // stays unscored.
+  // A whole score 0–5; left out when nothing resolves, so the driver keeps
+  // its own.
   const resolveUnc = (): number | undefined => {
     const s = srcOf('uncertainty', eU != null);
     if (s === 'current') return undefined;

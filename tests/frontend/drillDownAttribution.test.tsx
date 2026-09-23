@@ -44,7 +44,7 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'dri
   inputs: {
     drivers: FixtureDriver[];
     config: { force_weights: Record<ForceName, number>; per_force_attenuation: Record<ForceName, number>;
-      within_force_overlap: Record<ForceName, number>; base_year: number; path_years: number[]; peak_year_jitter: number };
+      within_force_overlap: Record<ForceName, number>; base_year: number; path_years: number[]; peak_year_jitter: boolean };
     cellWeights: Record<string, Record<string, number>>;
   };
   expected: {

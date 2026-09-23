@@ -2,8 +2,7 @@
  * What a driver's uncertainty score (0 to 5) does in the engine: the
  * concentration of its Beta prior and the width of its peak-year jitter
  * (prism/config.py UNCERTAINTY_KAPPA and UNCERTAINTY_PEAK_JITTER, indexed by
- * the score; tests/test_uncertainty.py holds these copies to them). An
- * unscored driver takes concentration 6 and the model-wide jitter.
+ * the score; tests/test_uncertainty.py holds these copies to them).
  */
 
 /** Beta-prior concentration (alpha + beta) by score; the mean stays probability / 6. */

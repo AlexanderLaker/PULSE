@@ -27,7 +27,8 @@ export interface DriverScores {
   /** Year by which the effect is fully present. */
   peak_year: number;
   diffusion_curve: string;
-  /** Spread around the modelled size and timing, 0 to 5; null when not scored. */
+  /** Spread around the modelled size and timing, 0 to 5. Null only for a driver
+   *  stored without a score, which the production run refuses until it has one. */
   uncertainty: number | null;
   category_exposure: ExposureMap;
   regional_exposure: ExposureMap;

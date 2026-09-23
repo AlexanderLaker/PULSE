@@ -202,8 +202,8 @@ def _schema() -> List[str]:
             direction TEXT,
             probability INTEGER,
             start_year INTEGER,
-            peak_year INTEGER DEFAULT 0,
-            diffusion_curve TEXT DEFAULT 's_curve',
+            peak_year INTEGER,
+            diffusion_curve TEXT,
             gp1_pct_affected REAL,
             uncertainty INTEGER,
             confidence TEXT DEFAULT 'Medium',
@@ -563,10 +563,11 @@ def load_drivers() -> List[Driver]:
             regional_exposure=e["region"],
             sources=sources[r["id"]],
             confidence=r["confidence"] or "Medium",
-            # A missing GP1 share stays missing so the engine refuses to run.
+            # A missing score stays missing, so the engine refuses to run
+            # rather than simulate an invented value.
             gp1_pct_affected=r["gp1_pct_affected"],
-            peak_year=r["peak_year"] or 0,
-            diffusion_curve=r["diffusion_curve"] or "s_curve",
+            peak_year=_int_or_none(r["peak_year"]),
+            diffusion_curve=r["diffusion_curve"],
             uncertainty=_int_or_none(r["uncertainty"]),
             baseline=_loads(r["baseline"]),
             scores_edited=bool(r["scores_edited"]),

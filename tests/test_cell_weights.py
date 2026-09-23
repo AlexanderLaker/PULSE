@@ -45,7 +45,7 @@ def _outer(category_weights: dict, region_weights: dict) -> dict:
 def _europe_driver(**overrides) -> DriverSet:
     kwargs = dict(id="eu_only", force="Consumer", name="EU only", direction="Contraction", probability=5,
                   start_year=2025, gp1_pct_affected=0.30, peak_year=2028, diffusion_curve="linear",
-                  category_exposure={"Hair: Color": 5}, regional_exposure={"Europe": 5},
+                  uncertainty=3, category_exposure={"Hair: Color": 5}, regional_exposure={"Europe": 5},
                   vc_exposure={"Marketing": 5})
     kwargs.update(overrides)
     return DriverSet(drivers=[Driver(**kwargs)])

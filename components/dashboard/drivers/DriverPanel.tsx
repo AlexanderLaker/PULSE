@@ -459,7 +459,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
                 </div>
                 <span style={{ fontSize: 11, color: S.mutedText }}>
                   {driver.uncertainty == null
-                    ? 'Unscored: concentration 6 and the model-wide ±1-year jitter.'
+                    ? 'Not scored: the production run refuses this driver until it has a score.'
                     : `Beta concentration ${UNCERTAINTY_KAPPA[Math.max(0, Math.min(5, driver.uncertainty))]} · peak-year jitter ±${UNCERTAINTY_PEAK_JITTER[Math.max(0, Math.min(5, driver.uncertainty))]} y`}
                 </span>
               </div>

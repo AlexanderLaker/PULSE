@@ -22,7 +22,7 @@ import {
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
-import { computeDriverAttribution } from '@/lib/driverAttribution';
+import { computeDriverAttribution, scoredDrivers } from '@/lib/driverAttribution';
 import useOverlay from '@/hooks/useOverlay';
 import type { Driver, ModelConfig, SimulationResult } from '@/types';
 import {
@@ -72,9 +72,12 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
       .sort((a, b) => Math.abs(b.median) - Math.abs(a.median));
   }, [simulation, category, year]);
 
-  const attribution = useMemo(() => (config
-    ? computeDriverAttribution({ drivers, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
-    : null), [drivers, config, simulation.cell_weights_used]);
+  // The decomposition needs the model configuration and every driver fully
+  // scored; without either the contributors fall back to the exposure proxy.
+  const scored = useMemo(() => scoredDrivers(drivers), [drivers]);
+  const attribution = useMemo(() => (config && scored
+    ? computeDriverAttribution({ drivers: scored, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
+    : null), [scored, config, simulation.cell_weights_used]);
 
   const shiftEnd = path[String(HORIZON)].median;
   const shiftStart = path[String(FIRST_YEAR)].median;
@@ -86,9 +89,6 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
     () => rankContributors(category, drivers, attribution, shiftEnd),
     [category, drivers, attribution, shiftEnd],
   );
-  const approximateCount = attribution
-    ? contributors.filter((c) => attribution.byDriver[c.driver.id].approximate).length
-    : 0;
 
   // Share of the category's movement carried by its five largest drivers.
   const topShare = useMemo(() => {
@@ -540,10 +540,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             the row&rsquo;s MC median at the selected year.
             {contributors.length > 0 && (attribution
               ? ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'
-              : ' Contributing drivers: exposure proxy (Shift × category exposure), because the model configuration did not load; the PRISM Analysis on the Drivers page is attributed at the score means.')}
-            {approximateCount > 0 && (approximateCount === 1
-              ? ' 1 driver without a peak year or curve is taken at full materialisation.'
-              : ` ${approximateCount} drivers without a peak year or curve are taken at full materialisation.`)}
+              : ` Contributing drivers: exposure proxy (Shift × category exposure), because ${scored ? 'the model configuration did not load' : 'a driver misses a score the model needs'}; the PRISM Analysis on the Drivers page is attributed at the score means.`)}
           </footer>
         </div>
       </motion.aside>

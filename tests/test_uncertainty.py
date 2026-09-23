@@ -2,8 +2,8 @@
 
 UNCERTAINTY_KAPPA gives the concentration kappa = alpha + beta (24/16/10/6/4/3)
 with the mean p/6 unchanged; UNCERTAINTY_PEAK_JITTER gives the jitter width
-(0/1/1/2/3/4 years). An unscored driver takes the prior (p, 6 - p) and the
-engine-wide jitter width.
+(0/1/1/2/3/4 years). Every driver needs a score: a driver without one cannot
+be simulated.
 """
 import re
 from pathlib import Path
@@ -11,18 +11,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from prism.config import (DEFAULT_PEAK_YEAR_JITTER, UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER,
-                          beta_prior_for, peak_jitter_for)
+from prism.config import UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER, beta_prior_for, peak_jitter_for
 from prism.drivers import Driver, DriverSet, simulation_problems
 from prism.input_drift import compute_input_drift_event, driver_fingerprint
 from prism.simulation.engine import MonteCarloEngine
 
 
 class TestPriorMapping:
-    def test_an_unscored_driver_gets_p_and_6_minus_p(self):
-        for p in range(1, 6):
-            assert beta_prior_for(p, None) == (p, 6 - p)
-
     def test_concentration_follows_table_and_mean_is_preserved(self):
         for p in range(1, 6):
             for u in range(6):
@@ -31,9 +26,9 @@ class TestPriorMapping:
                 assert a / (a + b) == pytest.approx(p / 6.0), (p, u)
                 assert a >= 0.5 and b >= 0.5
 
-    def test_score_3_equals_the_unscored_prior(self):
+    def test_score_3_gives_p_and_6_minus_p(self):
         for p in range(1, 6):
-            assert beta_prior_for(p, 3) == pytest.approx(beta_prior_for(p, None))
+            assert beta_prior_for(p, 3) == pytest.approx((p, 6 - p))
 
     def test_out_of_range_scores_are_clamped(self):
         assert beta_prior_for(4, 9) == beta_prior_for(4, 5)
@@ -47,10 +42,9 @@ class TestPriorMapping:
         assert not re.search(r"fixed[^.;]{0,30}(concentration|spread)", src)
         k, j = UNCERTAINTY_KAPPA, UNCERTAINTY_PEAK_JITTER
         assert f"keep the mean and narrow or widen the band, from &alpha;+&beta;={k[0]} at score 0 to {k[5]} at score 5" in src
-        assert f"the prior at uncertainty score 3, the same as for an unscored driver (&alpha;+&beta;={k[3]})" in src
-        assert beta_prior_for(4, None) == pytest.approx(beta_prior_for(4, 3))
+        assert f"the prior at uncertainty score 3 (&alpha;+&beta;={k[3]})" in src
         assert f"peak-year jitter of &plusmn;{min(j.values())} to &plusmn;{max(j.values())} years" in src
-        assert f"(&plusmn;{DEFAULT_PEAK_YEAR_JITTER} year by default for an unscored driver)" in src
+        assert "unscored" not in src
 
     def test_the_dashboard_copies_of_the_tables_match(self):
         """lib/uncertainty.ts carries the two tables for the editor and the drill-down."""
@@ -65,41 +59,43 @@ class TestPriorMapping:
         assert ts_array("UNCERTAINTY_PEAK_JITTER") == [UNCERTAINTY_PEAK_JITTER[u] for u in range(6)]
 
     def test_jitter_table(self):
-        assert [peak_jitter_for(u, 1) for u in range(6)] == [0, 1, 1, 2, 3, 4]
-        assert peak_jitter_for(None, 1) == 1
-        assert peak_jitter_for(None, 2) == 2
+        assert [peak_jitter_for(u, True) for u in range(6)] == [0, 1, 1, 2, 3, 4]
         assert UNCERTAINTY_PEAK_JITTER[5] == 4
 
-    def test_global_zero_is_the_engine_wide_off_switch(self):
-        """config.peak_year_jitter = 0 means no timing jitter for any driver, scored or not."""
-        assert peak_jitter_for(None, 0) == 0
-        assert all(peak_jitter_for(u, 0) == 0 for u in range(6))
+    def test_the_switch_off_silences_every_driver(self):
+        """config.peak_year_jitter off means no timing jitter for any driver, whatever its score."""
+        assert all(peak_jitter_for(u, False) == 0 for u in range(6))
 
 
 class TestDriverModel:
-    def test_driver_prior_uses_score_and_recomputes_on_post_init(self):
-        d = Driver(id="u1", force="Consumer", probability=5, gp1_pct_affected=0.2)
-        assert d.probability_prior == (5, 1)
-        assert d.uncertainty is None
+    def test_driver_prior_uses_score_and_recomputes(self):
+        d = Driver(id="u1", force="Consumer", direction="Expansion", probability=5, gp1_pct_affected=0.2,
+                   uncertainty=3)
+        assert d.probability_prior == pytest.approx((5, 1))
         d.uncertainty = 1
-        d.__post_init__()
+        d.recompute()
         a, b = d.probability_prior
         assert a + b == pytest.approx(16)
         assert d.normalized_score == pytest.approx(5 / 6 * 0.2)  # mean unchanged
         d.uncertainty = 7
-        d.__post_init__()
+        d.recompute()
         assert d.uncertainty == 7                              # never rewritten silently
         assert d.probability_prior == beta_prior_for(5, 5)     # the prior reads the end of the scale
         assert any("uncertainty 7" in line for line in simulation_problems([d]))   # and a run refuses it
 
+    def test_a_driver_without_a_score_is_listed_but_never_simulated(self):
+        d = Driver(id="u2", force="Consumer", probability=4, gp1_pct_affected=0.2)
+        assert d.uncertainty is None and d.probability_prior == (3, 3)   # neutral, for listing only
+        assert any("uncertainty None" in line for line in simulation_problems([d]))
+
     def test_fingerprint_carries_score_and_diffs_it(self):
         base = Driver(id="u1", force="Consumer", probability=4, gp1_pct_affected=0.1,
                      category_exposure={"Hair: Care": 3}, regional_exposure={"Europe": 5},
-                     vc_exposure={"Marketing": 5}, peak_year=2029, diffusion_curve="linear")
+                     vc_exposure={"Marketing": 5}, peak_year=2029, diffusion_curve="linear", uncertainty=2)
         fp0 = driver_fingerprint([base])
-        assert fp0["u1"]["u"] is None
+        assert fp0["u1"]["u"] == 2
         base.uncertainty = 4
-        base.__post_init__()
+        base.recompute()
         fp1 = driver_fingerprint([base])
         assert fp1["u1"]["u"] == 4
         ev = compute_input_drift_event(fp1, fp0, previous_run_id=1)
@@ -132,8 +128,8 @@ def _terminal_band(r, cat="Hair: Care"):
 
 class TestEngine:
     def test_score_0_disables_jitter_and_score_5_widens_it(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=1)
-        r_u0_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=11).run(_db([0]))
+        cfg = mock_model_config.copy_with(iterations=3000, peak_year_jitter=True)
+        r_u0_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=11).run(_db([0]))
         r_u0 = MonteCarloEngine(cfg, seed=11).run(_db([0]))
         r_u3 = MonteCarloEngine(cfg, seed=11).run(_db([3]))
         r_u5 = MonteCarloEngine(cfg, seed=11).run(_db([5]))
@@ -146,27 +142,25 @@ class TestEngine:
         assert w5 > w3
 
     def test_global_switch_off_silences_scored_drivers_too(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=0)
-        # With the global switch off a score-5 driver draws no offset at all;
-        # switching it on makes the +/-4 offsets live and widens the timing bands.
+        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=False)
+        # With the switch off a score-5 driver draws no offset at all; switching
+        # it on makes the +/-4 offsets live and widens the timing bands.
         r_u5_off = MonteCarloEngine(cfg, seed=2).run(_db([5]))
-        r_u5_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=1), seed=2).run(_db([5]))
+        r_u5_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=2).run(_db([5]))
         assert r_u5_off["shift_matrix"] != r_u5_on["shift_matrix"]
         assert _velocity_width(r_u5_on) > _velocity_width(r_u5_off)
 
     def test_low_score_narrows_terminal_band_high_score_widens_it(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=4000, peak_year_jitter=0)
+        cfg = mock_model_config.copy_with(iterations=4000, peak_year_jitter=False)
         bands = {}
         for u in (0, 3, 5):
             r = MonteCarloEngine(cfg, seed=5).run(_db([u]))
             bands[u] = _terminal_band(r)
-        r_none = MonteCarloEngine(cfg, seed=5).run(_db([None]))
         assert bands[0] < bands[3] < bands[5]
-        assert bands[3] == pytest.approx(_terminal_band(r_none), rel=1e-12)  # score 3 == unscored (kappa 6)
 
     def test_mixed_scores_reproducible_under_seed(self, mock_model_config):
-        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=1)
-        db = _db([None, 0, 2, 5])
+        cfg = mock_model_config.copy_with(iterations=2000, peak_year_jitter=True)
+        db = _db([1, 0, 2, 5])
         a = MonteCarloEngine(cfg, seed=3).run(db)
         b = MonteCarloEngine(cfg, seed=3).run(db)
         assert a["shift_matrix"] == b["shift_matrix"]
@@ -174,10 +168,10 @@ class TestEngine:
         assert a["shift_matrix"] != c["shift_matrix"]
 
     def test_mixed_scores_keep_each_drivers_own_offset_range(self, mock_model_config):
-        """A score-0 driver never moves its peak, a score-5 driver uses offsets up
-        to +/-4, and an unscored driver stays inside the global +/-1."""
-        cfg = mock_model_config.copy_with(iterations=5000, peak_year_jitter=1)
-        db = _db([None, 0, 5])
+        """A score-0 driver never moves its peak, a score-2 driver stays inside
+        +/-1, and a score-5 driver uses offsets up to +/-4."""
+        cfg = mock_model_config.copy_with(iterations=5000, peak_year_jitter=True)
+        db = _db([2, 0, 5])
         eng = MonteCarloEngine(cfg, seed=8)
         # Re-create the offset draw the engine performs (same RNG consumption
         # order as _compute_all_paths_vectorized): copula draws first.
@@ -185,7 +179,7 @@ class TestEngine:
         R = eng.build_correlation_matrix(drivers)
         eng.generate_copula_samples(drivers, R, 5000)
         from prism.config import peak_jitter_for as pj
-        widths = [pj(d.uncertainty, 1) for d in drivers]
+        widths = [pj(d.uncertainty, True) for d in drivers]
         assert widths == [1, 0, 4]
         jmax = max(widths)
         offsets = list(range(-jmax, jmax + 1))
@@ -222,8 +216,10 @@ class TestDatabaseRoundTrip:
         loaded = {x.id: x for x in dbm.load_drivers()}
         assert loaded["unc_1"].uncertainty == 2
         assert loaded["unc_1"].probability_prior == pytest.approx(beta_prior_for(4, 2))
+        # a missing score loads as missing: listed, never simulated
         assert loaded["unc_2"].uncertainty is None
         assert loaded["unc_2"].probability_prior == (3, 3)
+        assert any("uncertainty None" in line for line in simulation_problems([loaded["unc_2"]]))
         # proposals carry the field too
         row = dbm.upsert_driver_proposal("unc_1", "expert-a", {"uncertainty": 4, "probability": 3}, "A")
         assert row["uncertainty"] == 4
@@ -249,7 +245,7 @@ class TestOnsetClamp:
                      vc_exposure={"Marketing": 5}, uncertainty=u)
 
     def test_schedule_table_is_monotone_earlier_for_negative_offsets(self, mock_model_config):
-        cfg = mock_model_config.copy_with(peak_year_jitter=1,
+        cfg = mock_model_config.copy_with(peak_year_jitter=True,
                                           path_years=[2026, 2027, 2028, 2029, 2030])
         eng = MonteCarloEngine(cfg, seed=1)
         # start 2025, peak 2027, score 3 gives +/-2: offsets -2 and -1 land at or before the onset
@@ -264,11 +260,11 @@ class TestOnsetClamp:
         assert probs[0].sum() == pytest.approx(1.0) and probs[0][2] == pytest.approx(3 / 9)
 
     def test_offset_draw_uses_each_drivers_own_width(self, mock_model_config):
-        """The engine's own draw: score 0 never moves, unscored stays inside the
-        global +/-1, score 5 uses offsets up to +/-4."""
-        cfg = mock_model_config.copy_with(peak_year_jitter=1)
+        """The engine's own draw: score 0 never moves, score 2 stays inside +/-1,
+        score 5 uses offsets up to +/-4."""
+        cfg = mock_model_config.copy_with(peak_year_jitter=True)
         eng = MonteCarloEngine(cfg, seed=8)
-        drivers = _db([None, 0, 5]).drivers
+        drivers = _db([2, 0, 5]).drivers
         _sched, offsets, probs = eng.peak_schedule_table(drivers)
         idx = eng.draw_peak_offsets(probs, 6000)
         off = np.array(offsets)[idx]
@@ -276,7 +272,7 @@ class TestOnsetClamp:
         assert set(np.unique(off[:, 0])) == {-1, 0, 1}
         assert off[:, 2].min() == -4 and off[:, 2].max() == 4
         # a single-offset grid consumes no randomness
-        eng2 = MonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=8)
+        eng2 = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=8)
         _s, o2, p2 = eng2.peak_schedule_table(drivers)
         assert o2 == [0] and eng2.draw_peak_offsets(p2, 10).sum() == 0
         assert eng2.rng.random() == MonteCarloEngine(cfg, seed=8).rng.random()
@@ -287,8 +283,8 @@ class TestOnsetClamp:
         median is at least the no-jitter level in magnitude."""
         cfg = mock_model_config.copy_with(iterations=4000, path_years=[2026, 2027, 2028, 2029, 2030])
         db = DriverSet(drivers=[self._driver(3)])
-        r_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=1), seed=3).run(db)
-        r_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=0), seed=3).run(db)
+        r_on = MonteCarloEngine(cfg.copy_with(peak_year_jitter=True), seed=3).run(db)
+        r_off = MonteCarloEngine(cfg.copy_with(peak_year_jitter=False), seed=3).run(db)
         m_on = r_on["shift_matrix"]["Hair: Care"]["path"][2026]["median"]
         m_off = r_off["shift_matrix"]["Hair: Care"]["path"][2026]["median"]
         assert m_on < 0 and m_off < 0

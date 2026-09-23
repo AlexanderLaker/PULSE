@@ -123,8 +123,8 @@ def _ddl(postgres: bool) -> list:
             direction TEXT,
             probability INTEGER,
             start_year INTEGER,
-            peak_year INTEGER DEFAULT 0,
-            diffusion_curve TEXT DEFAULT 's_curve',
+            peak_year INTEGER,
+            diffusion_curve TEXT,
             gp1_pct_affected REAL,
             uncertainty INTEGER,
             confidence TEXT DEFAULT 'Medium',
@@ -392,7 +392,7 @@ def migrate(db: Database) -> dict:
             "diffusion_curve, gp1_pct_affected, uncertainty, confidence, analysis, baseline, "
             f"scores_edited, created_at, updated_at) VALUES ({', '.join([p] * 17)})",
             (r["id"], r["force"], r["name"], r.get("description"), r.get("direction"), r.get("probability"),
-             r.get("start_year"), r.get("peak_year") or 0, r.get("diffusion_curve") or "s_curve",
+             r.get("start_year"), r.get("peak_year") or None, r.get("diffusion_curve") or None,
              r.get("gp1_pct_affected"), r.get("uncertainty"), r.get("confidence") or "Medium",
              r.get("strategic_implication"), json_text(r.get("ai_suggestion")),
              bool(r.get("user_override")), r.get("created_at"), r.get("updated_at")))

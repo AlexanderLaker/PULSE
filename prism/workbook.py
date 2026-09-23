@@ -23,7 +23,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from prism.config import (
-    DEFAULT_PEAK_YEAR_JITTER,
+    CATEGORIES,
     FORCES,
     REGIONS,
     UNCERTAINTY_KAPPA,
@@ -72,9 +72,9 @@ READING_NOTES = (
      "epicentre. Propagation along the chain is not modelled."),
     ("Uncertainty",
      "P10 to P90 bands are Monte Carlo percentiles. The concentration of a driver's Beta prior follows "
-     f"its uncertainty score 0 to 5 ({', '.join(str(UNCERTAINTY_KAPPA[u]) for u in range(6))}; 6 when "
-     f"unscored), and so does its peak-year jitter ({', '.join(str(UNCERTAINTY_PEAK_JITTER[u]) for u in range(6))} "
-     f"years; {DEFAULT_PEAK_YEAR_JITTER} year when unscored). A driver's start year gates its onset."),
+     f"its uncertainty score 0 to 5 ({', '.join(str(UNCERTAINTY_KAPPA[u]) for u in range(6))}), and so "
+     f"does its peak-year jitter ({', '.join(str(UNCERTAINTY_PEAK_JITTER[u]) for u in range(6))} years). "
+     "A driver's start year gates its onset."),
     ("Score to prior",
      "Probability scores 1 to 5 give Beta prior means of 0.17, 0.33, 0.50, 0.67 and 0.83 (score / 6): "
      "a deliberate shrinkage, so a 5 means five in six, not certainty."),
@@ -143,7 +143,7 @@ def _shift_matrix(ws, result: dict, config: ModelConfig) -> None:
         for p in PERCENTILES:
             _header(ws, 2, col, p)
             col += 1
-    for row, cat in enumerate(config.category_names, 3):
+    for row, cat in enumerate(CATEGORIES, 3):
         ws.cell(row=row, column=1, value=cat).font = Font(name="Inter", bold=True, size=10)
         path = (result["shift_matrix"].get(cat) or {}).get("path", {})
         col = 2
@@ -165,7 +165,7 @@ def _regional_shift(ws, result: dict, config: ModelConfig) -> None:
         _header(ws, 1, j, str(year))
     weights = result["cell_weights_used"]
     row = 2
-    for cat in config.category_names:
+    for cat in CATEGORIES:
         for region in REGIONS:
             share = (weights.get(cat) or {}).get(region, 0.0)
             ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
@@ -188,7 +188,7 @@ def _cell_weights(ws, result: dict, config: ModelConfig) -> None:
         _header(ws, 1, j, region)
     _header(ws, 1, len(REGIONS) + 2, "Category share")
     row = 2
-    for cat in config.category_names:
+    for cat in CATEGORIES:
         shares = weights.get(cat) or {}
         ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
         for j, region in enumerate(REGIONS, 2):
@@ -198,7 +198,7 @@ def _cell_weights(ws, result: dict, config: ModelConfig) -> None:
         row += 1
     ws.cell(row=row, column=1, value="Region share").font = BOLD_FONT
     for j, region in enumerate(REGIONS, 2):
-        total = sum(float((weights.get(c) or {}).get(region, 0.0)) for c in config.category_names)
+        total = sum(float((weights.get(c) or {}).get(region, 0.0)) for c in CATEGORIES)
         ws.cell(row=row, column=j, value=round(total, 6)).number_format = "0.00%"
     ws.cell(row=row + 2, column=1, value="Source: " + str(result.get("cell_weights_source") or ""))
     row = _estimate_derivation(ws, weights, config, row + 4)
@@ -255,7 +255,7 @@ def _estimate_derivation(ws, weights: dict, config: ModelConfig, row: int) -> in
     for j, head in enumerate(("Category", "Share of block", "Grade", "Margin index", "Grade", "Basis"), 1):
         _header(ws, row, j, head)
     row += 1
-    for cat in config.category_names:
+    for cat in CATEGORIES:
         mix = inputs["category_mix"][cat]
         margin = inputs["margin_index"][cat]
         ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
@@ -270,7 +270,7 @@ def _estimate_derivation(ws, weights: dict, config: ModelConfig, row: int) -> in
     for j, head in enumerate(["Category", *REGIONS, "Grade", "Basis"], 1):
         _header(ws, row, j, head)
     row += 1
-    for cat in config.category_names:
+    for cat in CATEGORIES:
         entry = inputs["region_mix"][cat]
         ws.cell(row=row, column=1, value=cat).font = LABEL_FONT
         for j, region in enumerate(REGIONS, 2):
@@ -293,7 +293,7 @@ def _velocity(ws, result: dict, config: ModelConfig) -> None:
     years = config.path_years[1:]
     for j, head in enumerate(["Category", "Path shape", *(f"Velocity {y}" for y in years)], 1):
         _header(ws, 1, j, head)
-    for row, cat in enumerate(config.category_names, 2):
+    for row, cat in enumerate(CATEGORIES, 2):
         velocity = (result["shift_matrix"].get(cat) or {}).get("velocity", {})
         values = [float(_by_year(velocity, y).get("median", 0.0)) for y in years]
         if all(abs(v) < 0.001 for v in values):

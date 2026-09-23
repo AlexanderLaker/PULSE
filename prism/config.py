@@ -112,31 +112,6 @@ PRODUCTION_CHAINS = 3
 PRODUCTION_ITERATIONS = 50_000
 DEFAULT_PATH_YEARS = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035]
 
-# Default schedules for a driver scored without a peak year or diffusion curve:
-# the force's own schedule where one is defined, otherwise the general one.
-# Drivers with a peak year and a curve use compute_materialization_schedule.
-DEFAULT_MATERIALIZATION = {
-    2026: 0.08, 2027: 0.18, 2028: 0.32, 2029: 0.48, 2030: 0.62,
-    2031: 0.74, 2032: 0.84, 2033: 0.91, 2034: 0.96, 2035: 1.00,
-}
-REGULATORY_MATERIALIZATION = {
-    2026: 0.05, 2027: 0.15, 2028: 0.40, 2029: 0.60, 2030: 0.75,
-    2031: 0.85, 2032: 0.92, 2033: 0.97, 2034: 0.99, 2035: 1.00,
-}
-TECHNOLOGY_MATERIALIZATION = {
-    2026: 0.04, 2027: 0.10, 2028: 0.22, 2029: 0.40, 2030: 0.58,
-    2031: 0.72, 2032: 0.83, 2033: 0.91, 2034: 0.98, 2035: 1.00,
-}
-CONSUMER_MATERIALIZATION = {
-    2026: 0.10, 2027: 0.22, 2028: 0.38, 2029: 0.54, 2030: 0.68,
-    2031: 0.79, 2032: 0.87, 2033: 0.93, 2034: 0.98, 2035: 1.00,
-}
-FORCE_MATERIALIZATION_OVERRIDES = {
-    "Government": REGULATORY_MATERIALIZATION,
-    "Technology": TECHNOLOGY_MATERIALIZATION,
-    "Consumer": CONSUMER_MATERIALIZATION,
-}
-
 # Diffusion curves: the shape of the ramp from onset to peak.
 VALID_DIFFUSION_CURVES = ["s_curve", "linear", "front_loaded", "back_loaded", "step_function"]
 
@@ -153,7 +128,9 @@ def compute_materialization_schedule(
     The effect is zero up to the onset, ramps along ``diffusion_curve`` and is
     complete from ``peak_year`` on. The onset is the later of ``base_year`` and
     the driver's ``start_year`` (``base_year`` when ``start_year`` is None). A
-    peak at or before the onset ramps to the horizon instead.
+    driver's peak comes after its onset (simulation_problems refuses one that
+    does not, and the engine keeps a jittered peak after it); a peak at or
+    before the onset would ramp to the horizon.
 
     Curves: ``linear``; ``front_loaded`` (square root, fast then flat);
     ``back_loaded`` (quadratic, slow then fast); ``step_function`` (5 percent
@@ -211,9 +188,9 @@ def compute_materialization_schedule(
 
 # Each iteration shifts every driver's peak year by a small integer offset
 # drawn from a symmetric triangular distribution, so the timing bands reflect
-# "arrives a year earlier or later". This is the width in years for a driver
-# without an uncertainty score; 0 switches timing jitter off for every driver.
-DEFAULT_PEAK_YEAR_JITTER = 1
+# "arrives a year earlier or later". The width comes from the driver's
+# uncertainty score (UNCERTAINTY_PEAK_JITTER); ModelConfig.peak_year_jitter
+# switches the jitter off for every driver.
 
 # One uncertainty score per driver, 0-5: the dispersion around the modelled
 # size and timing of the effect, given its direction. It is neither the
@@ -232,17 +209,14 @@ UNCERTAINTY_PEAK_JITTER = {0: 0, 1: 1, 2: 1, 3: 2, 4: 3, 5: 4}
 BETA_PRIOR_FLOOR = 0.5
 
 
-def beta_prior_for(probability: int, uncertainty=None) -> tuple:
+def beta_prior_for(probability: int, uncertainty: int) -> tuple:
     """(alpha, beta) of a driver's Beta prior on the materialisation probability.
 
     The prior is structured judgment set from the 1-5 probability score; it is
-    never updated from data. Its mean is p/6. With an uncertainty score the
-    concentration follows UNCERTAINTY_KAPPA; without one it is 6, which gives
-    (p, 6 - p).
+    never updated from data. Its mean is p/6, and its concentration
+    alpha + beta follows the uncertainty score (UNCERTAINTY_KAPPA): score 3
+    gives (p, 6 - p).
     """
-    if uncertainty is None:
-        p0 = max(1, int(probability))
-        return (p0, max(6 - p0, 1))
     p = max(1, min(5, int(probability)))
     u = max(0, min(5, int(uncertainty)))
     kappa = float(UNCERTAINTY_KAPPA[u])
@@ -251,19 +225,12 @@ def beta_prior_for(probability: int, uncertainty=None) -> tuple:
     return (alpha, beta)
 
 
-def peak_jitter_for(uncertainty, global_jitter: int) -> int:
-    """A driver's peak-year jitter width in years.
-
-    ``global_jitter`` (ModelConfig.peak_year_jitter) is the engine-wide switch:
-    0 disables timing jitter for every driver. When it is on, a scored driver
-    takes its width from UNCERTAINTY_PEAK_JITTER and an unscored driver takes
-    ``global_jitter``.
-    """
-    g = int(global_jitter or 0)
-    if g <= 0:
+def peak_jitter_for(uncertainty: int, jitter_on: bool) -> int:
+    """A driver's peak-year jitter width in years: the width its uncertainty
+    score sets (UNCERTAINTY_PEAK_JITTER), or 0 with the jitter switched off
+    (ModelConfig.peak_year_jitter)."""
+    if not jitter_on:
         return 0
-    if uncertainty is None:
-        return g
     return int(UNCERTAINTY_PEAK_JITTER[max(0, min(5, int(uncertainty)))])
 
 
@@ -428,14 +395,10 @@ DEFAULT_CELL_WEIGHTS_SOURCE = (
 ESTIMATE_SOURCE_PREFIX = "ESTIMATE, not Henkel P&L"
 
 
-def cell_weight_marginals(cell_weights: dict, categories=None) -> tuple:
-    """(region_weights, category_weights): column and row sums of a cell matrix.
-
-    ``categories`` defaults to CATEGORIES.
-    """
-    cats = list(CATEGORIES if categories is None else categories)
-    rw = {r: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for c in cats)) for r in REGIONS}
-    cw = {c: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for r in REGIONS)) for c in cats}
+def cell_weight_marginals(cell_weights: dict) -> tuple:
+    """(region_weights, category_weights): column and row sums of a cell matrix."""
+    rw = {r: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for c in CATEGORIES)) for r in REGIONS}
+    cw = {c: float(sum(float((cell_weights.get(c) or {}).get(r, 0.0)) for r in REGIONS)) for c in CATEGORIES}
     return rw, cw
 
 
@@ -457,13 +420,13 @@ class ModelConfig:
     attenuation_source: str = DEFAULT_ATTENUATION_SOURCE
     base_year: int = DEFAULT_BASE_YEAR
     path_years: list = field(default_factory=lambda: list(DEFAULT_PATH_YEARS))
-    materialization: dict = field(default_factory=lambda: dict(DEFAULT_MATERIALIZATION))
     force_weights: dict = field(default_factory=lambda: dict(DEFAULT_FORCE_WEIGHTS))
     cell_weights: dict = field(default_factory=_default_cell_weights)
     cell_weights_source: str = DEFAULT_CELL_WEIGHTS_SOURCE
-    category_names: list = field(default_factory=lambda: list(CATEGORIES))
     iterations: int = DEFAULT_ITERATIONS
-    peak_year_jitter: int = DEFAULT_PEAK_YEAR_JITTER
+    #: The per-iteration peak-year jitter; off, every driver peaks in its own
+    #: peak year (the golden pins run that way).
+    peak_year_jitter: bool = True
     within_force_rho: float = DEFAULT_WITHIN_FORCE_RHO
     force_correlation_matrix: dict = field(default_factory=lambda: copy.deepcopy(DEFAULT_FORCE_CORRELATIONS))
     within_force_overlap: dict = field(default_factory=lambda: dict(DEFAULT_WITHIN_FORCE_OVERLAP))
@@ -473,7 +436,7 @@ class ModelConfig:
     def __post_init__(self):
         cw = {str(c): {str(r): float(v) for r, v in (row or {}).items()}
               for c, row in (self.cell_weights or {}).items()}
-        rw, catw = cell_weight_marginals(cw, self.category_names)
+        rw, catw = cell_weight_marginals(cw)
         object.__setattr__(self, "cell_weights", cw)
         object.__setattr__(self, "region_weights", rw)
         object.__setattr__(self, "category_weights", catw)

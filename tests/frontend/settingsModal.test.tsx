@@ -93,7 +93,7 @@ const cellGrid = () => region('Cell weights: share of HCB gross profit per categ
 describe('Model configuration: the parameters', () => {
   it("shows the code's parameters from the store's config", () => {
     STATE.store = makeStore({
-      config: makeConfig({ within_force_rho: 0.27, attenuation_source: 'overlap-correction-test', peak_year_jitter: 0 }),
+      config: makeConfig({ within_force_rho: 0.27, attenuation_source: 'overlap-correction-test', peak_year_jitter: false }),
     });
     openModal();
     openSection('Model configuration');

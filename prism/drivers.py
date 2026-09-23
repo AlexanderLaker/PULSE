@@ -19,16 +19,19 @@ MODEL_FIELDS = ("direction",) + SCORE_FIELDS
 class Driver:
     """One external driver of the HCB profit pool, with its scores.
 
-    ``probability_prior`` and ``normalized_score`` are derived from the scores
-    and cannot be passed in; call ``recompute()`` after changing a score.
+    No score has a default: a driver that misses one cannot be simulated
+    (simulation_problems says which). ``probability_prior`` and
+    ``normalized_score`` are derived from the scores and cannot be passed in;
+    call ``recompute()`` after changing a score.
     """
     id: str                           # e.g. "consumer_r01"; the display code is "C-01"
     force: str                        # one of config.FORCES
     name: str = ""
     description: str = ""
-    direction: str = "Expansion"      # "Expansion" | "Contraction"
-    probability: int = 3              # 1-5; the Beta prior's mean is probability / 6
-    start_year: int = 2028            # onset: no effect up to this year
+    direction: Optional[str] = None   # "Expansion" | "Contraction"
+    probability: Optional[int] = None  # 1-5; the Beta prior's mean is probability / 6
+    # Onset: no effect up to this year; None is the base year.
+    start_year: Optional[int] = None
     analysis: str = ""                # the PRISM Analysis reading (generated, read-only)
     category_exposure: dict = field(default_factory=dict)  # {category: 0-5}
     vc_exposure: dict = field(default_factory=dict)        # {value-chain step: 0-5}
@@ -39,11 +42,10 @@ class Driver:
     # materialisation, in (0, 1]. There is no default: a driver without it
     # cannot be simulated.
     gp1_pct_affected: Optional[float] = None
-    # Year by which the full effect has materialised; 0 means "not scored",
-    # in which case the force's default schedule applies.
-    peak_year: int = 0
-    diffusion_curve: str = "s_curve"  # one of config.VALID_DIFFUSION_CURVES
-    uncertainty: Optional[int] = None  # 0-5, see config.UNCERTAINTY_KAPPA; None = not scored
+    # Year by which the full effect has materialised: after the onset.
+    peak_year: Optional[int] = None
+    diffusion_curve: Optional[str] = None  # one of config.VALID_DIFFUSION_CURVES
+    uncertainty: Optional[int] = None  # 0-5, see config.UNCERTAINTY_KAPPA
     # The scores the driver was seeded with (see scores()): the reference the
     # Drivers page compares expert proposals and later edits against.
     baseline: Optional[dict] = None
@@ -96,13 +98,14 @@ def simulation_problems(drivers) -> list:
 
     Every check guards against a value the engine would otherwise read with a
     silent default and turn into confident numbers: an unknown force (it
-    would count as Consumer), an unknown direction (as Contraction), an
-    unknown diffusion curve (as the S-curve), a missing or impossible GP1
-    share (NaN everywhere), a probability or uncertainty outside its scale,
-    and exposure scores outside 0-5 or on a name outside the taxonomy (never
-    read). Duplicate ids are refused as well.
+    would count as Consumer), a missing or unknown direction (as
+    Contraction), a missing or unknown diffusion curve (as the S-curve), a
+    missing or impossible GP1 share (NaN everywhere), a probability or
+    uncertainty score missing or outside its scale, a peak year missing or not
+    after the onset, and exposure scores outside 0-5 or on a name outside the
+    taxonomy (never read). Duplicate ids are refused as well.
     """
-    from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS
+    from prism.config import CATEGORIES, FORCES, REGIONS, VALID_DIFFUSION_CURVES, VC_STEPS, first_peak_year
     problems = [f"driver id {i!r} appears {n} times" for i, n in Counter(d.id for d in drivers).items() if n > 1]
     for d in drivers:
         where = f"driver {d.id}"
@@ -115,10 +118,15 @@ def simulation_problems(drivers) -> list:
         gp1 = d.gp1_pct_affected
         if isinstance(gp1, bool) or not isinstance(gp1, (int, float)) or not (0 < gp1 <= 1):
             problems.append(f"{where}: gp1_pct_affected {gp1!r} is not a share in (0, 1]")
-        if d.uncertainty is not None and not _score_in_range(d.uncertainty, 0, 5):
+        if not _score_in_range(d.uncertainty, 0, 5):
             problems.append(f"{where}: uncertainty {d.uncertainty!r} is not a whole number from 0 to 5")
-        if d.diffusion_curve and d.diffusion_curve not in VALID_DIFFUSION_CURVES:
-            problems.append(f"{where}: unknown diffusion curve {d.diffusion_curve!r}")
+        if d.diffusion_curve not in VALID_DIFFUSION_CURVES:
+            problems.append(f"{where}: diffusion curve {d.diffusion_curve!r} is not one of {VALID_DIFFUSION_CURVES}")
+        if d.start_year is not None and not _score_in_range(d.start_year, 2000, 2100):
+            problems.append(f"{where}: start year {d.start_year!r} is not a year")
+        elif not _score_in_range(d.peak_year, first_peak_year(d.start_year), 2100):
+            problems.append(f"{where}: peak year {d.peak_year!r} is not a year after the onset "
+                            f"(from {first_peak_year(d.start_year)})")
         for name, exposure, keys in (("category_exposure", d.category_exposure, CATEGORIES),
                                      ("regional_exposure", d.regional_exposure, REGIONS),
                                      ("vc_exposure", d.vc_exposure, VC_STEPS)):

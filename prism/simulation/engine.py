@@ -27,10 +27,8 @@ import scipy as _scipy
 from scipy.linalg import cholesky
 from scipy.stats import beta as _beta_dist, norm as _norm_dist
 
-from prism.config import (FORCES, REGIONS, VC_STEPS, FORCE_MATERIALIZATION_OVERRIDES,
-                          ModelConfig, build_driver_correlation_matrix,
-                          compute_materialization_schedule, peak_jitter_for,
-                          vc_epicentre_step_of)
+from prism.config import (CATEGORIES, FORCES, REGIONS, VC_STEPS, ModelConfig, build_driver_correlation_matrix,
+                          compute_materialization_schedule, peak_jitter_for, vc_epicentre_step_of)
 from prism.drivers import DriverSet, InvalidDriversError, simulation_problems
 
 beta_ppf = _beta_dist.ppf
@@ -142,7 +140,7 @@ class MonteCarloEngine:
         """
         n_iter = iterations or self.config.iterations
         logger.info("Running Monte Carlo: %d iterations, %d drivers, %d categories, %d regions, %d years",
-                    n_iter, len(db.drivers), len(self.config.category_names), len(REGIONS),
+                    n_iter, len(db.drivers), len(CATEGORIES), len(REGIONS),
                     len(self.config.path_years))
 
         category_samples, regional_samples = self._simulate_samples(db, n_iter)
@@ -165,7 +163,7 @@ class MonteCarloEngine:
         integrity event; that is a guard against a broken config, not a
         modelling choice.
         """
-        cats = self.config.category_names
+        cats = CATEGORIES
         cw = self.config.cell_weights or {}
         W = np.zeros((len(cats), len(REGIONS)))
         for c_idx, cat in enumerate(cats):
@@ -201,7 +199,7 @@ class MonteCarloEngine:
                 Wn[c_idx, :] = W[c_idx, :] / rows[c_idx]
             else:
                 Wn[c_idx, :] = 1.0 / W.shape[1]
-                zero_rows.append(self.config.category_names[c_idx])
+                zero_rows.append(CATEGORIES[c_idx])
         if zero_rows and not any(e.get("type") == "cell_weight_zero_row" for e in self._integrity_events):
             one = len(zero_rows) == 1
             self._integrity_events.append({
@@ -224,7 +222,7 @@ class MonteCarloEngine:
     def _weights_used(self) -> dict:
         """The weights the run actually applied, as returned with the result."""
         W = self.cell_weight_matrix()
-        cats = self.config.category_names
+        cats = CATEGORIES
         return {
             "cell_weights_used": {
                 cat: {r: float(W[c_idx, r_idx]) for r_idx, r in enumerate(REGIONS)}
@@ -244,7 +242,7 @@ class MonteCarloEngine:
         (iterations, categories, regions, years) and their gross-profit-weighted
         category roll-up as (iterations, categories, years).
         """
-        n_cats = len(self.config.category_names)
+        n_cats = len(CATEGORIES)
         n_regions = len(REGIONS)
         n_years = len(self.config.path_years)
         drivers = db.drivers
@@ -265,7 +263,7 @@ class MonteCarloEngine:
 
     def _build_regional_matrix(self, regional_samples: np.ndarray) -> dict:
         """Percentile paths and velocity bands per (category, region)."""
-        cats = self.config.category_names
+        cats = CATEGORIES
         years = self.config.path_years
         out: dict = {}
         for c_idx, cat in enumerate(cats):
@@ -354,13 +352,11 @@ class MonteCarloEngine:
         when its peak moves by ``offsets[k]``; ``off_probs_by_driver[j]`` is
         driver j's symmetric triangular distribution over the offsets (all mass
         at 0 when its width is 0). A jittered peak never falls on or before the
-        onset: it saturates at the year after onset. Drivers without a peak year
-        or curve follow the force's default schedule, gated by their onset.
+        onset: it saturates at the year after onset.
         """
         n_drivers = len(drivers)
         n_years = len(self.config.path_years)
-        jitter_global = int(self.config.peak_year_jitter or 0)
-        driver_jitter = [peak_jitter_for(d.uncertainty, jitter_global) for d in drivers]
+        driver_jitter = [peak_jitter_for(d.uncertainty, self.config.peak_year_jitter) for d in drivers]
         jitter = max(driver_jitter) if driver_jitter else 0
         offsets = list(range(-jitter, jitter + 1)) if jitter > 0 else [0]
         n_off = len(offsets)
@@ -375,23 +371,14 @@ class MonteCarloEngine:
         path_years = self.config.path_years
         sched_table = np.ones((n_drivers, n_off, n_years))
         for j, driver in enumerate(drivers):
-            base_pk = driver.peak_year or 0
-            dc = driver.diffusion_curve or ""
             sy = driver.start_year
             onset = self.config.base_year if sy is None else max(int(self.config.base_year), int(sy))
             for k, off in enumerate(offsets):
-                if base_pk > 0 and dc:
-                    pk = max(base_pk + off, onset + 1)
-                    sched = compute_materialization_schedule(pk, dc, path_years, self.config.base_year,
-                                                             start_year=sy)
-                else:
-                    force_mat = FORCE_MATERIALIZATION_OVERRIDES.get(driver.force, {})
-                    sched = {
-                        yr: (force_mat.get(yr, self.config.materialization.get(yr, 1.0)) if yr > onset else 0.0)
-                        for yr in path_years
-                    }
+                pk = max(int(driver.peak_year) + off, onset + 1)
+                sched = compute_materialization_schedule(pk, driver.diffusion_curve, path_years,
+                                                         self.config.base_year, start_year=sy)
                 for y_idx, yr in enumerate(path_years):
-                    sched_table[j, k, y_idx] = sched.get(yr, 1.0)
+                    sched_table[j, k, y_idx] = sched[yr]
         return sched_table, offsets, off_probs_by_driver
 
     def draw_peak_offsets(self, off_probs_by_driver: np.ndarray, n_iter: int) -> np.ndarray:
@@ -423,7 +410,7 @@ class MonteCarloEngine:
         then compound multiplicatively, each factor floored at zero (a cell
         cannot lose more than its whole pool).
         """
-        categories = self.config.category_names
+        categories = CATEGORIES
         n_drivers = len(drivers)
         n_cells = n_cats * n_regions
         if n_drivers == 0:
@@ -532,7 +519,7 @@ class MonteCarloEngine:
         years = self.config.path_years
         shift_matrix = {}
 
-        for c_idx, cat in enumerate(self.config.category_names):
+        for c_idx, cat in enumerate(CATEGORIES):
             cat_data = samples[:, c_idx, :]
             path = {}
             for y_idx, year in enumerate(years):
@@ -561,7 +548,7 @@ class MonteCarloEngine:
 
         vc_shares: dict = {}
         vc_fallback_cats: list = []
-        for cat in self.config.category_names:
+        for cat in CATEGORIES:
             vsum = {s: 0.0 for s in VC_STEPS}
             for driver in drivers:
                 cat_exp = driver.category_exposure.get(cat, 0)
@@ -604,7 +591,7 @@ class MonteCarloEngine:
                 "detail": {"categories": list(vc_fallback_cats)},
             })
 
-        cats = list(self.config.category_names)
+        cats = list(CATEGORIES)
         # Region lens: each (category, region) cell weighted by its own share
         # of the category's gross profit.
         Wn_lens = self.row_normalized_cell_weights()
@@ -710,7 +697,7 @@ class MonteCarloEngine:
         terminal_year = int(self.config.path_years[-1])
         rng = np.random.default_rng(MC_SE_BOOTSTRAP_SEED)
         out: dict = {}
-        for c_idx, cat in enumerate(self.config.category_names):
+        for c_idx, cat in enumerate(CATEGORIES):
             col = samples[:, c_idx, last]
             meds = np.empty(n_boot)
             p10s = np.empty(n_boot)
@@ -768,7 +755,7 @@ class MonteCarloEngine:
         # Per-chain portfolio median at the terminal year, before pooling.
         w = self._category_weight_vector()
         w = (w / w.sum()) if w.sum() > 0 else np.full(
-            len(self.config.category_names), 1.0 / len(self.config.category_names))
+            len(CATEGORIES), 1.0 / len(CATEGORIES))
         per_chain_portfolio_medians = [
             float(np.median(per_chain_cat[i][:, :, last_idx] @ w)) for i in range(n_chains)
         ]

@@ -25,11 +25,10 @@ class DriverUpdate(BaseModel):
 
     ``revision`` is the driver revision the edit was made on (from GET
     /api/v1/drivers); the edit is refused if the driver has changed since.
-    Every other field is optional and only the fields sent change;
-    ``uncertainty`` may be sent as null to clear the score, and an exposure
-    map may name only the cells that change. The name, the force and the
-    onset (start year) come from the driver base and are not edited here; a
-    peak year must come after the onset.
+    Every other field is optional and only the fields sent change (none may
+    be sent as null); an exposure map may name only the cells that change.
+    The name, the force and the onset (start year) come from the driver base
+    and are not edited here; a peak year must come after the onset.
     """
     model_config = ConfigDict(extra="forbid")
 
