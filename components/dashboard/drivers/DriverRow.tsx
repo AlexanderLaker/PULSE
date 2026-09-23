@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Store, Cpu, Landmark, Leaf, Swords, ChevronDown, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { EXPANSION_SOFT, NO_VALUE, fmtPct, fmtShift, shiftColor } from '@/lib/format';
-import { S, SHADOW, HEADLINE_FONT, MONO_FONT } from '@/lib/theme';
+import { S, SHADOW, HEADLINE_FONT, MONO_FONT, BODY_FONT } from '@/lib/theme';
 import Chip from '@/components/dashboard/Chip';
 import type { Driver, DriverProposal, DriverUpdate, ForceName } from '@/types';
 import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './shared';
@@ -108,7 +108,7 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
   const [tip, setTip] = useState(false);
   const dirSign = driver.direction === 'Contraction' ? -1 : 1;
 
-  // Expert Rating: the expert's own shift, from their own probability and GP1 %.
+  // Expert Rating: the expert's own expected effect, from their own probability and GP1 %.
   if (mode === 'rating') {
     const my = myProposal ?? driver.proposal_summary.my;
     const p = my?.probability;
@@ -116,26 +116,26 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
     if (p == null || g == null) {
       return <span style={{ color: S.onSurfaceVariant, fontSize: 13, fontWeight: 700 }}>{NO_VALUE}</span>;
     }
-    const myShift = dirSign * (p / 6) * g;
+    const myEffect = dirSign * (p / 6) * g;
     return (
       <span className="font-bold text-[14px]"
-        title={`Your shift = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${fmtPct(g, 0)} × ${dirSign > 0 ? '+1' : '−1'}`}
-        style={{ color: shiftColor(myShift), cursor: 'help' }}>
-        {fmtShift(myShift)}
+        title={`Your expected effect = (your prob / 6) × your GP1% × direction = (${Math.round(p)}/6) × ${fmtPct(g, 0)} × ${dirSign > 0 ? '+1' : '−1'}`}
+        style={{ color: shiftColor(myEffect), cursor: 'help' }}>
+        {fmtShift(myEffect)}
       </span>
     );
   }
 
-  // Driver List and Review: the driver's own shift, with the arithmetic on hover.
-  const shift = driver.expected_effect;
+  // Driver List and Review: the driver's expected effect, with the arithmetic on hover.
+  const effect = driver.expected_effect;
   return (
     <div className="text-right" style={{ position: 'relative' }}
       onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
       <span className="font-bold text-[14px]" style={{
-        color: shiftColor(shift),
+        color: shiftColor(effect),
         borderBottom: `1px dotted ${S.onSurfaceVariant}66`, cursor: 'help',
       }}>
-        {fmtShift(shift)}
+        {fmtShift(effect)}
       </span>
       {tip && (
         <div role="tooltip" onClick={(e) => e.stopPropagation()} style={{
@@ -144,8 +144,10 @@ const RowEndCell: FC<{ driver: Driver; mode: ScoringMode; myProposal?: DriverPro
           fontFamily: MONO_FONT, fontSize: 11, lineHeight: 1.5, textAlign: 'left',
           boxShadow: SHADOW.tip, pointerEvents: 'none',
         }}>
-          Shift = (prob/6) × GP1% × direction
-          <br />= ({driver.probability}/6) × {(driver.gp1_pct_affected * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(shift)}
+          Expected effect = (prob/6) × GP1% × direction
+          <br />= ({driver.probability}/6) × {(driver.gp1_pct_affected * 100).toFixed(1)}% × {dirSign > 0 ? '+1' : '−1'} = {fmtShift(effect)}
+          <br /><span style={{ fontFamily: BODY_FONT }}>Before the force weight, the overlap correction, the timing and the
+          exposures: the Shift Matrix carries a small fraction of it.</span>
         </div>
       )}
     </div>

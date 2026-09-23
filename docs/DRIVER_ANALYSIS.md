@@ -10,7 +10,7 @@ it follows and how it is regenerated.
 Everything an expert scores is already on the page: the direction, the
 probability, the GP1 share, the timing, the uncertainty, the exposures, the
 sources. None of it says what the driver does to the dashboard's headline. A
-driver with a large Shift value can be a small item in the portfolio because
+driver with a large expected effect can be a small item in the portfolio because
 it acts in a region that holds a twentieth of the pool; a driver with modest
 scores can be the largest single headwind because it reaches every cell. The
 exposures say where a mechanism acts; only the roll-up says where the gross
@@ -19,7 +19,7 @@ profit is.
 The reading answers one question per driver, in four labelled paragraphs:
 
 1. **Weight in the answer.** How much of the headline the driver carries, and
-   why that much: its Shift value, the pass-through of its force, its reach
+   why that much: its expected effect, the pass-through of its force, its reach
    and the overlap correction it faces.
 2. **Where it lands.** The cells, regions and categories that carry the
    effect once the gross-profit mix is applied, and the drivers of the same
@@ -92,7 +92,7 @@ holds per driver:
   engine's own copula and jitter samplers (the shares add up to one; a
   tailwind's share can be negative because its draws move with the headwinds
   of its force);
-- the chain from Shift value to portfolio contribution: the force's
+- the chain from expected effect to portfolio contribution: the force's
   pass-through, the reach (the share of the gross-profit mix the exposures
   cover, the sum over the 52 cells of the cell's share times both exposures
   over 5) and the overlap correction in its cells.

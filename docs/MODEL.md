@@ -94,7 +94,8 @@ with `g_j` the share of the category's gross profit the driver can move at
 full materialisation (in (0, 1]) and `d_j` its direction, +1 for expansion
 and -1 for contraction. A driver without `g_j` stops the run: there is no
 default. The deterministic counterpart, `E[s_j] = (p / 6) x g_j x d_j`, is the
-"Shift" column of the Drivers page and the driver's `expected_effect`.
+"Expected effect" column of the Drivers page and the driver's
+`expected_effect`.
 
 ### 3. Timing
 
@@ -173,7 +174,7 @@ The product `w_f x a_f` is the force's pass-through: 6.3 percent
 (Environmental) to 8.1 percent (Consumer). A driver drawn at probability 1
 with a GP1 share of 1 and full exposure moves its force's factor by that much.
 This is why a driver's contribution to the portfolio is a small fraction of
-its Shift value.
+its expected effect.
 
 ### 7. The roll-up
 

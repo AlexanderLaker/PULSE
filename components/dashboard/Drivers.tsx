@@ -26,7 +26,7 @@ import { EXPERT_COLOR, REVIEWED_COLOR, type ScoringMode } from './drivers/shared
 import { DriverRow, ROW_GRID } from './drivers/DriverRow';
 
 // ─── Sort helpers ──────────────────────────────────────────────────
-type SortKey = 'name' | 'direction' | 'probability' | 'gp1' | 'shift';
+type SortKey = 'name' | 'direction' | 'probability' | 'gp1' | 'effect';
 type SortDir = 'asc' | 'desc';
 
 // The direction a column sorts in when first chosen: numbers biggest first,
@@ -36,7 +36,7 @@ const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   direction:   'asc',
   probability: 'desc',
   gp1:         'desc',
-  shift:       'desc',
+  effect:      'desc',
 };
 
 function sortValue(d: Driver, key: SortKey): string | number {
@@ -45,7 +45,7 @@ function sortValue(d: Driver, key: SortKey): string | number {
     case 'direction':   return d.direction;
     case 'probability': return d.probability;
     case 'gp1':         return d.gp1_pct_affected;
-    case 'shift':       return d.expected_effect;
+    case 'effect':      return d.expected_effect;
   }
 }
 
@@ -324,7 +324,7 @@ const Drivers: FC<DriversProps> = ({ search: opened, isAdmin = false }) => {
               <SortHeader label="GP1 % Affected" sortKey="gp1"         currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
               <Gp1InfoTip />
             </span>
-            <SortHeader label="Shift"          sortKey="shift"       currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
+            <SortHeader label="Expected effect" sortKey="effect"     currentKey={sortKey} currentDir={sortDir} onToggle={toggleSort} align="right" />
             <span className="inline-flex items-center justify-end w-full text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: S.onSurfaceVariant }}>
               {mode === 'rating' ? 'Your review' : mode === 'review' ? 'Proposals' : 'Edited'}
             </span>
@@ -443,7 +443,7 @@ const Gp1InfoTip: FC = () => {
           pointerEvents: 'none', whiteSpace: 'normal' }}>
           <b>GP1 % Affected</b>: the share of a category&apos;s GP1 (gross profit after cost of goods)
           that this driver can realistically move at full materialisation. Multiplied by probability and
-          direction, it produces the Shift column.
+          direction, it gives the Expected effect column.
         </span>
       )}
     </span>
