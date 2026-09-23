@@ -5,7 +5,7 @@
  * database, a database awaiting the migration, none configured); above the
  * matrix it says when the drivers or the engine have moved on since the run;
  * the impact filter splits the net by the drivers' contributions and needs
- * the model configuration; its "About this model" footer names the run's
+ * the model configuration and the drivers; its "About this model" footer names the run's
  * cell-weight basis and the pass-through of the served configuration.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -13,7 +13,9 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import type { DiagnosticsResult } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
 import { ESTIMATED_CELL_WEIGHTS } from '@/lib/cellWeightProvenance';
-import { makeConfig, makeSimulation, makeStore } from './fixtures/prism';
+import { computeDriverAttribution } from '@/lib/driverAttribution';
+import { CATEGORY_NAMES, YEARS } from '@/lib/format';
+import { distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 const DIAGNOSIS = vi.hoisted(() => ({ result: null as DiagnosticsResult | null }));
@@ -132,7 +134,15 @@ describe('the impact filter', () => {
   const total2035 = () => screen.getByTitle(/^2035, column total: /).getAttribute('title');
 
   it('splits the net by the drivers behind it: all of it for the contracting side here, none for the other', () => {
-    STORE.store = makeStore();   // one driver, a contracting one
+    // One driver, a contracting one, and a run whose medians are its shift at the means.
+    const driver = makeDriver();
+    const config = makeConfig();
+    const attribution = computeDriverAttribution({
+      drivers: [driver], categories: CATEGORY_NAMES, config, cellWeights: ESTIMATED_CELL_WEIGHTS,
+    });
+    const shifts = Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(
+      YEARS.map((y) => [String(y), distribution(attribution.categoryShift[c][y])]))]));
+    STORE.store = makeStore({ drivers: [driver], config, simulation: makeSimulation({ shifts }) });
     render(<ShiftAnalysis />);
     const net = total2035();
     fireEvent.click(screen.getByRole('button', { name: 'Contraction drivers' }));
@@ -141,13 +151,29 @@ describe('the impact filter', () => {
     expect(total2035()).toMatch(/: [+-]?0\.0%$/);
   });
 
-  it('cannot be used without the model configuration, which the split needs', () => {
-    STORE.store = makeStore({ config: null });
+  it('shows the drivers at the means where the run is far from them, never turned around', () => {
+    // The fixture run's medians are about four times this driver's shift at the means.
+    STORE.store = makeStore();
+    render(<ShiftAnalysis />);
+    const net = total2035();
+    fireEvent.click(screen.getByRole('button', { name: 'Contraction drivers' }));
+    const contraction = total2035();
+    expect(contraction).not.toBe(net);
+    expect(contraction).toMatch(/: -\d+\.\d%$/);
+    fireEvent.click(screen.getByRole('button', { name: 'Expansion drivers' }));
+    expect(total2035()).toMatch(/: [+-]?0\.0%$/);
+  });
+
+  it.each([
+    ['the model configuration', { config: null }],
+    ['the drivers', { drivers: [] }],
+  ])('cannot be used without %s, which the split needs', (missing, overrides) => {
+    STORE.store = makeStore(overrides);
     render(<ShiftAnalysis />);
     for (const name of ['Expansion drivers', 'Contraction drivers']) {
       const button = screen.getByRole('button', { name }) as HTMLButtonElement;
       expect(button.disabled).toBe(true);
-      expect(button.title).toContain('model configuration');
+      expect(button.title).toBe(`Needs ${missing}, which did not load; reload the page to try again.`);
     }
     expect((screen.getByRole('button', { name: 'Net' }) as HTMLButtonElement).disabled).toBe(false);
   });

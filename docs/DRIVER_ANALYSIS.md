@@ -128,19 +128,27 @@ and the served run's cell weights:
 
 - The category drill-down ranks its contributing drivers with it, so a
   driver's rank there and its reading agree. It scales each category's
-  contributions to that category's own terminal-year median. Its bars are
-  shares of the category's gross movement, headwinds and tailwinds counted by
-  size, and add up to 100 percent; the readings quote shares of the net
-  shift, which are larger where tailwinds offset headwinds. The panel's footer
-  says both.
-- The Time Path's Expansion drivers and Contraction drivers filters split each
-  cell's median by the sum of the expanding and of the contracting drivers'
-  contributions in that category and year (`signSplit`). The two parts add up
-  to the median; they are a split of the one simulated number, not a
-  separate run.
+  contributions so they add up to that category's own terminal-year median.
+  Its bars are shares of the category's gross movement, headwinds and
+  tailwinds counted by size, and add up to 100 percent; the readings quote
+  shares of the net shift, which are larger where tailwinds offset
+  headwinds. The panel's footer says both.
+- The Time Path's Expansion drivers and Contraction drivers filters show the
+  sums of the expanding and of the contracting drivers' contributions in each
+  category and year, scaled the same way, so the two parts add up to the
+  cell's median (`signParts`); they are a split of the one simulated number,
+  not a separate run.
 
-Without the model configuration there is no attribution: the drill-down says
-that its drivers cannot be attributed, and the two filters cannot be chosen.
+The scaling factor is the median over the net at the means
+(`reconciliationFactor`). On the published base it lies within one percent
+of 1 in every category and year. Where expanding and contracting drivers
+nearly cancel, or the drivers were edited after the run, the two can differ
+in size or sign; a factor that is not positive or lies outside 1/2 to 2 is
+not applied, and the contributions keep their values at the means rather
+than being turned around or inflated.
+
+Without the model configuration or the drivers there is no attribution: the
+drill-down and the two filters name the input that did not load.
 
 ### Rules
 

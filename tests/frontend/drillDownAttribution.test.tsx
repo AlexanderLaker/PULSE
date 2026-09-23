@@ -9,8 +9,10 @@
  *
  *   1. name the score-means basis in its footer,
  *   2. rank the drivers as the fixture does (X-15, C-01, C-06 first),
- *   3. say, when the configuration did not load, that the drivers cannot be
- *      attributed, and rank none of them another way.
+ *   3. say, when the configuration or the drivers did not load, which of
+ *      the two the ranking needs, and rank none of the drivers another way;
+ *   4. keep every driver's sign where the row's median and the net at the
+ *      means disagree.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
@@ -18,7 +20,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Driver, ForceName, ShiftPath } from '@/types';
 import type { PrismStore } from '@/hooks/usePrism';
-import { distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
+import type { AttributionResult } from '@/lib/driverAttribution';
+import { categoryMap, distribution, makeConfig, makeDriver, makeSimulation, makeStore } from './fixtures/prism';
 
 const STORE = vi.hoisted(() => ({ store: null as unknown as PrismStore }));
 
@@ -35,6 +38,7 @@ class ResizeObserverStub {
 (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
 
 import ShiftAnalysis from '@/components/dashboard/ShiftAnalysis';
+import { rankContributors } from '@/components/dashboard/shift/contributors';
 
 type FixtureDriver = Pick<Driver,
   'id' | 'normalized_score' | 'category_exposure' | 'regional_exposure'
@@ -64,7 +68,7 @@ function fixtureDrivers(): Driver[] {
   }));
 }
 
-function buildStore(configLoaded: boolean): PrismStore {
+function buildStore(configLoaded: boolean, driversLoaded = true): PrismStore {
   const shifts: Record<string, ShiftPath> = Object.fromEntries(
     Object.entries(FIXTURE.expected.categoryShift).map(([cat, byYear]) => [
       cat, Object.fromEntries(Object.entries(byYear).map(([year, median]) => [year, distribution(median)])),
@@ -72,7 +76,7 @@ function buildStore(configLoaded: boolean): PrismStore {
   );
   const cfg = FIXTURE.inputs.config;
   return makeStore({
-    drivers: fixtureDrivers(),
+    drivers: driversLoaded ? fixtureDrivers() : [],
     simulation: makeSimulation({ shifts, cell_weights_used: FIXTURE.inputs.cellWeights }),
     config: configLoaded
       ? makeConfig({
@@ -136,5 +140,27 @@ describe('category drill-down: contributing drivers at the score means', () => {
     expect(aside.textContent).toContain('attributed with the model configuration, which did not load');
     expect(aside.textContent).not.toContain('the same decomposition as the PRISM Analysis');
     expect(within(aside).queryAllByRole('button', { name: /on the Drivers page$/ })).toHaveLength(0);
+  });
+
+  it('says so when the drivers did not load', () => {
+    STORE.store = buildStore(true, false);
+    const { container } = render(<ShiftAnalysis onNavigateToDriver={vi.fn()} />);
+    const aside = openFabricClean(container);
+    expect(aside.textContent).toContain('attributed with the drivers, which did not load');
+    expect(within(aside).queryAllByRole('button', { name: /on the Drivers page$/ })).toHaveLength(0);
+  });
+});
+
+describe('a row whose median disagrees with the net at the means', () => {
+  it('keeps every driver at its value at the means, never turned around', () => {
+    const exposed = categoryMap({ [FCN]: 5 });
+    const drivers = [makeDriver({ id: 'up', category_exposure: exposed }), makeDriver({ id: 'down', category_exposure: exposed })];
+    const at = (v: number) => ({ portfolio: {}, category: { [FCN]: { 2035: v } } });
+    const attribution: AttributionResult = {
+      years: [2035], byDriver: { up: at(0.02), down: at(-0.019) }, categoryShift: {}, portfolioShift: {},
+    };
+    // The net at the means is +0.1 pt, the median -0.3 pt: scaling to it would turn both drivers around.
+    const ranked = rankContributors(FCN, drivers, attribution, -0.003);
+    expect(ranked.map((c) => [c.driver.id, c.contribution])).toEqual([['up', 0.02], ['down', -0.019]]);
   });
 });

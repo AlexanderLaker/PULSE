@@ -7,8 +7,9 @@
  * The contributing drivers are attributed at the score means with
  * lib/driverAttribution.ts, the decomposition the PRISM Analysis on the
  * Drivers page is written on, so a driver's rank here and its reading agree.
- * Without the model configuration there is no attribution, and the panel
- * says so instead of ranking the drivers another way.
+ * Without the model configuration or the drivers there is no attribution,
+ * and the panel says which is missing instead of ranking the drivers another
+ * way.
  *
  * The panel shares the Shift Analysis surface (S tokens, Manrope headlines,
  * JetBrains Mono figures, white cards on the light page background), so the
@@ -22,7 +23,7 @@ import {
 } from '@/lib/format';
 import { S, SHADOW, HEADLINE_FONT, BODY_FONT, MONO_FONT } from '@/lib/theme';
 import { rowShares } from '@/lib/cellWeights';
-import type { AttributionResult } from '@/lib/driverAttribution';
+import type { RunAttribution } from '@/lib/driverAttribution';
 import useOverlay from '@/hooks/useOverlay';
 import type { Driver, SimulationResult } from '@/types';
 import {
@@ -38,8 +39,8 @@ interface CategoryDetailPanelProps {
   year: number;
   simulation: SimulationResult;
   drivers: Driver[];
-  /** The drivers' parts of the shift at the score means; null without the model configuration. */
-  attribution: AttributionResult | null;
+  /** The drivers' parts of the shift at the score means, or the input they lack. */
+  attribution: RunAttribution;
   onClose: () => void;
   /** Opens the Drivers page searched for a driver's name; makes every driver card a link. */
   onOpenDriver?: (name: string) => void;
@@ -79,7 +80,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
   const lastYearChange = simulation.velocity[category]?.[String(HORIZON)];
 
   const contributors = useMemo(
-    () => (attribution ? rankContributors(category, drivers, attribution, shiftEnd) : []),
+    () => (attribution.result ? rankContributors(category, drivers, attribution.result, shiftEnd) : []),
     [category, drivers, attribution, shiftEnd],
   );
   const exposedDrivers = useMemo(
@@ -435,10 +436,10 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-            {!attribution && exposedDrivers > 0 && (
+            {attribution.missing && (
               <Section title="Contributing Drivers" icon={Layers}>
                 <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: S.onSurfaceVariant, fontFamily: BODY_FONT }}>
-                  The drivers behind this row are attributed with the model configuration, which did not
+                  The drivers behind this row are attributed with {attribution.missing}, which did not
                   load. Reload the page to try again.
                 </p>
               </Section>
@@ -544,7 +545,7 @@ const CategoryDetailPanel: React.FC<CategoryDetailPanelProps> = ({
             Shifts are cumulative vs 2025 from the Monte Carlo engine. Force shares sum to
             the row&rsquo;s MC median at the selected year.
             {contributors.length > 0
-              && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), rescaled here to the row’s terminal-year median, so the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
+              && ' Contributing drivers: the same decomposition as the PRISM Analysis on the Drivers page (force weight × attenuation × overlap correction × expected materialisation × category and regional exposure, rolled up with the run’s cell weights), scaled here so they add up to the row’s terminal-year median (where that would reverse them or more than double them, they stay at the means); the ranking agrees with the readings. A bar is the driver’s part of the row’s gross movement, headwinds and tailwinds counted by size, and the bars add up to 100%; the readings quote shares of the net shift, which are larger where tailwinds offset headwinds.'}
           </footer>
         </div>
       </motion.aside>

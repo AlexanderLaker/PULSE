@@ -21,10 +21,10 @@ const LENS_COLUMNS: Record<Lens, string[]> = {
 };
 
 // ─── Impact filter (Time Path) ───────────────────────────────────────────
-// Shows the expansion or the contraction drivers' part of each cell: the net
-// cell times its category's split in that year (signSplit in
-// lib/driverAttribution.ts, the drivers' contributions at the score means
-// summed by sign). It splits the net run rather than running a separate one.
+// Shows the expansion or the contraction drivers' part of each cell: the
+// drivers' contributions at the score means summed by sign and scaled to the
+// cell's median (signParts in lib/driverAttribution.ts). It splits the net
+// run rather than running a separate one.
 export type ImpactFilter = 'total' | 'expansion' | 'contraction';
 
 // ─── The matrix model ────────────────────────────────────────────────────

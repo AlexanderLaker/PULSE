@@ -30,7 +30,8 @@
  * Read the result as attribution, never as a second simulation: the Monte
  * Carlo medians of the persisted run stay the published numbers. The
  * drill-down scales the drivers of a category to that median, and the
- * matrix's Expansion and Contraction filters split it (signSplit).
+ * matrix's Expansion and Contraction filters split it (reconciliationFactor,
+ * signParts).
  */
 import { FORCES, REGIONS } from '@/lib/format';
 import { UNCERTAINTY_PEAK_JITTER } from '@/lib/uncertainty';
@@ -296,26 +297,61 @@ export function computeDriverAttribution(inputs: AttributionInputs): Attribution
 }
 
 /**
+ * The attribution of the served run, or the input it could not be computed
+ * without. The Shift Analysis computes it once; the drill-down and the impact
+ * filter use the result or name what is missing.
+ */
+export type RunAttribution =
+  | { result: AttributionResult; missing: null }
+  | { result: null; missing: 'the model configuration' | 'the drivers' };
+
+/** The attribution of a run over these drivers, with its cell weights and
+ *  the model configuration; which of the two inputs is missing, if one is. */
+export function attributeRun(
+  drivers: AttributionDriver[], config: AttributionConfig | null, categories: string[],
+  cellWeights: Record<string, Record<string, number>>,
+): RunAttribution {
+  if (!config) return { result: null, missing: 'the model configuration' };
+  if (drivers.length === 0) return { result: null, missing: 'the drivers' };
+  return { result: computeDriverAttribution({ drivers, categories, config, cellWeights }), missing: null };
+}
+
+/**
+ * The factor that takes a category's contributions at the score means to the
+ * run's median in the same year: median / net, so the contributions add up to
+ * the number the matrix shows. The Monte Carlo median and the net at the
+ * means agree closely (on the published base the factor lies within one
+ * percent of 1 in every category and year), but where expanding and
+ * contracting drivers nearly cancel, or the drivers were edited after the
+ * run, they can differ in size or even in sign. Scaling by such a factor would
+ * turn every contribution around or inflate it, so a factor that is not
+ * positive or lies outside 1/2 to 2 is not applied: the contributions keep
+ * their values at the means (factor 1) and add up to the net at the means
+ * instead of the median.
+ */
+export function reconciliationFactor(net: number, median: number): number {
+  const k = median / net;
+  return Number.isFinite(k) && k >= 0.5 && k <= 2 ? k : 1;
+}
+
+/**
  * The parts of a category's shift in one year that its expanding and its
  * contracting drivers carry, for the matrix's Expansion and Contraction
- * filters. With pos and neg the sums of the drivers' positive and negative
- * contributions, expansion = pos / (pos + neg) and contraction =
- * neg / (pos + neg): signed fractions of the net that add up to 1, so scaling
- * the run's median by one of them splits it without a second simulation.
- * Where the two cancel the split falls back to shares of the gross movement.
+ * filters: the sums of the drivers' positive and of their negative
+ * contributions at the score means, both multiplied by the category's
+ * reconciliationFactor, so they add up to the run's median. The expansion
+ * part is never negative and the contraction part never positive.
  */
-export function signSplit(
-  result: AttributionResult, category: string, year: number,
+export function signParts(
+  result: AttributionResult, category: string, year: number, median: number,
 ): { expansion: number; contraction: number } {
   let pos = 0;
   let neg = 0;
   for (const d of Object.values(result.byDriver)) {
-    const v = d.category[category]?.[year] ?? 0;
+    const v = d.category[category][year];
     if (v > 0) pos += v;
     else neg += v;
   }
-  const net = pos + neg;
-  if (Math.abs(net) >= 1e-12) return { expansion: pos / net, contraction: neg / net };
-  const gross = pos - neg;
-  return gross > 1e-12 ? { expansion: pos / gross, contraction: neg / gross } : { expansion: 0, contraction: 0 };
+  const k = reconciliationFactor(pos + neg, median);
+  return { expansion: k * pos, contraction: k * neg };
 }

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { FORCE_COLORS, HORIZON, NO_VALUE, fmtShift, fmtPct } from '@/lib/format';
 import { S, SHADOW, BODY_FONT, MONO_FONT } from '@/lib/theme';
-import type { AttributionResult } from '@/lib/driverAttribution';
+import { reconciliationFactor, type AttributionResult } from '@/lib/driverAttribution';
 import type { Driver } from '@/types';
 
 // ─── Contributing drivers ──────────────────────────────────────────────────
@@ -17,7 +17,8 @@ interface Contributor {
   driver: Driver;
   /** The driver's exposure score for the category: 0 to 5, and above 0 for every contributor. */
   exposure: number;
-  /** Signed, in shift units; the category's contributors add up to its terminal-year median. */
+  /** Signed, in shift units; the category's contributors add up to its terminal-year median
+   *  (reconciliationFactor says when they cannot). */
   contribution: number;
   /** |contribution| over the category's total |contribution|. */
   share: number;
@@ -25,16 +26,16 @@ interface Contributor {
 
 /**
  * The drivers that touch the category, largest part first: each driver's
- * contribution at the score means in the terminal year, rescaled so the parts
- * add up to the median the matrix shows.
+ * contribution at the score means in the terminal year, scaled by the
+ * category's reconciliationFactor so the parts add up to the median the
+ * matrix shows. The scaling never changes a driver's sign.
  */
 export function rankContributors(
   category: string, drivers: Driver[], attribution: AttributionResult, median: number,
 ): Contributor[] {
   const exposed = drivers.filter((d) => d.category_exposure[category] > 0);
   const raw = exposed.map((d) => attribution.byDriver[d.id].category[category][HORIZON]);
-  const rawTotal = raw.reduce((a, b) => a + b, 0);
-  const scale = Math.abs(rawTotal) > 1e-9 && Math.abs(median) > 1e-9 ? median / rawTotal : 1;
+  const scale = reconciliationFactor(raw.reduce((a, b) => a + b, 0), median);
   const scaled = raw.map((v) => v * scale);
   const totalAbs = scaled.reduce((a, b) => a + Math.abs(b), 0);
   return exposed

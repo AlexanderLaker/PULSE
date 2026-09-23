@@ -14,10 +14,10 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
-  peakJitterFor, signSplit, type AttributionResult,
+  attributeRun, computeDriverAttribution, computeMaterializationSchedule, expectedMaterialization,
+  peakJitterFor, reconciliationFactor, signParts, type AttributionResult,
 } from '@/lib/driverAttribution';
-import { BASE_YEAR, YEARS } from '@/lib/format';
+import { BASE_YEAR, CATEGORY_NAMES, YEARS } from '@/lib/format';
 
 const FIXTURE = path.resolve(__dirname, 'fixtures', 'driverAttribution.fixture.json');
 
@@ -144,7 +144,23 @@ describe('materialisation schedule and jitter (ports of prism/config.py)', () =>
   });
 });
 
-describe('signSplit: the expansion and contraction parts of a category in a year', () => {
+describe('reconciliationFactor: from the net at the means to the median', () => {
+  it('takes the contributions to the median where the two agree', () => {
+    expect(reconciliationFactor(-0.0460, -0.0464)).toBeCloseTo(0.0464 / 0.0460, 12);
+    expect(reconciliationFactor(0.02, 0.03)).toBeCloseTo(1.5, 12);
+  });
+
+  it('never turns them around or stretches them more than twofold: then they stay at the means', () => {
+    expect(reconciliationFactor(0.001, -0.002)).toBe(1);     // the median has the other sign
+    expect(reconciliationFactor(0.001, 0.0030)).toBe(1);     // three times the net
+    expect(reconciliationFactor(-0.004, -0.0015)).toBe(1);   // less than half of it
+    expect(reconciliationFactor(0, 0.001)).toBe(1);
+    expect(reconciliationFactor(0, 0)).toBe(1);
+    expect(reconciliationFactor(0.001, 0)).toBe(1);
+  });
+});
+
+describe('signParts: the expansion and contraction parts of a category in a year', () => {
   const result = (parts: number[]): AttributionResult => ({
     years: [2035],
     byDriver: Object.fromEntries(parts.map((v, i) => [`d${i}`, { portfolio: {}, category: { 'Hair: Color': { 2035: v } } }])),
@@ -152,35 +168,45 @@ describe('signSplit: the expansion and contraction parts of a category in a year
     portfolioShift: {},
   });
 
-  it('gives signed fractions of the net that add up to 1', () => {
-    const f = signSplit(result([0.3, -0.1]), 'Hair: Color', 2035);
-    expect(f.expansion + f.contraction).toBeCloseTo(1, 12);
-    expect(f.expansion).toBeCloseTo(1.5, 12);
-    expect(f.contraction).toBeCloseTo(-0.5, 12);
+  it('splits the median in the proportion of the two sides at the means', () => {
+    const parts = signParts(result([0.3, -0.1]), 'Hair: Color', 2035, 0.21);
+    expect(parts.expansion + parts.contraction).toBeCloseTo(0.21, 12);
+    expect(parts.expansion).toBeCloseTo(0.315, 12);
+    expect(parts.contraction).toBeCloseTo(-0.105, 12);
   });
 
-  it('falls back to shares of the gross movement where the parts cancel', () => {
-    const f = signSplit(result([0.2, -0.2]), 'Hair: Color', 2035);
-    expect(f.expansion).toBeCloseTo(0.5, 12);
-    expect(f.contraction).toBeCloseTo(-0.5, 12);
+  it('keeps the parts at the means where the two sides nearly cancel, with their own signs', () => {
+    const parts = signParts(result([0.2, -0.199]), 'Hair: Color', 2035, -0.004);
+    expect(parts).toEqual({ expansion: 0.2, contraction: -0.199 });
   });
 
   it('is zero where no driver contributes', () => {
-    expect(signSplit(result([0, 0]), 'Hair: Color', 2035)).toEqual({ expansion: 0, contraction: 0 });
-    expect(signSplit(result([0.1]), 'LHC: FCN', 2035)).toEqual({ expansion: 0, contraction: 0 });
+    expect(signParts(result([0, 0]), 'Hair: Color', 2035, 0)).toEqual({ expansion: 0, contraction: 0 });
   });
 
-  it('splits the fixture category by category, year by year, into parts that add up to the net', () => {
+  it('splits the fixture category by category, year by year, into parts with their own signs that add up', () => {
     const fx = load();
     const r = computeDriverAttribution(fx.inputs);
     for (const cat of fx.inputs.categories) {
       for (const year of r.years) {
-        const net = Object.values(r.byDriver).reduce((a, d) => a + d.category[cat][year], 0);
-        const f = signSplit(r, cat, year);
-        expect(net * f.expansion + net * f.contraction).toBeCloseTo(net, 12);
-        expect(net * f.expansion).toBeGreaterThanOrEqual(-1e-15);
-        expect(net * f.contraction).toBeLessThanOrEqual(1e-15);
+        const median = fx.expected.categoryShift[cat][year] * 1.004;
+        const parts = signParts(r, cat, year, median);
+        expect(parts.expansion + parts.contraction).toBeCloseTo(median, 12);
+        expect(parts.expansion).toBeGreaterThanOrEqual(0);
+        expect(parts.contraction).toBeLessThanOrEqual(0);
       }
     }
+  });
+});
+
+describe('attributeRun: the attribution, or the input it lacks', () => {
+  it('names the missing input instead of attributing with less', () => {
+    const fx = load();
+    const { drivers, config, cellWeights } = fx.inputs;
+    expect(attributeRun(drivers, null, CATEGORY_NAMES, cellWeights)).toEqual({ result: null, missing: 'the model configuration' });
+    expect(attributeRun([], config, CATEGORY_NAMES, cellWeights)).toEqual({ result: null, missing: 'the drivers' });
+    const run = attributeRun(drivers, config, CATEGORY_NAMES, cellWeights);
+    expect(run.missing).toBeNull();
+    expect(run.result?.categoryShift).toEqual(computeDriverAttribution(fx.inputs).categoryShift);
   });
 });

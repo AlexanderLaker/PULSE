@@ -30,7 +30,8 @@
  * expanding or the contracting drivers carry, splitting the median by the
  * drivers' contributions at the score means (lib/driverAttribution.ts). The
  * same attribution ranks the drivers in the drill-down; without the model
- * configuration there is none, and the filter and the ranking say so.
+ * configuration or the drivers there is none, and the filter and the
+ * drill-down say which of the two is missing.
  *
  * Above the matrix a KPI strip shows the portfolio band and the most resilient
  * and most exposed categories; a row or a category tile opens the drill-down
@@ -51,7 +52,7 @@ import { getDiagnostics } from '@/lib/apiClient';
 import { CATEGORIES, CATEGORY_NAMES, HORIZON, categoryDisplay } from '@/lib/format';
 import { S, HEADLINE_FONT, BODY_FONT } from '@/lib/theme';
 import { categoryShares, getYearPercentiles } from '@/lib/shiftMatrix';
-import { computeDriverAttribution, signSplit } from '@/lib/driverAttribution';
+import { attributeRun, signParts } from '@/lib/driverAttribution';
 import { cellWeightsBasis } from '@/lib/cellWeights';
 import CategoryDetailPanel from './shift/CategoryDetailPanel';
 import type { DiagnosticsResult } from '@/types';
@@ -104,24 +105,26 @@ const ShiftAnalysis: FC<{
   );
   // The drivers' parts of the shift at the score means: the drill-down ranks
   // its drivers with it and the impact filter splits the net with it. It
-  // needs the configuration and the drivers.
-  const attribution = useMemo(() => (simulation && config && drivers.length > 0
-    ? computeDriverAttribution({ drivers, categories: CATEGORY_NAMES, config, cellWeights: simulation.cell_weights_used })
+  // needs the configuration and the drivers; without one of them both say
+  // which.
+  const attribution = useMemo(() => (simulation
+    ? attributeRun(drivers, config, CATEGORY_NAMES, simulation.cell_weights_used)
     : null), [drivers, config, simulation]);
-  const filter: ImpactFilter = attribution ? impactFilter : 'total';
+  const attributionResult = attribution?.result ?? null;
+  const filter: ImpactFilter = attributionResult ? impactFilter : 'total';
 
   const matrix = useMemo<MatrixModel | null>(() => {
     if (!simulation) return null;
     const model = buildMatrix(simulation, view, selectedYear, categoryWeights);
-    if (view !== 'time' || filter === 'total' || !attribution) return model;
-    // The filter scales each cell by its category's split in that year. The
-    // P10–P90 bands describe the unfiltered distribution, so they are dropped.
+    if (view !== 'time' || filter === 'total' || !attributionResult) return model;
+    // The filter shows each cell's expansion or contraction part. The P10–P90
+    // bands describe the unfiltered distribution, so they are dropped.
     const data: CellMap = Object.fromEntries(CATEGORY_NAMES.map((c) => [c, Object.fromEntries(model.columns.map((col) => {
       const v = model.data[c][col];
-      return [col, v == null || !isFinite(v) ? null : v * signSplit(attribution, c, Number(col))[filter]];
+      return [col, v == null || !isFinite(v) ? null : signParts(attributionResult, c, Number(col), v)[filter]];
     }))]));
     return { ...model, data, colTotals: columnTotals(data, model.columns, categoryWeights), cellDetails: undefined };
-  }, [simulation, view, selectedYear, categoryWeights, filter, attribution]);
+  }, [simulation, view, selectedYear, categoryWeights, filter, attributionResult]);
 
   // The KPI strip: the joint portfolio band at the horizon, and the most
   // resilient and most exposed categories with their own bands.
@@ -181,8 +184,8 @@ const ShiftAnalysis: FC<{
               id: f,
               label: IMPACT_META[f].label,
               Icon: IMPACT_META[f].Icon,
-              disabledReason: f !== 'total' && !attribution
-                ? 'Needs the model configuration, which did not load; reload the page to try again.'
+              disabledReason: f !== 'total' && attribution?.missing
+                ? `Needs ${attribution.missing}, which did not load; reload the page to try again.`
                 : undefined,
             }))}
             activeId={filter}
@@ -348,7 +351,7 @@ const ShiftAnalysis: FC<{
         </motion.section>
 
         <AnimatePresence>
-          {selectedCategory && simulation && (
+          {selectedCategory && simulation && attribution && (
             <CategoryDetailPanel
               category={selectedCategory}
               year={selectedYear}

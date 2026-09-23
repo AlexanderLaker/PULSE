@@ -20,8 +20,8 @@ export const VIEW_META: Record<ViewMode, { label: string; description: string; I
 
 export const IMPACT_META: Record<ImpactFilter, { label: string; description: string; Icon: LucideIcon }> = {
   total:       { label: 'Net',                 description: 'Net shift: expansion and contraction drivers combined.', Icon: Activity },
-  expansion:   { label: 'Expansion drivers',   description: 'The part of each year\'s net shift the expanding drivers carry, from their contributions at the score means: a split of the net run, not a separate one.', Icon: TrendingUp },
-  contraction: { label: 'Contraction drivers', description: 'The part of each year\'s net shift the contracting drivers carry, from their contributions at the score means: a split of the net run, not a separate one.', Icon: TrendingDown },
+  expansion:   { label: 'Expansion drivers',   description: 'The part of each year\'s net shift the expanding drivers carry: their contributions at the score means, scaled to the net. A split of the net run, not a separate one.', Icon: TrendingUp },
+  contraction: { label: 'Contraction drivers', description: 'The part of each year\'s net shift the contracting drivers carry: their contributions at the score means, scaled to the net. A split of the net run, not a separate one.', Icon: TrendingDown },
 };
 
 // ─── Controls ────────────────────────────────────────────────────────────
