@@ -88,7 +88,8 @@ class TestRollUpAlgebra:
         W = {c: {r: 0.0 for r in REGIONS} for c in CATEGORIES}
         W["Hair: Color"]["Europe"] = 0.6
         W["Hair: Care"]["Asia"] = 0.4
-        driver_set = _europe_driver(probability=4, gp1_pct_affected=0.20, regional_exposure=region_map({"Europe": 5, "Asia": 3}))
+        driver_set = _europe_driver(probability=4, gp1_pct_affected=0.20,
+                                    regional_exposure=region_map({"Europe": 5, "Asia": 3}))
         r = _run(mock_model_config.copy_with(cell_weights=W), driver_set, iterations=300)
         category = r["shift_matrix"]["Hair: Color"]["path"][2030]
         cell = r["regional_shift_matrix"]["Hair: Color"]["Europe"]["path"][2030]
@@ -121,7 +122,8 @@ class TestContract:
     def test_multichain_carries_them_too(self, mock_model_config, mock_driver_set):
         r = MonteCarloEngine(mock_model_config, seed=SEED).run_multichain(
             mock_driver_set, n_chains=2, iterations=150)
-        assert r["cell_weights_used"]["LHC: IC"]["High Growth"] == pytest.approx(RECORD["cells"]["LHC: IC"]["High Growth"])
+        used, recorded = r["cell_weights_used"]["LHC: IC"], RECORD["cells"]["LHC: IC"]
+        assert used["High Growth"] == pytest.approx(recorded["High Growth"])
         assert r["category_weights_used"]["LHC: IC"] == pytest.approx(RECORD["marginals"]["category"]["LHC: IC"])
 
 

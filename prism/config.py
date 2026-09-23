@@ -223,14 +223,17 @@ DEFAULT_FORCE_OVERLAP_MATRIX = overlap_correction.FORCE_OVERLAP_MATRIX
 
 DEFAULT_WITHIN_FORCE_RHO = 0.3
 
-DEFAULT_FORCE_CORRELATIONS = {
-    "Consumer":      {"Consumer": 1.0,  "Customer": 0.18, "Technology": 0.11, "Government": 0.04, "Environmental": 0.15, "Competitive": 0.15},
-    "Customer":      {"Consumer": 0.18, "Customer": 1.0,  "Technology": 0.11, "Government": 0.15, "Environmental": 0.04, "Competitive": 0.18},
-    "Technology":    {"Consumer": 0.11, "Customer": 0.11, "Technology": 1.0,  "Government": 0.22, "Environmental": 0.11, "Competitive": 0.18},
-    "Government":    {"Consumer": 0.04, "Customer": 0.15, "Technology": 0.22, "Government": 1.0,  "Environmental": 0.22, "Competitive": 0.04},
-    "Environmental": {"Consumer": 0.15, "Customer": 0.04, "Technology": 0.11, "Government": 0.22, "Environmental": 1.0,  "Competitive": 0.04},
-    "Competitive":   {"Consumer": 0.15, "Customer": 0.18, "Technology": 0.18, "Government": 0.04, "Environmental": 0.04, "Competitive": 1.0},
-}
+# Rows and columns in FORCES order: Consumer, Customer, Technology, Government,
+# Environmental, Competitive.
+_FORCE_CORRELATION_ROWS = (
+    (1.0,  0.18, 0.11, 0.04, 0.15, 0.15),
+    (0.18, 1.0,  0.11, 0.15, 0.04, 0.18),
+    (0.11, 0.11, 1.0,  0.22, 0.11, 0.18),
+    (0.04, 0.15, 0.22, 1.0,  0.22, 0.04),
+    (0.15, 0.04, 0.11, 0.22, 1.0,  0.04),
+    (0.15, 0.18, 0.18, 0.04, 0.04, 1.0),
+)
+DEFAULT_FORCE_CORRELATIONS = {force: dict(zip(FORCES, row)) for force, row in zip(FORCES, _FORCE_CORRELATION_ROWS)}
 
 
 def build_driver_correlation_matrix(driver_forces, within_force_rho, force_correlation_matrix):

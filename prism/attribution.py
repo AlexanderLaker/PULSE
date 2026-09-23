@@ -310,7 +310,8 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
         for i in top:
             c, r = divmod(i, len(REGIONS))
             partners = []
-            same_force = [k for k in range(len(drivers)) if dec["fidx"][k] == f and k != j and abs(A_cell[k, i, y_last]) > 0]
+            same_force = [k for k in range(len(drivers))
+                          if dec["fidx"][k] == f and k != j and abs(A_cell[k, i, y_last]) > 0]
             same_force.sort(key=lambda k: -abs(A_cell[k, i, y_last]))
             for k in same_force[:TOP_PARTNERS]:
                 partners.append({"id": drivers[k].id, "code": display_code(drivers[k].id, drivers[k].force),
@@ -323,7 +324,8 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
                 "cell_shift_pp": r4(dec["cell_shift"][i, y_last] * factor * 100),
                 # the driver's share of the cell's own shift, both at the means and
                 # unscaled (the reconciliation factor cancels in the ratio)
-                "share_of_cell": r4(dec["A_cell"][j, i, y_last] / dec["cell_shift"][i, y_last]) if dec["cell_shift"][i, y_last] else 0.0,
+                "share_of_cell": (r4(dec["A_cell"][j, i, y_last] / dec["cell_shift"][i, y_last])
+                                  if dec["cell_shift"][i, y_last] else 0.0),
                 "n_eff": r4(dec["n_eff"][f, i]),
                 "dampening": r4(dec["damp"][f, i]),
                 "same_force_partners": partners,
@@ -332,7 +334,8 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
         # the cell where this driver is the largest share of the cell's shift,
         # so a reading can say "its largest share of any cell" truthfully.
         shares_all = np.array([
-            (dec["A_cell"][j, i, y_last] / dec["cell_shift"][i, y_last]) if dec["cell_shift"][i, y_last] and abs(A_cell[j, i, y_last]) > 0 else 0.0
+            (dec["A_cell"][j, i, y_last] / dec["cell_shift"][i, y_last])
+            if dec["cell_shift"][i, y_last] and abs(A_cell[j, i, y_last]) > 0 else 0.0
             for i in range(len(w_cell))])
         i_max = int(np.argmax(np.abs(shares_all)))
         c_max, r_max = divmod(i_max, len(REGIONS))
@@ -365,7 +368,8 @@ def build_record(config: ModelConfig, drivers: list, reference: dict, persisted:
                             else (r4(own / force_tw[drv.force]) if own > 0 and force_tw[drv.force] else 0.0)),
             "force_rank": force_rank[j],
             "category_pp": {cats[c]: r4(cat_pp[j, c, y_last] * 100) for c in range(len(cats))},
-            "category_share": {cats[c]: (r4(cat_pp[j, c, y_last] / cat_tot[c]) if cat_tot[c] else 0.0) for c in range(len(cats))},
+            "category_share": {cats[c]: (r4(cat_pp[j, c, y_last] / cat_tot[c]) if cat_tot[c] else 0.0)
+                               for c in range(len(cats))},
             "region_pp": {REGIONS[r]: r4(reg_pp[j, r, y_last] * 100) for r in range(len(REGIONS))},
             "region_split": {REGIONS[r]: (r4(reg_pp[j, r, y_last] / own) if own else 0.0) for r in range(len(REGIONS))},
             "cells": cells,

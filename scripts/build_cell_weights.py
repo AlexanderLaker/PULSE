@@ -55,7 +55,8 @@ LHC_MIX = {
     "LHC: FCN": (0.48, "B", "heavy-duty detergents: Persil, Weisser Riese, Spee, all, Purex"),
     "LHC: FFI": (0.12, "E", "finishers: Vernel, Silan, Snuggle"),
     "LHC: ADW": (0.11, "E", "Somat"),
-    "LHC: HSC": (0.07, "E", "surface, bathroom, kitchen, glass, bleach, polishes: Bref surface, Biff, Sidolin, Danklorix"),
+    "LHC: HSC": (0.07, "E", "surface, bathroom, kitchen, glass, bleach, polishes: Bref surface, Biff, Sidolin, "
+                            "Danklorix"),
     "LHC: TOI": (0.04, "E", "toilet care: WC-Frisch, Bref WC Duo-Aktiv and Power-Aktiv; rim blocks are a "
                             "large, high-turnover franchise in Europe and the growth markets"),
     "LHC: FCA": (0.07, "E", "specialty fabric care: Perwoll"),
@@ -183,9 +184,13 @@ def record(cells):
 
 def emit_ts(cells, rec):
     """The derivation as a generated TypeScript module for the Config sheet."""
-    def j(o, indent=2):
-        return json.dumps(o, indent=indent, ensure_ascii=False).replace("\n", "\n" + " " * 0)
+    def pretty(o):
+        return json.dumps(o, indent=2, ensure_ascii=False)
     inp = rec["inputs"]
+    block_shares = {"LHC": inp["block_split"]["LHC"], "Hair & Body": inp["block_split"]["Hair & Body"]}
+    category_mix = {c: {"shareOfBlock": v["share_of_block"], "block": v["block"], "grade": v["grade"],
+                        "note": v["note"]}
+                    for c, v in inp["category_mix"].items()}
     lines = [
         "/**",
         " * The estimated HCB gross-profit mix and the graded inputs it is built from,",
@@ -205,30 +210,31 @@ def emit_ts(cells, rec):
         "",
         f"export const ESTIMATE_SOURCE =\n  {json.dumps(rec['source'])};",
         "",
-        f"export const GRADE_LEGEND: Record<Grade, string> = {j(rec['grade_legend'])} as const;",
+        f"export const GRADE_LEGEND: Record<Grade, string> = {pretty(rec['grade_legend'])} as const;",
         "",
         "/** The default matrix itself: Settings shows the derivation only for a run whose weights are these. */",
-        f"export const ESTIMATED_CELL_WEIGHTS: Record<string, Record<string, number>> = {j(cells)};",
+        f"export const ESTIMATED_CELL_WEIGHTS: Record<string, Record<string, number>> = {pretty(cells)};",
         "",
         "export const BLOCK_SPLIT = {",
-        f"  shares: {j({'LHC': inp['block_split']['LHC'], 'Hair & Body': inp['block_split']['Hair & Body']}, 2)},",
+        f"  shares: {pretty(block_shares)},",
         f"  grade: {json.dumps(inp['block_split']['grade'])} as Grade,",
         f"  note: {json.dumps(inp['block_split']['note'])},",
         "} as const;",
         "",
         "/** Each category's share of its block, with the grade and the brands behind it. */",
-        f"export const CATEGORY_MIX: Record<string, GradedShare> = {json.dumps({c: {'shareOfBlock': v['share_of_block'], 'block': v['block'], 'grade': v['grade'], 'note': v['note']} for c, v in inp['category_mix'].items()}, indent=2, ensure_ascii=False)};",
+        f"export const CATEGORY_MIX: Record<string, GradedShare> = {pretty(category_mix)};",
         "",
         "/** GP1 margin index relative to the HCB average. */",
-        f"export const MARGIN_INDEX: Record<string, {{ index: number; grade: Grade }}> = {json.dumps(inp['margin_index'], indent=2, ensure_ascii=False)};",
+        "export const MARGIN_INDEX: Record<string, { index: number; grade: Grade }> = "
+        f"{pretty(inp['margin_index'])};",
         f"export const MARGIN_INDEX_NOTE = {json.dumps(inp['margin_index_note'])};",
         "",
         "/** Regional mix within each category: what makes the matrix non-separable. */",
-        f"export const REGION_MIX: Record<string, GradedRegionMix> = {json.dumps(inp['region_mix'], indent=2, ensure_ascii=False)};",
+        f"export const REGION_MIX: Record<string, GradedRegionMix> = {pretty(inp['region_mix'])};",
         f"export const REGION_MIX_NOTE = {json.dumps(inp['region_mix_note'])};",
         "",
         "/** Derived marginals of the estimate, for the summary line. */",
-        f"export const ESTIMATE_MARGINALS = {j(rec['marginals'])};",
+        f"export const ESTIMATE_MARGINALS = {pretty(rec['marginals'])};",
         "",
     ]
     return "\n".join(lines)

@@ -82,5 +82,6 @@ def test_adding_a_driver_is_a_warning():
 def test_the_previous_fingerprint_is_read_from_the_stored_run():
     assert previous_fingerprint(None) == (None, None, None)
     fp, run_id, run_date = previous_fingerprint(
-        {"id": 10, "run_date": "2026-09-13 23:04:39.081562", "results": {"meta": {"driver_fingerprint": {"x": {"p": 3}}}}})
+        {"id": 10, "run_date": "2026-09-13 23:04:39.081562",
+         "results": {"meta": {"driver_fingerprint": {"x": {"p": 3}}}}})
     assert fp == {"x": {"p": 3}} and run_id == 10 and run_date == "2026-09-13 23:04:39"

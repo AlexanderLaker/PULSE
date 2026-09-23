@@ -268,9 +268,9 @@ class TestMultichainPooling:
         """The count depends on the draws, so the pooled run reports the sum over its chains."""
         # Three strong Consumer headwinds, undamped by attenuation or force weight,
         # remove more than a whole cell in a varying share of the draws.
-        cfg = mock_model_config.copy_with(per_force_attenuation={f: 1.0 for f in mock_model_config.per_force_attenuation},
-                                          force_weights={f: (1.0 if f == "Consumer" else 0.0)
-                                                         for f in mock_model_config.force_weights})
+        cfg = mock_model_config.copy_with(
+            per_force_attenuation={f: 1.0 for f in mock_model_config.per_force_attenuation},
+            force_weights={f: (1.0 if f == "Consumer" else 0.0) for f in mock_model_config.force_weights})
         driver_set = DriverSet(drivers=[_global_driver(f"d{i}", "Contraction", 0.40, 5) for i in range(3)])
         for d in driver_set.drivers:
             d.peak_year, d.diffusion_curve = 2026, "linear"

@@ -151,7 +151,8 @@ FORBIDDEN = [
                 r"\blevers?\b|\bmitigat|\bhedge\b|\bcountermeasure", re.I),
      "a management response"),
     (re.compile("[\u2014\u2013]"), "a dash"),
-    (re.compile(r"\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b", re.I), "filler"),
+    (re.compile(r"\b(?:genuinely|honestly|straightforward|crucially|it is worth noting|importantly)\b", re.I),
+     "filler"),
     (re.compile(r"\btrends?\b", re.I), "the word trend"),
     (re.compile(r"\{\w+\}"), "an unfilled placeholder"),
 ]
@@ -163,22 +164,26 @@ FORBIDDEN = [
 HAND_TYPED_MODEL_FIGURE = [
     (re.compile(r"\d[\d.]* percent of (?:the|that|its|a|this) (?:pool|effect|total|contraction|cell|headwind|tailwind|"
                 r"portfolio|terminal|net|estimated mix|mix|gross headwind|gross tailwind|net exposure|"
-                r"(?:Consumer|Customer|Technology|Government|Environmental|Competitive)(?: force's)? (?:headwind|tailwind))\b", re.I),
+                r"(?:Consumer|Customer|Technology|Government|Environmental|Competitive)(?: force's)? "
+                r"(?:headwind|tailwind))\b", re.I),
      "a typed share of the pool, effect, cell or headline"),
     (re.compile(r"\d[\d.]* (?:of the (?:net|gross)|points? of (?:the|net|gross))\b|\bof the \d[\d.]* points\b|"
                 r"\d[\d.]*-point (?:tailwind|headwind)", re.I), "a typed contribution in points"),
-    (re.compile(r"\b(?:half-way point (?:is|falls in|in) (?:only )?20\d\d|complete by 20\d\d|the whole of it by 20\d\d)", re.I),
+    (re.compile(r"\b(?:half-way point (?:is|falls in|in) (?:only )?20\d\d|complete by 20\d\d|"
+                r"the whole of it by 20\d\d)", re.I),
      "a typed materialisation year"),
     (re.compile(r"\bpass-through (?:is|of|\() ?\d", re.I), "a typed pass-through"),
     (re.compile(r"\breaches (?:only )?\d", re.I), "a typed reach"),
-    (re.compile(r"\b(?:ranked|the) \d+(?:st|nd|rd|th) (?:largest|contribution|tailwind|headwind)\b", re.I), "a typed rank"),
+    (re.compile(r"\b(?:ranked|the) \d+(?:st|nd|rd|th) (?:largest|contribution|tailwind|headwind)\b", re.I),
+     "a typed rank"),
 ]
 
 # Where a typed copy of a rendered model figure would sit in the prose: the
 # number followed by one of these. Source facts take other shapes ("percent
 # of households", "share points", "basis points", "USD ... per tonne").
 _TYPED_FIGURE_CONTEXT = re.compile(
-    r"(?<![\d.{{])(?<!minus )(?<!plus )\b(?P<value>\d+(?:\.\d+)?)\b(?![\d.}}])(?: percent(?: of (?:the|that|its|a|this)\b|"
+    r"(?<![\d.{{])(?<!minus )(?<!plus )\b(?P<value>\d+(?:\.\d+)?)\b(?![\d.}}])"
+    r"(?: percent(?: of (?:the|that|its|a|this)\b|"
     r" European| North American| in (?:Europe|North America|Asia|High Growth)| by 20\d\d|$)| points\b(?! of hair)|"
     r" of (?:the|its) (?:5\.6|7\.3|1\.7)\b)")
 
@@ -264,7 +269,8 @@ class TestCommittedArtefacts:
         by_code = {d["code"]: d for d in record["drivers"].values()}
         offenders = []
         for code, entry in analysis["drivers"].items():
-            values = {v for v in render.render_fields(record, by_code[code]).values() if re.fullmatch(r"\d+(?:\.\d+)?", v)}
+            fields = render.render_fields(record, by_code[code])
+            values = {v for v in fields.values() if re.fullmatch(r"\d+(?:\.\d+)?", v)}
             for m in _TYPED_FIGURE_CONTEXT.finditer(entry["template"]):
                 if m.group("value") in values and m.group("value") not in {"2035", "2026"}:
                     offenders.append((code, m.group(0)))
@@ -290,8 +296,8 @@ class TestCommittedArtefacts:
         assert not re.search(typed.format(2028), "{by2028} percent by 2028")
         assert sum("{peak_year}" in e["template"] for e in analysis["drivers"].values()) >= 30
 
-    def test_inputs_hash_follows_the_scoring_state_and_check_refuses_a_stale_reference(self, build, script, drivers, record,
-                                                                                       tmp_path, monkeypatch, capsys):
+    def test_inputs_hash_follows_the_scoring_state_and_check_refuses_a_stale_reference(
+            self, build, script, drivers, record, tmp_path, monkeypatch, capsys):
         """The reference run is stamped with a digest of the seed's scoring
         state and the configuration; a re-scored seed (or a changed
         configuration) must fail --check and must be refused by a build
@@ -302,7 +308,8 @@ class TestCommittedArtefacts:
         rescored = [copy.deepcopy(d) for d in drivers]
         rescored[0].probability = max(1, rescored[0].probability - 1)
         assert build.inputs_hash(config, rescored) != record["reference_run"]["inputs_hash"]
-        moved = config.copy_with(force_weights={f: (0.17 if f == "Consumer" else v) for f, v in config.force_weights.items()})
+        moved = config.copy_with(force_weights={f: (0.17 if f == "Consumer" else v)
+                                                for f, v in config.force_weights.items()})
         assert build.inputs_hash(moved, drivers) != record["reference_run"]["inputs_hash"]
         # --check on a record whose reference carries another hash
         stale = json.loads(ATTRIBUTION.read_text(encoding="utf-8"))

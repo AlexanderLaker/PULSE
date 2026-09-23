@@ -120,7 +120,8 @@ class TestCodeMap:
 
     def test_an_initialism_does_not_end_the_first_sentence(self):
         gen = _generator()
-        assert gen.first_sentence("P.L. 119-21 expanded the rules. States pay more.") == "P.L. 119-21 expanded the rules."
+        sentence = gen.first_sentence("P.L. 119-21 expanded the rules. States pay more.")
+        assert sentence == "P.L. 119-21 expanded the rules."
         assert gen.first_sentence("Demand in the U.S. falls by 3%. Prices hold.") == "Demand in the U.S. falls by 3%."
         assert gen.first_sentence("One sentence only") == "One sentence only"
 

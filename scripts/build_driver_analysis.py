@@ -109,7 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         problems = []
         if committed is None:
             problems.append(f"{os.path.relpath(ATTRIBUTION_PATH, REPO)} is missing")
-        elif not attribution.records_match(attribution.strip_volatile(committed), attribution.strip_volatile(record), attribution.RECORD_ATOL):
+        elif not attribution.records_match(attribution.strip_volatile(committed), attribution.strip_volatile(record),
+                                           attribution.RECORD_ATOL):
             problems.append(f"{os.path.relpath(ATTRIBUTION_PATH, REPO)} differs from the recomputed record "
                             f"(regenerate: python3 scripts/build_driver_analysis.py)")
         if committed is not None and committed["reference_run"].get("inputs_hash") != current_hash:
@@ -124,7 +125,8 @@ def main(argv: list[str] | None = None) -> int:
                 problems.append(f"{code}: rendered text differs from the committed one (regenerate)")
         if not os.path.exists(FIXTURE_PATH):
             problems.append(f"{os.path.relpath(FIXTURE_PATH, REPO)} is missing")
-        elif not attribution.records_match(_load_json(FIXTURE_PATH), json.loads(json.dumps(fixture)), attribution.FIXTURE_ATOL, attribution.FIXTURE_RTOL):
+        elif not attribution.records_match(_load_json(FIXTURE_PATH), json.loads(json.dumps(fixture)),
+                                           attribution.FIXTURE_ATOL, attribution.FIXTURE_RTOL):
             problems.append(f"{os.path.relpath(FIXTURE_PATH, REPO)} differs from the recomputed fixture (regenerate)")
         if problems:
             print("driver analysis check FAILED:")

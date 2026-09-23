@@ -611,7 +611,8 @@ class TestMigration:
         assert migration.main(["--sqlite", str(previous)]) == 0
         report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])["journey"]
         assert report["codes_removed"] == {"t.a": ["C-99", "T-06"]} and report["texts_with_breaks_written_out"] == 1
-        content = json.loads(query(previous, "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")[0]["content"])
+        newest = query(previous, "SELECT content FROM journey_content ORDER BY id DESC LIMIT 1")[0]
+        content = json.loads(newest["content"])
         a = content["lhc"][0]["benefiting"][0]
         assert a["driverCodes"] == ["C-01"] and a["analysis"] == "**One.** First.\n\n**Two.** Second."
         assert content["hair"][0]["negativelyImpacted"][0]["driverCodes"] == []
@@ -901,8 +902,9 @@ def in_prism(url: str, code: str) -> str:
 def postgres_schema(conn, schema: str) -> dict:
     """Columns, constraints and indexes of every table in one schema, schema names removed."""
     cur = conn.cursor()
-    cur.execute("SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns "
-                "WHERE table_schema = %s ORDER BY table_name, ordinal_position", (schema,))
+    cur.execute("SELECT table_name, column_name, data_type, is_nullable, column_default "
+                "FROM information_schema.columns WHERE table_schema = %s ORDER BY table_name, ordinal_position",
+                (schema,))
     out: dict = {}
     for table, column, data_type, nullable, default in cur.fetchall():
         out.setdefault(table, {"columns": [], "constraints": [], "indexes": []})["columns"].append(
@@ -962,7 +964,8 @@ def test_postgres_older_leftovers_need_no_cascade(migration, monkeypatch, capsys
     monkeypatch.setenv("POSTGRES_URL", schema_url(schema))
     assert migration.main(["--postgres"]) == 0
     report = json.loads(capsys.readouterr().out.split("\nMigrated.")[0])
-    assert {"delphi_rounds", "delphi_calibration", "delphi_sessions", "config_snapshots"} <= set(report["dropped_tables"])
+    older = {"delphi_rounds", "delphi_calibration", "delphi_sessions", "config_snapshots"}
+    assert older <= set(report["dropped_tables"])
     assert "config_snapshot_id" in report["dropped_simulation_run_columns"]
     assert not pg_tables(admin, schema) & set(migration.DROP_TABLES)
 

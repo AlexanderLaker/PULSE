@@ -234,7 +234,8 @@ class TestSimulation:
         path = "/api/v1/simulation"
         assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {"changed": [], "added": [], "removed": []}
         api.put("/api/v1/drivers/technology_r01", headers=bearer("admin"), json={"revision": 1, "probability": 1})
-        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "description": "text only"})
+        api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                json={"revision": 1, "description": "text only"})
         assert api.get(path, headers=bearer()).json()["inputs_since_run"] == {
             "changed": ["technology_r01"], "added": [], "removed": []}
 
@@ -290,7 +291,8 @@ class TestDrivers:
         assert driver["baseline"]["vc_epicentre"] == "Commercial"
 
     def test_text_edits_do_not_mark_the_scores_as_edited(self, api):
-        sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A", "published": "Apr 2026"}]
+        sources = [{"title": "Circana, April 2026", "url": "https://example.org/c", "tier": "A",
+                    "published": "Apr 2026"}]
         response = api.put("/api/v1/drivers/consumer_r02", headers=bearer("admin"),
                            json={"revision": 1, "description": "New text.", "confidence": "Low", "sources": sources})
         assert response.status_code == 200
@@ -299,7 +301,8 @@ class TestDrivers:
         assert driver["sources"] == sources and driver["scores_edited"] is False
 
     def test_an_unchanged_edit_writes_nothing(self, api):
-        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 5})
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"revision": 1, "probability": 5})
         assert response.json() == {"status": "unchanged", "driver_id": "consumer_r01", "revision": 1}
 
     def test_an_edit_made_on_an_older_revision_is_refused(self, api):
@@ -324,7 +327,8 @@ class TestDrivers:
             original(other, other.revision)
             return original(driver, expected, audit)
         monkeypatch.setattr(dbm, "save_driver_edit", someone_else_first)
-        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"revision": 1, "probability": 4})
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"),
+                           json={"revision": 1, "probability": 4})
         assert response.status_code == 409
         driver = next(d for d in load_drivers() if d.id == "consumer_r01")
         assert (driver.name, driver.probability) == ("saved in between", 5)
@@ -334,7 +338,8 @@ class TestDrivers:
             assert cursor.fetchone()[0] == 0   # the refused edit left no audit entry
 
     def test_an_edit_needs_the_revision(self, api):
-        assert api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4}).status_code == 422
+        response = api.put("/api/v1/drivers/consumer_r01", headers=bearer("admin"), json={"probability": 4})
+        assert response.status_code == 422
 
     @pytest.mark.parametrize("body", [
         {"probability": 9}, {"uncertainty": 6}, {"uncertainty": None}, {"peak_year": None},
@@ -398,7 +403,8 @@ class TestProposals:
                           "regional_exposure": {}}}
         api.put(path, headers=bearer(sub="ana", name="Ana"), json={"probability": 4, "comment": "  looks high  "})
         body = api.put(path, headers=bearer(sub="ana", name="Ana"), json={"peak_year": 2031}).json()
-        assert body["my"]["probability"] == 4 and body["my"]["peak_year"] == 2031 and body["my"]["comment"] == "looks high"
+        my = body["my"]
+        assert my["probability"] == 4 and my["peak_year"] == 2031 and my["comment"] == "looks high"
         api.put(path, headers=bearer(sub="ben", email="ben@example.com"),
                 json={"probability": 2, "category_exposure": {"Hair: Care": 4}})
         body = api.get(path, headers=bearer(sub="ben", email="ben@example.com")).json()
@@ -464,7 +470,8 @@ class TestProposals:
 
 class TestConfig:
     def test_the_configuration_is_read_only(self, api):
-        from prism.config import DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_FORCE_OVERLAP_MATRIX, DEFAULT_PER_FORCE_ATTENUATION
+        from prism.config import (DEFAULT_CELL_WEIGHTS_SOURCE, DEFAULT_FORCE_OVERLAP_MATRIX,
+                                  DEFAULT_PER_FORCE_ATTENUATION)
         body = api.get("/api/v1/config", headers=bearer()).json()
         assert body["per_force_attenuation"] == DEFAULT_PER_FORCE_ATTENUATION
         assert body["force_overlap_matrix"] == DEFAULT_FORCE_OVERLAP_MATRIX
@@ -485,7 +492,8 @@ class TestJourney:
         assert api.get("/api/v1/journey", headers=bearer()).json() == {"version": 0, "content": None}
 
     def test_save_and_read(self, api):
-        response = api.put("/api/v1/journey", headers=bearer("admin"), json={"base_version": 0, "content": self.CONTENT})
+        response = api.put("/api/v1/journey", headers=bearer("admin"),
+                           json={"base_version": 0, "content": self.CONTENT})
         assert response.status_code == 200
         saved = response.json()
         assert saved["status"] == "saved" and saved["tiles"] == 1 and saved["version"] >= 1

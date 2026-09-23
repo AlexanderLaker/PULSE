@@ -1,8 +1,15 @@
-# Python lint settings (ruff): syntax errors, unused code and likely bugs.
+# Python lint settings (ruff): syntax errors, unused code, likely bugs and the line length.
 target-version = "py310"
 line-length = 120
 
 [lint]
-select = ["F", "E9", "B", "W6"]
+select = ["F", "E9", "E501", "B", "W6"]
 # FastAPI declares dependencies as Depends(...) defaults; zip() lengths are the tests' business.
 ignore = ["B008", "B905"]
+
+[lint.per-file-ignores]
+# Generated modules: the driver texts and the parameter tables are written as
+# single lines by their generators.
+"prism/seed_drivers.py" = ["E501"]
+"prism/overlap_correction.py" = ["E501"]
+"prism/cell_weight_estimate.py" = ["E501"]

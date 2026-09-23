@@ -188,7 +188,8 @@ class TestSyncAnalysis:
     def test_dry_run_then_sync(self, seeded, capsys):
         sync = load_module("scripts/sync_analysis.py")
         with seeded.get_db_connection() as conn:
-            conn.cursor().execute("UPDATE drivers SET analysis = 'outdated' WHERE id IN ('consumer_r01', 'technology_r01')")
+            conn.cursor().execute(
+                "UPDATE drivers SET analysis = 'outdated' WHERE id IN ('consumer_r01', 'technology_r01')")
         assert sync.main(["--dry-run"]) == 0
         assert "2 with an outdated analysis" in capsys.readouterr().out
         assert {d.id: d.analysis for d in seeded.load_drivers()}["consumer_r01"] == "outdated"
