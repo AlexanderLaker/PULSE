@@ -43,8 +43,8 @@ def create_app() -> FastAPI:
     @app.exception_handler(DatabaseUnavailableError)
     def _unreachable(request: Request, exc: Exception) -> JSONResponse:
         # A passing outage (a waking serverless database, a network fault).
-        # The driver's message can name the host and the user, so the answer
-        # names neither; the log has the details.
+        # The answer names nothing about the database; the log has the
+        # category of the failure (prism.database.describe_error).
         logger.warning("%s %s: %s", request.method, request.url.path, exc)
         return JSONResponse(status_code=503, content={
             "detail": "The database cannot be reached right now; try again in a moment."})

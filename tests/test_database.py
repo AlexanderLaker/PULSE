@@ -429,12 +429,17 @@ class TestRunsJourneyAudit:
         ('could not translate host name "ep-secret.neon.tech" to address', "the database host name does not resolve"),
         ("connection timed out", "the database did not answer in time"),
     ])
-    def test_errors_are_described_without_credentials(self, db, monkeypatch, message, words):
+    def test_errors_are_described_without_credentials(self, db, monkeypatch, caplog, message, words):
+        """Not in the answer, not in the log, not in the error the API turns into a 503."""
         monkeypatch.setattr(db, "_connect", lambda: (_ for _ in ()).throw(RuntimeError(message)))
         monkeypatch.setattr(db.time, "sleep", lambda s: None)
         error = db.diagnose_connection()["error"]
         assert error.startswith(words)
-        assert not any(secret in error for secret in ("owner", "s3cr", "ep-secret"))
+        with pytest.raises(db.DatabaseUnavailableError) as refused:
+            db.load_drivers()
+        assert words in str(refused.value) and "attempt 2 failed" in caplog.text
+        for text in (error, str(refused.value), caplog.text):
+            assert not any(secret in text for secret in ("owner", "s3cr", "ep-secret")), text
 
     @pytest.mark.skipif(ON_POSTGRES, reason="the refusal concerns the SQLite fallback")
     def test_on_vercel_without_a_database_url_nothing_falls_back_to_sqlite(self, db, monkeypatch):

@@ -146,11 +146,12 @@ def get_db_connection():
             last_error = e
             if attempt < 2:
                 wait = 0.5 * (2 ** attempt)
-                logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs", attempt + 1, e, wait)
+                logger.warning("Database connection attempt %d failed: %s; retrying in %.1fs",
+                               attempt + 1, describe_error(e), wait)
                 time.sleep(wait)
     if conn is None:
         raise DatabaseUnavailableError(
-            f"Failed to connect to the database after 3 attempts: {last_error}") from last_error
+            f"Failed to connect to the database after 3 attempts: {describe_error(last_error)}") from last_error
     try:
         yield conn
         conn.commit()
@@ -357,9 +358,9 @@ def failure_reason(e: BaseException) -> str:
 def describe_error(e: BaseException) -> str:
     """A database failure in words that name no host, user or password.
 
-    Driver messages can quote the connection string (a malformed
-    percent-escape echoes part of the password), so /api/v1/diagnostics shows
-    this category instead of the raw text; the raw text goes to the log.
+    A driver's message about a failed connection can quote the connection
+    string (a malformed percent-escape echoes part of the password), so the
+    log, the 503 answers and /api/v1/diagnostics give this category instead.
     """
     if isinstance(e, MigrationPendingError):
         return str(e)
