@@ -7,7 +7,7 @@ Inputs
                                      by scripts/build_driver_analysis.py
 
 Outputs (committed, never edited by hand)
-  prism/seed_drivers.py              the drivers a new database is seeded with
+  prism/seed_drivers.py              the drivers a new database is seeded with, in id order
   data/driverCodeMap.ts              display code <-> driver id for the dashboard
 
 The base is validated before anything is written (prism/driver_base.py): every
@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from prism.config import CATEGORIES, REGIONS  # noqa: E402
+from prism.config import CATEGORIES, FORCES, REGIONS  # noqa: E402
 from prism.driver_base import InvalidBaseError, load_base  # noqa: E402
 from prism.readings import render_all  # noqa: E402
 
@@ -38,10 +38,6 @@ ANALYSIS = ROOT / "data" / "drivers" / "driver_analysis.json"
 ATTRIBUTION = ROOT / "data" / "drivers" / "driver_attribution.json"
 SEED_OUT = ROOT / "prism" / "seed_drivers.py"
 CODEMAP_OUT = ROOT / "data" / "driverCodeMap.ts"
-
-#: Order of the forces in the generated files (largest first, then related).
-FORCE_ORDER = ["Consumer", "Customer", "Competitive", "Technology", "Government", "Environmental"]
-
 
 def q(s) -> str:
     """A double-quoted Python string literal (JSON escapes are valid Python)."""
@@ -89,7 +85,7 @@ def render_seed(drivers: list, texts: dict) -> str:
     a("the PRISM Analysis texts in data/drivers/driver_analysis.json. Do not edit")
     a("this file: change the JSON and re-run the generator.")
     a("")
-    a(f"{len(drivers)} drivers: " + ", ".join(f"{f} {by_force.get(f, 0)}" for f in FORCE_ORDER) + ";")
+    a(f"{len(drivers)} drivers: " + ", ".join(f"{f} {by_force.get(f, 0)}" for f in FORCES) + ";")
     a(f"{by_dir.get('Contraction', 0)} Contraction, {by_dir.get('Expansion', 0)} Expansion.")
     a('"""')
     a("import copy")
@@ -192,8 +188,10 @@ def generate() -> tuple:
         drivers = load_base()
     except InvalidBaseError as e:
         raise SystemExit(str(e)) from None
-    order = {f: i for i, f in enumerate(FORCE_ORDER)}
-    drivers = sorted(drivers, key=lambda d: (order[d["force"]], d["id"]))
+    # In id order, the order the database returns them in, so the seed and a
+    # seeded database hand the engine the drivers in the same order (the
+    # copula pairs draws with drivers by position).
+    drivers = sorted(drivers, key=lambda d: d["id"])
     return render_seed(drivers, load_analysis()), render_codemap(drivers), drivers
 
 
@@ -213,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     CODEMAP_OUT.write_text(codemap_src, encoding="utf-8")
     counts = collections.Counter(d["force"] for d in drivers)
     print(f"wrote {SEED_OUT.relative_to(ROOT)} and {CODEMAP_OUT.relative_to(ROOT)}: {len(drivers)} drivers ("
-          + ", ".join(f"{f} {counts[f]}" for f in FORCE_ORDER) + ")")
+          + ", ".join(f"{f} {counts[f]}" for f in FORCES) + ")")
     return 0
 
 

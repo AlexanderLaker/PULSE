@@ -62,9 +62,10 @@ class TestSeed:
             assert d.baseline == {name: getattr(original, name) for name in SCORE_FIELDS}
 
     def test_the_seed_equals_the_driver_base(self):
-        """The generated module builds the same drivers the attribution build reads from the JSON."""
+        """The generated module builds the same drivers the attribution build reads from the JSON, in the
+        order the database returns them (by id): the copula pairs draws with drivers by position."""
         from_base = {d.id: d for d in base_drivers()}
-        assert set(from_base) == {d.id for d in seed_drivers.DRIVERS}
+        assert [d.id for d in seed_drivers.DRIVERS] == list(from_base) == sorted(from_base)
         for d in seed_drivers.DRIVERS:
             b = from_base[d.id]
             for field in ("force", "name", "description", "direction", "probability", "start_year", "gp1_pct_affected",
