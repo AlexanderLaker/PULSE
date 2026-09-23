@@ -213,12 +213,24 @@ describe('ConsumerJourney: stored content and the admin save', () => {
     render(<ConsumerJourney isAdmin />);
     await startEditing();
     fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
-    expect(await screen.findByText(/did not answer in time and may still have been stored/)).toBeTruthy();
+    expect(await screen.findByText(/got no answer and may still have been stored/)).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Load the saved version' }));
     await waitFor(() => expect(API.getJourneyContent).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('keeps asking for the saved version when a tile is edited after a save that timed out', async () => {
+    API.saveJourneyContent.mockRejectedValue(new ApiError(0, 'The request timed out after 20 s', true));
+    render(<ConsumerJourney isAdmin />);
+    await startEditing();
+    fireEvent.click(screen.getByRole('button', { name: 'Save to server' }));
+    expect(await screen.findByText(/got no answer and may still have been stored/)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Add a tailwind tile to / })[0]!);
+    expect(screen.getByText(/got no answer and may still have been stored/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save to server' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(API.saveJourneyContent).toHaveBeenCalledTimes(1);
   });
 
   it('turns saving off while the saved journey cannot be loaded', async () => {

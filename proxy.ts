@@ -12,7 +12,9 @@
  *   - /api/v1/*, the PRISM API. It authenticates every data request itself
  *     (the viewer cookie or an admin token; /health and /diagnostics are
  *     anonymous), and the dashboard's own routes call it server to server
- *     without a Clerk session.
+ *     without a Clerk session;
+ *   - DELETE /api/prism-cookie, which only expires the viewer cookie, so a
+ *     page whose session has ended can still clear it.
  */
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
@@ -25,8 +27,11 @@ const isPublicRoute = createRouteMatcher([
   '/api/v1/(.*)',
 ]);
 
+const expiresTheCookie = (request: Request) =>
+  request.method === 'DELETE' && new URL(request.url).pathname === '/api/prism-cookie';
+
 export default clerkMiddleware(async (auth, request) => {
-  if (isPublicRoute(request)) return;
+  if (isPublicRoute(request) || expiresTheCookie(request)) return;
   const { userId, redirectToSignIn } = await auth();
   if (userId) return;
   if (request.nextUrl.pathname.startsWith('/api/')) {

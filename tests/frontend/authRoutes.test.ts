@@ -116,6 +116,14 @@ describe('/api/drivers/{id}', () => {
     expect((await res.json()).error).toBe('This driver was changed after you opened it.');
   });
 
+  it('answers 502 with an unknown outcome when the API gives no answer to a forwarded edit', async () => {
+    signedIn('admin');
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('socket hang up'); }));
+    const res = await driverPUT(edit(), params);
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe('The PRISM API gave no answer, so the change may or may not have been saved.');
+  });
+
   it('refuses a body that is not a JSON object', async () => {
     signedIn('admin');
     const res = await driverPUT(edit([1, 2]), params);

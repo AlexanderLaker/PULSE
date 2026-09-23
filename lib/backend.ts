@@ -66,13 +66,24 @@ export async function forwardAdminWrite(
         { status: 503 },
       );
     }
-    const res = await fetch(await apiUrl(path), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-    });
-    const text = await res.text();
+    // From here on the write may reach the API: a failure without its answer
+    // leaves the outcome unknown, and 502 says so to the browser (lib/apiClient.ts).
+    const url = await apiUrl(path);
+    let res: Response;
+    let text: string;
+    try {
+      res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+      });
+      text = await res.text();
+    } catch (err) {
+      console.error(`[admin write ${path}] no answer from the API`, err);
+      return NextResponse.json(
+        { error: 'The PRISM API gave no answer, so the change may or may not have been saved.' }, { status: 502 });
+    }
     if (!res.ok) {
       return NextResponse.json({ error: formatApiError(text, res.status) }, { status: res.status });
     }
@@ -81,6 +92,6 @@ export async function forwardAdminWrite(
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });
     if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 403 });
     console.error(`[admin write ${path}]`, err);
-    return NextResponse.json({ error: 'The change could not be saved' }, { status: 502 });
+    return NextResponse.json({ error: 'The change could not be saved' }, { status: 500 });
   }
 }

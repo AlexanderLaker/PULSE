@@ -23,15 +23,20 @@ import { errorDetail } from '@/lib/apiError';
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export class ApiError extends Error {
-  /** `timedOut`: no answer came in time. The request may still have been
-   *  carried out, so a write that timed out has an unknown outcome. */
-  constructor(public status: number, message: string, public timedOut = false) {
+  /** `outcomeUnknown`: a write went out and no answer came back from the API
+   *  (a timeout, a lost connection, or a gateway that gave up with 502 or 504),
+   *  so it may still have been carried out. */
+  constructor(public status: number, message: string, public outcomeUnknown = false) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
+/** Gateway answers: the API's own answer never arrived. */
+const GATEWAY_STATUSES = new Set([502, 504]);
+
 async function send<T>(url: string, init: RequestInit = {}, retried = false): Promise<T> {
+  const write = (init.method ?? 'GET') !== 'GET';
   let res: Response;
   try {
     res = await fetch(url, {
@@ -41,16 +46,17 @@ async function send<T>(url: string, init: RequestInit = {}, retried = false): Pr
     });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'TimeoutError') {
-      throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`, true);
+      throw new ApiError(0, `The request timed out after ${REQUEST_TIMEOUT_MS / 1000} s`, write);
     }
-    throw new ApiError(0, 'The PRISM service could not be reached');
+    throw new ApiError(0, 'The PRISM service could not be reached', write);
   }
   if (res.status === 401 && !retried && url.startsWith('/api/v1/')) {
     await primeViewerCookie();
     return send<T>(url, init, true);
   }
   if (!res.ok) {
-    throw new ApiError(res.status, errorDetail(await res.json().catch(() => null)) ?? `Request failed (${res.status})`);
+    throw new ApiError(res.status, errorDetail(await res.json().catch(() => null)) ?? `Request failed (${res.status})`,
+      write && GATEWAY_STATUSES.has(res.status));
   }
   return (await res.json()) as T;
 }
@@ -65,13 +71,28 @@ export const getHealth = (): Promise<HealthStatus> => send('/api/v1/health');
 export const getDiagnostics = (): Promise<DiagnosticsResult | null> =>
   send<DiagnosticsResult>('/api/v1/diagnostics').catch(() => null);
 
-/** Sets the viewer cookie the /api/v1 reads need. Resolves whether or not it succeeded. */
-export const primeViewerCookie = (): Promise<void> =>
-  fetch('/api/prism-cookie').then(() => undefined, () => undefined);
+/** Set once the viewer cookie is expired for a sign-out or an ended session:
+ *  no request of this page may set it again (the page navigates away next). */
+let cookieRetired = false;
 
-/** Expires the viewer cookie, before signing out. Resolves whether or not it succeeded. */
-export const clearViewerCookie = (): Promise<void> =>
+/** Expires the viewer cookie. Resolves whether or not it succeeded. */
+const expireViewerCookie = (): Promise<void> =>
   fetch('/api/prism-cookie', { method: 'DELETE' }).then(() => undefined, () => undefined);
+
+/** Sets the viewer cookie the /api/v1 reads need. When it cannot be set, any
+ *  cookie left in the browser (perhaps another user's) is expired instead, so
+ *  the reads that follow fail rather than go out under it. Resolves either way. */
+export const primeViewerCookie = (): Promise<void> =>
+  cookieRetired
+    ? Promise.resolve()
+    : fetch('/api/prism-cookie').then((res) => (res.ok ? undefined : expireViewerCookie()), expireViewerCookie);
+
+/** Expires the viewer cookie for good on this page: before signing out, and
+ *  when the session has ended. Resolves whether or not it succeeded. */
+export const clearViewerCookie = (): Promise<void> => {
+  cookieRetired = true;
+  return expireViewerCookie();
+};
 
 // ── Drivers ─────────────────────────────────────────────────────────────────
 

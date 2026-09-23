@@ -2,7 +2,8 @@
  * lib/apiClient.ts: every request the dashboard makes. The viewer cookie lasts
  * thirty minutes, so a /api/v1 request answered 401 asks /api/prism-cookie for a
  * new one and is sent once more; the dashboard's own routes are never retried,
- * and a second 401 is the answer.
+ * and a second 401 is the answer. A write that got no answer from the API has
+ * an unknown outcome.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError, getDrivers, getJourneyContent, saveJourneyContent, updateDriver } from '@/lib/apiClient';
@@ -46,6 +47,29 @@ describe('the viewer cookie', () => {
     await expect(updateDriver('consumer_r01', { revision: 1, probability: 3 })).rejects.toThrow('Sign in again');
     expect(calls).toEqual(['/api/drivers/consumer_r01']);
   });
+
+  it('is expired when a new one cannot be set, so no read goes out under a cookie left behind', async () => {
+    const requests: Array<[string, string]> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      requests.push([String(url), init?.method ?? 'GET']);
+      return String(url) === '/api/prism-cookie' && (init?.method ?? 'GET') === 'GET'
+        ? json(500, { error: 'Failed to sign the API token' }) : json(200, { ok: true });
+    }));
+    const { primeViewerCookie } = await import('@/lib/apiClient');
+    await primeViewerCookie();
+    expect(requests).toEqual([['/api/prism-cookie', 'GET'], ['/api/prism-cookie', 'DELETE']]);
+  });
+
+  it('is never set again by this page once it is cleared for a sign-out', async () => {
+    vi.resetModules();
+    const client = await import('@/lib/apiClient');
+    answer(json(401, { detail: 'Invalid or expired token' }), json(401, { detail: 'Invalid or expired token' }));
+    await client.clearViewerCookie();
+    await client.primeViewerCookie();
+    await expect(client.getDrivers()).rejects.toThrow('Invalid or expired token');
+    expect(vi.mocked(fetch).mock.calls.map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? 'GET'} ${url}`))
+      .toEqual(['DELETE /api/prism-cookie', 'GET /api/v1/drivers', 'GET /api/v1/drivers']);
+  });
 });
 
 describe('the journey content', () => {
@@ -56,6 +80,25 @@ describe('the journey content', () => {
     const save = vi.mocked(fetch).mock.calls[1]!;
     expect(save[0]).toBe('/api/journey');
     expect(JSON.parse(String((save[1] as RequestInit).body))).toEqual({ base_version: 7, content: { lhc: [], hair: [] } });
+  });
+});
+
+describe('a write without the API\'s answer', () => {
+  it('has an unknown outcome when a gateway answers or the connection fails, and a read never does', async () => {
+    for (const status of [502, 504]) {
+      answer(new Response('<html>Gateway</html>', { status }));
+      const failure = await updateDriver('consumer_r01', { revision: 1, probability: 3 }).catch((e: unknown) => e);
+      expect((failure as ApiError).outcomeUnknown).toBe(true);
+    }
+    answer(json(503, { detail: 'The database cannot be reached' }));
+    expect(((await updateDriver('consumer_r01', { revision: 1 }).catch((e: unknown) => e)) as ApiError)
+      .outcomeUnknown).toBe(false);
+    answer(new Response('<html>Gateway</html>', { status: 504 }));
+    expect(((await getDrivers().catch((e: unknown) => e)) as ApiError).outcomeUnknown).toBe(false);
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    expect(((await updateDriver('consumer_r01', { revision: 1 }).catch((e: unknown) => e)) as ApiError)
+      .outcomeUnknown).toBe(true);
+    expect(((await getDrivers().catch((e: unknown) => e)) as ApiError).outcomeUnknown).toBe(false);
   });
 });
 

@@ -15,7 +15,8 @@
  *     loads, and lib/apiClient.ts asks again when an /api/v1 request is
  *     answered 401, then repeats the request once.
  *
- * DELETE expires it; the dashboard calls it before signing out.
+ * DELETE expires it, with or without a session (proxy.ts lets it through):
+ * the dashboard calls it before signing out and when the session has ended.
  */
 import { NextResponse } from 'next/server';
 import { requireSignedIn, UnauthorizedError } from '@/lib/roles';

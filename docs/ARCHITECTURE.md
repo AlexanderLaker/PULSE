@@ -97,17 +97,20 @@ engine.
 | `GET /api/v1/journey` | signed in | `{version, content}`: the newest stored Consumer Journey tile map, or version 0 and no content while the dashboard's bundled content applies |
 | `PUT /api/v1/journey` | admin | Stores a new version of the whole tile map, edited from the version the request names (409 when another save came in between) |
 
-A body the API cannot accept is answered 422 with the reason, and a write
-made on an outdated revision or version 409; the dashboard shows both
-messages as they come (its own server routes answer 400 to a body they
-refuse before forwarding it). While the database cannot be used the routes
-that read or write it answer 503: with the migration to run when the schema
-is older than the code, with the missing setting when no database is
-configured, and with "try again in a moment" when the database cannot be
-reached after three attempts (the details go to the log, never to the
-browser). `/health` and `/diagnostics` answer 200 even then and say what is
-wrong (`/health` with status `degraded`, both with the reason). Any other
-database error is logged and answered 500.
+A body the API cannot accept is answered 422 with the reason, and a write made
+on an outdated revision or version 409; the dashboard shows both messages as
+they come (its own server routes answer 400 to a body they refuse before
+forwarding it). A write that gets no answer from the API (a timeout, a lost
+connection, a 502 or 504 from the gateway or from the dashboard's route) may
+still have been stored: the editors say so and ask for the stored version
+before the next save. While the database cannot be used the routes that read
+or write it answer 503: with the migration to run when the schema is older
+than the code, with the missing setting when no database is configured, and
+with "try again in a moment" when the database cannot be reached after three
+attempts (the details go to the log, never to the browser). `/health` and
+`/diagnostics` answer 200 even then and say what is wrong (`/health` with
+status `degraded`, both with the reason). Any other database error is logged
+and answered 500.
 
 Each instance keeps the drivers and the latest run in memory
 (`prism/api/state.py`). A request that reads them first checks whether the
@@ -143,6 +146,9 @@ signed-in user (`lib/prismJwt.ts`, verified in `prism/api/auth.py`):
   it. It authorises reads and the user's own expert proposals, nothing else.
   When an `/api/v1` request is answered 401 (the token expired), the client
   asks for a new cookie once and repeats the request (`lib/apiClient.ts`).
+  The cookie is not tied to the Clerk session, so the dashboard expires it
+  (`DELETE /api/prism-cookie`) before signing out and when the session ends,
+  and in place of a cookie it cannot renew.
 - **Admin writes.** A driver edit or a journey save goes to a dashboard route
   (`/api/drivers/{id}`, `/api/journey`). The route checks the user's role in
   `user_roles`, then forwards the request to the API (on `PRISM_API_ORIGIN`
@@ -155,15 +161,17 @@ their full name, which the proposals list shows next to each expert's scores
 (the email's local part when there is no name).
 
 `proxy.ts` requires a Clerk session for every page and dashboard route except
-the sign-in and sign-up pages, the webhook (which checks its Svix signature)
-and the admin bootstrap route (which checks a shared secret). `/api/v1` is
-left to the API's own checks.
+the sign-in and sign-up pages, the webhook (which checks its Svix signature),
+the admin bootstrap route (which checks a shared secret) and
+`DELETE /api/prism-cookie`, which only expires the cookie. `/api/v1` is left to
+the API's own checks.
 
 The dashboard's server routes (`app/api`):
 
 | Route | Access | Does |
 |---|---|---|
 | `GET /api/prism-cookie` | signed in | Sets the viewer cookie for `/api/v1` |
+| `DELETE /api/prism-cookie` | anyone | Expires the viewer cookie |
 | `GET /api/me` | signed in | The user's Clerk id, email and role |
 | `PUT /api/drivers/{id}` | admin | Forwards a driver edit to the API with an admin token |
 | `PUT /api/journey` | admin | Forwards a journey save to the API with an admin token |

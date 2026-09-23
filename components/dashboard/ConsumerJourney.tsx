@@ -153,14 +153,20 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
   }, [selected, editing, paneActive, stepSelection]);
 
   // ── Admin edits: local until "Save to server" ──
+  // A save whose outcome is unknown, or one refused because someone saved
+  // meanwhile, needs the stored version loaded before the next save; an edit
+  // leaves that notice and the hold on saving in place.
+  const needsReload = saveState === 'uncertain' || saveState === 'conflict';
   const mutateTiles = useCallback((stageId: string, side: Side, update: (tiles: JourneyTile[]) => JourneyTile[]) => {
     setContent(prev => ({
       ...prev,
       [tab]: prev[tab].map(s => (s.id === stageId ? { ...s, [side]: update(s[side]) } : s)),
     }));
-    setSaveState('idle');
-    setSaveMsg(null);
-  }, [tab]);
+    if (!needsReload) {
+      setSaveState('idle');
+      setSaveMsg(null);
+    }
+  }, [tab, needsReload]);
 
   const applyEdits = useCallback((sel: SelectedTile, edits: TileEdits) => {
     const updated: JourneyTile = {
@@ -217,9 +223,9 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
         setSaveMsg('Admin required: your account cannot save journey content.');
         return;
       }
-      if (e instanceof ApiError && e.timedOut) {
+      if (e instanceof ApiError && e.outcomeUnknown) {
         setSaveState('uncertain');
-        setSaveMsg('The save did not answer in time and may still have been stored. Load the saved version '
+        setSaveMsg('The save got no answer and may still have been stored. Load the saved version '
           + 'to see what the server holds (your unsaved edits here are dropped).');
         return;
       }
@@ -234,7 +240,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
       setSaveMsg(`Save failed${status}. ${(e as Error).message.slice(0, 160)}`);
     }
   }, [content, version, origin]);
-  const canSave = (origin === 'stored' || origin === 'bundled') && saveState !== 'uncertain';
+  const contentKnown = origin === 'stored' || origin === 'bundled';
+  const canSave = contentKnown && !needsReload;
 
   // ════════════════════════════════════════════════════════════════════
   // RENDER
@@ -422,8 +429,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         <button type="button"
                           onClick={() => addTile(stage.id, 'benefiting')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.expansion, padding: 0, display: 'inline-flex' }}
-                          title="Add benefiting tile"
-                          aria-label="Add benefiting tile"
+                          title={`Add a tailwind tile to ${stage.label}`}
+                          aria-label={`Add a tailwind tile to ${stage.label}`}
                         >
                           <Plus size={13} strokeWidth={2.5} />
                         </button>
@@ -463,8 +470,8 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
                         <button type="button"
                           onClick={() => addTile(stage.id, 'negativelyImpacted')}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.error, padding: 0, display: 'inline-flex' }}
-                          title="Add declining tile"
-                          aria-label="Add declining tile"
+                          title={`Add a headwind tile to ${stage.label}`}
+                          aria-label={`Add a headwind tile to ${stage.label}`}
                         >
                           <Plus size={13} strokeWidth={2.5} />
                         </button>
@@ -506,7 +513,7 @@ const ConsumerJourney: FC<ConsumerJourneyProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-3">
-              {!canSave && saveState !== 'uncertain' && (
+              {!contentKnown && (
                 <span className="text-[11.5px] font-bold" style={{ color: origin === 'unavailable' ? S.error : S.onSurfaceVariant, fontFamily: HEADLINE_FONT }}>
                   {origin === 'loading'
                     ? 'Loading the saved journey…'

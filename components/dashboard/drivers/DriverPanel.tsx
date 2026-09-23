@@ -108,7 +108,7 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // A save that timed out may have been stored: no second save before the
+  // A save that got no answer may have been stored: no second save before the
   // admin has seen the driver as it is stored now.
   const [uncertain, setUncertain] = useState(false);
   const [draft, setDraft] = useState(() => draftOf(driver));
@@ -127,7 +127,9 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
     setDraft(draftOf(driver));
     setPeakText(String(driver.peak_year));
   }
-  const changedMeanwhile = isEditing && draftBase.revision !== driver.revision;
+  // Not while saving: the store brings the saved driver (one revision on)
+  // before the save resolves and the editor closes.
+  const changedMeanwhile = isEditing && !saving && draftBase.revision !== driver.revision;
   const peakMin = firstPeakYear(draftBase.start_year);
   const peakOk = validPeak(peakText, peakMin);
   const linksOk = draft.sources.every((src) => validLink(src.url));
@@ -164,9 +166,9 @@ export const ExpandedPanel: FC<ExpandedPanelProps> = ({ driver, isAdmin, updateD
       await updateDriver(driver.id, update);
       setIsEditing(false);
     } catch (e) {
-      if (e instanceof ApiError && e.timedOut) setUncertain(true);
-      setSaveError(e instanceof ApiError && e.timedOut
-        ? 'The save did not answer in time and may still have been stored. Discard your edits to see the '
+      if (e instanceof ApiError && e.outcomeUnknown) setUncertain(true);
+      setSaveError(e instanceof ApiError && e.outcomeUnknown
+        ? 'The save got no answer and may still have been stored. Discard your edits to see the '
           + 'driver as it is stored now, and make the change again if it is missing.'
         : e instanceof ApiError && e.status === 409
           ? 'This driver was changed by someone else while you were editing. Your edits are still here; '

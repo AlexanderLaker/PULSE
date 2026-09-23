@@ -133,6 +133,26 @@ describe('the admin editor', () => {
       driver.id, { revision: 7, category_exposure: { 'Hair: Color': 4 } }]);
   });
 
+  it('raises no conflict when the saved driver arrives before the save resolves', async () => {
+    // The store reloads the drivers first; the saved driver is one revision on
+    // while the editor is still open for a moment.
+    const driver = makeDriver({ revision: 7 });
+    let resolveSave: () => void = () => {};
+    const updateDriver = vi.fn<PrismStore['updateDriver']>(() => new Promise((resolve) => { resolveSave = resolve; }));
+    STORE.current = makeStore({ drivers: [driver], updateDriver });
+    const { rerender } = render(<Drivers isAdmin />);
+    fireEvent.click(screen.getByRole('button', { name: /Private label structural penetration/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByDisplayValue(driver.description), { target: { value: 'My wording.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    STORE.current = makeStore({ drivers: [{ ...driver, revision: 8, description: 'My wording.' }], updateDriver });
+    rerender(<Drivers isAdmin />);
+    expect(screen.queryByText(/changed by someone else/)).toBeNull();
+    await act(async () => { resolveSave(); });
+    expect(await screen.findByRole('button', { name: 'Edit' })).toBeTruthy();
+    expect(screen.queryByText(/changed by someone else/)).toBeNull();
+  });
+
   it('sends the value-chain epicentre as the stage it names', async () => {
     const driver = makeDriver({ revision: 7 });
     STORE.current = makeStore({ drivers: [driver] });
@@ -180,7 +200,7 @@ describe('the admin editor checks what the API would refuse', () => {
     vi.mocked(STORE.current!.updateDriver).mockRejectedValueOnce(new ApiError(0, 'The request timed out after 20 s', true));
     fireEvent.change(screen.getByRole('textbox', { name: 'Peak year, 2026 to 2035' }), { target: { value: '2033' } });
     fireEvent.click(save());
-    expect(await screen.findByText(/did not answer in time and may still have been stored/)).toBeTruthy();
+    expect(await screen.findByText(/got no answer and may still have been stored/)).toBeTruthy();
     expect(save().disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Discard edits' })).toBeTruthy();
   });

@@ -135,8 +135,42 @@ describe('usePrism', () => {
       status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
     });
     await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
-    expect(screen.getByTestId('run').textContent).toBe('yes');
+    await waitFor(() => expect(screen.getByTestId('run').textContent).toBe('yes'));
     expect(screen.getByTestId('run-error').textContent).toBe('');
+  });
+
+  it('resolves an edit once the drivers are in, while the run is still on its way', async () => {
+    // The editor closes when the edit resolves; were it to wait for the run, the
+    // reloaded driver (one revision on) would meet an editor still open.
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth());
+    mount();
+    await loaded();
+    vi.mocked(api.updateDriver).mockResolvedValue({
+      status: 'updated', driver_id: 'consumer_r01', changed: ['probability'], revision: 2,
+    });
+    vi.mocked(api.getDrivers).mockResolvedValue([makeDriver({ revision: 2 })]);
+    vi.mocked(api.getSimulation).mockImplementation(() => new Promise(() => {}));
+    await act(async () => { await lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 4 }); });
+    expect(lastStore!.drivers[0]!.revision).toBe(2);
+    expect(api.getSimulation).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads the run after a refused edit that replaced a load still bringing it', async () => {
+    vi.mocked(api.getHealth).mockResolvedValue(makeHealth({ latest_run_id: 99 }));
+    let answerRun: (run: ReturnType<typeof makeSimulation>) => void = () => {};
+    vi.mocked(api.getSimulation)
+      .mockImplementationOnce(() => new Promise((resolve) => { answerRun = resolve; }))
+      .mockResolvedValue(makeSimulation());
+    mount();
+    await waitFor(() => expect(screen.getByTestId('drivers').textContent).toBe('1'));
+    vi.mocked(api.updateDriver).mockRejectedValue(new Error('This driver was changed after you opened it'));
+    await act(async () => {
+      await expect(lastStore!.updateDriver('consumer_r01', { revision: 1, probability: 3 })).rejects.toThrow();
+    });
+    await waitFor(() => expect(screen.getByTestId('run').textContent).toBe('yes'));
+    expect(api.getSimulation).toHaveBeenCalledTimes(2);
+    await act(async () => { answerRun(makeSimulation()); });   // the replaced load's answer changes nothing
+    expect(screen.getByTestId('loading').textContent).toBe('false');
   });
 
   it('never lets a load still in flight overwrite the drivers an edit reloaded', async () => {

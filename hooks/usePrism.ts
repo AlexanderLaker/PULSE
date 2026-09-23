@@ -146,10 +146,12 @@ function usePrismStore(): PrismStore {
     return load();
   }, [load]);
 
-  // The poll compares each answer with the last one through a ref, so its
-  // callback can stay stable.
+  // The poll and the edit compare with the last health answer and the run on
+  // screen through refs, so their callbacks can stay stable.
   const healthRef = useRef<HealthStatus | null>(null);
   useEffect(() => { healthRef.current = health; }, [health]);
+  const simulationRef = useRef<SimulationResult | null>(null);
+  useEffect(() => { simulationRef.current = simulation; }, [simulation]);
 
   const checkHealth = useCallback(async () => {
     try {
@@ -194,10 +196,13 @@ function usePrismStore(): PrismStore {
       saved = true;
     } finally {
       // After a save, and after a refusal (another change got there first),
-      // show the drivers as they now are; after a save the run too, when the
-      // service holds one. A new sequence number, so a load still in flight
-      // cannot overwrite this. A failed edit is the editor's message to show,
-      // not a store-wide error.
+      // show the drivers as they now are. A new sequence number, so a load
+      // still in flight cannot overwrite this. The run is loaded again after
+      // a save (its "edited since the run" notice follows the drivers) and
+      // whenever the one on screen is not the newest, as when this load
+      // replaced one that was bringing a newer run. The edit resolves once
+      // the drivers are in; the run follows. A failed edit is the editor's
+      // message to show, not a store-wide error.
       const sequence = ++loadSequence.current;
       const current = () => mounted.current && sequence === loadSequence.current;
       const fresh = await settle(api.getDrivers());
@@ -206,9 +211,14 @@ function usePrismStore(): PrismStore {
         setDriversError(null);
       }
       const h = healthRef.current;
-      if (saved && current() && h?.status === 'ok') await loadSimulation(h.has_simulation, current);
+      const shown = simulationRef.current?.run_meta.run_id ?? null;
       // The load this one replaced leaves the loading state to it.
-      if (current()) setLoading(false);
+      const done = () => { if (current()) setLoading(false); };
+      if (current() && h?.status === 'ok' && (saved || shown !== h.latest_run_id)) {
+        void loadSimulation(h.has_simulation, current).then(done);
+      } else {
+        done();
+      }
     }
   }, [loadSimulation]);
 
